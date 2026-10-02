@@ -1,0 +1,146 @@
+// src/render/rts-camera.js: a high oblique battle camera (UG:G style).
+//
+// State is a ground target point, an azimuth (yaw), a pitch above the horizon and a distance. Inputs set
+// goals; update() eases toward them. Pan keeps the grabbed ground point under the pointer.
+// Keys: WASD / arrows pan, Q/E turn, +/- (and PageUp/PageDown) zoom. Mouse: see ui/input.js.
+
+import * as THREE from 'three';
+
+const _v = new THREE.Vector3();
+const _ray = new THREE.Raycaster();
+const _ndc = new THREE.Vector2();
+
+export class RtsCamera {
+  constructor(camera, terrain, { target = [0, 0], yaw = Math.PI, pitch = 0.9, dist = 900 } = {}) {
+    this.camera = camera;
+    this.terrain = terrain;
+    this.target = new THREE.Vector3(target[0], 0, target[1]);
+    this.goal = { x: target[0], z: target[1], yaw, pitch, dist };
+    this.yaw = yaw;
+    this.pitch = pitch;
+    this.dist = dist;
+    this.minDist = 120;
+    this.maxDist = 2000;
+    this.keys = new Set();
+    this.bound = terrain.half - 120;
+    this.groundY = 0;
+  }
+
+  onKey(e, down) {
+    const k = e.key.toLowerCase();
+    if (['w', 'a', 's', 'd', 'q', 'e', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright', '+', '=', '-', '_', 'pageup', 'pagedown'].includes(k)) {
+      if (down) this.keys.add(k); else this.keys.delete(k);
+      return true;
+    }
+    return false;
+  }
+
+  /** Pan by a world-space delta (x, z). */
+  panBy(dx, dz) {
+    this.goal.x += dx;
+    this.goal.z += dz;
+    this._clamp();
+  }
+
+  /** Pan by screen-relative amounts (right, forward) in metres. */
+  panScreen(right, forward) {
+    const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
+    // camera sits at target + (sin yaw, cos yaw) * horizontal distance, so "forward" is -(sin, cos)
+    this.panBy(right * c - forward * s, -right * s - forward * c);
+  }
+
+  rotateBy(dyaw, dpitch) {
+    this.goal.yaw += dyaw;
+    this.goal.pitch = THREE.MathUtils.clamp(this.goal.pitch + dpitch, 0.52, 1.35);
+  }
+
+  /** Zoom by a factor; if a ground point is given, zoom toward it. */
+  zoomBy(factor, toward) {
+    const old = this.goal.dist;
+    const next = THREE.MathUtils.clamp(old * factor, this.minDist, this.maxDist);
+    if (toward) {
+      const t = 1 - next / old;
+      this.goal.x += (toward.x - this.goal.x) * t;
+      this.goal.z += (toward.z - this.goal.z) * t;
+    }
+    this.goal.dist = next;
+    this._clamp();
+  }
+
+  _clamp() {
+    this.goal.x = THREE.MathUtils.clamp(this.goal.x, -this.bound, this.bound);
+    this.goal.z = THREE.MathUtils.clamp(this.goal.z, -this.bound, this.bound);
+  }
+
+  update(dt) {
+    // keyboard
+    const speed = this.goal.dist * 0.9 * dt;
+    const k = this.keys;
+    if (k.size) {
+      let r = 0, f = 0;
+      if (k.has('a') || k.has('arrowleft')) r -= speed;
+      if (k.has('d') || k.has('arrowright')) r += speed;
+      if (k.has('w') || k.has('arrowup')) f += speed;
+      if (k.has('s') || k.has('arrowdown')) f -= speed;
+      if (r || f) this.panScreen(r, f);
+      if (k.has('q')) this.rotateBy(-1.4 * dt, 0);
+      if (k.has('e')) this.rotateBy(1.4 * dt, 0);
+      if (k.has('+') || k.has('=') || k.has('pageup')) this.zoomBy(1 - 1.5 * dt);
+      if (k.has('-') || k.has('_') || k.has('pagedown')) this.zoomBy(1 + 1.5 * dt);
+    }
+    const a = 1 - Math.exp(-dt * 9);
+    this.target.x += (this.goal.x - this.target.x) * a;
+    this.target.z += (this.goal.z - this.target.z) * a;
+    this.yaw += (this.goal.yaw - this.yaw) * a;
+    this.pitch += (this.goal.pitch - this.pitch) * a;
+    this.dist += (this.goal.dist - this.dist) * a;
+    const gy = this.terrain.heightAt(this.target.x, this.target.z);
+    this.groundY += (gy - this.groundY) * Math.min(1, dt * 4);
+    this.target.y = this.groundY;
+    const h = Math.cos(this.pitch) * this.dist;
+    this.camera.position.set(
+      this.target.x + Math.sin(this.yaw) * h,
+      this.target.y + Math.sin(this.pitch) * this.dist,
+      this.target.z + Math.cos(this.yaw) * h,
+    );
+    // never dip under a ridge between camera and target
+    const under = this.terrain.heightAt(this.camera.position.x, this.camera.position.z) + 25;
+    if (this.camera.position.y < under) this.camera.position.y = under;
+    this.camera.lookAt(this.target);
+    this.camera.far = this.dist * 4 + 2000;
+    this.camera.near = Math.max(2, this.dist * 0.02);
+    this.camera.updateProjectionMatrix();
+  }
+
+  /** World point on the terrain under a client (CSS px) position, or null. Ray-marched heightfield. */
+  pick(clientX, clientY, dom) {
+    const rect = dom.getBoundingClientRect();
+    _ndc.set(((clientX - rect.left) / rect.width) * 2 - 1, -((clientY - rect.top) / rect.height) * 2 + 1);
+    _ray.setFromCamera(_ndc, this.camera);
+    const o = _ray.ray.origin, d = _ray.ray.direction;
+    const maxT = this.camera.far;
+    let step = Math.max(2, this.dist * 0.01);
+    let prevT = 0;
+    for (let t = step; t < maxT; t += step) {
+      _v.copy(d).multiplyScalar(t).add(o);
+      if (!this.terrain.inBounds(_v.x, _v.z, -400)) {
+        if (_v.y < -50) return null;
+        continue;
+      }
+      if (_v.y <= this.terrain.heightAt(_v.x, _v.z)) {
+        let lo = prevT, hi = t;
+        for (let i = 0; i < 12; i++) {
+          const mid = (lo + hi) / 2;
+          _v.copy(d).multiplyScalar(mid).add(o);
+          if (_v.y <= this.terrain.heightAt(_v.x, _v.z)) hi = mid; else lo = mid;
+        }
+        _v.copy(d).multiplyScalar(hi).add(o);
+        _v.y = this.terrain.heightAt(_v.x, _v.z);
+        return _v.clone();
+      }
+      prevT = t;
+      step *= 1.01;
+    }
+    return null;
+  }
+}

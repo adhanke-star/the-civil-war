@@ -5,7 +5,22 @@
 - Yuka 0.7.8 — MIT — https://github.com/Mugen87/yuka
 - three.quarks 0.17.1 and quarks.core — MIT — https://github.com/Alchemist0823/three.quarks
 - ZzFX 1.4.0 — MIT — https://github.com/KilledByAPixel/ZzFX
+- @mapbox/martini 0.2.0 — ISC — https://github.com/mapbox/martini
+- geotiff.js 3.0.5 — MIT — https://github.com/geotiffjs/geotiff.js (dev tool only: tools/fetch-terrain.mjs; not shipped)
 
-## Assets
-None yet. Every map, texture or model added must be listed here with its source URL, license
-(public domain, CC0 or CC-BY) and author.
+## Data and assets
+- `assets/terrain/henry-hill.bin` — elevation from the USGS 3D Elevation Program (3DEP) bare-earth DEM,
+  https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer — public domain (US
+  federal work). Smoothed and resampled by `tools/fetch-terrain.mjs` (exact request URL in henry-hill.json).
+- `assets/terrain/henry-hill.json` roads — USGS The National Map transportation service,
+  https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer — public domain.
+- `assets/terrain/henry-hill.json` streams — USGS National Hydrography Dataset,
+  https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer — public domain.
+- `assets/portraits/jackson.jpg` — crop of "Stonewall Jackson.jpg" (derivative of NARA 526067),
+  https://commons.wikimedia.org/wiki/File:Stonewall_Jackson.jpg — public domain. Photographed 1863.
+- `assets/portraits/sherman.jpg` — crop of "General William T. Sherman - NARA - 527045.jpg",
+  https://commons.wikimedia.org/wiki/File:General_William_T._Sherman_-_NARA_-_527045.jpg — public domain
+  (US National Archives). Photographed later in the war.
+- Place positions: NPS Public POIs (MANA) cross-checked with OpenStreetMap/Wikidata/Wikipedia; coordinates
+  only (facts), each cited in `assets/scenarios/henry-hill.json`. No OSM geometry is shipped.
+- Fonts: none shipped; ground labels use the system serif (Georgia / Times / DejaVu Serif).

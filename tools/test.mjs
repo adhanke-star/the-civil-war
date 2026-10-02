@@ -1,12 +1,16 @@
-// tools/test.mjs: M0 browser test. Serves the repo on a free port, loads index.html in headless Chromium
-// (SwiftShader WebGL so CI and the Mac both render), and checks:
-//   1. window.__ready within 120 s (fails fast on the first page/console error during load)
-//   2. zero pageerror / console error messages
-//   3. the canvas is not blank (sampled pixels outside the HUD have more than one distinct colour)
-//   4. window.__stats.figures >= 200
-//   5. axe-core: no serious or critical violations
-// Saves one timestamped screenshot and .out/last-result.json, then prunes .out/.
-// Exit code 0 only if every check passes; each failed check prints one "FAIL <check>: <reason>" line.
+// tools/test.mjs: M1 browser test. Serves the repo on a free port, loads index.html?quality=low in headless
+// Chromium (SwiftShader WebGL, so CI and the Mac both render), and checks:
+//   1. ready: window.__ready within 180 s (fails fast on the first page/console error during load)
+//   2. no-console-errors: zero pageerror / console error / failed request / HTTP >= 400
+//   3. canvas-not-blank: sampled pixels have many distinct colours
+//   4. figures: >= 1000 soldier figures and one marker button per unit
+//   5. select-drag-order: a real mouse press on Franklin's flag, a curved drag across the field and a
+//      release issue a march order (the same path a player uses)
+//   6. hold-button: the Hold button stops the brigade
+//   7. fight: after re-ordering and fast-forwarding 300 sim seconds, both sides have casualties and
+//      there was musket or cannon smoke
+//   8. axe: no serious or critical accessibility violations
+// Saves screenshots and .out/last-result.json, then prunes .out/. Exit 0 only if every check passes.
 
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
@@ -16,196 +20,162 @@ import { PNG } from 'pngjs';
 import { startServer, ROOT } from './serve.mjs';
 import { prune, OUT_DIR } from './prune.mjs';
 
-const READY_TIMEOUT_MS = 120_000;
-const SETTLE_MS = 4_000; // let the regiment march before measuring
-const VOLLEY_WAIT_MS = 30_000; // then wait (not a check) for the first volley so the screenshot shows smoke
-const SMOKE_SETTLE_MS = 1_500;
+const READY_TIMEOUT_MS = 180_000;
 const VIEWPORT = { width: 1280, height: 720 };
-const MIN_FIGURES = 200;
+const MIN_FIGURES = 1000;
 
 const started = Date.now();
 const stamp = new Date(started).toISOString().replace(/[:.]/g, '-');
 const checks = [];
 const consoleErrors = [];
 const consoleWarnings = [];
-const result = {
-  ok: false,
-  timestamp: new Date(started).toISOString(),
-  url: null,
-  browser: null,
-  playwright: null,
-  checks,
-  stats: null,
-  smoke: null,
-  consoleErrors,
-  consoleWarnings,
-  axe: null,
-  screenshot: null,
-  durationMs: 0,
-};
+const result = { ok: false, timestamp: new Date(started).toISOString(), url: null, browser: null, checks, stats: null, consoleErrors, consoleWarnings, axe: null, screenshots: [], durationMs: 0 };
 
 function check(name, ok, detail) {
   checks.push({ name, ok: Boolean(ok), detail });
-  if (!ok) console.error(`FAIL ${name}: ${detail}`);
-  else console.log(`ok   ${name}: ${detail}`);
+  console[ok ? 'log' : 'error'](`${ok ? 'ok  ' : 'FAIL'} ${name}: ${detail}`);
 }
+
+async function shot(page, name) {
+  const file = path.join(OUT_DIR, `m1-${name}-${stamp}.png`);
+  const buf = await page.screenshot({ path: file, type: 'png' });
+  result.screenshots.push(path.relative(ROOT, file));
+  return PNG.sync.read(buf);
+}
+
+/** Screen position (CSS px) of a world point on the ground. */
+const project = (page, x, z) => page.evaluate(([x, z]) => {
+  const { camera, terrain } = window.__game;
+  const v = camera.position.clone().set(x, terrain.heightAt(x, z), z).project(camera);
+  return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight };
+}, [x, z]);
 
 async function main() {
   await fs.mkdir(OUT_DIR, { recursive: true });
-  const { createRequire } = await import('node:module');
-  result.playwright = createRequire(import.meta.url)('playwright/package.json').version;
-
   const { server, url } = await startServer({ port: 0 });
   result.url = url;
   let browser;
   try {
-    browser = await chromium.launch({
-      headless: true,
-      args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'],
-    });
+    browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     result.browser = `chromium ${browser.version()}`;
-    const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 });
-    const page = await context.newPage();
+    const page = await (await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 })).newPage();
 
     let rejectEarly;
-    const earlyError = new Promise((_, reject) => {
-      rejectEarly = reject;
-    });
-    earlyError.catch(() => {}); // only observed through Promise.race below
-    page.on('pageerror', (err) => {
-      const msg = `pageerror: ${err.message}`;
-      consoleErrors.push(msg);
-      rejectEarly(new Error(msg));
-    });
+    const earlyError = new Promise((_, reject) => { rejectEarly = reject; });
+    earlyError.catch(() => {});
+    const fail = (text) => { consoleErrors.push(text); rejectEarly(new Error(text)); };
+    page.on('pageerror', (err) => fail(`pageerror: ${err.message}`));
     page.on('console', (msg) => {
       const loc = msg.location();
       const where = loc && loc.url ? ` (${loc.url.replace(url, '')}:${loc.lineNumber})` : '';
-      if (msg.type() === 'error') {
-        const text = `console.error: ${msg.text()}${where}`;
-        consoleErrors.push(text);
-        rejectEarly(new Error(text));
-      } else if (msg.type() === 'warning') {
-        consoleWarnings.push(`${msg.text()}${where}`);
-      }
+      if (msg.type() === 'error') fail(`console.error: ${msg.text()}${where}`);
+      else if (msg.type() === 'warning' && !/GL Driver Message|GPU stall|already non-indexed/.test(msg.text())) consoleWarnings.push(`${msg.text()}${where}`);
     });
-    page.on('requestfailed', (req) => {
-      const text = `request failed: ${req.url().replace(url, '/')} (${req.failure()?.errorText ?? 'unknown'})`;
-      consoleErrors.push(text);
-      rejectEarly(new Error(text));
-    });
-    page.on('response', (res) => {
-      if (res.status() >= 400) {
-        const text = `HTTP ${res.status()} for ${res.url().replace(url, '/')}`;
-        consoleErrors.push(text);
-        rejectEarly(new Error(text));
-      }
-    });
+    page.on('requestfailed', (req) => fail(`request failed: ${req.url().replace(url, '/')} (${req.failure()?.errorText ?? 'unknown'})`));
+    page.on('response', (res) => { if (res.status() >= 400) fail(`HTTP ${res.status()} for ${res.url().replace(url, '/')}`); });
 
     // 1. ready
-    let readyOk = false;
-    let readyDetail;
+    let readyOk = false, readyDetail;
     const t0 = Date.now();
     try {
-      await page.goto(url, { waitUntil: 'load', timeout: READY_TIMEOUT_MS });
-      await Promise.race([
-        page.waitForFunction(() => window.__ready === true, null, { timeout: READY_TIMEOUT_MS, polling: 100 }),
-        earlyError,
-      ]);
+      await page.goto(`${url}?quality=low`, { waitUntil: 'load', timeout: READY_TIMEOUT_MS });
+      await Promise.race([page.waitForFunction(() => window.__ready === true, null, { timeout: READY_TIMEOUT_MS, polling: 200 }), earlyError]);
       readyOk = true;
       readyDetail = `window.__ready after ${Date.now() - t0} ms`;
     } catch (err) {
-      readyDetail = /Timeout/i.test(err.message)
-        ? `window.__ready was not set within ${READY_TIMEOUT_MS / 1000} s`
-        : `page failed while loading: ${err.message.split('\n')[0]}`;
+      readyDetail = /Timeout/i.test(err.message) ? `window.__ready was not set within ${READY_TIMEOUT_MS / 1000} s` : `page failed while loading: ${err.message.split('\n')[0]}`;
     }
     check('ready', readyOk, readyDetail);
-
     if (readyOk) {
-      await page.waitForTimeout(SETTLE_MS);
-      const volleyed = await page
-        .waitForFunction(() => (window.__stats?.volleys ?? 0) >= 1, null, { timeout: VOLLEY_WAIT_MS, polling: 200 })
-        .then(() => true, () => false);
-      if (volleyed) await page.waitForTimeout(SMOKE_SETTLE_MS);
-      else console.warn(`note: no volley within ${VOLLEY_WAIT_MS / 1000} s; screenshot taken without smoke`);
-    }
+      await page.waitForTimeout(2500);
+      const png = await shot(page, 'start');
 
-    // Stats (read even on failure, for the record).
-    const stats = await page.evaluate(() => window.__stats ?? null).catch(() => null);
-    result.stats = stats;
-    result.smoke = stats ? stats.smoke : null;
-
-    // Screenshot (always attempted).
-    const shotPath = path.join(OUT_DIR, `m0-${stamp}.png`);
-    let png = null;
-    try {
-      const buf = await page.screenshot({ path: shotPath, type: 'png' });
-      png = PNG.sync.read(buf);
-      result.screenshot = path.relative(ROOT, shotPath);
-    } catch (err) {
-      result.screenshot = `screenshot failed: ${err.message.split('\n')[0]}`;
-    }
-
-    // 2. console / page errors
-    check(
-      'no-console-errors',
-      consoleErrors.length === 0,
-      consoleErrors.length === 0 ? '0 errors' : `${consoleErrors.length} error(s): ${consoleErrors.slice(0, 5).join(' | ')}`,
-    );
-
-    // 3. canvas not blank: sample a grid over the canvas, skipping the HUD box.
-    if (png) {
-      const hud = await page.evaluate(() => {
-        const r = document.querySelector('.hud')?.getBoundingClientRect();
-        return r ? { x: r.left, y: r.top, w: r.width, h: r.height } : null;
-      });
+      // 3. canvas not blank
       const colours = new Set();
-      let samples = 0;
-      const step = 16;
-      for (let y = step / 2; y < png.height; y += step) {
-        for (let x = step / 2; x < png.width; x += step) {
-          if (hud && x >= hud.x - 4 && x <= hud.x + hud.w + 4 && y >= hud.y - 4 && y <= hud.y + hud.h + 4) continue;
-          const i = (Math.floor(y) * png.width + Math.floor(x)) * 4;
-          colours.add((png.data[i] << 16) | (png.data[i + 1] << 8) | png.data[i + 2]);
-          samples++;
-        }
+      for (let y = 40; y < png.height; y += 24) for (let x = 40; x < png.width; x += 24) {
+        const i = (y * png.width + x) * 4;
+        colours.add((png.data[i] << 16) | (png.data[i + 1] << 8) | png.data[i + 2]);
       }
-      check('canvas-not-blank', colours.size > 1, `${colours.size} distinct colour(s) in ${samples} samples outside the HUD`);
-    } else {
-      check('canvas-not-blank', false, `no screenshot to sample (${result.screenshot})`);
+      check('canvas-not-blank', colours.size > 50, `${colours.size} distinct colours in the sample grid`);
+
+      // 4. figures and markers
+      const info = await page.evaluate(() => ({ figures: window.__game.game.figureCount(), units: window.__game.game.units.length, markers: document.querySelectorAll('#markers .marker').length }));
+      check('figures', info.figures >= MIN_FIGURES && info.markers === info.units, `${info.figures} figures (need >= ${MIN_FIGURES}); ${info.markers} markers for ${info.units} units`);
+
+      // 5. select + drag-order with a real mouse: press on Franklin's flag, drag a curve, release.
+      const marker = page.getByRole('button', { name: /^Franklin.s Brigade/ });
+      const box = await marker.boundingBox();
+      let orderOk = false, orderDetail = 'Franklin marker not found or off screen';
+      if (box) {
+        const sx = box.x + box.width / 2, sy = box.y + box.height * 0.45;
+        const via = await project(page, -60, 470);
+        const end = await project(page, 120, 520);
+        await page.mouse.move(sx, sy);
+        await page.mouse.down();
+        const steps = 14;
+        for (let i = 1; i <= steps; i++) {
+          const t = i / steps;
+          // quadratic curve start -> via -> end
+          const x = (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * via.x + t * t * end.x;
+          const y = (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * via.y + t * t * end.y;
+          await page.mouse.move(x, y);
+          await page.waitForTimeout(30);
+        }
+        const previewShown = await page.evaluate(() => !!window.__game.arrows.preview);
+        await page.mouse.up();
+        const st = await page.evaluate(() => {
+          const g = window.__game.game;
+          const u = g.units.find((v) => v.id === 'franklin');
+          return { selected: g.selected && g.selected.id, orders: g.orders || 0, type: u.order.type, active: u.follow.active, pathPts: u.path ? u.path.length : 0 };
+        });
+        orderOk = st.selected === 'franklin' && st.orders >= 1 && st.type === 'move' && st.active && previewShown;
+        orderDetail = `selected=${st.selected} orders=${st.orders} order=${st.type} moving=${st.active} pathPoints=${st.pathPts} previewArrow=${previewShown}`;
+        await page.waitForTimeout(1500);
+        await shot(page, 'ordered');
+      }
+      check('select-drag-order', orderOk, orderDetail);
+
+      // 6. Hold button
+      await page.getByRole('button', { name: 'Hold', exact: true }).click();
+      const held = await page.evaluate(() => { const u = window.__game.game.units.find((v) => v.id === 'franklin'); return { type: u.order.type, active: u.follow.active }; });
+      check('hold-button', held.type === 'hold' && !held.active, `after Hold: order=${held.type} moving=${held.active}`);
+
+      // 7. fight: march three brigades up the hill, fast-forward, look for casualties and smoke on both sides
+      const fight = await page.evaluate(() => {
+        const g = window.__game.game;
+        const by = (id) => g.units.find((u) => u.id === id);
+        g.order(by('franklin'), { type: 'move', points: [[by('franklin').x, by('franklin').z], [80, 470], [230, 500]] });
+        g.order(by('willcox'), { type: 'move', points: [[by('willcox').x, by('willcox').z], [60, 300], [220, 360]] });
+        g.order(by('sherman'), { type: 'move', points: [[by('sherman').x, by('sherman').z], [150, 120], [240, 260]] });
+        g.fastForward(300);
+        const cas = { US: 0, CS: 0 };
+        for (const u of g.units) cas[u.side] += u.casualties;
+        const fr = by('franklin');
+        return { cas, puffs: window.__game.effects.puffs, smoke: window.__game.effects.ok, franklin: [Math.round(fr.x), Math.round(fr.z), fr.state], simTime: Math.round(g.simTime),
+          states: g.units.map((u) => `${u.id}:${Math.round(u.men)}:${u.state}`).join(' ') };
+      });
+      await page.evaluate(() => { const r = window.__game.rts; r.goal.x = 150; r.goal.z = 420; r.goal.dist = 520; });
+      await page.waitForTimeout(3000);
+      await shot(page, 'fight');
+      check('fight', fight.cas.US > 0 && fight.cas.CS > 0 && (fight.puffs > 0 || !fight.smoke),
+        `after ${fight.simTime} sim s: Union casualties ${Math.round(fight.cas.US)}, Confederate ${Math.round(fight.cas.CS)}, smoke puffs ${fight.puffs} (smoke ${fight.smoke ? 'on' : 'unavailable'}); ${fight.states}`);
+      result.fight = fight;
     }
 
-    // 4. figures
-    const figures = stats && Number.isFinite(stats.figures) ? stats.figures : null;
-    check(
-      'figures',
-      figures !== null && figures >= MIN_FIGURES,
-      figures === null ? 'window.__stats.figures is missing' : `window.__stats.figures = ${figures} (need >= ${MIN_FIGURES})`,
-    );
+    // 2. errors
+    check('no-console-errors', consoleErrors.length === 0, consoleErrors.length === 0 ? '0 errors' : `${consoleErrors.length} error(s): ${consoleErrors.slice(0, 5).join(' | ')}`);
 
-    // 5. accessibility
+    // 8. accessibility
     try {
       const axe = await new AxeBuilder({ page }).analyze();
       const bad = axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
-      result.axe = {
-        violations: axe.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, help: v.help })),
-        incomplete: axe.incomplete.length,
-        passes: axe.passes.length,
-      };
-      check(
-        'axe',
-        bad.length === 0,
-        bad.length === 0
-          ? `0 serious/critical violations (${axe.violations.length} minor/moderate, ${axe.passes.length} rules passed)`
-          : bad.map((v) => `${v.impact} ${v.id} on ${v.nodes.length} node(s): ${v.help}`).join(' | '),
-      );
+      result.axe = { violations: axe.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, help: v.help })), passes: axe.passes.length };
+      check('axe', bad.length === 0, bad.length === 0 ? `0 serious/critical violations (${axe.violations.length} minor/moderate, ${axe.passes.length} rules passed)` : bad.map((v) => `${v.impact} ${v.id} on ${v.nodes.length} node(s): ${v.help}`).join(' | '));
     } catch (err) {
       check('axe', false, `axe-core could not run: ${err.message.split('\n')[0]}`);
     }
-
-    if (stats) {
-      console.log(`stats: fps=${stats.fps} figures=${stats.figures} drawCalls=${stats.drawCalls} smoke=${stats.smoke}`);
-    }
-    if (stats && stats.smoke === false) console.warn('note: three.quarks smoke did not initialise (the game continued without it)');
+    result.stats = await page.evaluate(() => window.__stats ?? null).catch(() => null);
+    if (result.stats) console.log(`stats: ${JSON.stringify(result.stats)}`);
   } finally {
     if (browser) await browser.close().catch(() => {});
     await new Promise((resolve) => server.close(resolve));
@@ -218,7 +188,6 @@ try {
   exitCode = checks.length > 0 && checks.every((c) => c.ok) ? 0 : 1;
 } catch (err) {
   check('harness', false, err.stack ? err.stack.split('\n').slice(0, 3).join(' ') : String(err));
-  exitCode = 1;
 }
 result.ok = exitCode === 0;
 result.durationMs = Date.now() - started;

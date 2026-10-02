@@ -34,6 +34,7 @@ const ENTRIES = [
   'three.quarks/dist/three.quarks.esm.js',
   'quarks.core/dist/quarks.core.esm.js', // three.quarks imports the bare specifier 'quarks.core'
   'zzfx/ZzFX.js',
+  '@mapbox/martini/index.js',
 ];
 
 const LICENSE_NAMES = ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'license'];

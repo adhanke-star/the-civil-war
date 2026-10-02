@@ -1,6 +1,6 @@
 # PLAN — weekly milestones (each one playable)
 
-Status: M0 in progress. Every milestone ends with: CI green, the GitHub Pages link working, a `vN`
+Status: M0 shipped (v0); M1 in progress. Every milestone ends with: CI green, the GitHub Pages link working, a `vN`
 Release, and Aaron able to play it.
 
 ## M0 · Pipeline proven (2026-10-02)
@@ -47,6 +47,12 @@ AGENTS §1b bar on a small part of the field: Henry House Hill to Matthews Hill.
 - Figure animation, smoother formations and painterly v2.
 - HUD/UX polish, accessibility pass (keyboard, colour-blind safe), and a measured performance budget
   on this Mac.
+- Gamepad (browser Gamepad API, no library; target a DualShock 4 over Bluetooth): left stick moves a
+  cursor, right stick turns/tilts the camera, L2/R2 zoom, D-pad pans; X selects, hold X on your own
+  brigade and steer to draw the order arrow (same path as a mouse drag); Square Hold, Triangle Charge,
+  Circle Fallback, R1 Run, L1 Halt; Options pause, Share help sheet. Dead zones, cursor acceleration, a
+  pad hint in the help sheet on `gamepadconnected`; mouse and keyboard keep working. CI injects a fake
+  pad in Playwright to exercise select + order.
 
 **Play:** the same battle, now beautiful.
 
@@ -71,6 +77,12 @@ Campaign link between battles, more battles, codex and documents, Confederate si
 | any | Kenney, Poly Haven (download from the websites, not their GitHub repos) | CC0 | textures, trees, buildings |
 | dev | ChromeDevTools/chrome-devtools-mcp | Apache-2.0 | console and performance traces from the real page; use a throwaway profile |
 
-Rejected: three-geo (needs a Mapbox token); three.js r128-era libraries; third-party skill aggregators
+Rejected or deferred:
+- agargaro/instanced-mesh: not needed at ~1,250 figures; conflicts with GPU walk/aim animation (DECISIONS 0006).
+- proj4js/proj4js: not needed for a 2.6 km local frame (DECISIONS 0006).
+- pmndrs/postprocessing: the custom 4-pass chain in src/render/post.js already does tilt-shift, grade and vignette cheaply on the UHD 617.
+- gkjohnson/three-mesh-bvh: picking is a heightfield ray-march and markers are DOM buttons; nothing needs a BVH yet.
+- protectwise/troika-three-text: ground names are painted once into canvas textures; no runtime SDF text needed.
+- three-geo (needs a Mapbox token); three.js r128-era libraries; third-party skill aggregators
 (no confirmed license, and a skill runs with shell rights); playwright-mcp (duplicates the test kit at
 high token cost).

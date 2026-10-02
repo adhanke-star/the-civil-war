@@ -1,0 +1,730 @@
+{
+ "id": "henry-hill",
+ "title": "Henry House Hill",
+ "battle": "First Bull Run (First Manassas)",
+ "date": "1861-07-21",
+ "start": "14:00",
+ "end": "16:30",
+ "sites": [
+  {
+   "id": "henry",
+   "name": "Henry House",
+   "x": -7,
+   "z": 375,
+   "rot": 0.1,
+   "yard": 30,
+   "fenceRadius": 260,
+   "source": "38.81487,-77.52258 Verified (geo research 2026-10-02 (NPS Public POIs MANA + OSM/Wikidata/Wikipedia agree within 60 m)); house rebuilt 1870s on the 1861 site (NRHP nomination p.8)",
+   "buildings": [
+    [
+     0,
+     0,
+     10,
+     7,
+     6.2,
+     0,
+     "frame-house"
+    ],
+    [
+     -14,
+     12,
+     6,
+     5,
+     3.2,
+     0.1,
+     "shed"
+    ],
+    [
+     16,
+     16,
+     9,
+     7,
+     5,
+     0,
+     "barn"
+    ]
+   ]
+  },
+  {
+   "id": "robinson",
+   "name": "Robinson House",
+   "x": 300,
+   "z": -50,
+   "rot": -0.2,
+   "yard": 28,
+   "fenceRadius": 220,
+   "embowered": true,
+   "source": "38.81870,-77.51904 Verified (geo research 2026-10-02 (NPS Public POIs MANA + OSM/Wikidata/Wikipedia agree within 60 m)); “densely embowered in trees and environed by a double row of fences on two sides” (Beauregard, OR I/2 no. 84)",
+   "buildings": [
+    [
+     0,
+     0,
+     9,
+     6.5,
+     5,
+     0,
+     "frame-house"
+    ],
+    [
+     18,
+     -10,
+     10,
+     8,
+     5.5,
+     0.05,
+     "barn"
+    ],
+    [
+     -14,
+     12,
+     5,
+     4,
+     3,
+     0,
+     "shed"
+    ]
+   ]
+  },
+  {
+   "id": "stone",
+   "name": "Stone House",
+   "x": -312,
+   "z": -64,
+   "rot": 0.28,
+   "yard": 22,
+   "fenceRadius": 160,
+   "source": "38.81883,-77.52609 Verified (geo research 2026-10-02 (NPS Public POIs MANA + OSM/Wikidata/Wikipedia agree within 60 m)); still standing",
+   "buildings": [
+    [
+     0,
+     0,
+     12,
+     8.5,
+     7,
+     0,
+     "stone-house"
+    ],
+    [
+     18,
+     14,
+     6,
+     5,
+     3,
+     0,
+     "shed"
+    ]
+   ]
+  },
+  {
+   "id": "matthews",
+   "name": "Matthew farm",
+   "x": -641,
+   "z": -830,
+   "rot": 0.25,
+   "yard": 28,
+   "fenceRadius": 240,
+   "orchard": [
+    40,
+    -40,
+    5,
+    4,
+    0.25
+   ],
+   "source": "about 38.82573,-77.52988 Inferred (one NPS wayside, error 100-200 m); NPS spells it Matthew",
+   "buildings": [
+    [
+     0,
+     0,
+     9,
+     6.5,
+     5.2,
+     0,
+     "frame-house"
+    ],
+    [
+     -18,
+     10,
+     9,
+     7,
+     5,
+     0,
+     "barn"
+    ]
+   ]
+  }
+ ],
+ "woodsNote": "Woods edges are drawn from period descriptions, not surveyed: “Around the eastern and southern brow of the plateau an almost unbroken fringe of second-growth pines”; “a broad belt of oaks ... across the crest on both sides of the Sudley road”; slopes “studded with clumps and patches of young pines and oaks” (Beauregard, OR Series I vol. 2, report no. 84); “Oak woods east of Robinson” (Atkinson 1862 map, LoC 2006626052, as read). Status: Inferred.",
+ "woods": [
+  {
+   "name": "pine fringe on the east brow of Henry Hill",
+   "polygon": [
+    [
+     350,
+     170
+    ],
+    [
+     420,
+     120
+    ],
+    [
+     560,
+     140
+    ],
+    [
+     640,
+     260
+    ],
+    [
+     660,
+     520
+    ],
+    [
+     620,
+     760
+    ],
+    [
+     520,
+     820
+    ],
+    [
+     420,
+     780
+    ],
+    [
+     355,
+     640
+    ],
+    [
+     340,
+     450
+    ]
+   ]
+  },
+  {
+   "name": "pine fringe on the south brow",
+   "polygon": [
+    [
+     -120,
+     860
+    ],
+    [
+     100,
+     800
+    ],
+    [
+     300,
+     800
+    ],
+    [
+     520,
+     820
+    ],
+    [
+     700,
+     900
+    ],
+    [
+     760,
+     1300
+    ],
+    [
+     -160,
+     1300
+    ]
+   ]
+  },
+  {
+   "name": "oak belt astride the Sudley Road",
+   "polygon": [
+    [
+     -560,
+     470
+    ],
+    [
+     -420,
+     430
+    ],
+    [
+     -250,
+     470
+    ],
+    [
+     -160,
+     560
+    ],
+    [
+     -150,
+     900
+    ],
+    [
+     -200,
+     1300
+    ],
+    [
+     -620,
+     1300
+    ],
+    [
+     -640,
+     800
+    ]
+   ]
+  },
+  {
+   "name": "oak woods east of the Robinson house",
+   "polygon": [
+    [
+     470,
+     -260
+    ],
+    [
+     700,
+     -300
+    ],
+    [
+     980,
+     -240
+    ],
+    [
+     1050,
+     40
+    ],
+    [
+     900,
+     160
+    ],
+    [
+     700,
+     120
+    ],
+    [
+     520,
+     40
+    ]
+   ]
+  },
+  {
+   "name": "woods toward Bull Run",
+   "polygon": [
+    [
+     700,
+     -1300
+    ],
+    [
+     1300,
+     -1300
+    ],
+    [
+     1300,
+     -500
+    ],
+    [
+     1050,
+     -420
+    ],
+    [
+     820,
+     -560
+    ]
+   ]
+  },
+  {
+   "name": "woods north-west of Matthews Hill",
+   "polygon": [
+    [
+     -1300,
+     -1300
+    ],
+    [
+     -900,
+     -1300
+    ],
+    [
+     -1000,
+     -1050
+    ],
+    [
+     -1300,
+     -950
+    ]
+   ]
+  },
+  {
+   "name": "woods south-east toward Holkums Branch",
+   "polygon": [
+    [
+     760,
+     300
+    ],
+    [
+     1300,
+     250
+    ],
+    [
+     1300,
+     1300
+    ],
+    [
+     780,
+     1300
+    ],
+    [
+     700,
+     900
+    ],
+    [
+     680,
+     560
+    ]
+   ]
+  }
+ ],
+ "labels": [
+  {
+   "text": "Henry House Hill",
+   "x": 110,
+   "z": 560,
+   "height": 48,
+   "angle": 1.6207963267948966
+  },
+  {
+   "text": "Henry",
+   "x": -7,
+   "z": 410,
+   "height": 20,
+   "angle": 1.5707963267948966
+  },
+  {
+   "text": "Robinson",
+   "x": 300,
+   "z": -15,
+   "height": 20,
+   "angle": 1.5707963267948966
+  },
+  {
+   "text": "Stone House",
+   "x": -312,
+   "z": -28,
+   "height": 20,
+   "angle": 1.6707963267948966
+  },
+  {
+   "text": "Matthews Hill",
+   "x": -834,
+   "z": -740,
+   "height": 44,
+   "angle": 1.5707963267948966
+  },
+  {
+   "text": "Buck Hill",
+   "x": -277,
+   "z": -690,
+   "height": 30,
+   "angle": 1.5707963267948966
+  },
+  {
+   "text": "Young’s Branch",
+   "x": 150,
+   "z": -330,
+   "height": 24,
+   "angle": 1.9707963267948965,
+   "italic": true
+  },
+  {
+   "text": "Sudley Road",
+   "x": -420,
+   "z": 300,
+   "height": 20,
+   "angle": 1.2207963267948965,
+   "italic": true
+  },
+  {
+   "text": "Warrenton Turnpike",
+   "x": 520,
+   "z": -200,
+   "height": 20,
+   "angle": 1.8707963267948966,
+   "italic": true
+  }
+ ],
+ "units": [
+  {
+   "id": "franklin",
+   "side": "US",
+   "type": "infantry",
+   "name": "Franklin’s Brigade",
+   "short": "Franklin",
+   "commander": {
+    "name": "William B. Franklin",
+    "rank": "Colonel"
+   },
+   "parent": "1st Brigade, 3rd Division (Heintzelman)",
+   "regiments": [
+    "5th Massachusetts",
+    "11th Massachusetts",
+    "1st Minnesota"
+   ],
+   "men": 2000,
+   "weapon": "rifled",
+   "xp": 1,
+   "x": -330,
+   "z": 330,
+   "facing": 1.25,
+   "sources": [
+    "old repo (tag reference-freeze-2026-10-02) data/bullrun.json:147 (BR), HISTORICAL-DATA.md:101-106; rank Col. per old built-battle audit §4 (BG-USV 20 Aug 1861)"
+   ],
+   "status": "OOB/commander Verified (old repo); strength Inferred"
+  },
+  {
+   "id": "willcox",
+   "side": "US",
+   "type": "infantry",
+   "name": "Willcox’s Brigade",
+   "short": "Willcox",
+   "commander": {
+    "name": "Orlando B. Willcox",
+    "rank": "Colonel"
+   },
+   "parent": "2nd Brigade, 3rd Division (Heintzelman)",
+   "regiments": [
+    "1st Michigan",
+    "11th New York (Fire Zouaves)",
+    "38th New York"
+   ],
+   "men": 2000,
+   "weapon": "smooth",
+   "xp": 1,
+   "x": -300,
+   "z": 120,
+   "facing": 1.45,
+   "sources": [
+    "old repo (tag reference-freeze-2026-10-02) data/bullrun.json:148, HISTORICAL-DATA.md:109-115; person-register CW-P-083 (Inferred)"
+   ],
+   "status": "OOB Verified (old repo); strength Inferred"
+  },
+  {
+   "id": "sherman",
+   "side": "US",
+   "type": "infantry",
+   "name": "Sherman’s Brigade",
+   "short": "Sherman",
+   "commander": {
+    "name": "William T. Sherman",
+    "rank": "Colonel",
+    "portrait": "./assets/portraits/sherman.jpg",
+    "portraitNote": "photographed later in the war"
+   },
+   "parent": "3rd Brigade, 1st Division (Tyler)",
+   "regiments": [
+    "13th New York",
+    "69th New York State Militia",
+    "79th New York",
+    "2nd Wisconsin"
+   ],
+   "men": 3000,
+   "weapon": "smooth",
+   "xp": 1,
+   "x": 40,
+   "z": -90,
+   "facing": 2.4,
+   "sources": [
+    "old repo (tag reference-freeze-2026-10-02) data/bullrun.json:142, HISTORICAL-DATA.md:56-62; soldier-replacements.json records[31] (Col., BG 7 Aug 1861)"
+   ],
+   "status": "OOB Verified (old repo); strength Inferred"
+  },
+  {
+   "id": "ricketts",
+   "side": "US",
+   "type": "artillery",
+   "name": "Ricketts’s Battery",
+   "short": "Ricketts",
+   "commander": {
+    "name": "James B. Ricketts",
+    "rank": "Captain"
+   },
+   "parent": "Battery I, 1st U.S. Artillery",
+   "regiments": [],
+   "men": 120,
+   "guns": 6,
+   "weapon": "parrott",
+   "xp": 3,
+   "x": -250,
+   "z": 230,
+   "facing": 1.3,
+   "sources": [
+    "old repo (tag reference-freeze-2026-10-02) data/bullrun.json:143, HISTORICAL-DATA.md:106; 6 guns per old notes; crew strength is a game value",
+    "1861 position about 170 m SSE of the Henry House (NPS wayside, OSM way 903966558); NPS Handbook 15: about 2 p.m. “an exposed position just south of the Henry House”"
+   ],
+   "status": "guns Verified (old repo); crew strength Inferred"
+  },
+  {
+   "id": "griffin",
+   "side": "US",
+   "type": "artillery",
+   "name": "Griffin’s Battery",
+   "short": "Griffin",
+   "commander": {
+    "name": "Charles Griffin",
+    "rank": "Captain"
+   },
+   "parent": "Battery D, 5th U.S. Artillery",
+   "regiments": [],
+   "men": 120,
+   "guns": 6,
+   "weapon": "parrott",
+   "xp": 3,
+   "x": -200,
+   "z": 60,
+   "facing": 1.45,
+   "sources": [
+    "old repo (tag reference-freeze-2026-10-02) data/bullrun.json:141, HISTORICAL-DATA.md:85,488; soldier-replacements.json records[34]",
+    "1861 position about 350 m SE of the Henry House (NPS wayside, OSM way 903966557)"
+   ],
+   "status": "guns Verified (old repo); crew strength Inferred"
+  },
+  {
+   "id": "jackson",
+   "side": "CS",
+   "type": "infantry",
+   "name": "Jackson’s Brigade",
+   "short": "Jackson",
+   "commander": {
+    "name": "Thomas J. Jackson",
+    "rank": "Brigadier General",
+    "portrait": "./assets/portraits/jackson.jpg",
+    "portraitNote": "photographed in 1863"
+   },
+   "parent": "First Brigade, Army of the Shenandoah",
+   "regiments": [
+    "2nd Virginia",
+    "4th Virginia",
+    "5th Virginia",
+    "27th Virginia",
+    "33rd Virginia"
+   ],
+   "men": 2600,
+   "weapon": "smooth",
+   "xp": 2,
+   "x": 375,
+   "z": 480,
+   "facing": -1.57,
+   "morale": 84,
+   "sources": [
+    "old repo (tag reference-freeze-2026-10-02) data/bullrun.json:146, HISTORICAL-DATA.md:343-352; strength Disputed: 2,600 (BR) vs ~2,000 (HISTORICAL-DATA.md:484). ‘Stonewall Brigade’ is a later nickname (old audit §4)",
+    "position: “below the brim of the plateau, nearly east of the Henry house” (Beauregard, OR I/2 no. 84); Confederate guns about 300 m east of the house (NPS wayside, OSM way 903966556)"
+   ],
+   "status": "OOB Verified (old repo); strength Disputed"
+  },
+  {
+   "id": "bee",
+   "side": "CS",
+   "type": "infantry",
+   "name": "Bee’s Brigade",
+   "short": "Bee",
+   "commander": {
+    "name": "Barnard E. Bee",
+    "rank": "Brigadier General"
+   },
+   "parent": "Third Brigade, Army of the Shenandoah",
+   "regiments": [
+    "4th Alabama",
+    "2nd Mississippi",
+    "11th Mississippi (2 cos.)",
+    "6th North Carolina"
+   ],
+   "men": 1900,
+   "weapon": "smooth",
+   "xp": 1,
+   "x": 370,
+   "z": 230,
+   "facing": -1.5,
+   "morale": 62,
+   "sources": [
+    "old repo (tag reference-freeze-2026-10-02) data/bullrun.json:135, HISTORICAL-DATA.md:361-368; soldier-replacements.json records[36]",
+    "remnants of Bee, Bartow and Evans in “the ravine and woods” to Jackson’s right (Beauregard, OR I/2 no. 84)"
+   ],
+   "status": "OOB Verified (old repo); afternoon strength not in old repo"
+  },
+  {
+   "id": "hampton",
+   "side": "CS",
+   "type": "infantry",
+   "name": "Hampton’s Legion",
+   "short": "Hampton",
+   "commander": {
+    "name": "Wade Hampton",
+    "rank": "Colonel"
+   },
+   "parent": "Hampton Legion (infantry battalion), Army of the Potomac",
+   "regiments": [
+    "Hampton Legion infantry"
+   ],
+   "men": 600,
+   "weapon": "rifled",
+   "xp": 2,
+   "x": 330,
+   "z": 40,
+   "facing": -1.9,
+   "sources": [
+    "old repo (tag reference-freeze-2026-10-02) data/bullrun.json:140, HISTORICAL-DATA.md:335; soldier-replacements.json records[38]"
+   ],
+   "status": "OOB Verified (old repo); strength Inferred"
+  },
+  {
+   "id": "rockbridge",
+   "side": "CS",
+   "type": "artillery",
+   "name": "Rockbridge Artillery",
+   "short": "Rockbridge Arty",
+   "commander": null,
+   "parent": "with Jackson’s Brigade",
+   "regiments": [],
+   "men": 100,
+   "guns": 4,
+   "weapon": "smbart",
+   "xp": 2,
+   "x": 290,
+   "z": 470,
+   "facing": -1.57,
+   "sources": [
+    "old repo (tag reference-freeze-2026-10-02) HISTORICAL-DATA.md:343-352 (with Jackson; ~13 guns on the crest, HISTORICAL-DATA.md:484). Commander shown generically: the old repo names Lt. Brockenbrough from one source only"
+   ],
+   "status": "presence Verified (old repo); gun count and crew Inferred"
+  },
+  {
+   "id": "staunton",
+   "side": "CS",
+   "type": "artillery",
+   "name": "Staunton Artillery",
+   "short": "Staunton Arty",
+   "commander": {
+    "name": "John D. Imboden",
+    "rank": "Captain"
+   },
+   "parent": "with Bee’s Brigade",
+   "regiments": [],
+   "men": 100,
+   "guns": 4,
+   "weapon": "smbart",
+   "xp": 2,
+   "x": 300,
+   "z": 350,
+   "facing": -1.6,
+   "sources": [
+    "old repo (tag reference-freeze-2026-10-02) HISTORICAL-DATA.md:361-368 (Staunton Arty, Capt. John D. Imboden)",
+    "“Imboden’s battery and two of Stanard’s pieces” with the remnants (Beauregard, OR I/2 no. 84)"
+   ],
+   "status": "presence Verified (old repo); gun count and crew Inferred"
+  }
+ ],
+ "objective": {
+  "name": "Henry House Hill",
+  "x": 110,
+  "z": 500,
+  "r": 210
+ },
+ "positionsNote": "Union start positions are schematic (Inferred), below the plateau on the Sudley Road and Young’s Branch side about 2 p.m. Confederate positions follow Beauregard’s report and the NPS wayside sites (see each unit).",
+ "strengthNote": "Strengths are the old repo values (data/bullrun.json), which it marks Inferred (medium): brigade-scale approximations from after-action reports. Bee: strength at the start of the day; his afternoon strength was lower and is not in the old repo.",
+ "historyNote": "About 2 p.m. on 21 July 1861 the Union army, having driven the Confederates off Matthews Hill, pushed batteries and brigades up Henry House Hill. Thomas J. Jackson’s Virginia brigade had formed behind the crest at the edge of the pines. Judith Henry, a bedridden widow, was killed in her house by artillery fire. By late afternoon Confederate counterattacks and reinforcements broke the Union line, and the Union army retreated toward Washington. Sources and their status are listed in assets/scenarios/henry-hill.json.",
+ "labelsNote": "Place positions: Henry, Robinson, Stone House Verified; Matthews Hill summit 38.82515,-77.53210 Verified (GNIS point is 330 m off and not used); Buck Hill Inferred (GNIS and OSM 427 m apart)."
+}

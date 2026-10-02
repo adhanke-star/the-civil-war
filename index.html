@@ -3,9 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>The Civil War</title>
+  <title>The Civil War — Henry House Hill</title>
   <link rel="icon" href="data:,">
-  <meta name="description" content="The Civil War: a real-time battle game in the browser.">
+  <meta name="description" content="The Civil War: a real-time battle game in the browser. First Bull Run, Henry House Hill, 21 July 1861.">
   <script type="importmap">
   {
     "imports": {
@@ -14,50 +14,88 @@
       "yuka": "./vendor/yuka/build/yuka.module.js",
       "three.quarks": "./vendor/three.quarks/dist/three.quarks.esm.js",
       "quarks.core": "./vendor/quarks.core/dist/quarks.core.esm.js",
-      "zzfx": "./vendor/zzfx/ZzFX.js"
+      "zzfx": "./vendor/zzfx/ZzFX.js",
+      "@mapbox/martini": "./vendor/@mapbox/martini/index.js"
     }
   }
   </script>
-  <style>
-    :root { color-scheme: dark; }
-    html, body { margin: 0; height: 100%; overflow: hidden; background: #1d1a16; }
-    body { font: 15px/1.4 Georgia, "Times New Roman", serif; color: #f4ecd8; }
-    #battlefield { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; }
-    #battlefield:focus { outline: none; }
-    #battlefield:focus-visible { outline: 3px solid #ffd27a; outline-offset: -3px; }
-    .hud {
-      position: fixed; top: 12px; left: 12px; max-width: min(28rem, calc(100vw - 24px));
-      padding: 10px 14px; border-radius: 6px;
-      background: rgba(22, 18, 13, 0.82); border: 1px solid rgba(244, 236, 216, 0.35);
-    }
-    .hud h1 { margin: 0 0 4px; font-size: 1.25rem; font-weight: normal; letter-spacing: 0.02em; }
-    .hud p { margin: 0; font-size: 0.9rem; }
-    .hud .fps { font-variant-numeric: tabular-nums; }
-    .hud button {
-      margin-top: 8px; font: inherit; font-size: 0.9rem; color: #1d1a16; background: #f4ecd8;
-      border: 2px solid #f4ecd8; border-radius: 4px; padding: 4px 10px; cursor: pointer;
-    }
-    .hud button:hover { background: #ffe9b8; }
-    /* Visible keyboard focus everywhere (WCAG 2.4.7 / 2.4.11). */
-    :focus-visible { outline: 3px solid #ffd27a; outline-offset: 2px; }
-    .visually-hidden {
-      position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
-      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
-    }
-  </style>
+  <link rel="stylesheet" href="./src/ui/hud.css">
 </head>
 <body>
   <main>
-    <canvas id="battlefield" tabindex="0" role="img"
-            aria-label="Battlefield: a Union regiment marching in line across rolling farmland. Drag to orbit the camera, scroll to zoom."></canvas>
-    <section class="hud" aria-labelledby="hud-title">
-      <h1 id="hud-title">The Civil War</h1>
-      <p>FPS: <span id="fps" class="fps" aria-live="off">--</span></p>
-      <p id="status" role="status">Loading the battlefield…</p>
-      <button id="sound" type="button" aria-pressed="false">Sound</button>
+    <canvas id="battlefield" tabindex="0" role="application"
+            aria-label="Battlefield. Click a blue brigade to select it, then drag from it to draw its march. Right-drag turns the camera, the wheel zooms, W A S D pan."></canvas>
+    <div id="markers" role="group" aria-label="Brigades"></div>
+
+    <section id="unitcard" class="panel" aria-label="Selected brigade" hidden>
+      <div class="portrait" id="uc-portrait" aria-hidden="true"></div>
+      <div class="tiles">
+        <div class="tile morale"><span class="lbl">Morale</span><span class="val" id="uc-morale">--</span><i id="uc-morale-bar"></i></div>
+        <div class="tile condition"><span class="lbl">Condition</span><span class="val" id="uc-condition">--</span><i id="uc-condition-bar"></i></div>
+        <div class="tile cover"><span class="lbl">Cover</span><span class="val" id="uc-cover">--</span><i id="uc-cover-bar"></i></div>
+        <div class="tile reload"><span class="lbl">Reload</span><span class="val" id="uc-reload">--</span><i id="uc-reload-bar"></i></div>
+      </div>
+      <p class="ucname"><span id="uc-name">--</span> <span class="cas" title="Casualties"><span aria-hidden="true">☠</span> <span id="uc-cas">0</span></span></p>
+      <p class="ucstate" id="uc-state"></p>
     </section>
+
+    <section id="clock" class="panel" aria-label="Time">
+      <button id="pause" type="button" aria-pressed="false" aria-label="Pause">❚❚</button>
+      <div class="clocktext"><span id="clock-date">21st July 1861</span>, <span id="clock-time">14:00</span></div>
+      <button id="speed" type="button" aria-label="Game speed">1×</button>
+      <div class="progress" aria-hidden="true"><i id="clock-bar"></i></div>
+    </section>
+
+    <section id="balance" class="panel" aria-label="Army strength">
+      <span class="flag us" aria-hidden="true"></span>
+      <div class="bar"><i id="bal-us"></i><b id="bal-mark"></b></div>
+      <span class="flag cs" aria-hidden="true"></span>
+      <span class="visually-hidden" id="bal-text"></span>
+    </section>
+
+    <nav id="orders" aria-label="Orders">
+      <button type="button" data-order="hold" title="Hold (H)" disabled>Hold</button>
+      <button type="button" data-order="charge" title="Charge (C)" disabled>Charge</button>
+      <button type="button" data-order="run" title="Run (R)" aria-pressed="false" disabled>Run</button>
+      <button type="button" data-order="fallback" title="Fallback (F)" disabled>Fallback</button>
+      <button type="button" data-order="halt" title="Halt (X)" disabled>Halt</button>
+    </nav>
+
+    <button id="menu-btn" class="panel" type="button" aria-haspopup="dialog" aria-label="Menu">☰</button>
+    <p id="objective" class="panel"></p>
+    <p id="perf" class="panel"><span>FPS <span id="fps">--</span></span> <span id="scale"></span></p>
+    <p id="tip" class="panel" role="note">Click a <b>blue brigade</b>, then <b>drag from it</b> to draw its march. Right-drag turns the camera, wheel zooms, WASD pans.</p>
+    <div id="toasts" role="status" aria-live="polite"></div>
+    <p id="status" class="visually-hidden" role="status">Loading the battlefield…</p>
+
+    <dialog id="menu" aria-labelledby="menu-title">
+      <h2 id="menu-title">Henry House Hill</h2>
+      <p class="sub">First Bull Run · 21 July 1861 · 2:00 p.m.</p>
+      <fieldset>
+        <legend>Quality <kbd>G</kbd></legend>
+        <label><input type="radio" name="quality" value="auto"> Auto</label>
+        <label><input type="radio" name="quality" value="high"> High</label>
+        <label><input type="radio" name="quality" value="low"> Low</label>
+      </fieldset>
+      <label class="row"><input type="checkbox" id="sound-toggle" checked> Sound</label>
+      <h3>Controls</h3>
+      <ul class="keys">
+        <li><b>Select</b>: click a brigade or its flag (Tab cycles flags)</li>
+        <li><b>March</b>: drag from your brigade; release to order. Right-click ground for a straight march</li>
+        <li><b>Camera</b>: drag the ground to pan, right-drag to turn, wheel to zoom; WASD / arrows, Q/E, +/-</li>
+        <li><b>Orders</b>: H hold · C charge · R run · F fall back · X halt · Space pause · 1/2/3 speed</li>
+      </ul>
+      <h3>History</h3>
+      <p id="history-note" class="small"></p>
+      <form method="dialog"><button type="submit">Close</button></form>
+    </dialog>
+    <div id="result" class="panel" role="alertdialog" aria-labelledby="result-title" hidden>
+      <h2 id="result-title"></h2>
+      <p id="result-text"></p>
+      <button type="button" id="result-close">Keep watching</button>
+    </div>
   </main>
-  <noscript><p class="hud">This game needs JavaScript and must be served over HTTP (run play.command).</p></noscript>
+  <noscript><p class="panel">This game needs JavaScript and must be served over HTTP (run play.command).</p></noscript>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>
