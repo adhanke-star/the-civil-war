@@ -12,7 +12,8 @@ playable** (PLAN.md). Done for a milestone means Aaron can open it and enjoy it,
 is high.
 
 ## 1b · The visual and play bar (minimum = Ultimate General: Gettysburg)
-Run `node tools/fetch-reference-shots.mjs` and look at `.out/reference/` before any visual work. The
+Run `node tools/fetch-reference-shots.mjs` and look at `.out/reference/` before any visual work; the measured
+up-close notes (figure size, poses, formations, guns, farms, trees) are in `docs/visual-reference.md`. The
 minimum bar:
 - **Camera:** a high oblique camera with tilt-shift blur at the edges and a warm colour grade.
 - **Ground:** painted, saturated terrain divided into fields: wheat-yellow and green parcels, curving

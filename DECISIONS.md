@@ -1,5 +1,11 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0010 — Graphics, movement and appearance first (Aaron, 2026-10-02)
+Before any new gameplay: detailed soldiers and guns (Aaron: the M1 ones are "block blobs"), UG:G-like
+movement (two dense ranks with skirmishers, column on roads, wheeling, charge swarm, rout scatter) and the
+landscape detail measured in docs/visual-reference.md. Supersedes the four-rank block of 0009. The work is
+queued as a Fable 5.1 trial on branch figures-detail (Aaron's routing exception).
+
 ## 0009 — UG:G-style scale stylisation (2026-10-02)
 After side-by-side review against the UG:G references: figures 4.4x life size in four loose ranks
 (one figure = 10 men, so frontage is already ~3x compressed), farm buildings 1.8x, and a darker, cooler
