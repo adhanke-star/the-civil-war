@@ -341,7 +341,7 @@ export class Unit {
     const muzzles = [];
     const s = Math.sin(this.facing), c = Math.cos(this.facing);
     for (const f of this.figures) {
-      if (!f.alive || f.aim < 0.5) continue;
+      if (!f.alive || (f.aim < 0.5 && !this.follow.active)) continue; // a walking line fires without the aim pose
       if (f.rank !== 0 && this.rnd() < 0.5) continue;
       f.fireAt = time + this.rnd() * 0.9;
       if (this.rnd() < 0.35) muzzles.push([f.x + s * 3.2, f.z + c * 3.2, f.fireAt - time]);

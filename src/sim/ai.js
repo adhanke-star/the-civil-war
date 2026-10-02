@@ -29,7 +29,8 @@ export class Ai {
         if (d < nd) { nd = d; near = e; }
       }
       if (!near) continue;
-      if (u.type === 'infantry' && u.state === 'steady' && u.order.type !== 'charge' && nd < this.chargeReach &&
+      const ahead = Math.abs(wrap(Math.atan2(near.x - u.x, near.z - u.z) - u.facing)) < 1.1;
+      if (u.type === 'infantry' && u.state === 'steady' && u.order.type !== 'charge' && nd < this.chargeReach && ahead &&
           (near.state === 'wavering' || near.state === 'shaken' && near.men < u.men * 0.7)) {
         u.orderCharge(near);
         continue;
@@ -39,6 +40,9 @@ export class Ai {
         u.lastFallback = this.game.simTime;
         u.orderFallback(110);
         continue;
+      }
+      if (!u.follow.active && u.order.type === 'hold' && !u.order.firm && u.state !== 'wavering') {
+        u.order = { type: 'hold', firm: true }; // back in position after a charge or fallback
       }
       if (!u.follow.active && nd < 900 && !u.target) {
         const want = Math.atan2(near.x - u.x, near.z - u.z);

@@ -59,6 +59,8 @@ export class Game {
     };
     this.combat = new Combat({ units: this.units, terrain, coverAt: this.coverAt, fallen: this.fallen, fx: effects, rnd: this.rnd });
     this.ai = new Ai(this, scenario.ai || {});
+    // the defenders begin under orders to hold their ground
+    for (const u of this.units) if (u.side !== playerSide) u.order = { type: 'hold', firm: true };
     const [hh, mm] = scenario.start.split(':').map(Number);
     const [eh, em] = scenario.end.split(':').map(Number);
     this.clockStart = hh * 3600 + mm * 60;

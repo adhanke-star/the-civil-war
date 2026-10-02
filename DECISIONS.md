@@ -25,7 +25,10 @@ metres, 1 sim s = 4 historical s. Changes: volleys timed by the real rate of fir
 2 guns; old weapons.json and artillery.json, Verified); a 65-degree firing arc and terrain line of sight
 (so Jackson's reverse slope protects him); rout roll as a per-second rate; symmetric capped melee;
 Fallback keeps its face to the enemy; a marching line halts to engage inside 75% of its range.
-FIRE_BASE 1.5 and the drains are tuned, not sourced.
+FIRE_BASE 1.5 and the drains are tuned, not sourced. Balance pass (headless 10-minute timelines): losses
+drive morale (factor 150; flat under-fire drain 0.12/s divided by cover; firm Hold +0.12/s, defenders
+start on it); melee 9 men/s x ratio, capped 4%/s (was ~108/s); player lines march to the arrow's end and
+fire on the move at half effect; ammo ~80 volleys, refilled out of contact (>300 m, not under fire).
 
 ## 0004 — Ground: real relief, roads, streams and sites; illustrative fields (2026-10-02)
 Relief (USGS 3DEP, x2 vertical), roads (USGS transportation), streams (NHD) and farm sites (NPS POIs) are

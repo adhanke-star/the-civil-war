@@ -10,7 +10,9 @@
 //     had neither, so a reverse slope gave no protection);
 //   - the rout roll is a per-second rate (the old per-tick roll made rout near-instant);
 //   - melee is symmetric (the old array-order quirk is gone) and capped;
-//   - Fallback keeps the unit's face to the enemy (the old T39 bug turned its back).
+//   - Fallback keeps the unit's face to the enemy (the old T39 bug turned its back);
+//   - a walking line fires at half effect with a slower reload (no fire while running or charging); the
+//     player's lines march to the end of their arrow, AI lines halt to engage inside 75% of their range.
 // FIRE_BASE and the drains are tuned for a few minutes of fighting per brigade, not sourced (as in the old
 // model, where FIRE_BASE was "tuned so the loop runs ~90 s").
 
@@ -28,7 +30,8 @@ const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 export class Combat {
-  constructor({ units, terrain, coverAt, fallen, fx, rnd }) {
+  constructor({ units, terrain, coverAt, fallen, fx, rnd, autoHaltSides = ['CS'] }) {
+    this.autoHalt = new Set(autoHaltSides);
     this.units = units;
     this.terrain = terrain;
     this.coverAt = coverAt; // (x, z) -> { value, kind }
@@ -117,8 +120,8 @@ export class Combat {
     const t = u.target;
     const moving = u.follow.active && Math.hypot(u.vehicle.velocity.x, u.vehicle.velocity.z) > 0.5;
     const isArt = u.type === 'artillery';
-    // A line on the march halts to engage an enemy well inside its range (unless charging or running).
-    if (t && moving && !u.run && u.order.type === 'move' && u.state !== 'routing') {
+    // An AI line on the march halts to engage an enemy well inside its range (unless charging or running).
+    if (t && moving && this.autoHalt.has(u.side) && !u.run && u.order.type === 'move' && u.state !== 'routing') {
       const d = Math.hypot(t.x - u.x, t.z - u.z);
       if (d < this.range(u) * (isArt ? 0.8 : 0.75)) {
         u.stop();
@@ -133,9 +136,9 @@ export class Combat {
     }
     const canFire = t && !u.melee && u.state !== 'routing' && u.order.type !== 'charge' && !(moving && (u.run || isArt)) && (!isArt || u.unlimbered);
     u.firing = !!canFire && !moving;
-    const period = (isArt ? RELOAD.gun : RELOAD.musket) * (1 + 0.5 * (u.fatigue / 100));
+    const period = (isArt ? RELOAD.gun : RELOAD.musket) * (1 + 0.5 * (u.fatigue / 100)) * (moving ? 1.5 : 1);
     if (u.reload < 1) u.reload = Math.min(1, u.reload + dt / period);
-    if (!canFire || u.reload < 1 || moving) return;
+    if (!canFire || u.reload < 1) return;
 
     // Volley.
     u.reload = this.rnd() * 0.15;
@@ -156,14 +159,14 @@ export class Combat {
       else art = 0.5;
     }
     const heightAdv = this.terrain.heightAt(t.x, t.z) - this.terrain.heightAt(u.x, u.z) > 8 ? 1.1 : 1;
-    const wav = u.state === 'wavering' ? 0.7 : 1;
+    const wav = (u.state === 'wavering' ? 0.7 : 1) * (moving ? 0.5 : 1);
     const rate = FIRE_BASE * (fireMen / 1500) * pow * rngF * xpF * ammoF * morF * fatF * art * arc * wav / (t.cover * heightAdv);
     const cas = Math.min(t.men, rate * period * (0.78 + this.rnd() * 0.44));
     t.takeLosses(cas, this.fallen[t.side], time);
     t.underFire = 1.4;
     if (arc > 1) t.flanked = 1.0;
     t.casTick = (t.casTick || 0) + cas;
-    u.ammo = Math.max(0, u.ammo - (isArt ? 1.2 : 1.6));
+    u.ammo = Math.max(0, u.ammo - (isArt ? 1.0 : 1.2)); // about 80 volleys (~7 sim min) per full box
     u.shots = (u.shots || 0) + 1;
     u.kills = (u.kills || 0) + cas;
     if (this.fx) {
@@ -195,15 +198,16 @@ export class Combat {
         const atk = a.men * armA * (0.6 + 0.4 * a.morale / a.moraleMax) * (0.9 + 0.06 * a.xp) * (bCharging ? 1 : 1.15);
         const def = b.men * armB * (0.6 + 0.4 * b.morale / b.moraleMax) * (0.9 + 0.06 * b.xp) * (bCharging ? 1 : b.cover);
         const r = atk / Math.max(1, def);
-        const base = 9 * 12 * 0.3 * dt;
-        const aCas = Math.min(a.men, a.menMax * 0.12 * dt, base * (1 / r) * (0.7 + this.rnd() * 0.6));
-        const bCas = Math.min(b.men, b.menMax * 0.12 * dt, base * r * (0.7 + this.rnd() * 0.6));
+        // old: 9 x 12 men/s x ratio (108/s) with a 20% per second cap; that bled ~450 men a side in 20 s
+        const base = 9 * dt;
+        const aCas = Math.min(a.men, a.menMax * 0.04 * dt, base * (1 / r) * (0.7 + this.rnd() * 0.6));
+        const bCas = Math.min(b.men, b.menMax * 0.04 * dt, base * r * (0.7 + this.rnd() * 0.6));
         a.takeLosses(aCas, this.fallen[a.side], time);
         b.takeLosses(bCas, this.fallen[b.side], time);
         a.casTick = (a.casTick || 0) + aCas;
         b.casTick = (b.casTick || 0) + bCas;
-        if (r < 0.85) a.morale -= 30 * dt;
-        if (r > 1.18) b.morale -= 30 * dt;
+        if (r < 0.85) a.morale -= 18 * dt;
+        if (r > 1.18) b.morale -= 18 * dt;
         a.fatigue = Math.min(100, a.fatigue + 2.4 * dt);
         b.fatigue = Math.min(100, b.fatigue + 2.4 * dt);
       }
@@ -217,14 +221,16 @@ export class Combat {
     const rally = 1 + 0.12 * u.xp;
     const cas = u.casTick || 0;
     u.casTick = 0;
-    u.morale -= ((cas / u.menMax) * 60) / rally;
+    // Losses drive morale (old factor 60 with a -1.1/s under-fire drain suited a ~90 s fight; over a
+    // several-minute fight the flat drain alone broke a brigade that had lost 10%).
+    u.morale -= ((cas / u.menMax) * 150) / rally;
     const enemies = this.enemiesOf(u);
     const nearest = enemies.reduce((m, e) => Math.min(m, Math.hypot(e.x - u.x, e.z - u.z)), Infinity);
-    if (u.underFire > 0) u.morale -= 0.55 * dt;
-    if (u.flanked > 0) u.morale -= 1.0 * dt;
-    if (u.ammo < 18) u.morale -= 0.35 * dt;
+    if (u.underFire > 0) u.morale -= (0.12 / u.cover) * dt; // men in woods or behind walls feel it less
+    if (u.flanked > 0) u.morale -= 0.6 * dt;
+    if (u.ammo < 18) u.morale -= 0.15 * dt;
     if (u.fatigue > 60) u.morale -= 0.45 * dt;
-    if (u.order.firm) u.morale += 0.15 * dt; // Hold: steadied by orders to stand
+    if (u.order.firm) u.morale += 0.12 * dt; // Hold: steadied by orders to stand
     for (const f of this.units) {
       if (f !== u && f.side === u.side && f.state === 'routing' && !f.panicSeen?.has(u.id) && Math.hypot(f.x - u.x, f.z - u.z) < 180) {
         (f.panicSeen ||= new Set()).add(u.id);
@@ -232,6 +238,8 @@ export class Combat {
       }
     }
     if (u.state !== 'routing' && u.underFire <= 0 && nearest > 0.9 * RANGE.rifled) u.morale += 1.1 * dt;
+    // Resupply from the trains behind the line (M1 simplification; the old model used a supply wagon).
+    if (u.state !== 'routing' && u.underFire <= 0 && nearest > 300) u.ammo = Math.min(100, u.ammo + 2 * dt);
     u.underFire = Math.max(0, u.underFire - dt);
     u.flanked = Math.max(0, u.flanked - dt);
     u.morale = clamp(u.morale, 0, u.moraleMax);
@@ -273,9 +281,9 @@ export class Combat {
 
   fatigueStep(u, dt) {
     const moving = u.follow.active || u.state === 'routing';
+    // as in the old model, standing still rests a unit even while it fires
     if (moving) u.fatigue += (u.state === 'routing' || u.run || u.order.type === 'charge' ? 1.2 : 0.3) * dt;
-    else if (u.firing) u.fatigue += 0.12 * dt;
-    else u.fatigue -= 0.9 * dt;
+    else u.fatigue -= (u.firing ? 0.35 : 0.9) * dt;
     u.fatigue = clamp(u.fatigue, 0, 100);
   }
 }
