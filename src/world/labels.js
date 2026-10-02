@@ -1,57 +1,147 @@
-// src/world/labels.js: big serif place names painted onto the ground, UG:G style.
+// src/world/labels.js: big serif place names standing up off the ground as extruded 3D letters, UG:G style.
 //
-// Each label is a canvas-rendered word with a cast "extrusion" (stacked dark offsets) and a lit face,
-// draped over the terrain on a fine grid so it follows the hills. No font file ships: the canvas uses the
-// system serif (Georgia, else Times/DejaVu Serif).
+// No font file ships (the project's asset rule is public domain, CC0 or CC-BY, and the free typeface JSONs
+// that come with three.js are under the MgOpen licence). Instead each word is drawn with the system serif
+// on a canvas, its bitmap is traced into outline polygons (pixel-edge following, then Douglas-Peucker
+// simplification, holes assigned to their letters), and the polygons are extruded. The letter tops follow
+// the terrain, the sides reach down into it, so the words sit on the hills with a lit face and dark sides.
+// If tracing fails for a label (an empty bitmap), it falls back to a flat painted label.
 
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 const FONT = '"Georgia", "Times New Roman", "DejaVu Serif", serif';
+const PX = 96; // canvas font size; letters are traced at this resolution
 
-function labelTexture(text, { italic = false, color = '#e9d9a6', depth = 9 } = {}) {
-  const px = 140;
-  const font = `${italic ? 'italic ' : ''}bold ${px}px ${FONT}`;
+/** Render text white on transparent; return the alpha bitmap. */
+function textBitmap(text, italic) {
+  const font = `${italic ? 'italic ' : ''}bold ${PX}px ${FONT}`;
   const probe = document.createElement('canvas').getContext('2d');
   probe.font = font;
-  const w = Math.ceil(probe.measureText(text).width + px * 0.6 + depth * 2);
-  const h = Math.ceil(px * 1.5 + depth * 2);
+  const w = Math.ceil(probe.measureText(text).width + PX * 0.4);
+  const h = Math.ceil(PX * 1.4);
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
-  const ctx = canvas.getContext('2d');
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   ctx.font = font;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  const cx = w / 2 - depth * 0.4;
-  const cy = h / 2 - depth * 0.5;
-  // soft ground shadow
-  ctx.shadowColor = 'rgba(0,0,0,0.55)';
-  ctx.shadowBlur = 14;
-  ctx.shadowOffsetX = depth * 0.8;
-  ctx.shadowOffsetY = depth * 1.1;
-  ctx.fillStyle = '#2a2010';
-  ctx.fillText(text, cx + depth * 0.6, cy + depth * 0.9);
-  ctx.shadowColor = 'transparent';
-  // extrusion
-  for (let i = depth; i > 0; i--) {
-    const k = i / depth;
-    ctx.fillStyle = `rgb(${Math.round(70 + 30 * (1 - k))},${Math.round(52 + 22 * (1 - k))},${Math.round(24 + 10 * (1 - k))})`;
-    ctx.fillText(text, cx + i * 0.55, cy + i * 0.85);
+  ctx.fillStyle = '#fff';
+  ctx.fillText(text, w / 2, h / 2);
+  const data = ctx.getImageData(0, 0, w, h).data;
+  const bits = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i++) bits[i] = data[i * 4 + 3] > 127 ? 1 : 0;
+  return { bits, w, h };
+}
+
+/**
+ * Trace the filled pixels into closed loops. Each boundary edge between a filled and an empty cell is a
+ * directed edge keeping the filled cell on its left; chaining edges head to tail gives counter-clockwise
+ * outer loops and clockwise holes (in image coordinates, y down).
+ */
+function traceLoops({ bits, w, h }) {
+  const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : bits[y * w + x]);
+  const next = new Map(); // "x,y" -> list of [x2,y2]
+  const add = (x1, y1, x2, y2) => {
+    const k = `${x1},${y1}`;
+    if (!next.has(k)) next.set(k, []);
+    next.get(k).push([x2, y2]);
+  };
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!at(x, y)) continue;
+      // edges around a filled cell, filled side on the left of each directed edge (y down: clockwise screen = ccw math)
+      if (!at(x, y - 1)) add(x, y, x + 1, y); // top edge, left to right
+      if (!at(x + 1, y)) add(x + 1, y, x + 1, y + 1); // right edge, downward
+      if (!at(x, y + 1)) add(x + 1, y + 1, x, y + 1); // bottom edge, right to left
+      if (!at(x - 1, y)) add(x, y + 1, x, y); // left edge, upward
+    }
   }
-  // face with a vertical light gradient
-  const grd = ctx.createLinearGradient(0, cy - px / 2, 0, cy + px / 2);
-  grd.addColorStop(0, '#fff3c8');
-  grd.addColorStop(0.5, color);
-  grd.addColorStop(1, '#b89a58');
-  ctx.fillStyle = grd;
-  ctx.fillText(text, cx, cy);
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = 'rgba(80,60,25,0.6)';
-  ctx.strokeText(text, cx, cy);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  return { tex, aspect: w / h };
+  const loops = [];
+  for (const [k, outs] of next) {
+    while (outs.length) {
+      const start = k.split(',').map(Number);
+      const loop = [start];
+      let cur = outs.pop();
+      let guard = 0;
+      while (cur && (cur[0] !== start[0] || cur[1] !== start[1]) && guard++ < 200000) {
+        loop.push(cur);
+        const lst = next.get(`${cur[0]},${cur[1]}`);
+        if (!lst || !lst.length) break;
+        // prefer the turn that keeps the filled side on the left (first available is fine for a pixel grid)
+        let pick = 0;
+        if (lst.length > 1) {
+          const prev = loop[loop.length - 2];
+          const dx = cur[0] - prev[0], dy = cur[1] - prev[1];
+          for (let i = 0; i < lst.length; i++) {
+            const ex = lst[i][0] - cur[0], ey = lst[i][1] - cur[1];
+            if (dx * ey - dy * ex > 0) { pick = i; break; } // turn left first
+          }
+        }
+        cur = lst.splice(pick, 1)[0];
+      }
+      if (loop.length > 6) loops.push(loop);
+    }
+  }
+  return loops;
+}
+
+function simplify(pts, eps) {
+  if (pts.length < 4) return pts;
+  const keep = new Uint8Array(pts.length);
+  keep[0] = keep[pts.length - 1] = 1;
+  const stack = [[0, pts.length - 1]];
+  while (stack.length) {
+    const [a, b] = stack.pop();
+    let maxD = 0, idx = -1;
+    const [ax, ay] = pts[a], [bx, by] = pts[b];
+    const dx = bx - ax, dy = by - ay;
+    const len = Math.hypot(dx, dy) || 1;
+    for (let i = a + 1; i < b; i++) {
+      const d = Math.abs((pts[i][0] - ax) * dy - (pts[i][1] - ay) * dx) / len;
+      if (d > maxD) { maxD = d; idx = i; }
+    }
+    if (maxD > eps && idx > 0) { keep[idx] = 1; stack.push([a, idx], [idx, b]); }
+  }
+  const out = [];
+  for (let i = 0; i < pts.length; i++) if (keep[i]) out.push(pts[i]);
+  return out;
+}
+
+const area = (p) => { let a = 0; for (let i = 0, j = p.length - 1; i < p.length; j = i++) a += (p[j][0] + p[i][0]) * (p[j][1] - p[i][1]); return a / 2; };
+const inside = (x, y, poly) => {
+  let ok = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) ok = !ok;
+  }
+  return ok;
+};
+
+/** Shapes (with holes) for a word, in canvas pixels centred on the word, y up. */
+function textShapes(text, italic) {
+  const bm = textBitmap(text, italic);
+  const loops = traceLoops(bm).map((l) => simplify(l, 1.1)).filter((l) => l.length >= 3);
+  const outers = [], holes = [];
+  for (const l of loops) {
+    const a = area(l);
+    if (Math.abs(a) < 12) continue;
+    (a < 0 ? outers : holes).push(l); // y-down image: outer loops come out negative
+  }
+  const shapes = outers.map((o) => ({ outer: o, holes: [], area: Math.abs(area(o)) }));
+  for (const hl of holes) {
+    let best = null;
+    for (const s of shapes) if (inside(hl[0][0], hl[0][1], s.outer) && (!best || s.area < best.area)) best = s;
+    if (best) best.holes.push(hl);
+  }
+  const cx = bm.w / 2, cy = bm.h / 2;
+  const toShape = (pts) => pts.map(([x, y]) => new THREE.Vector2(x - cx, cy - y));
+  return shapes.map((s) => {
+    const shape = new THREE.Shape(toShape(s.outer));
+    for (const hl of s.holes) shape.holes.push(new THREE.Path(toShape(hl)));
+    return shape;
+  });
 }
 
 /**
@@ -61,36 +151,51 @@ function labelTexture(text, { italic = false, color = '#e9d9a6', depth = 9 } = {
 export function buildLabels(terrain, labels) {
   const group = new THREE.Group();
   group.name = 'labels';
+  const geos = [];
+  const face = new THREE.Color('#efdca8'), faceHi = new THREE.Color('#fff4cf'), side = new THREE.Color('#4a3618');
   for (const L of labels) {
-    const { tex, aspect } = labelTexture(L.text, { italic: !!L.italic });
+    let shapes;
+    try { shapes = textShapes(L.text, !!L.italic); } catch (err) { console.warn(`label trace failed for "${L.text}":`, err.message); shapes = []; }
+    if (!shapes.length) continue;
     const hgt = L.height || 40;
-    const wid = hgt * aspect;
-    const segX = Math.max(8, Math.round(wid / 8));
-    const segZ = Math.max(3, Math.round(hgt / 8));
-    const geo = new THREE.PlaneGeometry(wid, hgt, segX, segZ);
-    geo.rotateX(-Math.PI / 2); // lie flat; texture top points to -z (north) before rotation
-    const pos = geo.attributes.position;
+    const scale = (hgt * 0.72) / PX; // metres per canvas pixel: cap height about 0.72 of the box
+    const depth = Math.max(1.5, hgt * 0.07);
+    const geo = new THREE.ExtrudeGeometry(shapes, { depth: depth / scale, bevelEnabled: false, curveSegments: 3 });
+    geo.scale(scale, scale, scale);
+    // lay flat: shape x -> east (along the label), shape y -> north (-z), extrusion -> up
+    geo.rotateX(-Math.PI / 2);
+    geo.computeVertexNormals();
+    const pos = geo.attributes.position, nor = geo.attributes.normal;
+    const col = new Float32Array(pos.count * 3);
     const c = Math.cos(L.angle || 0), s = Math.sin(L.angle || 0);
+    const minX = geo.boundingBox ? geo.boundingBox.min.x : 0;
+    geo.computeBoundingBox();
+    const span = Math.max(1, geo.boundingBox.max.x - geo.boundingBox.min.x);
     for (let i = 0; i < pos.count; i++) {
-      const lx = pos.getX(i), lz = pos.getZ(i);
+      const lx = pos.getX(i), ly = pos.getY(i), lz = pos.getZ(i);
       const x = L.x + lx * c - lz * s;
       const z = L.z + lx * s + lz * c;
-      pos.setXYZ(i, x, terrain.heightAt(x, z) + 1.2, z);
+      const top = nor.getY(i) > 0.5;
+      const ground = terrain.heightAt(x, z);
+      // the top face rides on the terrain; everything else reaches down into it
+      pos.setXYZ(i, x, ground + (ly > depth * 0.5 ? depth + 0.3 : -2.0), z);
+      const t = (lx - geo.boundingBox.min.x) / span;
+      const cc = top ? faceHi.clone().lerp(face, 0.3 + 0.5 * t) : side;
+      col[i * 3] = cc.r; col[i * 3 + 1] = cc.g; col[i * 3 + 2] = cc.b;
+      void minX;
     }
-    geo.computeBoundingSphere();
-    const mat = new THREE.MeshBasicMaterial({
-      map: tex,
-      transparent: true,
-      depthWrite: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -4,
-      polygonOffsetUnits: -4,
-      fog: true,
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.renderOrder = 2;
-    mesh.name = `label:${L.text}`;
-    group.add(mesh);
+    geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    geo.deleteAttribute('uv');
+    geo.computeVertexNormals();
+    geos.push(geo.index ? geo.toNonIndexed() : geo);
   }
+  if (!geos.length) return group;
+  const merged = mergeGeometries(geos, false);
+  merged.computeVertexNormals();
+  merged.computeBoundingSphere();
+  const mesh = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  mesh.name = 'labels-3d';
+  mesh.userData.triangles = merged.attributes.position.count / 3;
+  group.add(mesh);
   return group;
 }

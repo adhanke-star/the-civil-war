@@ -317,16 +317,18 @@ export function placeTrees(terrain, streams, roadField, streamField, parcels, { 
   const nearStream = (x, z, d) => streamField.dist(x, z) < d;
   const nearSite = (x, z, d) => PLAN.sites.some((s) => Math.hypot(s.x - x, s.z - z) < d * BUILDING_SCALE * 0.8);
 
-  // Woods: jittered grid.
-  const W = 10.5;
+  // Woods: a jittered grid of open stands (crowns 5-7.5 m, 13 m apart, so grass shows between them),
+  // with conifers grouped where the noise is high and mixed in singly elsewhere.
+  const W = 13;
   for (let z = -half; z < half; z += W) {
     for (let x = -half; x < half; x += W) {
       const px = x + (rnd() - 0.5) * W * 0.9;
       const pz = z + (rnd() - 0.5) * W * 0.9;
       if (!inWoods(px, pz)) continue;
       if (nearRoad(px, pz, 9) || nearStream(px, pz, 3) || nearSite(px, pz, 45)) continue;
-      const pine = valueNoise(px * 0.012, pz * 0.012) > 0.78;
-      trees.push([px, pz, 6 + rnd() * 2.6, pine ? 1 : 0]);
+      const pn = valueNoise(px * 0.012, pz * 0.012);
+      const pine = pn > 0.74 || (pn > 0.5 && rnd() < 0.12);
+      trees.push([px, pz, pine ? 4.5 + rnd() * 2 : 5 + rnd() * 2.5, pine ? 1 : 0]);
     }
   }
   // Stream banks.
@@ -385,7 +387,7 @@ export function placeTrees(terrain, streams, roadField, streamField, parcels, { 
   return trees;
 }
 
-/** Rail-fence segments [x, z, angle, len] along both roads and along field edges near farms. */
+/** Fence segments [x, z, angle, len, kind]: kind 0 straight post-and-rail along roads, 1 worm (zig-zag) in fields. */
 export function placeFences(terrain, roads, parcels, { seed = 7 } = {}) {
   const rnd = mulberry32(seed);
   const segs = [];
@@ -406,7 +408,7 @@ export function placeFences(terrain, roads, parcels, { seed = 7 } = {}) {
           const x = ax + ((bx - ax) * t) / len + nx * side * 7.5;
           const z = az + ((bz - az) * t) / len + nz * side * 7.5;
           if (Math.abs(x) > half || Math.abs(z) > half || inWoods(x, z)) continue;
-          segs.push([x, z, ang + (k % 2 ? 0.32 : -0.32), SEG]);
+          segs.push([x, z, ang, SEG, 0]);
         }
       }
     }
@@ -419,7 +421,7 @@ export function placeFences(terrain, roads, parcels, { seed = 7 } = {}) {
     if (!near || inWoods(x, z)) continue;
     const p = parcels.lookup(x, z, 2.2);
     if (!p.edge) continue;
-    segs.push([x, z, p.edgeAngle + (rnd() < 0.5 ? 0.3 : -0.3), SEG]);
+    segs.push([x, z, p.edgeAngle + (rnd() < 0.5 ? 0.3 : -0.3), SEG, 1]);
   }
   return segs;
 }
