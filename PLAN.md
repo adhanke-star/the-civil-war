@@ -9,16 +9,21 @@ CI (Playwright smoke + axe), Pages deploy, `play.command`, `.out/` auto-pruned.
 **Play:** one regiment of about 200 figures marching in line on a painted-colour field, with musket
 smoke and a volley sound.
 
-## M1 · The ground at First Bull Run (week of 2026-10-05)
-- A public-domain 1861 Bull Run period map (Library of Congress), georeferenced and draped on terrain
-  built from free USGS elevation data.
-- Painterly post-process v1. Named landmarks: Henry House Hill, Matthews Hill, Stone Bridge, Sudley
-  Ford, Chinn Ridge.
-- A camera that feels like UG:G.
-- Two brigades per side: select, drag to march and face, line or column, Yuka steering with formation
-  slots.
+## M1 · First Bull Run vertical slice — looks like UG:G, plays (week of 2026-10-05)
+M0 shipped a non-interactive demo, which Aaron judged "awful and doesn't work". M1 must clear the
+AGENTS §1b bar on a small part of the field: Henry House Hill to Matthews Hill.
 
-**Play:** maneuver real brigades on the real field.
+- Painted terrain from USGS 3DEP elevation (geotiff.js + martini), with field parcels, roads, fences,
+  woods, the stream and 3D farm buildings.
+- Ground labels; tilt-shift and colour grade.
+- Two brigades per side as hundreds of instanced soldiers (instanced-mesh) in loose ranks, with flag
+  markers.
+- Select and drag-order with curved arrows; Yuka steering keeps formation.
+- Fire, smoke, casualties and morale (simple v1).
+- The UG:G HUD layout.
+- OOB, names and places come from the old repo (`data/bullrun.json`, `src/tactical/T1-bull-run.js`).
+
+**Play:** order a Union brigade up Henry House Hill against Jackson and watch the fight.
 
 ## M2 · The fight (week of 2026-10-12)
 - Fire, casualties, morale, charge and rout, ported from the old Field rules: one universal combat

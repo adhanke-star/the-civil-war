@@ -11,6 +11,26 @@ the history is cited. One battle at a time; a campaign comes later. **Weekly mil
 playable** (PLAN.md). Done for a milestone means Aaron can open it and enjoy it, not that a gate count
 is high.
 
+## 1b · The visual and play bar (minimum = Ultimate General: Gettysburg)
+Run `node tools/fetch-reference-shots.mjs` and look at `.out/reference/` before any visual work. The
+minimum bar:
+- **Camera:** a high oblique camera with tilt-shift blur at the edges and a warm colour grade.
+- **Ground:** painted, saturated terrain divided into fields: wheat-yellow and green parcels, curving
+  orange dirt roads, stone walls and rail fences, orchards in rows, dense round-canopy woods, streams
+  with banks, and red barns and white farmhouses as 3D models.
+- **Names on the ground:** large 3D serif names painted on the terrain (ridges, farms).
+- **Soldiers:** every brigade is hundreds of small individual soldiers in loose ranks, in blue or
+  butternut uniforms with muskets. Casualties lie on the field. Artillery has guns, crews and limbers.
+- **Brigade marker:** a flag-shield icon, a strength number and the commander's name.
+- **Orders:** big curved translucent arrows, red for Confederate and blue for Union.
+- **Smoke:** puffs of musket smoke along the firing lines.
+- **HUD:**
+  - unit card at top-left: portrait, then Morale/Condition/Cover/Reload tiles;
+  - date and time with play/pause at top-centre;
+  - army-strength balance bar at top-right;
+  - Hold/Charge/Run/Fallback/Halt on the right.
+- **It must play:** select, drag-order, fight. A demo that only animates is not a milestone.
+
 ## 2 · Stack law
 
 - **Plain JavaScript ES modules plus an import map.** No TypeScript, no bundler, no Python. Tools are
@@ -75,4 +95,6 @@ helper gets the files it may touch and the exact command to run.
 | Research packets | `docs/design/*research*`, `HISTORICAL-DATA*.md` |
 | Lessons | the old `DECISIONS.md` live laws; `REVIEW-QUEUE.md` GM-182..188 (playtest findings) |
 
-Re-check every copied historical claim against its cited sources as you port it.
+**Data policy (Aaron):** the old project already holds the history we need. Reuse its data, OOBs,
+codex, sources and rules. Research anew only when what we need is missing there. Carry each item's
+citations across with it. Never copy a fabricated label: old GM-182, random "Gen. X" subordinates.
