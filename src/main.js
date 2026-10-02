@@ -170,3 +170,8 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, gpuTier };
+
+// Developer tuning panel (lil-gui), only with ?tune in the URL; players never load it.
+if (new URLSearchParams(location.search).has('tune')) {
+  import('./dev/tune.js').then((m) => m.openTuner({ post, world }));
+}

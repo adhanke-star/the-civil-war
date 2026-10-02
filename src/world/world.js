@@ -56,8 +56,22 @@ export function buildWorld(scene, terrain, scenario) {
   light.position.copy(sun.direction).multiplyScalar(1000);
   scene.add(hemi, light);
 
+  /** Repaint the ground texture (after a palette change in the ?tune panel). */
+  const repaint = () => {
+    const u = terrainMesh.material.uniforms;
+    const next = paintGround(terrain, parcels, meta.roads, meta.streams, trees, sun.direction);
+    u.uGround.value.dispose();
+    u.uInfo.value.dispose();
+    u.uGround.value = next.ground;
+    u.uInfo.value = next.info;
+  };
+
   return {
     sun,
+    terrainMesh,
+    light,
+    hemi,
+    repaint,
     trees: treeGroup,
     parcels,
     roadField,

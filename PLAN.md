@@ -69,6 +69,7 @@ Campaign link between battles, more battles, codex and documents, Confederate si
 | M1 | geotiffjs/geotiff.js | MIT | read USGS 3DEP elevation into heights |
 | M1 | proj4js/proj4js | MIT (LICENSE.md; API shows NOASSERTION, so confirm) | georeference LoC maps to the DEM |
 | M1 | mapbox/martini | ISC | low-triangle adaptive terrain mesh |
+| M1 (in, 0.21.0, dev only) | georgealways/lil-gui — https://github.com/georgealways/lil-gui | MIT (gh api 2026-10-02) | look-tuning panel, loaded only with ?tune |
 | M1 (in, 5.0.70) | pmndrs/detect-gpu — https://github.com/pmndrs/detect-gpu | MIT (gh api 2026-10-02) | GPU tier picks Auto quality's starting level; benchmark JSON vendored, no CDN |
 | M1 | agargaro/instanced-mesh | MIT (peer three >=0.186) | thousands of soldiers with culling and LOD |
 | M1 | donmccurdy/glTF-Transform (CLI, dev only) | MIT | shrink models and textures before they enter the repo |

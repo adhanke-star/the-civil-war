@@ -177,10 +177,9 @@ export const FIELD_TYPES = [
   { name: 'corn', weight: 12, color: [56, 76, 31], stroke: 1.0 },
   { name: 'fallow', weight: 4, color: [114, 94, 58], stroke: 0.9 },
 ];
-const FIELD_TOTAL = FIELD_TYPES.reduce((s, t) => s + t.weight, 0);
-
 export function fieldTypeFor(id) {
-  let r = hash2(id * 0.137 + 0.5, id * 0.071 + 9.2) * FIELD_TOTAL;
+  // total recomputed per call so the ?tune panel can change weights
+  let r = hash2(id * 0.137 + 0.5, id * 0.071 + 9.2) * FIELD_TYPES.reduce((s, t) => s + t.weight, 0);
   for (const t of FIELD_TYPES) {
     if ((r -= t.weight) < 0) return t;
   }

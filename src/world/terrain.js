@@ -202,6 +202,9 @@ export function buildTerrainMesh(data, groundTexture, infoTexture, sun) {
       uFogColor: { value: sun.fog },
       uFogRange: { value: new THREE.Vector2(1400, 3600) },
       uHalf: { value: data.half },
+      uLit: { value: 1.15 },
+      uAmbient: { value: 0.8 },
+      uCavity: { value: 0.56 },
     },
     vertexShader: /* glsl */ `
       varying vec2 vUv;
@@ -228,6 +231,9 @@ export function buildTerrainMesh(data, groundTexture, infoTexture, sun) {
       uniform vec3 uFogColor;
       uniform vec2 uFogRange;
       uniform float uHalf;
+      uniform float uLit;
+      uniform float uAmbient;
+      uniform float uCavity;
       varying vec2 vUv;
       varying vec3 vWorld;
       varying float vDepth;
@@ -257,8 +263,8 @@ export function buildTerrainMesh(data, groundTexture, infoTexture, sun) {
         float ndl = dot(n, normalize(uSunDir));
         float lit = smoothstep(0.05, 0.85, ndl);
         vec3 hemi = mix(uEarth, uSky, n.y * 0.5 + 0.5);
-        vec3 col = base * (hemi * 0.8 + uSunColor * lit * 1.15);
-        col *= 0.72 + cavity * 0.56;
+        vec3 col = base * (hemi * uAmbient + uSunColor * lit * uLit);
+        col *= 1.0 - uCavity * 0.5 + cavity * uCavity;
 
         // Edge of the mapped area falls off into dark haze.
         float edge = max(abs(vWorld.x), abs(vWorld.z));

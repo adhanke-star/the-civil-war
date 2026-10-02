@@ -6,6 +6,7 @@
 - three.quarks 0.17.1 and quarks.core — MIT — https://github.com/Alchemist0823/three.quarks
 - ZzFX 1.4.0 — MIT — https://github.com/KilledByAPixel/ZzFX
 - @mapbox/martini 0.2.0 — ISC — https://github.com/mapbox/martini
+- lil-gui 0.21.0 — MIT — https://github.com/georgealways/lil-gui (developer panel, only with ?tune)
 - detect-gpu 5.0.70 — MIT — https://github.com/pmndrs/detect-gpu (with its dist/benchmarks GPU tables)
 - geotiff.js 3.0.5 — MIT — https://github.com/geotiffjs/geotiff.js (dev tool only: tools/fetch-terrain.mjs; not shipped)
 

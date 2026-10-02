@@ -36,6 +36,7 @@ const ENTRIES = [
   'zzfx/ZzFX.js',
   '@mapbox/martini/index.js',
   'detect-gpu/dist/detect-gpu.esm.js',
+  'lil-gui/dist/lil-gui.esm.min.js', // dev-only ?tune panel (src/dev/tune.js); never loaded for players
 ];
 
 // Data folders copied verbatim (no import following): detect-gpu's GPU benchmark tables, so the game
