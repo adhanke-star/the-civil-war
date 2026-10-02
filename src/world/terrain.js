@@ -82,6 +82,36 @@ export class TerrainData {
 }
 const _n = new THREE.Vector3();
 
+/** Tileable value noise, 256^2: r 16 cells per tile, g 32, b 64, a 8. Replaces per-pixel sin() hashes. */
+function buildNoiseTexture() {
+  const N = 256;
+  const px = new Uint8Array(N * N * 4);
+  const hash = (x, y, s) => { const v = Math.sin(x * 127.1 + y * 311.7 + s * 74.7) * 43758.5453; return v - Math.floor(v); };
+  const chan = [16, 32, 64, 8];
+  for (let c = 0; c < 4; c++) {
+    const cells = chan[c];
+    for (let y = 0; y < N; y++) {
+      for (let x = 0; x < N; x++) {
+        const fx = (x / N) * cells, fy = (y / N) * cells;
+        const x0 = Math.floor(fx), y0 = Math.floor(fy);
+        const u = fx - x0, v = fy - y0;
+        const su = u * u * (3 - 2 * u), sv = v * v * (3 - 2 * v);
+        const h = (i, j) => hash((x0 + i) % cells, (y0 + j) % cells, c);
+        const a = h(0, 0) + (h(1, 0) - h(0, 0)) * su;
+        const b = h(0, 1) + (h(1, 1) - h(0, 1)) * su;
+        px[(y * N + x) * 4 + c] = Math.round((a + (b - a) * sv) * 255);
+      }
+    }
+  }
+  const tex = new THREE.DataTexture(px, N, N, THREE.RGBAFormat, THREE.UnsignedByteType);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.generateMipmaps = true;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 /**
  * Normal map (RGBA8, grid resolution) so lighting keeps full DEM detail on the simplified mesh. Alpha holds
  * a cavity term (height minus a 60 m blur): valleys paint darker and crests lighter, like a hand-shaded map.
@@ -139,7 +169,7 @@ export function buildTerrainMesh(data, groundTexture, infoTexture, sun) {
   const G = data.grid;
   const martini = new Martini(G);
   const tile = martini.createTile(data.heights);
-  const { vertices, triangles } = tile.getMesh(0.35);
+  const { vertices, triangles } = tile.getMesh(0.5);
   const n = vertices.length / 2;
   const pos = new Float32Array(n * 3);
   const uv = new Float32Array(n * 2);
@@ -164,6 +194,7 @@ export function buildTerrainMesh(data, groundTexture, infoTexture, sun) {
       uGround: { value: groundTexture },
       uInfo: { value: infoTexture },
       uNormal: { value: buildNormalTexture(data) },
+      uNoise: { value: buildNoiseTexture() },
       uSunDir: { value: sun.direction },
       uSunColor: { value: sun.color },
       uSky: { value: sun.sky },
@@ -189,6 +220,7 @@ export function buildTerrainMesh(data, groundTexture, infoTexture, sun) {
       uniform sampler2D uGround;
       uniform sampler2D uInfo;
       uniform sampler2D uNormal;
+      uniform sampler2D uNoise;
       uniform vec3 uSunDir;
       uniform vec3 uSunColor;
       uniform vec3 uSky;
@@ -200,12 +232,8 @@ export function buildTerrainMesh(data, groundTexture, infoTexture, sun) {
       varying vec3 vWorld;
       varying float vDepth;
 
-      float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-      float noise(vec2 p) {
-        vec2 i = floor(p); vec2 f = fract(p);
-        vec2 u = f * f * (3.0 - 2.0 * f);
-        return mix(mix(hash(i), hash(i + vec2(1, 0)), u.x), mix(hash(i + vec2(0, 1)), hash(i + vec2(1, 1)), u.x), u.y);
-      }
+      // value noise from the tileable texture (16 cells per tile in the red channel)
+      float noise(vec2 p) { return texture2D(uNoise, p / 16.0).r; }
 
       void main() {
         vec3 base = texture2D(uGround, vUv).rgb;

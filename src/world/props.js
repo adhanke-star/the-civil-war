@@ -19,8 +19,8 @@ function colorize(geo, color) {
 
 // ---------------------------------------------------------------------------------------------------
 // Trees
-function canopyGeometry(seed, flat = 1) {
-  const g = new THREE.SphereGeometry(1, 7, 5);
+function canopyGeometry(seed, flat = 1, segW = 7, segH = 5) {
+  const g = new THREE.SphereGeometry(1, segW, segH);
   const pos = g.attributes.position;
   const rnd = mulberry32(seed);
   const bumps = [];
@@ -48,10 +48,10 @@ function canopyGeometry(seed, flat = 1) {
   return g;
 }
 
-function pineGeometry() {
+function pineGeometry(tiers = 3, seg = 7) {
   const parts = [];
-  for (let i = 0; i < 3; i++) {
-    const c = new THREE.ConeGeometry(0.9 - i * 0.22, 1.1, 7, 1);
+  for (let i = 0; i < tiers; i++) {
+    const c = new THREE.ConeGeometry(0.9 - i * 0.22, tiers === 1 ? 2.2 : 1.1, seg, 1);
     c.translate(0, 0.2 + i * 0.6, 0);
     parts.push(c.toNonIndexed());
   }
@@ -70,15 +70,19 @@ function pineGeometry() {
 export function buildTrees(terrain, trees) {
   const group = new THREE.Group();
   group.name = 'trees';
-  const CH = 420; // chunk size (m)
+  const CH = 320; // chunk size (m): the camera frustum culls whole chunks, and each picks a level of detail
   const chunks = new Map();
   for (const t of trees) {
     const key = `${Math.floor(t[0] / CH)},${Math.floor(t[1] / CH)},${t[3] === 1 ? 1 : 0}`;
     if (!chunks.has(key)) chunks.set(key, []);
     chunks.get(key).push(t);
   }
+  // Two levels of detail: ~56-triangle canopies near the camera, ~20 far away (trees were 1M+ triangles).
   const canopy = canopyGeometry(5);
+  const canopyLo = canopyGeometry(5, 1, 5, 3);
   const pine = pineGeometry();
+  const pineLo = pineGeometry(1, 6);
+  const lods = [];
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
   const dummy = new THREE.Object3D();
   const color = new THREE.Color();
@@ -107,9 +111,17 @@ export function buildTrees(terrain, trees) {
     mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
     group.add(mesh);
+    lods.push({ mesh, hi: isPine ? pine : canopy, lo: isPine ? pineLo : canopyLo, center: mesh.boundingSphere.center.clone() });
     count += list.length;
   }
   group.userData.count = count;
+  /** Pick each chunk's detail from its distance to the camera (call once per frame). */
+  group.userData.updateLod = (camera, near) => {
+    for (const l of lods) {
+      const g = camera.position.distanceTo(l.center) < near ? l.hi : l.lo;
+      if (l.mesh.geometry !== g) l.mesh.geometry = g;
+    }
+  };
   return group;
 }
 

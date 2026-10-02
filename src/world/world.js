@@ -58,6 +58,7 @@ export function buildWorld(scene, terrain, scenario) {
 
   return {
     sun,
+    trees: treeGroup,
     parcels,
     roadField,
     streamField,

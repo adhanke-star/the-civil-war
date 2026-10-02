@@ -118,9 +118,11 @@ export class Post {
     this.setMode(mode);
   }
 
+  // MSAA is the costliest pass on the UHD 617 (4x at scale 0.85 ran slower than no MSAA at 0.7):
+  // supersampled scales need none, lower scales get 2x, Low gets none.
   _samplesFor(scale) {
-    if (this.mode === 'low') return 0;
-    return scale > 1.25 ? 2 : 4;
+    if (this.mode === 'low' || scale >= 1.25) return 0;
+    return 2;
   }
 
   setMode(mode) {
