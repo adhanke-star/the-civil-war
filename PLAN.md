@@ -1,6 +1,6 @@
 # PLAN — weekly milestones (each one playable)
 
-Status: M0 shipped (v0); M1 in progress. Every milestone ends with: CI green, the GitHub Pages link working, a `vN`
+Status: M0 shipped (v0); M1 playable on Pages, not yet tagged (STATE.md lists the gaps). Every milestone ends with: CI green, the GitHub Pages link working, a `vN`
 Release, and Aaron able to play it.
 
 ## M0 · Pipeline proven (2026-10-02)
