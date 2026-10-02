@@ -1,0 +1,24 @@
+{
+  "name": "the-civil-war",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "The Civil War: a real-time browser battle game (plain JavaScript ES modules, three.js, no build step).",
+  "scripts": {
+    "serve": "node tools/serve.mjs",
+    "test": "node tools/test.mjs",
+    "vendor": "node tools/vendor.mjs"
+  },
+  "dependencies": {
+    "three": "0.186.1",
+    "three.quarks": "0.17.1",
+    "yuka": "0.7.8",
+    "zzfx": "1.4.0"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "pixelmatch": "^7.2.0",
+    "playwright": "^1.63.0",
+    "pngjs": "^7.0.0"
+  }
+}

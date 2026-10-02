@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Civil War</title>
+  <link rel="icon" href="data:,">
+  <meta name="description" content="The Civil War: a real-time battle game in the browser.">
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/build/three.module.js",
+      "three/addons/": "./vendor/three/examples/jsm/",
+      "yuka": "./vendor/yuka/build/yuka.module.js",
+      "three.quarks": "./vendor/three.quarks/dist/three.quarks.esm.js",
+      "quarks.core": "./vendor/quarks.core/dist/quarks.core.esm.js",
+      "zzfx": "./vendor/zzfx/ZzFX.js"
+    }
+  }
+  </script>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #1d1a16; }
+    body { font: 15px/1.4 Georgia, "Times New Roman", serif; color: #f4ecd8; }
+    #battlefield { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; }
+    #battlefield:focus { outline: none; }
+    #battlefield:focus-visible { outline: 3px solid #ffd27a; outline-offset: -3px; }
+    .hud {
+      position: fixed; top: 12px; left: 12px; max-width: min(28rem, calc(100vw - 24px));
+      padding: 10px 14px; border-radius: 6px;
+      background: rgba(22, 18, 13, 0.82); border: 1px solid rgba(244, 236, 216, 0.35);
+    }
+    .hud h1 { margin: 0 0 4px; font-size: 1.25rem; font-weight: normal; letter-spacing: 0.02em; }
+    .hud p { margin: 0; font-size: 0.9rem; }
+    .hud .fps { font-variant-numeric: tabular-nums; }
+    .hud button {
+      margin-top: 8px; font: inherit; font-size: 0.9rem; color: #1d1a16; background: #f4ecd8;
+      border: 2px solid #f4ecd8; border-radius: 4px; padding: 4px 10px; cursor: pointer;
+    }
+    .hud button:hover { background: #ffe9b8; }
+    /* Visible keyboard focus everywhere (WCAG 2.4.7 / 2.4.11). */
+    :focus-visible { outline: 3px solid #ffd27a; outline-offset: 2px; }
+    .visually-hidden {
+      position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <canvas id="battlefield" tabindex="0" role="img"
+            aria-label="Battlefield: a Union regiment marching in line across rolling farmland. Drag to orbit the camera, scroll to zoom."></canvas>
+    <section class="hud" aria-labelledby="hud-title">
+      <h1 id="hud-title">The Civil War</h1>
+      <p>FPS: <span id="fps" class="fps" aria-live="off">--</span></p>
+      <p id="status" role="status">Loading the battlefield…</p>
+      <button id="sound" type="button" aria-pressed="false">Sound</button>
+    </section>
+  </main>
+  <noscript><p class="hud">This game needs JavaScript and must be served over HTTP (run play.command).</p></noscript>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
