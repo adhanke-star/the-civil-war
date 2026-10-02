@@ -1,5 +1,17 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0011 — Rigged figures with a baked bone texture; no MSAA (Fable trial, branch figures-detail, 2026-10-02)
+Soldiers are a hand-built 12-bone rig (350/228/96 triangles at three distances) animated on the GPU from
+one float texture of baked bone matrices (clips keyframed in src/units/figure.js), not a CC0 glTF model:
+no loader, no asset to shrink, and the kepi/slouch-hat, pack and musket silhouettes are drawn at the
+13-17 px size that UG:G reads at. A back-face outline hull (1 / 0.7 px, none on the far level) gives the
+painted-miniature edge. Formation is two dense ranks plus a skirmish screen, column of fours on long
+marches (DECISIONS 0009's four loose ranks are superseded). State sits at the feet as halos; bodies are
+not tinted. Place names are traced from the system serif and extruded (the three.js typeface JSONs are
+MgOpen-licensed, outside the CC0/CC-BY asset rule). MSAA is off at every quality level: on the UHD 617,
+2x at scale 0.6 ran 30 fps in a fight where scale 0.7 without it ran 54. Real GPU after the change:
+High 30/24, Auto 37/34 (scale 1.3 -> 0.85), Low 46/39 (opening/fight); main was 31/27, 36/36, 46/46.
+
 ## 0010 — Graphics, movement and appearance first (Aaron, 2026-10-02)
 Before any new gameplay: detailed soldiers and guns (Aaron: the M1 ones are "block blobs"), UG:G-like
 movement (two dense ranks with skirmishers, column on roads, wheeling, charge swarm, rout scatter) and the

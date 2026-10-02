@@ -526,7 +526,7 @@ export class Unit {
       f.flash = Math.max(0, f.flash - dt * 9);
       const y = T.heightAt(f.x, f.z);
       pool.push(f.x, y, f.z, f.yaw, s, framePos(f.clip, f.clipT), f.prevPos, f.blend, f.flash, f.coatVar, f.trouserVar, f.prop ?? (infantry ? 1 : 0), 0);
-      if (halos) halos.push(f.x, y, f.z, f.yaw, 1.7, 1.1, haloKind, haloStr);
+      if (halos) halos.push(f.x, y, f.z, f.yaw, haloKind ? 2.6 : 1.7, haloKind ? 1.9 : 1.1, haloKind, haloStr);
     }
     if (this.officer) this.animateOfficer(dt, time);
   }

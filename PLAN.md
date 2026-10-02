@@ -26,6 +26,7 @@ AGENTS §1b bar on a small part of the field: Henry House Hill to Matthews Hill.
 **Play:** order a Union brigade up Henry House Hill against Jackson and watch the fight.
 **First (Aaron, DECISIONS 0010):** graphics, movement and appearance to the measured bar in
 docs/visual-reference.md (detailed figures and guns, two-rank lines, columns, per-man halos) before new gameplay.
+Done on branch `figures-detail` (Fable trial, DECISIONS 0011), awaiting Aaron's side-by-side judgement and merge.
 
 ## M2 · The fight (week of 2026-10-12)
 - Fire, casualties, morale, charge and rout, ported from the old Field rules: one universal combat

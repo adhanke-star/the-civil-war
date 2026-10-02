@@ -92,11 +92,12 @@ export function buildTrees(terrain, trees) {
     if (!chunks.has(key)) chunks.set(key, []);
     chunks.get(key).push(t);
   }
-  // Two levels of detail: ~80-triangle crowns near the camera, ~24 far away.
-  const canopy = canopyGeometry(5, 1, 8, 6);
+  // Two levels of detail: ~80-triangle crowns near the camera, ~30 far away (the far one carries most
+  // of the 15k trees at the battle zoom; the UHD 617 is fill-bound, so the near band is kept short).
+  const canopy = canopyGeometry(5, 1, 7, 5);
   const canopyLo = canopyGeometry(5, 1, 5, 3, 5);
-  const pine = pineGeometry();
-  const pineLo = pineGeometry(1, 6);
+  const pine = pineGeometry(3, 6);
+  const pineLo = pineGeometry(1, 5);
   const lods = [];
   const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
   const dummy = new THREE.Object3D();

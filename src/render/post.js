@@ -6,7 +6,7 @@
 //   saturation, purple-dark vignette, sRGB encode, dither.
 //
 // Quality (render scale = render pixels per CSS pixel):
-//   High: full device pixel ratio capped at 2.   Low: 0.7, no MSAA.
+//   High: full device pixel ratio capped at 2.   Low: 0.7.   No level uses MSAA (see _samplesFor).
 //   Auto (default): starts at High, or at the level for the GPU's detect-gpu tier once known; after 3 s averaging under 30 fps it steps one level down (two under
 //   18 fps); after 3 s over 50 fps it steps back up. A level that failed is not retried for 20 s.
 
@@ -118,11 +118,10 @@ export class Post {
     this.setMode(mode);
   }
 
-  // MSAA is the costliest pass on the UHD 617 (4x at scale 0.85 ran slower than no MSAA at 0.7):
-  // supersampled scales need none, lower scales get 2x, Low gets none.
-  _samplesFor(scale) {
-    if (this.mode === 'low' || scale >= 1.25) return 0;
-    return 2;
+  // MSAA is the costliest pass on the UHD 617: 2x at scale 0.6 ran 30 fps in a fight where scale 0.7
+  // without it ran 54, so no level uses it (the figures carry their own outline pass for crisp edges).
+  _samplesFor() {
+    return 0;
   }
 
   /**

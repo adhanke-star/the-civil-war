@@ -7,8 +7,8 @@
 import * as THREE from 'three';
 
 const SHADOW = [0.05, 0.04, 0.03, 0.34];
-const SELECTED = [0.5, 1.0, 0.3, 0.62];
-const UNDER_FIRE = [1.0, 0.22, 0.12, 0.6];
+const SELECTED = [0.45, 1.0, 0.25, 0.8];
+const UNDER_FIRE = [1.0, 0.2, 0.1, 0.75];
 
 export class HaloPool {
   constructor(capacity) {

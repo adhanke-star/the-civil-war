@@ -17,7 +17,7 @@ import { buildFigureGeometry, boneTexture, BONE_COUNT, CLIP_ROWS, fallenFrame } 
 export const FIGURE_SCALE = 4.4; // UG:G-style: figures are enlarged so they read as individuals from the battle camera
 export const LOD_NEAR = 300; // m from the camera: full detail inside, medium to LOD_FAR, far beyond
 export const LOD_FAR = 700;
-const OUTLINE_PX = { 2: 1.0, 1: 0.75, 0: 0.6 }; // outline width per level, in render pixels
+const OUTLINE_PX = { 2: 1.0, 1: 0.7, 0: 0 }; // outline width per level, in render pixels (0: no outline pass)
 
 const BONE_GLSL = /* glsl */ `
   attribute float aBone;
@@ -158,7 +158,7 @@ export class SoldierPool {
       mesh.name = `soldiers-${kit}-lod${lod}`;
       this.group.add(mesh);
       const b = { lod, mesh, anim, tint, n: 0, outline: null };
-      if (outline) {
+      if (outline && OUTLINE_PX[lod] > 0) {
         const o = new THREE.InstancedMesh(geo, outlineMaterial(OUTLINE_PX[lod]), capacity);
         o.instanceMatrix = mesh.instanceMatrix; // share the per-instance buffers
         o.frustumCulled = false;

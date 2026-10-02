@@ -130,7 +130,7 @@ function frame(now) {
   effects.update(game.paused ? 0 : dt * game.speed);
   arrows.update(game.units, 'US');
   rts.update(dt);
-  world.trees.userData.updateLod(camera, rts.dist + 450);
+  world.trees.userData.updateLod(camera, rts.dist + 200);
   hud.update(dt);
   if (game.orders && !tip.hidden) tip.hidden = true;
 

@@ -61,11 +61,16 @@ closer than its store shots, so this is the detail a player actually sees.
 - Lines advance and stay straight; turning is a wheel (the inner end slows). Long marches go in column on
   roads and deploy into line. A charge breaks into a sprint. A rout scatters. Skirmishers screen ahead.
 
-## Gap list for this repo (M1 build 3e2896c)
-- Figures are ~90-triangle merged boxes: no stride silhouette, no kepi brim or pack, no musket line at
-  battle zoom. Aaron: "block blobs".
-- Formation: four loose ranks (DECISIONS 0009). UG:G uses **two dense ranks** plus a skirmish screen.
-- No column on roads, no per-man state halos (bodies are tinted instead), no officer riders.
-- Guns are a cylinder, a box and two discs: no spokes. Limbers have box horses. No crew poses or recoil.
-- Buildings are flat-coloured boxes without painted windows. Trees are one lumpy sphere type plus simple cones.
-- Labels are painted flat, not extruded.
+## Gap list for this repo (branch figures-detail, 2026-10-02; main 3e2896c in brackets)
+- Figures: rigged 350-triangle men with kepi/slouch hat, pack, musket line, stride, aim/load/fire/charge/fall
+  clips and a 1-px outline. Still flat-coloured facets, no face or cloth detail, so up close (under 200 m)
+  they read as toy soldiers rather than UG:G's painted sprites. [was: ~90-triangle boxes, "block blobs"]
+- Formation: two dense ranks plus skirmish screen, column of fours on roads, charge swarm, rout scatter.
+  Wheeling pivots about the centre, not the inner end. [was: four loose ranks]
+- Per-man halos at the feet (green selected, red under fire) and an officer rider per brigade. [was: none]
+- Guns: spoked wheels, trail, Parrott breech band vs bronze tube, 3-man crew poses, recoil, limbers with
+  four-horse teams (six was standard) and mounted drivers. Horses' legs do not animate. [was: cylinder + box]
+- Buildings: window frames, doors, porches, chimneys, painted boards/shingles/stone. Still no textures. [was: flat boxes]
+- Trees: open stands with trunks, lumpier crowns, 3-tier conifers; still low-poly blobs up close. [was: carpet]
+- Labels: extruded 3D letters (traced system serif). [was: painted flat]
+- Still missing: stone walls, dead horses, textured ground detail up close, a warmer/darker grade.
