@@ -65,7 +65,17 @@ function traceLoops({ bits, w, h }) {
       const loop = [start];
       let cur = outs.pop();
       let guard = 0;
+      const seen = new Map([[k, 0]]);
       while (cur && (cur[0] !== start[0] || cur[1] !== start[1]) && guard++ < 200000) {
+        const ck = `${cur[0]},${cur[1]}`;
+        const prevIdx = seen.get(ck);
+        if (prevIdx !== undefined) {
+          // the walk came back to a vertex of this loop (a one-pixel pinch): cut the sub-loop out as its own
+          const sub = loop.splice(prevIdx);
+          for (const q of sub) seen.delete(`${q[0]},${q[1]}`);
+          if (sub.length > 6) loops.push(sub);
+        }
+        seen.set(ck, loop.length);
         loop.push(cur);
         const lst = next.get(`${cur[0]},${cur[1]}`);
         if (!lst || !lst.length) break;
@@ -119,29 +129,45 @@ const inside = (x, y, poly) => {
   return ok;
 };
 
-/** Shapes (with holes) for a word, in canvas pixels centred on the word, y up. */
+/** Shapes (with holes) for a word, in canvas pixels centred on the word, y up. Each glyph is traced alone
+ * (so touching letters such as "ry" in bold serif never merge into one self-touching polygon) and placed
+ * at its measured advance. */
 function textShapes(text, italic) {
-  const bm = textBitmap(text, italic);
-  const loops = traceLoops(bm).map((l) => simplify(l, 1.1)).filter((l) => l.length >= 3);
-  const outers = [], holes = [];
-  for (const l of loops) {
-    const a = area(l);
-    if (Math.abs(a) < 12) continue;
-    (a < 0 ? outers : holes).push(l); // y-down image: outer loops come out negative
+  const font = `${italic ? 'italic ' : ''}bold ${PX}px ${FONT}`;
+  const probe = document.createElement('canvas').getContext('2d');
+  probe.font = font;
+  const total = probe.measureText(text).width;
+  const shapes = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === ' ') continue;
+    const advance = probe.measureText(text.slice(0, i)).width;
+    const bm = textBitmap(ch, italic);
+    const loops = traceLoops(bm).map((l) => simplify(l, 1.1)).filter((l) => l.length >= 3);
+    const outers = [], holes = [];
+    for (const l of loops) {
+      const a = area(l);
+      if (Math.abs(a) < 12) continue;
+      (a < 0 ? outers : holes).push(l); // y-down image: outer loops come out negative
+    }
+    const glyph = outers.map((o) => ({ outer: o, holes: [], area: Math.abs(area(o)) }));
+    for (const hl of holes) {
+      let best = null;
+      for (const g of glyph) if (inside(hl[0][0], hl[0][1], g.outer) && (!best || g.area < best.area)) best = g;
+      if (best) best.holes.push(hl);
+    }
+    // the glyph was drawn centred in its own canvas; move it to its place in the word, centred on the word
+    const glyphW = probe.measureText(ch).width;
+    const dx = advance + glyphW / 2 - total / 2 - bm.w / 2;
+    const cy = bm.h / 2;
+    const toShape = (pts) => pts.map(([x, y]) => new THREE.Vector2(x + dx, cy - y));
+    for (const g of glyph) {
+      const shape = new THREE.Shape(toShape(g.outer));
+      for (const hl of g.holes) shape.holes.push(new THREE.Path(toShape(hl)));
+      shapes.push(shape);
+    }
   }
-  const shapes = outers.map((o) => ({ outer: o, holes: [], area: Math.abs(area(o)) }));
-  for (const hl of holes) {
-    let best = null;
-    for (const s of shapes) if (inside(hl[0][0], hl[0][1], s.outer) && (!best || s.area < best.area)) best = s;
-    if (best) best.holes.push(hl);
-  }
-  const cx = bm.w / 2, cy = bm.h / 2;
-  const toShape = (pts) => pts.map(([x, y]) => new THREE.Vector2(x - cx, cy - y));
-  return shapes.map((s) => {
-    const shape = new THREE.Shape(toShape(s.outer));
-    for (const hl of s.holes) shape.holes.push(new THREE.Path(toShape(hl)));
-    return shape;
-  });
+  return shapes;
 }
 
 /**
@@ -152,7 +178,7 @@ export function buildLabels(terrain, labels) {
   const group = new THREE.Group();
   group.name = 'labels';
   const geos = [];
-  const face = new THREE.Color('#efdca8'), faceHi = new THREE.Color('#fff4cf'), side = new THREE.Color('#4a3618');
+  const face = new THREE.Color('#cfc08c'), faceHi = new THREE.Color('#e9dcae'), side = new THREE.Color('#4a3618');
   for (const L of labels) {
     let shapes;
     try { shapes = textShapes(L.text, !!L.italic); } catch (err) { console.warn(`label trace failed for "${L.text}":`, err.message); shapes = []; }

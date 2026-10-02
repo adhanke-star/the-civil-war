@@ -316,6 +316,14 @@ export function placeTrees(terrain, streams, roadField, streamField, parcels, { 
   const nearRoad = (x, z, d) => roadField.dist(x, z) < d;
   const nearStream = (x, z, d) => streamField.dist(x, z) < d;
   const nearSite = (x, z, d) => PLAN.sites.some((s) => Math.hypot(s.x - x, s.z - z) < d * BUILDING_SCALE * 0.8);
+  // no lone trees on a place name (the 3D letters would be hidden under a crown)
+  const onLabel = (x, z) => PLAN.labels.some((L) => {
+    const h = L.height || 40;
+    const c = Math.cos(L.angle || 0), sn = Math.sin(L.angle || 0);
+    const dx = x - L.x, dz = z - L.z;
+    const along = dx * c + dz * sn, across = -dx * sn + dz * c;
+    return Math.abs(along) < 0.32 * h * L.text.length + h && Math.abs(across) < 0.75 * h;
+  });
 
   // Woods: a jittered grid of open stands (crowns 5-7.5 m, 13 m apart, so grass shows between them),
   // with conifers grouped where the noise is high and mixed in singly elsewhere.
@@ -354,7 +362,7 @@ export function placeTrees(terrain, streams, roadField, streamField, parcels, { 
   for (let i = 0; i < 16000; i++) {
     const x = (rnd() * 2 - 1) * half;
     const z = (rnd() * 2 - 1) * half;
-    if (inWoods(x, z) || nearRoad(x, z, 8) || nearSite(x, z, 30)) continue;
+    if (inWoods(x, z) || nearRoad(x, z, 8) || nearSite(x, z, 30) || onLabel(x, z)) continue;
     const p = parcels.lookup(x, z, 6);
     if (p.edge) {
       if (hash2(p.id, 3.3) < 0.5) trees.push([x, z, 3.8 + rnd() * 2.4, 0]);
