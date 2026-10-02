@@ -169,6 +169,7 @@ export class Combat {
     u.ammo = Math.max(0, u.ammo - (isArt ? 1.0 : 1.2)); // about 80 volleys (~7 sim min) per full box
     u.shots = (u.shots || 0) + 1;
     u.kills = (u.kills || 0) + cas;
+    u.fireT = time; // guns recoil, men flash (battery.js, unit.js)
     if (this.fx) {
       if (isArt) this.fx.boom(u, t, d <= CANISTER);
       else this.fx.volley(u, u.volley(time));
@@ -226,6 +227,7 @@ export class Combat {
     u.morale -= ((cas / u.menMax) * 150) / rally;
     const enemies = this.enemiesOf(u);
     const nearest = enemies.reduce((m, e) => Math.min(m, Math.hypot(e.x - u.x, e.z - u.z)), Infinity);
+    u.nearestEnemy = nearest; // the brigade marches in column only with no enemy near (unit.js)
     if (u.underFire > 0) u.morale -= (0.12 / u.cover) * dt; // men in woods or behind walls feel it less
     if (u.flanked > 0) u.morale -= 0.6 * dt;
     if (u.ammo < 18) u.morale -= 0.15 * dt;

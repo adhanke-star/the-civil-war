@@ -125,6 +125,7 @@ function frame(now) {
   const dt = Math.min(0.1, realDt); // capped, for simulation and camera
   last = now;
   const simDt = game.step(dt);
+  game.setView(camera, window.innerHeight * post.scale);
   game.animate(simDt);
   effects.update(game.paused ? 0 : dt * game.speed);
   arrows.update(game.units, 'US');
@@ -146,6 +147,8 @@ function frame(now) {
     stats.scale = post.scale;
     stats.quality = post.mode;
     stats.figures = game.figureCount();
+    stats.figureTriangles = game.figureTriangles();
+    stats.lod = game.pools.US.buckets.map((b) => b.n).join('/') + ' ' + game.pools.CS.buckets.map((b) => b.n).join('/');
     stats.simTime = Math.round(game.simTime);
     stats.puffs = effects.puffs;
     fpsEl.textContent = stats.fps.toFixed(0);

@@ -1,9 +1,11 @@
 // src/game.js: the battle: units, simulation clock, orders, AI, objective, victory.
 
 import { EntityManager } from 'yuka';
-import { Unit } from './units/unit.js';
+import { Unit, MEN_PER_FIGURE, MEN_PER_CREW_FIGURE } from './units/unit.js';
 import { Battery, GunPool } from './units/battery.js';
-import { SoldierPool, UNIFORMS } from './units/soldier-mesh.js';
+import { SoldierPool, FallenPool, UNIFORMS } from './units/soldier-mesh.js';
+import { HaloPool } from './units/halos.js';
+import { HorsePool, HORSE_COATS } from './units/mounts.js';
 import { Combat, CLOCK_RATIO } from './sim/combat.js';
 import { Ai } from './sim/ai.js';
 import { mulberry32, inWoods, PLAN } from './world/landscape.js';
@@ -27,24 +29,33 @@ export class Game {
     this.over = false;
 
     const defs = scenario.units;
-    const figs = (side) => defs.filter((d) => d.side === side).reduce((s, d) => s + Math.round(d.men / 10) + 4, 0);
+    // figures per side: one per 10 men (4 per crew figure in a battery), plus an officer and slack
+    const figs = (side) => defs.filter((d) => d.side === side).reduce((s, d) => s + Math.round(d.men / (d.type === 'artillery' ? MEN_PER_CREW_FIGURE : MEN_PER_FIGURE)) + 6, 0);
+    const outline = !/\boutline=0\b/.test(globalThis.location ? location.search : '');
     this.pools = {
-      US: new SoldierPool(figs('US'), UNIFORMS.US),
-      CS: new SoldierPool(figs('CS'), UNIFORMS.CS),
+      US: new SoldierPool(figs('US'), UNIFORMS.US, { kit: 'US', outline }),
+      CS: new SoldierPool(figs('CS'), UNIFORMS.CS, { kit: 'CS', outline }),
     };
     this.fallen = {
-      US: new SoldierPool(figs('US'), UNIFORMS.US),
-      CS: new SoldierPool(figs('CS'), UNIFORMS.CS),
+      US: new FallenPool(figs('US'), UNIFORMS.US, { kit: 'US' }),
+      CS: new FallenPool(figs('CS'), UNIFORMS.CS, { kit: 'CS' }),
     };
-    this.gunPool = new GunPool(defs.reduce((s, d) => s + (d.guns || 0), 0) + 1);
-    for (const p of [this.pools.US, this.pools.CS, this.fallen.US, this.fallen.CS]) scene.add(p.mesh);
-    scene.add(this.gunPool.guns, this.gunPool.limbers);
+    this.halos = new HaloPool(figs('US') + figs('CS'));
+    this.horses = new HorsePool(defs.length + 2);
+    const gunsOf = (side) => defs.filter((d) => d.side === side).reduce((s, d) => s + (d.guns || 0), 0);
+    this.gunPool = new GunPool({ US: gunsOf('US'), CS: gunsOf('CS') });
+    for (const p of [this.pools.US, this.pools.CS, this.fallen.US, this.fallen.CS, this.halos, this.horses]) scene.add(p.mesh);
+    scene.add(...this.gunPool.meshes);
 
     this.entities = new EntityManager();
     this.units = defs.map((d, k) => {
       const u = d.type === 'artillery'
         ? new Battery(d, this.pools[d.side], this.gunPool, terrain, 100 + k)
         : new Unit(d, this.pools[d.side], terrain, 100 + k);
+      u.halos = this.halos;
+      u.horses = this.horses;
+      u.fallenPool = this.fallen[d.side];
+      if (u.officer) u.officer.coat = HORSE_COATS[k % HORSE_COATS.length];
       this.entities.add(u.vehicle);
       return u;
     });
@@ -208,8 +219,17 @@ export class Game {
     return this.simTime;
   }
 
-  /** Animate figures with the (speed-scaled) sim delta; upload buffers. */
+  /** Level of detail and outline width follow the camera (call before animate). */
+  setView(camera, renderHeightPx) {
+    this.pools.US.setView(camera, renderHeightPx);
+    this.pools.CS.setView(camera, renderHeightPx);
+  }
+
+  /** Animate figures with the (speed-scaled) sim delta; refill and upload the instance buffers. */
   animate(simDt) {
+    this.pools.US.begin();
+    this.pools.CS.begin();
+    this.halos.begin();
     for (const u of this.units) u.animate(simDt, this.simTime);
     this.flushAll();
   }
@@ -219,7 +239,14 @@ export class Game {
     this.pools.CS.flush();
     this.fallen.US.flush();
     this.fallen.CS.flush();
+    this.halos.flush();
+    this.horses.flush();
     this.gunPool.flush();
+  }
+
+  /** Figure triangles submitted this frame (both sides, all levels of detail, with outlines). */
+  figureTriangles() {
+    return this.pools.US.trianglesDrawn() + this.pools.CS.trianglesDrawn();
   }
 
   figureCount() {
