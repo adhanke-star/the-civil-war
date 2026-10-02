@@ -61,7 +61,7 @@ const scenario = await (await fetch('./assets/scenarios/henry-hill.json')).json(
 const world = buildWorld(scene, terrain, scenario);
 Object.assign(stats, world.stats);
 
-const rts = new RtsCamera(camera, terrain, { target: [-130, 280], yaw: -Math.PI / 2 - 0.12, pitch: 0.95, dist: 920 });
+const rts = new RtsCamera(camera, terrain, { target: [-110, 290], yaw: -Math.PI / 2 - 0.12, pitch: 0.95, dist: 840 });
 const effects = new Effects(scene, terrain, rts);
 await effects.init();
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');

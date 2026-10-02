@@ -10,7 +10,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-export const FIGURE_SCALE = 3.0; // figures are enlarged so they read from the battle camera
+export const FIGURE_SCALE = 4.4; // UG:G-style: figures are enlarged so they read as individuals from the battle camera
 
 const PART = { BODY: 0, LEG_L: 1, LEG_R: 2, ARMS: 3, MUSKET: 4 };
 const MAT = { FIXED: 0, COAT: 1, TROUSER: 2, TIP: 3, HAT: 4 };

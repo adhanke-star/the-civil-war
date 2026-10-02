@@ -1,5 +1,10 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0009 — UG:G-style scale stylisation (2026-10-02)
+After side-by-side review against the UG:G references: figures 4.4x life size in four loose ranks
+(one figure = 10 men, so frontage is already ~3x compressed), farm buildings 1.8x, and a darker, cooler
+grade with violet corners. Historical formation was two ranks; the deeper block is a readability choice.
+
 ## 0008 — Voronoi fields replace the row patchwork (2026-10-02)
 d3-delaunay 6.0.4 (ISC, with delaunator and robust-predicates' orient2d; +53 KB) builds relaxed,
 domain-warped Voronoi fields split where roads and streams cross. Side by side with the patchwork and

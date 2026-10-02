@@ -1,7 +1,7 @@
 // src/units/unit.js: a brigade (or battery) on the field: formation, movement, figures, state.
 //
 // The unit's anchor is a Yuka Vehicle steered along the order path (FollowPathBehavior, which arrives at
-// the last waypoint). Each figure owns a formation slot (two loose ranks) and walks to it with its own
+// the last waypoint). Each figure owns a formation slot (four loose ranks) and walks to it with its own
 // pace, so lines wheel, ripple and compact as men fall. One figure stands for MEN_PER_FIGURE men.
 //
 // Directions: yaw/facing f means forward = (sin f, cos f) in (x, z); lateral = (cos f, -sin f).
@@ -12,8 +12,11 @@ import { mulberry32 } from '../world/landscape.js';
 
 export const MEN_PER_FIGURE = 10;
 export const SPEED = { walk: 4.4, run: 7.4, charge: 8.4, fallback: 3.0, rout: 8.6 };
-const FILE_SPACING = 1.75;
-const RANK_SPACING = 2.8;
+// Four loose ranks (a stylisation like UG:G's: one figure stands for 10 men, so frontage is already
+// compressed about threefold; a deeper block reads as a brigade from the battle camera).
+const FILE_SPACING = 2.6;
+const RANK_SPACING = 4.2;
+const RANKS = 4;
 const TURN_RATE = 0.55; // rad/s for a whole line
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -80,7 +83,7 @@ export class Unit {
         i: pool.alloc(),
         alive: true,
         x: def.x, z: def.z, yaw: def.facing,
-        jx: (this.rnd() - 0.5) * 0.9, jz: (this.rnd() - 0.5) * 1.2,
+        jx: (this.rnd() - 0.5) * 1.3, jz: (this.rnd() - 0.5) * 1.8,
         pace: 0.9 + this.rnd() * 0.25,
         phase: this.rnd() * Math.PI * 2,
         aim: 0, flash: 0, fireAt: -1,
@@ -104,7 +107,7 @@ export class Unit {
   /** Assign two-rank slots to living figures, keeping men on the same side of the line. */
   layout() {
     const live = this.figures.filter((f) => f.alive);
-    const ranks = live.length > 24 ? 2 : 1;
+    const ranks = live.length > 36 ? RANKS : live.length > 12 ? 2 : 1;
     const files = Math.ceil(live.length / ranks);
     live.sort((a, b) => a.lx - b.lx || a.rank - b.rank);
     for (let k = 0; k < live.length; k++) {
@@ -112,7 +115,7 @@ export class Unit {
       const rank = k % ranks;
       const f = live[k];
       f.lx = (file - (files - 1) / 2) * FILE_SPACING;
-      f.lz = (ranks === 2 ? (rank === 0 ? 0.5 : -0.5) : 0) * RANK_SPACING;
+      f.lz = ((ranks - 1) / 2 - rank) * RANK_SPACING;
       f.rank = rank;
     }
     this.halfFront = Math.max(4, ((files - 1) / 2) * FILE_SPACING);

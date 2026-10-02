@@ -8,7 +8,7 @@
 // Canvas row 0 is the north edge (z = -half); textures use flipY = false to match the terrain UVs.
 
 import * as THREE from 'three';
-import { fieldTypeFor, PLAN, hash2, valueNoise } from './landscape.js';
+import { fieldTypeFor, PLAN, hash2, valueNoise, BUILDING_SCALE } from './landscape.js';
 
 const P_RES = 1024; // parcel/info resolution
 
@@ -100,7 +100,7 @@ export function paintGround(terrain, parcels, roads, streams, trees, sunDir) {
   // Farmyards: trodden earth around each site.
   for (const s of PLAN.sites) {
     const [gx, gz] = toG(s.x, s.z);
-    const rad = (s.yard || 30) * S;
+    const rad = (s.yard || 30) * BUILDING_SCALE * S;
     const grd = ctx.createRadialGradient(gx, gz, rad * 0.2, gx, gz, rad);
     grd.addColorStop(0, 'rgba(150,118,72,0.85)');
     grd.addColorStop(0.7, 'rgba(120,104,58,0.45)');
@@ -161,8 +161,9 @@ export function paintGround(terrain, parcels, roads, streams, trees, sunDir) {
     ctx.fill();
   }
   for (const s of PLAN.sites) {
-    for (const b of s.buildings || []) {
-      const [bx, bz, w, d, h, rot] = b;
+    for (const b0 of s.buildings || []) {
+      const [bx, bz, w, d, h] = b0.slice(0, 5).map((v) => v * BUILDING_SCALE);
+      const rot = b0[5];
       const c = Math.cos(s.rot || 0), sn = Math.sin(s.rot || 0);
       const wx = s.x + bx * c - bz * sn;
       const wz = s.z + bx * sn + bz * c;

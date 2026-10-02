@@ -87,14 +87,14 @@ export class Post {
         col = aces(col * uExposure);
         // grade: cool violet shadows, warm golden highlights
         float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
-        vec3 shadowTint = vec3(0.8, 0.84, 1.12);
-        vec3 highTint = vec3(1.06, 1.0, 0.86);
+        vec3 shadowTint = vec3(0.78, 0.84, 1.16);
+        vec3 highTint = vec3(1.05, 1.0, 0.88);
         col *= mix(shadowTint, highTint, smoothstep(0.05, 0.75, l));
         col = mix(vec3(l), col, uSaturation);
         // vignette toward deep violet
         vec2 q = (vUv - 0.5) * vec2(uAspect, 1.0);
         float v = smoothstep(0.32, 1.0, length(q * vec2(0.8, 1.1)));
-        col = mix(col, col * vec3(0.32, 0.26, 0.42), v * uVignette);
+        col = mix(col, col * vec3(0.3, 0.25, 0.46) + vec3(0.012, 0.008, 0.03), min(1.0, v * uVignette));
         col = clamp(col, 0.0, 1.0);
         // sRGB encode
         col = mix(col * 12.92, 1.055 * pow(col, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, col));
@@ -107,9 +107,9 @@ export class Post {
       uTiltCenter: { value: 0.42 },
       uTiltBand: { value: 0.14 },
       uTilt: { value: 0.9 },
-      uExposure: { value: 0.74 },
-      uSaturation: { value: 0.96 },
-      uVignette: { value: 1.25 },
+      uExposure: { value: 0.66 },
+      uSaturation: { value: 0.86 },
+      uVignette: { value: 1.55 },
     });
 
     // governor

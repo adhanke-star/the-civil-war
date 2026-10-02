@@ -22,6 +22,10 @@ export function mulberry32(seed) {
   };
 }
 
+// Farm buildings are drawn at BUILDING_SCALE x life size, like the figures (a UG:G stylisation), so a
+// farm reads from the battle camera; footprints, spacing, yards and shadows scale together.
+export const BUILDING_SCALE = 1.8;
+
 export function hash2(x, z) {
   const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453123;
   return s - Math.floor(s);
@@ -281,10 +285,10 @@ export class VoronoiParcels {
 // Field types and their painted colours (sRGB). Late July 1861: wheat already cut (golden stubble and
 // shocks), corn tall and dark, oats ripening, most ground in pasture or hay meadow.
 export const FIELD_TYPES = [
-  { name: 'pasture', weight: 30, color: [86, 98, 42], stroke: 0.55 },
-  { name: 'pasture-dark', weight: 22, color: [68, 80, 35], stroke: 0.5 },
-  { name: 'meadow', weight: 14, color: [104, 110, 50], stroke: 0.8 },
-  { name: 'hay', weight: 8, color: [136, 130, 62], stroke: 1.0 },
+  { name: 'pasture', weight: 32, color: [80, 92, 42], stroke: 0.55 },
+  { name: 'pasture-dark', weight: 24, color: [64, 76, 34], stroke: 0.5 },
+  { name: 'meadow', weight: 12, color: [96, 104, 48], stroke: 0.8 },
+  { name: 'hay', weight: 6, color: [128, 122, 60], stroke: 1.0 },
   { name: 'wheat-stubble', weight: 6, color: [192, 156, 62], stroke: 1.0 },
   { name: 'oats', weight: 4, color: [148, 136, 64], stroke: 1.0 },
   { name: 'corn', weight: 12, color: [56, 76, 31], stroke: 1.0 },
@@ -311,7 +315,7 @@ export function placeTrees(terrain, streams, roadField, streamField, parcels, { 
   const half = terrain.half - 8;
   const nearRoad = (x, z, d) => roadField.dist(x, z) < d;
   const nearStream = (x, z, d) => streamField.dist(x, z) < d;
-  const nearSite = (x, z, d) => PLAN.sites.some((s) => Math.hypot(s.x - x, s.z - z) < d);
+  const nearSite = (x, z, d) => PLAN.sites.some((s) => Math.hypot(s.x - x, s.z - z) < d * BUILDING_SCALE * 0.8);
 
   // Woods: jittered grid.
   const W = 10.5;

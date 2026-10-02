@@ -6,7 +6,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mulberry32 } from './landscape.js';
+import { mulberry32, BUILDING_SCALE } from './landscape.js';
 
 function colorize(geo, color) {
   const c = new THREE.Color(color);
@@ -41,7 +41,7 @@ function canopyGeometry(seed, flat = 1, segW = 7, segH = 5) {
   const col = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) {
     const t = THREE.MathUtils.clamp((pos.getY(i) + 0.4) / 1.4, 0, 1);
-    const k = 0.45 + t * 0.65;
+    const k = 0.34 + t * 0.62;
     col.set([k, k, k], i * 3);
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
@@ -175,10 +175,13 @@ const BUILDING_STYLES = {
   shed: (w, d, h) => gableHouse({ w, d, h, roof: 0.45, wall: '#7d6247', roofCol: '#4a4038', trim: '#3a2c20', chimneys: 0 }),
 };
 
+
 export function buildBuildings(terrain, sites) {
   const geos = [];
   for (const s of sites) {
-    for (const b of s.buildings || []) {
+    for (const b0 of s.buildings || []) {
+      const k = BUILDING_SCALE;
+      const b = [b0[0] * k, b0[1] * k, b0[2] * k, b0[3] * k, b0[4] * k, b0[5], b0[6]];
       const [bx, bz, w, d, h, rot, style] = b;
       const make = BUILDING_STYLES[style] || BUILDING_STYLES['frame-house'];
       const g = make(w, d, h);

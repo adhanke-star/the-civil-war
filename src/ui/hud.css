@@ -64,9 +64,9 @@ button { font: inherit; color: var(--text); }
 #objective { bottom: 12px; left: 82px; margin: 0; padding: 8px 12px; font-size: 13px; max-width: 46vw; }
 #objective:empty { display: none; }
 #perf { bottom: 12px; right: 12px; margin: 0; padding: 4px 8px; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
-#tip { bottom: 80px; left: 50%; transform: translateX(-50%); margin: 0; padding: 8px 14px; font-size: 14px; max-width: min(640px, 90vw); text-align: center; }
+#tip { top: 60px; left: 50%; transform: translateX(-50%); margin: 0; padding: 8px 14px; font-size: 14px; max-width: min(640px, 90vw); text-align: center; pointer-events: none; } /* never covers a brigade */
 #tip[hidden] { display: none; }
-#toasts { position: fixed; top: 64px; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; pointer-events: none; }
+#toasts { position: fixed; top: 116px; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; pointer-events: none; }
 #toasts p { margin: 0; padding: 6px 12px; background: var(--panel); border-radius: 6px; font: 15px Georgia, serif; text-align: center; animation: fade 5s forwards; }
 @keyframes fade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
 
