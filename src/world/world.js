@@ -2,10 +2,12 @@
 
 import * as THREE from 'three';
 import { buildTerrainMesh, buildApron } from './terrain.js';
-import { Parcels, LineField, setPlan, placeTrees, placeFences, PLAN } from './landscape.js';
+import { Parcels, VoronoiParcels, LineField, setPlan, placeTrees, placeFences, PLAN } from './landscape.js';
 import { paintGround } from './ground-paint.js';
 import { buildTrees, buildBuildings, buildFences } from './props.js';
 import { buildLabels } from './labels.js';
+
+export const DEFAULT_PARCELS = 'voronoi';
 
 export function makeSun() {
   // Mid-afternoon sun from the west-south-west (direction points toward the sun).
@@ -24,11 +26,14 @@ export function buildWorld(scene, terrain, scenario) {
   const meta = terrain.meta;
   const pike = meta.roads.find((r) => r.name === 'Warrenton Turnpike');
   const a = pike.points[0], b = pike.points[pike.points.length - 1];
-  const parcels = new Parcels({ angle: Math.atan2(b[1] - a[1], b[0] - a[0]) });
+  const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
 
   const t0 = performance.now();
   const roadField = new LineField(terrain.half, meta.roads);
   const streamField = new LineField(terrain.half, meta.streams);
+  // ?parcels=grid|voronoi picks the field generator (comparison switch; default per DECISIONS 0008)
+  const kind = new URLSearchParams(globalThis.location ? location.search : '').get('parcels') || DEFAULT_PARCELS;
+  const parcels = kind === 'grid' ? new Parcels({ angle }) : new VoronoiParcels({ angle, half: terrain.half, roadField, streamField });
   const trees = placeTrees(terrain, meta.streams, roadField, streamField, parcels);
   const fences = placeFences(terrain, meta.roads, parcels);
   const fenceField = new LineField(terrain.half, fences.map(([x, z, a, l]) => {

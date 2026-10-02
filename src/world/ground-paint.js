@@ -45,7 +45,7 @@ export function paintGround(terrain, parcels, roads, streams, trees, sunDir) {
   const ictx = iCanvas.getContext('2d', { willReadFrequently: true });
   const iImg = ictx.createImageData(P_RES, P_RES);
   const woodsFloor = [40, 54, 24];
-  const angleByte = Math.round(((((parcels.angle % Math.PI) + Math.PI) % Math.PI) / Math.PI) * 255);
+  const angleByte = (a) => Math.round(((((a % Math.PI) + Math.PI) % Math.PI) / Math.PI) * 255);
   for (let py = 0; py < P_RES; py++) {
     const z = ((py + 0.5) / P_RES) * size - half;
     for (let px = 0; px < P_RES; px++) {
@@ -68,8 +68,7 @@ export function paintGround(terrain, parcels, roads, streams, trees, sunDir) {
         b = b * (1 - woods) + woodsFloor[2] * n * woods;
       }
       pImg.data[k] = r; pImg.data[k + 1] = g; pImg.data[k + 2] = b; pImg.data[k + 3] = 255;
-      // Stroke direction: the patchwork axis, turned 90 degrees in alternate parcels.
-      iImg.data[k] = hash2(p.id, 5.1) < 0.5 ? angleByte : (angleByte + 128) & 255;
+      iImg.data[k] = angleByte(parcels.strokeAngle(p.id)); // brush-stroke (furrow/mowing) direction
       iImg.data[k + 1] = Math.round(t.stroke * (1 - woods) * (1 - 0.7 * e) * 255);
       iImg.data[k + 2] = Math.round(tint * 255);
       iImg.data[k + 3] = 255;

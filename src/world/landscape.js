@@ -1,10 +1,15 @@
 // src/world/landscape.js: the 1861 farmland plan for the Henry House Hill to Matthews Hill slice.
 //
 // Pure data and deterministic generation (no three.js, no DOM) so tools can import it too.
+// Two parcel generators share one interface (lookup -> { id, dist, edge, edgeAngle }; strokeAngle(id)):
+// Parcels (a warped row/column patchwork) and VoronoiParcels (relaxed Voronoi cells split by roads and
+// streams, via d3-delaunay). DECISIONS 0008 records which one the game uses and why.
 // Real, sourced geometry: roads and streams (USGS, in the terrain asset), farm sites (PLAN.sites, cited in
 // assets/scenarios/henry-hill.json). Illustrative, NOT sourced: the exact field parcel boundaries and crop
 // colours (generated from a seeded patchwork aligned with the Warrenton Turnpike) and the precise edges of
 // the woods (drawn from the period descriptions cited in PLAN.woodsNote). See DECISIONS.md 0004.
+
+import { Delaunay } from 'd3-delaunay';
 
 export function mulberry32(seed) {
   let a = seed >>> 0;
@@ -161,7 +166,115 @@ export class Parcels {
     const dCol = Math.min(u - cols[a], cols[a + 1] - u);
     // axis 0: the nearest boundary runs along u (the turnpike direction); 1: across it.
     const dist = Math.min(dRow, dCol);
-    return { id: lo * 1000 + a, edge: dist < edgeWidth, dist, axis: dRow < dCol ? 0 : 1 };
+    // the nearest boundary runs along u (the turnpike direction) or across it
+    return { id: lo * 1000 + a, edge: dist < edgeWidth, dist, edgeAngle: this.angle + (dRow < dCol ? 0 : Math.PI / 2) };
+  }
+
+  /** Furrow/mowing direction: the patchwork axis, turned 90 degrees in alternate parcels. */
+  strokeAngle(id) {
+    return this.angle + (hash2(id, 5.1) < 0.5 ? 0 : Math.PI / 2);
+  }
+}
+
+/**
+ * Relaxed Voronoi fields: jittered seeds with uneven density, two Lloyd passes, a gentle domain warp
+ * for curved hedges, and cells split where a road or stream crosses them (connected regions of a 4 m
+ * raster with roads and streams as walls).
+ */
+export class VoronoiParcels {
+  constructor({ angle, half, roadField, streamField, seed = 1861, spacing = 230 }) {
+    this.angle = angle;
+    const rnd = mulberry32(seed);
+    const E = half + 320;
+    let pts = [];
+    for (let z = -E; z <= E; z += spacing) {
+      for (let x = -E; x <= E; x += spacing) {
+        pts.push(x + (rnd() - 0.5) * spacing * 0.9, z + (rnd() - 0.5) * spacing * 0.9);
+        // some ground is cut into smaller fields
+        if (valueNoise(x * 0.0018 + 4, z * 0.0018) > 0.58) pts.push(x + (rnd() - 0.5) * spacing, z + (rnd() - 0.5) * spacing);
+      }
+    }
+    let delaunay = Delaunay.from({ length: pts.length / 2 }, (_, i) => pts[i * 2], (_, i) => pts[i * 2 + 1]);
+    for (let it = 0; it < 2; it++) {
+      const vor = delaunay.voronoi([-E, -E, E, E]);
+      const next = [];
+      for (let i = 0; i < pts.length / 2; i++) {
+        const poly = vor.cellPolygon(i);
+        if (!poly) { next.push(pts[i * 2], pts[i * 2 + 1]); continue; }
+        let cx = 0, cz = 0, A = 0;
+        for (let k = 0; k < poly.length - 1; k++) {
+          const [x0, z0] = poly[k], [x1, z1] = poly[k + 1];
+          const c = x0 * z1 - x1 * z0;
+          A += c; cx += (x0 + x1) * c; cz += (z0 + z1) * c;
+        }
+        next.push(cx / (3 * A), cz / (3 * A));
+      }
+      pts = next;
+      delaunay = Delaunay.from({ length: pts.length / 2 }, (_, i) => pts[i * 2], (_, i) => pts[i * 2 + 1]);
+    }
+    this.delaunay = delaunay;
+    this.P = delaunay.points;
+    this.nbrs = [];
+    for (let i = 0; i < pts.length / 2; i++) this.nbrs.push(Int32Array.from(delaunay.neighbors(i)));
+    this.last = 0;
+
+    // Regions split by roads and streams.
+    this.half = half;
+    this.rc = 4;
+    const n = (this.rn = Math.ceil((2 * half) / this.rc) + 1);
+    const reg = (this.reg = new Int16Array(n * n).fill(-2));
+    for (let gz = 0; gz < n; gz++) {
+      for (let gx = 0; gx < n; gx++) {
+        const x = gx * this.rc - half, z = gz * this.rc - half;
+        if (roadField.dist(x, z) < 5 || streamField.dist(x, z) < 3) reg[gz * n + gx] = -1;
+      }
+    }
+    let label = 0;
+    const stack = [];
+    for (let k = 0; k < n * n; k++) {
+      if (reg[k] !== -2) continue;
+      reg[k] = label;
+      stack.push(k);
+      while (stack.length) {
+        const c = stack.pop();
+        const cx = c % n, cz = (c - cx) / n;
+        if (cx > 0 && reg[c - 1] === -2) { reg[c - 1] = label; stack.push(c - 1); }
+        if (cx < n - 1 && reg[c + 1] === -2) { reg[c + 1] = label; stack.push(c + 1); }
+        if (cz > 0 && reg[c - n] === -2) { reg[c - n] = label; stack.push(c - n); }
+        if (cz < n - 1 && reg[c + n] === -2) { reg[c + n] = label; stack.push(c + n); }
+      }
+      label++;
+    }
+    this.regions = label;
+  }
+
+  regionAt(x, z) {
+    const gx = Math.max(0, Math.min(this.rn - 1, Math.round((x + this.half) / this.rc)));
+    const gz = Math.max(0, Math.min(this.rn - 1, Math.round((z + this.half) / this.rc)));
+    return this.reg[gz * this.rn + gx];
+  }
+
+  lookup(x, z, edgeWidth = 0) {
+    const wx = x + (valueNoise(x * 0.004 + 3.1, z * 0.004) - 0.5) * 80 + (valueNoise(x * 0.021, z * 0.021 + 7) - 0.5) * 12;
+    const wz = z + (valueNoise(x * 0.004, z * 0.004 - 5.3) - 0.5) * 80 + (valueNoise(x * 0.021 + 2, z * 0.021) - 0.5) * 12;
+    const i = (this.last = this.delaunay.find(wx, wz, this.last));
+    const P = this.P;
+    const ax = P[i * 2], az = P[i * 2 + 1];
+    const da2 = (wx - ax) ** 2 + (wz - az) ** 2;
+    let dist = Infinity, edgeAngle = this.angle;
+    for (const j of this.nbrs[i]) {
+      const bx = P[j * 2], bz = P[j * 2 + 1];
+      const ab = Math.hypot(bx - ax, bz - az) || 1;
+      const d = ((wx - bx) ** 2 + (wz - bz) ** 2 - da2) / (2 * ab);
+      if (d < dist) { dist = d; edgeAngle = Math.atan2(bz - az, bx - ax) + Math.PI / 2; }
+    }
+    const r = this.regionAt(x, z);
+    return { id: i * 64 + ((r + 64) & 63), edge: dist < edgeWidth, dist, edgeAngle };
+  }
+
+  /** Each field ploughed or mown along its own direction, loosely following the turnpike grain. */
+  strokeAngle(id) {
+    return this.angle + (hash2(id, 5.1) - 0.5) * 1.2 + (hash2(id, 8.3) < 0.4 ? Math.PI / 2 : 0);
   }
 }
 
@@ -302,8 +415,7 @@ export function placeFences(terrain, roads, parcels, { seed = 7 } = {}) {
     if (!near || inWoods(x, z)) continue;
     const p = parcels.lookup(x, z, 2.2);
     if (!p.edge) continue;
-    const ang = parcels.angle + (p.axis ? Math.PI / 2 : 0);
-    segs.push([x, z, ang + (rnd() < 0.5 ? 0.3 : -0.3), SEG]);
+    segs.push([x, z, p.edgeAngle + (rnd() < 0.5 ? 0.3 : -0.3), SEG]);
   }
   return segs;
 }

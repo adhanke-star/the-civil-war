@@ -37,6 +37,9 @@ const ENTRIES = [
   '@mapbox/martini/index.js',
   'detect-gpu/dist/detect-gpu.esm.js',
   'lil-gui/dist/lil-gui.esm.min.js', // dev-only ?tune panel (src/dev/tune.js); never loaded for players
+  'd3-delaunay/src/index.js', // Voronoi field parcels; imports 'delaunator', which imports 'robust-predicates'
+  'delaunator/index.js',
+  'robust-predicates/esm/orient2d.js', // delaunator needs only orient2d; mapping the bare name here skips ~65 KB
 ];
 
 // Data folders copied verbatim (no import following): detect-gpu's GPU benchmark tables, so the game

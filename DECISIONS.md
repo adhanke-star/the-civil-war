@@ -1,5 +1,12 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0008 — Voronoi fields replace the row patchwork (2026-10-02)
+d3-delaunay 6.0.4 (ISC, with delaunator and robust-predicates' orient2d; +53 KB) builds relaxed,
+domain-warped Voronoi fields split where roads and streams cross. Side by side with the patchwork and
+the UG:G references, the Voronoi fields read as irregular farm parcels (Beauregard: "small open fields
+of irregular outline"); the patchwork's straight rows read as tiling. Caveat: a slight honeycomb look
+(similar cell sizes). ?parcels=grid keeps the old generator for comparison.
+
 ## 0007 — detect-gpu picks Auto's starting level (2026-10-02)
 pmndrs/detect-gpu 5.0.70 (MIT) is vendored with its benchmark tables (+703 KB) and called with a local
 benchmarksURL, so Pages never touches its default unpkg CDN. Tier 3/2/1/0 starts Auto at render scale
