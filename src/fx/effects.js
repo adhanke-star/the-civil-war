@@ -7,7 +7,7 @@
 
 import * as THREE from 'three';
 
-const POOL = 110;
+const POOL = 200;
 
 function smokeTexture() {
   const size = 64;
@@ -59,9 +59,9 @@ export class Effects {
           startSpeed: new Q.IntervalValue(0.6, big ? 4 : 2.2),
           startSize: new Q.IntervalValue(big ? 10 : 5, big ? 16 : 8.5),
           startRotation: new Q.IntervalValue(0, Math.PI * 2),
-          startColor: new Q.ConstantColor(new Q.Vector4(0.95, 0.94, 0.9, 0.62)),
+          startColor: new Q.ConstantColor(new Q.Vector4(0.96, 0.95, 0.91, big ? 0.55 : 0.45)),
           emissionOverTime: new Q.ConstantValue(0),
-          emissionBursts: [{ time: 0, count: new Q.ConstantValue(big ? 9 : 4), cycle: 1, interval: 0.01, probability: 1 }],
+          emissionBursts: [{ time: 0, count: new Q.ConstantValue(big ? 8 : 3), cycle: 1, interval: 0.01, probability: 1 }],
           behaviors: [
             new Q.SizeOverLife(new Q.PiecewiseBezier([[new Q.Bezier(1, 1.8, 2.6, 3.2), 0]])),
             new Q.ColorOverLife(new Q.Gradient(

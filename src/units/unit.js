@@ -332,19 +332,26 @@ export class Unit {
       const y = T.heightAt(f.x, f.z);
       this.pool.set(f.i, f.x, y, f.z, f.yaw, s, f.phase, walk, f.aim, f.flash);
       const hurt = this.lastHit && time - this.lastHit < 0.5 ? 1 - (time - this.lastHit) / 0.5 : 0;
-      this.pool.setTint(f.i, f.coatVar, f.trouserVar, this.selected ? 1 : 0, Math.max(hurt * 0.8, this.underFire > 0 ? 0.25 : 0));
+      this.pool.setTint(f.i, f.coatVar, f.trouserVar, this.selected ? 1 : 0, Math.max(hurt * 0.8, this.underFire > 0 ? 0.12 : 0));
     }
   }
 
-  /** Schedule a ragged volley: front-rank figures fire over ~0.9 s. Returns muzzle positions for smoke. */
+  /**
+   * Schedule a ragged volley: front-rank figures fire over ~0.9 s. Returns muzzle positions for smoke:
+   * about one puff per 9 m of front, so the line disappears into a bank of powder smoke.
+   */
   volley(time) {
     const muzzles = [];
     const s = Math.sin(this.facing), c = Math.cos(this.facing);
-    for (const f of this.figures) {
-      if (!f.alive || (f.aim < 0.5 && !this.follow.active)) continue; // a walking line fires without the aim pose
+    let lastLx = -Infinity;
+    const shooters = this.figures.filter((f) => f.alive && (f.aim >= 0.5 || this.follow.active)).sort((a, b) => a.lx - b.lx);
+    for (const f of shooters) {
       if (f.rank !== 0 && this.rnd() < 0.5) continue;
       f.fireAt = time + this.rnd() * 0.9;
-      if (this.rnd() < 0.35) muzzles.push([f.x + s * 3.2, f.z + c * 3.2, f.fireAt - time]);
+      if (f.rank === 0 && f.lx - lastLx > 9) {
+        lastLx = f.lx;
+        muzzles.push([f.x + s * 3.5, f.z + c * 3.5, f.fireAt - time]);
+      }
     }
     return muzzles;
   }

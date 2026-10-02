@@ -26,6 +26,14 @@
 - `assets/portraits/sherman.jpg` — crop of "General William T. Sherman - NARA - 527045.jpg",
   https://commons.wikimedia.org/wiki/File:General_William_T._Sherman_-_NARA_-_527045.jpg — public domain
   (US National Archives). Photographed later in the war.
+- `assets/portraits/franklin.jpg` — crop of "William B. Franklin - Brady-Handy.jpg" (Mathew B. Brady; LoC
+  Brady-Handy collection), https://commons.wikimedia.org/wiki/File:William_B._Franklin_-_Brady-Handy.jpg — public domain.
+- `assets/portraits/willcox.jpg` — crop of "Orlando B. Willcox - Brady-Handy.jpg" (Mathew B. Brady),
+  https://commons.wikimedia.org/wiki/File:Orlando_B._Willcox_-_Brady-Handy.jpg — public domain.
+- `assets/portraits/bee.jpg` — crop of "Barnard Elliott Bee.JPG" (author unknown),
+  https://commons.wikimedia.org/wiki/File:Barnard_Elliott_Bee.JPG — public domain.
+- `assets/portraits/hampton.jpg` — crop of "Wade Hampton.jpg" (author unknown, wartime carte de visite),
+  https://commons.wikimedia.org/wiki/File:Wade_Hampton.jpg — public domain.
 - Place positions: NPS Public POIs (MANA) cross-checked with OpenStreetMap/Wikidata/Wikipedia; coordinates
   only (facts), each cited in `assets/scenarios/henry-hill.json`. No OSM geometry is shipped.
 - Fonts: none shipped; ground labels use the system serif (Georgia / Times / DejaVu Serif).

@@ -456,7 +456,9 @@
    "short": "Franklin",
    "commander": {
     "name": "William B. Franklin",
-    "rank": "Colonel"
+    "rank": "Colonel",
+    "portrait": "./assets/portraits/franklin.jpg",
+    "portraitNote": "photographed later in the war"
    },
    "parent": "1st Brigade, 3rd Division (Heintzelman)",
    "regiments": [
@@ -483,7 +485,9 @@
    "short": "Willcox",
    "commander": {
     "name": "Orlando B. Willcox",
-    "rank": "Colonel"
+    "rank": "Colonel",
+    "portrait": "./assets/portraits/willcox.jpg",
+    "portraitNote": "photographed later in the war"
    },
    "parent": "2nd Brigade, 3rd Division (Heintzelman)",
    "regiments": [
@@ -623,7 +627,9 @@
    "short": "Bee",
    "commander": {
     "name": "Barnard E. Bee",
-    "rank": "Brigadier General"
+    "rank": "Brigadier General",
+    "portrait": "./assets/portraits/bee.jpg",
+    "portraitNote": "date unknown"
    },
    "parent": "Third Brigade, Army of the Shenandoah",
    "regiments": [
@@ -653,7 +659,9 @@
    "short": "Hampton",
    "commander": {
     "name": "Wade Hampton",
-    "rank": "Colonel"
+    "rank": "Colonel",
+    "portrait": "./assets/portraits/hampton.jpg",
+    "portraitNote": "wartime carte de visite"
    },
    "parent": "Hampton Legion (infantry battalion), Army of the Potomac",
    "regiments": [

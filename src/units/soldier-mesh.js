@@ -107,7 +107,7 @@ export function soldierMaterial({ coatA, coatB, trouserA, trouserB, hat }) {
         else if (aMat > 1.5 && aMat < 2.5) vColor.rgb = mix(uTrouserA, uTrouserB, aTint.y);
         else if (aMat > 3.5) vColor.rgb = mix(uHat, uCoatB, aTint.x * 0.5);
         vColor.rgb = mix(vColor.rgb, vColor.rgb * vec3(1.15, 1.45, 1.0) + vec3(0.02, 0.06, 0.0), aTint.z * 0.6);
-        vColor.rgb = mix(vColor.rgb, vec3(1.0, 0.25, 0.15), aTint.w * 0.45);
+        vColor.rgb = mix(vColor.rgb, vec3(0.9, 0.2, 0.12), aTint.w * 0.3);
         vEmit = (aMat > 2.5 && aMat < 3.5) ? aAnim.w : 0.0;`);
     shader.fragmentShader = 'varying float vEmit;\n' + shader.fragmentShader.replace(
       '#include <emissivemap_fragment>',

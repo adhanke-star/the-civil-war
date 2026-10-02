@@ -105,7 +105,7 @@ export function buildTrees(terrain, trees) {
       const v = rnd();
       if (kind === 2) color.setRGB(0.25 + v * 0.05, 0.34 + v * 0.04, 0.12);
       else if (isPine) color.setRGB(0.12 + v * 0.03, 0.22 + v * 0.04, 0.11);
-      else color.setRGB(0.15 + v * 0.07, 0.26 + v * 0.07, 0.08 + v * 0.03);
+      else color.setRGB(0.13 + v * 0.06, 0.22 + v * 0.06, 0.07 + v * 0.03);
       mesh.setColorAt(i, color);
     }
     mesh.instanceColor.needsUpdate = true;
