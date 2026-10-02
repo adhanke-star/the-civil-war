@@ -69,7 +69,7 @@ function patchVertex(shader, outline) {
 
 /** A Lambert material patched for bone animation, side colours, the baked shade and a rim darkening. */
 export function soldierMaterial({ coatA, coatB, trouserA, trouserB, hat, officerCoat = '#1c2136', officerTrouser = '#2a3350' }) {
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   mat.userData.uniforms = {
     uBones: { value: boneTexture() },
     uCoatA: { value: new THREE.Color(coatA) },
@@ -92,11 +92,12 @@ export function soldierMaterial({ coatA, coatB, trouserA, trouserB, hat, officer
         vEmit = (aMat > 2.5 && aMat < 3.5) ? aAnim.w : 0.0;`);
     shader.fragmentShader = 'varying float vEmit;\n' + shader.fragmentShader
       .replace('#include <color_fragment>', `#include <color_fragment>
-        float rim = pow(1.0 - clamp(dot(normalize(vNormal), normalize(vViewPosition)), 0.0, 1.0), 2.5);
+        vec3 faceN = normalize(cross(dFdx(vViewPosition), dFdy(vViewPosition)));
+        float rim = pow(1.0 - clamp(dot(faceN, normalize(vViewPosition)), 0.0, 1.0), 2.5);
         diffuseColor.rgb *= 1.0 - 0.2 * rim;`)
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += vec3(9.0, 6.5, 2.5) * vEmit;');
   };
-  mat.customProgramCacheKey = () => 'soldier-v2';
+  mat.customProgramCacheKey = () => 'soldier-v3';
   return mat;
 }
 

@@ -15,6 +15,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Unit } from './unit.js';
 import { FIGURE_SCALE } from './soldier-mesh.js';
 import { horseGeometry, HORSE_COATS } from './mounts.js';
+import { weldFlat } from '../render/weld.js';
 
 const GUN_SPACING = 16;
 const GUN_COLUMN_SPACING = 48;
@@ -90,9 +91,7 @@ function gunGeometry(kind) {
     P.push(colored(new THREE.SphereGeometry(0.07, 5, 4).translate(0, 1.02, -0.48), bronze)); // cascabel knob
   }
   P.push(colored(new THREE.BoxGeometry(0.5, 0.08, 0.18).translate(0, 1.02, 0.02), IRON)); // trunnions
-  const g = mergeGeometries(P, false);
-  g.computeVertexNormals();
-  return g;
+  return weldFlat(mergeGeometries(P, false));
 }
 
 /** Limber: ammunition chest on two wheels, a pole, and a four-horse team in two pairs. */
@@ -116,15 +115,13 @@ function limberGeometry() {
   }
   // traces: two long thin straps from the chest to the lead pair
   for (const x of [-0.75, 0.75]) P.push(colored(new THREE.BoxGeometry(0.03, 0.03, 4.0).translate(x, 1.0, 2.6), '#2a1f16'));
-  const g = mergeGeometries(P, false);
-  g.computeVertexNormals();
-  return g;
+  return weldFlat(mergeGeometries(P, false));
 }
 
 /** Instanced meshes for guns (one geometry per side's pieces) and limbers, shared by every battery. */
 export class GunPool {
   constructor({ US = 0, CS = 0 } = {}) {
-    const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+    const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
     this.guns = {
       US: new THREE.InstancedMesh(gunGeometry('parrott'), mat, Math.max(1, US)),
       CS: new THREE.InstancedMesh(gunGeometry('bronze'), mat, Math.max(1, CS)),

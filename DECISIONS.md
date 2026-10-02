@@ -1,5 +1,17 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0012 — Welded geometry, an Auto that will not blur for nothing, Sherman faces the battle (2026-10-02)
+Profiling on the UHD 617 showed the frame bound by vertex work, not pixels: 2.5M vertices a frame, because
+every figure, tree, fence and gun was built from loose triangles; rendering at scale 0.35 was barely faster
+than 1.3, so Auto's drop to 0.85 (Low 0.7) only stretched a blurred picture 2.4-2.9x on the retina screen.
+Meshes are now indexed (src/render/weld.js; flat facets from screen derivatives, smooth tree crowns), fences
+are chunked for culling, a step down that does not gain 8% fps is undone and held 60 s, the final pass
+sharpens (clamped to the local range, stronger when upscaled), the tilt-shift sharp band is 19-69% of the
+screen, and state halos are one crisp ellipse per man. Real GPU, opening/fight: High 32.9/25.2 (was
+30/24.4), Auto 36/44 at scale 1.3/1.0 (was 36.8/33.8 at 0.85), Low 60/57.9 (was 44.5/36.8). Sherman's
+brigade started facing 2.4 rad, away from Henry House Hill (Aaron: "facing the wrong way"); now 1.0, and
+the test checks every unit starts within 75 degrees of its nearest enemy.
+
 ## 0011 — Rigged figures with a baked bone texture; no MSAA (Fable trial, branch figures-detail, 2026-10-02)
 Soldiers are a hand-built 12-bone rig (350/228/96 triangles at three distances) animated on the GPU from
 one float texture of baked bone matrices (clips keyframed in src/units/figure.js), not a CC0 glTF model:

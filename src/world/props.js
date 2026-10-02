@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mulberry32, BUILDING_SCALE } from './landscape.js';
+import { weldFlat, weldSmooth } from '../render/weld.js';
 
 function colorize(geo, color) {
   const c = new THREE.Color(color);
@@ -24,7 +25,7 @@ function colorize(geo, color) {
 // ---------------------------------------------------------------------------------------------------
 // Trees
 function canopyGeometry(seed, flat = 1, segW = 7, segH = 5, lobes = 7) {
-  const g = new THREE.SphereGeometry(1, segW, segH);
+  const g = weldSmooth(new THREE.SphereGeometry(1, segW, segH)); // indexed, seam welded
   const pos = g.attributes.position;
   const rnd = mulberry32(seed);
   const bumps = [];
@@ -50,12 +51,10 @@ function canopyGeometry(seed, flat = 1, segW = 7, segH = 5, lobes = 7) {
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   // a short trunk below the crown (the crown's origin sits 1.15 radii above the ground)
-  const trunk = new THREE.CylinderGeometry(0.1, 0.14, 1.0, 5, 1, true).translate(0, -0.85, 0);
+  const trunk = weldSmooth(new THREE.CylinderGeometry(0.1, 0.14, 1.0, 5, 1, true).translate(0, -0.85, 0));
   const tc = new Float32Array(trunk.attributes.position.count * 3).fill(0.22);
   trunk.setAttribute('color', new THREE.BufferAttribute(tc, 3));
-  trunk.deleteAttribute('uv');
-  g.deleteAttribute('uv');
-  return mergeGeometries([g.toNonIndexed(), trunk.toNonIndexed()], false);
+  return mergeGeometries([g, trunk], false);
 }
 
 function pineGeometry(tiers = 4, seg = 7) {
@@ -64,12 +63,10 @@ function pineGeometry(tiers = 4, seg = 7) {
     const r = tiers === 1 ? 0.9 : 0.95 - i * 0.2;
     const c = new THREE.ConeGeometry(r, tiers === 1 ? 2.4 : 1.0, seg, 1, true);
     c.translate(0, 0.35 + i * 0.5, 0);
-    parts.push(c.toNonIndexed());
+    parts.push(weldSmooth(c));
   }
-  const trunk = new THREE.CylinderGeometry(0.08, 0.12, 0.6, 5, 1, true).translate(0, 0.05, 0);
-  parts.push(trunk.toNonIndexed());
+  parts.push(weldSmooth(new THREE.CylinderGeometry(0.08, 0.12, 0.6, 5, 1, true).translate(0, 0.05, 0)));
   const g = mergeGeometries(parts, false);
-  g.deleteAttribute('uv');
   const pos = g.attributes.position;
   const col = new Float32Array(pos.count * 3);
   for (let i = 0; i < pos.count; i++) {
@@ -78,7 +75,6 @@ function pineGeometry(tiers = 4, seg = 7) {
     col.set([k, k, k], i * 3);
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  g.computeVertexNormals();
   return g;
 }
 
@@ -318,19 +314,26 @@ function railFence(rails, zig) {
   }
   const geo = mergeGeometries(parts.map((p) => p.toNonIndexed()), false);
   colorize(geo, zig ? '#8c7a5e' : '#9a8a6c');
-  geo.deleteAttribute('uv');
-  return geo;
+  return weldFlat(geo);
 }
 
 export function buildFences(terrain, segs) {
   const group = new THREE.Group();
   group.name = 'fences';
-  const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const mat = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
   const dummy = new THREE.Object3D();
-  for (const kind of [0, 1]) {
-    const list = segs.filter((s) => (s[4] || 0) === kind);
-    if (!list.length) continue;
-    const mesh = new THREE.InstancedMesh(railFence(kind ? 4 : 3, kind === 1), mat, list.length);
+  const geos = [railFence(3, false), railFence(4, true)];
+  // spatial chunks (like the trees) so the camera frustum culls the fences it cannot see
+  const CH = 320;
+  const chunks = new Map();
+  for (const s of segs) {
+    const key = `${Math.floor(s[0] / CH)},${Math.floor(s[1] / CH)},${s[4] || 0}`;
+    if (!chunks.has(key)) chunks.set(key, []);
+    chunks.get(key).push(s);
+  }
+  for (const [key, list] of chunks) {
+    const kind = key.endsWith(',1') ? 1 : 0;
+    const mesh = new THREE.InstancedMesh(geos[kind], mat, list.length);
     for (let i = 0; i < list.length; i++) {
       const [x, z, ang, len] = list[i];
       dummy.position.set(x, terrain.heightAt(x, z), z);

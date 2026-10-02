@@ -3,7 +3,8 @@
 //   1. ready: window.__ready within 180 s (fails fast on the first page/console error during load)
 //   2. no-console-errors: zero pageerror / console error / failed request / HTTP >= 400
 //   3. canvas-not-blank: sampled pixels have many distinct colours
-//   4. figures: >= 1000 soldier figures and one marker button per unit
+//   4. figures: >= 1000 soldier figures and one marker button per unit; facing: every unit starts within
+//      75 degrees of its nearest enemy (catches a brigade set up facing away from the battle)
 //   5. select-drag-order: a real mouse press on Franklin's flag, a curved drag across the field and a
 //      release issue a march order (the same path a player uses)
 //   6. hold-button: the Hold button stops the brigade
@@ -101,6 +102,19 @@ async function main() {
       // 4. figures and markers
       const info = await page.evaluate(() => ({ figures: window.__game.game.figureCount(), units: window.__game.game.units.length, markers: document.querySelectorAll('#markers .marker').length }));
       check('figures', info.figures >= MIN_FIGURES && info.markers === info.units, `${info.figures} figures (need >= ${MIN_FIGURES}); ${info.markers} markers for ${info.units} units`);
+
+      // 4b. every brigade and battery starts facing its nearest enemy (within 75 degrees)
+      const facing = await page.evaluate(() => {
+        const us = window.__game.game.units;
+        return us.map((u) => {
+          let best = null, bd = Infinity;
+          for (const e of us) if (e.side !== u.side) { const d = Math.hypot(e.x - u.x, e.z - u.z); if (d < bd) { bd = d; best = e; } }
+          const bear = Math.atan2(best.x - u.x, best.z - u.z);
+          return { id: u.id, off: Math.abs(Math.atan2(Math.sin(bear - u.facing), Math.cos(bear - u.facing))) };
+        });
+      });
+      const wrong = facing.filter((f) => f.off > (75 * Math.PI) / 180);
+      check('facing', wrong.length === 0, wrong.length === 0 ? `all ${facing.length} units face within 75 deg of their nearest enemy (worst ${Math.max(...facing.map((f) => f.off)).toFixed(2)} rad)` : wrong.map((f) => `${f.id} ${f.off.toFixed(2)} rad off`).join(', '));
 
       // 5. select + drag-order with a real mouse: press on Franklin's flag, drag a curve, release.
       const marker = page.getByRole('button', { name: /^Franklin.s Brigade/ });

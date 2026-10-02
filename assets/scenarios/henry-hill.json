@@ -530,7 +530,7 @@
    "xp": 1,
    "x": 40,
    "z": -90,
-   "facing": 2.4,
+   "facing": 1.0,
    "sources": [
     "old repo (tag reference-freeze-2026-10-02) data/bullrun.json:142, HISTORICAL-DATA.md:56-62; soldier-replacements.json records[31] (Col., BG 7 Aug 1861)"
    ],

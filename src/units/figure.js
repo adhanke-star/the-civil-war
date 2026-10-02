@@ -16,6 +16,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
+import { weldFlat } from '../render/weld.js';
 
 export const MAT = { FIXED: 0, COAT: 1, TROUSER: 2, TIP: 3, HAT: 4, FACE: 5 };
 export const PROP = { BODY: 0, MUSKET: 1, RAMMER: 2 };
@@ -170,7 +171,7 @@ export function buildFigureGeometry(lod = 2, kit = 'US') {
   }
 
   const g = mergeGeometries(P, false);
-  g.computeVertexNormals(); // non-indexed: face normals (the painted-miniature facets)
+  g.computeVertexNormals(); // face normals, only to build the outline's smooth normals below
   // baked shade: feet dark, head bright
   const pos = g.attributes.position;
   const n = pos.count;
@@ -191,9 +192,8 @@ export function buildFigureGeometry(lod = 2, kit = 'US') {
     smooth[i * 3] = sn.getX(j); smooth[i * 3 + 1] = sn.getY(j); smooth[i * 3 + 2] = sn.getZ(j);
   }
   g.setAttribute('aSmoothN', new THREE.BufferAttribute(smooth, 3));
-  g.computeBoundingSphere();
   g.userData.triangles = n / 3;
-  return g;
+  return weldFlat(g); // indexed: each corner is shaded once (the material draws flat-shaded facets)
 }
 
 // ---------------------------------------------------------------------------------------------------

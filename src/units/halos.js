@@ -31,8 +31,13 @@ export class HaloPool {
         varying vec2 vUv;
         void main() {
           float r = length(vUv - 0.5) * 2.0;
-          float a = vCol.a * smoothstep(1.0, 0.45, r);
-          gl_FragColor = vec4(vCol.rgb, a);
+          // alpha above 1 marks a state halo (selected, under fire): a crisp rim and a lighter centre, so
+          // neighbouring men's halos read as separate ellipses; the plain shadow blob stays soft
+          float hard = step(1.5, vCol.a);
+          float a0 = vCol.a - hard * 2.0;
+          float soft = smoothstep(1.0, 0.45, r);
+          float ring = smoothstep(1.0, 0.9, r) * (0.55 + 0.45 * smoothstep(0.55, 0.9, r));
+          gl_FragColor = vec4(vCol.rgb, a0 * mix(soft, ring, hard));
         }`,
       transparent: true,
       depthWrite: false,
@@ -66,7 +71,7 @@ export class HaloPool {
     te[o + 12] = x; te[o + 13] = y + 0.7; te[o + 14] = z; te[o + 15] = 1;
     const col = kind === 1 ? SELECTED : kind === 2 ? UNDER_FIRE : SHADOW;
     const a = this.color.array;
-    a[i * 4] = col[0]; a[i * 4 + 1] = col[1]; a[i * 4 + 2] = col[2]; a[i * 4 + 3] = col[3] * (kind === 2 ? strength : 1);
+    a[i * 4] = col[0]; a[i * 4 + 1] = col[1]; a[i * 4 + 2] = col[2]; a[i * 4 + 3] = col[3] * (kind === 2 ? strength : 1) + (kind ? 2 : 0);
   }
 
   flush() {

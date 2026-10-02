@@ -4,6 +4,7 @@
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { weldFlat } from '../render/weld.js';
 
 function colored(geo, color) {
   const g = geo.index ? geo.toNonIndexed() : geo;
@@ -57,7 +58,7 @@ export const HORSE_COATS = ['#5a3a26', '#3a2518', '#7a4a2a', '#8a7a6a', '#2a2522
 /** Officers' mounts: fixed-index instances, moved every frame. */
 export class HorsePool {
   constructor(capacity) {
-    this.mesh = new THREE.InstancedMesh(horseGeometry({ coat: '#ffffff', mane: '#2a1a10' }), new THREE.MeshLambertMaterial({ vertexColors: true }), capacity);
+    this.mesh = new THREE.InstancedMesh(weldFlat(horseGeometry({ coat: '#ffffff', mane: '#2a1a10' })), new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }), capacity);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
     this.mesh.count = 0;
