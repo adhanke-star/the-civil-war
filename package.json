@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@mapbox/martini": "^0.2.0",
+    "detect-gpu": "^5.0.70",
     "three": "0.186.1",
     "three.quarks": "0.17.1",
     "yuka": "0.7.8",

@@ -35,7 +35,12 @@ const ENTRIES = [
   'quarks.core/dist/quarks.core.esm.js', // three.quarks imports the bare specifier 'quarks.core'
   'zzfx/ZzFX.js',
   '@mapbox/martini/index.js',
+  'detect-gpu/dist/detect-gpu.esm.js',
 ];
+
+// Data folders copied verbatim (no import following): detect-gpu's GPU benchmark tables, so the game
+// never fetches them from the unpkg CDN (src/main.js passes benchmarksURL).
+const DATA_DIRS = ['detect-gpu/dist/benchmarks'];
 
 const LICENSE_NAMES = ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'license'];
 
@@ -144,6 +149,17 @@ async function main() {
     }
     for (const spec of dynamic) {
       console.warn(`note: ${path.relative(ROOT, dest)} has a dynamic import('${spec}') (not followed)`);
+    }
+  }
+
+  for (const dir of DATA_DIRS) {
+    const src = path.join(NODE_MODULES, dir);
+    for (const name of (await fs.readdir(src)).sort()) {
+      const buf = await fs.readFile(path.join(src, name));
+      const dest = path.join(VENDOR, dir, name);
+      await fs.mkdir(path.dirname(dest), { recursive: true });
+      await fs.writeFile(dest, buf);
+      copied.set(path.relative(ROOT, dest), buf.length);
     }
   }
 

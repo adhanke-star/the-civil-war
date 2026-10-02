@@ -46,6 +46,11 @@ renderer.info.autoReset = false;
 const urlQuality = new URLSearchParams(location.search).get('quality');
 const post = new Post(renderer, { mode: QUALITY_MODES.includes(urlQuality) ? urlQuality : loadPref('cw.quality', 'auto') });
 post.setSize(window.innerWidth, window.innerHeight);
+// GPU tier picks Auto's starting level; benchmark tables are vendored (no CDN). Failure keeps High.
+const gpuTier = import('detect-gpu')
+  .then(({ getGPUTier }) => getGPUTier({ benchmarksURL: './vendor/detect-gpu/dist/benchmarks', glContext: renderer.getContext() }))
+  .then((t) => { stats.gpuTier = t.tier; stats.gpu = t.gpu || ''; post.startFromTier(t.tier); return t; })
+  .catch((err) => { console.warn('detect-gpu unavailable; Auto starts at High:', err && err.message ? err.message : err); return null; });
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 2, 6000);
@@ -164,4 +169,4 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows };
+window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, gpuTier };

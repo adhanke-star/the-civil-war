@@ -7,7 +7,7 @@
 //
 // Quality (render scale = render pixels per CSS pixel):
 //   High: full device pixel ratio capped at 2.   Low: 0.7, no MSAA.
-//   Auto (default): starts at High; after 3 s averaging under 30 fps it steps one level down (two under
+//   Auto (default): starts at High, or at the level for the GPU's detect-gpu tier once known; after 3 s averaging under 30 fps it steps one level down (two under
 //   18 fps); after 3 s over 50 fps it steps back up. A level that failed is not retried for 20 s.
 
 import * as THREE from 'three';
@@ -125,6 +125,22 @@ export class Post {
     return 2;
   }
 
+  /**
+   * Auto's starting level from a pmndrs/detect-gpu tier (0-3), applied only before Auto has adjusted
+   * anything; Auto then governs by measured frame rate as usual (DECISIONS 0003, 0007).
+   */
+  startFromTier(tier) {
+    if (this.mode !== 'auto' || this.adjusted) return false;
+    const want = { 3: 2, 2: 1.6, 1: 1.3, 0: 1 }[tier] ?? this.maxScale;
+    let best = 0;
+    this.levels.forEach((l, i) => { if (Math.abs(l - want) < Math.abs(this.levels[best] - want)) best = i; });
+    this.level = best;
+    this.scale = this.levels[best];
+    this.samplesLog.length = 0;
+    this._apply();
+    return true;
+  }
+
   setMode(mode) {
     this.mode = QUALITY_MODES.includes(mode) ? mode : 'auto';
     this.level = 0;
@@ -211,6 +227,7 @@ export class Post {
     if (next > this.level) this.blockedUntil.set(this.level, now + 20000); // the level we are leaving failed
     this.level = next;
     this.scale = this.levels[next];
+    this.adjusted = true;
     log.length = 0;
     this._apply();
   }

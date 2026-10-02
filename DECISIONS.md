@@ -1,5 +1,11 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0007 — detect-gpu picks Auto's starting level (2026-10-02)
+pmndrs/detect-gpu 5.0.70 (MIT) is vendored with its benchmark tables (+703 KB) and called with a local
+benchmarksURL, so Pages never touches its default unpkg CDN. Tier 3/2/1/0 starts Auto at render scale
+2/1.6/1.3/1; Auto still governs by measured fps (0003). This Mac: tier 1 (UHD 617, 24 fps benchmark),
+Auto starts at 1.3 and holds about 43 fps instead of opening at 2.0 near 20 fps.
+
 ## 0006 — Plain InstancedMesh; no proj4js (2026-10-02)
 Soldiers use plain THREE.InstancedMesh with a patched Lambert shader (walk/aim/flash animated on the
 GPU from per-instance attributes), not agargaro/instanced-mesh: its texture-packed matrices fight that

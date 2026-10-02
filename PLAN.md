@@ -69,11 +69,11 @@ Campaign link between battles, more battles, codex and documents, Confederate si
 | M1 | geotiffjs/geotiff.js | MIT | read USGS 3DEP elevation into heights |
 | M1 | proj4js/proj4js | MIT (LICENSE.md; API shows NOASSERTION, so confirm) | georeference LoC maps to the DEM |
 | M1 | mapbox/martini | ISC | low-triangle adaptive terrain mesh |
+| M1 (in, 5.0.70) | pmndrs/detect-gpu — https://github.com/pmndrs/detect-gpu | MIT (gh api 2026-10-02) | GPU tier picks Auto quality's starting level; benchmark JSON vendored, no CDN |
 | M1 | agargaro/instanced-mesh | MIT (peer three >=0.186) | thousands of soldiers with culling and LOD |
 | M1 | donmccurdy/glTF-Transform (CLI, dev only) | MIT | shrink models and textures before they enter the repo |
 | M1/M4 | KittyGiraudel/a11y-dialog, @floating-ui/dom, color-js/color.js | MIT | accessible menus, tooltips, CVD-safe palettes |
 | M3 | jrnold/acw_battle_data | code BSD-3 / text CC-BY, data unlabelled | battle and commander spine; attribute it and verify each file's NPS provenance |
-| M4 | pmndrs/detect-gpu | MIT | automatic quality tier |
 | any | Kenney, Poly Haven (download from the websites, not their GitHub repos) | CC0 | textures, trees, buildings |
 | dev | ChromeDevTools/chrome-devtools-mcp | Apache-2.0 | console and performance traces from the real page; use a throwaway profile |
 
