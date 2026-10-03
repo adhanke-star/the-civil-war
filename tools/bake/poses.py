@@ -32,6 +32,9 @@ G = {
     "steps_per_min": 110.0,     # quick time                                  Inferred
     "step_m": 0.711,            # 28 in step                                  Inferred
     "stance_frac": 0.60,        # walking stance share of the cycle           placeholder
+    "stance_half_m": 0.36,      # ankle travel each side of the hip in stance placeholder
+    "march_half_width": 0.085,  # ankle offset from the centre line, marching placeholder
+    "fire_half_width": 0.13,    # ankle offset from the centre line, firing   placeholder
     "foot_lift": 0.09,          # swing clearance of the ankle                placeholder
     "march_lean_deg": 4.0,      #                                             placeholder
     "pelvis_yaw_deg": 4.0,      #                                             placeholder
@@ -71,6 +74,8 @@ class Poser:
             }
         self.rest_ank = {s: self.rh(self.S[s]["foot"]) for s in ("L", "R")}
         self.rest_hip = {s: self.rh(self.S[s]["thigh"][0]) for s in ("L", "R")}
+        # MPFB's rest pose stands with the feet apart; poses place ankles from the centre line
+        self.ank_mid = (self.rest_ank["L"] + self.rest_ank["R"]) / 2
         for p in rig.pose.bones:
             p.rotation_mode = "QUATERNION"
 
@@ -196,6 +201,8 @@ class Poser:
             cp = cur - hd * cur.dot(hd)
             if pw.length > 1e-6 and cp.length > 1e-6:
                 q = cp.normalized().rotation_difference(pw.normalized())
+                if q.angle > math.radians(90):  # a wrist cannot twist further without a forearm roll
+                    q = Quaternion().slerp(q, math.radians(90) / q.angle)
                 self.rotate_about(hb, self.ph(hb), q)
 
     def curl(self, s, degs=(35, 50, 40), thumb=20):
@@ -275,8 +282,7 @@ def pose_walk(ps, musket, frame, k):
     F, L, U = ps.F, ps.L, ps.U
     ps.reset()
     p = k / 8.0
-    S = G["step_m"]
-    A = G["stance_frac"] * S          # stance excursion half-length (1.2 S per stance / 2)
+    A = G["stance_half_m"]            # stance excursion half-length; ground speed follows from it
     feet = {}
     for s, phase in (("L", p), ("R", (p + 0.5) % 1.0)):
         st = G["stance_frac"]
@@ -296,9 +302,9 @@ def pose_walk(ps, musket, frame, k):
     for s in ("L", "R"):
         x, lift, pitch = feet[s]
         hip = ps.rest_hip[s]
-        ank = ps.rest_ank[s] + F * x
+        ank = ps.ank_mid + L * ((1 if s == "L" else -1) * G["march_half_width"]) + F * x
         ank.z += lift + (0.06 * math.sin(math.radians(-pitch)) if pitch < 0 else 0.0)
-        reach = 0.985 * (ps.len[s]["thigh"] + ps.len[s]["shin"])
+        reach = 0.995 * (ps.len[s]["thigh"] + ps.len[s]["shin"])
         dxy = (Vector((ank.x - hip.x, ank.y - hip.y, 0))).length
         hz_max = ank.z + math.sqrt(max(reach * reach - dxy * dxy, 0.0))
         drop = max(drop, hip.z - hz_max)
@@ -311,7 +317,7 @@ def pose_walk(ps, musket, frame, k):
     err = {}
     for s in ("L", "R"):
         x, lift, pitch = feet[s]
-        ank = ps.rest_ank[s] + F * x
+        ank = ps.ank_mid + L * ((1 if s == "L" else -1) * G["march_half_width"]) + F * x
         ank.z += lift + (0.06 * math.sin(math.radians(-pitch)) if pitch < 0 else 0.0)
         err["leg" + s] = ps.leg(s, ank, F)
         ps.foot(s, ps.foot_rest_dir(s, pitch_deg=pitch, yaw_deg=(6.0 if s == "L" else -6.0)))
@@ -350,8 +356,8 @@ def pose_fire(ps, musket, frame, stage):
     ps.spine(U, -yaw * 0.30)
     ps.spine(L, 6.0 - 3.0 * (stage == 1))
     err = {}
-    ankL = ps.rest_ank["L"] + F * 0.20 + L * 0.02
-    ankR = ps.rest_ank["R"] - F * 0.16 - L * 0.04
+    ankL = ps.ank_mid + L * G["fire_half_width"] + F * 0.20
+    ankR = ps.ank_mid - L * G["fire_half_width"] - F * 0.16
     err["legL"] = ps.leg("L", ankL, F + L * 0.2)
     err["legR"] = ps.leg("R", ankR, F - L * 0.6)
     ps.foot("L", ps.foot_rest_dir("L", yaw_deg=-12.0))
@@ -467,11 +473,13 @@ def main():
     worst = max((v for d in REP["ik_error_m"].values() for v in d.values()), default=0.0)
     REP["ik_error_worst_m"] = worst
     cycle_s = 2.0 * 60.0 / G["steps_per_min"]
+    metres_cycle = 2 * G["stance_half_m"] / G["stance_frac"]  # what the planted feet actually cover
     clips = {
         "stand": {"frames": FR["stand"], "fps": 1, "loop": False},
         "walk": {"frames": FR["walk"], "fps": round(8 / cycle_s, 3), "loop": True,
-                 "metres_per_cycle": round(2 * G["step_m"], 3),
-                 "speed_mps": round(2 * G["step_m"] / cycle_s, 3)},
+                 "metres_per_cycle": round(metres_cycle, 3),
+                 "speed_mps": round(metres_cycle / cycle_s, 3),
+                 "drill_metres_per_cycle": round(2 * G["step_m"], 3)},
         "fire": {"frames": FR["fire"], "fps": 8, "loop": False},
         "fallen": {"frames": FR["fallen"], "fps": 1, "loop": False},
     }

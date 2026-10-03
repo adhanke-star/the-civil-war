@@ -22,6 +22,9 @@ const opt = (k, d) => {
 const OUT = path.resolve(opt('out', process.env.BAKE_OUT || '.out/bake'));
 const MAX_PAGE = 2048;
 const PAD = 1;
+// The shadow catcher leaves a faint sky-occlusion haze (alpha 1-5 of 255) over the whole frame,
+// which would defeat trimming; anything below this is cleared before packing.
+const ALPHA_CUT = 6;
 
 const readJSON = (p, d = {}) => (fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, 'utf8')) : d);
 const readPNG = (p) => PNG.sync.read(fs.readFileSync(p));
@@ -118,6 +121,7 @@ function packTier(tier) {
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.png')).sort();
   const items = files.map((f) => {
     const png = readPNG(path.join(dir, f));
+    for (let i = 0; i < png.data.length; i += 4) if (png.data[i + 3] < ALPHA_CUT) png.data.writeUInt32LE(0, i);
     return { key: f.replace(/\.png$/, ''), png, rect: trimRect(png), size: png.width };
   });
   items.sort((a, b) => b.rect.h - a.rect.h || b.rect.w - a.rect.w);

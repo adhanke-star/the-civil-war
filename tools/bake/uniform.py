@@ -39,8 +39,10 @@ D = {
     "coat_waist_above_hip": 0.125,  # belt line above the hip joints           placeholder
     "coat_hem_below_hip":  0.16,    # four-button sack coat to upper thigh     placeholder
     "coat_hem_flare":      0.028,   # extra radius at the hem                  placeholder
-    "trouser_offset":      0.012,   # kersey trousers, loose-ish               placeholder
+    "trouser_offset":      0.016,   # kersey trousers, loose-ish               placeholder
     "shoe_offset":         0.008,   # brogan leather over the foot             placeholder
+    "shoe_smooth_iterations": 40,  # irons the toes out of the foot shell      placeholder
+    "collar_above_neck":   0.03,    # coat collar line above the neck joint   placeholder
     "shoe_top_above_ankle": 0.055,  # ankle-high bootee                        placeholder
     "cloth_thickness":     0.004,   # solidify thickness of all cloth          placeholder
     "smooth_iterations":   8,       # Taubin passes that iron out anatomy      placeholder
@@ -60,7 +62,7 @@ D = {
     "canteen_d":           0.19,    # smoothside canteen diameter              placeholder
     "canteen_t":           0.065,   # canteen thickness                        placeholder
     "scabbard":            (0.045, 0.52, 0.02),  # bayonet scabbard w l t       placeholder
-    "blanket_roll_r":      0.045,   # radius of the horseshoe roll             placeholder
+    "blanket_roll_r":      0.038,   # radius of the horseshoe roll             placeholder
     # -- headgear -------------------------------------------------------------
     "cap_band_h":          0.045,   # forage cap band                          placeholder
     "cap_crown_back":      0.085,   # crown rise above band at the back        placeholder
@@ -247,7 +249,7 @@ def taubin(bm, iters):
             Dl[fixed] = 0.0
             P += lam * Dl
     for v, p in zip(bm.verts, P):
-        v.co = Vector(p)
+        v.co = Vector(p.tolist())
 
 
 def make_shell(name, body, rig, rest, nrm, keep, offset_of, mat, iters, solid, min_z=None, subdiv=1):
@@ -284,7 +286,7 @@ def make_shell(name, body, rig, rest, nrm, keep, offset_of, mat, iters, solid, m
             sh.modifiers.remove(m)
     if not any(m.type == "ARMATURE" for m in sh.modifiers):
         C.add_modifier(sh, "ARMATURE", "Armature", object=rig)
-    C.add_modifier(sh, "SOLIDIFY", "Cloth", thickness=solid, offset=-1.0, use_even_offset=True)
+    C.add_modifier(sh, "SOLIDIFY", "Cloth", thickness=solid, offset=-1.0, use_even_offset=False)
     if subdiv:
         C.add_modifier(sh, "SUBSURF", "Smooth", levels=0, render_levels=subdiv)
     for k in list(sh.keys()):
@@ -368,6 +370,7 @@ def section_loop(cloud, center, normal, ref, band=0.015, bins=48, pad=0.0, smoot
     if convex:
         for _ in range(20):
             rad = np.maximum(rad, 0.985 * (np.roll(rad, 1) + np.roll(rad, -1)) / 2)
+    rad = [float(x) for x in rad]
     pts, outs = [], []
     for i in range(bins):
         a = -math.pi + (i + 0.5) * 2 * math.pi / bins
@@ -396,8 +399,8 @@ def tube_along(name, pts, outs, across, radius, mat, skinner, seg=10, k=12):
     n = len(pts)
     rings = []
     for i in range(n):
-        c = pts[i] + outs[i] * radius
-        rings.append(C.ring(c, outs[i], across, radius, radius * 0.92, seg))
+        c = pts[i] + outs[i] * (radius * 0.8)   # squashed against the body
+        rings.append(C.ring(c, outs[i], across, radius * 0.8, radius * 1.1, seg))
     verts, faces = [], []
     for r in rings:
         verts.extend(r)
@@ -500,7 +503,7 @@ def head_ring(cloud_head, lm, z, pad, bins=32):
     U, F = lm["U"], lm["F"]
     c = np.array(cloud_head)
     sel = c[np.abs(c[:, 2] - z) < 0.012]
-    centre = Vector(sel.mean(axis=0)) if len(sel) else lm["headb"]
+    centre = Vector(sel.mean(axis=0).tolist()) if len(sel) else lm["headb"]
     centre.z = z
     pts, outs, _w = section_loop(c, centre, U, F, band=0.012, bins=bins, pad=pad, smooth=2)
     return pts, outs, centre
@@ -608,11 +611,12 @@ def main():
                         for k, v in lm.items() if k != "eyes"}
 
     coat_set, trouser_set, shoe_set = set(), set(), set()
+    collar_z = lm["neck"].z + D["collar_above_neck"]  # a level cut, not the ragged bone-weight edge
     for i, r in enumerate(region):
         if r is None:
             continue
         z = rest_w[i].z
-        if r in ("torso", "arm") or (r in ("hip", "thigh") and z > waist_z - 0.02):
+        if (r in ("torso", "neck") and z < collar_z) or r == "arm" or (r in ("hip", "thigh") and z > waist_z - 0.02):
             coat_set.add(i)
         elif r == "foot" or (r == "shin" and z < shoe_top):
             shoe_set.add(i)
@@ -628,7 +632,7 @@ def main():
                                lambda i: D["trouser_offset"], m["trousers"], D["smooth_iterations"],
                                D["cloth_thickness"])
     shoes, _sp = make_shell("tcw_brogans", body, rig, rest, nrm, shoe_set, lambda i: D["shoe_offset"],
-                            m["brogans"], D["smooth_iterations"] * 2, 0.003, min_z=0.0)
+                            m["brogans"], D["shoe_smooth_iterations"], 0.003, min_z=0.0)
     T.mark("garment shells")
 
     # body cross-sections -> coat skirt (a lofted tube from above the belt to the hem)
@@ -641,7 +645,7 @@ def main():
         t = k / steps
         z = (waist_z + 0.04) * (1 - t) + hem_z * t
         sel = leg_cloud[np.abs(leg_cloud[:, 2] - z) < 0.012]
-        cen = Vector(sel.mean(axis=0))
+        cen = Vector(sel.mean(axis=0).tolist())
         cen.z = z
         pad = D["coat_offset_torso"] + 0.004 + D["coat_hem_flare"] * t * t
         pts, _o, _w = section_loop(leg_cloud, cen, U, F, band=0.012, bins=48, pad=pad, smooth=3)
@@ -661,7 +665,7 @@ def main():
     sk_torso = Skinner(rig, rest_w, info, torso_regions)
 
     # waist belt + plate
-    wb_c = Vector(cloth_np[np.abs(cloth_np[:, 2] - waist_z) < 0.012].mean(axis=0))
+    wb_c = Vector(cloth_np[np.abs(cloth_np[:, 2] - waist_z) < 0.012].mean(axis=0).tolist())
     wb_c.z = waist_z
     wpts, wouts, _w = section_loop(cloth_np, wb_c, U, F, band=0.012, bins=64,
                                    pad=D["strap_thickness"] / 2 + 0.001)
@@ -674,16 +678,17 @@ def main():
     C.assign(plate, m["brass"])
     sk_torso.apply(plate, 6)
 
-    def diag_loop(top_side, bottom_side, shift, width, pad):
+    def diag_loop(top_side, bottom_side, shift, width, pad, bottom_z=None):
         sh = lm["shL"] if top_side == "L" else lm["shR"]
         hp = lm["hipR"] if bottom_side == "R" else lm["hipL"]
         side_out = (hp - lm["hip_c"]).normalized()
         A = sh + U * 0.06 - (sh - lm["mid"]).dot(Lv) * Lv * 0.25
         A.z = sh.z + 0.06
-        B = Vector((hp.x, hp.y, hip_z + 0.03)) + side_out * 0.02
+        B = Vector((hp.x, hp.y, bottom_z if bottom_z is not None else hip_z + 0.03)) + side_out * 0.02
         nrml = (B - A).cross(F).normalized()
         cen = (A + B) / 2 + nrml * shift
-        pts, outs, across = section_loop(cloth_np, cen, nrml, A - cen, band=0.014, bins=72, pad=pad)
+        cloud = cloth_np[cloth_np[:, 2] > B.z - 0.015]  # nothing below the hip end of the loop
+        pts, outs, across = section_loop(cloud, cen, nrml, A - cen, band=0.014, bins=72, pad=pad)
         return pts, outs, nrml
 
     cb_pts, cb_outs, cb_n = diag_loop("L", "R", 0.0, D["cartridge_belt_width"], D["strap_thickness"] + 0.002)
@@ -696,7 +701,8 @@ def main():
                 D["breast_plate_d"] / 2, D["breast_plate_d"] / 2, 20) for dz in (0.0, 0.004)]))
     C.assign(bp, m["brass"])
     sk_torso.apply(bp, 6)
-    roll_pts, roll_outs, roll_n = diag_loop("L", "R", -0.01, 0.0, D["strap_thickness"] + 0.006)
+    roll_pts, roll_outs, roll_n = diag_loop("L", "R", -0.01, 0.0, D["strap_thickness"] + 0.006,
+                                            bottom_z=waist_z + 0.02)
     tube_along("tcw_blanket_roll", roll_pts, roll_outs, roll_n, D["blanket_roll_r"], m["blanket"], sk_torso)
     for j, (shift, mat_name) in enumerate(((0.025, "haversack"), (-0.025, "webbing"))):
         p_, o_, n_ = diag_loop("R", "L", shift, D["sling_strap_width"], D["strap_thickness"] + 0.003 + 0.002 * j)
@@ -724,7 +730,7 @@ def main():
     # hip kit, rigid on the lower spine
     anchor = rm["hip_anchor"]
     hz = hip_z + 0.02
-    hip_ring_c = Vector(cloth_np[np.abs(cloth_np[:, 2] - hz) < 0.015].mean(axis=0))
+    hip_ring_c = Vector(cloth_np[np.abs(cloth_np[:, 2] - hz) < 0.015].mean(axis=0).tolist())
     hip_ring_c.z = hz
     hpts, houts, _w = section_loop(cloth_np, hip_ring_c, U, F, band=0.015, bins=72, pad=0.0)
 
