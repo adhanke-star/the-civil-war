@@ -1,0 +1,297 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>The Civil War — device test</title>
+  <link rel="icon" href="data:,">
+  <meta name="description" content="Reports this device's graphics and measures a frame rate benchmark for The Civil War.">
+  <!-- the same import map as index.html -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/build/three.module.js",
+      "three/addons/": "./vendor/three/examples/jsm/",
+      "yuka": "./vendor/yuka/build/yuka.module.js",
+      "three.quarks": "./vendor/three.quarks/dist/three.quarks.esm.js",
+      "quarks.core": "./vendor/quarks.core/dist/quarks.core.esm.js",
+      "zzfx": "./vendor/zzfx/ZzFX.js",
+      "@mapbox/martini": "./vendor/@mapbox/martini/index.js",
+      "detect-gpu": "./vendor/detect-gpu/dist/detect-gpu.esm.js",
+      "lil-gui": "./vendor/lil-gui/dist/lil-gui.esm.min.js",
+      "d3-delaunay": "./vendor/d3-delaunay/src/index.js",
+      "delaunator": "./vendor/delaunator/index.js",
+      "robust-predicates": "./vendor/robust-predicates/esm/orient2d.js"
+    }
+  }
+  </script>
+  <style>
+    :root { color-scheme: dark; --text: #f1ece0; --dim: #c9c2b4; --focus: #ffd27a; --edge: rgba(255,255,255,0.14); }
+    html, body { margin: 0; min-height: 100%; background: #17141a; color: var(--text); }
+    body { font: 18px/1.45 system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+    #bench { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; z-index: 0; }
+    main { position: relative; z-index: 1; max-width: 760px; margin: 0; padding: calc(16px + env(safe-area-inset-top)) 20px 24px calc(20px + env(safe-area-inset-left));
+      background: rgba(23, 20, 26, 0.9); min-height: 100vh; box-sizing: border-box; }
+    body.running main { background: rgba(23, 20, 26, 0.72); }
+    h1 { margin: 0 0 4px; font: normal 30px Georgia, serif; }
+    .sub { margin: 0 0 16px; color: var(--dim); }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: 8px 16px; margin: 0 0 16px; }
+    dt { color: var(--dim); }
+    dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+    .big { font-size: 26px; font-variant-numeric: tabular-nums; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+    button { font: inherit; min-height: 48px; min-width: 48px; padding: 0 18px; border-radius: 8px; border: 1px solid var(--edge); background: rgba(255,255,255,0.1); color: var(--text); cursor: pointer; }
+    button.primary { background: #f1ece0; color: #1d1a16; }
+    button:disabled { opacity: 0.6; cursor: default; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+    textarea { width: 100%; box-sizing: border-box; min-height: 160px; background: #121015; color: var(--text); border: 1px solid var(--edge); border-radius: 6px; font: 13px ui-monospace, Menlo, Consolas, monospace; }
+    #status { color: var(--dim); }
+    a { color: var(--focus); }
+  </style>
+</head>
+<body>
+  <canvas id="bench" aria-hidden="true"></canvas>
+  <main>
+    <h1>Device test</h1>
+    <p class="sub">What this device's browser offers the game, then a 6-second drawing test at two sharpness levels. Keep the screen awake until it finishes.</p>
+    <dl id="facts">
+      <dt>Device</dt><dd id="r-ua">--</dd>
+      <dt>Screen</dt><dd id="r-screen">--</dd>
+      <dt>WebGL 2</dt><dd id="r-webgl2">--</dd>
+      <dt>Graphics chip</dt><dd id="r-renderer">--</dd>
+      <dt>Largest texture</dt><dd id="r-maxtex">--</dd>
+      <dt>GPU tier</dt><dd id="r-tier" class="big">--</dd>
+      <dt>Benchmark, ratio 1</dt><dd id="r-bench1" class="big">--</dd>
+      <dt>Benchmark, native</dt><dd id="r-benchn" class="big">--</dd>
+    </dl>
+    <p id="status" role="status" aria-live="polite">Starting…</p>
+    <div class="row">
+      <button type="button" id="copy" class="primary">Copy results</button>
+      <button type="button" id="again" disabled>Run benchmark again</button>
+      <a href="./" style="align-self: center">Back to the game</a>
+    </div>
+    <div id="copybox" hidden>
+      <label for="copytext">Copying is blocked here: select all of this text and copy it.</label>
+      <textarea id="copytext" readonly></textarea>
+    </div>
+  </main>
+  <script type="module">
+    // device.html: a report Aaron opens on his iPad and Mac. Every probe reports a failure in words, never throws.
+    const $ = (id) => document.getElementById(id);
+    const results = {}; // label -> text, in the order shown
+    function put(id, label, text) { $(id).textContent = text; results[label] = text; }
+    const status = (t) => { $('status').textContent = t; };
+    const errText = (err) => (err && err.message ? err.message : String(err));
+
+    // ---- facts -----------------------------------------------------------------------------------------
+    put('r-ua', 'Device', navigator.userAgent);
+    const dpr = window.devicePixelRatio || 1;
+    put('r-screen', 'Screen', `${screen.width} × ${screen.height} CSS px, window ${innerWidth} × ${innerHeight}, devicePixelRatio ${dpr}, touch points ${navigator.maxTouchPoints || 0}`);
+
+    let gl = null;
+    try {
+      gl = document.createElement('canvas').getContext('webgl2');
+    } catch (err) {
+      gl = null;
+    }
+    put('r-webgl2', 'WebGL 2', gl ? 'available' : 'NOT available: this browser cannot run the game');
+    if (gl) {
+      let name = '';
+      try {
+        const ext = gl.getExtension('WEBGL_debug_renderer_info');
+        name = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : `${gl.getParameter(gl.RENDERER)} (the browser hides the real chip name)`;
+      } catch (err) {
+        name = `unknown (${errText(err)})`;
+      }
+      put('r-renderer', 'Graphics chip', String(name));
+      try { put('r-maxtex', 'Largest texture', `${gl.getParameter(gl.MAX_TEXTURE_SIZE)} px`); } catch (err) { put('r-maxtex', 'Largest texture', `unknown (${errText(err)})`); }
+    } else {
+      put('r-renderer', 'Graphics chip', 'unknown: no WebGL 2');
+      put('r-maxtex', 'Largest texture', 'unknown: no WebGL 2');
+    }
+
+    // ---- detect-gpu tier, loaded exactly as src/main.js does (vendored benchmark tables, no CDN) ---------
+    status('Looking up the GPU tier…');
+    try {
+      const { getGPUTier } = await import('detect-gpu');
+      const opts = { benchmarksURL: './vendor/detect-gpu/dist/benchmarks' };
+      if (gl) opts.glContext = gl;
+      const t = await getGPUTier(opts);
+      const bits = [t.type, t.gpu, t.fps ? `about ${t.fps} fps in its tables` : '', t.isMobile ? 'mobile' : ''].filter(Boolean).join(', ');
+      put('r-tier', 'GPU tier', `Tier ${t.tier} of 3 (${bits})`);
+    } catch (err) {
+      put('r-tier', 'GPU tier', `Tier unknown: detect-gpu failed (${errText(err)})`);
+    }
+    gl = null; // the probe context is dropped; the benchmark makes its own
+
+    // ---- benchmark -------------------------------------------------------------------------------------
+    // 8,000 camera-facing, alpha-tested textured quads (figure-like sprites, one instanced draw) over a
+    // 256 x 256-segment plane, full window. 0.5 s warm-up, then 6 s measured, at ratio 1 then native.
+    const SPRITES = 8000;
+    const MEASURE_MS = 6000;
+    const WARM_MS = 500;
+    let THREE = null, renderer = null, scene = null, camera = null;
+
+    function spriteTexture() {
+      const c = document.createElement('canvas');
+      c.width = 32; c.height = 64;
+      const x = c.getContext('2d');
+      x.fillStyle = '#2f4a86'; // a little standing figure: coat, legs, head, musket
+      x.fillRect(10, 18, 12, 22);
+      x.fillStyle = '#28324a';
+      x.fillRect(11, 40, 4, 20); x.fillRect(17, 40, 4, 20);
+      x.fillStyle = '#e2b48c';
+      x.beginPath(); x.arc(16, 12, 6, 0, Math.PI * 2); x.fill();
+      x.fillStyle = '#3a2a1a';
+      x.fillRect(23, 4, 2, 40);
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+    function groundTexture() {
+      const c = document.createElement('canvas');
+      c.width = c.height = 256;
+      const x = c.getContext('2d');
+      const cols = ['#9fae4a', '#c9b04d', '#7f9a3c', '#b8a24a', '#8a9b47'];
+      for (let i = 0; i < 64; i++) { x.fillStyle = cols[i % cols.length]; x.fillRect((i % 8) * 32, Math.floor(i / 8) * 32, 32, 32); }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(6, 6);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+    function build() {
+      renderer = new THREE.WebGLRenderer({ canvas: $('bench'), antialias: false, powerPreference: 'high-performance', stencil: false });
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color('#9cb6c9');
+      camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 2, 6000);
+      scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x5a5030, 1.4));
+      const sun = new THREE.DirectionalLight(0xfff1d6, 2.2);
+      sun.position.set(300, 600, 200);
+      scene.add(sun);
+
+      const ground = new THREE.PlaneGeometry(2000, 2000, 256, 256);
+      ground.rotateX(-Math.PI / 2);
+      const pos = ground.attributes.position;
+      const h = (x, z) => 18 * Math.sin(x * 0.006) * Math.cos(z * 0.005) + 6 * Math.sin(x * 0.02 + z * 0.013);
+      for (let i = 0; i < pos.count; i++) pos.setY(i, h(pos.getX(i), pos.getZ(i)));
+      ground.computeVertexNormals();
+      scene.add(new THREE.Mesh(ground, new THREE.MeshLambertMaterial({ map: groundTexture() })));
+
+      const quad = new THREE.PlaneGeometry(1, 2);
+      quad.translate(0, 1, 0);
+      const mat = new THREE.ShaderMaterial({
+        uniforms: { map: { value: spriteTexture() }, size: { value: 2.2 } },
+        vertexShader: `
+          uniform float size;
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            vec4 mv = modelViewMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+            mv.xy += position.xy * size; // camera-facing
+            gl_Position = projectionMatrix * mv;
+          }`,
+        fragmentShader: `
+          uniform sampler2D map;
+          varying vec2 vUv;
+          void main() {
+            vec4 c = texture2D(map, vUv);
+            if (c.a < 0.5) discard; // alpha test
+            gl_FragColor = vec4(c.rgb, 1.0);
+          }`,
+      });
+      const sprites = new THREE.InstancedMesh(quad, mat, SPRITES);
+      const m = new THREE.Matrix4();
+      for (let i = 0; i < SPRITES; i++) {
+        // 40 blocks of 200 figures in loose ranks, like brigades on a field
+        const b = Math.floor(i / 200), k = i % 200;
+        const bx = ((b % 8) - 3.5) * 180, bz = (Math.floor(b / 8) - 2) * 160;
+        const x = bx + (k % 50) * 2.2 + Math.sin(i * 12.9) * 0.6, z = bz + Math.floor(k / 50) * 3 + Math.cos(i * 7.3) * 0.6;
+        m.makeTranslation(x, h(x, z), z);
+        sprites.setMatrixAt(i, m);
+      }
+      sprites.frustumCulled = false;
+      scene.add(sprites);
+    }
+    function resize(ratio) {
+      renderer.setPixelRatio(ratio);
+      renderer.setSize(innerWidth, innerHeight, false);
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+    }
+    function view(t) {
+      const a = t * 0.00012; // slow orbit, so every frame is different
+      camera.position.set(Math.sin(a) * 900, 520, Math.cos(a) * 900);
+      camera.lookAt(0, 0, 0);
+    }
+    function run(ratio) {
+      return new Promise((resolve) => {
+        resize(ratio);
+        const times = [];
+        let start = 0, last = 0;
+        function frame(now) {
+          if (!start) start = now;
+          view(now);
+          renderer.render(scene, camera);
+          const el = now - start;
+          if (el > WARM_MS) {
+            if (last) times.push(now - last);
+            last = now;
+          }
+          if (el < WARM_MS + MEASURE_MS) requestAnimationFrame(frame);
+          else resolve(times);
+        }
+        requestAnimationFrame(frame);
+      });
+    }
+    function summary(times, ratio) {
+      if (times.length < 5) return `not enough frames to judge (${times.length})`;
+      const mean = times.reduce((s, v) => s + v, 0) / times.length;
+      const worst = [...times].sort((p, q) => q - p).slice(0, Math.max(1, Math.round(times.length * 0.01)));
+      const low = 1000 / (worst.reduce((s, v) => s + v, 0) / worst.length);
+      const px = `${Math.round(innerWidth * ratio)} × ${Math.round(innerHeight * ratio)} px`;
+      return `${(1000 / mean).toFixed(1)} fps average, ${low.toFixed(1)} fps 1% low (${px}, ${times.length} frames)`;
+    }
+    async function bench() {
+      $('again').disabled = true;
+      document.body.classList.add('running');
+      try {
+        if (!THREE) THREE = await import('three');
+        if (!renderer) build();
+        put('r-bench1', 'Benchmark, ratio 1', 'running…');
+        put('r-benchn', 'Benchmark, native', 'waiting…');
+        status('Benchmark at devicePixelRatio 1 (6 seconds)…');
+        put('r-bench1', 'Benchmark, ratio 1', summary(await run(1), 1));
+        status(`Benchmark at the native ratio ${dpr} (6 seconds)…`);
+        put('r-benchn', 'Benchmark, native', `${summary(await run(dpr), dpr)}${dpr === 1 ? '; the native ratio is 1 here' : ''}`);
+        status('Done. The frame rate cannot exceed the screen refresh rate. Copy the results and paste them back.');
+      } catch (err) {
+        const why = /webgl/i.test(errText(err)) ? `not run: WebGL 2 is not available (${errText(err)})` : `not run: ${errText(err)}`;
+        if (/running|waiting|--/.test($('r-bench1').textContent)) put('r-bench1', 'Benchmark, ratio 1', why);
+        if (/running|waiting|--/.test($('r-benchn').textContent)) put('r-benchn', 'Benchmark, native', why);
+        status('The benchmark could not run on this device.');
+      }
+      document.body.classList.remove('running');
+      $('again').disabled = false;
+    }
+
+    // ---- copy ------------------------------------------------------------------------------------------
+    $('copy').addEventListener('click', async () => {
+      const text = [`The Civil War device test, ${new Date().toISOString()}`, ...Object.entries(results).map(([k, v]) => `${k}: ${v}`)].join('\n');
+      try {
+        if (!navigator.clipboard || !window.isSecureContext) throw new Error('no clipboard');
+        await navigator.clipboard.writeText(text);
+        status('Results copied.');
+      } catch {
+        $('copytext').value = text;
+        $('copybox').hidden = false;
+        $('copytext').focus();
+        $('copytext').select();
+        status('Copy the selected text by hand.');
+      }
+    });
+    $('again').addEventListener('click', () => bench());
+    window.__device = { results, done: bench() };
+  </script>
+</body>
+</html>

@@ -2,9 +2,16 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
   <title>The Civil War — Henry House Hill</title>
   <link rel="icon" href="data:,">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Civil War">
+  <meta name="theme-color" content="#17141a">
   <meta name="description" content="The Civil War: a real-time battle game in the browser. First Bull Run, Henry House Hill, 21 July 1861.">
   <script type="importmap">
   {
@@ -83,6 +90,7 @@
         <label><input type="radio" name="quality" value="low"> Low</label>
       </fieldset>
       <label class="row"><input type="checkbox" id="sound-toggle" checked> Sound</label>
+      <p class="row"><a href="?sandbox" style="color: var(--focus)">Sandbox</a>: try and change the look and play, then copy your settings</p>
       <h3>Controls</h3>
       <ul class="keys">
         <li><b>Select</b>: click a brigade or its flag (Tab cycles flags)</li>

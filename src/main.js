@@ -180,3 +180,13 @@ window.__game = { game, rts, terrain, scene, camera, post, world, effects, input
 if (new URLSearchParams(location.search).has('tune')) {
   import('./dev/tune.js').then((m) => m.openTuner({ post, world }));
 }
+
+// Sandbox workbench panel, with ?sandbox in the URL (Menu > Sandbox).
+if (new URLSearchParams(location.search).has('sandbox')) {
+  import('./sandbox/panel.js').then((m) => m.mountSandbox({ game: window.__game }));
+}
+
+// Installable app: the service worker only on the live https site (local http dev and tests never get one); ?nosw skips it.
+if (location.protocol === 'https:' && 'serviceWorker' in navigator && !new URLSearchParams(location.search).has('nosw')) {
+  navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('service worker not registered:', err && err.message ? err.message : err));
+}
