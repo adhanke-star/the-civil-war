@@ -177,6 +177,12 @@ export class Unit {
     this.files = files;
   }
 
+  /** Half the width of the brigade's front once it stands in line (also while it marches in column). */
+  lineHalfFront() {
+    if (this.formation !== 'column' || !this.files) return this.halfFront;
+    return Math.max(4, ((this.files - 1) / 2) * FILE_SPACING);
+  }
+
   /** Column of fours along the trail: slot k = rank k/4 at COLUMN_RANK_SPACING back along the trail. */
   layoutColumn() {
     const live = this.figures.filter((f) => f.alive).sort((a, b) => a.order - b.order);

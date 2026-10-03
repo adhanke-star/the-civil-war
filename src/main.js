@@ -61,7 +61,8 @@ const scenario = await (await fetch('./assets/scenarios/henry-hill.json')).json(
 const world = buildWorld(scene, terrain, scenario);
 Object.assign(stats, world.stats);
 
-const rts = new RtsCamera(camera, terrain, { target: [-110, 290], yaw: -Math.PI / 2 - 0.12, pitch: 0.95, dist: 840 });
+// Opening view: both armies between the clock and the bottom panels; the pitch follows the zoom.
+const rts = new RtsCamera(camera, terrain, { target: [-60, 200], yaw: -Math.PI / 2 - 0.12, dist: 1150 });
 const effects = new Effects(scene, terrain, rts);
 await effects.init();
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -75,6 +76,7 @@ function setQuality(mode) {
   post.setMode(mode);
   savePref('cw.quality', post.mode);
   hud.setQuality(post.mode);
+hud.onFocus = (u) => rts.focus(u.x, u.z);
 }
 
 const hud = new Hud({

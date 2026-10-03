@@ -3,6 +3,8 @@
 // A path of ground points is smoothed (centripetal Catmull-Rom), resampled, and extruded into a ribbon
 // that widens into an arrowhead. The shader draws a white rim and a soft translucent body; arrows draw on
 // top of the battlefield (no depth test) so they stay readable over hills and smoke.
+// At the end of every march (and of the arrow being dragged) a ghost shows where the line will stand: a
+// rimmed bar as wide as the brigade's front, with a short arrow for the way it will face.
 
 import * as THREE from 'three';
 
@@ -28,6 +30,49 @@ const material = (side, opacity) => new THREE.ShaderMaterial({
   depthTest: false,
   depthWrite: false,
 });
+
+const ghostMaterial = (side) => new THREE.ShaderMaterial({
+  uniforms: { uColor: { value: COLORS[side].clone() } },
+  vertexShader: /* glsl */ `
+    attribute vec2 aRib;
+    varying vec2 vRib;
+    void main() { vRib = aRib; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }
+  `,
+  fragmentShader: /* glsl */ `
+    uniform vec3 uColor; varying vec2 vRib;
+    void main() {
+      float e = max(smoothstep(0.5, 0.8, abs(vRib.y)), max(1.0 - smoothstep(0.0, 0.04, vRib.x), smoothstep(0.96, 1.0, vRib.x)));
+      gl_FragColor = vec4(mix(uColor, vec3(1.0, 0.98, 0.94), e), mix(0.3, 0.92, e));
+    }
+  `,
+  transparent: true,
+  depthTest: false,
+  depthWrite: false,
+});
+
+/** A straight bar from a to b, draped on the ground every few metres; width in metres. */
+function barGeometry(a, b, width, terrain) {
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+  const tx = (b[0] - a[0]) / len, tz = (b[1] - a[1]) / len;
+  const nx = -tz * width * 0.5, nz = tx * width * 0.5;
+  const n = Math.max(2, Math.ceil(len / 6) + 1);
+  const pos = [], rib = [], idx = [];
+  for (let i = 0; i < n; i++) {
+    const u = i / (n - 1);
+    const x = a[0] + (b[0] - a[0]) * u, z = a[1] + (b[1] - a[1]) * u;
+    for (const s of [-1, 1]) {
+      const px = x + nx * s, pz = z + nz * s;
+      pos.push(px, terrain.heightAt(px, pz) + 2.5, pz);
+      rib.push(u, s);
+    }
+    if (i < n - 1) { const k = i * 2; idx.push(k, k + 1, k + 2, k + 1, k + 3, k + 2); }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('aRib', new THREE.Float32BufferAttribute(rib, 2));
+  g.setIndex(idx);
+  return g;
+}
 
 function smooth(points, step) {
   if (points.length < 2) return points;
@@ -90,11 +135,31 @@ export class ArrowLayer {
     this.group.renderOrder = 20;
     scene.add(this.group);
     this.preview = null;
+    this.previewGhost = null;
     this.unitArrows = new Map();
+    this.ghosts = new Map();
     this.mats = { US: material('US', 0.85), CS: material('CS', 0.85), USp: material('US', 0.95), CSp: material('CS', 0.95) };
+    this.ghostMats = { US: ghostMaterial('US'), CS: ghostMaterial('CS') };
   }
 
-  setPreview(points, side, width) {
+  /** The line's footprint at (x, z) facing `facing`, half as wide as `halfFront`, plus a facing arrow. */
+  ghost(x, z, facing, halfFront, side) {
+    const lx = Math.cos(facing), lz = -Math.sin(facing), fx = Math.sin(facing), fz = Math.cos(facing);
+    const g = new THREE.Group();
+    const bar = new THREE.Mesh(barGeometry([x - lx * halfFront, z - lz * halfFront], [x + lx * halfFront, z + lz * halfFront], 7, this.terrain), this.ghostMats[side]);
+    const head = new THREE.Mesh(arrowGeometry([[x + fx * 5, z + fz * 5], [x + fx * 26, z + fz * 26]], 9, this.terrain).geometry, this.mats[side]);
+    for (const m of [bar, head]) { m.frustumCulled = false; m.renderOrder = 22; g.add(m); }
+    this.group.add(g);
+    return g;
+  }
+
+  dropGhost(g) {
+    if (!g) return;
+    this.group.remove(g);
+    for (const m of g.children) m.geometry.dispose();
+  }
+
+  setPreview(points, side, width, halfFront = 0) {
     this.clearPreview();
     if (points.length < 2) return null;
     const { geometry, length, smoothed } = arrowGeometry(points, width, this.terrain);
@@ -103,14 +168,36 @@ export class ArrowLayer {
     this.preview.renderOrder = 21;
     this.preview.frustumCulled = false;
     this.group.add(this.preview);
+    if (halfFront > 0 && smoothed.length >= 2) {
+      const b = smoothed[smoothed.length - 1], a = smoothed[Math.max(0, smoothed.length - 4)];
+      this.previewGhost = this.ghost(b[0], b[1], Math.atan2(b[0] - a[0], b[1] - a[1]), halfFront, side);
+    }
     return smoothed;
   }
 
   clearPreview() {
+    this.dropGhost(this.previewGhost);
+    this.previewGhost = null;
     if (!this.preview) return;
     this.group.remove(this.preview);
     this.preview.geometry.dispose();
     this.preview = null;
+  }
+
+  /** Keep each marching player brigade's destination ghost in step with its order. */
+  updateGhost(u, show) {
+    const old = this.ghosts.get(u.id);
+    if (!show || u.order.type === 'charge') {
+      if (old) { this.dropGhost(old.g); this.ghosts.delete(u.id); }
+      return;
+    }
+    const end = u.path[u.path.length - 1];
+    const facing = u.order.keepFacing ? u.facing : u.order.endFacing ?? u.facing;
+    const hf = u.lineHalfFront();
+    const key = `${Math.round(end[0])},${Math.round(end[1])},${facing.toFixed(2)},${Math.round(hf)}`;
+    if (old && old.key === key) return;
+    if (old) this.dropGhost(old.g);
+    this.ghosts.set(u.id, { key, g: this.ghost(end[0], end[1], facing, hf, u.side) });
   }
 
   /** Show the remaining path of each moving unit (player side, plus visible enemy charges). */
@@ -120,9 +207,11 @@ export class ArrowLayer {
       let m = this.unitArrows.get(u.id);
       if (!show) {
         if (m) { this.group.remove(m); m.geometry.dispose(); this.unitArrows.delete(u.id); }
+        this.updateGhost(u, false);
         continue;
       }
       const remain = Math.hypot(u.path[u.path.length - 1][0] - u.x, u.path[u.path.length - 1][1] - u.z);
+      this.updateGhost(u, u.side === showSide && remain >= 8);
       if (remain < 15) {
         if (m) { this.group.remove(m); m.geometry.dispose(); this.unitArrows.delete(u.id); }
         continue;

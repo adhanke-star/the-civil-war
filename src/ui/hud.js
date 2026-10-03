@@ -37,6 +37,49 @@ export function flagDataUrl(side) {
   return `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
 }
 
+const COMPASS = ['north', 'north-east', 'east', 'south-east', 'south', 'south-west', 'west', 'north-west'];
+/** Compass word for a facing (forward = (sin f, cos f); +x east, +z south). */
+export function compass(f) {
+  const b = Math.atan2(Math.sin(f), -Math.cos(f)); // clockwise from north
+  return COMPASS[((Math.round(b / (Math.PI / 4)) % 8) + 8) % 8];
+}
+
+/** What a unit is doing, in one or two words, and a tone for its colour. */
+export function activity(u) {
+  if (u.state === 'routing') return ['Routing', 'bad'];
+  if (u.melee) return ['Hand to hand', 'bad'];
+  const o = u.order.type;
+  if (u.follow.active) {
+    if (o === 'charge') return ['Charging', 'hot'];
+    if (o === 'fallback') return ['Falling back', 'warn'];
+    if (u.firing) return ['Advancing, firing', 'hot'];
+    return [u.formation === 'column' ? 'Marching in column' : u.run ? 'Advancing at the double' : 'Advancing', 'move'];
+  }
+  if (u.type === 'artillery' && !u.unlimbered) return ['Unlimbering', 'move'];
+  if (u.firing) return ['Firing', 'hot'];
+  if (u.state === 'wavering') return ['Wavering', 'warn'];
+  return [o === 'hold' && u.order.firm ? 'Holding' : 'Halted', 'idle'];
+}
+
+/** A sentence for the flag's tooltip: who, how many, what now and what next. */
+export function intention(u) {
+  const [now] = activity(u);
+  let next = '';
+  if (u.follow.active && u.path && u.path.length > 1) {
+    let len = 0;
+    for (let i = 1; i < u.path.length; i++) len += Math.hypot(u.path[i][0] - u.path[i - 1][0], u.path[i][1] - u.path[i - 1][1]);
+    const end = u.order.endFacing ?? u.facing;
+    next = u.order.type === 'charge'
+      ? `; ${Math.round(len)} m to the enemy, then hand-to-hand`
+      : u.order.type === 'fallback'
+        ? `; ${Math.round(len)} m back, then holds`
+        : `; ${Math.round(len)} m to go, then holds facing ${compass(end)}`;
+  } else if (u.state !== 'routing') {
+    next = `; facing ${compass(u.facing)}`;
+  }
+  return `${u.name}: ${Math.round(u.men)} men, ${u.state}. ${now}${next}.`;
+}
+
 const rankShort = (r) => ({ 'Brigadier General': 'Brig. Gen.', Colonel: 'Col.', Captain: 'Capt.', Lieutenant: 'Lt.', 'First Lieutenant': '1st Lt.', Major: 'Maj.' }[r] || r || '');
 
 export class Hud {
@@ -49,11 +92,12 @@ export class Hud {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = `marker ${u.side.toLowerCase()}`;
-      b.innerHTML = `<span class="str"></span>${markerSvg(u.side, u.type)}<span class="nm">${u.short}</span>`;
+      b.innerHTML = `<span class="str"></span>${markerSvg(u.side, u.type)}<span class="nm">${u.short}</span><span class="act"></span>`;
       b.addEventListener('click', (e) => { e.stopPropagation(); onSelect(u, { fromMarker: true }); });
+      b.addEventListener('dblclick', (e) => { e.stopPropagation(); if (this.onFocus) this.onFocus(u); });
       b.addEventListener('pointerdown', (e) => this.onMarkerDown && this.onMarkerDown(u, e));
       box.appendChild(b);
-      this.markers.set(u.id, { el: b, str: b.querySelector('.str'), last: '' });
+      this.markers.set(u.id, { el: b, str: b.querySelector('.str'), act: b.querySelector('.act'), last: '', lastAct: '', lastTip: '' });
     }
     document.querySelector('#balance .flag.us').style.backgroundImage = flagDataUrl('US');
     document.querySelector('#balance .flag.cs').style.backgroundImage = flagDataUrl('CS');
@@ -128,15 +172,13 @@ export class Hud {
     set('cover', Math.min(100, (u.cover - 1) * 100));
     set('reload', u.reload * 100);
     $('uc-cas').textContent = String(Math.round(u.casualties));
-    const st = { steady: 'Steady', shaken: 'Shaken', wavering: 'Wavering', routing: 'Routing' }[u.state];
-    const ord = u.state === 'routing' ? 'running for the rear' : u.melee ? 'in hand-to-hand fighting' : u.firing ? 'firing' :
-      { move: 'marching', charge: 'charging', fallback: 'falling back', hold: u.order.firm ? 'holding' : 'halted' }[u.order.type] || '';
-    $('uc-state').textContent = `${Math.round(u.men)} men · ${st}${ord ? ` · ${ord}` : ''}${u.run ? ' · at the double' : ''}${u.coverKind && u.coverKind !== 'open' ? ` · in ${u.coverKind}` : ''}`;
+    $('uc-state').textContent = `${intention(u).replace(/^[^:]*: /, '')}${u.coverKind && u.coverKind !== 'open' ? ` In ${u.coverKind}.` : ''}`;
   }
 
-  /** Per frame: place markers; every 0.25 s refresh numbers. */
+  /** Per frame: place markers (stacked so none hides another); every 0.25 s refresh numbers. */
   update(dt) {
     const w = window.innerWidth, h = window.innerHeight;
+    const shown = [];
     for (const u of this.units) {
       const m = this.markers.get(u.id);
       if (!u.alive) { m.el.classList.add('hidden'); continue; }
@@ -144,17 +186,46 @@ export class Hud {
       const off = _v.z > 1 || _v.x < -1.1 || _v.x > 1.1 || _v.y < -1.1 || _v.y > 1.1;
       m.el.classList.toggle('hidden', off);
       if (off) continue;
-      const x = (_v.x * 0.5 + 0.5) * w, y = (-_v.y * 0.5 + 0.5) * h;
-      m.el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+      if (!m.w || this.sizeTimer <= 0) { m.w = m.el.offsetWidth; m.h = m.el.offsetHeight; }
+      shown.push({ u, m, x: (_v.x * 0.5 + 0.5) * w, y: (-_v.y * 0.5 + 0.5) * h });
+    }
+    this.sizeTimer = this.sizeTimer > 0 ? this.sizeTimer - dt : 1;
+    // nearest (lowest on screen) first; a flag that would cover one already placed moves up above it
+    shown.sort((a, b) => b.y - a.y);
+    const placed = [];
+    for (const s of shown) {
+      const mw = s.m.w || 60, mh = s.m.h || 80;
+      let y = s.y;
+      for (let k = 0; k < 8; k++) {
+        const hit = placed.find((p) => Math.abs(p.x - s.x) < (p.w + mw) / 2 + 2 && y > p.y - p.h - 2 && y - mh < p.y + 2);
+        if (!hit) break;
+        y = hit.y - hit.h - 3;
+      }
+      placed.push({ x: s.x, y, w: mw, h: mh });
+      s.m.el.style.transform = `translate(${s.x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+    }
+    for (const { u, m } of shown) {
       const label = String(Math.round(u.men));
       if (label !== m.last) { m.str.textContent = label; m.last = label; }
       m.el.classList.toggle('wavering', u.state === 'wavering');
       m.el.classList.toggle('routing', u.state === 'routing');
-      m.el.setAttribute('aria-label', `${u.name}, ${u.side === 'US' ? 'Union' : 'Confederate'}, ${label} men, ${u.state}${u.selected ? ', selected' : ''}`);
+      const [act, tone] = activity(u);
+      const actKey = act + tone;
+      if (actKey !== m.lastAct) { m.act.textContent = act; m.act.className = `act ${tone}`; m.lastAct = actKey; }
     }
     this.cardTimer -= dt;
     if (this.cardTimer <= 0) {
       this.cardTimer = 0.25;
+      for (const u of this.units) {
+        const m = this.markers.get(u.id);
+        if (!u.alive) continue;
+        const tip = intention(u);
+        if (tip !== m.lastTip) {
+          m.el.title = tip;
+          m.el.setAttribute('aria-label', `${tip}${u.selected ? ' Selected.' : ''}`);
+          m.lastTip = tip;
+        }
+      }
       if (this.selected) {
         this.updateCard(this.selected);
         this.updateOrders();

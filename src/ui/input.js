@@ -4,7 +4,9 @@
 //   ending on an enemy orders a charge). On an enemy selects it to inspect. On open ground drags the map;
 //   a click on open ground clears the selection.
 // Right button: drag turns/tilts the camera; a click on the ground marches the selected brigade straight
-//   there. Middle drag turns too. Wheel zooms toward the pointer.
+//   there. Middle drag turns too.
+// Mouse wheel zooms toward the pointer. Trackpad (Mac): two-finger scroll pans, pinch zooms toward the
+//   pointer, Option + two-finger scroll turns and tilts. Double-click a flag to centre the camera on it.
 // Keys: H hold, C charge, R run, F fall back, X halt, Space pause, 1/2/3 speed, Esc deselect, G quality;
 //   camera keys are handled by RtsCamera.
 
@@ -21,14 +23,45 @@ export class Input {
     window.addEventListener('pointermove', (e) => this.move(e));
     window.addEventListener('pointerup', (e) => this.up(e));
     window.addEventListener('pointercancel', () => this.cancel());
-    canvas.addEventListener('wheel', (e) => {
+    this.wheelGesture = null;
+    const onWheel = (e) => {
       e.preventDefault();
-      const p = rts.pick(e.clientX, e.clientY, canvas);
-      rts.zoomBy(Math.exp(Math.max(-120, Math.min(120, e.deltaY)) * 0.0015), p);
-    }, { passive: false });
+      const kind = this.wheelKind(e);
+      if (kind === 'pinch') {
+        rts.zoomBy(Math.exp(Math.max(-60, Math.min(60, e.deltaY)) * 0.012), rts.pick(e.clientX, e.clientY, canvas));
+      } else if (kind === 'trackpad') {
+        if (e.altKey) rts.rotateBy(e.deltaX * 0.004, e.deltaY * 0.002);
+        else rts.panPixels(e.deltaX, e.deltaY, window.innerHeight);
+      } else {
+        const px = e.deltaY * (e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? 800 : 1); // lines or pages to pixels
+        rts.zoomBy(Math.exp(Math.max(-120, Math.min(120, px)) * 0.0015), rts.pick(e.clientX, e.clientY, canvas));
+      }
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    // the flags sit over the canvas: wheel over a flag must still steer the camera
+    document.getElementById('markers').addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener('keydown', (e) => this.key(e));
     window.addEventListener('keyup', (e) => rts.onKey(e, false));
     window.addEventListener('blur', () => rts.keys.clear());
+  }
+
+  /**
+   * What sent this wheel event: 'pinch' (trackpad pinch, which browsers send with ctrlKey), 'trackpad'
+   * (two-finger scroll: precise pixel deltas) or 'mouse' (a wheel: line deltas, or pixel deltas in whole
+   * notches of 120). A gesture keeps its first answer, so trackpad momentum is never read as a wheel.
+   */
+  wheelKind(e) {
+    if (e.ctrlKey) return 'pinch';
+    const now = performance.now();
+    const g = this.wheelGesture;
+    if (g && now - g.t < 240) { g.t = now; return g.kind; }
+    let kind;
+    if (e.deltaMode !== 0) kind = 'mouse';
+    else if (e.deltaX !== 0) kind = 'trackpad';
+    else if (typeof e.wheelDeltaY === 'number' && e.wheelDeltaY !== 0) kind = Math.abs(e.wheelDeltaY) % 120 === 0 ? 'mouse' : 'trackpad';
+    else kind = Math.abs(e.deltaY) >= 50 ? 'mouse' : 'trackpad';
+    this.wheelGesture = { kind, t: now };
+    return kind;
   }
 
   unitAt(p) {
@@ -76,7 +109,7 @@ export class Input {
       if (!p) return;
       const last = d.points[d.points.length - 1];
       if (Math.hypot(p.x - last[0], p.z - last[1]) > 9) d.points.push([p.x, p.z]);
-      d.preview = this.arrows.setPreview(d.points.concat([[p.x, p.z]]), d.unit.side, Math.min(26, Math.max(12, d.unit.halfFront * 0.22)));
+      d.preview = this.arrows.setPreview(d.points.concat([[p.x, p.z]]), d.unit.side, Math.min(26, Math.max(12, d.unit.halfFront * 0.22)), d.unit.lineHalfFront());
       d.end = p;
     } else if (d.mode === 'pan') {
       if (far) d.moved = true;

@@ -64,7 +64,7 @@ button { font: inherit; color: var(--text); }
 #objective { bottom: 12px; left: 82px; margin: 0; padding: 8px 12px; font-size: 13px; max-width: 46vw; }
 #objective:empty { display: none; }
 #perf { bottom: 12px; right: 12px; margin: 0; padding: 4px 8px; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
-#tip { top: 60px; left: 50%; transform: translateX(-50%); margin: 0; padding: 8px 14px; font-size: 14px; max-width: min(640px, 90vw); text-align: center; pointer-events: none; } /* never covers a brigade */
+#tip { bottom: 64px; left: 50%; transform: translateX(-50%); margin: 0; padding: 8px 14px; font-size: 14px; width: max-content; max-width: min(760px, 90vw); text-align: center; pointer-events: none; } /* below the armies in the opening view; never takes a click */
 #tip[hidden] { display: none; }
 #toasts { position: fixed; top: 116px; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; pointer-events: none; }
 #toasts p { margin: 0; padding: 6px 12px; background: var(--panel); border-radius: 6px; font: 15px Georgia, serif; text-align: center; animation: fade 5s forwards; }
@@ -76,6 +76,13 @@ button { font: inherit; color: var(--text); }
 .marker .str { font-size: 13px; font-weight: bold; line-height: 1; }
 .marker svg { width: 34px; height: 34px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
 .marker .nm { font: bold 13px "Helvetica Neue", Arial, sans-serif; white-space: nowrap; }
+/* what the brigade is doing, under its name (UG:G shows state on the flag; Aaron could not tell) */
+.marker .act { font: 600 11px "Helvetica Neue", Arial, sans-serif; white-space: nowrap; padding: 1px 5px; margin-top: 1px; border-radius: 3px; background: rgba(12, 10, 14, 0.72); text-shadow: none; }
+.marker .act.idle { color: #d9d3c4; }
+.marker .act.move { color: #9fd0ff; }
+.marker .act.hot { color: #ffb15c; }
+.marker .act.warn { color: #ffd34d; }
+.marker .act.bad { color: #ff8a7a; }
 .marker.selected svg { filter: drop-shadow(0 0 5px #b9ff7a) drop-shadow(0 0 2px #b9ff7a); }
 .marker.selected .nm { color: #d8ffb0; }
 .marker.wavering .nm { color: #ffd34d; }

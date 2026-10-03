@@ -29,7 +29,7 @@
 <body>
   <main>
     <canvas id="battlefield" tabindex="0" role="application"
-            aria-label="Battlefield. Click a blue brigade to select it, then drag from it to draw its march. Right-drag turns the camera, the wheel zooms, W A S D pan."></canvas>
+            aria-label="Battlefield. Click a blue brigade to select it, then drag from it to draw its march. Drag the ground or scroll with two fingers to pan, pinch or use the wheel to zoom, Q and E turn, W A S D pan."></canvas>
     <div id="markers" role="group" aria-label="Brigades"></div>
 
     <section id="unitcard" class="panel" aria-label="Selected brigade" hidden>
@@ -69,7 +69,7 @@
     <button id="menu-btn" class="panel" type="button" aria-haspopup="dialog" aria-label="Menu">☰</button>
     <p id="objective" class="panel"></p>
     <p id="perf" class="panel"><span>FPS <span id="fps">--</span></span> <span id="scale"></span></p>
-    <p id="tip" class="panel" role="note">Click a <b>blue brigade</b>, then <b>drag from it</b> to draw its march. Right-drag turns the camera, wheel zooms, WASD pans.</p>
+    <p id="tip" class="panel" role="note">Click a <b>blue brigade's flag</b>, then <b>drag from it</b> to draw its march: the outline shows where its line will stand. Two-finger scroll or drag the ground to pan, pinch or wheel to zoom, Q/E to turn.</p>
     <div id="toasts" role="status" aria-live="polite"></div>
     <p id="status" class="visually-hidden" role="status">Loading the battlefield…</p>
 
@@ -87,7 +87,8 @@
       <ul class="keys">
         <li><b>Select</b>: click a brigade or its flag (Tab cycles flags)</li>
         <li><b>March</b>: drag from your brigade; release to order. Right-click ground for a straight march</li>
-        <li><b>Camera</b>: drag the ground to pan, right-drag to turn, wheel to zoom; WASD / arrows, Q/E, +/-</li>
+        <li><b>Camera</b>: drag the ground or two-finger scroll to pan; pinch or wheel to zoom (the view tilts as you zoom); right-drag or Option + scroll to turn and tilt; WASD / arrows, Q/E, +/-; double-click a flag to centre on it</li>
+        <li><b>Reading the field</b>: under each flag is what the brigade is doing; hover a flag for what it will do next; a marching brigade shows an outline where its line will stand</li>
         <li><b>Orders</b>: H hold · C charge · R run · F fall back · X halt · Space pause · 1/2/3 speed</li>
       </ul>
       <h3>History</h3>

@@ -2,24 +2,36 @@
 //
 // State is a ground target point, an azimuth (yaw), a pitch above the horizon and a distance. Inputs set
 // goals; update() eases toward them. Pan keeps the grabbed ground point under the pointer.
-// Keys: WASD / arrows pan, Q/E turn, +/- (and PageUp/PageDown) zoom. Mouse: see ui/input.js.
+// The tilt follows the zoom (Aaron: the old fixed 54 degrees looked "too angled down"): close in the camera
+// looks across the field at about 24 degrees, at the default distance about 38, fully out about 45; a
+// vertical right-drag adds the player's own offset on top.
+// Keys: WASD / arrows pan, Q/E turn, +/- (and PageUp/PageDown) zoom. Mouse and trackpad: see ui/input.js.
 
 import * as THREE from 'three';
 
 const _v = new THREE.Vector3();
+const NEAR_DIST = 150, FAR_DIST = 2000, NEAR_PITCH = 0.42, FAR_PITCH = 0.78;
+
+/** Default camera pitch for a distance: low and oblique close in, more map-like far out. */
+export function pitchForDist(dist) {
+  const t = THREE.MathUtils.clamp(Math.log(dist / NEAR_DIST) / Math.log(FAR_DIST / NEAR_DIST), 0, 1);
+  return NEAR_PITCH + (FAR_PITCH - NEAR_PITCH) * t;
+}
 const _ray = new THREE.Raycaster();
 const _ndc = new THREE.Vector2();
 
 export class RtsCamera {
-  constructor(camera, terrain, { target = [0, 0], yaw = Math.PI, pitch = 0.9, dist = 900 } = {}) {
+  constructor(camera, terrain, { target = [0, 0], yaw = Math.PI, pitch, dist = 900 } = {}) {
     this.camera = camera;
     this.terrain = terrain;
+    this.tilt = 0; // the player's own tilt on top of pitchForDist (right-drag up/down)
+    if (pitch === undefined) pitch = pitchForDist(dist);
     this.target = new THREE.Vector3(target[0], 0, target[1]);
     this.goal = { x: target[0], z: target[1], yaw, pitch, dist };
     this.yaw = yaw;
     this.pitch = pitch;
     this.dist = dist;
-    this.minDist = 120;
+    this.minDist = 100;
     this.maxDist = 2000;
     this.keys = new Set();
     this.bound = terrain.half - 120;
@@ -51,7 +63,25 @@ export class RtsCamera {
 
   rotateBy(dyaw, dpitch) {
     this.goal.yaw += dyaw;
-    this.goal.pitch = THREE.MathUtils.clamp(this.goal.pitch + dpitch, 0.52, 1.35);
+    this.tilt = THREE.MathUtils.clamp(this.tilt + dpitch, -0.25, 0.6);
+    this.goal.pitch = this._pitch(this.goal.dist);
+  }
+
+  _pitch(dist) {
+    return THREE.MathUtils.clamp(pitchForDist(dist) + this.tilt, 0.3, 1.35);
+  }
+
+  /** Pan by a screen-space drag in CSS pixels (two-finger trackpad scroll): the ground follows the fingers. */
+  panPixels(dxPx, dyPx, viewHeightPx) {
+    const mpp = (2 * this.dist * Math.tan((this.camera.fov * Math.PI) / 360)) / Math.max(1, viewHeightPx);
+    this.panScreen(dxPx * mpp, (-dyPx * mpp) / Math.max(0.35, Math.sin(this.pitch)));
+  }
+
+  /** Glide to centre a ground point (double-click on a brigade's flag). */
+  focus(x, z) {
+    this.goal.x = x;
+    this.goal.z = z;
+    this._clamp();
   }
 
   /** Zoom by a factor; if a ground point is given, zoom toward it. */
@@ -64,6 +94,7 @@ export class RtsCamera {
       this.goal.z += (toward.z - this.goal.z) * t;
     }
     this.goal.dist = next;
+    this.goal.pitch = this._pitch(next);
     this._clamp();
   }
 
