@@ -23,7 +23,7 @@ on:
         default: '35'
       budget_min:
         description: Render budget in minutes before directions are reduced
-        default: '16'
+        default: '18'
   push:
     branches: [bake]
     paths:
@@ -49,7 +49,7 @@ env:
   SAMPLES_HERO: ${{ inputs.samples_hero || '128' }}
   DIRECTIONS: ${{ inputs.directions || '16' }}
   ELEVATION: ${{ inputs.elevation || '35' }}
-  BUDGET_MIN: ${{ inputs.budget_min || '16' }}
+  BUDGET_MIN: ${{ inputs.budget_min || '18' }}
 
 jobs:
   bake:

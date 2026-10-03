@@ -41,7 +41,6 @@ D = {
     "coat_hem_flare":      0.028,   # extra radius at the hem                  placeholder
     "trouser_offset":      0.016,   # kersey trousers, loose-ish               placeholder
     "shoe_offset":         0.008,   # brogan leather over the foot             placeholder
-    "shoe_smooth_iterations": 40,  # irons the toes out of the foot shell      placeholder
     "collar_above_neck":   0.03,    # coat collar line above the neck joint   placeholder
     "shoe_top_above_ankle": 0.055,  # ankle-high bootee                        placeholder
     "cloth_thickness":     0.004,   # solidify thickness of all cloth          placeholder
@@ -509,6 +508,42 @@ def head_ring(cloud_head, lm, z, pad, bins=32):
     return pts, outs, centre
 
 
+def build_brogan(m, rig, rm, lm, side, sg, shoe_idx, rest_w, info):
+    """A convex envelope of the foot, lofted heel to toe: the toes merge into one blunt shoe.
+    (A shell offset from the foot kept every toe, even after 40 smoothing passes.)"""
+    U = lm["U"]
+    mid_x = lm["mid"].dot(lm["L"])
+    pts = [rest_w[i] for i in shoe_idx if (rest_w[i].dot(lm["L"]) - mid_x) * sg > 0]
+    cloud = np.array([p[:] for p in pts])
+    fb = rm["side"][side]["foot"]
+    bone = rig.data.bones[fb]
+    ax = bone.tail_local - bone.head_local
+    ax = Vector((ax.x, ax.y, 0)).normalized()
+    proj = cloud @ np.array(ax[:])
+    lo, hi = float(proj.min()), float(proj.max())
+    origin = Vector(cloud.mean(axis=0).tolist())
+    origin -= ax * origin.dot(ax)
+    rings = []
+    n_st = 12
+    for k in range(n_st):
+        t = 0.04 + 0.92 * k / (n_st - 1)
+        c = origin + ax * (lo + (hi - lo) * t)
+        sel = cloud[np.abs(proj - (lo + (hi - lo) * t)) < 0.02]
+        if len(sel) < 8:
+            continue
+        cc = Vector(sel.mean(axis=0).tolist())
+        cc = cc - ax * (cc.dot(ax)) + ax * c.dot(ax)
+        r, _o, _w = section_loop(cloud, cc, ax, U, band=0.02, bins=24, pad=D["shoe_offset"], smooth=2)
+        rings.append([Vector((p.x, p.y, max(p.z, 0.0))) for p in r])
+    v, f = C.loft(rings)
+    obj = C.mesh_object("tcw_brogan_" + side, v, f)
+    C.assign(obj, m["brogans"])
+    Skinner(rig, rest_w, info, ("foot", "shin")).apply(obj, k=12)
+    C.add_modifier(obj, "SUBSURF", "Smooth", levels=0, render_levels=2)
+    REP["objects"][obj.name] = {"verts": len(v), "rings": len(rings)}
+    return obj
+
+
 def build_cap(m, rig, rm, lm, head_cloud, brow_z):
     F, U = lm["F"], lm["U"]
     base, outs, centre = head_ring(head_cloud, lm, brow_z + 0.01, 0.007)
@@ -631,8 +666,8 @@ def main():
     trousers, _tp = make_shell("tcw_trousers", body, rig, rest, nrm, trouser_set,
                                lambda i: D["trouser_offset"], m["trousers"], D["smooth_iterations"],
                                D["cloth_thickness"])
-    shoes, _sp = make_shell("tcw_brogans", body, rig, rest, nrm, shoe_set, lambda i: D["shoe_offset"],
-                            m["brogans"], D["shoe_smooth_iterations"], 0.003, min_z=0.0)
+    for side, sg in (("L", 1.0), ("R", -1.0)):
+        build_brogan(m, rig, rm, lm, side, sg, [i for i in shoe_set], rest_w, info)
     T.mark("garment shells")
 
     # body cross-sections -> coat skirt (a lofted tube from above the belt to the hem)

@@ -51,7 +51,7 @@ P = {
     "sun_strength": C.arg("sun-strength", 4.0),
     "sun_soft_deg": C.arg("sun-soft", 4.0),
     "sky_strength": C.arg("sky-strength", 0.55),
-    "budget_min": C.arg("budget-min", 16.0),      # matrix render budget; directions halve if over
+    "budget_min": C.arg("budget-min", 18.0),      # matrix render budget; directions halve if over
     "hero_dir": C.arg("hero-dir", 2),
     "skip_field": C.arg("skip-field", False),
 }
@@ -232,7 +232,7 @@ def main():
             if tier == "close" and k == 0:
                 per = statistics.mean(times[1:]) if len(times) > 1 else times[0]
                 est_close = per * len(frames) * N
-                est_field = 0.0 if P["skip_field"] else est_close * 0.45  # rough: per-frame overhead dominates
+                est_field = 0.0 if P["skip_field"] else est_close * 0.16  # measured run 2: field 0.51 s vs close 3.7 s per frame
                 C.log("first direction: %.2fs/frame; estimated close %.0fs + field %.0fs (budget %.0fs)" % (
                     per, est_close, est_field, budget_s))
                 if est_close + est_field > budget_s and reduced is None:
