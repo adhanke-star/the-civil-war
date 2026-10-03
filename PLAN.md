@@ -1,93 +1,90 @@
-# PLAN — weekly milestones (each one playable)
+# PLAN — build order for "One Army, One War" (design: DESIGN.md; decision: DECISIONS 0013)
 
-Status: M0 shipped (v0); M1 playable on Pages, not yet tagged (STATE.md lists the gaps). Every milestone ends with: CI green, the GitHub Pages link working, a `vN`
-Release, and Aaron able to play it.
+Status: M0 shipped (v0). M1 (Henry House Hill) is playable on Pages and becomes the practice field and
+sandbox ground. Every step ends with CI green, the Pages link working, a five-line note to Aaron with
+3-5 things to try, and a short "how games do this" lesson. Popups only for choices that change what
+Aaron sees or plays.
 
-## M0 · Pipeline proven (2026-10-02)
-Public repo, scaffold, import map with three.js 0.186.1 plus Yuka, three.quarks and ZzFX vendored,
-CI (Playwright smoke + axe), Pages deploy, `play.command`, `.out/` auto-pruned.
-**Play:** one regiment of about 200 figures marching in line on a painted-colour field, with musket
-smoke and a volley sound.
+## Order
+1. **S1 · Sandbox: feel + reward sequence** (first build, Mac + iPad)
+2. **Art track** (starts alongside S1; the battlefield look is the top polish priority)
+3. **S3 · Screens gallery**
+4. **Lock**: every sandbox topic locked by Aaron; quality gates switched on
+5. **R3 · Shiloh** -> **R4 · Camp (thin slice)** -> **R6 · Chattanooga** -> **R5 · Stones River**
+6. Endgame set, sandbox battle, then post-v1 (officers and Confederate franchise first)
 
-## M1 · First Bull Run vertical slice — looks like UG:G, plays (week of 2026-10-05)
-M0 shipped a non-interactive demo, which Aaron judged "awful and doesn't work". M1 must clear the
-AGENTS §1b bar on a small part of the field: Henry House Hill to Matthews Hill.
+## S1 · Sandbox: feel + reward sequence
+- `src/sandbox/`: slide-out panel, five tabs (Units, Rules, Look, Moments, Screens), a plain-English note
+  and Reset per control, split-screen compare, Lock this, Copy settings, fps meter with cost warnings.
+  Reached by `?sandbox` and the menu.
+- Field feel, each as a switch: map-style camera (zoom to cursor, auto tilt, fly-to), touch (drag from
+  the unit, twist to face, pinch, two-finger pan), ghost preview with range arc and march time, pencil
+  order lines, automatic adjustable facing, move = fight on the way, attack = engage by fire, six order
+  buttons, bottom dock with survey minimap, flag marker, box/division select, army list, engagement
+  lines, casualty ticks, status words, event feed, pause with orders, 1x/2x/4x, auto-pause, soldier's-eye key.
+- Units tab: place and command either side; strength, arms, veterancy. Rules tab: sliders on the
+  constants in `src/sim/combat.js`. Moments tab: volley, charge, rout, shell burst, loot card, X-Factor.
+- Reward sequence on placeholder data: capture crates on the field, after-action, cards dealt with
+  rarity fanfare, side-by-side compare with best-fit star, equip, rating count-ups.
+- Installable web app (manifest + service worker), save export/import, `device.html` GPU test page.
+- Review: Aaron plays on both devices and pastes the Copy-settings block; those become defaults.
 
-- Painted terrain from USGS 3DEP elevation (geotiff.js + martini), with field parcels, roads, fences,
-  woods, the stream and 3D farm buildings.
-- Ground labels; tilt-shift and colour grade.
-- Two brigades per side as hundreds of instanced soldiers (instanced-mesh) in loose ranks, with flag
-  markers.
-- Select and drag-order with curved arrows; Yuka steering keeps formation.
-- Fire, smoke, casualties and morale (simple v1).
-- The UG:G HUD layout.
-- OOB, names and places come from the old repo (`data/bullrun.json`, `src/tactical/T1-bull-run.js`).
+## Art track
+- Source survey with pictures and licenses per object (Smithsonian 3D Open Access, MakeHuman/MPFB,
+  Quaternius, Poly Haven, Kenney, LoC) -> popup: hero-model route.
+- Bake job on GitHub Actions (Blender headless, dev only): model -> sprite atlas with baked light ->
+  optimised texture in the repo; `tools/bake-sprites.mjs`; `src/units/impostor.js`.
+- Candidates into the sandbox Look tab, split-screen against UG: Civil War / Total War references:
+  figures, horses, guns, trees, buildings, terrain detail, grade, effects (artillery impact, charge and
+  melee, cinematic moments, X-Factor banner), unflinching casualties with the gore toggle.
+- Low/High/Ultra; 1 figure = 5 men must hold 30 fps in a fight on Auto on the UHD 617, else 1:10.
 
-**Play:** order a Union brigade up Henry House Hill against Jackson and watch the fight.
-**First (Aaron, DECISIONS 0010):** graphics, movement and appearance to the measured bar in
-docs/visual-reference.md (detailed figures and guns, two-rank lines, columns, per-man halos) before new gameplay.
-Done on branch `figures-detail` (Fable trial, DECISIONS 0011), awaiting Aaron's side-by-side judgement and merge.
+## S3 · Screens gallery
+Static pages: brigade card, camp table with Requisition drawer and living backdrop, loot reveal, level-up,
+badge ceremony, after-action, title; three UI styles (period desk / clean modern / hybrid), modern sans,
+touch-sized targets, baked card art.
 
-## M2 · The fight (week of 2026-10-12)
-- Fire, casualties, morale, charge and rout, ported from the old Field rules: one universal combat
-  model, no per-battle fudge.
-- Smoke and sound tied to fire.
-- Objective: hold or take Henry House Hill.
-- AI v1 (Yuka goals).
-- After-action summary.
+## Lock
+Quality gates on: locked-look reference screenshots, frame-rate floor, order-obedience tests, balance robot.
 
-**Play:** a real small fight you can win or lose.
+## R3 · Shiloh in phases
+- Battle pack format `battles/<id>/`: terrain, OOB, phases (starts, arrivals, objectives, enemy opening),
+  fly-over stops, after-action text, quotations, citations. `src/world/world.js` and `src/main.js` load a pack.
+- OOB and sources from the old repo's `data/shiloh.json`, re-verified (2 sources per fact; no invented names).
+  Proposed phases, to be checked: dawn attack on the camps; Hornet's Nest; Grant's last line (first Army of
+  the Ohio brigade lands); day-2 counterattack.
+- New-player opening fight, regiments visible, sourced AI temperaments, terrain play, phase carry-over,
+  three save slots, fly-over briefing, after-action with map replay, Battles menu, title diorama,
+  difficulty levels, sound (howler.js, CC0/PD recordings), historical thread.
 
-## M3 · The whole battle (week of 2026-10-19)
-- The full sourced First Bull Run OOB, ported and re-verified.
-- Timed arrivals (Jackson; Kirby Smith and Early on Chinn Ridge).
-- Officers, ammunition and teaching cards.
-- After-action compared with the history.
+## R4 · Camp, thin slice
+`src/franchise/` (`ovr.js`, `loot.js`, `badges.js`, `shop.js`, `reputation.js`, `enemy-army.js`, `save.js`,
+`tuning.js`), `src/ui/` (`camp.js`, `card.js`, `loot-reveal.js`, `record.js`). Weapons loot, cards, 6 badges,
+arms-only shop, reputation 1-3, Shiloh decision cards. Data with citations from the old repo's
+`weapons.json`, `artillery.json`, `ratings.json`, `loot-survival.json`. Future hooks stored from the start
+(dates, quantities, coordinates, standing with Washington).
 
-**Play:** First Bull Run start to finish.
-
-## M4 · Look and feel (week of 2026-10-26)
-- Figure animation, smoother formations and painterly v2.
-- HUD/UX polish, accessibility pass (keyboard, colour-blind safe), and a measured performance budget
-  on this Mac.
-- Gamepad (browser Gamepad API, no library; target a DualShock 4 over Bluetooth): left stick moves a
-  cursor, right stick turns/tilts the camera, L2/R2 zoom, D-pad pans; X selects, hold X on your own
-  brigade and steer to draw the order arrow (same path as a mouse drag); Square Hold, Triangle Charge,
-  Circle Fallback, R1 Run, L1 Halt; Options pause, Share help sheet. Dead zones, cursor acceleration, a
-  pad hint in the help sheet on `gamepadconnected`; mouse and keyboard keep working. CI injects a fake
-  pad in Playwright to exercise select + order.
-
-**Play:** the same battle, now beautiful.
-
-## M5 · Second battle and battle menu
-Gettysburg Day 1 or Wilson's Creek, plus a battle-select screen.
+## R6 · Chattanooga, R5 · Stones River
+Phase-list popup, battle pack, AI openings. Franchise fill-in alongside: all 20 badges with tiers and
+X-Factors, stores, depot limit, uniques, training and army upgrades, slots and re-rolls, reputation to 10,
+enemy badges, record book. Chattanooga ends v1: campaign grade, name popup, tag and Release.
 
 ## Later
-Campaign link between battles, more battles, codex and documents, Confederate side, save/load.
+Endgame (medals, achievements, challenge phases, New Game Plus), sandbox battle; officers and the
+Confederate franchise; Eastern campaign; strategy map and President; fog of war, weather, codex, gamepad,
+text scale, key rebinding.
 
-## Tools queued by milestone (all OSI or CC0; licenses checked through the GitHub API on 2026-10-02)
-| Milestone | Tool | License | Why |
+## Tools (all OSI or CC0; licenses checked through the GitHub API when vendored)
+| Status | Tool | License | Why |
 |---|---|---|---|
-| M0 | three 0.186.1, yuka, three.quarks, zzfx; playwright, pixelmatch, @axe-core/playwright | MIT / MIT / MIT / MIT; Apache-2.0 / ISC / MPL-2.0 | scaffold + tests |
-| M1 | geotiffjs/geotiff.js | MIT | read USGS 3DEP elevation into heights |
-| M1 | proj4js/proj4js | MIT (LICENSE.md; API shows NOASSERTION, so confirm) | georeference LoC maps to the DEM |
-| M1 | mapbox/martini | ISC | low-triangle adaptive terrain mesh |
-| M1 (in, 6.0.4) | d3/d3-delaunay — https://github.com/d3/d3-delaunay (+ mapbox/delaunator 5.1.0 ISC, mourner/robust-predicates 3.0.3 Unlicense) | ISC (gh api 2026-10-02) | relaxed Voronoi field parcels split by roads and streams |
-| M1 (in, 0.21.0, dev only) | georgealways/lil-gui — https://github.com/georgealways/lil-gui | MIT (gh api 2026-10-02) | look-tuning panel, loaded only with ?tune |
-| M1 (in, 5.0.70) | pmndrs/detect-gpu — https://github.com/pmndrs/detect-gpu | MIT (gh api 2026-10-02) | GPU tier picks Auto quality's starting level; benchmark JSON vendored, no CDN |
-| M1 | agargaro/instanced-mesh | MIT (peer three >=0.186) | thousands of soldiers with culling and LOD |
-| M1 | donmccurdy/glTF-Transform (CLI, dev only) | MIT | shrink models and textures before they enter the repo |
-| M1/M4 | KittyGiraudel/a11y-dialog, @floating-ui/dom, color-js/color.js | MIT | accessible menus, tooltips, CVD-safe palettes |
-| M3 | jrnold/acw_battle_data | code BSD-3 / text CC-BY, data unlabelled | battle and commander spine; attribute it and verify each file's NPS provenance |
-| any | Kenney, Poly Haven (download from the websites, not their GitHub repos) | CC0 | textures, trees, buildings |
-| dev | ChromeDevTools/chrome-devtools-mcp | Apache-2.0 | console and performance traces from the real page; use a throwaway profile |
+| in | three 0.186.1, yuka, three.quarks, d3-delaunay, detect-gpu, lil-gui (dev) | MIT / MIT / MIT / ISC / MIT / MIT | engine, steering, smoke, parcels, GPU tier, tuning |
+| in (tests) | playwright, pixelmatch, @axe-core/playwright | Apache-2.0 / ISC / MPL-2.0 | smoke, visual diff, accessibility |
+| S1/R3 | goldfire/howler.js | MIT | recorded, positioned sound; replaces ZzFX |
+| art | Blender on Actions (dev, never shipped) | GPL | bake sprite atlases |
+| art | donmccurdy/glTF-Transform (dev) | MIT | shrink models before baking |
+| art | MakeHuman / MPFB (dev; exported humans CC0) | AGPL tool, CC0 output (confirm) | realistic bodies and faces |
+| S3 | an SIL OFL sans, self-hosted | OFL | UI type |
+| R3 | jrnold/acw_battle_data | BSD-3 code / CC-BY text | battle spine; verify provenance |
 
-Rejected or deferred:
-- agargaro/instanced-mesh: not needed at ~1,250 figures; conflicts with GPU walk/aim animation (DECISIONS 0006).
-- proj4js/proj4js: not needed for a 2.6 km local frame (DECISIONS 0006).
-- pmndrs/postprocessing: the custom 4-pass chain in src/render/post.js already does tilt-shift, grade and vignette cheaply on the UHD 617.
-- gkjohnson/three-mesh-bvh: picking is a heightfield ray-march and markers are DOM buttons; nothing needs a BVH yet.
-- protectwise/troika-three-text: ground names are painted once into canvas textures; no runtime SDF text needed.
-- three-geo (needs a Mapbox token); three.js r128-era libraries; third-party skill aggregators
-(no confirmed license, and a skill runs with shell rights); playwright-mcp (duplicates the test kit at
-high token cost).
+Rejected or deferred (unchanged): agargaro/instanced-mesh, proj4js, pmndrs/postprocessing, three-mesh-bvh,
+troika-three-text, three-geo, playwright-mcp (reasons in DECISIONS 0006 and git history).

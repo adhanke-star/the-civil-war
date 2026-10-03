@@ -14,23 +14,23 @@ is high.
 ## 1b · The visual and play bar (minimum = Ultimate General: Gettysburg)
 Run `node tools/fetch-reference-shots.mjs` and look at `.out/reference/` before any visual work; the measured
 up-close notes (figure size, poses, formations, guns, farms, trees) are in `docs/visual-reference.md`. The
-minimum bar:
-- **Camera:** a high oblique camera with tilt-shift blur at the edges and a warm colour grade.
-- **Ground:** painted, saturated terrain divided into fields: wheat-yellow and green parcels, curving
-  orange dirt roads, stone walls and rail fences, orchards in rows, dense round-canopy woods, streams
-  with banks, and red barns and white farmhouses as 3D models.
-- **Names on the ground:** large 3D serif names painted on the terrain (ridges, farms).
-- **Soldiers:** every brigade is hundreds of small individual soldiers in loose ranks, in blue or
-  butternut uniforms with muskets. Casualties lie on the field. Artillery has guns, crews and limbers.
-- **Brigade marker:** a flag-shield icon, a strength number and the commander's name.
-- **Orders:** big curved translucent arrows, red for Confederate and blue for Union.
-- **Smoke:** puffs of musket smoke along the firing lines.
-- **HUD:**
-  - unit card at top-left: portrait, then Morale/Condition/Cover/Reload tiles;
-  - date and time with play/pause at top-centre;
-  - army-strength balance bar at top-right;
-  - Hold/Charge/Run/Fallback/Halt on the right.
-- **It must play:** select, drag-order, fight. A demo that only animates is not a milestone.
+minimum bar. **`DESIGN.md` is the design of record (2026-10-03) and overrides this list where they differ;
+Aaron judges looks in the sandbox against UG: Civil War / Total War references.**
+- **Look:** a realistic diorama: true proportions, real uniform detail, natural colours, rich terrain.
+  Detail is baked (sprite sheets and pre-rendered ground made on GitHub Actions), not drawn live.
+- **Camera:** map-style: drag to pan, zoom to the cursor, automatic tilt; mouse, trackpad and touch.
+- **Ground:** fields, curving dirt roads, stone walls and rail fences, orchards, woods, streams with
+  banks, farm buildings; large 3D place names on the terrain.
+- **Soldiers:** one figure per 5 men (if it holds 30 fps), regiments visible inside a brigade with their
+  own colours. The fallen remain (gore toggle). Artillery has guns, crews and limbers.
+- **Brigade marker:** a small flag on a staff with a strength bar tinted by morale.
+- **Orders:** a ghost of the line at the destination with its range arc and march time, then a thin
+  dashed pencil line. Drag = march and fight on the way; drag onto an enemy = engage by fire.
+- **HUD:** bottom dock (unit card, Hold/Charge/Run/Fallback/Halt/Hold Fire + Delegate, survey minimap);
+  thin top strip (clock, pause and speeds, army balance).
+- **It must play:** select, drag-order, fight, then open the loot. A demo that only animates is not a
+  milestone. Three tests from Aaron: it must not look cheap; units do what he meant; few screens and an
+  obvious next step.
 
 ## 2 · Stack law
 

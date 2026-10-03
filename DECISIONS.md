@@ -1,5 +1,19 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0013 — Redesign: "One Army, One War"; sandbox first (Aaron, 2026-10-03)
+About 130 choices made by Aaron in popups are recorded in DESIGN.md, now the design of record. In short: an
+army-commander franchise (Union Army of the Ohio/Cumberland) through Shiloh, Stones River and Chattanooga in
+15-20 minute phases; Madden cards, 20 tiered badges with X-Factors, Borderlands loot (5 rarities, strong
+condition affixes, invented-name uniques labelled as game items), a requisition shop and reputation levels;
+spectacle is the top pillar and opening the loot is the core moment. Looks: a realistic diorama judged against
+UG: Civil War / Total War, reached by baking sprites and ground on GitHub Actions; 1 figure = 5 men if it
+holds 30 fps. Mac and iPad (Pro 12.9 2nd gen, A10X) are both first-class, with touch and an installable web
+app. The first build is a sandbox (controls and feel + the reward sequence on placeholder data); every
+sandbox topic is locked before campaign work. Supersedes 0009 (4.4x figures, saturated grade), the big
+translucent arrows, the UG:G HUD layout and the M2-M5 milestones. Flags raised once: gear-led OVR with 15%
+affixes cuts against realism (weights live in one tuning file); the scope is far beyond "finish quickly"
+(thin-slice staging; Stones River is the battle that slips).
+
 ## 0012 — Welded geometry, an Auto that will not blur for nothing, Sherman faces the battle (2026-10-02)
 Profiling on the UHD 617 showed the frame bound by vertex work, not pixels: 2.5M vertices a frame, because
 every figure, tree, fence and gun was built from loose triangles; rendering at scale 0.35 was barely faster
