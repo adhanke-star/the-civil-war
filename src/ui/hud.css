@@ -1,96 +1,176 @@
-/* src/ui/hud.css: UG:G-style HUD. Dark rounded panels, light sans labels, serif names. */
+/* src/ui/hud.css: the battle HUD. A thin top strip (menu, clock, pause, speeds, army list, balance), a bottom
+   dock (unit card left, six orders centre, minimap right), brigade markers on the field. Dark rounded panels,
+   light sans labels, serif names. Every dock and strip control is at least 44 CSS px (iPad touch). */
 :root {
   color-scheme: dark;
-  --panel: rgba(18, 16, 22, 0.82);
+  --panel: rgba(18, 16, 22, 0.84);
   --panel-edge: rgba(255, 255, 255, 0.14);
   --text: #f1ece0;
   --dim: #c9c2b4;
   --us: #3f7fd8;
   --cs: #c8384a;
   --focus: #ffd27a;
+  --edge: 8px;
+  --top-h: 52px;
+  --dock-h: 150px;
+  --mm: 140px;
 }
-html, body { margin: 0; height: 100%; overflow: hidden; background: #17141a; }
-body { font: 14px/1.35 "Helvetica Neue", Arial, sans-serif; color: var(--text); }
-#battlefield { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; cursor: default; }
+html, body { margin: 0; height: 100%; overflow: hidden; background: #17141a; touch-action: manipulation; overscroll-behavior: none; }
+body { font: 14px/1.35 "Helvetica Neue", Arial, sans-serif; color: var(--text); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+#battlefield { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; cursor: default; -webkit-tap-highlight-color: transparent; }
 #battlefield:focus { outline: none; }
 #battlefield:focus-visible { outline: 3px solid var(--focus); outline-offset: -3px; }
 :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 .panel { position: fixed; background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.45); }
-button { font: inherit; color: var(--text); }
+button { font: inherit; color: var(--text); -webkit-tap-highlight-color: transparent; }
+kbd { font-size: 11px; border: 1px solid #8a8580; border-radius: 3px; padding: 0 4px; }
 
-/* unit card, top-left */
-#unitcard { top: 10px; left: 10px; padding: 8px; display: grid; grid-template-columns: 64px auto; gap: 6px 8px; align-items: start; }
-#unitcard[hidden] { display: none; }
-.portrait { width: 64px; height: 64px; border-radius: 6px; background: #2a2630 center / cover no-repeat; display: grid; place-items: center; font: bold 26px Georgia, serif; color: #e9dfc6; border: 1px solid rgba(255,255,255,0.18); }
+/* ---- top strip ------------------------------------------------------------------------------------ */
+#topbar { top: calc(var(--edge) + env(safe-area-inset-top)); left: calc(var(--edge) + env(safe-area-inset-left)); right: calc(var(--edge) + env(safe-area-inset-right));
+  height: var(--top-h); box-sizing: border-box; padding: 3px 8px; display: flex; align-items: center; gap: 10px; z-index: 10; }
+.tb-btn, #topbar button { min-width: 44px; min-height: 44px; background: none; border: 1px solid transparent; border-radius: 6px; cursor: pointer; padding: 0 8px; }
+#topbar button:hover { background: rgba(255,255,255,0.1); }
+#topbar button[aria-pressed="true"], #topbar button[aria-expanded="true"] { background: rgba(255, 210, 122, 0.18); border-color: var(--focus); }
+#menu-btn { font-size: 22px; }
+#clock { position: relative; display: flex; align-items: center; gap: 6px; padding-bottom: 4px; }
+#pause { font-size: 15px; }
+.clocktext { font-size: 14px; min-width: 150px; text-align: center; white-space: nowrap; }
+.speeds { display: flex; gap: 2px; }
+.speeds button { font-size: 14px; font-variant-numeric: tabular-nums; }
+.progress { position: absolute; left: 50px; right: 4px; bottom: 0; height: 3px; background: rgba(255,255,255,0.12); border-radius: 2px; }
+.progress i { display: block; height: 100%; width: 0; background: #4ec24e; border-radius: 2px; }
+#balance { margin-left: auto; display: flex; align-items: center; gap: 6px; flex: 0 1 260px; min-width: 120px; }
+#balance .bar { position: relative; flex: 1 1 auto; height: 6px; background: var(--cs); border-radius: 3px; }
+#balance .bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 50%; background: var(--us); border-radius: 3px 0 0 3px; transition: width 0.4s; }
+#balance .bar b { position: absolute; top: -4px; width: 8px; height: 14px; margin-left: -4px; left: 50%; background: #eee; border-radius: 2px; transition: left 0.4s; }
+.flag { width: 22px; height: 15px; display: inline-block; background-size: cover; border-radius: 2px; flex: none; }
+#perf { margin: 0; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+#objective { top: calc(var(--edge) + var(--top-h) + 6px + env(safe-area-inset-top)); left: calc(var(--edge) + env(safe-area-inset-left)); margin: 0; padding: 6px 10px; font-size: 13px; max-width: 46vw; }
+#objective:empty { display: none; }
+#banner { top: calc(var(--edge) + var(--top-h) + 6px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
+  padding: 4px 6px 4px 14px; font: 15px Georgia, serif; border-color: var(--focus); z-index: 12; max-width: 92vw; }
+#banner[hidden] { display: none; }
+#banner button { min-height: 44px; min-width: 44px; padding: 0 12px; border-radius: 6px; border: 1px solid var(--panel-edge); background: rgba(255,255,255,0.1); cursor: pointer; font: 14px "Helvetica Neue", Arial, sans-serif; }
+#banner #banner-fly { background: #f1ece0; color: #1d1a16; }
+
+/* ---- army list and event feed ------------------------------------------------------------------------ */
+#army { top: calc(var(--edge) + var(--top-h) + 44px + env(safe-area-inset-top)); left: calc(var(--edge) + env(safe-area-inset-left)); width: 270px; max-height: calc(100vh - var(--top-h) - var(--dock-h) - 80px);
+  overflow-y: auto; padding: 8px; box-sizing: border-box; z-index: 9; }
+#army[hidden] { display: none; }
+#army h2 { margin: 0 0 6px; font: normal 16px Georgia, serif; }
+#army ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+#army li button { width: 100%; min-height: 44px; display: grid; grid-template-columns: 1fr auto; gap: 0 8px; align-items: center; text-align: left; padding: 4px 8px;
+  background: rgba(255,255,255,0.05); border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
+#army li button:hover { background: rgba(255,255,255,0.12); }
+#army li button[aria-pressed="true"] { border-color: #b9ff7a; }
+#army .al-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#army .al-men { font-variant-numeric: tabular-nums; }
+#army .al-state { grid-column: 1 / -1; font-size: 12px; color: var(--dim); }
+#army .al-state.shaken { color: #ffd34d; }
+#army .al-state.wavering { color: #ffb15c; }
+#army .al-state.routing { color: #ff9a8a; }
+
+#feed { right: calc(var(--edge) + env(safe-area-inset-right)); bottom: calc(var(--edge) + var(--dock-h) + 8px + env(safe-area-inset-bottom)); width: min(330px, 38vw); margin: 0; padding: 4px; list-style: none; display: grid; gap: 2px; z-index: 8; }
+#feed:empty, #feed[hidden] { display: none; }
+#feed button { width: 100%; min-height: 32px; display: flex; gap: 8px; align-items: baseline; text-align: left; padding: 3px 6px; background: none; border: 0; border-radius: 4px; cursor: pointer; font-size: 13px; }
+#feed button:hover { background: rgba(255,255,255,0.1); }
+#feed time { color: var(--dim); font-variant-numeric: tabular-nums; flex: none; }
+#feed .us { color: #b8d4ff; }
+#feed .cs { color: #ffc2c8; }
+
+/* ---- bottom dock ----------------------------------------------------------------------------------- */
+#dock { position: fixed; left: calc(var(--edge) + env(safe-area-inset-left)); right: calc(var(--edge) + env(safe-area-inset-right)); bottom: calc(var(--edge) + env(safe-area-inset-bottom));
+  height: var(--dock-h); display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: end; pointer-events: none; z-index: 10; }
+#dock > * { pointer-events: auto; position: static; }
+#unitcard { width: 330px; height: var(--dock-h); box-sizing: border-box; padding: 8px; overflow: hidden; }
+.ucempty { margin: 0; color: var(--dim); font-size: 14px; height: 100%; display: grid; place-items: center; text-align: center; }
+.ucempty[hidden], #uc-body[hidden] { display: none; }
+.uchead { display: grid; grid-template-columns: 56px auto; gap: 6px; align-items: start; }
+.portrait { width: 56px; height: 56px; border-radius: 6px; background: #2a2630 center / cover no-repeat; display: grid; place-items: center; font: bold 22px Georgia, serif; color: #e9dfc6; border: 1px solid rgba(255,255,255,0.18); }
 .portrait.us { background-color: #24304e; }
 .portrait.cs { background-color: #4c4436; }
-.tiles { display: grid; grid-template-columns: repeat(4, 66px); gap: 6px; }
-.tile { position: relative; height: 64px; border-radius: 6px; background: #2b2830; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 3px 0 5px; }
-.tile .lbl { position: relative; z-index: 1; font-size: 12px; color: #e8e2d4; background: rgba(0,0,0,0.35); width: 100%; text-align: center; }
-.tile .val { position: relative; z-index: 1; font-size: 22px; font-weight: 300; text-shadow: 0 1px 2px rgba(0,0,0,0.8); }
+.tiles { display: grid; grid-template-columns: repeat(4, 58px); gap: 5px; }
+.tile { position: relative; height: 56px; border-radius: 6px; background: #2b2830; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 2px 0 4px; box-sizing: border-box; }
+.tile .lbl { position: relative; z-index: 1; font-size: 11px; color: #ece6d8; background: rgba(0,0,0,0.45); width: 100%; text-align: center; }
+.tile .val { position: relative; z-index: 1; font-size: 19px; font-weight: 300; text-shadow: 0 1px 2px rgba(0,0,0,0.9); }
 .tile i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; transition: height 0.25s; }
 .tile.morale i { background: linear-gradient(#6fae2a, #3d7012); }
 .tile.condition i { background: linear-gradient(#23a3b8, #10697a); }
 .tile.cover i { background: linear-gradient(#c7a51a, #806608); }
 .tile.reload i { background: linear-gradient(#d04a1e, #85240a); }
-.ucname { grid-column: 1 / -1; margin: 0; font-size: 13px; display: flex; justify-content: space-between; gap: 12px; }
+.ucname { margin: 6px 0 0; font-size: 13px; display: flex; justify-content: space-between; gap: 10px; }
+.ucname #uc-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ucname .cas { color: var(--dim); white-space: nowrap; }
-.ucstate { grid-column: 1 / -1; margin: 0; font-size: 12px; color: var(--dim); }
+.ucstate { margin: 2px 0 0; font-size: 12px; color: var(--dim); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
-/* clock, top-centre */
-#clock { top: 8px; left: 50%; transform: translateX(-50%); padding: 6px 10px 10px; display: flex; align-items: center; gap: 10px; }
-#clock button { background: none; border: 0; cursor: pointer; padding: 2px 6px; border-radius: 4px; font-size: 15px; }
-#clock button:hover { background: rgba(255,255,255,0.1); }
-.clocktext { font-size: 14px; min-width: 150px; text-align: center; }
-.progress { position: absolute; left: 10px; right: 10px; bottom: 4px; height: 3px; background: rgba(255,255,255,0.12); border-radius: 2px; }
-.progress i { display: block; height: 100%; width: 0; background: #4ec24e; border-radius: 2px; }
+#orders { justify-self: center; display: grid; grid-template-columns: repeat(3, 86px); gap: 6px; padding: 6px; box-sizing: border-box; }
+#orders button { position: relative; width: 86px; height: 50px; min-height: 44px; background: rgba(40, 37, 46, 0.95); border: 1px solid var(--panel-edge); border-radius: 8px; cursor: pointer; font-size: 14px; padding: 0 4px; }
+#orders button .key { position: absolute; right: 4px; top: 2px; font-size: 10px; color: var(--dim); }
+#orders button:hover:not(:disabled) { background: rgba(70, 64, 82, 0.98); }
+#orders button:disabled { color: #9a958b; cursor: default; }
+#orders button:disabled .key { color: #77736c; }
+#orders button[aria-pressed="true"] { background: #4a6a2a; border-color: #b9ff7a; }
+#orders button[data-order="holdfire"][aria-pressed="true"] { background: #6a3a22; border-color: #ffb15c; }
 
-/* balance, top-right */
-#balance { top: 10px; right: 10px; padding: 6px 8px; display: flex; align-items: center; gap: 6px; }
-#balance .bar { position: relative; width: 230px; height: 6px; background: var(--cs); border-radius: 3px; }
-#balance .bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 50%; background: var(--us); border-radius: 3px 0 0 3px; transition: width 0.4s; }
-#balance .bar b { position: absolute; top: -4px; width: 8px; height: 14px; margin-left: -4px; left: 50%; background: #eee; border-radius: 2px; transition: left 0.4s; }
-.flag { width: 22px; height: 15px; display: inline-block; background-size: cover; border-radius: 2px; }
+#minimap-box { padding: 4px; box-sizing: border-box; height: calc(var(--mm) + 10px); }
+#minimap { display: block; width: var(--mm); height: var(--mm); border-radius: 4px; cursor: crosshair; touch-action: none; }
+#minimap-box.large { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); height: auto; z-index: 30; }
+#minimap-box.large #minimap { width: min(78vmin, 720px); height: min(78vmin, 720px); }
 
-/* orders, right */
-#orders { position: fixed; right: 10px; top: 50%; transform: translateY(-50%); display: grid; gap: 8px; }
-#orders button { width: 76px; height: 62px; background: var(--panel); border: 1px solid var(--panel-edge); border-radius: 8px; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.45); }
-#orders button:hover:not(:disabled) { background: rgba(60, 56, 70, 0.95); }
-#orders button:disabled { color: #8f8a80; cursor: default; }
-#orders button[aria-pressed="true"] { background: #4a6a2a; }
-
-#menu-btn { bottom: 12px; left: 12px; width: 58px; height: 58px; font-size: 24px; cursor: pointer; }
-#objective { bottom: 12px; left: 82px; margin: 0; padding: 8px 12px; font-size: 13px; max-width: 46vw; }
-#objective:empty { display: none; }
-#perf { bottom: 12px; right: 12px; margin: 0; padding: 4px 8px; font-size: 12px; color: var(--dim); font-variant-numeric: tabular-nums; }
-#tip { bottom: 64px; left: 50%; transform: translateX(-50%); margin: 0; padding: 8px 14px; font-size: 14px; width: max-content; max-width: min(760px, 90vw); text-align: center; pointer-events: none; } /* below the armies in the opening view; never takes a click */
+/* first-run hint: above the unit card (the event feed takes the right side) */
+#tip { bottom: calc(var(--edge) + var(--dock-h) + 10px + env(safe-area-inset-bottom)); left: calc(var(--edge) + env(safe-area-inset-left)); margin: 0; padding: 8px 14px; font-size: 14px; max-width: min(460px, 40vw); pointer-events: none; }
 #tip[hidden] { display: none; }
-#toasts { position: fixed; top: 116px; left: 50%; transform: translateX(-50%); display: grid; gap: 6px; pointer-events: none; }
+#toasts { position: fixed; top: calc(var(--top-h) + 64px); left: 50%; transform: translateX(-50%); display: grid; gap: 6px; pointer-events: none; z-index: 11; }
 #toasts p { margin: 0; padding: 6px 12px; background: var(--panel); border-radius: 6px; font: 15px Georgia, serif; text-align: center; animation: fade 5s forwards; }
 @keyframes fade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
 
-/* brigade markers */
+/* ---- on the field: box select, ghost label, casualty numbers ----------------------------------------- */
+#boxsel { position: fixed; border: 1.5px dashed #f4f0e4; background: rgba(120, 170, 255, 0.12); pointer-events: none; z-index: 6; }
+#boxsel[hidden] { display: none; }
+#ghost-label { position: fixed; left: 0; top: 0; margin: 0; padding: 3px 8px; border-radius: 4px; background: rgba(14, 18, 34, 0.86); color: #eef3ff; font: 600 12px "Helvetica Neue", Arial, sans-serif;
+  white-space: nowrap; pointer-events: none; z-index: 5; will-change: transform; }
+#ghost-label[hidden] { display: none; }
+#ticks { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 4; }
+#ticks span { position: absolute; left: 0; top: 0; font: bold 13px "Helvetica Neue", Arial, sans-serif; color: #ffd0c4; text-shadow: 0 1px 2px #000, 0 0 3px #000; will-change: transform, opacity; }
+#ticks span.us { color: #cfe0ff; }
+
+/* ---- brigade markers: a small national flag on a staff, a strength bar tinted and patterned by morale --- */
 #markers { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
-.marker { position: absolute; left: 0; top: 0; pointer-events: auto; background: none; border: 0; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; color: #fff; text-shadow: 0 1px 2px #000, 0 0 4px rgba(0,0,0,0.9); will-change: transform; }
-.marker .str { font-size: 13px; font-weight: bold; line-height: 1; }
-.marker svg { width: 34px; height: 34px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
-.marker .nm { font: bold 13px "Helvetica Neue", Arial, sans-serif; white-space: nowrap; }
-/* what the brigade is doing, under its name (UG:G shows state on the flag; Aaron could not tell) */
-.marker .act { font: 600 11px "Helvetica Neue", Arial, sans-serif; white-space: nowrap; padding: 1px 5px; margin-top: 1px; border-radius: 3px; background: rgba(12, 10, 14, 0.72); text-shadow: none; }
+.marker { position: absolute; left: 0; top: 0; pointer-events: auto; background: none; border: 0; padding: 0 4px; min-width: 44px; min-height: 44px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
+  color: #fff; text-shadow: 0 1px 2px #000, 0 0 4px rgba(0,0,0,0.9); will-change: transform; touch-action: none; -webkit-tap-highlight-color: transparent; }
+.marker svg { width: 34px; height: 30px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
+.marker .mstr { display: flex; align-items: center; gap: 3px; margin-top: 1px; }
+.marker .sbar { position: relative; width: 36px; height: 6px; border: 1px solid rgba(0,0,0,0.85); background: rgba(10,10,12,0.75); border-radius: 2px; overflow: hidden; box-sizing: content-box; }
+.marker .sbar i { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: #5fbf3a; }
+.marker.m-shaken .sbar i { background: repeating-linear-gradient(-45deg, #e8c43a 0 3px, #8a6d12 3px 5px); }
+.marker.m-wavering .sbar i { background: repeating-linear-gradient(90deg, #f08a2a 0 4px, transparent 4px 7px); }
+.marker.m-routing .sbar i { background: transparent; box-shadow: inset 0 0 0 1.5px #ff6b5a; }
+.marker .glyph { font: bold 11px "Helvetica Neue", Arial, sans-serif; min-width: 10px; line-height: 1; }
+.marker .str { font-size: 11px; font-weight: bold; line-height: 1; font-variant-numeric: tabular-nums; }
+.marker .hf { display: none; position: absolute; top: 0; right: 0; font: bold 10px "Helvetica Neue", Arial, sans-serif; background: #6a3a22; color: #ffe2c8; border-radius: 3px; padding: 0 3px; text-shadow: none; }
+.marker.holdfire .hf { display: block; }
+.marker .info { display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); padding: 2px 6px; border-radius: 4px; background: rgba(12, 10, 14, 0.85); white-space: nowrap; text-shadow: none; text-align: center; }
+.marker:hover .info, .marker.selected .info, .marker:focus-visible .info { display: block; }
+.marker .nm { display: block; font: bold 13px "Helvetica Neue", Arial, sans-serif; }
+.marker .cmd { display: block; font: 12px Georgia, serif; color: #e9dfc6; }
+.marker .cmd:empty { display: none; }
+.marker .st { display: block; font: 600 11px "Helvetica Neue", Arial, sans-serif; color: #d9d3c4; }
+/* what the brigade is doing, under its flag (look.statusWords) */
+.marker .act { font: 600 11px "Helvetica Neue", Arial, sans-serif; white-space: nowrap; padding: 1px 5px; margin-top: 2px; border-radius: 3px; background: rgba(12, 10, 14, 0.75); text-shadow: none; }
+body.no-status-words .marker .act { display: none; }
 .marker .act.idle { color: #d9d3c4; }
 .marker .act.move { color: #9fd0ff; }
 .marker .act.hot { color: #ffb15c; }
 .marker .act.warn { color: #ffd34d; }
-.marker .act.bad { color: #ff8a7a; }
+.marker .act.bad { color: #ff9a8a; }
 .marker.selected svg { filter: drop-shadow(0 0 5px #b9ff7a) drop-shadow(0 0 2px #b9ff7a); }
 .marker.selected .nm { color: #d8ffb0; }
-.marker.wavering .nm { color: #ffd34d; }
-.marker.routing .nm { color: #ff8a7a; }
-.marker.routing svg { opacity: 0.7; }
+.marker.m-routing svg { opacity: 0.7; }
 .marker.hidden { display: none; }
 
-dialog { background: #1d1a22; color: var(--text); border: 1px solid var(--panel-edge); border-radius: 10px; max-width: min(560px, 92vw); padding: 18px 22px; }
+dialog { background: #1d1a22; color: var(--text); border: 1px solid var(--panel-edge); border-radius: 10px; max-width: min(600px, 92vw); padding: 18px 22px; -webkit-user-select: text; user-select: text; }
 dialog::backdrop { background: rgba(0,0,0,0.55); }
 dialog h2 { margin: 0; font: normal 24px Georgia, serif; }
 dialog h3 { margin: 14px 0 4px; font: normal 17px Georgia, serif; }
@@ -99,17 +179,34 @@ dialog fieldset { border: 1px solid var(--panel-edge); border-radius: 6px; displ
 dialog .row { display: block; margin: 10px 0; }
 dialog .keys { margin: 0; padding-left: 18px; }
 dialog .small { font-size: 13px; color: var(--dim); }
-dialog button, #result button { margin-top: 12px; padding: 6px 16px; background: #f1ece0; color: #1d1a16; border: 0; border-radius: 4px; cursor: pointer; }
-kbd { font-size: 11px; border: 1px solid #777; border-radius: 3px; padding: 0 4px; }
-#result { top: 30%; left: 50%; transform: translateX(-50%); padding: 18px 26px; text-align: center; max-width: 520px; }
+dialog button, #result button { margin-top: 12px; min-height: 44px; padding: 6px 16px; background: #f1ece0; color: #1d1a16; border: 0; border-radius: 4px; cursor: pointer; }
+#result { top: 30%; left: 50%; transform: translateX(-50%); padding: 18px 26px; text-align: center; max-width: 520px; z-index: 20; }
 #result h2 { margin: 0 0 6px; font: normal 28px Georgia, serif; }
 #result[hidden] { display: none; }
 
-@media (max-width: 760px) {
-  .tiles { grid-template-columns: repeat(4, 52px); }
-  .tile { height: 52px; }
+/* The sandbox panel (src/sandbox/sandbox.css) docks on wide mouse screens: move the strip, dock and feed out
+   from under it. (Its own rules for #orders/#balance/#perf predate the dock and no longer move anything.) */
+@media (min-width: 900px) and (pointer: fine) {
+  body.sb-open-right #topbar, body.sb-open-right #dock, body.sb-open-right #feed { right: calc(var(--sb-w, 360px) + var(--edge)); }
+  body.sb-open-left #topbar, body.sb-open-left #dock, body.sb-open-left #objective, body.sb-open-left #army, body.sb-open-left #tip { left: calc(var(--sb-w, 360px) + var(--edge)); }
+}
+/* the compare toolbar sits above the dock, not on it */
+body .sb-cmp-bar { bottom: calc(var(--dock-h) + var(--edge) + 14px + env(safe-area-inset-bottom)); }
+
+@media (max-width: 1100px) {
+  :root { --mm: 128px; --dock-h: 142px; }
+  #unitcard { width: 300px; }
+  .tiles { grid-template-columns: repeat(4, 51px); }
   .tile .val { font-size: 17px; }
-  #balance .bar { width: 110px; }
-  #orders button { width: 62px; height: 46px; }
-  #clock { top: auto; bottom: 12px; }
+  #orders { grid-template-columns: repeat(3, 78px); }
+  #orders button { width: 78px; }
+  .clocktext { min-width: 0; }
+}
+@media (max-width: 760px) {
+  #unitcard { width: 230px; }
+  .uchead { grid-template-columns: 1fr; }
+  .portrait { display: none; }
+  #orders { grid-template-columns: repeat(3, 56px); }
+  #orders button { width: 56px; font-size: 12px; }
+  #perf, #army-btn { display: none; }
 }

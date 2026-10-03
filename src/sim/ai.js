@@ -2,7 +2,8 @@
 //
 // Each AI unit, twice a second: routing or in melee -> nothing; a wavering or routing foe within 170 m and
 // this unit steady -> charge it (Jackson's counterattack); wavering with a stronger foe close -> fall back;
-// otherwise hold its ground and face the nearest threat. AI never touches the player's units.
+// otherwise hold its ground and face the nearest threat. AI never touches the player's units, nor an AI-side
+// unit the sandbox player has ordered (unit.manual, with units.controlBothSides on).
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
@@ -20,7 +21,7 @@ export class Ai {
     this.t = 0.5;
     const units = this.game.units;
     for (const u of units) {
-      if (u.side !== this.side || !u.alive || u.state === 'routing' || u.melee) continue;
+      if (u.side !== this.side || !u.alive || u.state === 'routing' || u.melee || u.manual) continue;
       const foes = units.filter((e) => e.side !== u.side && e.alive);
       let near = null, nd = Infinity;
       for (const e of foes) {

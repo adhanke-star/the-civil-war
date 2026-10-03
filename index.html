@@ -36,47 +36,78 @@
 <body>
   <main>
     <canvas id="battlefield" tabindex="0" role="application"
-            aria-label="Battlefield. Click a blue brigade to select it, then drag from it to draw its march. Drag the ground or scroll with two fingers to pan, pinch or use the wheel to zoom, Q and E turn, W A S D pan."></canvas>
+            aria-label="Battlefield. Tap or click a blue brigade to select it, then drag from it to draw its march; release on an enemy to attack. Drag the ground or scroll with two fingers to pan, pinch or use the wheel to zoom, Q and E turn, W A S D pan."></canvas>
     <div id="markers" role="group" aria-label="Brigades"></div>
+    <div id="ticks" aria-hidden="true"></div>
+    <p id="ghost-label" aria-hidden="true" hidden></p>
 
-    <section id="unitcard" class="panel" aria-label="Selected brigade" hidden>
-      <div class="portrait" id="uc-portrait" aria-hidden="true"></div>
-      <div class="tiles">
-        <div class="tile morale"><span class="lbl">Morale</span><span class="val" id="uc-morale">--</span><i id="uc-morale-bar"></i></div>
-        <div class="tile condition"><span class="lbl">Condition</span><span class="val" id="uc-condition">--</span><i id="uc-condition-bar"></i></div>
-        <div class="tile cover"><span class="lbl">Cover</span><span class="val" id="uc-cover">--</span><i id="uc-cover-bar"></i></div>
-        <div class="tile reload"><span class="lbl">Reload</span><span class="val" id="uc-reload">--</span><i id="uc-reload-bar"></i></div>
-      </div>
-      <p class="ucname"><span id="uc-name">--</span> <span class="cas" title="Casualties"><span aria-hidden="true">☠</span> <span id="uc-cas">0</span></span></p>
-      <p class="ucstate" id="uc-state"></p>
-    </section>
-
-    <section id="clock" class="panel" aria-label="Time">
-      <button id="pause" type="button" aria-pressed="false" aria-label="Pause">❚❚</button>
-      <div class="clocktext"><span id="clock-date">21st July 1861</span>, <span id="clock-time">14:00</span></div>
-      <button id="speed" type="button" aria-label="Game speed">1×</button>
-      <div class="progress" aria-hidden="true"><i id="clock-bar"></i></div>
-    </section>
-
-    <section id="balance" class="panel" aria-label="Army strength">
-      <span class="flag us" aria-hidden="true"></span>
-      <div class="bar"><i id="bal-us"></i><b id="bal-mark"></b></div>
-      <span class="flag cs" aria-hidden="true"></span>
-      <span class="visually-hidden" id="bal-text"></span>
-    </section>
-
-    <nav id="orders" aria-label="Orders">
-      <button type="button" data-order="hold" title="Hold (H)" disabled>Hold</button>
-      <button type="button" data-order="charge" title="Charge (C)" disabled>Charge</button>
-      <button type="button" data-order="run" title="Run (R)" aria-pressed="false" disabled>Run</button>
-      <button type="button" data-order="fallback" title="Fallback (F)" disabled>Fallback</button>
-      <button type="button" data-order="halt" title="Halt (X)" disabled>Halt</button>
-    </nav>
-
-    <button id="menu-btn" class="panel" type="button" aria-haspopup="dialog" aria-label="Menu">☰</button>
+    <div id="topbar" class="panel">
+      <button id="menu-btn" type="button" aria-haspopup="dialog" aria-label="Menu" title="Menu">☰</button>
+      <section id="clock" aria-label="Time">
+        <button id="pause" type="button" aria-pressed="false" aria-label="Pause" title="Pause or resume (Space)">❚❚</button>
+        <div class="clocktext"><span id="clock-date">21st July 1861</span>, <span id="clock-time">14:00</span></div>
+        <div class="speeds" role="group" aria-label="Game speed">
+          <button type="button" data-speed="1" aria-pressed="true" title="Normal speed (1)">1×</button>
+          <button type="button" data-speed="2" aria-pressed="false" title="Double speed (2)">2×</button>
+          <button type="button" data-speed="4" aria-pressed="false" title="Four times speed (3)">4×</button>
+        </div>
+        <div class="progress" aria-hidden="true"><i id="clock-bar"></i></div>
+      </section>
+      <button id="army-btn" type="button" aria-expanded="false" aria-controls="army" title="Your brigades (L)">Army</button>
+      <section id="balance" aria-label="Army strength">
+        <span class="flag us" aria-hidden="true"></span>
+        <div class="bar"><i id="bal-us"></i><b id="bal-mark"></b></div>
+        <span class="flag cs" aria-hidden="true"></span>
+        <span class="visually-hidden" id="bal-text"></span>
+      </section>
+      <p id="perf"><span>FPS <span id="fps">--</span></span> <span id="scale"></span></p>
+    </div>
     <p id="objective" class="panel"></p>
-    <p id="perf" class="panel"><span>FPS <span id="fps">--</span></span> <span id="scale"></span></p>
-    <p id="tip" class="panel" role="note">Click a <b>blue brigade's flag</b>, then <b>drag from it</b> to draw its march: the outline shows where its line will stand. Two-finger scroll or drag the ground to pan, pinch or wheel to zoom, Q/E to turn.</p>
+    <div id="banner" class="panel" role="alert" hidden>
+      <span id="banner-text"></span>
+      <button type="button" id="banner-fly">Fly there</button>
+      <button type="button" id="banner-resume">Resume</button>
+    </div>
+
+    <aside id="army" class="panel" aria-label="Your brigades" hidden>
+      <h2>Your brigades <kbd>L</kbd></h2>
+      <ul id="army-list"></ul>
+    </aside>
+    <ol id="feed" class="panel" aria-label="Recent events"></ol>
+
+    <div id="dock">
+      <section id="unitcard" class="panel" aria-label="Selected brigade">
+        <p id="uc-empty" class="ucempty">Tap or click a blue flag to select a brigade.</p>
+        <div id="uc-body" hidden>
+          <div class="uchead">
+            <div class="portrait" id="uc-portrait" aria-hidden="true"></div>
+            <div class="tiles">
+              <div class="tile morale"><span class="lbl">Morale</span><span class="val" id="uc-morale">--</span><i id="uc-morale-bar"></i></div>
+              <div class="tile condition"><span class="lbl">Condition</span><span class="val" id="uc-condition">--</span><i id="uc-condition-bar"></i></div>
+              <div class="tile cover"><span class="lbl">Cover</span><span class="val" id="uc-cover">--</span><i id="uc-cover-bar"></i></div>
+              <div class="tile reload"><span class="lbl">Reload</span><span class="val" id="uc-reload">--</span><i id="uc-reload-bar"></i></div>
+            </div>
+          </div>
+          <p class="ucname"><span id="uc-name">--</span> <span class="cas" title="Casualties"><span aria-hidden="true">☠</span> <span id="uc-cas">0</span></span></p>
+          <p class="ucstate" id="uc-state"></p>
+        </div>
+      </section>
+
+      <nav id="orders" class="panel" aria-label="Orders">
+        <button type="button" data-order="hold" aria-label="Hold" title="Hold: stand firm here and fire at anything in range (H)" disabled>Hold<span class="key" aria-hidden="true">H</span></button>
+        <button type="button" data-order="charge" aria-label="Charge" title="Charge: close with the bayonet on the target, or the nearest enemy in front (C)" disabled>Charge<span class="key" aria-hidden="true">C</span></button>
+        <button type="button" data-order="run" aria-label="Run" title="Run: march at the double; no firing on the way (R)" aria-pressed="false" disabled>Run<span class="key" aria-hidden="true">R</span></button>
+        <button type="button" data-order="fallback" aria-label="Fallback" title="Fall back: withdraw 130 m facing the enemy (F)" disabled>Fallback<span class="key" aria-hidden="true">F</span></button>
+        <button type="button" data-order="halt" aria-label="Halt" title="Halt: stop where you are (X)" disabled>Halt<span class="key" aria-hidden="true">X</span></button>
+        <button type="button" data-order="holdfire" aria-label="Hold fire" title="Hold fire: do not fire until this is switched off (V)" aria-pressed="false" disabled>Hold fire<span class="key" aria-hidden="true">V</span></button>
+      </nav>
+
+      <section id="minimap-box" class="panel" aria-label="Map">
+        <canvas id="minimap" width="200" height="200" role="img" aria-label="Map of the field: blue Union and red Confederate brigades, the white frame is your view. Click or drag to move there; M enlarges it."></canvas>
+      </section>
+    </div>
+
+    <p id="tip" class="panel" role="note">Tap or click a <b>blue flag</b>, then <b>drag from it</b> to draw its march; release on an enemy to attack it. Drag the ground to pan, pinch or wheel to zoom, Space to pause.</p>
     <div id="toasts" role="status" aria-live="polite"></div>
     <p id="status" class="visually-hidden" role="status">Loading the battlefield…</p>
 
@@ -91,13 +122,15 @@
       </fieldset>
       <label class="row"><input type="checkbox" id="sound-toggle" checked> Sound</label>
       <p class="row"><a href="?sandbox" style="color: var(--focus)">Sandbox</a>: try and change the look and play, then copy your settings</p>
+      <p class="row"><a href="reward.html?sandbox" style="color: var(--focus)">Reward sequence</a>: open the loot, compare and issue it (placeholder data)</p>
       <h3>Controls</h3>
       <ul class="keys">
-        <li><b>Select</b>: click a brigade or its flag (Tab cycles flags)</li>
-        <li><b>March</b>: drag from your brigade; release to order. Right-click ground for a straight march</li>
-        <li><b>Camera</b>: drag the ground or two-finger scroll to pan; pinch or wheel to zoom (the view tilts as you zoom); right-drag or Option + scroll to turn and tilt; WASD / arrows, Q/E, +/-; double-click a flag to centre on it</li>
-        <li><b>Reading the field</b>: under each flag is what the brigade is doing; hover a flag for what it will do next; a marching brigade shows an outline where its line will stand</li>
-        <li><b>Orders</b>: H hold · C charge · R run · F fall back · X halt · Space pause · 1/2/3 speed</li>
+        <li><b>Select</b>: click or tap a brigade or its flag (Tab cycles flags); Shift+drag on the ground, or hold a finger still then drag, to box-select several</li>
+        <li><b>March</b>: drag from your brigade and release; it halts to fight any enemy that comes in range on the way, then marches on. Hold Shift (or twist a second finger) to set the facing. Right-click ground for a straight march</li>
+        <li><b>Attack</b>: release the drag on an enemy: the brigade closes to effective range, halts and fires, and follows if the enemy moves. Only Charge goes in with the bayonet</li>
+        <li><b>Camera</b>: drag the ground or two-finger scroll to pan; pinch or wheel to zoom toward the pointer (the view tilts as you zoom); right-drag or Option + scroll to turn; WASD / arrows, Q/E, +/-; double-click or double-tap a flag to fly to it; click the map</li>
+        <li><b>Reading the field</b>: under each flag is what the brigade is doing; the bar under the flag is its strength, striped when shaken, broken when wavering, hollow when routing</li>
+        <li><b>Orders</b>: H hold · C charge · R run · F fall back · X halt · V hold fire · Space pause · 1/2/3 speed · M map · L army list</li>
       </ul>
       <h3>History</h3>
       <p id="history-note" class="small"></p>

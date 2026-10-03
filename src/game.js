@@ -1,17 +1,33 @@
 // src/game.js: the battle: units, simulation clock, orders, AI, objective, victory.
+//
+// Orders the player gives (DESIGN.md 4b, "Move order" / "Attack order"):
+//   move    march to the mark; meeting an enemy in effective range on the way the line halts and fires
+//           (rules.moveOrder 'fight') and marches on once that enemy is gone, out of range or routing; on
+//           arrival it holds, facing endFacing (by default toward the nearest enemy from the mark)
+//   attack  close on a target to effective range with line of sight, halt, fire, and follow it if it moves
+//           (attackStep); never charges on its own
+//   charge  only from the Charge button or key
+// A selection may hold several brigades (box select); a drag order moves them all, keeping their places
+// relative to the brigade dragged, turned with it. Brigade initiative (rules.initiative): a unit without
+// orders turns to face fire from beyond its arc when nothing is in front of it; it never advances unordered.
+// Events: 'select', 'log' (a toast: replies to the player's own actions), 'event' ({ text, time, x, z, side, kind }), 'alert' (an auto-pause:
+// { text, x, z }), 'spawn' / 'remove' (a unit added or taken off the field in the sandbox).
 
 import { EntityManager } from 'yuka';
-import { Unit, MEN_PER_FIGURE, MEN_PER_CREW_FIGURE } from './units/unit.js';
+import { Unit, MEN_PER_FIGURE, MEN_PER_CREW_FIGURE, SPEED } from './units/unit.js';
 import { Battery, GunPool } from './units/battery.js';
 import { SoldierPool, FallenPool, UNIFORMS } from './units/soldier-mesh.js';
 import { HaloPool } from './units/halos.js';
 import { HorsePool, HORSE_COATS } from './units/mounts.js';
 import { Combat, CLOCK_RATIO } from './sim/combat.js';
 import { Ai } from './sim/ai.js';
+import { RULES } from './sim/rules.js';
 import { mulberry32, inWoods, PLAN } from './world/landscape.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const SPAWN_RESERVE = 1000; // figures per side kept free for sandbox spawns (four 2,500-man brigades at 1:10)
+const ARC = (65 * Math.PI) / 180; // the firing arc each side of the facing (combat.js)
 
 export class Game {
   constructor({ scene, terrain, scenario, world, effects, playerSide = 'US' }) {
@@ -24,23 +40,28 @@ export class Game {
     this.paused = false;
     this.speed = 1;
     this.simTime = 0;
-    this.selected = null;
-    this.listeners = { select: [], log: [] };
+    this.selected = null; // the primary selection (the unit card shows it)
+    this.selection = []; // every selected unit (box select)
+    this.listeners = { select: [], log: [], event: [], alert: [], spawn: [], remove: [] };
     this.over = false;
+    this.controlBoth = false; // sandbox: the player may order the other side too (units.controlBothSides)
+    this.spawned = { US: 0, CS: 0 };
 
     const defs = scenario.units;
     // figures per side: one per 10 men (4 per crew figure in a battery), plus an officer and slack
     const figs = (side) => defs.filter((d) => d.side === side).reduce((s, d) => s + Math.round(d.men / (d.type === 'artillery' ? MEN_PER_CREW_FIGURE : MEN_PER_FIGURE)) + 6, 0);
     const outline = !/\boutline=0\b/.test(globalThis.location ? location.search : '');
+    this.reserve = { US: SPAWN_RESERVE, CS: SPAWN_RESERVE };
+    const cap = (side) => figs(side) + SPAWN_RESERVE;
     this.pools = {
-      US: new SoldierPool(figs('US'), UNIFORMS.US, { kit: 'US', outline }),
-      CS: new SoldierPool(figs('CS'), UNIFORMS.CS, { kit: 'CS', outline }),
+      US: new SoldierPool(cap('US'), UNIFORMS.US, { kit: 'US', outline }),
+      CS: new SoldierPool(cap('CS'), UNIFORMS.CS, { kit: 'CS', outline }),
     };
     this.fallen = {
-      US: new FallenPool(figs('US'), UNIFORMS.US, { kit: 'US' }),
-      CS: new FallenPool(figs('CS'), UNIFORMS.CS, { kit: 'CS' }),
+      US: new FallenPool(cap('US'), UNIFORMS.US, { kit: 'US' }),
+      CS: new FallenPool(cap('CS'), UNIFORMS.CS, { kit: 'CS' }),
     };
-    this.halos = new HaloPool(figs('US') + figs('CS'));
+    this.halos = new HaloPool(cap('US') + cap('CS'));
     this.horses = new HorsePool(defs.length + 2);
     const gunsOf = (side) => defs.filter((d) => d.side === side).reduce((s, d) => s + (d.guns || 0), 0);
     this.gunPool = new GunPool({ US: gunsOf('US'), CS: gunsOf('CS') });
@@ -48,17 +69,7 @@ export class Game {
     scene.add(...this.gunPool.meshes);
 
     this.entities = new EntityManager();
-    this.units = defs.map((d, k) => {
-      const u = d.type === 'artillery'
-        ? new Battery(d, this.pools[d.side], this.gunPool, terrain, 100 + k)
-        : new Unit(d, this.pools[d.side], terrain, 100 + k);
-      u.halos = this.halos;
-      u.horses = this.horses;
-      u.fallenPool = this.fallen[d.side];
-      if (u.officer) u.officer.coat = HORSE_COATS[k % HORSE_COATS.length];
-      this.entities.add(u.vehicle);
-      return u;
-    });
+    this.units = defs.map((d, k) => this.makeUnit(d, 100 + k));
 
     const sites = PLAN.sites;
     const fenceField = world.fenceField;
@@ -78,47 +89,151 @@ export class Game {
     this.clockEnd = eh * 3600 + em * 60;
     this.objective = scenario.objective;
     this.logSeen = 0;
+    this.slowT = 0;
     this.flushAll();
+  }
+
+  /** One construction path for scenario units and sandbox spawns. */
+  makeUnit(d, seed) {
+    const u = d.type === 'artillery'
+      ? new Battery(d, this.pools[d.side], this.gunPool, this.terrain, seed)
+      : new Unit(d, this.pools[d.side], this.terrain, seed);
+    u.halos = this.halos;
+    u.horses = this.horses;
+    u.fallenPool = this.fallen[d.side];
+    if (u.officer) u.officer.coat = HORSE_COATS[seed % HORSE_COATS.length];
+    this.entities.add(u.vehicle);
+    return u;
   }
 
   on(ev, fn) { this.listeners[ev].push(fn); }
   emit(ev, ...a) { for (const fn of this.listeners[ev]) fn(...a); }
 
+  /** May the player order this unit? (His own side; the other side too with units.controlBothSides.) */
+  controls(u) {
+    return !!u && u.alive && (u.side === this.playerSide || this.controlBoth);
+  }
+
   // ---------------------------------------------------------------------------------------------------
-  select(u) {
-    if (this.selected) this.selected.selected = false;
-    this.selected = u && u.alive ? u : null;
-    if (this.selected) this.selected.selected = true;
+  // Selection
+  select(u, { add = false } = {}) {
+    if (u && !u.alive) u = null;
+    if (add && u) {
+      if (this.selection.includes(u)) {
+        this.selection = this.selection.filter((v) => v !== u);
+        u.selected = false;
+        this.selected = this.selection[this.selection.length - 1] || null;
+      } else if (this.controls(u) && this.selection.every((v) => this.controls(v))) {
+        this.selection.push(u);
+        u.selected = true;
+        this.selected = u;
+      } else {
+        return this.select(u);
+      }
+      this.emit('select', this.selected);
+      return;
+    }
+    for (const v of this.selection) v.selected = false;
+    this.selection = u ? [u] : [];
+    this.selected = u || null;
+    if (u) u.selected = true;
     this.emit('select', this.selected);
   }
 
-  order(u, { type, points, target }) {
-    if (!u || u.side !== this.playerSide) return false;
+  /** Box select: only units the player may order; the first becomes the primary. */
+  selectMany(list) {
+    const mine = list.filter((u) => this.controls(u));
+    for (const v of this.selection) v.selected = false;
+    this.selection = mine;
+    for (const v of mine) v.selected = true;
+    this.selected = mine[0] || null;
+    this.emit('select', this.selected);
+  }
+
+  /** The selected units the player may order now. */
+  orderable() {
+    return this.selection.filter((u) => this.controls(u) && u.canTakeOrders());
+  }
+
+  // ---------------------------------------------------------------------------------------------------
+  // Orders
+  order(u, { type, points, target, endFacing }) {
+    if (!this.controls(u)) return false;
     if (!u.canTakeOrders()) { this.emit('log', `${u.short} is routing and will not take orders.`); return false; }
     let ok;
-    if (type === 'charge') {
+    if (type === 'attack') {
+      ok = u.orderAttack(target, endFacing);
+      if (ok) this.attackStep(u);
+    } else if (type === 'charge') {
       ok = u.orderMove(points, { charge: true });
       if (ok) u.order.target = target;
     } else {
-      ok = u.orderMove(points);
+      const end = points[points.length - 1];
+      const face = Number.isFinite(endFacing) ? endFacing : this.ghostFacing(end[0], end[1], u.side, undefined);
+      ok = u.orderMove(points, { endFacing: face });
     }
-    if (ok) this.orders = (this.orders || 0) + 1;
+    if (ok) {
+      this.orders = (this.orders || 0) + 1;
+      if (u.side !== this.playerSide) u.manual = true;
+    }
     return ok;
   }
 
-  orderSelected(kind) {
-    const u = this.selected;
-    if (!u || u.side !== this.playerSide) return false;
-    if (!u.canTakeOrders()) { this.emit('log', `${u.short} is routing and will not take orders.`); return false; }
+  /**
+   * A drag order from `leader`: if it is part of a multiple selection, every selected brigade takes it,
+   * keeping its place relative to the leader (turned with the leader's change of facing).
+   */
+  orderGroup(leader, spec) {
+    const group = this.selection.includes(leader) ? this.orderable() : [leader];
+    if (group.length <= 1) return this.order(leader, spec);
     let ok = false;
-    if (kind === 'hold') ok = u.orderHold();
-    else if (kind === 'halt') ok = u.orderHalt();
-    else if (kind === 'run') ok = u.toggleRun();
-    else if (kind === 'fallback') ok = u.orderFallback();
-    else if (kind === 'charge') {
-      const target = this.chargeTarget(u);
-      if (!target) { this.emit('log', `No enemy close enough for ${u.short} to charge.`); return false; }
-      ok = u.orderCharge(target);
+    if (spec.type !== 'move') {
+      for (const u of group) ok = this.order(u, spec) || ok;
+      return ok;
+    }
+    const end = spec.points[spec.points.length - 1];
+    const face = Number.isFinite(spec.endFacing) ? spec.endFacing : this.ghostFacing(end[0], end[1], leader.side, leader.facing);
+    for (const u of group) {
+      if (u === leader) { ok = this.order(u, { ...spec, endFacing: face }) || ok; continue; }
+      const [dx, dz] = this.groupOffset(leader, u, face);
+      ok = this.order(u, { type: 'move', points: [[u.x, u.z], [end[0] + dx, end[1] + dz]], endFacing: face }) || ok;
+    }
+    return ok;
+  }
+
+  /** Where `u` stands relative to `leader` once the leader faces `face` (offset turned with the leader). */
+  groupOffset(leader, u, face) {
+    const rot = wrap(face - leader.facing);
+    const c = Math.cos(rot), s = Math.sin(rot);
+    const ox = u.x - leader.x, oz = u.z - leader.z;
+    return [ox * c + oz * s, oz * c - ox * s];
+  }
+
+  orderSelected(kind) {
+    const group = this.orderable();
+    if (!group.length) {
+      const u = this.selected;
+      if (u && this.controls(u) && !u.canTakeOrders()) this.emit('log', `${u.short} is routing and will not take orders.`);
+      return false;
+    }
+    let ok = false;
+    if (kind === 'holdfire') {
+      const on = !group[0].holdFire;
+      for (const u of group) u.holdFire = on;
+      this.emit('log', group.length === 1 ? `${group[0].short}: ${on ? 'hold your fire' : 'fire at will'}.` : `${group.length} brigades: ${on ? 'hold your fire' : 'fire at will'}.`);
+      ok = true;
+    }
+    for (const u of group) {
+      if (kind === 'hold') ok = u.orderHold() || ok;
+      else if (kind === 'halt') ok = u.orderHalt() || ok;
+      else if (kind === 'run') ok = u.toggleRun() || ok;
+      else if (kind === 'fallback') ok = u.orderFallback() || ok;
+      else if (kind === 'charge') {
+        const target = u.order.type === 'attack' && u.order.target && u.order.target.alive ? u.order.target : this.chargeTarget(u);
+        if (!target) { this.emit('log', `No enemy close enough for ${u.short} to charge.`); continue; }
+        ok = u.orderCharge(target) || ok;
+      }
+      if (ok && u.side !== this.playerSide) u.manual = true;
     }
     if (ok) this.orders = (this.orders || 0) + 1;
     return ok;
@@ -138,6 +253,74 @@ export class Game {
     return best;
   }
 
+  /** Facing from (x, z) toward the nearest enemy of `side` that is not routing (the ghost's default). */
+  ghostFacing(x, z, side, fallback) {
+    let best = null, bd = Infinity;
+    for (const e of this.units) {
+      if (e.side === side || !e.alive || e.state === 'routing') continue;
+      const d = Math.hypot(e.x - x, e.z - z);
+      if (d < bd) { bd = d; best = e; }
+    }
+    if (best && bd > 1) return Math.atan2(best.x - x, best.z - z);
+    return fallback;
+  }
+
+  range(u) { return this.combat.range(u); }
+  effRange(u) { return this.combat.effRange(u); }
+
+  /** Where an attack on `target` will halt (the ghost shows it): effective range, on the line between. */
+  attackHalt(u, target) {
+    const d = Math.max(1, Math.hypot(u.x - target.x, u.z - target.z));
+    const eff = this.effRange(u);
+    if (d <= eff) return { x: u.x, z: u.z, facing: Math.atan2(target.x - u.x, target.z - u.z) };
+    const x = target.x + ((u.x - target.x) / d) * eff, z = target.z + ((u.z - target.z) / d) * eff;
+    return { x, z, facing: Math.atan2(target.x - x, target.z - z) };
+  }
+
+  /** March time in historical minutes for `len` metres at the walking pace (the ghost's label). */
+  marchMinutes(len) {
+    return (len / (SPEED.walk * RULES.marchSpeed)) * CLOCK_RATIO / 60;
+  }
+
+  /** Attack order: close to effective range with line of sight, halt and fire; follow a target that moves. */
+  attackStep(u) {
+    const o = u.order;
+    const t = o.target;
+    if (!t || !t.alive || t.state === 'routing' || !this.units.includes(t)) {
+      u.stop();
+      u.order = { type: 'hold' };
+      this.emit('log', `${u.short}: the enemy has gone; holding here.`);
+      return;
+    }
+    const eff = this.effRange(u), rng = this.range(u);
+    const d = Math.hypot(t.x - u.x, t.z - u.z);
+    const bearing = Math.atan2(t.x - u.x, t.z - u.z);
+    o.endFacing = bearing;
+    const los = this.combat.los(u, t);
+    if (los && d <= eff + 6) {
+      if (u.follow.active) { u.stop(); o.goal = null; }
+      u.goalFacing = bearing;
+      return;
+    }
+    if (!u.follow.active && los && d <= eff + 30) { u.goalFacing = bearing; return; } // a target drifting a little is not chased
+    const want = los ? eff : Math.max(rng * 0.5, Math.min(eff, d - 50));
+    const gx = t.x + ((u.x - t.x) / d) * want, gz = t.z + ((u.z - t.z) / d) * want;
+    if (Math.hypot(gx - u.x, gz - u.z) < 8) { u.goalFacing = bearing; return; }
+    if (!u.follow.active || !o.goal || Math.hypot(gx - o.goal[0], gz - o.goal[1]) > 20) {
+      u.setPath([[u.x, u.z], [gx, gz]]);
+      o.goal = [gx, gz];
+    }
+  }
+
+  /** Brigade initiative: a unit without orders turns toward fire from beyond its arc when nothing is ahead. */
+  initiativeStep(u) {
+    if (!RULES.initiative || u.follow.active || u.engaged || u.order.type !== 'hold' || u.target || u.melee || u.state === 'routing') return;
+    const s = u.lastShooter;
+    if (!s || !s.alive || this.simTime - u.lastShotT > 4) return;
+    const want = Math.atan2(s.x - u.x, s.z - u.z);
+    if (Math.abs(wrap(want - u.facing)) > ARC) u.goalFacing = want;
+  }
+
   togglePause() { this.paused = !this.paused; return this.paused; }
   setSpeed(s) { this.speed = s; }
 
@@ -154,14 +337,15 @@ export class Game {
   }
 
   // ---------------------------------------------------------------------------------------------------
-  /** Advance the simulation by real seconds dt (scaled by speed, in fixed sub-steps). */
+  /** Advance the simulation by real seconds dt (scaled by speed and rules.battleSpeed, in fixed sub-steps). */
   step(dt) {
     if (this.paused) return 0;
-    let simDt = Math.min(0.25, dt) * this.speed;
-    const out = simDt;
-    while (simDt > 1e-6) {
+    let simDt = Math.min(0.25, dt) * this.speed * RULES.battleSpeed;
+    let out = 0;
+    while (simDt > 1e-6 && !this.paused) {
       const h = Math.min(0.05, simDt);
       simDt -= h;
+      out += h;
       this.tick(h);
     }
     return out;
@@ -176,8 +360,34 @@ export class Game {
     }
     this.combat.step(h, this.simTime);
     this.ai.step(h);
-    while (this.logSeen < this.combat.log.length) this.emit('log', this.combat.log[this.logSeen++].text);
+    this.slowT -= h;
+    if (this.slowT <= 0) {
+      this.slowT = 0.5;
+      for (const u of this.units) {
+        if (!u.alive || !this.controls(u)) continue;
+        if (u.order.type === 'attack') this.attackStep(u);
+        else this.initiativeStep(u);
+      }
+    }
+    while (this.logSeen < this.combat.log.length) {
+      const e = this.combat.log[this.logSeen++];
+      this.event(e.text, e.unit, e.kind); // the feed shows it (or a toast with look.eventFeed off, main.js)
+      if (e.kind === 'rout' && !e.forced && e.unit && e.unit.side === this.playerSide) this.alert(`${e.unit.short} is routing.`, e.unit.x, e.unit.z);
+    }
     this.checkObjective(h);
+  }
+
+  /** A line for the event feed (clock time, sentence, where). */
+  event(text, unit, kind = 'info', at) {
+    const p = at || (unit ? { x: unit.x, z: unit.z } : null);
+    this.emit('event', { text, time: this.clockText().time, x: p ? p.x : null, z: p ? p.z : null, side: unit ? unit.side : null, kind, unit: unit || null });
+  }
+
+  /** Auto-pause (rules.autoPause): pause and tell the HUD why (it shows a banner with "Fly there"). */
+  alert(text, x, z) {
+    if (!RULES.autoPause || this.paused) return;
+    this.paused = true;
+    this.emit('alert', { text, x, z });
   }
 
   /** Henry House Hill: who holds the plateau? Union wins by holding it at the end, or by breaking the defence. */
@@ -191,7 +401,17 @@ export class Game {
       if (!u.alive || u.state === 'routing') continue;
       if (Math.hypot(u.x - o.x, u.z - o.z) < o.r) strength[u.side] += u.men;
     }
+    const prev = this.holder;
     this.holder = strength.US > 0 && strength.CS === 0 ? 'US' : strength.CS > 0 && strength.US === 0 ? 'CS' : strength.US || strength.CS ? 'contested' : 'none';
+    if (prev && prev !== this.holder) {
+      const ps = this.playerSide;
+      if (this.holder === ps) this.event(`Your troops hold ${o.name}.`, null, 'objective', o);
+      else if (prev === ps && this.holder !== 'none') {
+        const text = `The enemy is on ${o.name}.`;
+        this.event(text, null, 'objective', o);
+        this.alert(text, o.x, o.z);
+      }
+    }
     const effective = (side) => this.units.filter((u) => u.side === side && u.alive && u.state !== 'routing' && u.type === 'infantry').length;
     if (this.over) return;
     const t = this.clockStart + this.simTime * CLOCK_RATIO;
@@ -206,8 +426,61 @@ export class Game {
     if (result) {
       this.over = true;
       this.result = result;
-      this.emit('log', result.why);
+      this.event(result.why, null, 'result', o);
     }
+  }
+
+  // ---------------------------------------------------------------------------------------------------
+  // Sandbox: place and remove brigades
+  /**
+   * A generic infantry brigade (never a real commander or regiment): "Union brigade 3". Same construction
+   * path as the scenario's units. Returns the unit, or null when the side's figure reserve is used up.
+   */
+  spawnUnit({ side, men = 1000, weapon = 'smooth', x, z, facing }) {
+    const nFig = Math.round(men / MEN_PER_FIGURE) + 6;
+    if (this.reserve[side] < nFig) {
+      this.emit('log', `No room for another ${side === 'US' ? 'Union' : 'Confederate'} brigade of ${men} (the figure reserve is used up); remove one first.`);
+      return null;
+    }
+    this.reserve[side] -= nFig;
+    const n = ++this.spawned[side];
+    const name = `${side === 'US' ? 'Union' : 'Confederate'} brigade ${n}`;
+    const face = Number.isFinite(facing) ? facing : this.ghostFacing(x, z, side, side === 'US' ? Math.PI / 2 : -Math.PI / 2);
+    const def = {
+      id: `sandbox-${side.toLowerCase()}-${n}`, side, type: 'infantry', name, short: name, commander: null, parent: 'Sandbox',
+      regiments: [], men, weapon, xp: 1, x, z, facing: face, sources: [], notes: 'Placed in the sandbox; not a historical unit.',
+    };
+    const u = this.makeUnit(def, 500 + n * 13 + (side === 'CS' ? 7 : 0));
+    u.reserveFigs = nFig;
+    u.order = side === this.playerSide ? { type: 'hold' } : { type: 'hold', firm: true };
+    this.units.push(u);
+    this.emit('spawn', u);
+    this.emit('log', `${name} placed: ${men} men with ${weapon === 'rifled' ? 'rifled' : 'smoothbore'} muskets.`);
+    return u;
+  }
+
+  removeUnit(u) {
+    const i = this.units.indexOf(u);
+    if (i < 0) return false;
+    this.units.splice(i, 1);
+    this.entities.remove(u.vehicle);
+    this.reserve[u.side] += u.reserveFigs || 0;
+    if (u.gunSlots) for (const g of u.gunSlots) { this.gunPool.hide(this.gunPool.guns[u.side], g.gun); this.gunPool.hide(this.gunPool.limbers, g.limber); }
+    if (u.officer && u.officer.horse >= 0) this.horses.set(u.officer.horse, 0, -500, 0, 0, 0.001);
+    u.men = 0; // no longer alive: targets, attack orders and charges drop it
+    u.removed = true;
+    for (const v of this.units) {
+      if (v.target === u) v.target = null;
+      if (v.lastShooter === u) v.lastShooter = null;
+    }
+    if (this.selection.includes(u)) {
+      u.selected = false;
+      this.selection = this.selection.filter((v) => v !== u);
+      this.selected = this.selection[0] || null;
+      this.emit('select', this.selected);
+    }
+    this.emit('remove', u);
+    return true;
   }
 
   /** Test/fast-forward hook: advance sim seconds without rendering, then stand every man in his slot. */

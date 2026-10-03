@@ -10,16 +10,25 @@
 //   6. hold-button: the Hold button stops the brigade
 //   7. fight: after re-ordering and fast-forwarding 300 sim seconds, both sides have casualties and
 //      there was musket or cannon smoke
+//   f. zoom-to-pointer: a trackpad pinch (ctrl+wheel) keeps the ground under the pointer within 3% of the view
+//   g. touch-tap-select / touch-drag-order: synthetic pointerType 'touch' events select a brigade and order it
+//   order-obedience (generic sandbox brigades in the quiet north-west corner, see orderObedience):
+//      order-move-arrives, order-move-fights-on-the-way (rules.moveOrder fight vs march), order-attack-engages,
+//      order-hold-fire, order-while-paused
+//   h. dock-fit: unit card, orders, minimap and top strip do not overlap and every target is >= 44 px, at
+//      1024x768 (iPad) and 1440x788
 //   8. axe: no serious or critical accessibility violations
 // Then, with the first page closed (one page at a time on an 8 GB Mac):
 //   settings (Node, before the browser): src/settings.js define/get/set/reset/on/lock/exportText/importText
 //      round-trip, range clamping and snapping, unknown keys and bad values ignored
 //   sandbox-*: index.html?sandbox&quality=low: the panel has 5 tabs; the Interface size slider moves
 //      --ui-scale; "Lock this" disables it and set() is refused; Copy/Paste settings; the round button hides
-//      the panel; axe has no serious/critical violations with the panel open; no console errors
+//      the panel; Units/Moments tools spawn, shell, rout and remove a generic brigade; the order line compares
+//      split-screen (both styles, each clipped); axe has no serious/critical violations with the panel open; no console errors
 //   device-*: device.html prints a GPU tier line and finishes the ratio-1 benchmark without console errors
 // `node tools/test.mjs --unit` runs only the Node settings checks (no browser, writes nothing).
 // `node tools/test.mjs --s1` runs the settings, sandbox and device checks only (skips the battle page).
+// `node tools/test.mjs --field` runs the settings and battle-page checks only (skips the sandbox and device pages).
 // SETTINGS_MODULE=<path> points the settings checks at another copy (used to prove the checks fail).
 // Saves screenshots and .out/last-result.json, then prunes .out/. Exit 0 only if every check passes.
 
@@ -126,6 +135,171 @@ async function settingsUnit() {
     : bad.join(' | '));
 }
 
+/**
+ * Order obedience (DESIGN.md 4b "Quality gates"), on generic sandbox brigades placed in the quiet north-west
+ * corner (about (-1000, -850): out of every scenario unit's range and arc, open ground, line of sight checked):
+ *   a. a move order ends within 15 m of its ghost, facing within 20 degrees of endFacing
+ *   b. rules.moveOrder 'fight': a brigade ordered past an enemy halts and fires before its mark; 'march': it
+ *      never halts (the same scene, so each half is the other's control)
+ *   c. an attack order halts between 50% and 100% of weapon range from the target and fires (never charges)
+ *   d. Hold fire (the dock button): zero volleys while set at an enemy in range; volleys again once cleared
+ *   e. an order given while paused is stored and only runs after Play
+ */
+async function orderObedience(page) {
+  await page.evaluate(async () => {
+    const S = await import('./src/settings.js');
+    S.set('rules.autoPause', false); // a rout elsewhere must not pause these runs
+    S.set('rules.moveOrder', 'fight');
+    const g = window.__game.game;
+    if (g.paused) g.togglePause();
+    window.__game.hud.toggleArmy(false);
+    document.getElementById('result').hidden = true;
+  });
+
+  // a. move: ends at the ghost, facing as set
+  const a = await page.evaluate(() => {
+    const g = window.__game.game;
+    const u = g.spawnUnit({ side: 'US', men: 1500, weapon: 'rifled', x: -1100, z: -700, facing: Math.PI / 2 });
+    const face = 0.4;
+    g.order(u, { type: 'move', points: [[u.x, u.z], [-1030, -760], [-960, -800]], endFacing: face });
+    const ghost = u.order.dest.slice();
+    g.fastForward(90);
+    const off = Math.abs(Math.atan2(Math.sin(u.facing - face), Math.cos(u.facing - face)));
+    const res = { d: Math.hypot(u.x - ghost[0], u.z - ghost[1]), offDeg: (off * 180) / Math.PI, moving: u.follow.active, order: u.order.type, at: [Math.round(u.x), Math.round(u.z)], ghost: ghost.map(Math.round) };
+    g.removeUnit(u);
+    return res;
+  });
+  check('order-move-arrives', a.d <= 15 && a.offDeg <= 20 && !a.moving,
+    `after 90 sim s the brigade stands at (${a.at}) ${a.d.toFixed(1)} m from its ghost (${a.ghost}) (limit 15), facing ${a.offDeg.toFixed(1)} deg off endFacing (limit 20), still moving=${a.moving}, order=${a.order}`);
+
+  // b. move past an enemy: 'fight' halts and fires on the way; 'march' marches on
+  const pass = (mode) => page.evaluate(async (mode) => {
+    const S = await import('./src/settings.js');
+    S.set('rules.moveOrder', mode);
+    const g = window.__game.game;
+    const e = g.spawnUnit({ side: 'CS', men: 500, weapon: 'smooth', x: -900, z: -990, facing: 0 });
+    const u = g.spawnUnit({ side: 'US', men: 1500, weapon: 'rifled', x: -1150, z: -850, facing: Math.PI / 2 });
+    g.order(u, { type: 'move', points: [[u.x, u.z], [-650, -850]], endFacing: Math.PI / 2 });
+    let haltAt = null, firedHalted = false;
+    for (let t = 0; t < 60; t++) {
+      g.fastForward(1);
+      if (u.engaged && !haltAt) haltAt = [Math.round(u.x), Math.round(u.z)];
+      if (u.engaged && (u.shots || 0) > 0) firedHalted = true;
+    }
+    const res = { mode, halts: u.haltCount, haltAt, firedHalted, shots: u.shots || 0, x: Math.round(u.x), toGo: Math.round(Math.hypot(u.x + 650, u.z + 850)), state: u.state };
+    g.removeUnit(u);
+    g.removeUnit(e);
+    S.set('rules.moveOrder', 'fight');
+    return res;
+  }, mode);
+  const bf = await pass('fight');
+  const bm = await pass('march');
+  check('order-move-fights-on-the-way', bf.halts >= 1 && bf.haltAt && bf.haltAt[0] < -800 && bf.firedHalted && bm.halts === 0 && bm.x > -1040,
+    `fight: halted ${bf.halts}x, first at (${bf.haltAt}) with ${bf.toGo} m still to go, fired while halted=${bf.firedHalted} (${bf.shots} volleys); march: halted ${bm.halts}x, reached x=${bm.x} (past the halt point, want > -1040), ${bm.shots} volleys on the move`);
+
+  // c. attack: closes to effective range, halts, fires
+  const c = await page.evaluate(() => {
+    const g = window.__game.game;
+    const e = g.spawnUnit({ side: 'CS', men: 500, weapon: 'smooth', x: -900, z: -990, facing: 0 });
+    const u = g.spawnUnit({ side: 'US', men: 1500, weapon: 'rifled', x: -1150, z: -700, facing: Math.PI / 2 });
+    const d0 = Math.hypot(u.x - e.x, u.z - e.z);
+    g.order(u, { type: 'attack', target: e });
+    const rng = g.range(u);
+    let haltD = null, fired = false, charged = false;
+    for (let t = 0; t < 120 && !fired; t++) {
+      g.fastForward(1);
+      if (u.order.type === 'charge' || u.melee) charged = true;
+      if (haltD === null && !u.follow.active && u.order.type === 'attack') haltD = Math.hypot(u.x - e.x, u.z - e.z);
+      if (haltD !== null && !u.follow.active && (u.shots || 0) > 0) fired = true;
+    }
+    const res = { d0: Math.round(d0), rng: Math.round(rng), haltD: haltD === null ? null : Math.round(haltD), fired, charged, order: u.order.type };
+    g.removeUnit(u);
+    g.removeUnit(e);
+    return res;
+  });
+  check('order-attack-engages', c.haltD !== null && c.haltD >= c.rng * 0.5 && c.haltD <= c.rng && c.fired && !c.charged,
+    `from ${c.d0} m: halted at ${c.haltD} m from the target (weapon range ${c.rng} m, want ${Math.round(c.rng * 0.5)}-${c.rng}), fired=${c.fired}, charged=${c.charged}, order now ${c.order}`);
+
+  // d. Hold fire through the dock button
+  await page.evaluate(() => {
+    const g = window.__game.game;
+    const e = g.spawnUnit({ side: 'CS', men: 500, weapon: 'smooth', x: -900, z: -990, facing: 0 });
+    const u = g.spawnUnit({ side: 'US', men: 1500, weapon: 'rifled', x: -900, z: -840, facing: Math.PI });
+    window.__t = { e, u };
+    g.select(u);
+  });
+  const hfBtn = page.getByRole('button', { name: 'Hold fire', exact: true });
+  await hfBtn.click();
+  const d1 = await page.evaluate(() => {
+    const { u } = window.__t;
+    const s0 = u.shots || 0;
+    window.__game.game.fastForward(30);
+    return { set: u.holdFire, shots: (u.shots || 0) - s0, target: u.target ? u.target.short : null, pressed: document.querySelector('#orders [data-order=holdfire]').getAttribute('aria-pressed') };
+  });
+  await hfBtn.click();
+  const d2 = await page.evaluate(() => {
+    const { u } = window.__t;
+    const s0 = u.shots || 0;
+    window.__game.game.fastForward(15);
+    return { set: u.holdFire, shots: (u.shots || 0) - s0 };
+  });
+  check('order-hold-fire', d1.set && d1.pressed === 'true' && d1.shots === 0 && d1.target && !d2.set && d2.shots > 0,
+    `Hold fire on (button pressed=${d1.pressed}): ${d1.shots} volleys in 30 sim s with ${d1.target || 'no target'} in range; off again: ${d2.shots} volleys in 15 s (want 0, then > 0)`);
+
+  // e. orders given while paused are stored and run on Play
+  const e0 = await page.evaluate(() => {
+    const g = window.__game.game;
+    const { e, u } = window.__t;
+    g.removeUnit(e); // nothing to halt for
+    if (!g.paused) g.togglePause();
+    g.order(u, { type: 'move', points: [[u.x, u.z], [u.x - 120, u.z + 60]] });
+    return { x: u.x, z: u.z, paused: g.paused, order: u.order.type, active: u.follow.active };
+  });
+  await page.waitForTimeout(800);
+  const e1 = await page.evaluate(() => { const { u } = window.__t; return { x: u.x, z: u.z, order: u.order.type }; });
+  const simAtPlay = await page.evaluate(() => window.__game.game.simTime);
+  await page.getByRole('button', { name: 'Play', exact: true }).click();
+  // the real loop runs the sim (SwiftShader manages about 1-5 fps): wait for 3 sim seconds, not wall time
+  await page.waitForFunction((t0) => window.__game.game.simTime >= t0 + 3, simAtPlay, { timeout: 60_000, polling: 200 }).catch(() => {});
+  const e2 = await page.evaluate(() => { const { u } = window.__t; const g = window.__game.game; const r = { x: u.x, z: u.z, paused: g.paused }; g.removeUnit(u); delete window.__t; return r; });
+  const still = Math.hypot(e1.x - e0.x, e1.z - e0.z), moved = Math.hypot(e2.x - e1.x, e2.z - e1.z);
+  check('order-while-paused', e0.paused && e0.order === 'move' && e0.active && still < 0.01 && e1.order === 'move' && !e2.paused && moved > 1,
+    `paused=${e0.paused}, order stored=${e0.order} (marching flag ${e0.active}); moved ${still.toFixed(3)} m in 0.8 s paused, then ${moved.toFixed(1)} m in the first 3 sim s after Play (want 0, then > 1)`);
+}
+
+/** h. The bottom dock fits without overlap at the iPad's 1024x768 points and a 1440x788 Mac window. */
+async function dockFit(page) {
+  const bad = [];
+  const seen = [];
+  for (const vp of [{ width: 1024, height: 768 }, { width: 1440, height: 788 }]) {
+    await page.setViewportSize(vp);
+    await page.evaluate(() => { const g = window.__game.game; const u = g.units.find((v) => v.alive && g.controls(v)); g.select(u || null); });
+    await page.waitForTimeout(500);
+    const r = await page.evaluate(() => {
+      const box = (el) => { const b = el.getBoundingClientRect(); return { x: b.x, y: b.y, w: b.width, h: b.height }; };
+      const q = (s) => box(document.querySelector(s));
+      return {
+        card: q('#unitcard'), orders: q('#orders'), map: q('#minimap-box'), top: q('#topbar'),
+        targets: [...document.querySelectorAll('#dock button, #topbar button, #minimap')].filter((b) => b.offsetParent !== null).map((b) => ({ name: b.getAttribute('aria-label') || b.textContent.trim() || b.id, ...box(b) })),
+      };
+    });
+    const over = (a, b) => a.x < b.x + b.w - 0.5 && b.x < a.x + a.w - 0.5 && a.y < b.y + b.h - 0.5 && b.y < a.y + a.h - 0.5;
+    const inside = (a) => a.x >= 0 && a.y >= 0 && a.x + a.w <= vp.width + 0.5 && a.y + a.h <= vp.height + 0.5;
+    const tag = `${vp.width}x${vp.height}`;
+    const parts = { card: r.card, orders: r.orders, map: r.map, top: r.top };
+    const names = Object.keys(parts);
+    for (let i = 0; i < names.length; i++) {
+      if (!inside(parts[names[i]])) bad.push(`${tag}: ${names[i]} leaves the window (${JSON.stringify(parts[names[i]])})`);
+      for (let j = i + 1; j < names.length; j++) if (over(parts[names[i]], parts[names[j]])) bad.push(`${tag}: ${names[i]} overlaps ${names[j]}`);
+    }
+    for (const t of r.targets) if (t.w < 44 || t.h < 44) bad.push(`${tag}: "${t.name}" is ${Math.round(t.w)}x${Math.round(t.h)} px (min 44)`);
+    seen.push(`${tag} card ${Math.round(r.card.w)}x${Math.round(r.card.h)}, orders ${Math.round(r.orders.w)}x${Math.round(r.orders.h)}, map ${Math.round(r.map.w)}x${Math.round(r.map.h)}, ${r.targets.length} targets`);
+  }
+  await page.setViewportSize(VIEWPORT);
+  await page.waitForTimeout(300);
+  check('dock-fit', bad.length === 0, bad.length === 0 ? seen.join('; ') : bad.slice(0, 6).join(' | '));
+}
+
 /** Collects page errors for a secondary page into `into` (no early abort: those checks run after load). */
 function watchErrors(page, url, into) {
   page.on('pageerror', (err) => into.push(`pageerror: ${err.message}`));
@@ -221,6 +395,42 @@ async function sandboxAndDevice(browser, url) {
       check('sandbox-late-define-compare', lateShown && s0 && s0.key === 'look.testGrade' && s0.a === 'a' && s0.b === 'b' && s0.split === 0.5
         && s1 && Math.abs(s1.split - 0.52) < 1e-9 && s2 && s2.b === 'c' && s2.a === 'a' && cmp.ended.state === null && cmp.ended.overlay === 0,
       `late define shown=${lateShown}; started ${JSON.stringify(s0)}; after ArrowRight ${JSON.stringify(s1)}; after Right C ${JSON.stringify(s2)}; ended ${JSON.stringify(cmp.ended)}`);
+
+      // Units and Moments tools: spawn a generic brigade, shell it, rout it, remove it (through the panel)
+      {
+        await page.getByRole('tab', { name: 'Units' }).click();
+        const n0 = await page.locator('#markers .marker').count();
+        await page.getByRole('button', { name: 'Spawn Union brigade at view centre' }).click();
+        const spawned = await page.evaluate(() => {
+          const u = window.__game.game.selected;
+          return { markers: document.querySelectorAll('#markers .marker').length, name: u ? u.name : null, commander: u ? u.commander : 'none', men: u ? u.men : 0, figs: u ? u.figures.length : 0 };
+        });
+        await page.getByRole('tab', { name: 'Moments' }).click();
+        await page.getByRole('button', { name: 'Shell burst at view centre' }).click();
+        await page.getByRole('button', { name: 'Selected: rout' }).click();
+        const routed = await page.evaluate(() => (window.__game.game.selected ? window.__game.game.selected.state : null));
+        await page.getByRole('tab', { name: 'Units' }).click();
+        await page.getByRole('button', { name: 'Remove selected' }).click();
+        const n2 = await page.locator('#markers .marker').count();
+        check('sandbox-units-moments', spawned.markers === n0 + 1 && /^Union brigade \d+$/.test(spawned.name || '') && spawned.commander === null && spawned.men === 500 && spawned.figs === 50 && routed === 'routing' && n2 === n0,
+          `markers ${n0} -> ${spawned.markers} after spawn -> ${n2} after remove; spawned "${spawned.name}" (commander ${JSON.stringify(spawned.commander)}, ${spawned.men} men, ${spawned.figs} figures); after "Selected: rout" its state was ${routed}`);
+      }
+      // look.orderLine compares split-screen: both styles are built, each clipped to its side of the divider
+      {
+        await page.getByRole('tab', { name: 'Look' }).click();
+        await page.getByRole('button', { name: 'Compare Order line side by side' }).click();
+        const during = await page.evaluate(() => {
+          const a = window.__game.arrows;
+          a.setPreview([[-200, 100], [-100, 160], [0, 140]], 'US', 14, 30);
+          const r = { styles: a.styles(), meshes: a.preview ? a.preview.children.length : 0, clips: a.preview ? a.preview.children.map((m) => m.material.uniforms.uClip.value) : [] };
+          a.clearPreview();
+          return r;
+        });
+        await page.getByRole('button', { name: 'End compare' }).first().click();
+        const after = await page.evaluate(() => window.__game.arrows.styles());
+        check('sandbox-orderline-compare', JSON.stringify(during.styles) === '[["pencil",-1],["arrow",1]]' && during.meshes === 2 && during.clips.join() === '-1,1' && JSON.stringify(after) === '[["pencil",0]]',
+          `comparing: styles ${JSON.stringify(during.styles)}, preview meshes ${during.meshes} with clips ${during.clips.join(',')}; after End compare ${JSON.stringify(after)}`);
+      }
 
       // fps meter shows a number
       await page.waitForTimeout(1200);
@@ -388,6 +598,87 @@ async function main() {
       const held = await page.evaluate(() => { const u = window.__game.game.units.find((v) => v.id === 'franklin'); return { type: u.order.type, active: u.follow.active }; });
       check('hold-button', held.type === 'hold' && !held.active, `after Hold: order=${held.type} moving=${held.active}`);
 
+      // f. zoom: a trackpad pinch (ctrl + wheel) toward a point keeps the ground under it within 3% of the view
+      {
+        const px = { x: Math.round(VIEWPORT.width * 0.32), y: Math.round(VIEWPORT.height * 0.58) };
+        const before = await page.evaluate(([x, y]) => {
+          const { rts } = window.__game;
+          rts.update(1); // settle any easing first
+          const p = rts.pick(x, y, document.getElementById('battlefield'));
+          return p ? { x: p.x, y: p.y, z: p.z, dist: rts.goal.dist, goal: { ...rts.goal } } : null;
+        }, [px.x, px.y]);
+        let zoomOk = false, zoomDetail = 'no ground under the test point';
+        if (before) {
+          await page.mouse.move(px.x, px.y);
+          await page.keyboard.down('Control');
+          await page.mouse.wheel(0, -240);
+          await page.keyboard.up('Control');
+          const after = await page.evaluate(([x, y, z, goal]) => {
+            const { rts, camera } = window.__game;
+            const settle = () => {
+              for (let i = 0; i < 4; i++) rts.update(1); // let the eased camera reach its goal
+              camera.updateMatrixWorld();
+              const v = camera.position.clone().set(x, y, z).project(camera);
+              return { sx: (v.x * 0.5 + 0.5) * innerWidth, sy: (-v.y * 0.5 + 0.5) * innerHeight, dist: rts.goal.dist };
+            };
+            const r = settle();
+            // controls: the same zoom about the view centre (no anchoring) must miss by more than the limit, or
+            // this check could not fail; the pre-S1 method (target moved a share of the way toward the point) is
+            // reported for comparison
+            const factor = r.dist / goal.dist;
+            Object.assign(rts.goal, goal);
+            rts.snap();
+            rts.zoomBy(factor);
+            r.centre = settle();
+            Object.assign(rts.goal, goal);
+            rts.snap();
+            rts.zoomBy(factor, { x, z });
+            r.old = settle();
+            return r;
+          }, [before.x, before.y, before.z, before.goal]);
+          const ex = Math.abs(after.sx - px.x) / VIEWPORT.width, ey = Math.abs(after.sy - px.y) / VIEWPORT.height;
+          const err = (o) => Math.max(Math.abs(o.sx - px.x) / VIEWPORT.width, Math.abs(o.sy - px.y) / VIEWPORT.height);
+          const ce = err(after.centre), oe = err(after.old);
+          zoomOk = after.dist < before.dist * 0.8 && ex < 0.03 && ey < 0.03 && ce >= 0.03;
+          zoomDetail = `zoomed ${Math.round(before.dist)} -> ${Math.round(after.dist)} m; the ground point under (${px.x}, ${px.y}) is now at (${after.sx.toFixed(1)}, ${after.sy.toFixed(1)}): off by ${(ex * 100).toFixed(2)}% x, ${(ey * 100).toFixed(2)}% y of the view (limit 3%); controls: zoom about the centre off by ${(ce * 100).toFixed(1)}% (must exceed 3%), pre-S1 zoom-toward off by ${(oe * 100).toFixed(1)}%`;
+        }
+        check('zoom-to-pointer', zoomOk, zoomDetail);
+      }
+
+      // g. touch: synthetic pointerType 'touch' events: a tap selects Willcox, a drag from him orders a march
+      {
+        const touch = await page.evaluate(async () => {
+          const { game, rts, camera, terrain } = window.__game;
+          const cv = document.getElementById('battlefield');
+          const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+          const u = game.units.find((v) => v.id === 'willcox');
+          rts.goal.x = u.x + 60; rts.goal.z = u.z; rts.goal.dist = 700; rts.goal.pitch = rts._pitch(700);
+          rts.snap(); rts.update(1); camera.updateMatrixWorld();
+          const proj = (x, z) => { const v = camera.position.clone().set(x, terrain.heightAt(x, z), z).project(camera); return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight }; };
+          const fire = (type, x, y) => {
+            const el = document.elementFromPoint(x, y) || cv;
+            el.dispatchEvent(new PointerEvent(type, { pointerId: 41, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1, bubbles: true, cancelable: true, composed: true }));
+          };
+          game.select(null);
+          const s = proj(u.x, u.z);
+          const hit = (document.elementFromPoint(s.x, s.y) || {}).id || (document.elementFromPoint(s.x, s.y) || {}).className || '?';
+          fire('pointerdown', s.x, s.y); await sleep(50); fire('pointerup', s.x, s.y);
+          const tapped = game.selected ? game.selected.id : null;
+          await sleep(450); // not a double tap
+          const dest = proj(u.x + 150, u.z + 20);
+          fire('pointerdown', s.x, s.y);
+          for (let i = 1; i <= 8; i++) { fire('pointermove', s.x + (dest.x - s.x) * (i / 8), s.y + (dest.y - s.y) * (i / 8)); await sleep(16); }
+          const preview = !!window.__game.arrows.preview;
+          fire('pointerup', dest.x, dest.y);
+          const want = rts.pick(dest.x, dest.y, cv);
+          const end = u.order.dest;
+          return { hit, tapped, preview, order: u.order.type, moving: u.follow.active, gap: end && want ? Math.hypot(end[0] - want.x, end[1] - want.z) : null };
+        });
+        check('touch-tap-select', touch.tapped === 'willcox', `a touch tap on Willcox's men (element "${touch.hit}") selected ${touch.tapped}`);
+        check('touch-drag-order', touch.order === 'move' && touch.moving && touch.preview && touch.gap !== null && touch.gap < 20,
+          `touch drag: preview shown=${touch.preview}, order=${touch.order}, moving=${touch.moving}, order end ${touch.gap === null ? 'missing' : `${touch.gap.toFixed(1)} m`} from the ground under the lifted finger (limit 20 m)`);
+      }
+
       // 7. fight: march three brigades up the hill, fast-forward, look for casualties and smoke on both sides
       const fight = await page.evaluate(() => {
         const g = window.__game.game;
@@ -408,6 +699,9 @@ async function main() {
       check('fight', fight.cas.US > 0 && fight.cas.CS > 0 && (fight.puffs > 0 || !fight.smoke),
         `after ${fight.simTime} sim s: Union casualties ${Math.round(fight.cas.US)}, Confederate ${Math.round(fight.cas.CS)}, smoke puffs ${fight.puffs} (smoke ${fight.smoke ? 'on' : 'unavailable'}); ${fight.states}`);
       result.fight = fight;
+
+      await orderObedience(page);
+      await dockFit(page);
     }
 
     // 2. errors
@@ -425,6 +719,7 @@ async function main() {
     result.stats = await page.evaluate(() => window.__stats ?? null).catch(() => null);
     if (result.stats) console.log(`stats: ${JSON.stringify(result.stats)}`);
     await page.context().close().catch(() => {}); // one game page at a time
+    if (process.argv.includes('--field')) { result.mode = 'field only (sandbox and device pages skipped)'; return; }
     await sandboxAndDevice(browser, url);
   } finally {
     if (browser) await browser.close().catch(() => {});

@@ -13,6 +13,9 @@ import { Effects } from './fx/effects.js';
 import { ArrowLayer } from './ui/arrows.js';
 import { Hud } from './ui/hud.js';
 import { Input } from './ui/input.js';
+import { Readout } from './ui/readout.js';
+import { LOOK } from './ui/look.js';
+import { defineSandboxTools } from './ui/sandbox-tools.js';
 
 const stats = { fps: 0, scale: 1, quality: 'auto', drawCalls: 0, triangles: 0, figures: 0 };
 window.__stats = stats;
@@ -72,26 +75,33 @@ motion.addEventListener('change', (e) => { effects.reducedMotion = e.matches; })
 const game = new Game({ scene, terrain, scenario, world, effects, playerSide: 'US' });
 const arrows = new ArrowLayer(scene, terrain);
 
+const hud = new Hud({
+  camera, canvas, terrain, units: game.units, playerSide: 'US', rts, game,
+  onSelect: (u) => game.select(u),
+  onOrder: (kind) => game.orderSelected(kind),
+  onPause: () => game.togglePause(),
+  onSpeed: (s) => game.setSpeed(s),
+  onQuality: (q) => setQuality(q),
+  onSound: (on) => { effects.sound.enabled = on; },
+});
+hud.onFocus = (u) => rts.flyTo(u.x, u.z);
+hud.onFly = (x, z) => rts.flyTo(x, z);
+hud.onResume = () => { if (game.paused) game.togglePause(); };
+hud.setQuality(post.mode);
+
 function setQuality(mode) {
   post.setMode(mode);
   savePref('cw.quality', post.mode);
   hud.setQuality(post.mode);
-hud.onFocus = (u) => rts.focus(u.x, u.z);
 }
 
-const hud = new Hud({
-  camera, canvas, terrain, units: game.units, playerSide: 'US',
-  onSelect: (u) => game.select(u),
-  onOrder: (kind) => game.orderSelected(kind),
-  onPause: () => hud.setPaused(game.togglePause()),
-  onSpeed: () => { game.setSpeed(game.speed === 1 ? 2 : game.speed === 2 ? 4 : 1); hud.setSpeed(game.speed); },
-  onQuality: (q) => setQuality(q),
-  onSound: (on) => { effects.sound.enabled = on; },
-});
-hud.setQuality(post.mode);
 document.getElementById('history-note').textContent = scenario.historyNote;
 game.on('select', (u) => hud.select(u));
 game.on('log', (text) => hud.toast(text));
+game.on('event', (ev) => { if (LOOK.eventFeed) hud.feed(ev); else hud.toast(ev.text); });
+game.on('alert', (a) => { hud.setPaused(true); hud.showAlert(a); });
+game.on('spawn', (u) => hud.addUnit(u));
+game.on('remove', (u) => hud.removeUnit(u));
 
 const input = new Input({
   canvas, rts, game, arrows, hud, playerSide: 'US',
@@ -101,6 +111,8 @@ const input = new Input({
     hud.toast(`Quality: ${next}`);
   },
 });
+const readout = new Readout({ scene, terrain, camera, game, layer: document.getElementById('ticks') });
+defineSandboxTools({ game, rts, effects, hud });
 // keep the pause/speed buttons in step with keyboard changes
 const togglePause = game.togglePause.bind(game);
 game.togglePause = () => { const p = togglePause(); hud.setPaused(p); return p; };
@@ -116,6 +128,11 @@ window.addEventListener('resize', () => {
   post.setSize(window.innerWidth, window.innerHeight);
 });
 
+/** Metres per CSS pixel at the view centre (order lines and engagement lines keep a screen width). */
+const metresPerPixel = () => (2 * rts.dist * Math.tan((camera.fov * Math.PI) / 360)) / Math.max(1, window.innerHeight);
+const arcOf = (u) => (u.selected ? input.arcOf(u) : null);
+const commands = (u) => game.controls(u);
+
 // ---------------------------------------------------------------------------------------------------
 // Loop
 let last = performance.now();
@@ -130,10 +147,13 @@ function frame(now) {
   game.setView(camera, window.innerHeight * post.scale);
   game.animate(simDt);
   effects.update(game.paused ? 0 : dt * game.speed);
-  arrows.update(game.units, 'US');
+  const mpp = metresPerPixel();
+  arrows.setScale(mpp);
+  arrows.update(game.units, commands, arcOf);
   rts.update(dt);
   world.trees.userData.updateLod(camera, rts.dist + 200);
   hud.update(dt);
+  readout.update(game.paused ? 0 : dt, mpp);
   if (game.orders && !tip.hidden) tip.hidden = true;
 
   renderer.info.reset();
@@ -174,7 +194,7 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, gpuTier };
+window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, readout, gpuTier };
 
 // Developer tuning panel (lil-gui), only with ?tune in the URL; players never load it.
 if (new URLSearchParams(location.search).has('tune')) {

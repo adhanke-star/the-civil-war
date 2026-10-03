@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>The Civil War — reward sequence (prototype)</title>
+  <link rel="icon" href="data:,">
+  <meta name="theme-color" content="#17141a">
+  <meta name="description" content="The Civil War: the after-action loot reveal, issue and rating count-up prototype, on placeholder data.">
+  <!-- the same import map as index.html -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three/build/three.module.js",
+      "three/addons/": "./vendor/three/examples/jsm/",
+      "yuka": "./vendor/yuka/build/yuka.module.js",
+      "three.quarks": "./vendor/three.quarks/dist/three.quarks.esm.js",
+      "quarks.core": "./vendor/quarks.core/dist/quarks.core.esm.js",
+      "zzfx": "./vendor/zzfx/ZzFX.js",
+      "@mapbox/martini": "./vendor/@mapbox/martini/index.js",
+      "detect-gpu": "./vendor/detect-gpu/dist/detect-gpu.esm.js",
+      "lil-gui": "./vendor/lil-gui/dist/lil-gui.esm.min.js",
+      "d3-delaunay": "./vendor/d3-delaunay/src/index.js",
+      "delaunator": "./vendor/delaunator/index.js",
+      "robust-predicates": "./vendor/robust-predicates/esm/orient2d.js"
+    }
+  }
+  </script>
+  <link rel="stylesheet" href="./src/reward/reward.css" data-reward-css>
+  <style>
+    /* the HUD variables the sandbox panel uses (src/ui/hud.css is not loaded on this page) */
+    :root { color-scheme: dark; --panel: rgba(18, 16, 22, 0.82); --panel-edge: rgba(255, 255, 255, 0.14); --text: #f1ece0; --dim: #c9c2b4; --focus: #ffd27a; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #17141a; color: var(--text); }
+    body { font: 16px/1.45 system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+    #launch { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }
+    body.sb-open-right #launch { right: var(--sb-w, 0px); }
+    body.sb-open-left #launch { left: var(--sb-w, 0px); }
+    #launch section { max-width: 560px; padding: 28px 30px; border-radius: 16px; background: #1f1c24; border: 1px solid var(--panel-edge); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+    #launch h1 { margin: 0 0 4px; font-size: 26px; font-weight: 800; letter-spacing: -0.01em; }
+    #launch p { margin: 0 0 16px; color: var(--dim); }
+    #launch .row { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; }
+    #launch button, #launch a.btn { min-height: 48px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--panel-edge); background: rgba(255,255,255,0.06); color: var(--text); font: inherit; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; }
+    #launch button.main { background: #f2efe6; color: #13161c; border-color: transparent; }
+    #launch button[aria-pressed="true"] { background: rgba(240,199,94,0.22); border-color: #f0c75e; }
+    #launch .last { font-size: 14px; }
+  </style>
+</head>
+<body>
+  <main id="launch" aria-labelledby="launch-title">
+    <section>
+      <h1 id="launch-title">Reward sequence</h1>
+      <p>Prototype on placeholder data: after action, loot reveal, issue the arms, ratings. Uniques and conditions are game items, not history.</p>
+      <div class="row" role="group" aria-label="Grade">
+        <button type="button" data-grade="Decisive" aria-pressed="false">Decisive</button>
+        <button type="button" data-grade="Victory" aria-pressed="true">Victory</button>
+        <button type="button" data-grade="Draw" aria-pressed="false">Draw</button>
+        <button type="button" data-grade="Defeat" aria-pressed="false">Defeat</button>
+      </div>
+      <div class="row">
+        <button type="button" class="main" id="play">Play the reward sequence</button>
+        <button type="button" id="play-legendary">With a Legendary</button>
+        <button type="button" id="deal-one">Deal one card</button>
+      </div>
+      <div class="row"><a class="btn" id="sandbox-link" href="?sandbox">Open with the sandbox panel</a></div>
+      <p class="last" id="last" role="status" aria-live="polite"></p>
+    </section>
+  </main>
+  <noscript><p>This page needs JavaScript and must be served over HTTP (run play.command).</p></noscript>
+  <script type="module">
+    import { mountReward } from './src/reward/sequence.js';
+
+    const q = new URLSearchParams(location.search);
+    const GRADES = ['Decisive', 'Victory', 'Draw', 'Defeat'];
+    let grade = GRADES.find((g) => g.toLowerCase() === String(q.get('grade') || '').toLowerCase()) || 'Victory';
+    const seedParam = q.get('seed');
+    const firstSeed = seedParam === null || seedParam === '' ? null : (Number.isFinite(Number(seedParam)) ? Number(seedParam) : seedParam);
+    const legendary = q.get('legendary') === '1';
+
+    const last = document.getElementById('last');
+    const gradeButtons = [...document.querySelectorAll('[data-grade]')];
+    const syncGrade = () => { for (const b of gradeButtons) b.setAttribute('aria-pressed', String(b.dataset.grade === grade)); };
+    for (const b of gradeButtons) b.addEventListener('click', () => { grade = b.dataset.grade; syncGrade(); });
+    syncGrade();
+    if (q.has('sandbox')) document.getElementById('sandbox-link').hidden = true;
+
+    function onDone(result) {
+      const changed = result.issued.length;
+      last.textContent = `Last run: seed ${result.seed}, ${result.grade}. ${changed} card${changed === 1 ? '' : 's'} issued; ${result.depot.length} in the depot.`;
+      document.getElementById('play').focus();
+      window.__rewardResult = result; // for a later test harness
+    }
+    const randomSeed = () => Math.floor(Math.random() * 1e9);
+    const start = (extra = {}) => mountReward(document.body, { seed: randomSeed(), grade, onDone, ...extra });
+
+    document.getElementById('play').addEventListener('click', () => start());
+    document.getElementById('play-legendary').addEventListener('click', () => start({ legendary: true }));
+    document.getElementById('deal-one').addEventListener('click', () => start({ mode: 'one' }));
+
+    // mount the sequence at once (the URL can fix the seed, grade and a forced Legendary)
+    window.__reward = mountReward(document.body, { seed: firstSeed ?? randomSeed(), grade, legendary, onDone });
+
+    if (q.has('sandbox')) {
+      import('./src/sandbox/panel.js').then(({ mountSandbox }) => mountSandbox()).catch((err) => console.error('sandbox panel failed to load:', err));
+    }
+  </script>
+</body>
+</html>

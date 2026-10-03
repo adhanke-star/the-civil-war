@@ -7,7 +7,7 @@
 // Never cached: cross-origin requests, non-GET, and any response that is not a plain 200.
 // Relative paths only: the site lives under a /the-civil-war/ subpath on GitHub Pages.
 
-const VERSION = 'cw-v1';
+const VERSION = 'cw-v2';
 
 self.addEventListener('install', () => {
   self.skipWaiting();

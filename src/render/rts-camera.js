@@ -6,10 +6,14 @@
 // looks across the field at about 24 degrees, at the default distance about 38, fully out about 45; a
 // vertical right-drag adds the player's own offset on top.
 // Keys: WASD / arrows pan, Q/E turn, +/- (and PageUp/PageDown) zoom. Mouse and trackpad: see ui/input.js.
+// anchor() is the map-style core: it moves the goal so a ground point sits exactly under a screen point once
+// the camera has settled, so zoom-to-cursor, drag-pan and pinch keep the grabbed ground under the fingers.
+// A released pan may glide on (inertia, rules.panInertia in ui/input.js).
 
 import * as THREE from 'three';
 
 const _v = new THREE.Vector3();
+const _cam = new THREE.PerspectiveCamera();
 const NEAR_DIST = 150, FAR_DIST = 2000, NEAR_PITCH = 0.42, FAR_PITCH = 0.78;
 
 /** Default camera pitch for a distance: low and oblique close in, more map-like far out. */
@@ -36,6 +40,7 @@ export class RtsCamera {
     this.keys = new Set();
     this.bound = terrain.half - 120;
     this.groundY = 0;
+    this.inertia = null; // { vx, vz } m/s of goal drift after a released pan
   }
 
   onKey(e, down) {
@@ -79,9 +84,86 @@ export class RtsCamera {
 
   /** Glide to centre a ground point (double-click on a brigade's flag). */
   focus(x, z) {
+    this.inertia = null;
     this.goal.x = x;
     this.goal.z = z;
     this._clamp();
+  }
+
+  /** Fly to a ground point and come in close enough to read the brigades there (flags, minimap, feed). */
+  flyTo(x, z, maxDist = 650) {
+    this.focus(x, z);
+    if (this.goal.dist > maxDist) {
+      this.goal.dist = maxDist;
+      this.goal.pitch = this._pitch(maxDist);
+    }
+  }
+
+  /** A camera at the goal state (where update() will settle), for solving anchor(). */
+  goalCamera() {
+    const g = this.goal;
+    const ty = this.terrain.heightAt(g.x, g.z);
+    const h = Math.cos(g.pitch) * g.dist;
+    _cam.fov = this.camera.fov;
+    _cam.aspect = this.camera.aspect;
+    _cam.near = Math.max(2, g.dist * 0.02);
+    _cam.far = g.dist * 4 + 2000;
+    _cam.updateProjectionMatrix();
+    _cam.position.set(g.x + Math.sin(g.yaw) * h, ty + Math.sin(g.pitch) * g.dist, g.z + Math.cos(g.yaw) * h);
+    _cam.lookAt(g.x, ty, g.z);
+    _cam.updateMatrixWorld();
+    return _cam;
+  }
+
+  /** Move the goal so ground point p ({x, y, z}) sits under client point (cx, cy) once the camera settles. */
+  anchor(p, cx, cy, dom) {
+    if (!p) return;
+    const rect = dom.getBoundingClientRect();
+    _ndc.set(((cx - rect.left) / rect.width) * 2 - 1, -((cy - rect.top) / rect.height) * 2 + 1);
+    for (let i = 0; i < 3; i++) {
+      _ray.setFromCamera(_ndc, this.goalCamera());
+      const o = _ray.ray.origin, d = _ray.ray.direction;
+      if (d.y > -1e-4) return; // at or above the horizon: no ground there
+      const t = (p.y - o.y) / d.y;
+      const dx = p.x - (o.x + d.x * t), dz = p.z - (o.z + d.z * t);
+      this.goal.x += dx;
+      this.goal.z += dz;
+      if (Math.abs(dx) + Math.abs(dz) < 0.05) break;
+    }
+    this._clamp();
+  }
+
+  /** Zoom by a factor toward the ground under a client point (wheel, trackpad pinch). */
+  zoomAt(factor, cx, cy, dom) {
+    const p = this.pick(cx, cy, dom);
+    this.zoomBy(factor);
+    if (p) this.anchor(p, cx, cy, dom);
+  }
+
+  /** Jump the eased state to the goal (direct manipulation: the ground stays glued to the fingers). */
+  snap() {
+    this.target.x = this.goal.x;
+    this.target.z = this.goal.z;
+    this.dist = this.goal.dist;
+    this.pitch = this.goal.pitch;
+    this.yaw = this.goal.yaw;
+  }
+
+  /** Ground footprint of the view: four [x, z] corners on the plane at the target's height (for the minimap). */
+  footprint(out = []) {
+    const cam = this.camera;
+    const y = this.target.y;
+    const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+    out.length = 0;
+    for (const [nx, ny] of corners) {
+      _ndc.set(nx, ny);
+      _ray.setFromCamera(_ndc, cam);
+      const o = _ray.ray.origin, d = _ray.ray.direction;
+      let t = d.y < -1e-4 ? (y - o.y) / d.y : 6000;
+      t = Math.min(t, 6000);
+      out.push([o.x + d.x * t, o.z + d.z * t]);
+    }
+    return out;
   }
 
   /** Zoom by a factor; if a ground point is given, zoom toward it. */
@@ -104,6 +186,15 @@ export class RtsCamera {
   }
 
   update(dt) {
+    // a released pan glides on and slows (rules.panInertia)
+    const iv = this.inertia;
+    if (iv) {
+      this.panBy(iv.vx * dt, iv.vz * dt);
+      const k = Math.exp(-dt * 4.5);
+      iv.vx *= k;
+      iv.vz *= k;
+      if (Math.hypot(iv.vx, iv.vz) < 2) this.inertia = null;
+    }
     // keyboard
     const speed = this.goal.dist * 0.9 * dt;
     const k = this.keys;

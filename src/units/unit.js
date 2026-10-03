@@ -11,11 +11,16 @@
 // (4 for a battery crew, so each gun has a crew of 4-5 figures).
 //
 // Directions: yaw/facing f means forward = (sin f, cos f) in (x, z); lateral = (cos f, -sin f).
+//
+// Orders (set by game.js): move (march to the mark; may halt on the way to fight, see pauseMarch), attack
+// (close on a target to effective range and fire; the game steers it), charge, fallback, hold. holdFire is a
+// standing flag on the unit, not an order: it survives new orders until toggled off.
 
 import { Vehicle, FollowPathBehavior, Path, Vector3 as YV } from 'yuka';
 import { FIGURE_SCALE } from './soldier-mesh.js';
 import { framePos } from './figure.js';
 import { mulberry32 } from '../world/landscape.js';
+import { RULES } from '../sim/rules.js';
 
 export const MEN_PER_FIGURE = 10;
 export const MEN_PER_CREW_FIGURE = 4;
@@ -90,6 +95,15 @@ export class Unit {
     this.nearestEnemy = Infinity;
     this.selected = false;
     this.path = null; // remaining order path [[x,z]...] for the arrow
+    this.engaged = false; // halted on the way to fight (the march resumes when the enemy is gone or beaten)
+    this.resumeT = 0;
+    this.haltCount = 0; // times this unit halted on a march to fight (order-obedience tests read it)
+    this.holdFire = false;
+    this.manual = false; // a non-player-side unit the sandbox player has ordered (the AI leaves it alone)
+    this.tickAcc = 0; // men lost since the last casualty tick was shown
+    this.fireLoad = 0; // recent casualties inflicted, decaying (engagement line thickness)
+    this.lastShooter = null;
+    this.lastShotT = -99;
     this.formation = 'line';
     this.rnd = mulberry32(seed);
 
@@ -257,21 +271,55 @@ export class Unit {
     return this.alive && this.state !== 'routing';
   }
 
-  orderMove(points, { charge = false, fallback = false } = {}) {
-    if (!this.canTakeOrders()) return false;
+  /** Steer along points [[x,z]...] without changing the order (used by move, attack, charge, fallback). */
+  setPath(points) {
     const path = new Path();
     for (const [x, z] of points) path.add(new YV(x, 0, z));
     this.follow.path = path;
     this.follow.active = true;
+    this.engaged = false;
+    this.resumeT = 0;
     this.path = points.map((p) => [p[0], p[1]]);
     let len = 0;
     for (let i = 1; i < points.length; i++) len += Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]);
     this.pathLength = len;
+  }
+
+  orderMove(points, { charge = false, fallback = false, endFacing } = {}) {
+    if (!this.canTakeOrders()) return false;
+    this.setPath(points);
     const n = points.length;
     const a = points[Math.max(0, n - 2)], b = points[n - 1];
-    const endFacing = Math.atan2(b[0] - a[0], b[1] - a[1]);
-    this.order = { type: charge ? 'charge' : fallback ? 'fallback' : 'move', endFacing, keepFacing: fallback };
+    const face = Number.isFinite(endFacing) ? endFacing : Math.atan2(b[0] - a[0], b[1] - a[1]);
+    this.order = { type: charge ? 'charge' : fallback ? 'fallback' : 'move', endFacing: face, keepFacing: fallback, dest: [b[0], b[1]] };
     return true;
+  }
+
+  /** Close on `target` to effective range and fire (the game steers the approach, see Game.attackStep). */
+  orderAttack(target, endFacing) {
+    if (!this.canTakeOrders() || !target) return false;
+    this.stop();
+    this.order = { type: 'attack', target, endFacing: Number.isFinite(endFacing) ? endFacing : Math.atan2(target.x - this.x, target.z - this.z), goal: null };
+    return true;
+  }
+
+  /** Halt on the march to fight an enemy in effective range; the path is kept and the march resumes later. */
+  pauseMarch(faceX, faceZ) {
+    if (this.engaged || !this.follow.active) return;
+    this.follow.active = false;
+    this.vehicle.velocity.set(0, 0, 0);
+    this.engaged = true;
+    this.resumeT = 0;
+    this.haltCount++;
+    this.setFormation('line');
+    if (faceX !== undefined) this.goalFacing = Math.atan2(faceX - this.x, faceZ - this.z);
+  }
+
+  resumeMarch() {
+    if (!this.engaged) return;
+    this.engaged = false;
+    this.resumeT = 0;
+    if (this.path && this.path.length && this.follow.path) this.follow.active = true;
   }
 
   orderHold() {
@@ -311,6 +359,7 @@ export class Unit {
     this.follow.active = false;
     this.vehicle.velocity.set(0, 0, 0);
     this.path = null;
+    this.engaged = false;
     if (this.order.type === 'move' || this.order.type === 'charge' || this.order.type === 'fallback') {
       this.goalFacing = this.facing;
     }
@@ -341,6 +390,7 @@ export class Unit {
     speed *= Math.max(0.55, 1 - slope * 0.8);
     if (this.inWoods) speed *= 0.7;
     if (this.formation === 'column') speed *= 1.1; // a road column keeps a better pace than a line over fields
+    speed *= RULES.marchSpeed;
     v.maxSpeed = speed;
 
     if (this.state === 'routing') {
@@ -370,8 +420,15 @@ export class Unit {
       if (this.follow.path.finished() && remain < 3 && sp < 0.6) {
         this.stop();
         this.run = false;
-        if (o.type === 'charge' && !this.melee) this.order = { type: 'hold' };
-        else if (o.type !== 'charge') this.order = { type: 'hold' };
+        if (o.type === 'attack') {
+          // in position: the game decides whether to close further; face the target meanwhile
+          if (o.target) this.goalFacing = Math.atan2(o.target.x - this.x, o.target.z - this.z);
+        } else {
+          // hold facing as the order set it (not wherever the wheel had got to when the men stopped)
+          if (o.endFacing !== undefined && !o.keepFacing && o.type === 'move') this.goalFacing = o.endFacing;
+          if (o.type === 'charge' && !this.melee) this.order = { type: 'hold' };
+          else if (o.type !== 'charge') this.order = { type: 'hold' };
+        }
       }
       const turn = TURN_RATE * (o.type === 'charge' ? 1.6 : this.formation === 'column' ? 2.5 : 1) * dt;
       this.facing += Math.max(-turn, Math.min(turn, wrap(this.goalFacing - this.facing)));
@@ -397,8 +454,10 @@ export class Unit {
   takeLosses(menLost, fallenPool, now) {
     if (menLost <= 0 || !this.alive) return;
     if (fallenPool) this.fallenPool = fallenPool;
+    const lost = Math.min(this.men, menLost);
     this.men = Math.max(0, this.men - menLost);
-    this.casualties += menLost;
+    this.casualties += lost;
+    this.tickAcc += lost;
     const want = Math.ceil(this.men / this.menPerFigure - 0.25);
     let live = this.figures.filter((f) => f.alive);
     let killed = 0;

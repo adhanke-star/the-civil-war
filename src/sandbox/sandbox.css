@@ -20,13 +20,13 @@
 .sb-panel button, .sb-panel input, .sb-panel textarea { font: inherit; }
 .sb-panel :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
 
-.sb-head { padding: 12px 64px 4px 16px; }
+.sb-head { flex: 0 0 auto; padding: 12px 64px 4px 16px; }
 .sb-left .sb-head { padding: 12px 16px 4px 16px; }
 .sb-head h2 { margin: 0; font-size: 1.35em; font-weight: 600; }
 .sb-sub { margin: 2px 0 0; color: var(--dim); font-size: 0.9em; }
 
 /* tabs */
-.sb-tabs { display: flex; gap: 2px; padding: 8px 8px 0; border-bottom: 1px solid var(--panel-edge); overflow-x: auto; }
+.sb-tabs { flex: 0 0 auto; display: flex; gap: 2px; padding: 8px 8px 0; border-bottom: 1px solid var(--panel-edge); overflow-x: auto; }
 .sb-tab { flex: 1 0 auto; min-height: 44px; min-width: 44px; padding: 0 8px; background: transparent; border: 0;
   border-bottom: 3px solid transparent; color: var(--dim); cursor: pointer; border-radius: 6px 6px 0 0; }
 .sb-tab:hover { background: rgba(255,255,255,0.07); color: var(--text); }

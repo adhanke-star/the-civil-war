@@ -120,6 +120,16 @@ export class Effects {
     this.playBoom(unit);
   }
 
+  /** A shell bursting at (x, z): a ring of cannon-sized clouds, a few small ones and a bang (sandbox moment). */
+  shellBurst(x, z) {
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2;
+      this.puff(x + Math.cos(a) * 5, z + Math.sin(a) * 5, true, i * 0.04);
+    }
+    for (let i = 0; i < 4; i++) this.puff(x + (Math.random() - 0.5) * 18, z + (Math.random() - 0.5) * 18, false, 0.1 + Math.random() * 0.3);
+    this.playBoom({ x, z });
+  }
+
   update(dt) {
     if (this.ok) this.batch.update(dt);
   }
