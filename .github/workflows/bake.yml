@@ -1,0 +1,208 @@
+# Art bake probe: build a Union infantryman in headless Blender (MPFB2 body + scripted uniform),
+# key poses, render sprite frames with baked light and shadow, pack atlases. The artifact is the
+# result (7-day retention); nothing is committed from this workflow. See tools/bake/README.md.
+name: Bake
+
+on:
+  workflow_dispatch:
+    inputs:
+      samples_close:
+        description: Cycles samples for the 256 px close tier
+        default: '48'
+      samples_field:
+        description: Cycles samples for the 96 px field tier
+        default: '24'
+      samples_hero:
+        description: Cycles samples for the 1024 px hero render
+        default: '128'
+      directions:
+        description: Yaw directions
+        default: '16'
+      elevation:
+        description: Camera elevation in degrees above horizontal
+        default: '35'
+      budget_min:
+        description: Render budget in minutes before directions are reduced
+        default: '16'
+  push:
+    branches: [bake]
+    paths:
+      - 'tools/bake/**'
+      - '.github/workflows/bake.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: bake-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BLENDER_VERSION: '4.2.23'
+  BLENDER_SHA256: bea0eb3146be13eae6225409a117b215184f41b7f79e799f97cb3abb8f6dc404
+  MPFB_REF: v2.0.17
+  MH_ASSETS_URL: https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip
+  MH_ASSETS_FILE: makehuman_system_assets_cc0.zip
+  BAKE_OUT: ${{ github.workspace }}/.out/bake
+  SAMPLES_CLOSE: ${{ inputs.samples_close || '48' }}
+  SAMPLES_FIELD: ${{ inputs.samples_field || '24' }}
+  SAMPLES_HERO: ${{ inputs.samples_hero || '128' }}
+  DIRECTIONS: ${{ inputs.directions || '16' }}
+  ELEVATION: ${{ inputs.elevation || '35' }}
+  BUDGET_MIN: ${{ inputs.budget_min || '16' }}
+
+jobs:
+  bake:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install Node deps (pngjs is already a devDependency)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Prepare output and print runner
+        run: |
+          mkdir -p "$BAKE_OUT"
+          : > "$BAKE_OUT/timing.tsv"
+          echo "cpus: $(nproc)"; free -g; df -h "$GITHUB_WORKSPACE"
+
+      - name: Cache Blender tarball
+        id: blender-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/dl/blender-${{ env.BLENDER_VERSION }}-linux-x64.tar.xz
+          key: blender-${{ env.BLENDER_VERSION }}-linux-x64
+
+      - name: Download Blender (download.blender.org first, official mirrors if blocked)
+        if: steps.blender-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/dl
+          f=~/dl/blender-${BLENDER_VERSION}-linux-x64.tar.xz
+          for base in https://download.blender.org/release https://mirrors.ocf.berkeley.edu/blender/release https://ftp.nluug.nl/pub/graphics/blender/release; do
+            url="$base/Blender4.2/blender-${BLENDER_VERSION}-linux-x64.tar.xz"
+            echo "trying $url"
+            if curl -fsSL --retry 3 --retry-delay 5 -o "$f" "$url" && echo "${BLENDER_SHA256}  $f" | sha256sum -c -; then
+              echo "downloaded from $url"
+              printf 'download blender (%s)\t%s\tok\n' "$base" "$SECONDS" >> "$BAKE_OUT/timing.tsv"
+              exit 0
+            fi
+            rm -f "$f"
+          done
+          exit 1
+
+      - name: Unpack Blender
+        run: |
+          f=~/dl/blender-${BLENDER_VERSION}-linux-x64.tar.xz
+          echo "${BLENDER_SHA256}  $f" | sha256sum -c -
+          mkdir -p ~/blender && tar -xf "$f" -C ~/blender
+          B=~/blender/blender-${BLENDER_VERSION}-linux-x64/blender
+          echo "BLENDER=$B" >> "$GITHUB_ENV"
+          if ! "$B" -b --factory-startup -noaudio --version; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends libxi6 libxxf86vm1 libxfixes3 libxrender1 libgl1 libegl1 libxkbcommon0 libsm6 libice6 libx11-6
+            "$B" -b --factory-startup -noaudio --version
+          fi
+          printf 'unpack blender\t%s\tok\n' "$SECONDS" >> "$BAKE_OUT/timing.tsv"
+
+      - name: Cache MakeHuman system assets (CC0)
+        id: mh-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/dl/${{ env.MH_ASSETS_FILE }}
+          key: mh-system-assets-cc0-2024-04-14
+
+      - name: Download MakeHuman system assets (CC0)
+        if: steps.mh-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/dl
+          curl -fsSL --retry 3 --retry-delay 5 -o ~/dl/$MH_ASSETS_FILE "$MH_ASSETS_URL"
+          ls -l ~/dl/$MH_ASSETS_FILE
+          printf 'download MakeHuman CC0 assets\t%s\tok\n' "$SECONDS" >> "$BAKE_OUT/timing.tsv"
+
+      - name: Fetch MPFB2 source (GPL add-on, used as a tool)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          repository: makehumancommunity/mpfb2
+          ref: ${{ env.MPFB_REF }}
+          path: _mpfb2
+          sparse-checkout: src/mpfb
+          persist-credentials: false
+
+      - name: Install MPFB2 as a Blender extension
+        run: |
+          set +e
+          cd _mpfb2/src/mpfb && zip -qr "$RUNNER_TEMP/mpfb.zip" . -x '*__pycache__*' && cd "$GITHUB_WORKSPACE"
+          ls -l "$RUNNER_TEMP/mpfb.zip"
+          "$BLENDER" --command extension install-file -r user_default -e "$RUNNER_TEMP/mpfb.zip"
+          rc=$?
+          echo "extension install-file exit $rc"
+          ls ~/.config/blender/4.2/extensions/user_default/ 2>/dev/null || true
+          printf 'install MPFB2 extension\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "cli exit $rc (probe retries)")" >> "$BAKE_OUT/timing.tsv"
+          exit 0
+
+      - name: 1 probe_mpfb.py (MPFB2 human, default rig, CC0 skin)
+        run: |
+          set +e
+          "$BLENDER" -b --factory-startup -noaudio --python-exit-code 1 -P tools/bake/probe_mpfb.py -- \
+            --out "$BAKE_OUT" --assets-zip ~/dl/$MH_ASSETS_FILE --mpfb-zip "$RUNNER_TEMP/mpfb.zip" \
+            --mpfb-src "$GITHUB_WORKSPACE/_mpfb2/src/mpfb"
+          rc=$?
+          printf 'probe_mpfb.py\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc")" >> "$BAKE_OUT/timing.tsv"
+          exit $rc
+
+      - name: 2 uniform.py (Union private, 1862)
+        run: |
+          set +e
+          "$BLENDER" -b --factory-startup -noaudio --python-exit-code 1 -P tools/bake/uniform.py -- --out "$BAKE_OUT"
+          rc=$?
+          printf 'uniform.py\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc")" >> "$BAKE_OUT/timing.tsv"
+          exit $rc
+
+      - name: 3 poses.py (stand, walk, fire, fallen)
+        run: |
+          set +e
+          "$BLENDER" -b --factory-startup -noaudio --python-exit-code 1 -P tools/bake/poses.py -- --out "$BAKE_OUT"
+          rc=$?
+          printf 'poses.py\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc")" >> "$BAKE_OUT/timing.tsv"
+          exit $rc
+
+      - name: 4 render.py (Cycles CPU, ortho, directions x frames x tiers, hero)
+        run: |
+          set +e
+          "$BLENDER" -b --factory-startup -noaudio --python-exit-code 1 -P tools/bake/render.py -- --out "$BAKE_OUT" \
+            --samples-close "$SAMPLES_CLOSE" --samples-field "$SAMPLES_FIELD" --samples-hero "$SAMPLES_HERO" \
+            --directions "$DIRECTIONS" --elevation "$ELEVATION" --budget-min "$BUDGET_MIN" 2>&1 \
+            | grep -v -E '^Fra:|^Saved:|^ Time:|^$'
+          rc=${PIPESTATUS[0]}
+          printf 'render.py\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc")" >> "$BAKE_OUT/timing.tsv"
+          exit $rc
+
+      - name: 5 pack.mjs (atlas, manifest, contact sheet, hero preview)
+        run: |
+          set +e
+          node tools/bake/pack.mjs --out "$BAKE_OUT"
+          rc=$?
+          printf 'pack.mjs\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc")" >> "$BAKE_OUT/timing.tsv"
+          exit $rc
+
+      - name: Job summary
+        if: always()
+        run: node tools/bake/pack.mjs --out "$BAKE_OUT" --summary >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload bake output
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: bake-${{ github.run_number }}
+          path: |
+            .out/bake/
+            !.out/bake/work/**
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
