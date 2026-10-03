@@ -59,10 +59,31 @@ never moves. The figure turns, so the one standard light always reads as upper-l
 
 ## Measured numbers
 
-See the latest green run's job summary. The numbers from the probe run are recorded in the leg
-report and copied here when the leg closes:
+Measured on run 37160936587 (2026-10-03). The runner was ubuntu-latest with 4 vCPU and Cycles on
+CPU. Speed varies between runners by about 30% (close tier: 3.1 s, 3.7 s and 4.0 s per frame on
+three runs).
 
-MEASURED_PLACEHOLDER
+- **MPFB2 headless works.** It was installed with `blender --command extension install-file -r
+  user_default` and enabled with `addon_utils.enable`. `create_human` takes 0.2 s and
+  `add_builtin_rig("default")` takes 0.2 s. The body has 13,380 visible vertices, is 1.73 m tall and
+  has 163 bones.
+- Close tier, 256 px @ 48 spp: **4.0 s/frame**. Field tier, 96 px @ 24 spp: **0.54 s/frame**.
+  Hero, 1024 px @ 128 spp: 59 s.
+- Full probe matrix (16 directions x 13 frames x 2 tiers = 416 frames, plus 2 variants and the
+  hero): render 17.0 min. **The job takes 17.7 min wall time** (setup about 0.7 min with warm caches).
+- Close atlas: 4 pages, 2048 wide, 3.6 MB. Field atlas: 1024x1224, 0.75 MB. Manifest: 57 KB.
+  Artifact: 21.8 MB zipped.
+- Extrapolated, linear, same samples:
+  - one full soldier (16 directions x 40 frames x 2 tiers): about 49 CPU-minutes and about 13 MB of
+    atlas;
+  - 8 figure variants: about 6.5 CPU-hours and about 107 MB.
+
+  That does not fit one 30-minute job. Shard directions across parallel jobs, which are free on a
+  public repo. Rendering the field tier by downsampling the close frames would remove its 12% share.
+
+Walk clip: 8 frames at 7.33 fps (110 steps/min). The planted feet cover **1.20 m per cycle
+(1.10 m/s)**, shorter than the 1.42 m drill step. The manifest carries both numbers, so the game
+can match ground speed to the feet.
 
 ## Licences of everything external
 
