@@ -21,7 +21,7 @@ import sys
 import bmesh
 import bpy
 import numpy as np
-from mathutils import Matrix, Vector
+from mathutils import Matrix, Vector, noise
 from mathutils.kdtree import KDTree
 from mathutils.bvhtree import BVHTree
 
@@ -45,6 +45,36 @@ D = {
     "shoe_top_above_ankle": 0.055,  # ankle-high bootee                        placeholder
     "cloth_thickness":     0.004,   # solidify thickness of all cloth          placeholder
     "smooth_iterations":   8,       # Taubin passes that iron out anatomy      placeholder
+    # -- garment cut (second pass: a loose sack coat and straight-cut trousers) ----------
+    "armpit_below_shoulder": 0.10,  # armpit level below the shoulder joint     placeholder
+    "chest_below_armpit":  0.04,    # the coat hangs straight down from here   placeholder
+    "coat_hang_taper":     0.05,    # hanging radius shrinks 5% chest->belt    placeholder
+    "sleeve_r_top":        0.066,   # sleeve radius below the armhole          placeholder
+    "sleeve_r_cuff":       0.049,   # sleeve radius at the cuff                placeholder
+    "cuff_len":            0.06,    # cuff band (a turned edge, no buttons)    placeholder
+    "crotch_below_hip":    0.07,    # trouser crotch below the hip joints      placeholder
+    "trouser_r_thigh":     0.090,   # straight-cut leg radius at the crotch    placeholder
+    "trouser_r_hem":       0.077,   # leg radius at the hem (~48 cm round)     placeholder
+    "trouser_lateral":     0.86,    # legs hang flatter side to side           placeholder
+    "hem_below_ankle":     0.004,   # hem height under the ankle joint         placeholder
+    "hem_break_front":     0.030,   # extra drop at the front: breaks on the shoe placeholder
+    "hem_break_back":      0.012,   #                                          placeholder
+    "collar_stand":        0.026,   # turned-down collar: stand height         placeholder
+    "collar_fall":         0.028,   # fall height (folds down outward)         placeholder
+    "collar_gap_deg":      42.0,    # opening at the throat                    placeholder
+    "front_edge_offset":   0.016,   # overlapping front edge, wearer's right of the buttons placeholder
+    # -- folds (metres of displacement; placeholder, judged by eye) ---------------------
+    "fold_elbow":          0.0075,
+    "fold_wrist":          0.0045,
+    "fold_upperarm":       0.0025,
+    "fold_knee":           0.0070,
+    "fold_hem":            0.0060,
+    "fold_drape":          0.0040,
+    "fold_seat":           0.0040,
+    "fold_pleat":          0.0060,  # radiating from the waist belt
+    "fold_drag":           0.0040,  # diagonal drag folds on the back
+    "fold_lumps":          0.0030,  # low-frequency unevenness everywhere
+    "fold_skirt":          0.0060,
     # -- belts and straps ------------------------------------------------------
     "waist_belt_width":    0.048,   # ~1.9 in black leather waist belt         Inferred
     "cartridge_belt_width": 0.057,  # ~2.25 in shoulder belt                   Inferred
@@ -99,18 +129,31 @@ T = C.Timer()
 REP = {"table": {k: v for k, v in D.items()}, "colours": COL, "objects": {}}
 
 
+# Weathering colours (placeholder, judged by eye): faded indigo goes greyer and lighter; dust is
+# a light tan; mud a dark brown.
+FADE = {"coat": "#3a4560", "cap": "#363f58", "trousers": "#9aa9bb", "blanket": "#8a8272",
+        "canteen": "#857c6c", "felt": "#3a3631", "webbing": "#c2b89c", "haversack": "#3a3832"}
+
+
 def mats():
     m = {}
     for k, (hexc, rough) in COL.items():
-        metal = 1.0 if k in ("steel", "brass") else 0.0
-        if k in ("coat", "cap", "trousers", "canteen", "blanket", "felt", "webbing"):
-            m[k] = C.material("tcw_" + k, hexc, roughness=rough, sheen=0.5, mottle=0.10,
-                              mottle_scale=4.0, bump=0.15, bump_scale=900.0)
+        name = "tcw_" + k
+        if k in ("coat", "cap", "trousers", "blanket", "canteen", "felt"):
+            m[k] = C.weathered_material(name, hexc, rough, kind="wool", fade_hex=FADE.get(k), fade=0.55,
+                                        mottle=0.09, sheen=0.55, weave_scale=330.0, bump=0.35)
+        elif k in ("webbing", "haversack"):
+            m[k] = C.weathered_material(name, hexc, rough, kind="canvas", fade_hex=FADE.get(k), fade=0.4,
+                                        mottle=0.10, weave_scale=420.0, bump=0.3)
+        elif k in ("leather", "brogans"):
+            m[k] = C.weathered_material(name, hexc, rough, kind="leather", mottle=0.12, bump=0.25,
+                                        edge_wear_hex="#4a3a2c")
         elif k == "wood":
-            m[k] = C.material("tcw_" + k, hexc, roughness=rough, grain=0.22)
-        else:
-            m[k] = C.material("tcw_" + k, hexc, roughness=rough, metallic=metal,
-                              mottle=0.05 if not metal else 0.0)
+            m[k] = C.weathered_material(name, hexc, rough, kind="wood", mottle=0.10, bump=0.15,
+                                        edge_wear_hex="#6b4428")
+        else:  # steel, brass
+            m[k] = C.weathered_material(name, hexc, rough, kind="metal", mottle=0.06, metallic=1.0,
+                                        bump=0.05, dust_hex="#7a6e58")
     return m
 
 
@@ -211,6 +254,9 @@ def landmarks(rig, rm):
         "shL": h(L_["upper"][0]), "shR": h(R_["upper"][0]),
         "ankL": h(L_["foot"]), "ankR": h(R_["foot"]),
         "neck": h(rm["neck"][0]), "headb": h(rm["head"]),
+        "elbowL": h(L_["lower"][0]), "elbowR": h(R_["lower"][0]),
+        "wristL": h(L_["hand"]), "wristR": h(R_["hand"]),
+        "kneeL": h(L_["shin"][0]), "kneeR": h(R_["shin"][0]),
     }
     lm["hip_c"] = (lm["hipL"] + lm["hipR"]) / 2
     lm["hip_z"] = lm["hip_c"].z
@@ -251,7 +297,11 @@ def taubin(bm, iters):
         v.co = Vector(p.tolist())
 
 
-def make_shell(name, body, rig, rest, nrm, keep, offset_of, mat, iters, solid, min_z=None, subdiv=1):
+def make_shell(name, body, rig, rest, nrm, keep, offset_of, mat, iters, solid, shaper=None, cuts=1, subdiv=1):
+    """A garment shell: the body surface offset along its normals, cut to `keep`, ironed (Taubin),
+    subdivided once so folds have vertices to live on, then reshaped by `shaper` (looser cut,
+    folds; it returns the weathering attributes). Bone weights come with the copied body mesh
+    and are interpolated by the subdivision."""
     sh = body.copy()
     sh.data = body.data.copy()
     sh.name = name
@@ -267,18 +317,41 @@ def make_shell(name, body, rig, rest, nrm, keep, offset_of, mat, iters, solid, m
     bm = bmesh.new()
     bm.from_mesh(sh.data)
     bm.verts.ensure_lookup_table()
-    src = bm.verts.layers.int.new("tcw_src")
-    for v in bm.verts:
-        v[src] = v.index
     bmesh.ops.delete(bm, geom=[v for v in bm.verts if v.index not in keep], context="VERTS")
     taubin(bm, iters)
-    if min_z is not None:
-        for v in bm.verts:
-            if v.co.z < min_z:
-                v.co.z = min_z
-    pos = [(v.co.copy(), v[src]) for v in bm.verts]
+    if cuts:
+        bmesh.ops.subdivide_edges(bm, edges=bm.edges[:], cuts=cuts, use_grid_fill=True, smooth=0.0)
+        taubin(bm, 2)
+    bm.normal_update()
+    bm.verts.ensure_lookup_table()
+    MW = sh.matrix_world.copy()
+    MWi = MW.inverted()
+    Pw = np.array([(MW @ v.co)[:] for v in bm.verts])
+    Nw = np.array([(MW.to_3x3() @ v.normal).normalized()[:] for v in bm.verts])
+    boundary = np.array([v.is_boundary for v in bm.verts])
+    attrs = {}
+    if shaper is not None:
+        Pw, attrs = shaper(Pw, Nw, boundary)
+        for v, p in zip(bm.verts, Pw):
+            v.co = MWi @ Vector(p.tolist())
+    pos = [Vector(p.tolist()) for p in Pw]
     bm.to_mesh(sh.data)
     bm.free()
+    # any vertex the subdivision left without weights copies its nearest weighted neighbour
+    dv = [len([g for g in v.groups if g.weight > 1e-4]) for v in sh.data.vertices]
+    bad = [i for i, n in enumerate(dv) if n == 0]
+    if bad:
+        good = [i for i, n in enumerate(dv) if n > 0]
+        kd = KDTree(len(good))
+        for j, i in enumerate(good):
+            kd.insert(sh.data.vertices[i].co, j)
+        kd.balance()
+        for i in bad:
+            _co, j, _d = kd.find(sh.data.vertices[i].co)
+            for g in sh.data.vertices[good[j]].groups:
+                sh.vertex_groups[g.group].add([i], g.weight, "REPLACE")
+    REP.setdefault("weightless_after_subdiv", {})[name] = len(bad)
+    C.stamp_attrs(sh, rest=pos, dirt=attrs.get("dirt"), wear=attrs.get("wear"), cavity=attrs.get("cavity"))
     sh.data.polygons.foreach_set("use_smooth", [True] * len(sh.data.polygons))
     for m in list(sh.modifiers):
         if m.type != "ARMATURE":
@@ -293,6 +366,266 @@ def make_shell(name, body, rig, rest, nrm, keep, offset_of, mat, iters, solid, m
     C.assign(sh, mat)
     REP["objects"][name] = {"verts": len(sh.data.vertices), "faces": len(sh.data.polygons)}
     return sh, pos
+
+
+# ------------------------------------------------------------------------------ garment shape
+
+class Outline:
+    """Convex outer outline of a point cloud in a horizontal slice, as radius(theta) about a
+    centre. theta = 0 points along F (front), +pi/2 along L (the wearer's left)."""
+
+    def __init__(self, cloud, z, F, Lv, band=0.012, bins=72, centre=None):
+        sel = cloud[np.abs(cloud[:, 2] - z) < band]
+        while len(sel) < 12 and band < 0.08:
+            band *= 1.6
+            sel = cloud[np.abs(cloud[:, 2] - z) < band]
+        if len(sel) < 3:
+            raise RuntimeError("outline at z=%.3f has %d points" % (z, len(sel)))
+        self.F = np.array([F.x, F.y])
+        self.L = np.array([Lv.x, Lv.y])
+        self.c = np.array(centre[:2]) if centre is not None else sel[:, :2].mean(axis=0)
+        rel = sel[:, :2] - self.c
+        th = np.arctan2(rel @ self.L, rel @ self.F)
+        r = np.hypot(rel[:, 0], rel[:, 1])
+        b = ((th + math.pi) / (2 * math.pi) * bins).astype(int) % bins
+        rad = np.zeros(bins)
+        np.maximum.at(rad, b, r)
+        have = rad > 0
+        if not have.all():
+            idx = np.arange(bins)
+            good = idx[have]
+            rad = np.interp(idx, np.concatenate([good - bins, good, good + bins]), np.concatenate([rad[have]] * 3))
+        for _ in range(3):
+            rad = (np.roll(rad, 1) + 2 * rad + np.roll(rad, -1)) / 4
+        for _ in range(20):
+            rad = np.maximum(rad, 0.985 * (np.roll(rad, 1) + np.roll(rad, -1)) / 2)
+        self.rad = rad
+        self.bins = bins
+        self.z = z
+
+    def theta(self, xy):
+        rel = np.asarray(xy)[..., :2] - self.c
+        return np.arctan2(rel @ self.L, rel @ self.F)
+
+    def at(self, th):
+        u = (np.asarray(th) + math.pi) / (2 * math.pi) * self.bins - 0.5
+        i0 = np.floor(u).astype(int)
+        f = u - i0
+        return self.rad[i0 % self.bins] * (1 - f) + self.rad[(i0 + 1) % self.bins] * f
+
+    def point(self, th, extra=0.0):
+        d = self.F * math.cos(th) + self.L * math.sin(th)
+        return self.c + d * (float(self.at(th)) + extra)
+
+
+class Stack:
+    """Outlines every `step` metres between z0 and z1, interpolated in z."""
+
+    def __init__(self, cloud, z0, z1, F, Lv, step=0.01, centre_fn=None):
+        n = max(2, int(round((z1 - z0) / step)) + 1)
+        self.zs = np.linspace(z0, z1, n)
+        self.o = [Outline(cloud, z, F, Lv, centre=(centre_fn(z) if centre_fn else None)) for z in self.zs]
+
+    def get(self, z):
+        k = int(np.clip(np.searchsorted(self.zs, z) - 1, 0, len(self.zs) - 2))
+        t = float(np.clip((z - self.zs[k]) / (self.zs[k + 1] - self.zs[k]), 0, 1))
+        return self.o[k], self.o[k + 1], t
+
+    def centre(self, z):
+        a, b, t = self.get(z)
+        return a.c * (1 - t) + b.c * t
+
+    def radius(self, z, xy):
+        a, b, t = self.get(z)
+        c = a.c * (1 - t) + b.c * t
+        rel = np.asarray(xy)[:2] - c
+        th = math.atan2(float(rel @ a.L), float(rel @ a.F))
+        return float(a.at(th)) * (1 - t) + float(b.at(th)) * t, th, c
+
+
+def nz(p, s):
+    return noise.noise(Vector((p[0] * s, p[1] * s, p[2] * s)))
+
+
+def closest_on_polyline(p, pts):
+    best = None
+    acc = 0.0
+    for a, b in zip(pts[:-1], pts[1:]):
+        ab = b - a
+        L2 = float(ab @ ab)
+        t = float(np.clip((p - a) @ ab / L2, 0, 1))
+        q = a + ab * t
+        d = float(np.linalg.norm(p - q))
+        if best is None or d < best[0]:
+            best = (d, q, acc + t * math.sqrt(L2), ab / math.sqrt(L2))
+        acc += math.sqrt(L2)
+    return best[1], best[2], best[3], acc
+
+
+class Garments:
+    """Reshapes the coat and trouser shells into a loose sack coat and straight-cut trousers,
+    adds folds, and returns per-vertex dirt / wear / crease attributes. All amplitudes are in
+    the table (placeholder estimates judged by eye)."""
+
+    def __init__(self, lm, body_np, region, body_kd):
+        self.lm = lm
+        self.F, self.L, self.U = lm["F"], lm["L"], lm["U"]
+        self.f2 = np.array([self.F.x, self.F.y, 0.0])
+        self.l2 = np.array([self.L.x, self.L.y, 0.0])
+        self.region = region
+        self.kd = body_kd
+        self.mid_l = float(np.array(lm["mid"][:]) @ self.l2)
+        self.hip_z = lm["hip_z"]
+        self.waist_z = self.hip_z + D["coat_waist_above_hip"]
+        self.hem_z = self.hip_z - D["coat_hem_below_hip"]
+        self.ankle_z = lm["ankle_z"]
+        self.crotch_z = self.hip_z - D["crotch_below_hip"]
+        self.sh_z = (lm["shL"].z + lm["shR"].z) / 2
+        self.armpit_z = self.sh_z - D["armpit_below_shoulder"]
+        self.chest_z = self.armpit_z - D["chest_below_armpit"]
+        self.knee_z = (lm["kneeL"].z + lm["kneeR"].z) / 2
+        torso = body_np[[i for i, r in enumerate(region) if r in ("torso", "hip")]]
+        self.torso = Stack(torso, self.waist_z - 0.06, self.armpit_z + 0.01, self.F, self.L)
+        self.arms = {s: [np.array(lm["sh" + s][:]), np.array(lm["elbow" + s][:]), np.array(lm["wrist" + s][:])]
+                     for s in ("L", "R")}
+        self.legs = {s: (np.array(lm["hip" + s][:]), np.array(lm["ank" + s][:])) for s in ("L", "R")}
+
+    def reg(self, p):
+        _co, j, _d = self.kd.find(Vector(p.tolist()))
+        return self.region[j] or "other"
+
+    def side(self, p):
+        return "L" if float(p @ self.l2) - self.mid_l > 0 else "R"
+
+    # ---------------------------------------------------------------- the coat (torso + sleeves)
+    def coat(self, P, N, boundary):
+        out = P.copy()
+        n = len(P)
+        dirt, wear, cav = np.zeros(n), np.zeros(n), np.zeros(n)
+        oc = self.torso.get(self.chest_z)[0]
+        for i in range(n):
+            p = P[i]
+            r = self.reg(p)
+            z = float(p[2])
+            d = 0.0
+            if r in ("arm", "hand"):
+                s_ = self.side(p)
+                q, s, tdir, Ltot = closest_on_polyline(p, self.arms[s_])
+                rad = p - q
+                rc = float(np.linalg.norm(rad))
+                if rc < 1e-6:
+                    continue
+                ru = rad / rc
+                R = D["sleeve_r_top"] + (D["sleeve_r_cuff"] - D["sleeve_r_top"]) * min(1.0, s / Ltot)
+                w = C.smoothstep(0.04, 0.12, s)
+                rn = rc + w * max(0.0, R - rc)
+                if Ltot - s < D["cuff_len"]:
+                    rn += 0.0025
+                ref = self.f2 - tdir * float(self.f2 @ tdir)
+                ref /= max(1e-6, np.linalg.norm(ref))
+                th = math.atan2(float(ru @ np.cross(tdir, ref)), float(ru @ ref))
+                s_el = float(np.linalg.norm(self.arms[s_][1] - self.arms[s_][0]))
+                e = s - s_el
+                we = max(0.0, 1.0 - (e / 0.10) ** 2)
+                inner = 0.55 + 0.45 * math.cos(th)
+                d += D["fold_elbow"] * we * inner * C.crease(e / 0.032 + 0.35 * math.sin(th) + 0.4 * nz(p, 9))
+                ew = Ltot - s
+                ww = max(0.0, 1.0 - ((ew - 0.08) / 0.07) ** 2)
+                d += D["fold_wrist"] * ww * C.crease(s / 0.028 + 0.25 * math.sin(2 * th) + 0.4 * nz(p, 11))
+                wu = C.smoothstep(0.08, 0.14, s) * C.smoothstep(s_el - 0.02, s_el - 0.10, s)
+                d += D["fold_upperarm"] * wu * math.sin(3 * th + 2.0 * nz(p, 4))
+                d += D["fold_lumps"] * nz(p, 7)
+                out[i] = q + ru * (rn + d)
+                dirt[i] = 0.35 * C.smoothstep(D["cuff_len"] + 0.03, 0.0, ew) + 0.15 * we * inner
+                wear[i] = 0.35 * max(0.0, float(N[i][2])) * C.smoothstep(0.25, 0.05, s) + 0.25 * we * (1 - inner)
+            elif r in ("torso", "hip", "thigh", "neck") and z >= self.waist_z - 0.04:
+                if z <= self.armpit_z:
+                    rcon, th, c = self.torso.radius(z, p)
+                    rel = p[:2] - c
+                    rc = float(np.linalg.norm(rel))
+                    if rc < 1e-6:
+                        continue
+                    ru = np.array([rel[0] / rc, rel[1] / rc, 0.0])
+                    # hang straight from the chest; cinched at the belt; blouses just above it
+                    k = (self.chest_z - z) / max(1e-3, self.chest_z - self.waist_z)
+                    hang = float(oc.at(th)) * (1.0 - D["coat_hang_taper"] * min(1.0, max(0.0, k)))
+                    belt = C.smoothstep(0.018, 0.05, abs(z - self.waist_z))
+                    target = rcon + belt * max(0.0, hang - rcon) + D["coat_offset_torso"]
+                    w = C.smoothstep(self.armpit_z, self.armpit_z - 0.05, z)
+                    rn = rc + w * max(0.0, target - rc)
+                    eb = z - self.waist_z
+                    wb = max(0.0, 1.0 - abs(eb) / 0.09) * C.smoothstep(0.012, 0.03, abs(eb))
+                    d += D["fold_pleat"] * wb * math.sin(13 * th + 1.2 * nz(p, 6))
+                    bk = max(0.0, -math.cos(th))
+                    wd = C.smoothstep(self.waist_z + 0.02, self.waist_z + 0.08, z) * C.smoothstep(self.chest_z + 0.04, self.chest_z - 0.04, z)
+                    d += D["fold_drag"] * wd * bk * C.crease((z - self.waist_z) / 0.06 + 1.1 * th)
+                    sd = abs(math.sin(th))
+                    wa = C.smoothstep(self.chest_z - 0.10, self.armpit_z - 0.01, z) * sd
+                    d += 0.6 * D["fold_drag"] * wa * C.crease((self.armpit_z - z) / 0.035 + 0.8 * math.cos(th))
+                    d += D["fold_lumps"] * nz(p, 7)
+                    out[i] = np.array([c[0], c[1], z]) + ru * (rn + d)
+                    cav[i] = max(0.0, -d / 0.006)
+                else:
+                    out[i] = p + N[i] * (D["fold_lumps"] * 0.6 * nz(p, 7))
+                wear[i] = max(wear[i], 0.9 * C.smoothstep(self.sh_z - 0.14, self.sh_z + 0.01, z) * max(0.0, float(N[i][2])) ** 0.5)
+            else:
+                out[i] = p + N[i] * (D["fold_lumps"] * nz(p, 7))
+            if cav[i] == 0.0 and d < 0:
+                cav[i] = min(1.0, -d / 0.006)
+        return out, {"dirt": dirt, "wear": wear, "cavity": np.clip(cav, 0, 1)}
+
+    # ---------------------------------------------------------------- straight-cut trousers
+    def trousers(self, P, N, boundary):
+        out = P.copy()
+        n = len(P)
+        dirt, wear, cav = np.zeros(n), np.zeros(n), np.zeros(n)
+        lat = D["trouser_lateral"]
+        hem0 = self.ankle_z - D["hem_below_ankle"]
+        for i in range(n):
+            p = P[i]
+            z = float(p[2])
+            s_ = self.side(p)
+            hip, ank = self.legs[s_]
+            t = float(np.clip((hip[2] - z) / (hip[2] - ank[2]), 0, 1))
+            ax = hip + (ank - hip) * t
+            rel = np.array([p[0] - ax[0], p[1] - ax[1], 0.0])
+            rc = float(np.linalg.norm(rel))
+            if rc < 1e-6:
+                continue
+            ru = rel / rc
+            th = math.atan2(float(ru @ self.l2), float(ru @ self.f2))
+            s = float(np.clip((self.crotch_z - z) / (self.crotch_z - self.ankle_z), 0, 1))
+            ell = 1.0 / math.sqrt(math.cos(th) ** 2 + (math.sin(th) / lat) ** 2)
+            R = (D["trouser_r_thigh"] + (D["trouser_r_hem"] - D["trouser_r_thigh"]) * s) * ell
+            w = C.smoothstep(self.crotch_z, self.crotch_z - 0.10, z)
+            rn = rc + w * max(0.0, R - rc)
+            front = 0.5 + 0.5 * math.cos(th)
+            brk = D["hem_break_back"] + (D["hem_break_front"] - D["hem_break_back"]) * front
+            zn = z
+            if z < self.ankle_z + 0.05:
+                k = C.smoothstep(self.ankle_z + 0.05, self.ankle_z, z)
+                zn = z - brk * k
+                rn *= 1.0 + 0.03 * k
+            if boundary[i] and z < self.knee_z:
+                zn = hem0 - brk
+            d = 0.0
+            ek = z - self.knee_z
+            wk = max(0.0, 1.0 - (ek / 0.09) ** 2)
+            d += D["fold_knee"] * wk * (0.35 + 0.65 * (1 - front)) * C.crease(ek / 0.04 + 0.4 * math.sin(th) + 0.3 * nz(p, 9))
+            eh = z - self.ankle_z
+            wh = C.smoothstep(0.22, 0.07, eh) * C.smoothstep(-0.01, 0.02, eh)
+            d += D["fold_hem"] * wh * (0.4 + 0.6 * front) * C.crease(eh / 0.034 + 0.5 * math.sin(th) + 0.35 * nz(p, 10))
+            wv = C.smoothstep(self.knee_z + 0.18, self.knee_z, z) * C.smoothstep(self.ankle_z + 0.02, self.ankle_z + 0.12, z)
+            d += D["fold_drape"] * wv * math.sin(4 * th + 1.5 * nz(p, 3))
+            es = z - (self.crotch_z - 0.02)
+            ws = max(0.0, 1.0 - (es / 0.05) ** 2) * max(0.0, -math.cos(th))
+            d += D["fold_seat"] * ws * C.crease(es / 0.025 + 0.6 * math.sin(2 * th))
+            d += D["fold_lumps"] * nz(p, 7)
+            out[i] = np.array([ax[0], ax[1], 0.0]) + ru * (rn + d) + np.array([0.0, 0.0, zn])
+            dirt[i] = C.smoothstep(self.knee_z + 0.06, self.ankle_z - 0.02, z) ** 1.3 + 0.3 * wk * front
+            wear[i] = 0.5 * wk * front + 0.4 * ws
+            cav[i] = max(0.0, -d / 0.006)
+        return out, {"dirt": np.clip(dirt, 0, 1), "wear": np.clip(wear, 0, 1), "cavity": np.clip(cav, 0, 1)}
 
 
 # ------------------------------------------------------------------------------ skinning
@@ -538,6 +871,7 @@ def build_brogan(m, rig, rm, lm, side, sg, shoe_idx, rest_w, info):
     v, f = C.loft(rings)
     obj = C.mesh_object("tcw_brogan_" + side, v, f)
     C.assign(obj, m["brogans"])
+    C.stamp_attrs(obj, dirt=0.75, wear=0.4)
     Skinner(rig, rest_w, info, ("foot", "shin")).apply(obj, k=12)
     C.add_modifier(obj, "SUBSURF", "Smooth", levels=0, render_levels=2)
     REP["objects"][obj.name] = {"verts": len(v), "rings": len(rings)}
@@ -653,50 +987,114 @@ def main():
         z = rest_w[i].z
         if (r in ("torso", "neck") and z < collar_z) or r == "arm" or (r in ("hip", "thigh") and z > waist_z - 0.02):
             coat_set.add(i)
-        elif r == "foot" or (r == "shin" and z < shoe_top):
-            shoe_set.add(i)
+        elif r == "foot" or (r == "shin" and z < lm["ankle_z"] + 0.012):
+            shoe_set.add(i)   # trousers now reach the ankle and break over the shoe
         elif r in ("hip", "thigh", "shin"):
             trouser_set.add(i)
 
     def coat_off(i):
         return D["coat_offset_sleeve"] if region[i] == "arm" else D["coat_offset_torso"]
 
+    body_np = np.array([p[:] for p in rest_w])
+    body_idx = [i for i, r in enumerate(region) if r is not None]
+    body_kd = KDTree(len(body_idx))
+    for j, i in enumerate(body_idx):
+        body_kd.insert(rest_w[i], j)
+    body_kd.balance()
+    G = Garments(lm, body_np, [region[i] for i in body_idx], body_kd)
     coat, coat_pos = make_shell("tcw_coat", body, rig, rest, nrm, coat_set, coat_off, m["coat"],
-                                D["smooth_iterations"], D["cloth_thickness"])
+                                D["smooth_iterations"], D["cloth_thickness"], shaper=G.coat)
     trousers, _tp = make_shell("tcw_trousers", body, rig, rest, nrm, trouser_set,
                                lambda i: D["trouser_offset"], m["trousers"], D["smooth_iterations"],
-                               D["cloth_thickness"])
+                               D["cloth_thickness"], shaper=G.trousers)
     for side, sg in (("L", 1.0), ("R", -1.0)):
         build_brogan(m, rig, rm, lm, side, sg, [i for i in shoe_set], rest_w, info)
     T.mark("garment shells")
 
-    # body cross-sections -> coat skirt (a lofted tube from above the belt to the hem)
+    # coat skirt: hangs from the belt over hips and seat (a running maximum going down: cloth
+    # falls straight off the widest point and never comes back in), flares a little, folds
     torso_regions = ("torso", "hip")
-    body_np = np.array([p[:] for p in rest_w])
     leg_cloud = body_np[[i for i, r in enumerate(region) if r in ("hip", "thigh", "torso")]]
-    rings = []
-    steps = 6
+    nb, steps = 96, 12
+    hip_o = Outline(leg_cloud, hip_z, F, Lv)
+    cen = hip_o.c
+    run = None
+    rings, ring_attrs = [], []
+    angs = [-math.pi + (j + 0.5) * 2 * math.pi / nb for j in range(nb)]
     for k in range(steps + 1):
         t = k / steps
-        z = (waist_z + 0.04) * (1 - t) + hem_z * t
-        sel = leg_cloud[np.abs(leg_cloud[:, 2] - z) < 0.012]
-        cen = Vector(sel.mean(axis=0).tolist())
-        cen.z = z
-        pad = D["coat_offset_torso"] + 0.004 + D["coat_hem_flare"] * t * t
-        pts, _o, _w = section_loop(leg_cloud, cen, U, F, band=0.012, bins=48, pad=pad, smooth=3)
-        rings.append(pts)
+        z = (waist_z + 0.035) * (1 - t) + hem_z * t
+        o = Outline(leg_cloud, z, F, Lv, centre=cen)
+        r = np.array([float(o.at(a)) for a in angs])
+        run = r if run is None else np.maximum(run, r)
+        ring = []
+        for j, a in enumerate(angs):
+            d = D["fold_skirt"] * (t ** 0.7) * math.sin(7 * a + 1.6 * nz((math.cos(a), math.sin(a), z), 2.5))
+            d += 0.5 * D["fold_pleat"] * max(0.0, 1 - t / 0.35) * math.sin(13 * a + 1.2 * nz((a, 0, z), 6))
+            rr = run[j] + D["coat_offset_torso"] + 0.006 + D["coat_hem_flare"] * t * t + d
+            xy = hip_o.c + (hip_o.F * math.cos(a) + hip_o.L * math.sin(a)) * rr
+            ring.append(Vector((xy[0], xy[1], z)))
+            ring_attrs.append((0.25 * C.smoothstep(0.75, 1.0, t), 0.0, max(0.0, -d / 0.006)))
+        rings.append(ring)
     sv, sf = C.loft(rings, cap_start=False, cap_end=False)
     skirt = C.mesh_object("tcw_coat_skirt", sv, sf)
     C.assign(skirt, m["coat"])
+    C.stamp_attrs(skirt, dirt=[a[0] for a in ring_attrs], wear=[a[1] for a in ring_attrs],
+                  cavity=[min(1.0, a[2]) for a in ring_attrs])
     Skinner(rig, rest_w, info, ("torso", "hip", "thigh")).apply(skirt, k=24)
     C.add_modifier(skirt, "SOLIDIFY", "Cloth", thickness=D["cloth_thickness"], offset=-1.0)
     C.add_modifier(skirt, "SUBSURF", "Smooth", levels=0, render_levels=1)
     T.mark("coat skirt")
 
     # clothed outline cloud (coat torso + skirt) for belts, straps and the blanket roll
-    cloth = [MW @ p for (p, s) in coat_pos if region[s] in torso_regions]
+    cloth = [p for p in coat_pos if G.reg(np.array(p[:])) in torso_regions]
     cloth += [p for p in sv]
     cloth_np = np.array([p[:] for p in cloth])
+
+    # turned-down collar, open at the throat
+    neck_cloud = body_np[[i for i, r in enumerate(region) if r == "neck"]]
+    no = Outline(neck_cloud, collar_z - 0.006, F, Lv, band=0.01)
+    gap = math.radians(D["collar_gap_deg"])
+    ca = [gap / 2 + (2 * math.pi - gap) * j / 47 for j in range(48)]
+    prof = [(-0.012, 0.010), (D["collar_stand"] - 0.008, 0.008), (D["collar_stand"], 0.015),
+            (D["collar_stand"] - D["collar_fall"], 0.028)]
+    crings = []
+    for dz, pad in prof:
+        crings.append([Vector((*no.point(a, pad), collar_z + dz)) for a in ca])
+    cv, cf = C.loft(crings, closed=False, cap_start=False, cap_end=False)
+    collar = C.mesh_object("tcw_collar", cv, cf)
+    C.assign(collar, m["coat"])
+    C.stamp_attrs(collar, wear=0.4)
+    Skinner(rig, rest_w, info, ("torso", "neck")).apply(collar, k=12)
+    C.add_modifier(collar, "SOLIDIFY", "Cloth", thickness=0.003, offset=0.0)
+    C.add_modifier(collar, "SUBSURF", "Smooth", levels=0, render_levels=1)
+
+    # the overlapping front edge: a raised strip down the centre front, collar to hem
+    bvhs = [BVHTree.FromPolygons(coat_pos, [tuple(pp.vertices) for pp in coat.data.polygons]),
+            BVHTree.FromPolygons(sv, sf)]
+    edge = []
+    zz = collar_z - 0.02
+    while zz > hem_z + 0.006:
+        o = Vector((lm["mid"].x, lm["mid"].y, zz)) - Lv * D["front_edge_offset"] + F * 1.0
+        hits = [b.ray_cast(o, -F) for b in bvhs]
+        hits = [h for h in hits if h[0] is not None]
+        if hits:
+            h = min(hits, key=lambda h: h[3])
+            edge.append((h[0], h[1]))
+        zz -= 0.012
+    if len(edge) > 3:
+        ev_, ef_ = [], []
+        for p, nrm_ in edge:
+            q = p + nrm_ * 0.0015
+            ev_ += [q - Lv * 0.0035, q + Lv * 0.0035]
+        for j in range(len(edge) - 1):
+            ef_.append((2 * j, 2 * j + 1, 2 * j + 3, 2 * j + 2))
+        fe = C.mesh_object("tcw_coat_front_edge", ev_, ef_)
+        C.assign(fe, m["coat"])
+        C.stamp_attrs(fe, wear=0.5)
+        Skinner(rig, rest_w, info, ("torso", "hip", "thigh")).apply(fe, k=8)
+        C.add_modifier(fe, "SOLIDIFY", "Thick", thickness=0.0035, offset=1.0)
+    T.mark("collar, front edge")
     sk_torso = Skinner(rig, rest_w, info, torso_regions)
 
     # waist belt + plate
@@ -745,7 +1143,7 @@ def main():
     T.mark("belts, straps, roll")
 
     # coat buttons down the centre front
-    bvh = BVHTree.FromPolygons([MW @ p for (p, s) in coat_pos], [tuple(pp.vertices) for pp in coat.data.polygons])
+    bvh = bvhs[0]
     top_z = lm["neck"].z - 0.05
     n_b = D["button_count"]
     for j in range(n_b):
@@ -754,11 +1152,16 @@ def main():
         hit = bvh.ray_cast(o, -F)
         if hit[0] is None:
             continue
-        pc = hit[0] + F * 0.002
+        nn = hit[1].normalized()
+        pc = hit[0] + nn * 0.0015
+        a1 = nn.cross(U).normalized()
+        a2 = nn.cross(a1).normalized()
         r = D["button_d"] / 2
         btn = C.mesh_object("tcw_button_%d" % j, *C.loft(
-            [C.ring(pc + F * dz, Lv, U, r * s, r * s, 10) for dz, s in ((0.0, 1.0), (0.003, 0.8))]))
+            [C.ring(pc + nn * dz, a1, a2, r * s, r * s, 12) for dz, s in
+             ((0.0, 1.0), (0.0015, 0.97), (0.003, 0.75), (0.0038, 0.35))], cap_start=True, cap_end=True))
         C.assign(btn, m["brass"])
+        C.stamp_attrs(btn)
         sk_torso.apply(btn, 4)
     T.mark("buttons")
 
@@ -847,6 +1250,9 @@ def main():
     for o in bpy.data.objects:
         if o.type == "MESH" and o.parent is None and o.name.startswith("tcw_"):
             C.log("unparented tcw object:", o.name)
+        # every scripted part gets the rest-position attribute the procedural materials read
+        if o.type == "MESH" and o.name.startswith("tcw_") and "tcw_rest" not in o.data.attributes:
+            C.stamp_attrs(o)
 
     C.update()
     dg = bpy.context.evaluated_depsgraph_get()

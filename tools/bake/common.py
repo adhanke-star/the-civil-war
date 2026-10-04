@@ -312,8 +312,9 @@ def weathered_material(name, hex_colour, roughness=0.9, kind="wool", fade_hex=No
     col = node_ramp(nt, node_noise(nt, rest, 2.5, 3.0), 0.3, 0.7, (*lo, 1), (*hi, 1)).outputs["Color"]
     # fine fleck (fibre / grain)
     fl = node_ramp(nt, node_noise(nt, rest, 420.0 if kind != "wood" else 60.0, 1.0), 0.25, 0.75,
-                   (0.93, 0.93, 0.93, 1), (1.07, 1.07, 1.07, 1)).outputs["Color"]
+                   (0.88, 0.88, 0.88, 1), (1.0, 1.0, 1.0, 1)).outputs["Color"]
     col = node_mix(nt, "MULTIPLY", 1.0, col, fl)
+    col = node_mix(nt, "MULTIPLY", 1.0, col, (1.06, 1.06, 1.06, 1.0))   # undo the fleck's mean darkening
     if kind == "wood":
         wv = nt.nodes.new("ShaderNodeTexWave")
         wv.wave_type = "BANDS"
@@ -323,8 +324,9 @@ def weathered_material(name, hex_colour, roughness=0.9, kind="wool", fade_hex=No
         wv.inputs["Detail"].default_value = 3.0
         coord = nt.nodes.new("ShaderNodeTexCoord")
         nt.links.new(coord.outputs["Object"], wv.inputs["Vector"])
-        g = node_ramp(nt, wv.outputs["Fac"], 0.2, 0.9, (0.70, 0.66, 0.62, 1), (1.12, 1.1, 1.08, 1)).outputs["Color"]
+        g = node_ramp(nt, wv.outputs["Fac"], 0.2, 0.9, (0.62, 0.58, 0.55, 1), (1.0, 1.0, 1.0, 1)).outputs["Color"]
         col = node_mix(nt, "MULTIPLY", 1.0, col, g)
+        col = node_mix(nt, "MULTIPLY", 1.0, col, (1.15, 1.15, 1.15, 1.0))
     # fading (sun and rubbing): toward a lighter, greyer shade, patchy
     if fade_hex and fade > 0:
         patch = node_noise(nt, rest, 9.0, 2.0)
@@ -389,12 +391,12 @@ def weathered_material(name, hex_colour, roughness=0.9, kind="wool", fade_hex=No
 
 def stamp_attrs(obj, rest=None, dirt=None, wear=None, cavity=None):
     """Write the per-vertex attributes the weathered materials read. rest defaults to the mesh's
-    own vertex positions in world space (correct for objects built in world rest space)."""
+    own vertex coordinates (world rest space for everything uniform.py builds; the musket's
+    own frame for the musket)."""
     me = obj.data
     n = len(me.vertices)
     if rest is None:
-        mw = obj.matrix_world
-        rest = [mw @ v.co for v in me.vertices]
+        rest = [v.co.copy() for v in me.vertices]
     flat = []
     for p in rest:
         flat.extend((p[0], p[1], p[2]))
