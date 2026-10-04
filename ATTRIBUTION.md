@@ -38,4 +38,20 @@
   only (facts), each cited in `assets/scenarios/henry-hill.json`. No OSM geometry is shipped.
 - Fonts: none shipped; ground labels are traced from the system serif (Georgia / Times / DejaVu Serif) at
   load and extruded. (The three.js example typefaces were considered and rejected: MgOpen licence, not CC0/CC-BY.)
-- Figures, horses, guns, limbers and buildings are procedural geometry built in src/ (no model files).
+- Figures, horses, guns, limbers and buildings are procedural geometry built in src/ (no model files), except
+  the baked infantryman below.
+- `assets/figures/union-infantry/` (soldier_field_0.png, soldier_close_0-3.png, soldier.json) — sprite atlases
+  of one Union infantryman, rendered with Blender 4.2 LTS on GitHub Actions (branch `bake`, tools/bake, run
+  37160936587, 2026-10-03) from a MakeHuman/MPFB2 body:
+  - MakeHuman system assets, CC0 pack — CC0 1.0 —
+    https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip
+    (assets used: skin `young_caucasian_male.mhmat`, eyes `low-poly.mhclo`, eyebrows `eyebrow001.mhclo`,
+    hair `short02.mhclo`);
+  - MPFB2 base mesh, targets, rig and weights — CC0 1.0 (MPFB2 `LICENSE.ASSETS.md`, read at v2.0.17) —
+    https://github.com/makehumancommunity/mpfb2 (tag v2.0.17).
+  - Blender (GPL-2.0-or-later) and MPFB2's code (GPL-3.0-or-later) were build tools on CI only; no GPL code
+    is shipped.
+  - The uniform, kit, rifle-musket, poses and lighting are original geometry and settings built by the
+    tools/bake scripts. Their dimensions, colours and drill positions are **Inferred / placeholder
+    estimates, not Verified**. No person, unit or regiment is depicted. Confederate infantry are this same
+    sprite tinted grey in the shader: a placeholder, not a depiction of a Confederate uniform.

@@ -12,11 +12,18 @@
 // orders turns to face fire from beyond its arc when nothing is in front of it; it never advances unordered.
 // Events: 'select', 'log' (a toast: replies to the player's own actions), 'event' ({ text, time, x, z, side, kind }), 'alert' (an auto-pause:
 // { text, x, z }), 'spawn' / 'remove' (a unit added or taken off the field in the sandbox).
+// Figures (src/ui/look.js): look.figureStyle picks rigged 3D figures or baked sprites (both, split-screen, while
+// it is compared); the atlas loads the first time baked is wanted and the rigged figures draw until it is in.
+// look.menPerFigure re-forms the infantry at 1:10 or 1:5; pools are sized for 1:5 from the start.
 
 import { EntityManager } from 'yuka';
-import { Unit, MEN_PER_FIGURE, MEN_PER_CREW_FIGURE, SPEED } from './units/unit.js';
+import { Unit, MEN_PER_FIGURE_OPTIONS, MEN_PER_CREW_FIGURE, SPEED, setMenPerFigure } from './units/unit.js';
 import { Battery, GunPool } from './units/battery.js';
-import { SoldierPool, FallenPool, UNIFORMS } from './units/soldier-mesh.js';
+import { SoldierPool, FallenPool, UNIFORMS, FIGURE_VIEW } from './units/soldier-mesh.js';
+import { ImpostorPool, loadBakedAtlas } from './units/impostor.js';
+import { LOOK } from './ui/look.js';
+import { on as onSetting } from './settings.js';
+import { compareState } from './sandbox/compare.js';
 import { HaloPool } from './units/halos.js';
 import { HorsePool, HORSE_COATS } from './units/mounts.js';
 import { Combat, CLOCK_RATIO } from './sim/combat.js';
@@ -26,7 +33,8 @@ import { mulberry32, inWoods, PLAN } from './world/landscape.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const SPAWN_RESERVE = 1000; // figures per side kept free for sandbox spawns (four 2,500-man brigades at 1:10)
+const MIN_MEN_PER_FIGURE = Math.min(...MEN_PER_FIGURE_OPTIONS); // pools are sized for the densest choice
+const SPAWN_RESERVE = 2100; // figures per side kept free for sandbox spawns (four 2,500-man brigades at 1:5)
 const ARC = (65 * Math.PI) / 180; // the firing arc each side of the facing (combat.js)
 
 export class Game {
@@ -48,8 +56,10 @@ export class Game {
     this.spawned = { US: 0, CS: 0 };
 
     const defs = scenario.units;
-    // figures per side: one per 10 men (4 per crew figure in a battery), plus an officer and slack
-    const figs = (side) => defs.filter((d) => d.side === side).reduce((s, d) => s + Math.round(d.men / (d.type === 'artillery' ? MEN_PER_CREW_FIGURE : MEN_PER_FIGURE)) + 6, 0);
+    // figures per side at the densest look.menPerFigure (5 men; 4 per crew figure in a battery), plus an
+    // officer and slack
+    setMenPerFigure(LOOK.menPerFigure);
+    const figs = (side) => defs.filter((d) => d.side === side).reduce((s, d) => s + Math.round(d.men / (d.type === 'artillery' ? MEN_PER_CREW_FIGURE : MIN_MEN_PER_FIGURE)) + 6, 0);
     const outline = !/\boutline=0\b/.test(globalThis.location ? location.search : '');
     this.reserve = { US: SPAWN_RESERVE, CS: SPAWN_RESERVE };
     const cap = (side) => figs(side) + SPAWN_RESERVE;
@@ -62,6 +72,13 @@ export class Game {
       CS: new FallenPool(cap('CS'), UNIFORMS.CS, { kit: 'CS' }),
     };
     this.halos = new HaloPool(cap('US') + cap('CS'));
+    // baked sprites (the Confederates are a tinted PLACEHOLDER of the Union bake)
+    this.impostors = {
+      US: new ImpostorPool(cap('US'), { side: 'US', tint: 0 }),
+      CS: new ImpostorPool(cap('CS'), { side: 'CS', tint: 1 }),
+    };
+    this.baked = { state: 'idle', atlas: null, error: null }; // idle | loading | ready | failed
+    scene.add(this.impostors.US.mesh, this.impostors.CS.mesh);
     this.horses = new HorsePool(defs.length + 2);
     const gunsOf = (side) => defs.filter((d) => d.side === side).reduce((s, d) => s + (d.guns || 0), 0);
     this.gunPool = new GunPool({ US: gunsOf('US'), CS: gunsOf('CS') });
@@ -90,7 +107,61 @@ export class Game {
     this.objective = scenario.objective;
     this.logSeen = 0;
     this.slowT = 0;
+    onSetting('look.menPerFigure', (v) => this.applyMenPerFigure(v));
+    this.updateFigureView();
     this.flushAll();
+  }
+
+  /** Re-form every infantry brigade at `n` men per figure (look.menPerFigure). */
+  applyMenPerFigure(n) {
+    setMenPerFigure(n);
+    let changed = 0;
+    for (const u of this.units) if (u.rebuildFigures()) changed++;
+    return changed;
+  }
+
+  /** Start loading the baked atlas (once); the rigged figures draw until it is ready. */
+  ensureBaked() {
+    if (this.baked.state !== 'idle') return;
+    this.baked.state = 'loading';
+    loadBakedAtlas().then((atlas) => {
+      this.baked.atlas = atlas;
+      this.impostors.US.attach(atlas);
+      this.impostors.CS.attach(atlas);
+      this.baked.state = 'ready';
+    }).catch((err) => {
+      this.baked.state = 'failed';
+      this.baked.error = err && err.message ? err.message : String(err);
+      console.warn('baked figures unavailable; drawing the rigged figures:', this.baked.error);
+    });
+  }
+
+  /**
+   * Which figure styles draw this frame (FIGURE_VIEW): look.figureStyle, or both clipped to their sides of
+   * the divider while it is compared; baked only once its atlas is in. Also hides the rigged casualties
+   * that the sprites now draw.
+   */
+  updateFigureView() {
+    const V = FIGURE_VIEW;
+    const cmp = compareState();
+    let a = LOOK.figureStyle, b = null;
+    if (cmp && cmp.key === 'look.figureStyle' && cmp.a !== cmp.b) { a = cmp.a; b = cmp.b; }
+    const want = a === 'baked' || b === 'baked';
+    if (want) this.ensureBaked();
+    const ready = want && this.baked.state === 'ready';
+    V.split = cmp ? cmp.split : 0.5;
+    V.scale = LOOK.figureScale;
+    if (b !== null && ready) {
+      V.baked = true; V.rigged = true;
+      V.clipRigged = a === 'rigged' ? -1 : 1;
+      V.clipBaked = -V.clipRigged;
+    } else {
+      V.baked = ready; V.rigged = !ready;
+      V.clipRigged = 0; V.clipBaked = 0;
+    }
+    const fallenClip = !V.baked ? 0 : V.rigged ? V.clipRigged : 2;
+    this.fallen.US.setBakedClip(fallenClip);
+    this.fallen.CS.setBakedClip(fallenClip);
   }
 
   /** One construction path for scenario units and sandbox spawns. */
@@ -99,6 +170,7 @@ export class Game {
       ? new Battery(d, this.pools[d.side], this.gunPool, this.terrain, seed)
       : new Unit(d, this.pools[d.side], this.terrain, seed);
     u.halos = this.halos;
+    u.impostors = this.impostors[d.side];
     u.horses = this.horses;
     u.fallenPool = this.fallen[d.side];
     if (u.officer) u.officer.coat = HORSE_COATS[seed % HORSE_COATS.length];
@@ -437,7 +509,7 @@ export class Game {
    * path as the scenario's units. Returns the unit, or null when the side's figure reserve is used up.
    */
   spawnUnit({ side, men = 1000, weapon = 'smooth', x, z, facing }) {
-    const nFig = Math.round(men / MEN_PER_FIGURE) + 6;
+    const nFig = Math.round(men / MIN_MEN_PER_FIGURE) + 6; // counted at 1:5, so look.menPerFigure never overfills the pools
     if (this.reserve[side] < nFig) {
       this.emit('log', `No room for another ${side === 'US' ? 'Union' : 'Confederate'} brigade of ${men} (the figure reserve is used up); remove one first.`);
       return null;
@@ -496,12 +568,17 @@ export class Game {
   setView(camera, renderHeightPx) {
     this.pools.US.setView(camera, renderHeightPx);
     this.pools.CS.setView(camera, renderHeightPx);
+    this.impostors.US.setView(camera);
+    this.impostors.CS.setView(camera);
   }
 
   /** Animate figures with the (speed-scaled) sim delta; refill and upload the instance buffers. */
   animate(simDt) {
+    this.updateFigureView();
     this.pools.US.begin();
     this.pools.CS.begin();
+    this.impostors.US.begin();
+    this.impostors.CS.begin();
     this.halos.begin();
     for (const u of this.units) u.animate(simDt, this.simTime);
     this.flushAll();
@@ -510,6 +587,8 @@ export class Game {
   flushAll() {
     this.pools.US.flush();
     this.pools.CS.flush();
+    this.impostors.US.flush();
+    this.impostors.CS.flush();
     this.fallen.US.flush();
     this.fallen.CS.flush();
     this.halos.flush();
@@ -524,5 +603,12 @@ export class Game {
 
   figureCount() {
     return this.units.reduce((s, u) => s + u.figures.filter((f) => f.alive).length, 0);
+  }
+
+  /** Figures drawn this frame: rigged instances (crews and officers included) and standing baked sprites. */
+  figuresDrawn() {
+    const rigged = this.pools.US.pushed + this.pools.CS.pushed;
+    const baked = this.impostors.US.standing + this.impostors.CS.standing;
+    return { rigged, baked, sprites: this.impostors.US.drawn + this.impostors.CS.drawn, calls: this.impostors.US.drawCalls() + this.impostors.CS.drawCalls() };
   }
 }

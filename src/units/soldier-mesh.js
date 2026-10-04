@@ -9,7 +9,12 @@
 // Per-instance attributes:
 //   aAnim = (frame position A, frame position B, blend A->B, muzzle flash 0..1)
 //   aTint = (coat variation, trouser variation, prop 0 none / 1 musket / 2 rammer, officer 0..1)
+//   aClip = split-screen side: 0 everywhere, -1 left of the divider only, +1 right only, 2 hidden
 // Side uniforms give the coat, trouser, hat and officer colours (two coats and two trousers, mixed per man).
+//
+// FIGURE_VIEW is the per-frame figure drawing state the game writes (src/game.js updateFigureView) and the
+// units read: which styles draw (rigged 3D figures, baked sprites from src/units/impostor.js, or both while
+// look.figureStyle is compared split-screen), each style's clip side, the divider and the figure size.
 
 import * as THREE from 'three';
 import { buildFigureGeometry, boneTexture, BONE_COUNT, CLIP_ROWS, fallenFrame } from './figure.js';
@@ -17,6 +22,21 @@ import { buildFigureGeometry, boneTexture, BONE_COUNT, CLIP_ROWS, fallenFrame } 
 export const FIGURE_SCALE = 4.4; // UG:G-style: figures are enlarged so they read as individuals from the battle camera
 export const LOD_NEAR = 300; // m from the camera: full detail inside, medium to LOD_FAR, far beyond
 export const LOD_FAR = 700;
+export const FIGURE_VIEW = { rigged: true, baked: false, clipRigged: 0, clipBaked: 0, split: 0.5, scale: 1 };
+
+const _vp = new THREE.Vector4();
+/** An onBeforeRender hook that puts the compare divider into uSplit, in the current target's pixels. */
+export function splitHook(uniforms) {
+  return (renderer) => {
+    renderer.getCurrentViewport(_vp);
+    uniforms.uSplit.value = _vp.x + FIGURE_VIEW.split * _vp.z;
+  };
+}
+/** Fragment prelude: drop the fragment on the other side of the compare divider (vClip from the vertex). */
+export const CLIP_FRAG = /* glsl */ `
+  uniform float uSplit; varying float vClip;
+  bool clipped() { return (vClip < -0.5 && gl_FragCoord.x > uSplit) || (vClip > 0.5 && gl_FragCoord.x < uSplit); }
+`;
 const OUTLINE_PX = { 2: 1.0, 1: 0.7, 0: 0 }; // outline width per level, in render pixels (0: no outline pass)
 
 const BONE_GLSL = /* glsl */ `
@@ -27,6 +47,8 @@ const BONE_GLSL = /* glsl */ `
   attribute vec3 aSmoothN;
   attribute vec4 aAnim;
   attribute vec4 aTint;
+  attribute float aClip;
+  varying float vClip;
   uniform sampler2D uBones;
   mat4 boneRow(int col, int row) {
     vec4 r0 = texelFetch(uBones, ivec2(col, row), 0);
@@ -58,8 +80,10 @@ function patchVertex(shader, outline) {
       objectNormal = mat3(bm) * objectNormal;`)
     .replace('#include <begin_vertex>', `#include <begin_vertex>
       ${outline ? 'mat4 bm = boneMatrix();' : ''}
+      vClip = aClip;
       if (propHidden()) transformed = vec3(0.0, 0.3, 0.0);
       transformed = (bm * vec4(transformed, 1.0)).xyz;
+      if (aClip > 1.5) transformed = vec3(0.0); // hidden: every vertex at the feet, no area
       ${outline ? `
       vec3 nS = normalize(mat3(bm) * aSmoothN);
       float isc = length(instanceMatrix[0].xyz);
@@ -79,6 +103,7 @@ export function soldierMaterial({ coatA, coatB, trouserA, trouserB, hat, officer
     uHat: { value: new THREE.Color(hat) },
     uOfficerCoat: { value: new THREE.Color(officerCoat) },
     uOfficerTrouser: { value: new THREE.Color(officerTrouser) },
+    uSplit: { value: 0 },
   };
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, mat.userData.uniforms);
@@ -90,43 +115,48 @@ export function soldierMaterial({ coatA, coatB, trouserA, trouserB, hat, officer
         else if (aMat > 3.5 && aMat < 4.5) vColor.rgb = mix(uHat, uCoatB, aTint.x * 0.35);
         vColor.rgb *= aAo;
         vEmit = (aMat > 2.5 && aMat < 3.5) ? aAnim.w : 0.0;`);
-    shader.fragmentShader = 'varying float vEmit;\n' + shader.fragmentShader
+    shader.fragmentShader = 'varying float vEmit;\n' + CLIP_FRAG + shader.fragmentShader
+      .replace('void main() {', 'void main() {\n  if (clipped()) discard;')
       .replace('#include <color_fragment>', `#include <color_fragment>
         vec3 faceN = normalize(cross(dFdx(vViewPosition), dFdy(vViewPosition)));
         float rim = pow(1.0 - clamp(dot(faceN, normalize(vViewPosition)), 0.0, 1.0), 2.5);
         diffuseColor.rgb *= 1.0 - 0.2 * rim;`)
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += vec3(9.0, 6.5, 2.5) * vEmit;');
   };
-  mat.customProgramCacheKey = () => 'soldier-v3';
+  mat.customProgramCacheKey = () => 'soldier-v4';
   return mat;
 }
 
 /** The outline hull: back faces pushed out ~1 px along the posed smooth normals, drawn dark. */
 export function outlineMaterial(px = 1) {
   const mat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#1c1711'), side: THREE.BackSide });
-  mat.userData.uniforms = { uBones: { value: boneTexture() }, uPx: { value: 0.001 } };
+  mat.userData.uniforms = { uBones: { value: boneTexture() }, uPx: { value: 0.001 }, uSplit: { value: 0 } };
   mat.userData.px = px;
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, mat.userData.uniforms);
     patchVertex(shader, true);
+    shader.fragmentShader = CLIP_FRAG + shader.fragmentShader.replace('void main() {', 'void main() {\n  if (clipped()) discard;');
   };
-  mat.customProgramCacheKey = () => 'soldier-outline-v2';
+  mat.customProgramCacheKey = () => 'soldier-outline-v3';
   return mat;
 }
 
-function instancedGeometry(base, anim, tint) {
+function instancedGeometry(base, anim, tint, clip) {
   const geo = base.clone();
   geo.setAttribute('aAnim', anim);
   geo.setAttribute('aTint', tint);
+  geo.setAttribute('aClip', clip);
   return geo;
 }
 
 function makeBuffers(capacity) {
   const anim = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4);
   const tint = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4);
+  const clip = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1);
   anim.setUsage(THREE.DynamicDrawUsage);
   tint.setUsage(THREE.DynamicDrawUsage);
-  return { anim, tint };
+  clip.setUsage(THREE.DynamicDrawUsage);
+  return { anim, tint, clip };
 }
 
 const geoCache = new Map();
@@ -150,18 +180,21 @@ export class SoldierPool {
     this.group = new THREE.Group();
     this.group.name = `soldiers-${kit}`;
     for (let lod = 2; lod >= 0; lod--) {
-      const { anim, tint } = makeBuffers(capacity);
-      const geo = instancedGeometry(figureGeometry(lod, kit), anim, tint);
+      const { anim, tint, clip } = makeBuffers(capacity);
+      const geo = instancedGeometry(figureGeometry(lod, kit), anim, tint, clip);
       const mesh = new THREE.InstancedMesh(geo, this.material, capacity);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.frustumCulled = false;
       mesh.count = 0;
       mesh.name = `soldiers-${kit}-lod${lod}`;
+      mesh.onBeforeRender = splitHook(this.material.userData.uniforms);
       this.group.add(mesh);
-      const b = { lod, mesh, anim, tint, n: 0, outline: null };
+      const b = { lod, mesh, anim, tint, clip, n: 0, outline: null };
       if (outline && OUTLINE_PX[lod] > 0) {
-        const o = new THREE.InstancedMesh(geo, outlineMaterial(OUTLINE_PX[lod]), capacity);
+        const om = outlineMaterial(OUTLINE_PX[lod]);
+        const o = new THREE.InstancedMesh(geo, om, capacity);
         o.instanceMatrix = mesh.instanceMatrix; // share the per-instance buffers
+        o.onBeforeRender = splitHook(om.userData.uniforms);
         o.frustumCulled = false;
         o.count = 0;
         o.name = `${mesh.name}-outline`;
@@ -189,8 +222,8 @@ export class SoldierPool {
     this.pushed = 0;
   }
 
-  /** One figure: position, yaw (forward = (sin yaw, cos yaw)), scale, frames A/B + blend, flash, tint. */
-  push(x, y, z, yaw, s, posA, posB, blend, flash, coatVar, trouserVar, prop, officer) {
+  /** One figure: position, yaw (forward = (sin yaw, cos yaw)), scale, frames A/B + blend, flash, tint, clip side. */
+  push(x, y, z, yaw, s, posA, posB, blend, flash, coatVar, trouserVar, prop, officer, clip = 0) {
     const dx = x - this.cam.x, dy = y - this.cam.y, dz = z - this.cam.z;
     const d2 = dx * dx + dy * dy + dz * dz;
     const b = d2 < LOD_NEAR * LOD_NEAR ? this.buckets[0] : d2 < LOD_FAR * LOD_FAR ? this.buckets[1] : this.buckets[2];
@@ -207,6 +240,7 @@ export class SoldierPool {
     a[i * 4] = posA; a[i * 4 + 1] = posB; a[i * 4 + 2] = blend; a[i * 4 + 3] = flash;
     const t = b.tint.array;
     t[i * 4] = coatVar; t[i * 4 + 1] = trouserVar; t[i * 4 + 2] = prop; t[i * 4 + 3] = officer;
+    b.clip.array[i] = clip;
     this.pushed++;
   }
 
@@ -218,6 +252,7 @@ export class SoldierPool {
       b.mesh.instanceMatrix.needsUpdate = true;
       b.anim.needsUpdate = true;
       b.tint.needsUpdate = true;
+      b.clip.needsUpdate = true;
     }
   }
 
@@ -233,15 +268,22 @@ export class SoldierPool {
   }
 }
 
-/** Casualties: fixed-index instances in a lying pose (medium detail, no outline). */
+/**
+ * Casualties: fixed-index instances in a lying pose (medium detail, no outline). An infantryman's casualty
+ * is "bakeable": while baked sprites draw the infantry, setBakedClip() hides (2) or clips (-1/+1) those.
+ */
 export class FallenPool {
   constructor(capacity, colors, { kit = 'US' } = {}) {
-    const { anim, tint } = makeBuffers(capacity);
+    const { anim, tint, clip } = makeBuffers(capacity);
     this.anim = anim;
     this.tint = tint;
-    const geo = instancedGeometry(figureGeometry(1, kit), anim, tint);
+    this.clip = clip;
+    this.bakeable = new Uint8Array(capacity);
+    this.bakedClip = 0;
+    const geo = instancedGeometry(figureGeometry(1, kit), anim, tint, clip);
     this.material = soldierMaterial(colors);
     this.mesh = new THREE.InstancedMesh(geo, this.material, capacity);
+    this.mesh.onBeforeRender = splitHook(this.material.userData.uniforms);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     this.mesh.frustumCulled = false;
     this.mesh.count = 0;
@@ -256,8 +298,8 @@ export class FallenPool {
     return this.used++;
   }
 
-  /** A lying man: feet toward `yaw`, on his back (front=false) or face down. */
-  set(i, x, y, z, yaw, s, front, coatVar, trouserVar) {
+  /** A lying man: feet toward `yaw`, on his back (front=false) or face down; bakeable = an infantryman. */
+  set(i, x, y, z, yaw, s, front, coatVar, trouserVar, bakeable = false) {
     const te = this.mesh.instanceMatrix.array;
     const o = i * 16;
     const c = Math.cos(yaw) * s, sn = Math.sin(yaw) * s;
@@ -270,6 +312,17 @@ export class FallenPool {
     a[i * 4] = p; a[i * 4 + 1] = p; a[i * 4 + 2] = 0; a[i * 4 + 3] = 0;
     const t = this.tint.array;
     t[i * 4] = coatVar; t[i * 4 + 1] = trouserVar; t[i * 4 + 2] = 1; t[i * 4 + 3] = 0;
+    this.bakeable[i] = bakeable ? 1 : 0;
+    this.clip.array[i] = bakeable ? this.bakedClip : 0;
+    this.dirty = true;
+  }
+
+  /** Clip side for the infantry casualties: 0 drawn, -1/+1 one side of the compare divider, 2 hidden. */
+  setBakedClip(c) {
+    if (c === this.bakedClip) return;
+    this.bakedClip = c;
+    const a = this.clip.array;
+    for (let i = 0; i < this.used; i++) if (this.bakeable[i]) a[i] = c;
     this.dirty = true;
   }
 
@@ -279,6 +332,7 @@ export class FallenPool {
     this.mesh.instanceMatrix.needsUpdate = true;
     this.anim.needsUpdate = true;
     this.tint.needsUpdate = true;
+    this.clip.needsUpdate = true;
     this.dirty = false;
   }
 }

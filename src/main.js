@@ -72,7 +72,19 @@ const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 effects.reducedMotion = motion.matches;
 motion.addEventListener('change', (e) => { effects.reducedMotion = e.matches; });
 
+// ?figures=rigged|baked and ?mpf=10|5 choose the soldier figures for this visit only (measurements and
+// screenshots), without saving: they set the live mirror in LOOK, not the stored setting.
+{
+  const q = new URLSearchParams(location.search);
+  if (['rigged', 'baked'].includes(q.get('figures'))) LOOK.figureStyle = q.get('figures');
+  if (['5', '10'].includes(q.get('mpf'))) LOOK.menPerFigure = Number(q.get('mpf'));
+}
 const game = new Game({ scene, terrain, scenario, world, effects, playerSide: 'US' });
+{
+  // profiling switches for the baked sprites: ?bakesoft=0 skips the soft edge/shadow pass, ?bakeclose=0 the close tier
+  const q = new URLSearchParams(location.search);
+  for (const p of [game.impostors.US, game.impostors.CS]) { p.softPass = q.get('bakesoft') !== '0'; p.allowClose = q.get('bakeclose') !== '0'; }
+}
 const arrows = new ArrowLayer(scene, terrain);
 
 const hud = new Hud({
@@ -171,6 +183,13 @@ function frame(now) {
     stats.figures = game.figureCount();
     stats.figureTriangles = game.figureTriangles();
     stats.lod = game.pools.US.buckets.map((b) => b.n).join('/') + ' ' + game.pools.CS.buckets.map((b) => b.n).join('/');
+    const drawn = game.figuresDrawn();
+    stats.figureStyle = game.baked.state === 'ready' && LOOK.figureStyle === 'baked' ? 'baked' : 'rigged';
+    stats.menPerFigure = LOOK.menPerFigure;
+    stats.riggedDrawn = drawn.rigged;
+    stats.sprites = drawn.sprites;
+    stats.spriteCalls = drawn.calls;
+    stats.atlasMB = game.baked.atlas ? Math.round(game.baked.atlas.memoryBytes() / 1e5) / 10 : 0;
     stats.simTime = Math.round(game.simTime);
     stats.puffs = effects.puffs;
     fpsEl.textContent = stats.fps.toFixed(0);

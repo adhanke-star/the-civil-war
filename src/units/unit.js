@@ -8,7 +8,12 @@
 //   column  a column of fours along the unit's own trail (breadcrumbs behind the anchor), taken for long
 //           marches with no enemy near, deploying back into line near the end of the path.
 // A charge or rout spreads the men into a running swarm. One figure stands for MEN_PER_FIGURE men
-// (4 for a battery crew, so each gun has a crew of 4-5 figures).
+// (look.menPerFigure: 10 or 5, live; setMenPerFigure + rebuildFigures) and 4 for a battery crew, so each gun
+// has a crew of 4-5 figures.
+//
+// Drawing (FIGURE_VIEW in soldier-mesh.js, written by the game each frame): infantrymen go to the rigged
+// SoldierPool, to the baked ImpostorPool (src/units/impostor.js), or to both with a clip side while
+// look.figureStyle is compared split-screen. Officers, drivers and gun crews always stay rigged.
 //
 // Directions: yaw/facing f means forward = (sin f, cos f) in (x, z); lateral = (cos f, -sin f).
 //
@@ -17,13 +22,20 @@
 // standing flag on the unit, not an order: it survives new orders until toggled off.
 
 import { Vehicle, FollowPathBehavior, Path, Vector3 as YV } from 'yuka';
-import { FIGURE_SCALE } from './soldier-mesh.js';
+import { FIGURE_SCALE, FIGURE_VIEW } from './soldier-mesh.js';
 import { framePos } from './figure.js';
+import { BAKE_CLIP } from './impostor.js';
 import { mulberry32 } from '../world/landscape.js';
 import { RULES } from '../sim/rules.js';
 
-export const MEN_PER_FIGURE = 10;
+export let MEN_PER_FIGURE = 10; // live binding: look.menPerFigure (the game calls setMenPerFigure)
+export const MEN_PER_FIGURE_OPTIONS = [10, 5];
 export const MEN_PER_CREW_FIGURE = 4;
+/** Infantry density for figures made from now on (existing units: rebuildFigures). */
+export function setMenPerFigure(n) {
+  if (MEN_PER_FIGURE_OPTIONS.includes(n)) MEN_PER_FIGURE = n;
+  return MEN_PER_FIGURE;
+}
 export const SPEED = { walk: 4.4, run: 7.4, charge: 8.4, fallback: 3.0, rout: 8.6 };
 // Two dense ranks: at FIGURE_SCALE 4.4 a man's shoulders are about 2 m wide, so files 2.35 m apart touch.
 const FILE_SPACING = 2.35;
@@ -49,6 +61,21 @@ const BLEND_RATE = 5; // 1/s crossfade between clips
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
+/**
+ * The baked pose for a figure's rigged clip. Only stand, an 8-frame walk, aim/fire/recover and the lying
+ * frame are baked: run and charge use the walk (its cycle follows the ground walked), loading shows the
+ * stand (shoulder arms), the fire clip is the firing frame then the recover.
+ */
+function bakedClip(f) {
+  switch (f.clip) {
+    case 'walk': case 'run': case 'charge': return BAKE_CLIP.WALK;
+    case 'aim': return BAKE_CLIP.AIM;
+    case 'fire': return f.clipT < 0.45 ? BAKE_CLIP.FIRE : BAKE_CLIP.RECOVER;
+    case 'fall-front': case 'fall-back': return BAKE_CLIP.FALLEN;
+    default: return BAKE_CLIP.STAND;
+  }
+}
+
 export class Unit {
   constructor(def, pool, terrain, seed) {
     Object.assign(this, {
@@ -70,6 +97,7 @@ export class Unit {
     this.terrain = terrain;
     this.pool = pool;
     this.halos = null; // set by the game (shared HaloPool)
+    this.impostors = null; // set by the game (the side's baked ImpostorPool)
     this.horses = null; // set by the game (shared HorsePool) for the officer's mount
     this.fallenPool = null;
     this.menMax = def.men;
@@ -119,28 +147,7 @@ export class Unit {
 
     // figures
     this.menPerFigure = this.type === 'artillery' ? MEN_PER_CREW_FIGURE : MEN_PER_FIGURE;
-    const n = Math.max(1, Math.round(this.men / this.menPerFigure));
-    this.figures = [];
-    for (let i = 0; i < n; i++) {
-      this.figures.push({
-        i,
-        alive: true,
-        dying: 0, front: false, gone: false,
-        x: def.x, z: def.z, yaw: def.facing,
-        jx: (this.rnd() - 0.5) * 1.0, jz: (this.rnd() - 0.5) * 1.4,
-        pace: 0.9 + this.rnd() * 0.25,
-        phase: this.rnd(),
-        clip: 'stand', clipT: 0, prevPos: 0, blend: 0,
-        flash: 0, fireAt: -1, fireT: -1,
-        lx: 0, lz: 0, rank: 0, skirmisher: false, order: i,
-        coatVar: this.rnd(), trouserVar: this.rnd(),
-      });
-    }
-    if (this.type === 'infantry' && n >= SKIRMISH_MIN_FIGURES) {
-      const k = Math.min(SKIRMISH_MAX, Math.round(n * SKIRMISH_SHARE));
-      const pick = [...this.figures].sort(() => this.rnd() - 0.5).slice(0, k);
-      for (const f of pick) f.skirmisher = true;
-    }
+    this.figures = this.makeFigures(Math.max(1, Math.round(this.men / this.menPerFigure)), def.x, def.z, def.facing);
     // the brigade commander rides behind the centre of the line (only infantry brigades with a sourced commander)
     this.officer = this.type === 'infantry' && this.commander && this.commander.name
       ? { x: def.x, z: def.z, yaw: def.facing, horse: -1, phase: this.rnd(), coatVar: this.rnd(), trouserVar: this.rnd() }
@@ -156,6 +163,48 @@ export class Unit {
       f.x = p[0];
       f.z = p[1];
     }
+  }
+
+  /** n standing figures at (x, z) facing `yaw`, a skirmish screen picked among them (infantry). */
+  makeFigures(n, x, z, yaw) {
+    const figures = [];
+    for (let i = 0; i < n; i++) {
+      figures.push({
+        i,
+        alive: true,
+        dying: 0, front: false, gone: false,
+        x, z, yaw,
+        jx: (this.rnd() - 0.5) * 1.0, jz: (this.rnd() - 0.5) * 1.4,
+        pace: 0.9 + this.rnd() * 0.25,
+        phase: this.rnd(),
+        clip: 'stand', clipT: 0, prevPos: 0, blend: 0,
+        flash: 0, fireAt: -1, fireT: -1,
+        lx: 0, lz: 0, rank: 0, skirmisher: false, order: i,
+        coatVar: this.rnd(), trouserVar: this.rnd(),
+        stride: 0, // world metres walked (scaled by pace): drives the baked walk cycle
+      });
+    }
+    if (this.type === 'infantry' && n >= SKIRMISH_MIN_FIGURES) {
+      const k = Math.min(SKIRMISH_MAX, Math.round(n * SKIRMISH_SHARE));
+      const pick = [...figures].sort(() => this.rnd() - 0.5).slice(0, k);
+      for (const f of pick) f.skirmisher = true;
+    }
+    return figures;
+  }
+
+  /**
+   * Re-form an infantry brigade at the current MEN_PER_FIGURE (look.menPerFigure): new standing figures for
+   * the men left, in their formation slots; men still falling finish their fall. Batteries keep their crews.
+   */
+  rebuildFigures() {
+    if (this.type !== 'infantry' || this.menPerFigure === MEN_PER_FIGURE) return false;
+    this.menPerFigure = MEN_PER_FIGURE;
+    const falling = this.figures.filter((f) => !f.alive && !f.gone);
+    const n = this.alive ? Math.max(1, Math.round(this.men / this.menPerFigure)) : 0;
+    this.figures = this.makeFigures(n, this.x, this.z, this.facing).concat(falling);
+    if (this.formation === 'column') this.layoutColumn(); else this.layout();
+    this.snapFigures();
+    return true;
   }
 
   get x() { return this.vehicle.position.x; }
@@ -505,7 +554,8 @@ export class Unit {
   /** Per-frame figure motion and upload to the pool. */
   animate(dt, time) {
     const T = this.terrain;
-    const s = FIGURE_SCALE;
+    const V = FIGURE_VIEW;
+    const s = FIGURE_SCALE * V.scale;
     const pool = this.pool;
     const routing = this.state === 'routing';
     const charging = this.order.type === 'charge' && this.follow.active;
@@ -516,6 +566,12 @@ export class Unit {
     const halos = this.halos;
     const haloKind = this.selected ? 1 : this.underFire > 0 ? 2 : 0;
     const haloStr = Math.min(1, this.underFire / 0.9);
+    // which styles draw this unit's infantrymen (crews, drivers and officers are always rigged)
+    const imp = infantry ? this.impostors : null;
+    const baked = !!(imp && V.baked);
+    const rigged = !baked || V.rigged;
+    const rc = baked ? V.clipRigged : 0, bc = V.clipBaked;
+    const walkM = imp && imp.layout ? imp.layout.walkMetres : 1.2;
     for (const f of this.figures) {
       if (f.gone) continue;
       if (!f.alive) {
@@ -525,14 +581,16 @@ export class Unit {
         if (p < 1) {
           this.setClip(f, f.front ? 'fall-front' : 'fall-back');
           f.blend = 0;
-          pool.push(f.x, y, f.z, f.dieYaw, s, framePos(f.clip, p), f.prevPos, 0, 0, f.coatVar, f.trouserVar, infantry ? 1 : 0, 0);
+          if (rigged) pool.push(f.x, y, f.z, f.dieYaw, s, framePos(f.clip, p), f.prevPos, 0, 0, f.coatVar, f.trouserVar, infantry ? 1 : 0, 0, rc);
+          if (baked) imp.push(f.x, y, f.z, f.dieYaw, s, BAKE_CLIP.FALLEN, 0, f.coatVar, bc); // only the lying frame is baked
         } else {
           f.gone = true;
           const fp = this.fallenPool;
           if (fp) {
             const j = fp.alloc();
-            if (j >= 0) fp.set(j, f.x, y, f.z, f.dieYaw, s, f.front, f.coatVar, f.trouserVar);
+            if (j >= 0) fp.set(j, f.x, y, f.z, f.dieYaw, s, f.front, f.coatVar, f.trouserVar, infantry);
           }
+          if (imp) imp.addFallen(f.x, y, f.z, f.dieYaw, s, f.coatVar);
         }
         continue;
       }
@@ -568,6 +626,7 @@ export class Unit {
         const clip = charging && infantry ? 'charge' : running ? 'run' : 'walk';
         this.setClip(f, clip);
         f.clipT += step / (s * (running ? RUN_CYCLE : WALK_CYCLE)) * f.pace;
+        f.stride += step * f.pace;
       } else if (infantry && this.firing && !routing) {
         if (f.fireAt >= 0 && time >= f.fireAt) { f.flash = 1; f.fireT = time; f.fireAt = -1; }
         if (f.fireT >= 0 && time - f.fireT < 0.35) {
@@ -590,8 +649,10 @@ export class Unit {
       f.blend = Math.max(0, f.blend - dt * BLEND_RATE);
       f.flash = Math.max(0, f.flash - dt * 9);
       const y = T.heightAt(f.x, f.z);
-      pool.push(f.x, y, f.z, f.yaw, s, framePos(f.clip, f.clipT), f.prevPos, f.blend, f.flash, f.coatVar, f.trouserVar, f.prop ?? (infantry ? 1 : 0), 0);
-      if (halos) halos.push(f.x, y, f.z, f.yaw, haloKind ? 1.45 : 1.7, haloKind ? 1.2 : 1.1, haloKind, haloStr); // one ellipse per man (files are 2.35 m apart)
+      if (rigged) pool.push(f.x, y, f.z, f.yaw, s, framePos(f.clip, f.clipT), f.prevPos, f.blend, f.flash, f.coatVar, f.trouserVar, f.prop ?? (infantry ? 1 : 0), 0, rc);
+      if (baked) imp.push(f.x, y, f.z, f.yaw, s, bakedClip(f), f.stride / (s * walkM), f.coatVar, bc);
+      // one ellipse per man (files are 2.35 m apart); a sprite carries its own baked shadow, so no blob for it
+      if (halos && (haloKind || rigged)) halos.push(f.x, y, f.z, f.yaw, (haloKind ? 1.45 : 1.7) * V.scale, (haloKind ? 1.2 : 1.1) * V.scale, haloKind, haloStr, haloKind ? 0 : rc);
     }
     if (this.officer) this.animateOfficer(dt, time);
   }
@@ -599,7 +660,7 @@ export class Unit {
   /** The brigade commander on horseback behind the centre of the line (ahead of a column). */
   animateOfficer(dt, time) {
     const o = this.officer;
-    const s = FIGURE_SCALE;
+    const s = FIGURE_SCALE * FIGURE_VIEW.scale;
     const T = this.terrain;
     if (o.horse < 0 && this.horses) o.horse = this.horses.alloc(o.coat || '#5a3a26');
     if (!this.alive) { if (o.horse >= 0) this.horses.set(o.horse, 0, -500, 0, 0, 0.001); return; }

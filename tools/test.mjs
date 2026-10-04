@@ -17,16 +17,24 @@
 //      order-hold-fire, order-while-paused
 //   h. dock-fit: unit card, orders, minimap and top strip do not overlap and every target is >= 44 px, at
 //      1024x768 (iPad) and 1440x788
+//   baked figures (look.figureStyle 'baked', src/units/impostor.js): baked-draws (sprites + the crews and officers
+//      still rigged >= the rigged count, canvas not blank and different from the rigged picture), baked-rects
+//      (every instance's atlas rect inside its page), baked-direction (the camera turned 180 degrees moves a
+//      man's baked direction by 8 of 16), baked-compare (both styles drawn, rigged left / baked right),
+//      men-per-figure (look.menPerFigure 5 gives 1.7-2.3x the figures; back to 10 restores the count)
 //   8. axe: no serious or critical accessibility violations
 // Then, with the first page closed (one page at a time on an 8 GB Mac):
 //   settings (Node, before the browser): src/settings.js define/get/set/reset/on/lock/exportText/importText
 //      round-trip, range clamping and snapping, unknown keys and bad values ignored
+//   baked-maths (Node): the bake's direction rule (0 faces the camera, 4 screen-right, 180-degree camera turn
+//      = +8), pose and walk-frame selection, every manifest rect inside its page; each with a deliberately
+//      broken control that must fail with the expected text
 //   sandbox-*: index.html?sandbox&quality=low: the panel has 5 tabs; the Interface size slider moves
 //      --ui-scale; "Lock this" disables it and set() is refused; Copy/Paste settings; the round button hides
 //      the panel; Units/Moments tools spawn, shell, rout and remove a generic brigade; the order line compares
 //      split-screen (both styles, each clipped); axe has no serious/critical violations with the panel open; no console errors
 //   device-*: device.html prints a GPU tier line and finishes the ratio-1 benchmark without console errors
-// `node tools/test.mjs --unit` runs only the Node settings checks (no browser, writes nothing).
+// `node tools/test.mjs --unit` runs only the Node checks (settings, baked-maths; no browser, writes nothing).
 // `node tools/test.mjs --s1` runs the settings, sandbox and device checks only (skips the battle page).
 // `node tools/test.mjs --field` runs the settings and battle-page checks only (skips the sandbox and device pages).
 // SETTINGS_MODULE=<path> points the settings checks at another copy (used to prove the checks fail).
@@ -133,6 +141,166 @@ async function settingsUnit() {
   check('settings', bad.length === 0, bad.length === 0
     ? 'define/get/set/reset/on/all/lock/exportText/importText round-trip; ranges clamp and snap; unknown keys, bad values and bad specs refused'
     : bad.join(' | '));
+}
+
+/**
+ * Baked-figure maths in Node (src/units/impostor.js): the direction rule, pose/frame selection and the
+ * manifest's rects. Each part also runs against a deliberately broken control, which must fail with the
+ * text the real check would print, so a wrong sign or an off-by-one cannot pass unnoticed.
+ */
+async function bakedUnit() {
+  const I = await import(pathToFileURL(path.join(ROOT, 'src', 'units', 'impostor.js')).href);
+  const manifest = JSON.parse(await fs.readFile(path.join(ROOT, 'assets', 'figures', 'union-infantry', 'soldier.json'), 'utf8'));
+  const TAU = Math.PI * 2;
+  const dirChecks = (dir) => {
+    const bad = [];
+    const d = (yaw, cx, cz) => dir(yaw, 0, 0, cx, cz, 16);
+    if (d(0, 0, 100) !== 0) bad.push(`facing the camera gave direction ${d(0, 0, 100)} (want 0)`);
+    if (d(Math.PI / 2, 0, 100) !== 4) bad.push(`facing screen-right gave direction ${d(Math.PI / 2, 0, 100)} (want 4)`);
+    if (d(Math.PI, 0, 100) !== 8) bad.push(`facing away gave direction ${d(Math.PI, 0, 100)} (want 8)`);
+    let turns = 0;
+    for (let k = 0; k < 40; k++) {
+      const yaw = -3 + k * 0.157, a = d(yaw, 70, 40), b = d(yaw, -70, -40);
+      if ((b - a + 16) % 16 !== 8) turns++;
+    }
+    if (turns) bad.push(`a 180-degree camera turn did not move the direction by 8 for ${turns} of 40 headings`);
+    return bad;
+  };
+  const mirrored = (yaw, x, z, cx, cz, n) => { const k = Math.round(((Math.atan2(cx - x, cz - z) - yaw) / TAU) * n); return ((k % n) + n) % n; };
+  const L = new I.AtlasLayout(manifest);
+  const C = I.BAKE_CLIP;
+  const frameChecks = (slotFor) => {
+    const bad = [];
+    const walk = L.clips.walk;
+    const seen = [];
+    for (let i = 0; i < walk.count; i++) seen.push(slotFor(C.WALK, (i + 0.5) / walk.count) - walk.start);
+    if (seen.join() !== [...Array(walk.count).keys()].join()) bad.push(`walk phases gave frames ${seen.join(',')} (want 0..${walk.count - 1} in order)`);
+    if (slotFor(C.WALK, 1.0) !== walk.start || slotFor(C.WALK, 2.999) !== walk.start + walk.count - 1) bad.push('the walk cycle does not wrap at whole cycles');
+    // the walk advances one cycle per metres_per_cycle of life-size ground (scaled like the figure)
+    const s = 4.4, metres = L.walkMetres * s * 0.25;
+    if (slotFor(C.WALK, metres / (s * L.walkMetres)) !== walk.start + Math.floor(walk.count * 0.25)) bad.push('a quarter of metres_per_cycle walked is not a quarter of the cycle');
+    const want = { [C.STAND]: 'stand_0', [C.AIM]: 'fire_0', [C.FIRE]: 'fire_1', [C.RECOVER]: 'fire_2', [C.FALLEN]: 'fallen_0' };
+    for (const [code, key] of Object.entries(want)) {
+      const [name, k] = [key.slice(0, key.lastIndexOf('_')), Number(key.slice(key.lastIndexOf('_') + 1))];
+      if (slotFor(Number(code), 0) !== L.clips[name].start + k) bad.push(`pose ${code} gave slot ${slotFor(Number(code), 0)} (want ${key})`);
+    }
+    return bad;
+  };
+  const offByOne = (clip, phase) => { const v = L.slotFor(clip, phase); return clip === C.WALK ? L.clips.walk.start + ((v - L.clips.walk.start + 1) % L.clips.walk.count) : v; };
+  const dReal = dirChecks(I.directionIndex), dCtl = dirChecks(mirrored);
+  const fReal = frameChecks((c, p) => L.slotFor(c, p)), fCtl = frameChecks(offByOne);
+  // rects: the shipped manifest is inside its pages; a copy with one frame pushed off its page is caught
+  const rReal = L.problems();
+  const broken = JSON.parse(JSON.stringify(manifest));
+  const key = Object.keys(broken.tiers.field.frames)[0];
+  broken.tiers.field.frames[key].x = broken.tiers.field.pages[0].w - 3;
+  const rCtl = new I.AtlasLayout(broken).problems();
+  const ok = dReal.length === 0 && dCtl.some((t) => /screen-right/.test(t)) && fReal.length === 0 && fCtl.some((t) => /walk phases/.test(t))
+    && L.missing.length === 0 && rReal.length === 0 && rCtl.length === 1;
+  check('baked-maths', ok, ok
+    ? `direction rule (0 toward the camera, 4 screen-right, 8 away, +8 on a 180-degree camera turn), walk frames by ground walked, aim/fire/recover/fallen poses, ${L.slots * L.n} frames per tier inside their pages; controls fail as they must: mirrored rule "${dCtl[0]}", off-by-one walk "${fCtl[0]}", rect off the page caught (${rCtl.length})`
+    : [...dReal, ...fReal, ...L.missing.map((m) => `missing frame ${m}`), ...rReal.map((r) => `rect off its page: ${r}`),
+      dCtl.length ? '' : 'CONTROL: the mirrored direction rule passed', fCtl.length ? '' : 'CONTROL: the off-by-one walk passed', rCtl.length === 1 ? '' : `CONTROL: the off-page rect gave ${rCtl.length} problems (want 1)`].filter(Boolean).join(' | '));
+}
+
+/**
+ * Baked figures on the battle page (look.figureStyle): the sprites draw at least as many men as the rigged
+ * figures did, every instance's atlas rect lies inside its page, the direction follows the camera, the
+ * split-screen compare draws both styles clipped to their sides, and look.menPerFigure 5 doubles the figures.
+ */
+async function bakedFigures(page) {
+  const setup = await page.evaluate(async () => {
+    const S = await import('./src/settings.js');
+    const G = window.__game, g = G.game;
+    if (!g.paused) g.togglePause();
+    window.__game.hud.toggleArmy(false);
+    document.getElementById('result').hidden = true;
+    const u = g.units.filter((v) => v.alive && v.type === 'infantry').sort((a, b) => b.figures.length - a.figures.length)[0];
+    const r = G.rts;
+    r.goal.x = u.x; r.goal.z = u.z; r.goal.dist = 320; r.goal.pitch = r._pitch(320); r.goal.yaw = u.facing + 0.6;
+    r.snap();
+    window.__bk = { id: u.id };
+    return { unit: u.id, style: S.get('look.figureStyle') };
+  });
+  const frames = (n) => page.evaluate((n) => new Promise((res) => { let k = 0; const f = () => (++k >= n ? res() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n);
+  await frames(3);
+  const rigPng = await shot(page, 'rigged-view');
+  const rig = await page.evaluate(() => window.__game.game.figuresDrawn());
+  await page.evaluate(async () => { (await import('./src/settings.js')).set('look.figureStyle', 'baked'); });
+  await page.waitForFunction(() => { const g = window.__game.game; return g.baked.state === 'failed' || (g.baked.state === 'ready' && g.figuresDrawn().sprites > 0); }, null, { timeout: 90_000, polling: 250 }).catch(() => {});
+  await frames(3);
+  const bakedPng = await shot(page, 'baked');
+  const bk = await page.evaluate(() => { const g = window.__game.game; return { state: g.baked.state, error: g.baked.error, drawn: g.figuresDrawn(), problems: [...g.impostors.US.rectProblems(), ...g.impostors.CS.rectProblems()] }; });
+  const colours = new Set();
+  let differ = 0, sampled = 0;
+  for (let y = 40; y < bakedPng.height; y += 12) for (let x = 40; x < bakedPng.width; x += 12) {
+    const i = (y * bakedPng.width + x) * 4;
+    colours.add((bakedPng.data[i] << 16) | (bakedPng.data[i + 1] << 8) | bakedPng.data[i + 2]);
+    sampled++;
+    if (Math.abs(bakedPng.data[i] - rigPng.data[i]) + Math.abs(bakedPng.data[i + 1] - rigPng.data[i + 1]) + Math.abs(bakedPng.data[i + 2] - rigPng.data[i + 2]) > 30) differ++;
+  }
+  const total = bk.drawn.baked + bk.drawn.rigged;
+  check('baked-draws', bk.state === 'ready' && total >= rig.rigged && bk.drawn.baked > 0 && colours.size > 50 && differ > sampled * 0.002,
+    `atlas ${bk.state}${bk.error ? ` (${bk.error})` : ''}; rigged style drew ${rig.rigged} figures, baked style ${bk.drawn.baked} sprites + ${bk.drawn.rigged} rigged (crews, officers) = ${total} (want >= ${rig.rigged}); ${bk.drawn.sprites} sprite instances in ${bk.drawn.calls} draw calls; ${colours.size} colours; ${differ} of ${sampled} sampled pixels changed from the rigged picture (want > 0.2%)`);
+  check('baked-rects', bk.drawn.sprites > 0 && bk.problems.length === 0, bk.problems.length === 0 ? `all ${bk.drawn.sprites} instances' atlas rects lie inside their pages` : `${bk.problems.length} outside: ${bk.problems.slice(0, 4).join('; ')}`);
+
+  // direction: turn the camera 180 degrees about the brigade; the same man's baked direction moves by 8 of 16
+  const dir = await page.evaluate(async () => {
+    const I = await import('./src/units/impostor.js');
+    const G = window.__game, g = G.game;
+    const u = g.units.find((v) => v.id === window.__bk.id);
+    const f = u.figures.find((v) => v.alive);
+    const imp = g.impostors[u.side];
+    G.rts.goal.x = f.x; G.rts.goal.z = f.z; // turn about this man, so his bearing to the camera turns by exactly 180 degrees
+    const at = () => { G.rts.snap(); G.rts.update(0.016); G.camera.updateMatrixWorld(); g.setView(G.camera, innerHeight); return I.directionIndex(f.yaw, f.x, f.z, imp.cam.x, imp.cam.z); };
+    const a = at();
+    const before = Array.from(imp.batches.field[0].data.subarray(0, 120));
+    G.rts.goal.yaw += Math.PI;
+    const b = at();
+    return { a, b, before };
+  });
+  await frames(2);
+  const after = await page.evaluate(() => { const g = window.__game.game; const u = g.units.find((v) => v.id === window.__bk.id); return Array.from(g.impostors[u.side].batches.field[0].data.subarray(0, 120)); });
+  const changed = after.some((v, i) => v !== dir.before[i]);
+  check('baked-direction', (dir.b - dir.a + 16) % 16 === 8 && changed, `a man's baked direction ${dir.a} -> ${dir.b} after the camera turned 180 degrees (want +8 mod 16); sprite buffer changed=${changed}`);
+
+  // split-screen compare: both styles drawn, each with its clip side
+  const cmp = await page.evaluate(async () => {
+    const S = await import('./src/settings.js');
+    const C = await import('./src/sandbox/compare.js');
+    const M = await import('./src/units/soldier-mesh.js');
+    const spec = S.all().find((e) => e.key === 'look.figureStyle').spec;
+    C.startCompare('look.figureStyle', spec, 'rigged');
+    await new Promise((r) => { let k = 0; const f = () => (++k >= 2 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+    const g = window.__game.game;
+    const V = { ...M.FIGURE_VIEW };
+    const drawn = g.figuresDrawn();
+    const clips = [...new Set(g.pools.US.buckets.flatMap((b) => Array.from(b.clip.array.subarray(0, b.n))))].sort();
+    C.stopCompare();
+    return { V, drawn, clips };
+  });
+  check('baked-compare', cmp.V.rigged && cmp.V.baked && cmp.V.clipRigged === -1 && cmp.V.clipBaked === 1 && cmp.drawn.baked > 0 && cmp.drawn.rigged > cmp.drawn.baked * 0.5 && cmp.clips.includes(-1),
+    `comparing rigged | baked: view ${JSON.stringify(cmp.V)}; rigged instances ${cmp.drawn.rigged}, sprites ${cmp.drawn.baked}; rigged clip sides in use ${cmp.clips.join(',')}`);
+
+  // men per figure: 5 roughly doubles the figures, 10 restores the count
+  const mpf = await page.evaluate(async () => {
+    const S = await import('./src/settings.js');
+    const g = window.__game.game;
+    const n10 = g.figureCount();
+    S.set('look.menPerFigure', 5);
+    const n5 = g.figureCount();
+    await new Promise((r) => { let k = 0; const f = () => (++k >= 2 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); });
+    const drawn5 = g.figuresDrawn();
+    S.set('look.menPerFigure', 10);
+    const back = g.figureCount();
+    S.set('look.figureStyle', 'rigged');
+    if (g.paused) g.togglePause();
+    delete window.__bk;
+    return { n10, n5, back, drawn5 };
+  });
+  const ratio = mpf.n5 / mpf.n10;
+  check('men-per-figure', ratio >= 1.7 && ratio <= 2.3 && Math.abs(mpf.back - mpf.n10) <= mpf.n10 * 0.05 && mpf.drawn5.baked >= mpf.n5 * 0.8,
+    `${mpf.n10} figures at 1:10 -> ${mpf.n5} at 1:5 (x${ratio.toFixed(2)}, want 1.7-2.3) -> ${mpf.back} back at 1:10; ${mpf.drawn5.baked} sprites drawn at 1:5`);
 }
 
 /**
@@ -491,6 +659,7 @@ async function sandboxAndDevice(browser, url) {
 
 async function main() {
   await settingsUnit();
+  await bakedUnit();
   await fs.mkdir(OUT_DIR, { recursive: true });
   const { server, url } = await startServer({ port: 0 });
   result.url = url;
@@ -702,6 +871,7 @@ async function main() {
 
       await orderObedience(page);
       await dockFit(page);
+      await bakedFigures(page);
     }
 
     // 2. errors
@@ -732,6 +902,11 @@ if (process.argv.includes('--unit')) {
     await settingsUnit();
   } catch (err) {
     check('settings', false, `the settings module failed to load or threw: ${err.message}`);
+  }
+  try {
+    await bakedUnit();
+  } catch (err) {
+    check('baked-maths', false, `src/units/impostor.js or the manifest failed to load or threw: ${err.message}`);
   }
   const ok = checks.every((c) => c.ok);
   console.log(ok ? 'UNIT OK' : `UNIT FAILED (${checks.filter((c) => !c.ok).length} check(s))`);

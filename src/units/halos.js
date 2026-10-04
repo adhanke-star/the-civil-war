@@ -3,8 +3,11 @@
 //
 // One InstancedMesh of flat ellipses refilled every frame (push), drawn after the terrain with depth
 // test but no depth write, slightly above the ground so the terrain mesh (0.5 m error) never clips it.
+// Baked sprites carry their own ground shadow, so the units push no shadow blob for a man drawn as a sprite;
+// while look.figureStyle is compared, the rigged side's blobs carry a clip side (aClip, as in soldier-mesh.js).
 
 import * as THREE from 'three';
+import { splitHook, CLIP_FRAG } from './soldier-mesh.js';
 
 const SHADOW = [0.05, 0.04, 0.03, 0.34];
 const SELECTED = [0.45, 1.0, 0.25, 0.8];
@@ -16,20 +19,28 @@ export class HaloPool {
     this.color = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4);
     this.color.setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aHalo', this.color);
+    this.clip = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1);
+    this.clip.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('aClip', this.clip);
     const mat = new THREE.ShaderMaterial({
       vertexShader: /* glsl */ `
         attribute vec4 aHalo;
+        attribute float aClip;
         varying vec4 vCol;
         varying vec2 vUv;
+        varying float vClip;
         void main() {
           vCol = aHalo;
+          vClip = aClip;
           vUv = uv;
           gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
         }`,
       fragmentShader: /* glsl */ `
         varying vec4 vCol;
         varying vec2 vUv;
+        ${CLIP_FRAG}
         void main() {
+          if (clipped()) discard;
           float r = length(vUv - 0.5) * 2.0;
           // alpha above 1 marks a state halo (selected, under fire): a crisp rim and a lighter centre, so
           // neighbouring men's halos read as separate ellipses; the plain shadow blob stays soft
@@ -39,6 +50,7 @@ export class HaloPool {
           float ring = smoothstep(1.0, 0.9, r) * (0.55 + 0.45 * smoothstep(0.55, 0.9, r));
           gl_FragColor = vec4(vCol.rgb, a0 * mix(soft, ring, hard));
         }`,
+      uniforms: { uSplit: { value: 0 } },
       transparent: true,
       depthWrite: false,
       depthTest: true,
@@ -51,6 +63,7 @@ export class HaloPool {
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 1;
     this.mesh.name = 'halos';
+    this.mesh.onBeforeRender = splitHook(mat.uniforms);
     this.mesh.count = 0;
     this.capacity = capacity;
     this.n = 0;
@@ -58,8 +71,8 @@ export class HaloPool {
 
   begin() { this.n = 0; }
 
-  /** kind: 0 shadow, 1 selected, 2 under fire (strength scales the red). */
-  push(x, y, z, yaw, rx, rz, kind, strength = 1) {
+  /** kind: 0 shadow, 1 selected, 2 under fire (strength scales the red); clip: compare side (-1/0/+1). */
+  push(x, y, z, yaw, rx, rz, kind, strength = 1, clip = 0) {
     if (this.n >= this.capacity) return;
     const i = this.n++;
     const te = this.mesh.instanceMatrix.array;
@@ -72,6 +85,7 @@ export class HaloPool {
     const col = kind === 1 ? SELECTED : kind === 2 ? UNDER_FIRE : SHADOW;
     const a = this.color.array;
     a[i * 4] = col[0]; a[i * 4 + 1] = col[1]; a[i * 4 + 2] = col[2]; a[i * 4 + 3] = col[3] * (kind === 2 ? strength : 1) + (kind ? 2 : 0);
+    this.clip.array[i] = clip;
   }
 
   flush() {
@@ -79,5 +93,6 @@ export class HaloPool {
     if (!this.n) return;
     this.mesh.instanceMatrix.needsUpdate = true;
     this.color.needsUpdate = true;
+    this.clip.needsUpdate = true;
   }
 }
