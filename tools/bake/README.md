@@ -57,12 +57,17 @@ uploaded.
 
   To draw a frame, place its rect at `screenAnchor - (ax, ay) + (ox, oy)` using **the frame's own
   `ax`, `ay`** and scale it by `(game px per metre) / ppm` (see "Manifest additions").
-- `contact-sheet.png`: the sheet a person judges at a glance. Its six rows:
+- `contact-sheet.png` (third pass: 8 x 10 cells of 256 px):
   - rows 1-2: all 16 standing directions;
   - row 3: the walk cycle;
   - row 4: aim, fire, recover, fallen, load 0-3;
-  - row 5: load 4, then the variants slouch hat, fixed bayonet, no blanket roll, second face, mixed;
-  - row 6: the field tier at 1:1, including the field-tier variants.
+  - row 5: load 4, then close-tier variants slouch hat, fixed bayonet, no blanket roll, face2 (h2), mixed (h3, slouch, no roll);
+  - row 6: the field tier at 1:1 and the first three field variants;
+  - row 7: every head preset at the close tier (stand, direction 1);
+  - row 8: every head preset, 256 px head-and-shoulders;
+  - rows 9-10: a 256 px hand close-up for every grip frame (stand, walk, aim, fire, recover, load 0-4), then the other field variants at 1:1.
+- `portrait.png` / `portrait-preview.png`: 1024 px head-and-shoulders lit as in game (direction 1, near eye level); `hands.png` / `hands-preview.png`: 1024 px, both hands on the musket in the aim frame; `kit.png` / `kit-preview.png`: 1024 px, blanket roll and kit from his right side.
+- `frames/<tier>_<variant>/` and `atlas/soldier_<tier>_<variant>_<page>.png`: the variants, in both tiers.
 - `hero.png` (transparent) and `hero-preview.png` (on a field-green ground): the 1024 px
   three-quarter-front render, fitted to the figure.
 - `hero-closeup.png` / `hero-closeup-preview.png`: 1024 px head-to-waist crop of the same pose, for
@@ -87,12 +92,28 @@ uploaded.
 - `measuredColours`: the sRGB each named part lands at in `hero.png`.
 - `variantsFraming`, `quick`, `readability`.
 
-### Direction plan (this leg)
+### Manifest additions (third pass; additive, no existing field changed meaning)
 
-The close tier renders `stand` in all 16 directions and the other clips in the 8 even directions;
-the field tier renders every clip in all 16. If the measured close-tier speed predicts the stage
-running over `--budget-min`, field-tier variants are dropped first, then the close tier's non-stand
-clips fall to 4 directions. `render.json` `reduced` and `field_variants` record what happened.
+- `tiers.close.variants.<name>`: the close tier now has the SAME variants as the field tier, same
+  names, same `{count, pages, frames}` shape as `tiers.field.variants` (atlas files
+  `soldier_close_<name>_<page>.png`), so a man keeps one variant at every distance.
+- `tiers.<tier>.variants.<name>.composition`: `{head, headLabel, use, hat, blanketRoll, assets}`.
+  `tiers.<tier>.baseComposition`: the same for the base frames.
+- `heads`: every head preset with its CC0 assets, targets and `use` (`any`, or `usct` = only for
+  United States Colored Troops regiments); `headsNote`.
+- `grips`, `gripsNote`: per clip frame and hand, the real-skin contact count and penetration.
+- `shards`: per render shard, wall seconds and renders.
+- `readability` gains the field-tier slouch hat note. `measuredColours`, `lights` (now with
+  `face_bounce`) as before. Per-frame `ax`, `ay`, `ppm`, `directionsByClip` and
+  `tiers.<tier>.variants` keep exactly their second-pass meaning.
+- Variant names are `<head>_<cap|slouch>_<roll|noroll>`. The second pass's field variants
+  `mixed`, `face2`, `slouch` are replaced by these (names are data, not format).
+
+### Direction plan (third pass)
+
+Every clip, every frame, all 16 directions, in both tiers, for the base figure and all 8 variants
+(9 x 288 = 2,592 frames per tier). There is no time budget and nothing is dropped: the work is
+split across the shard matrix instead. `render.json` `reduced` is always null.
 
 ### Lighting (one standard light)
 
@@ -103,7 +124,10 @@ clips fall to 4 directions. `render.json` `reduced` and `field_variants` record 
   (9 degree source). In game the shadow is fixed on screen (it does not turn with the camera); it
   is kept short and soft so that is hard to notice.
 - **Fills**, figure only, no ground shadow: cool rim from behind-right, soft frontal fill from the
-  camera side (lifts faces out of the cap's shadow), and a green ground-bounce area light.
+  camera side, a green ground-bounce area light and (third pass) a **warm face bounce**: a soft sun
+  from in front and 16 degrees below the eye line, strength 1.0, colour (1.0, 0.86, 0.68), the
+  light reflected off sunlit ground. It reaches under the visor, so the eyes are no longer black.
+  The key light and the single ground shadow are unchanged.
 - **View transform: Standard** (was AgX). AgX desaturated the dark-blue coat to pale grey-blue on
   the field. The game applies its own grade and draws sprites as baked.
 
@@ -112,10 +136,99 @@ clips fall to 4 directions. `render.json` `reduced` and `field_variants` record 
 - Field tier only: the musket's cross-section is scaled x1.7 (length unchanged) so it survives at
   96 px. Close tier and hero are true size.
 - Straps and blanket are darker than the first pass so they do not out-shine the coat.
+- Third pass, field tier only: the slouch hat is a twin with a wider brim (0.105 m against
+  0.075 m) in a lighter felt (#5a5045 against #151413), so the hat still reads at 96 px.
+- Third pass, for silhouettes at about 150 m: aim has a level barrel and the head down on the stock;
+  fire has a 26 degree muzzle rise and the shoulders 11 cm back; the ram stroke holds the rammer
+  0.36 m above the muzzle with the arm raised clear of the body.
 
 Direction rule: direction `d` faces `d * 360/N` degrees counter-clockwise, seen from above, from
 "toward the camera". So 0 faces the viewer, 4 faces screen-right and 8 faces away. The camera
 never moves. The figure turns, so the one standard light always reads as upper-left on screen.
+
+## Third pass (2026-10-04)
+
+Owner's order: face and hands first, then blanket roll and kit weight, cloth, parallel jobs,
+variants. Plus five in-play findings from fielding the second-pass atlas (close-tier variants,
+walk bob, silhouettes, slouch hat at field size, manifest fields kept).
+
+### Face
+
+- **Seven head presets** (`HEADS` at the top of `uniform.py`), each a body shape key
+  `tcw_head_<name>` (weighted MPFB2 CC0 face-shape targets plus the CC0 expression units in
+  `EXPR`: lids a little narrowed, brows a touch down with the inner ends up, lips pressed) and its
+  own CC0 high-poly eyes, eyebrows, eyelashes, hair, beard and skin (every body material slot):
+
+  | head | look | skin | hair, brows, lashes | beard | use |
+  |---|---|---|---|---|---|
+  | h1 (base) | young, clean-shaven, stubble | young_caucasian_male | short02, eyebrow001, eyelashes01 | none | any |
+  | h2 | full beard, dark brown | middleage_caucasian_male | short04, eyebrow003, eyelashes02 | grinsegold_beard_sigmund_wip | any |
+  | h3 | chin beard, shaved lip, sandy | young_caucasian_male2 | short01, eyebrow005, eyelashes01 | culturalibre_faun_beard | any |
+  | h4 | moustache, near-black | middleage_caucasian_male | short03, eyebrow007, eyelashes02 | rehmanpolanski_moustache_viking | any |
+  | h5 | older, grizzled short beard | old_caucasian_male | short04, eyebrow009, eyelashes03 | wdg_scruffy_beard | any |
+  | h6 | young, auburn, heavy stubble | young_caucasian_male | short01, eyebrow011, eyelashes01 | none | any |
+  | h7 | moustache | middleage_african_male | short02, eyebrow002, eyelashes02 | rehmanpolanski_moustache_viking | **usct only** |
+
+  `use: usct` means the game may draw h7 only in United States Colored Troops regiments (the
+  army was segregated); it must never appear in a white regiment. No person is depicted.
+- **Eyes**: procedural (no image): warm sclera darkening toward the corners, striated iris with
+  a dark limbal ring, black pupil, clear coat for the catch-light; iris 27 degrees and pupil 8.5
+  degrees of the eyeball, found per pixel from each eye's own centre.
+- **Skin**: sunburn, stubble and sideburns in the head's own hair colour, grime that gathers in
+  creases (concave pointiness), reddened knuckles and cheekbones (convex pointiness), pores, a
+  little subsurface scattering; grimed fingernails. Hair, brows, beard and lashes recoloured from
+  their CC0 textures per head. Hair under the cap is masked at the band's lower edge.
+- **Light under the visor**: the cap sits 1 cm higher and tips back (tilt 7 -> 1.5 degrees, visor
+  dip 28 -> 18) and the warm face bounce (Lighting) reaches the eyes.
+- Body gets render-level subdivision (face and fingers).
+
+### Hands
+
+`poses.py` measures the hand from the rest mesh (pad thickness per finger segment, pad side =
+opposite its fingernail, palm thickness, palm centre), then for every gripping hand:
+1. tries 90 placements (palm side round the object, wrap direction, hand tilt up to 45 degrees,
+   slide along it): the palm skin goes against the surface, the wrist follows from the measured
+   hand, the arm reaches it by IK, the forearm rolls to take the twist, the hand is set exactly;
+2. curls each finger joint until its pad touches (bisection; the thumb is opposed by a fixed turn
+   and its outer joints close); a joint never opens past 10 degrees beyond straight;
+3. finishes the best 5 on the **real skinned mesh**: the palm and knuckles are pushed out of the
+   wood, then each joint is curled or opened until its nearest skin is within -0.8..+1.2 mm of
+   the surface; the placement with the best measured contact, least penetration and straightest
+   wrist is kept.
+The load clip's right hand pinches a paper cartridge (thumb and two fingers, palm held off) at
+the box and over the muzzle, then grips the drawn rammer and the rammer for the stroke.
+The report measures the real skin against the analytic surfaces (stock ellipse, barrel, rammer
+and cartridge cylinders). Not measured: contact with the musket's actual mesh.
+
+### Blanket roll and kit weight
+
+Roll: squeezed 20% under each of the four ties, 3% fuller between them, flattened 22% where it
+lies on the shoulder and at the hip ends, a 1 cm sag off the body between, a dark band near each
+end (the blanket's end stripes, placeholder), heavier wool shading, and end discs with a stepped
+spiral (3.5 turns). Haversack and canteen swing 75% of the way back to plumb from their strap
+point every frame and swing 5 degrees on the march (lagging the stride).
+
+### Cloth (Blender cloth simulation, kept)
+
+`cloth.py` settles trousers, the coat (with its sleeves) and the coat skirt for each of the 17
+standing clip frames: the armature-posed garment is the start, a shape key holds its rest shape
+(the spring lengths, so squeezed cloth buckles into folds), pinned at the waist band, under the
+belts and at the top of the skirt (pin stiffness 20), cuffs and hems weighted, 36 frames under
+gravity colliding with the posed body (and, for the skirt, the trousers). Vertices that run away
+more than 3 cm blend back to the posed shape over two rings; more than 3% runaway rejects that
+garment-frame. Attempt 1 (run 16): trousers fine, the coat exploded at a few vertices. Attempt 2
+(run 17): runaway blend-back, 49 of 51 kept. Attempt 3 (run 19): stiffer pins after the coat sagged
+off the belt line, 48 of 51 kept. The fallen frame keeps the procedural folds.
+
+### Walk, silhouettes, slouch hat (in-play findings)
+
+- Walk: stride 0.36 -> 0.30 m each side, pelvis drop capped at 4.2 cm (2.4% of height), bob 5 mm;
+  the planted feet now cover 1.00 m per cycle (0.92 m/s; manifest `clips.walk`).
+- Silhouettes and the field-tier slouch hat: see Readability choices.
+
+### Measured numbers, third pass
+
+Filled in from the final full run below.
 
 ## Measured numbers, second pass
 
@@ -202,8 +315,9 @@ can match ground speed to the feet.
 | MPFB2 v2.0.17 (github.com/makehumancommunity/mpfb2) | GPL-3.0-or-later (code) | tool on CI only, never shipped |
 | MakeHuman system assets, CC0 pack: https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip | CC0 1.0 | body mesh, skin, eyes, eyebrows, hair (geometry and textures end up in rendered pixels) |
 | MPFB2 bundled data (base mesh, targets, rigs, weights) | CC0 1.0 (MPFB2 `LICENSE.ASSETS.md` is the CC0 text; read at v2.0.17) | body shape and rig |
-| MakeHuman "bodyparts05" pack (beards and moustaches): https://files.makehumancommunity.org/asset_packs/bodyparts05/bodyparts05_cc0.zip (mirror files2.), page https://static.makehumancommunity.org/assets/assetpacks/bodyparts05.html | CC0 (the page lists every asset in it as CC0) | only `wdg_scruffy_beard` (author WDG) is used, on the second face |
-| From the system pack, second face: `middleage_caucasian_male.mhmat` skin, `short04.mhclo` hair | CC0 1.0 (same system pack) | second face preset |
+| MakeHuman "bodyparts05" pack (beards and moustaches): https://files.makehumancommunity.org/asset_packs/bodyparts05/bodyparts05_cc0.zip (mirror files2.), page https://static.makehumancommunity.org/assets/assetpacks/bodyparts05.html (re-read 2026-10-04) | CC0 (the page lists each asset as CC0) | third pass uses four: `grinsegold_beard_sigmund_wip` (author grinsegold), `culturalibre_faun_beard` (culturalibre), `rehmanpolanski_moustache_viking` (RehmanPolanski), `wdg_scruffy_beard` (WDG) |
+| From the system pack (page https://static.makehumancommunity.org/assets/assetpacks/makehuman_system_assets.html, re-read 2026-10-04, every asset listed CC0), head presets: skins `young_caucasian_male`, `young_caucasian_male2`, `middleage_caucasian_male`, `old_caucasian_male`, `middleage_african_male`; hair `short01`-`short04`; eyebrows `eyebrow001/002/003/005/007/009/011`; eyelashes `eyelashes01`-`03`; eyes `high-poly` | CC0 1.0 | head presets h1-h7 |
+| MPFB2 bundled targets: face shapes (`head-*`, `chin-*`, `nose-*`, `cheek`, `eyes`, `mouth`, `ears`, `eyebrows`) and expression units `targets/expression/units/<race>/` | CC0 1.0 (LICENSE.ASSETS.md at v2.0.17) | head shapes and the tired/alert expression |
 | pngjs (already a devDependency) | MIT | atlas PNG I/O in `pack.mjs` |
 
 Everything else (uniform, kit, rifle-musket, cap, brogans, poses, lighting) is built by these
@@ -220,7 +334,9 @@ from Poly Haven or ambientCG was used, so none is listed.
   from bodyparts05);
 - note that Blender and MPFB2 (GPL) were build tools only and no GPL code is shipped.
 
-This branch does not edit `ATTRIBUTION.md`: no baked output is committed in this leg.
+This branch does not edit `ATTRIBUTION.md`: no baked output is committed in this leg. When the
+third-pass atlases enter the repo, list every asset in the two rows above (names from
+`report/probe.json` `heads`) and the four bodyparts05 beard authors.
 
 ## History status
 
@@ -231,3 +347,10 @@ regiment is depicted. Second-pass additions (garment cut, folds, brogan, cap sea
 loading sequence, weathering colours) are all placeholder or recalled-and-Inferred. The belt,
 breast and box plates are **plain ovals/discs with no lettering or eagle**. The sack coat has no
 outside pocket line: my recollection is an inside breast pocket only, which is unverified.
+
+Third pass: head shapes, expressions, hair and beard colours, eye colours, the cartridge size, the
+blanket roll stripes and shape, kit swing, cloth stiffness and the grip stations are placeholder
+estimates judged by eye. Facial-hair styles (full beard, chin beard, moustache, clean-shaven) are
+recalled as common in period photographs: Inferred, not cited. The loading poses (cartridge from
+the box, charge at the muzzle, draw, ram, prime) remain a reduced, recalled sequence (Inferred).
+h7 is flagged for USCT regiments only so the game cannot place a Black soldier in a white regiment.

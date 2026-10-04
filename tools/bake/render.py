@@ -113,7 +113,7 @@ P = {
     "hands_lens": 90.0,
     "hands_el": 16.0,
     "head_dir": C.arg("head-dir", 1),
-    "kit_dir": C.arg("kit-dir", 12),     # his right side: the roll ends, haversack strap, cartridge box
+    "kit_dir": C.arg("kit-dir", 4),      # faces screen-right, so his RIGHT side (roll ends, cartridge box) faces the camera
     "skip_field": C.arg("skip-field", False),
     "quick": C.arg("quick", False),
     "shard": C.arg("shard", "all"),
