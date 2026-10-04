@@ -540,6 +540,14 @@ class Garments:
                 if rc < 1e-6:
                     continue
                 ru = rad / rc
+                # a clean cuff: the shell's end follows the ragged bone-weight boundary, so every
+                # vertex past the cuff line is pulled back onto one ring (run 8 still looked torn)
+                cut = Ltot - 0.012
+                if s > cut:
+                    q = q - tdir * (s - cut)
+                    s = cut
+                    ru = ru - tdir * float(ru @ tdir)
+                    ru = ru / max(1e-6, float(np.linalg.norm(ru)))
                 R = D["sleeve_r_top"] + (D["sleeve_r_cuff"] - D["sleeve_r_top"]) * min(1.0, s / Ltot)
                 w = C.smoothstep(0.04, 0.12, s)
                 rn = rc + w * max(0.0, R - rc)

@@ -577,7 +577,9 @@ def main():
             if check_budget and clip != "stand" and times and not P["quick"]:
                 # budget check after the stand clip: per-frame time is now measured
                 per = statistics.median(times)
-                n_other = sum(len(clips[c]["frames"]) for c in clips if c != "stand")
+                # frames still to render in this tier: this clip and the ones after it (run 8
+                # counted clips already done, so it cut directions one clip late)
+                n_other = sum(len(clips[c]["frames"]) for c in order[order.index(clip):])
                 field_ratio = 0.19   # measured run 7: field 0.415 s vs close 2.26 s per frame
 
                 def est_for(nv, n_dirs):
