@@ -442,6 +442,7 @@ class Poser:
                     axis = dvec.normalized().cross(self.palm_world(s))
                     if axis.length > 1e-6:
                         self.rotate_about(bn, head, C.rot(axis.normalized(), G["thumb_oppose_deg"]))
+                        self.flex[bn] = self.flex.get(bn, 0.0) + G["thumb_oppose_deg"]
                     fr.append("opposed")
                     continue
                 axis = dvec.normalized().cross(self.palmar(bn))
@@ -534,8 +535,8 @@ class Poser:
                     gaps = [surf.gap(p) for p in pts]
                     j = min(range(len(gaps)), key=gaps.__getitem__)
                     g = gaps[j]
-                    if lo <= g <= hi or (ci == 0 and k == 0):
-                        continue
+                    if lo <= g <= hi or (ci == 0 and k == 0 and g > lo):
+                        continue      # the thumb opposition only ever backs out (run 18: thumb 8-9 mm in)
                     if g > 0.03:
                         break            # this finger is not over the object: leave it
                     ax = self.flex_axis(s, ci, k, bn)

@@ -15,21 +15,31 @@ interpreter on CI. Each file says so at the top. Everything outside Blender is N
 - Or run `gh workflow run bake.yml --ref bake -f samples_close=32 -f directions=16`. GitHub only
   lists `workflow_dispatch` once the workflow file is on the default branch. Until then, the push
   trigger is the way in.
-- Put `[quick]` in the commit message for a quick check run (hero, close-up, variants and a few
-  frames, about 6 minutes) instead of the full matrix.
-- Watch it with `gh run watch <id>`. Each run uploads two artifacts: `bake-<n>` (everything) and
-  `preview-<n>` (contact sheet, hero preview, close-up preview, reports; under 3 MB). Fetch the
-  small one with `gh run download <id> -n preview-<n> -D .out/<folder>`. Download only into `.out/`.
+- Put `[quick]` in the commit message for a quick check run (one `all` render shard: hero, close-up,
+  portrait, hands, kit, heads, hand shots, variants and a few frames; about 17 minutes) instead of
+  the full matrix.
+- Watch it with `gh run watch <id>`. Each run uploads `bake-<n>` (everything) and `preview-<n>`
+  (contact sheet, hero/close-up/portrait/hands/kit previews, reports; under 5 MB). Fetch the small
+  one with `gh run download <id> -n preview-<n> -D .out/<folder>`. Download only into `.out/`.
+  `reports-<n>` (prep reports) is uploaded even when a prep stage fails.
+
+**Jobs (third pass).** `prep` builds the soldier once (stages 1-3b) and hands `work/posed.blend` to
+the `render` matrix as a 1-day artifact; `render` runs one job per shard (`SHARDS_FULL` in
+`bake.yml`: `hero`, `c0of16`..`c15of16`, `f0of3`..`f2of3`); `pack` downloads every shard, merges
+the reports (`report/render-<shard>.json` -> `report/render.json`) and packs. A close shard `cKofN`
+renders the (variant, direction) units whose index modulo N is K, over every clip, so the load is
+even and nothing is ever dropped for time. Quick runs use one shard, `all`.
 
 Stages (each one is a separate Blender process, timed in the job summary):
 
 | step | file | in -> out |
 |---|---|---|
-| 1 | `probe_mpfb.py` | MPFB2 + CC0 packs -> `work/body.blend`, `report/probe.json` (adult male, default rig, CC0 skin, eyes, brows, hair; second-face parts: second skin, second hair, CC0 beard) |
+| 1 | `probe_mpfb.py` | MPFB2 + CC0 packs -> `work/body.blend`, `report/probe.json` (adult male, default rig; third pass: the seven head presets of `uniform.py` `HEADS`, each a body shape key plus its own CC0 eyes, brows, lashes, hair, beard and skin) |
 | 2 | `uniform.py` | -> `work/soldier.blend`, `report/uniform.json`. Garments, kit, rifle-musket, cap, brogans, skin shading; **all dimensions/colours in one table at the top** |
-| 3 | `poses.py` | -> `work/posed.blend`, `report/poses.json`. Stand (shoulder arms), 8-frame march, aim/fire/recover, fallen, load (5); grip and clearance solves; motion checks |
-| 4 | `render.py` | -> `frames/<tier>/*.png`, `frames/field_<variant>/*.png`, `variants/*.png`, `hero.png`, `hero-closeup.png`, `report/render.json` |
-| 5 | `pack.mjs` | -> `atlas/soldier_<tier>_<page>.png`, `atlas/soldier_field_<variant>_<page>.png`, `atlas/soldier.json`, `contact-sheet.png`, `hero-preview.png`, `hero-closeup-preview.png` |
+| 3 | `poses.py` | -> `work/posed.blend`, `report/poses.json`. Stand (shoulder arms), 8-frame march, aim/fire/recover, fallen, load (5); measured-hand grip solve with real-skin contact report; cartridge; kit hang; motion checks |
+| 3b | `cloth.py` | -> `work/posed.blend`, `report/cloth.json`. Blender cloth settled per pose for trousers, coat (sleeves) and coat skirt; never fails the job |
+| 4 | `render.py --shard <s>` | -> `frames/<tier>/*.png`, `frames/<tier>_<variant>/*.png` (both tiers), `variants/*.png`, `heads/*.png`, `hands/*.png`, `hero.png`, `hero-closeup.png`, `portrait.png`, `hands.png`, `kit.png`, `report/render[-<shard>].json` |
+| 5 | `pack.mjs` | -> `atlas/soldier_<tier>_<page>.png`, `atlas/soldier_<tier>_<variant>_<page>.png`, `atlas/soldier.json`, `contact-sheet.png`, `*-preview.png` |
 
 `common.py` holds the shared helpers. The `work/*.blend` files stay on the runner and are not
 uploaded.

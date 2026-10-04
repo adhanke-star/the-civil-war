@@ -1764,7 +1764,7 @@ def build_blanket_roll(m, pts, outs, across, rig, skin, obst_bone=None):
                 th = 2 * math.pi * ai / na
                 ph = rho * turns - th / (2 * math.pi)
                 fr_ = ph - math.floor(ph)
-                rec = 0.0035 * fr_ * C.smoothstep(0.0, 0.12, rho) + 0.0015 * (1 - rho)
+                rec = 0.006 * fr_ * C.smoothstep(0.0, 0.12, rho) + 0.0015 * (1 - rho)   # run 18: 3.5 mm steps did not read
                 p = c + (u * (math.cos(th) * ru) + v * (math.sin(th) * rv)) * rho * 0.985 - t * (rec - 0.0015)
                 verts.append(p)
                 cav.append(C.smoothstep(0.18, 0.0, fr_) * 0.9)

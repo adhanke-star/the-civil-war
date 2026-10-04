@@ -39,6 +39,7 @@ CL = {
     "mass_kg": 0.35,                        # vertex mass                                placeholder
     "tension": 18.0, "compression": 4.0, "shear": 6.0, "bending": 0.6,   # wool, fairly stiff placeholder
     "air_damping": 1.5,
+    "pin_stiffness": 20.0,                 # run 18: 1.0 let the pinned coat back sag off the belt line placeholder
     "collision_distance_m": 0.0035,         # cloth keeps this far off the body          placeholder
     "collider_thickness_m": 0.003,
     "runaway_m": 0.03,                      # a vertex moved further than this ran away (blended back) placeholder
@@ -117,12 +118,13 @@ def pin_weights(obj, kind, rest, lmh):
     hip, waist = lmh.get("hip_z", 0.95), lmh.get("waist_z", 1.07)
     if kind == "tcw_coat":
         w = 1.0 - np.clip((armw - 0.15) / 0.45, 0.0, 1.0)              # torso held by belts and straps
+        w = np.where(z < waist + 0.06, np.maximum(w, 1.0), w)          # the waist under the belt never moves
         w = np.where(boundary & (armw > 0.5), 0.75, w)                 # cuffs stay on the wrists
     elif kind == "tcw_trousers":
         w = np.clip((z - (hip - 0.12)) / 0.08, 0.0, 1.0)               # waistband and seat
         w = np.where(boundary & (z < hip - 0.3), 0.45, w)              # hems stay on the shoes
     else:
-        w = np.clip((z - (waist - 0.07)) / 0.05, 0.0, 1.0)             # skirt hangs from the belt
+        w = np.clip((z - (waist - 0.10)) / 0.06, 0.0, 1.0)             # skirt hangs from the belt
     return np.clip(w, 0.0, 1.0)
 
 
@@ -155,7 +157,7 @@ def simulate(name, start, rest, faces, pins, colliders):
         s.bending_stiffness = CL["bending"]
         s.air_damping = CL["air_damping"]
         s.vertex_group_mass = "pin"
-        s.pin_stiffness = 1.0
+        s.pin_stiffness = CL["pin_stiffness"]
         try:
             s.rest_shape_key = kr
         except Exception as e:  # noqa: BLE001
