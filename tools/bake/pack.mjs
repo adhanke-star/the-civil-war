@@ -168,11 +168,17 @@ function contactSheet(render, clips) {
   const row3 = [
     path.join(dir, `fire_0_d${dd(wd)}.png`), path.join(dir, `fire_1_d${dd(wd)}.png`),
     path.join(dir, `fire_2_d${dd(wd)}.png`), path.join(dir, `fallen_0_d${dd(wd)}.png`),
-    path.join(OUT, 'variants', 'slouch.png'), path.join(OUT, 'variants', 'bayonet.png'),
-    path.join(OUT, 'frames', 'field', `stand_0_d${dd(wd)}.png`), path.join(OUT, 'frames', 'field', `walk_0_d${dd(wd)}.png`),
+    ...['slouch', 'bayonet', 'noroll', 'face2'].map((v) => path.join(OUT, 'variants', `${v}.png`)),
   ];
   row3.forEach((f, i) => cells.push(cell(3, i, f)));
-  const sheet = new PNG({ width: 8 * S, height: 4 * S });
+  const fdir = path.join(OUT, 'frames', 'field');
+  const row4 = [
+    ...[0, 2, 4, 8, 12].map((d) => path.join(fdir, `stand_0_d${dd(d)}.png`)),
+    path.join(fdir, `walk_0_d${dd(wd)}.png`), path.join(fdir, `walk_4_d${dd(wd)}.png`),
+    path.join(fdir, `fire_1_d${dd(wd)}.png`),
+  ];
+  row4.forEach((f, i) => cells.push(cell(4, i, f)));
+  const sheet = new PNG({ width: 8 * S, height: 5 * S });
   fill(sheet, hex('#7f8d4e'));
   let placed = 0;
   for (const c of cells) {
@@ -200,13 +206,14 @@ function contactSheet(render, clips) {
       'row 1: stand, directions 0-7 (0 faces the viewer, 4 faces screen-right)',
       'row 2: stand, directions 8-15',
       `row 3: walk cycle frames 0-7, direction ${wd}`,
-      `row 4: aim, fire, recover, fallen (direction ${wd}); slouch-hat variant; fixed-bayonet variant; field tier (96 px) stand and walk at 1:1`,
+      `row 4: aim, fire, recover, fallen (direction ${wd}); variants: slouch hat, fixed bayonet, no blanket roll, second face`,
+      `row 5: field tier (96 px) at 1:1: stand directions 0, 2, 4, 8, 12; walk frames 0 and 4, fire (direction ${wd})`,
     ],
   };
 }
 
-function heroPreview() {
-  const f = path.join(OUT, 'hero.png');
+function heroPreview(src = 'hero.png', dst = 'hero-preview.png') {
+  const f = path.join(OUT, src);
   if (!fs.existsSync(f)) return null;
   const hero = readPNG(f);
   const bg = new PNG({ width: hero.width, height: hero.height });
@@ -220,7 +227,7 @@ function heroPreview() {
     }
   }
   over(bg, hero, 0, 0);
-  return { file: 'hero-preview.png', bytes: writePNG(path.join(OUT, 'hero-preview.png'), bg) };
+  return { file: dst, bytes: writePNG(path.join(OUT, dst), bg) };
 }
 
 function pack() {
@@ -236,28 +243,33 @@ function pack() {
       frameSize: t.frameSize, pxPerMetre: r.px_per_m, anchor: r.anchor_px, samples: r.samples,
       directionsRendered: r.directions, count: t.count, pages: t.pages, rawFrameBytes: t.rawFrameBytes,
       frames: t.frames,
+      // added (second pass): per-clip framing; tier-level pxPerMetre/anchor above are the stand clip's
+      clips: r.clips, directionsByClip: r.directions_by_clip,
     };
   }
   const manifest = {
     version: 1,
-    subject: 'Union infantry private, Western theater, 1862 (first-pass bake probe; uniform and kit are placeholder/Inferred)',
+    subject: 'Union infantry private, Western theater, 1862 (second-pass bake; uniform and kit are placeholder/Inferred)',
     generated: new Date().toISOString(),
     frameKey: '<clip>_<index>_d<direction, 2 digits>',
-    rectRule: 'draw atlas rect (x,y,w,h) at (screenAnchor - anchor + (ox,oy)) at 1:1 scale; anchor = the feet on the ground',
+    rectRule: 'draw atlas rect (x,y,w,h) at (screenAnchor - anchor + (ox,oy)), using the anchor and pxPerMetre of the frame\'s clip (tiers.<tier>.clips.<clip>); scale the rect by (game px per metre) / pxPerMetre. anchor = the feet on the ground',
     camera: render.camera, sun: render.sun, colour: render.colour, clips, tiers,
     variants: Object.keys(render.variants || {}),
+    // added (second pass)
+    lights: render.lights, quick: render.quick, variantsFraming: render.variants_framing,
   };
   fs.mkdirSync(path.join(OUT, 'atlas'), { recursive: true });
   fs.writeFileSync(path.join(OUT, 'atlas', 'soldier.json'), JSON.stringify(manifest, null, 1));
   const sheet = contactSheet(render, clips);
   const hero = heroPreview();
+  const closeup = heroPreview('hero-closeup.png', 'hero-closeup-preview.png');
   const pack = {
     tiers: Object.fromEntries(Object.entries(tiers).map(([k, v]) => [k, {
       count: v.count, pages: v.pages, rawFrameBytes: v.rawFrameBytes,
       atlasBytes: v.pages.reduce((s, p) => s + p.bytes, 0),
     }])),
     manifestBytes: fs.statSync(path.join(OUT, 'atlas', 'soldier.json')).size,
-    contactSheet: sheet, heroPreview: hero,
+    contactSheet: sheet, heroPreview: hero, closeupPreview: closeup,
   };
   fs.writeFileSync(path.join(OUT, 'report', 'pack.json'), JSON.stringify(pack, null, 2));
   for (const [k, v] of Object.entries(pack.tiers)) {
@@ -308,7 +320,17 @@ function summary() {
       const atlas = p ? `${p.pages.map((g) => `${g.w}x${g.h}`).join(' + ')}, ${mb(p.atlasBytes)}` : '-';
       lines.push(`| ${k} | ${t.px} | ${t.samples} | ${t.renders} | ${t.seconds_per_frame_mean} | ${t.seconds_per_frame_median} | ${t.seconds_first_frame} | ${t.seconds_total} | ${atlas} |`);
     }
-    lines.push('', `hero ${render.hero?.px}px @ ${render.hero?.samples} spp: ${render.hero?.seconds}s. Variants: ${JSON.stringify(render.variants)}`);
+    lines.push('', `hero ${render.hero?.px}px @ ${render.hero?.samples} spp: ${render.hero?.seconds}s; close-up @ ${render.closeup?.samples} spp: ${render.closeup?.seconds}s. Variants: ${JSON.stringify(render.variants)}`);
+    if (render.quick) lines.push('', '**Quick run** (check set only, not the full matrix).');
+    const fr = render.tiers.close?.clips || {};
+    lines.push('', '| clip | ortho m | close px/m | close anchor |', '|---|---:|---:|---|');
+    for (const [k, v] of Object.entries(fr)) lines.push(`| ${k} | ${v.orthoM} | ${v.pxPerMetre} | ${JSON.stringify(v.anchor)} |`);
+    const po = readJSON(path.join(OUT, 'report', 'poses.json'));
+    if (po.checks) lines.push('', '### Pose checks', '', '```', JSON.stringify(po.checks, null, 1).slice(0, 3000), '```');
+    const un = readJSON(path.join(OUT, 'report', 'uniform.json'));
+    if (un.timing) lines.push('', `uniform.py objects: ${Object.keys(un.objects || {}).length}; render triangles (viewport levels): ${un.render_triangles_viewport_levels}`);
+    const pr = readJSON(path.join(OUT, 'report', 'probe.json'));
+    if (pr.variant_assets) lines.push('', `variant assets: ${JSON.stringify(pr.variant_assets)}`);
     if (render.reduced) lines.push('', `**Directions reduced**: ${render.reduced.reason}; rendered ${JSON.stringify(render.reduced.directions_rendered)}`);
     const c = render.tiers.close, f = render.tiers.field;
     if (c) {

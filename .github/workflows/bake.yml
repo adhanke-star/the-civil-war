@@ -23,7 +23,10 @@ on:
         default: '35'
       budget_min:
         description: Render budget in minutes before directions are reduced
-        default: '18'
+        default: '20'
+      quick:
+        description: '1 = quick check set (hero, close-up, variants, a few frames) instead of the full matrix'
+        default: '0'
   push:
     branches: [bake]
     paths:
@@ -49,12 +52,14 @@ env:
   SAMPLES_HERO: ${{ inputs.samples_hero || '128' }}
   DIRECTIONS: ${{ inputs.directions || '16' }}
   ELEVATION: ${{ inputs.elevation || '35' }}
-  BUDGET_MIN: ${{ inputs.budget_min || '18' }}
+  BUDGET_MIN: ${{ inputs.budget_min || '20' }}
+  # push runs: put [quick] in the commit message for the quick check set
+  QUICK: ${{ inputs.quick || (contains(github.event.head_commit.message, '[quick]') && '1') || '0' }}
 
 jobs:
   bake:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 34
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
@@ -173,11 +178,12 @@ jobs:
           exit $rc
 
       - name: 4 render.py (Cycles CPU, ortho, directions x frames x tiers, hero)
+        timeout-minutes: 25
         run: |
           set +e
           "$BLENDER" -b --factory-startup -noaudio --python-exit-code 1 -P tools/bake/render.py -- --out "$BAKE_OUT" \
             --samples-close "$SAMPLES_CLOSE" --samples-field "$SAMPLES_FIELD" --samples-hero "$SAMPLES_HERO" \
-            --directions "$DIRECTIONS" --elevation "$ELEVATION" --budget-min "$BUDGET_MIN" 2>&1 \
+            --directions "$DIRECTIONS" --elevation "$ELEVATION" --budget-min "$BUDGET_MIN" --quick "$QUICK" 2>&1 \
             | grep -v -E '^Fra:|^Saved:|^ Time:|^$'
           rc=${PIPESTATUS[0]}
           printf 'render.py\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc")" >> "$BAKE_OUT/timing.tsv"
@@ -204,5 +210,19 @@ jobs:
             .out/bake/
             !.out/bake/work/**
           include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload preview (small; the images a person judges, plus reports)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: preview-${{ github.run_number }}
+          path: |
+            .out/bake/contact-sheet.png
+            .out/bake/hero-preview.png
+            .out/bake/hero-closeup-preview.png
+            .out/bake/report/
+            .out/bake/timing.tsv
           retention-days: 7
           if-no-files-found: warn
