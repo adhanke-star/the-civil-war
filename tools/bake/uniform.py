@@ -64,17 +64,18 @@ D = {
     "collar_gap_deg":      42.0,    # opening at the throat                    placeholder
     "front_edge_offset":   0.016,   # overlapping front edge, wearer's right of the buttons placeholder
     # -- folds (metres of displacement; placeholder, judged by eye) ---------------------
-    "fold_elbow":          0.0075,
-    "fold_wrist":          0.0045,
-    "fold_upperarm":       0.0025,
-    "fold_knee":           0.0070,
-    "fold_hem":            0.0060,
-    "fold_drape":          0.0040,
-    "fold_seat":           0.0040,
-    "fold_pleat":          0.0060,  # radiating from the waist belt
-    "fold_drag":           0.0040,  # diagonal drag folds on the back
-    "fold_lumps":          0.0030,  # low-frequency unevenness everywhere
-    "fold_skirt":          0.0060,
+    # (run 3 showed the first values, 2.5-7.5 mm, barely read even in the close-up: doubled)
+    "fold_elbow":          0.0160,
+    "fold_wrist":          0.0100,
+    "fold_upperarm":       0.0060,
+    "fold_knee":           0.0150,
+    "fold_hem":            0.0130,
+    "fold_drape":          0.0090,
+    "fold_seat":           0.0080,
+    "fold_pleat":          0.0120,  # radiating from the waist belt
+    "fold_drag":           0.0090,  # diagonal drag folds on the back
+    "fold_lumps":          0.0050,  # low-frequency unevenness everywhere
+    "fold_skirt":          0.0120,
     # -- belts and straps ------------------------------------------------------
     "waist_belt_width":    0.048,   # ~1.9 in black leather waist belt         Inferred
     "cartridge_belt_width": 0.057,  # ~2.25 in shoulder belt                   Inferred
@@ -87,6 +88,7 @@ D = {
     # -- kit ----------------------------------------------------------------------
     "cartridge_box":       (0.19, 0.14, 0.055),  # w h d                        placeholder
     "cap_pouch":           (0.08, 0.08, 0.035),  #                              placeholder
+    "box_plate":           (0.080, 0.050),       # oval brass plate on the box flap; plain, no lettering  placeholder
     "haversack":           (0.30, 0.28, 0.05),   #                              placeholder
     "canteen_d":           0.19,    # smoothside canteen diameter              placeholder
     "canteen_t":           0.065,   # canteen thickness                        placeholder
@@ -117,12 +119,15 @@ COL = {
     "brogans":     ("#16120f", 0.55),   # black rough-out / blacked brogans
     "haversack":   ("#1e1d1a", 0.65),   # tarred black canvas
     "canteen":     ("#6c6355", 0.95),   # grey-brown wool canteen cover
-    "webbing":     ("#a99d80", 0.90),   # natural cotton canteen strap
-    "blanket":     ("#6e665a", 0.95),   # grey-brown wool blanket
+    "webbing":     ("#7a705c", 0.90),   # natural cotton strap, darkened so it never out-shines the coat
+    "blanket":     ("#5a5246", 0.95),   # mid grey-brown wool blanket (in game the first pass read white)
     "felt":        ("#151413", 0.85),   # black felt slouch hat
     "wood":        ("#4a2c18", 0.45),   # oiled black walnut stock
     "steel":       ("#8e9297", 0.32),   # bright (unblued) iron and steel
     "brass":       ("#b08a3e", 0.35),   # belt plates and buttons
+    "pewter":      ("#8f8e88", 0.45),   # canteen spout
+    "cork":        ("#8b6a45", 0.90),   # canteen stopper
+    "bone":        ("#cfc5ab", 0.50),   # haversack button (material unsourced)
 }
 
 T = C.Timer()
@@ -132,7 +137,7 @@ REP = {"table": {k: v for k, v in D.items()}, "colours": COL, "objects": {}}
 # Weathering colours (placeholder, judged by eye): faded indigo goes greyer and lighter; dust is
 # a light tan; mud a dark brown.
 FADE = {"coat": "#3a4560", "cap": "#363f58", "trousers": "#9aa9bb", "blanket": "#8a8272",
-        "canteen": "#857c6c", "felt": "#3a3631", "webbing": "#c2b89c", "haversack": "#3a3832"}
+        "canteen": "#857c6c", "felt": "#3a3631", "webbing": "#958a72", "haversack": "#3a3832"}
 
 
 def mats():
@@ -151,7 +156,9 @@ def mats():
         elif k == "wood":
             m[k] = C.weathered_material(name, hexc, rough, kind="wood", mottle=0.10, bump=0.15,
                                         edge_wear_hex="#6b4428")
-        else:  # steel, brass
+        elif k in ("cork", "bone"):
+            m[k] = C.weathered_material(name, hexc, rough, kind="plain", mottle=0.12, bump=0.2)
+        else:  # steel, brass, pewter
             m[k] = C.weathered_material(name, hexc, rough, kind="metal", mottle=0.06, metallic=1.0,
                                         bump=0.05, dust_hex="#7a6e58")
     return m
@@ -564,14 +571,14 @@ class Garments:
                     d += 0.6 * D["fold_drag"] * wa * C.crease((self.armpit_z - z) / 0.035 + 0.8 * math.cos(th))
                     d += D["fold_lumps"] * nz(p, 7)
                     out[i] = np.array([c[0], c[1], z]) + ru * (rn + d)
-                    cav[i] = max(0.0, -d / 0.006)
+                    cav[i] = max(0.0, -d / 0.012)
                 else:
                     out[i] = p + N[i] * (D["fold_lumps"] * 0.6 * nz(p, 7))
                 wear[i] = max(wear[i], 0.9 * C.smoothstep(self.sh_z - 0.14, self.sh_z + 0.01, z) * max(0.0, float(N[i][2])) ** 0.5)
             else:
                 out[i] = p + N[i] * (D["fold_lumps"] * nz(p, 7))
             if cav[i] == 0.0 and d < 0:
-                cav[i] = min(1.0, -d / 0.006)
+                cav[i] = min(1.0, -d / 0.012)
         return out, {"dirt": dirt, "wear": wear, "cavity": np.clip(cav, 0, 1)}
 
     # ---------------------------------------------------------------- straight-cut trousers
@@ -624,7 +631,7 @@ class Garments:
             out[i] = np.array([ax[0], ax[1], 0.0]) + ru * (rn + d) + np.array([0.0, 0.0, zn])
             dirt[i] = C.smoothstep(self.knee_z + 0.06, self.ankle_z - 0.02, z) ** 1.3 + 0.3 * wk * front
             wear[i] = 0.5 * wk * front + 0.4 * ws
-            cav[i] = max(0.0, -d / 0.006)
+            cav[i] = max(0.0, -d / 0.012)
         return out, {"dirt": np.clip(dirt, 0, 1), "wear": np.clip(wear, 0, 1), "cavity": np.clip(cav, 0, 1)}
 
 
@@ -786,10 +793,51 @@ def build_musket(m):
         parts.append(C.loft([C.ring(Vector((0, -0.006, bz + dz)), X, Y, 0.019, hh / 2 + 0.004, 12)
                              for dz in (-0.006, 0.006)]))
     parts.append(C.loft([C.ring(Vector((0, -0.050, z)), X, Y, 0.022, 0.060, 12) for z in (-0.004, 0.003)]))
-    parts.append(C.box(Vector((-0.020, -0.004, 0.40)), (X, Y, Z), (0.002, 0.012, 0.065)))   # lock plate
-    parts.append(C.box(Vector((-0.019, 0.020, 0.37)), (X, Y, Z), (0.004, 0.012, 0.007)))    # hammer
-    parts.append(C.box(Vector((0.0, -0.048, 0.34)), (X, Y, Z), (0.003, 0.010, 0.040)))      # trigger guard
-    parts.append(C.loft([C.ring(Vector((0, -0.017, z)), X, Y, 0.0045, 0.0045, 6) for z in (0.55, L - 0.005)]))
+    # lock plate: a flat plate with rounded ends on the right (-X) side of the stock
+    lp = []
+    for dx in (0.0, 0.0025):
+        ring = []
+        for k in range(16):
+            a = 2 * math.pi * k / 16
+            zz = 0.405 + 0.068 * math.copysign(abs(math.cos(a)) ** 0.5, math.cos(a))
+            yy = -0.004 + 0.0125 * math.copysign(abs(math.sin(a)) ** 0.7, math.sin(a))
+            ring.append(Vector((-0.0175 - dx, yy, zz)))
+        lp.append(ring)
+    parts.append(C.loft(lp))
+    # hammer: body on the plate, a neck rising and curving forward, a nose over the nipple, a spur
+    hp = [((-0.022, 0.004, 0.372), (0.0035, 0.008, 0.009)),   # tumbler body
+          ((-0.022, 0.016, 0.368), (0.0030, 0.007, 0.006)),   # neck
+          ((-0.022, 0.026, 0.374), (0.0030, 0.005, 0.007)),   # upper neck
+          ((-0.020, 0.030, 0.386), (0.0035, 0.006, 0.008)),   # nose (cup over the nipple)
+          ((-0.022, 0.033, 0.360), (0.0025, 0.004, 0.010))]   # spur, back and up
+    for c, hh in hp:
+        parts.append(C.box(Vector(c), (X, Y, Z), hh))
+    # nipple bolster on the breech and the nipple cone
+    parts.append(C.box(Vector((-0.016, 0.014, br0 + 0.012)), (X, Y, Z), (0.006, 0.007, 0.012)))
+    parts.append(C.loft([C.ring(Vector((-0.016, 0.021 + dy, br0 + 0.014)), X, Z, rr, rr, 8)
+                         for dy, rr in ((0.0, 0.003), (0.006, 0.0022), (0.008, 0.0015))]))
+    # trigger guard: a bow under the wrist of the stock, with its tang strip; the trigger inside
+    bow = []
+    for k in range(13):
+        a = math.pi * k / 12
+        bow.append(Vector((0.0, -0.043 - 0.022 * math.sin(a), 0.315 + 0.034 * math.cos(a))))
+    gv, gf = [], []
+    for k in range(len(bow) - 1):
+        tv_, tf_ = C.loft([C.ring(bow[k], X, (bow[k + 1] - bow[k]).normalized().cross(X), 0.003, 0.0018, 6),
+                           C.ring(bow[k + 1], X, (bow[k + 1] - bow[k]).normalized().cross(X), 0.003, 0.0018, 6)],
+                          cap_start=False, cap_end=False)
+        gv.append((tv_, tf_))
+    parts.append(C.merge(gv))
+    parts.append(C.box(Vector((0.0, -0.044, 0.31)), (X, Y, Z), (0.0045, 0.0015, 0.085)))     # guard plate
+    parts.append(C.box(Vector((0.0, -0.053, 0.327)), (X, Y, Z), (0.002, 0.010, 0.0025)))     # trigger
+    # sling swivels: on the middle band and in front of the trigger guard
+    for zc, yc in ((D["barrel_bands_z"][1], -0.032), (0.37, -0.058)):
+        tv_, tf_ = torus(Vector((0.0, yc, zc)), X, 0.008, 0.0016, n=10, m=5)
+        parts.append((tv_, tf_))
+    # ramrod with a tulip head at the muzzle end
+    parts.append(C.loft([C.ring(Vector((0, -0.017, z)), X, Y, 0.0045, 0.0045, 6) for z in (0.55, L - 0.02)]))
+    parts.append(C.loft([C.ring(Vector((0, -0.017, z)), X, Y, rr, rr, 8) for z, rr in
+                         ((L - 0.03, 0.0045), (L - 0.018, 0.0062), (L - 0.006, 0.0058), (L - 0.004, 0.004))]))
     parts.append(C.box(Vector((0, 0.019, L - 0.03)), (X, Y, Z), (0.0015, 0.004, 0.006)))     # front sight
     parts.append(C.box(Vector((0, 0.022, br0 + 0.10)), (X, Y, Z), (0.008, 0.006, 0.012)))   # rear sight
     v, f = C.merge(parts)
@@ -871,7 +919,7 @@ def build_brogan(m, rig, rm, lm, side, sg, shoe_idx, rest_w, info):
     v, f = C.loft(rings)
     obj = C.mesh_object("tcw_brogan_" + side, v, f)
     C.assign(obj, m["brogans"])
-    C.stamp_attrs(obj, dirt=0.75, wear=0.4)
+    C.stamp_attrs(obj, dirt=0.4, wear=0.3)
     Skinner(rig, rest_w, info, ("foot", "shin")).apply(obj, k=12)
     C.add_modifier(obj, "SUBSURF", "Smooth", levels=0, render_levels=2)
     REP["objects"][obj.name] = {"verts": len(v), "rings": len(rings)}
@@ -950,6 +998,303 @@ def build_slouch(m, rig, rm, lm, head_cloud, brow_z):
     hat["tcw_variant"] = "slouch"
     hat.hide_render = True
     return hat
+
+
+# ------------------------------------------------------------------------------ kit (second pass)
+
+def torus(centre, axis, R, r, n=16, m=6, arc=2 * math.pi):
+    """A ring of tube around `axis` (a tie, a strap loop, a seam)."""
+    axis = axis.normalized()
+    u = axis.orthogonal().normalized()
+    v = axis.cross(u).normalized()
+    closed = arc >= 2 * math.pi - 1e-6
+    nn = n if closed else n + 1
+    verts, faces = [], []
+    for i in range(nn):
+        a = arc * i / n
+        d = u * math.cos(a) + v * math.sin(a)
+        c = centre + d * R
+        for j in range(m):
+            b = 2 * math.pi * j / m
+            verts.append(c + (d * math.cos(b) + axis * math.sin(b)) * r)
+    segs = n if closed else n
+    for i in range(segs):
+        i2 = (i + 1) % nn
+        for j in range(m):
+            j2 = (j + 1) % m
+            faces.append((i * m + j, i * m + j2, i2 * m + j2, i2 * m + j))
+    return verts, faces
+
+
+def plate_profile(centre, ax, ay, nrm, w, h, profile, n=28):
+    """A lofted badge: rings of (lift along nrm, scale of the w x h oval), capped at the top."""
+    rings = [C.ring(centre + nrm * dz, ax, ay, w / 2 * s, h / 2 * s, n) for dz, s in profile]
+    return C.loft(rings, cap_start=False, cap_end=True)
+
+
+OVAL_PROFILE = ((0.0, 1.0), (0.0025, 1.0), (0.0033, 0.95), (0.0026, 0.9), (0.0030, 0.6), (0.0034, 0.0))
+DOME_PROFILE = ((0.0, 1.0), (0.0015, 0.97), (0.003, 0.75), (0.0038, 0.35))
+
+
+def buckle(name, m, p, along, across, out, w, h, skin):
+    """A rectangular frame buckle with a centre bar (iron or brass), skinned to the torso."""
+    b = 0.0035
+    parts = []
+    for sx, sy, hx, hy in ((0, h / 2, w / 2, b / 2), (0, -h / 2, w / 2, b / 2),
+                           (w / 2, 0, b / 2, h / 2), (-w / 2, 0, b / 2, h / 2), (0, 0, b / 2, h / 2)):
+        parts.append(C.box(p + across * sx + along * sy + out * 0.002, (across, along, out), (hx, hy, 0.0016)))
+    v, f = C.merge(parts)
+    o = C.mesh_object(name, v, f, smooth=False)
+    C.assign(o, m)
+    skin.apply(o, 4)
+    return o
+
+
+def ribbon_point(pts, outs, target):
+    i = min(range(len(pts)), key=lambda k: (pts[k] - target).length)
+    j = (i + 1) % len(pts)
+    along = (pts[j] - pts[i]).normalized()
+    return pts[i], outs[i], along
+
+
+def build_blanket_roll(m, pts, outs, across, rig, skin):
+    """Horseshoe blanket roll: open at the hip with two capped ends that show the rolled layers,
+    a spiral layer edge winding along it, and three ties. Bin 0 of `pts` is at the bottom
+    (hip) end of the loop, so dropping the first/last bins opens it there."""
+    R = D["blanket_roll_r"]
+    n = len(pts)
+    gap = max(2, n // 24)
+    idx = list(range(gap, n - gap))
+    seg = 18
+    rings, cents, axes = [], [], []
+    for k, i in enumerate(idx):
+        c = pts[i] + outs[i] * (R * 0.82)
+        u = outs[i]
+        v = across
+        tw = 2 * math.pi * 3.0 * k / len(idx)       # the layer edge winds three times round
+        wob = 1.0 + 0.04 * noise.noise(Vector((k * 0.35, 0.0, 0.0)))
+        ring = []
+        for j in range(seg):
+            a = 2 * math.pi * j / seg
+            frac = ((a + tw) % (2 * math.pi)) / (2 * math.pi)
+            rr = R * wob * (0.93 + 0.07 * frac)
+            ring.append(c + u * (math.cos(a) * rr * 0.82) + v * (math.sin(a) * rr * 1.08))
+        rings.append(ring)
+        cents.append(c)
+    verts, faces = [], []
+    for r in rings:
+        verts.extend(r)
+    for k in range(len(rings) - 1):
+        for j in range(seg):
+            j2 = (j + 1) % seg
+            faces.append((k * seg + j, k * seg + j2, (k + 1) * seg + j2, (k + 1) * seg + j))
+    # layered end caps: concentric steps recessed in turn, so the rolled layers read
+    for end, sgn in ((0, -1), (len(rings) - 1, 1)):
+        c = cents[end]
+        t = (cents[min(len(cents) - 1, end + 1)] - cents[max(0, end - 1)]).normalized() * sgn
+        prev = list(range(end * seg, end * seg + seg))
+        for li, (s, dz) in enumerate(((0.8, -0.004), (0.62, 0.0), (0.44, -0.004), (0.26, 0.0))):
+            base = len(verts)
+            for j in range(seg):
+                verts.append(c + (verts[prev[j]] - c) * s + t * dz - t * (verts[prev[j]] - c).dot(t))
+            for j in range(seg):
+                j2 = (j + 1) % seg
+                f = (prev[j], prev[j2], base + j2, base + j) if sgn > 0 else (prev[j], base + j, base + j2, prev[j2])
+                faces.append(f)
+            prev = list(range(base, base + seg))
+        ci = len(verts)
+        verts.append(c - t * 0.002)
+        for j in range(seg):
+            j2 = (j + 1) % seg
+            faces.append((prev[j], prev[j2], ci) if sgn > 0 else (prev[j2], prev[j], ci))
+    obj = C.mesh_object("tcw_blanket_roll", verts, faces)
+    C.assign(obj, m["blanket"])
+    C.stamp_attrs(obj, wear=0.35, dirt=0.12)
+    skin.apply(obj, 12)
+    C.add_modifier(obj, "SUBSURF", "Smooth", levels=0, render_levels=1)
+    obj["tcw_variant"] = "roll"
+    REP["objects"][obj.name] = {"verts": len(verts), "rings": len(rings)}
+    # ties: near both ends and over the chest and back (cord, natural colour)
+    tparts = []
+    for fr in (0.05, 0.32, 0.68, 0.95):
+        k = int(fr * (len(cents) - 1))
+        k2 = min(len(cents) - 1, k + 1)
+        ax = (cents[k2] - cents[max(0, k - 1)]).normalized()
+        tparts.append(torus(cents[k], ax, R * 1.04 + 0.002, 0.0035, n=18, m=6))
+    v, f = C.merge(tparts)
+    ties = C.mesh_object("tcw_blanket_ties", v, f)
+    C.assign(ties, m["webbing"])
+    C.stamp_attrs(ties, dirt=0.3, wear=0.3)
+    skin.apply(ties, 12)
+    ties["tcw_variant"] = "roll"
+    return obj
+
+
+def build_box_kit(name, m, rig, bone, cen, across, up, out, size, plate=None, flap_frac=0.85):
+    """Leather box (cartridge box, cap pouch): bevelled body, a flap over the top and front with
+    a rounded edge, an optional oval brass plate and a closing stud."""
+    w, h, d = size
+    v, f = C.box(cen, (across, up, out), (w / 2, h / 2, d / 2))
+    rigid(name, v, f, m["leather"], rig, bone, bevel=min(0.006, d / 5))
+    t = 0.0028
+    path = [(h / 2 + t, -d / 2 + 0.004 + k * (d - 0.012) / 3) for k in range(4)]
+    for k in range(1, 4):
+        a = (math.pi / 2) * k / 3
+        path.append((h / 2 - 0.008 + (0.008 + t) * math.cos(a), d / 2 - 0.008 + (0.008 + t) * math.sin(a)))
+    yb = h / 2 - flap_frac * h
+    for k in range(1, 6):
+        path.append((h / 2 - 0.008 - (h / 2 - 0.008 - yb) * k / 5, d / 2 + t))
+    nx = 10
+    verts, faces = [], []
+    for ri, (y, z) in enumerate(path):
+        last = ri >= len(path) - 2
+        for j in range(nx + 1):
+            x = -(w / 2 + t) + (w + 2 * t) * j / nx
+            if last:   # round the lower corners
+                e = abs(x) / (w / 2 + t)
+                y = y + 0.012 * max(0.0, e - 0.6) / 0.4 * (1 if ri == len(path) - 1 else 0.5)
+            verts.append(cen + across * x + up * y + out * z)
+    for ri in range(len(path) - 1):
+        for j in range(nx):
+            a = ri * (nx + 1) + j
+            faces.append((a, a + 1, a + nx + 2, a + nx + 1))
+    flap = rigid(name + "_flap", verts, faces, m["leather"], rig, bone, smooth=True)
+    C.add_modifier(flap, "SOLIDIFY", "Thick", thickness=0.003, offset=1.0)
+    if plate:
+        pc = cen + up * (yb + 0.48 * (h / 2 - yb)) + out * (d / 2 + t + 0.003)
+        pv, pf = plate_profile(pc, across, up, out, plate[0], plate[1], OVAL_PROFILE)
+        rigid(name + "_plate", pv, pf, m["brass"], rig, bone, smooth=True)
+    sc = cen + up * (yb + 0.012) + out * (d / 2 + t + 0.003)
+    sv, sf = C.loft([C.ring(sc + out * dz, across, up, 0.006 * s, 0.006 * s, 10) for dz, s in
+                     ((0.0, 1.0), (0.004, 0.9), (0.006, 0.5))], cap_start=True, cap_end=True)
+    rigid(name + "_stud", sv, sf, m["brass"], rig, bone, smooth=True)
+
+
+def build_haversack(m, rig, bone, top_c, across, up, out, size):
+    """Tarred-canvas haversack: a soft bag that is thin at the top, bulges and sags at the bottom,
+    with a flap over the front, a button and a tab."""
+    w, h, d = size
+    nr, nseg = 10, 36
+    rings = []
+
+    def rrect_pts(hw, hd, rad):
+        pts = []
+        for k in range(nseg):
+            a = 2 * math.pi * k / nseg
+            cx, cy = math.cos(a), math.sin(a)
+            # superellipse: squarish but soft
+            x = hw * math.copysign(abs(cx) ** 0.45, cx)
+            yy = hd * math.copysign(abs(cy) ** 0.6, cy)
+            pts.append((x, yy))
+        return pts
+
+    front_z = []
+    for k in range(nr + 1):
+        t = k / nr
+        dz = d * (0.32 + 0.68 * t ** 0.6) * (1 - 0.45 * C.smoothstep(0.82, 1.0, t))
+        hw = w / 2 * (1 - 0.05 * t)
+        y = -h * t
+        ring = []
+        for x, zz in rrect_pts(hw, dz / 2, 0.02):
+            u = x / max(1e-6, hw)
+            sag = 0.028 * (1 - u * u) * C.smoothstep(0.55, 1.0, t)
+            ring.append(top_c + across * x + up * (y - sag) + out * (dz / 2 + zz))
+        rings.append(ring)
+        front_z.append(dz)
+    v, f = C.loft(rings, cap_start=True, cap_end=True)
+    bag = rigid("tcw_haversack", v, f, m["haversack"], rig, bone, smooth=True)
+    C.add_modifier(bag, "SUBSURF", "Smooth", levels=0, render_levels=1)
+    C.stamp_attrs(bag, dirt=0.25, wear=0.3)
+    # flap: follows the front face down 72% of the bag, rounded bottom edge
+    verts, faces = [], []
+    nx = 12
+    rows = 8
+    for ri in range(rows + 1):
+        t = 0.72 * ri / rows
+        k = t * nr
+        k0 = min(nr - 1, int(k))
+        fz = front_z[k0] + (front_z[k0 + 1] - front_z[k0]) * (k - k0)
+        hw = w / 2 * (1 - 0.05 * t) + 0.004
+        for j in range(nx + 1):
+            x = -hw + 2 * hw * j / nx
+            yy = -h * t
+            if ri == rows:
+                e = abs(x) / hw
+                yy += 0.03 * e ** 3
+            verts.append(top_c + across * x + up * (yy + 0.004) + out * (fz + 0.004))
+    for ri in range(rows):
+        for j in range(nx):
+            a = ri * (nx + 1) + j
+            faces.append((a, a + 1, a + nx + 2, a + nx + 1))
+    fl = rigid("tcw_haversack_flap", verts, faces, m["haversack"], rig, bone, smooth=True)
+    C.add_modifier(fl, "SOLIDIFY", "Thick", thickness=0.003, offset=1.0)
+    C.stamp_attrs(fl, dirt=0.2, wear=0.4)
+    t = 0.66
+    k0 = int(t * nr)
+    bc = top_c + up * (-h * t + 0.01) + out * (front_z[k0] + 0.009)
+    bv, bf = plate_profile(bc, across, up, out, 0.016, 0.016, DOME_PROFILE, n=12)
+    rigid("tcw_haversack_button", bv, bf, m["bone"], rig, bone, smooth=True)
+
+
+def build_canteen(m, rig, bone, cen, tang, up, o):
+    """Smoothside canteen: lens body in a wool cover, a tin seam round the edge, pewter spout,
+    cork stopper on a string, and three strap loops."""
+    r = D["canteen_d"] / 2
+    tk = D["canteen_t"]
+    rings_c = [C.ring(cen + o * (s * tk / 2), tang, up, r * k, r * k, 32)
+               for s, k in ((-1, 0.80), (-0.75, 0.93), (-0.4, 0.985), (0, 1.0), (0.4, 0.985), (0.75, 0.93), (1, 0.80))]
+    cv, cf = C.loft(rings_c)
+    body = rigid("tcw_canteen", cv, cf, m["canteen"], rig, bone, smooth=True)
+    C.stamp_attrs(body, dirt=0.2, wear=0.45)
+    sv, sf = torus(cen, o, r * 1.0, 0.0045, n=40, m=6)
+    rigid("tcw_canteen_seam", sv, sf, m["steel"], rig, bone, smooth=True)
+    top = cen + up * r
+    sp = C.loft([C.ring(top + up * dz, tang, o, rr, rr, 12) for dz, rr in
+                 ((-0.012, 0.013), (0.006, 0.012), (0.012, 0.010), (0.016, 0.012), (0.019, 0.012))], cap_end=False)
+    rigid("tcw_canteen_spout", sp[0], sp[1], m["pewter"], rig, bone, smooth=True)
+    ck = C.loft([C.ring(top + up * dz, tang, o, rr, rr, 12) for dz, rr in
+                 ((0.012, 0.0085), (0.030, 0.0100), (0.034, 0.0095))])
+    rigid("tcw_canteen_cork", ck[0], ck[1], m["cork"], rig, bone, smooth=True)
+    # three strap loops on the rim, and a string from the cork to the first one
+    loop_pts = []
+    lp = []
+    for ang in (math.radians(50), math.radians(-50), math.radians(180)):
+        p = cen + tang * (math.sin(ang) * r * 1.03) + up * (math.cos(ang) * r * 1.03)
+        axis = (tang * math.cos(ang) - up * math.sin(ang)).normalized()
+        tv, tf = torus(p, axis, 0.009, 0.0022, n=12, m=5)
+        lp.append((tv, tf))
+        loop_pts.append(p)
+    v, f = C.merge(lp)
+    rigid("tcw_canteen_loops", v, f, m["steel"], rig, bone, smooth=True)
+    st = []
+    p0 = top + up * 0.032 + o * 0.009
+    p1 = loop_pts[0]
+    for i in range(9):
+        s = i / 8
+        q = p0 * (1 - s) + p1 * s - up * (0.02 * math.sin(math.pi * s)) + o * 0.01 * math.sin(math.pi * s)
+        st.append(C.ring(q, tang, o, 0.0012, 0.0012, 5))
+    v, f = C.loft(st)
+    rigid("tcw_canteen_string", v, f, m["webbing"], rig, bone, smooth=True)
+
+
+def build_scabbard(m, rig, bone, p, o, tang, down):
+    """Leather bayonet scabbard: a frog loop at the belt, a tapering sheath, a brass ball tip."""
+    w, l, t = D["scabbard"]
+    rings = []
+    for k in range(9):
+        s = k / 8
+        rx = w / 2 * (1 - 0.68 * s)
+        ry = t / 2 * (1 - 0.35 * s) + 0.002
+        rings.append(C.ring(p + o * (0.012 + t) + down * (l * s), tang, o, rx, ry, 12))
+    v, f = C.loft(rings)
+    sh = rigid("tcw_scabbard", v, f, m["leather"], rig, bone, smooth=True)
+    C.stamp_attrs(sh, wear=0.4, dirt=0.25)
+    tip = p + o * (0.012 + t) + down * (l + 0.006)
+    tv, tf = C.loft([C.ring(tip + down * dz, tang, o, rr, rr, 10) for dz, rr in
+                     ((-0.022, 0.0075), (-0.004, 0.0085), (0.0, 0.010), (0.006, 0.007), (0.009, 0.0))])
+    rigid("tcw_scabbard_tip", tv, tf, m["brass"], rig, bone, smooth=True)
+    fv, ff = C.box(p + o * (0.010 + t / 2) + down * 0.03, (tang, down, o), (w / 2 + 0.006, 0.045, t / 2 + 0.006))
+    rigid("tcw_scabbard_frog", fv, ff, m["leather"], rig, bone, bevel=0.003)
 
 
 # ------------------------------------------------------------------------------ main
@@ -1034,7 +1379,7 @@ def main():
             rr = run[j] + D["coat_offset_torso"] + 0.006 + D["coat_hem_flare"] * t * t + d
             xy = hip_o.c + (hip_o.F * math.cos(a) + hip_o.L * math.sin(a)) * rr
             ring.append(Vector((xy[0], xy[1], z)))
-            ring_attrs.append((0.25 * C.smoothstep(0.75, 1.0, t), 0.0, max(0.0, -d / 0.006)))
+            ring_attrs.append((0.25 * C.smoothstep(0.75, 1.0, t), 0.0, max(0.0, -d / 0.012)))
         rings.append(ring)
     sv, sf = C.loft(rings, cap_start=False, cap_end=False)
     skirt = C.mesh_object("tcw_coat_skirt", sv, sf)
@@ -1106,10 +1451,15 @@ def main():
     fi = max(range(len(wpts)), key=lambda i: wouts[i].dot(F))
     pc = wpts[fi] + wouts[fi] * 0.004
     bw, bh = D["belt_plate"]
-    plate = C.mesh_object("tcw_belt_plate", *C.loft(
-        [C.ring(pc + wouts[fi] * dz, Lv, U, bw / 2, bh / 2, 16) for dz in (0.0, 0.004)]))
+    plate = C.mesh_object("tcw_belt_plate", *plate_profile(pc, Lv, U, wouts[fi], bw, bh, OVAL_PROFILE, n=32))
     C.assign(plate, m["brass"])
     sk_torso.apply(plate, 6)
+    # belt keeper: a brass loop beside the plate (wearer's left)
+    kp = pc + Lv * (bw / 2 + 0.02)
+    kv, kf = C.box(kp + wouts[fi] * 0.002, (Lv, U, wouts[fi]), (0.004, D["waist_belt_width"] / 2 + 0.002, 0.002))
+    keeper = C.mesh_object("tcw_belt_keeper", kv, kf, smooth=False)
+    C.assign(keeper, m["brass"])
+    sk_torso.apply(keeper, 6)
 
     def diag_loop(top_side, bottom_side, shift, width, pad, bottom_z=None):
         sh = lm["shL"] if top_side == "L" else lm["shR"]
@@ -1128,18 +1478,23 @@ def main():
     ribbon("tcw_cartridge_belt", cb_pts, cb_outs, cb_n, D["cartridge_belt_width"], m["leather"], sk_torso)
     target = lm["shL"] + F * 0.14 - U * 0.17
     bi = min(range(len(cb_pts)), key=lambda i: (cb_pts[i] - target).length)
-    pc = cb_pts[bi] + cb_outs[bi] * 0.004
-    bp = C.mesh_object("tcw_breast_plate", *C.loft(
-        [C.ring(pc + cb_outs[bi] * dz, cb_n, cb_n.cross(cb_outs[bi]).normalized(),
-                D["breast_plate_d"] / 2, D["breast_plate_d"] / 2, 20) for dz in (0.0, 0.004)]))
+    pc = cb_pts[bi] + cb_outs[bi] * 0.003
+    bp = C.mesh_object("tcw_breast_plate", *plate_profile(
+        pc, cb_n, cb_n.cross(cb_outs[bi]).normalized(), cb_outs[bi], D["breast_plate_d"], D["breast_plate_d"],
+        OVAL_PROFILE, n=32))
     C.assign(bp, m["brass"])
     sk_torso.apply(bp, 6)
+    # an iron buckle on the cartridge belt, low on the front (placeholder position)
+    p_, o_, al_ = ribbon_point(cb_pts, cb_outs, lm["hip_c"] + F * 0.2 - Lv * 0.08 + U * 0.22)
+    buckle("tcw_cartridge_belt_buckle", m["steel"], p_ + o_ * 0.003, al_, cb_n, o_, 0.066, 0.04, sk_torso)
     roll_pts, roll_outs, roll_n = diag_loop("L", "R", -0.01, 0.0, D["strap_thickness"] + 0.006,
                                             bottom_z=waist_z + 0.02)
-    tube_along("tcw_blanket_roll", roll_pts, roll_outs, roll_n, D["blanket_roll_r"], m["blanket"], sk_torso)
+    build_blanket_roll(m, roll_pts, roll_outs, roll_n, rig, sk_torso)
     for j, (shift, mat_name) in enumerate(((0.025, "haversack"), (-0.025, "webbing"))):
         p_, o_, n_ = diag_loop("R", "L", shift, D["sling_strap_width"], D["strap_thickness"] + 0.003 + 0.002 * j)
         ribbon("tcw_strap_" + mat_name, p_, o_, n_, D["sling_strap_width"], m[mat_name], sk_torso)
+        bp_, bo_, bal_ = ribbon_point(p_, o_, lm["shR"] + F * 0.12 - U * (0.14 + 0.05 * j) + Lv * 0.06)
+        buckle("tcw_strap_buckle_" + mat_name, m["steel"], bp_ + bo_ * 0.003, bal_, n_, bo_, 0.04, 0.03, sk_torso)
     T.mark("belts, straps, roll")
 
     # coat buttons down the centre front
@@ -1177,44 +1532,31 @@ def main():
         i = max(range(len(hpts)), key=lambda k: houts[k].dot(direction))
         return hpts[i] + U * z_shift, houts[i]
 
-    def side_box(name, size, direction, z_shift, mat, gap=0.006, tilt=0.0):
+    def side_frame(direction, z_shift, gap, d):
         p, o = surface(direction, z_shift)
         o = Vector((o.x, o.y, 0)).normalized()
-        tang = U.cross(o).normalized()
-        w, h, d = size
-        up = (U * math.cos(tilt) + tang * math.sin(tilt)).normalized()
-        across = up.cross(o).normalized()
-        cen = p + o * (gap + d / 2)
-        v, f = C.box(cen, (across, up, o), (w / 2, h / 2, d / 2))
-        return rigid(name, v, f, mat, rig, anchor, bevel=0.006)
+        return p + o * (gap + d / 2), o.cross(U).normalized(), U.copy(), o
 
     back = -F
-    side_box("tcw_cartridge_box", D["cartridge_box"], (-Lv) * 0.55 + back * 0.85, 0.0, m["leather"],
-             gap=D["strap_thickness"] + 0.004)
-    side_box("tcw_cap_pouch", D["cap_pouch"], F * 0.8 + (-Lv) * 0.6, waist_z - hz - 0.02, m["leather"],
-             gap=0.006)
-    hv = side_box("tcw_haversack", D["haversack"], Lv * 0.95 + F * 0.2, -0.10, m["haversack"], gap=0.012)
-    # canteen: a lens-shaped disc outside the haversack, a little behind it
+    cb = D["cartridge_box"]
+    cen, acr, up_, o_ = side_frame((-Lv) * 0.55 + back * 0.85, 0.0, D["strap_thickness"] + 0.004, cb[2])
+    build_box_kit("tcw_cartridge_box", m, rig, anchor, cen, acr, up_, o_, cb, plate=D["box_plate"])
+    cp = D["cap_pouch"]
+    cen, acr, up_, o_ = side_frame(F * 0.8 + (-Lv) * 0.6, waist_z - hz - 0.02, 0.006, cp[2])
+    build_box_kit("tcw_cap_pouch", m, rig, anchor, cen, acr, up_, o_, cp, plate=None, flap_frac=0.7)
+    hs = D["haversack"]
+    cen, acr, up_, o_ = side_frame(Lv * 0.95 + F * 0.2, -0.10, 0.010, 0.0)
+    build_haversack(m, rig, anchor, cen + U * (hs[1] / 2), acr, up_, o_, hs)
+    # canteen: outside the haversack, a little behind it
     p, o = surface(Lv * 0.9 + back * 0.45, -0.07)
     o = Vector((o.x, o.y, 0)).normalized()
-    cen = p + o * (0.012 + D["haversack"][2] + D["canteen_t"] / 2)
-    tang = U.cross(o).normalized()
-    r = D["canteen_d"] / 2
-    rings_c = [C.ring(cen + o * (s * D["canteen_t"] / 2), tang, U, r * k, r * k, 24)
-               for s, k in ((-1, 0.82), (-0.6, 0.97), (0, 1.0), (0.6, 0.97), (1, 0.82))]
-    cv, cf = C.loft(rings_c)
-    rigid("tcw_canteen", cv, cf, m["canteen"], rig, anchor, smooth=True)
-    spout = C.loft([C.ring(cen + U * (r + dz), tang, o, 0.012, 0.012, 10) for dz in (-0.01, 0.025)])
-    rigid("tcw_canteen_spout", spout[0], spout[1], m["steel"], rig, anchor, smooth=True)
+    cen = p + o * (0.012 + hs[2] + 0.01 + D["canteen_t"] / 2)
+    build_canteen(m, rig, anchor, cen, o.cross(U).normalized(), U.copy(), o)
     # bayonet scabbard on the left hip, angled back
     p, o = surface(Lv * 0.6 + back * 0.8, -0.02)
     o = Vector((o.x, o.y, 0)).normalized()
-    tang = U.cross(o).normalized()
-    w, l, t = D["scabbard"]
     down = (-U * math.cos(math.radians(25)) + back.normalized() * math.sin(math.radians(25))).normalized()
-    cen = p + o * (0.01 + t) + down * (l / 2)
-    v, f = C.box(cen, (tang, down, o), (w / 2, l / 2, t / 2))
-    rigid("tcw_scabbard", v, f, m["leather"], rig, anchor, bevel=0.004)
+    build_scabbard(m, rig, anchor, p, o, U.cross(o).normalized(), down)
     T.mark("hip kit")
 
     # headgear

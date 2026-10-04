@@ -64,8 +64,19 @@ P = {
     "sun_az": C.arg("sun-az", 200.0),             # deg, ground plane, from screen-right CCW
     "sun_el": C.arg("sun-el", 52.0),              # key elevation: models folds from upper-left
     "shadow_el": C.arg("shadow-el", 74.0),        # ground-shadow sun: same azimuth, ~0.29 m per metre
-    "sun_strength": C.arg("sun-strength", 4.2),
+    "sun_strength": C.arg("sun-strength", 3.4),
     "sun_soft_deg": C.arg("sun-soft", 3.0),
+    "shadow_soft_deg": C.arg("shadow-soft", 9.0),  # soft, short ground shadow (fixed on screen in game)
+    "view_transform": C.arg("view-transform", "Standard"),
+    "exposure": C.arg("exposure", 0.0),
+    # frontal fill from the camera side, soldier only: lifts faces out of the cap's shadow
+    "fill_el": C.arg("fill-el", 12.0),
+    "fill_strength": C.arg("fill-strength", 0.9),
+    "fill_rgb": (1.0, 0.97, 0.92),
+    # field tier only: thicken the musket's cross-section so it survives at 96 px (readability choice)
+    "field_musket_scale": C.arg("field-musket-scale", 1.7),
+    # extra figure variants rendered into the FIELD tier atlas (the game can pick per man)
+    "field_variants": C.arg("field-variants", "slouch,face2,mixed"),
     "sun_rgb": (1.0, 0.90, 0.78),                 # warm key
     "sky_strength": C.arg("sky-strength", 0.45),
     "sky_hex": "#a9bdd6",                         # cool sky fill (world)
@@ -97,6 +108,7 @@ VARIANTS = {
     "bayonet": {"cap", "roll", "face1", "bayonet"},
     "noroll":  {"cap", "face1"},
     "face2":   {"cap", "roll", "face2"},
+    "mixed":   {"slouch", "face2"},           # slouch hat, second face, no blanket roll
 }
 
 
@@ -138,15 +150,15 @@ def setup_scene():
     sc.render.image_settings.color_depth = "8"
     sc.render.image_settings.compression = 15
     sc.render.resolution_percentage = 100
+    # Standard view transform (second pass): the game draws sprites as baked and applies its own
+    # grade, and AgX desaturated the dark-blue coat into pale grey-blue on the field. Standard
+    # keeps albedo-true colours on the lit side.
     vs = sc.view_settings
     try:
-        vs.view_transform = "AgX"
-        for cand in ("AgX - Medium High Contrast", "Medium High Contrast"):
-            try:
-                vs.look = cand
-                break
-            except Exception:  # noqa: BLE001
-                continue
+        vs.view_transform = P["view_transform"]
+        vs.look = "None"
+        vs.exposure = P["exposure"]
+        vs.gamma = 1.0
     except Exception as e:  # noqa: BLE001
         C.log("colour management:", e)
     REP["colour"] = {"view": vs.view_transform, "look": vs.look}
@@ -207,7 +219,7 @@ def setup_scene():
     sun = sun_light("tcw_sun", to_sun, P["sun_strength"], P["sun_rgb"], P["sun_soft_deg"])
     to_shadow = dir_vec(P["sun_az"], P["shadow_el"])
     if link_to(sun, lit, "key"):
-        shs = sun_light("tcw_shadow_sun", to_shadow, P["sun_strength"], (1.0, 1.0, 1.0), P["sun_soft_deg"] + 2.0)
+        shs = sun_light("tcw_shadow_sun", to_shadow, P["sun_strength"], (1.0, 1.0, 1.0), P["shadow_soft_deg"])
         link_to(shs, ground, "shadow")
     else:
         to_shadow = to_sun  # no linking: the key also casts the ground shadow (long)
@@ -217,6 +229,11 @@ def setup_scene():
     rim = sun_light("tcw_rim", to_rim, P["rim_strength"], P["rim_rgb"], 8.0)
     if not link_to(rim, lit, "rim"):
         rim.data.use_shadow = False
+    # soft frontal fill from the camera side (lifts faces under the cap visor), soldier only
+    to_fill = dir_vec(270.0, P["fill_el"])
+    fill = sun_light("tcw_fill", to_fill, P["fill_strength"], P["fill_rgb"], 25.0)
+    if not link_to(fill, lit, "fill"):
+        fill.data.use_shadow = False
 
     # green ground bounce: a large area light lying on the ground, facing up, soldier only
     b_d = bpy.data.lights.new("tcw_bounce", "AREA")
@@ -253,6 +270,8 @@ def setup_scene():
         "shadow": {"type": "sun", "to_light_world": [round(x, 4) for x in to_shadow], "linking": linked.get("shadow")},
         "rim": {"type": "sun", "to_light_world": [round(x, 4) for x in to_rim], "strength": P["rim_strength"],
                 "colour": P["rim_rgb"], "linking": linked.get("rim")},
+        "fill": {"type": "sun (soft, from the camera side)", "to_light_world": [round(x, 4) for x in to_fill],
+                 "strength": P["fill_strength"], "linking": linked.get("fill")},
         "bounce": {"type": "area 4 m square on the ground, facing up", "watts": P["bounce_w"],
                    "colour": P["bounce_rgb"], "linking": linked.get("bounce")},
         "sky": {"hex": P["sky_hex"], "strength": P["sky_strength"]},
@@ -407,6 +426,46 @@ def tier_framing(fr, px):
     return {"orthoM": o, "pxPerMetre": round(px / o, 4), "anchors": anchors, "anchor": anchors[0]}
 
 
+def colour_probes(sc, cam, px, lm):
+    """Pixel positions in the hero image where named parts are directly visible, so pack.mjs can
+    report the sRGB each part actually lands at (coat, trousers, belts, roll, skin)."""
+    from bpy_extras.object_utils import world_to_camera_view
+    dg = bpy.context.evaluated_depsgraph_get()
+    body = sc.get("tcw_body", "")
+    eye_z = lm.get("brow_z", 1.6) - 0.028
+    targets = {"coat": "tcw_coat", "trousers": "tcw_trousers", "cartridge belt": "tcw_cartridge_belt",
+               "waist belt": "tcw_waist_belt", "blanket roll": "tcw_blanket_roll", "skin (face)": body,
+               "haversack": "tcw_haversack", "canteen": "tcw_canteen"}
+    cam_loc = cam.matrix_world.translation.copy()
+    out = {}
+    for label, name in targets.items():
+        o = bpy.data.objects.get(name)
+        if o is None or o.hide_render:
+            continue
+        ev = o.evaluated_get(dg)
+        me = ev.to_mesh()
+        M = ev.matrix_world.copy()
+        pts = [M @ v.co for v in me.vertices]
+        ev.to_mesh_clear()
+        if label.startswith("skin"):
+            pts = [p for p in pts if eye_z - 0.10 < p.z < eye_z + 0.03]
+        stride = max(1, len(pts) // 600)
+        hits = []
+        for p in pts[::stride]:
+            d = p - cam_loc
+            dist = d.length
+            d.normalize()
+            ok, loc, _n, _i, hobj, _m = sc.ray_cast(dg, cam_loc, d, distance=dist + 0.02)
+            if ok and getattr(hobj, "original", hobj).name == name and (loc - p).length < 0.012:
+                uv = world_to_camera_view(sc, cam, p)
+                if 0.01 < uv.x < 0.99 and 0.01 < uv.y < 0.99:
+                    hits.append([round(uv.x * px, 1), round((1.0 - uv.y) * px, 1)])
+            if len(hits) >= 60:
+                break
+        out[label] = hits
+    return out
+
+
 def render_to(sc, path):
     sc.render.filepath = path
     t = time.time()
@@ -460,6 +519,10 @@ def main():
     sc.cycles.samples = P["samples_hero"]
     REP["hero"].update({"px": P["hero_px"], "samples": P["samples_hero"], "direction": hd,
                         "seconds": round(render_to(sc, os.path.join(C.OUT, "hero.png")), 2)})
+    try:
+        REP["colour_probes"] = colour_probes(sc, hero, P["hero_px"], lm)
+    except Exception as e:  # noqa: BLE001
+        REP["colour_probes_error"] = str(e)
     T.mark("hero")
     sc.camera = closeup
     sc.cycles.samples = P["samples_closeup"]
@@ -496,29 +559,40 @@ def main():
         plan.pop("field")
     budget_s = P["budget_min"] * 60.0
     reduced = None
-    tiers = [("close", P["close_px"], P["samples_close"]), ("field", P["field_px"], P["samples_field"])]
-    for tier, px, spp in tiers:
-        if tier not in plan:
-            continue
+    fvars = [v for v in str(P["field_variants"]).split(",") if v in VARIANTS and v != "base"]
+    if P["quick"]:
+        fvars = fvars[:1]
+    REP["field_variants"] = {"planned": list(fvars)}
+    musket = bpy.data.objects.get("tcw_musket")
+    n_field_frames = sum(len(clips[c]["frames"]) for c in clips) * (N if not P["quick"] else 1)
+
+    def render_set(out, px, spp, plan_t, times, done, check_budget=False):
         sc.render.resolution_x = sc.render.resolution_y = px
         sc.cycles.samples = spp
-        out = os.path.join(C.OUT, "frames", tier)
         os.makedirs(out, exist_ok=True)
-        times = []
-        done = {}
+        nonlocal reduced, fvars
         order = ["stand"] + [c for c in clips if c != "stand"]
         for clip in order:
-            dirs = plan[tier].get(clip, [])
-            if tier == "close" and clip != "stand" and times and not P["quick"]:
+            dirs = plan_t.get(clip, [])
+            if check_budget and clip != "stand" and times and not P["quick"]:
                 # budget check after the stand clip: per-frame time is now measured
                 per = statistics.median(times)
                 n_close_left = sum(len(clips[c]["frames"]) for c in clips if c != "stand") * len(dirs)
-                n_field = sum(len(clips[c]["frames"]) for c in clips) * N
-                est = (time.time() - t_start) + per * n_close_left + per * 0.2 * n_field
+                field_ratio = 0.2
+
+                def est_for(nv, n_close):
+                    return (time.time() - t_start) + per * n_close + per * field_ratio * n_field_frames * (1 + nv)
+                est = est_for(len(fvars), n_close_left)
                 C.log("budget: %.2fs/frame close; estimated stage total %.0fs (budget %.0fs)" % (per, est, budget_s))
+                while est > budget_s and fvars:
+                    dropped = fvars.pop()
+                    REP["field_variants"].setdefault("dropped_for_budget", []).append(dropped)
+                    est = est_for(len(fvars), n_close_left)
                 if est > budget_s and reduced is None:
-                    plan["close"] = {c: (v if c == "stand" else list(range(0, N, 4))) for c, v in plan["close"].items()}
-                    dirs = plan["close"][clip]
+                    for c in plan_t:
+                        if c != "stand":
+                            plan_t[c] = list(range(0, N, 4))
+                    dirs = plan_t[clip]
                     reduced = {"reason": "estimated %.0fs > budget %.0fs" % (est, budget_s),
                                "close_directions_non_stand": dirs}
                     C.log("REDUCING close-tier directions for non-stand clips to", dirs)
@@ -531,6 +605,18 @@ def main():
                     sc.frame_set(f)
                     times.append(render_to(sc, os.path.join(out, "%s_%d_d%02d.png" % (clip, i, d))))
             done[clip] = dirs
+
+    tiers = [("close", P["close_px"], P["samples_close"]), ("field", P["field_px"], P["samples_field"])]
+    for tier, px, spp in tiers:
+        if tier not in plan:
+            continue
+        if tier == "field" and musket is not None:
+            # readability choice: a thicker musket cross-section at 96 px only (length unchanged)
+            s = P["field_musket_scale"]
+            musket.scale = (s, s, 1.0)
+        times, done = [], {}
+        render_set(os.path.join(C.OUT, "frames", tier), px, spp, plan[tier], times, done,
+                   check_budget=(tier == "close"))
         REP["tiers"][tier] = {
             "px": px, "samples": spp, "renders": len(times),
             "directions": sorted(set(d for v in done.values() for d in v)),
@@ -545,6 +631,23 @@ def main():
             "anchor_px": tier_framing(framing["stand"], px)["anchor"],
         }
         T.mark("tier " + tier)
+    # ---- extra figure variants in the FIELD tier only (same framing and anchors as base)
+    if "field" in plan:
+        per_field = REP["tiers"]["field"]["seconds_per_frame_median"] or 0.5
+        for v in list(fvars):
+            need = per_field * n_field_frames
+            if (time.time() - t_start) + need > budget_s + 120:
+                REP["field_variants"].setdefault("dropped_for_budget", []).append(v)
+                continue
+            set_variant(v)
+            times, done = [], {}
+            render_set(os.path.join(C.OUT, "frames", "field_" + v), P["field_px"], P["samples_field"],
+                       plan["field"], times, done)
+            REP["field_variants"][v] = {"renders": len(times), "seconds_total": round(sum(times), 2)}
+            T.mark("field variant " + v)
+        set_variant("base")
+    if musket is not None:
+        musket.scale = (1.0, 1.0, 1.0)
     REP["reduced"] = reduced
     REP["quick"] = bool(P["quick"])
     REP["camera"] = {"type": "orthographic", "elevation_deg": P["elevation"],

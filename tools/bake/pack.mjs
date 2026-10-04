@@ -180,9 +180,10 @@ function contactSheet(render, clips) {
   row3.forEach((f, i) => cells.push(cell(3, i, f)));
   const fdir = path.join(OUT, 'frames', 'field');
   const row4 = [
-    ...[0, 2, 4, 8, 12].map((d) => path.join(fdir, `stand_0_d${dd(d)}.png`)),
-    path.join(fdir, `walk_0_d${dd(wd)}.png`), path.join(fdir, `walk_4_d${dd(wd)}.png`),
-    path.join(fdir, `fire_1_d${dd(wd)}.png`),
+    path.join(fdir, `stand_0_d${dd(0)}.png`), path.join(fdir, `stand_0_d${dd(wd)}.png`),
+    path.join(fdir, `walk_0_d${dd(wd)}.png`), path.join(fdir, `fire_1_d${dd(wd)}.png`),
+    path.join(fdir, `load_2_d${dd(wd)}.png`),
+    ...['slouch', 'face2', 'mixed'].map((v) => path.join(OUT, 'frames', `field_${v}`, `stand_0_d${dd(wd)}.png`)),
   ];
   row4.forEach((f, i) => cells.push(cell(4, i, f)));
   const sheet = new PNG({ width: 8 * S, height: 5 * S });
@@ -214,7 +215,7 @@ function contactSheet(render, clips) {
       'row 2: stand, directions 8-15',
       `row 3: walk cycle frames 0-7, direction ${wd}`,
       `row 4: aim, fire, recover, fallen (direction ${wd}); variants: slouch hat, fixed bayonet, no blanket roll, second face`,
-      `row 5: field tier (96 px) at 1:1: stand directions 0, 2, 4, 8, 12; walk frames 0 and 4, fire (direction ${wd})`,
+      `row 5: field tier (96 px) at 1:1: stand d0 and d${wd}, walk, fire, load (d${wd}); field variants slouch, face2, mixed (stand d${wd})`,
     ],
   };
 }
@@ -237,6 +238,31 @@ function heroPreview(src = 'hero.png', dst = 'hero-preview.png') {
   return { file: dst, bytes: writePNG(path.join(OUT, dst), bg) };
 }
 
+// The sRGB each named part actually lands at in hero.png (median over directly visible pixels
+// that render.py found by ray casting from the hero camera).
+function measureColours(render) {
+  const f = path.join(OUT, 'hero.png');
+  const probes = render.colour_probes || {};
+  if (!fs.existsSync(f)) return {};
+  const png = readPNG(f);
+  const out = {};
+  for (const [label, pts] of Object.entries(probes)) {
+    const rs = [], gs = [], bs = [];
+    for (const [x, y] of pts) {
+      const xi = Math.round(x), yi = Math.round(y);
+      if (xi < 0 || yi < 0 || xi >= png.width || yi >= png.height) continue;
+      const i = (yi * png.width + xi) * 4;
+      if (png.data[i + 3] < 250) continue;
+      rs.push(png.data[i]); gs.push(png.data[i + 1]); bs.push(png.data[i + 2]);
+    }
+    if (!rs.length) continue;
+    const med = (a) => a.sort((p, q) => p - q)[a.length >> 1];
+    const c = [med(rs), med(gs), med(bs)];
+    out[label] = { hex: '#' + c.map((v) => v.toString(16).padStart(2, '0')).join(''), samples: rs.length };
+  }
+  return out;
+}
+
 function pack() {
   const render = readJSON(path.join(OUT, 'report', 'render.json'));
   const poses = readJSON(path.join(OUT, 'report', 'poses.json'));
@@ -254,6 +280,15 @@ function pack() {
       clips: r.clips, directionsByClip: r.directions_by_clip,
     };
   }
+  // added (second pass): extra figure variants in the field tier, same keys/anchors as the base
+  const fieldVariants = {};
+  const framesDir = path.join(OUT, 'frames');
+  for (const d of (fs.existsSync(framesDir) ? fs.readdirSync(framesDir) : []).filter((x) => x.startsWith('field_')).sort()) {
+    const t = packTier(d, render.tiers?.field?.clips || {});
+    if (t) fieldVariants[d.slice('field_'.length)] = { count: t.count, pages: t.pages, rawFrameBytes: t.rawFrameBytes, frames: t.frames };
+  }
+  if (tiers.field && Object.keys(fieldVariants).length) tiers.field.variants = fieldVariants;
+  const measuredColours = measureColours(render);
   const manifest = {
     version: 1,
     subject: 'Union infantry private, Western theater, 1862 (second-pass bake; uniform and kit are placeholder/Inferred)',
@@ -264,6 +299,8 @@ function pack() {
     variants: Object.keys(render.variants || {}),
     // added (second pass)
     lights: render.lights, quick: render.quick, variantsFraming: render.variants_framing,
+    measuredColours,
+    readability: 'field tier only: musket cross-section thickened x' + (render.params?.field_musket_scale ?? '?') + ' (length unchanged) so it survives at 96 px',
   };
   fs.mkdirSync(path.join(OUT, 'atlas'), { recursive: true });
   fs.writeFileSync(path.join(OUT, 'atlas', 'soldier.json'), JSON.stringify(manifest, null, 1));
@@ -276,7 +313,9 @@ function pack() {
       atlasBytes: v.pages.reduce((s, p) => s + p.bytes, 0),
     }])),
     manifestBytes: fs.statSync(path.join(OUT, 'atlas', 'soldier.json')).size,
-    contactSheet: sheet, heroPreview: hero, closeupPreview: closeup,
+    contactSheet: sheet, heroPreview: hero, closeupPreview: closeup, measuredColours,
+    fieldVariants: Object.fromEntries(Object.entries(fieldVariants).map(([k, v]) => [k, {
+      count: v.count, pages: v.pages, atlasBytes: v.pages.reduce((s, p) => s + p.bytes, 0) }])),
   };
   fs.writeFileSync(path.join(OUT, 'report', 'pack.json'), JSON.stringify(pack, null, 2));
   for (const [k, v] of Object.entries(pack.tiers)) {
@@ -329,6 +368,8 @@ function summary() {
     }
     lines.push('', `hero ${render.hero?.px}px @ ${render.hero?.samples} spp: ${render.hero?.seconds}s; close-up @ ${render.closeup?.samples} spp: ${render.closeup?.seconds}s. Variants: ${JSON.stringify(render.variants)}`);
     if (render.quick) lines.push('', '**Quick run** (check set only, not the full matrix).');
+    if (pack.measuredColours) lines.push('', `measured sRGB in hero.png: ${Object.entries(pack.measuredColours).map(([k, v]) => `${k} ${v.hex} (${v.samples})`).join('; ')}`);
+    if (pack.fieldVariants) lines.push('', `field variants: ${JSON.stringify(pack.fieldVariants)}; plan ${JSON.stringify(render.field_variants)}`);
     const fr = render.tiers.close?.clips || {};
     lines.push('', '| clip | ortho m | close px/m | close anchor |', '|---|---:|---:|---|');
     for (const [k, v] of Object.entries(fr)) lines.push(`| ${k} | ${v.orthoM} | ${v.pxPerMetre} | ${JSON.stringify(v.anchor)} |`);
