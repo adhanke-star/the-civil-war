@@ -1,6 +1,12 @@
 # Art bake probe: build a Union infantryman in headless Blender (MPFB2 body + scripted uniform),
 # key poses, render sprite frames with baked light and shadow, pack atlases. The artifact is the
 # result (7-day retention); nothing is committed from this workflow. See tools/bake/README.md.
+#
+# Third pass: three jobs.
+#   prep    builds the soldier once (probe, uniform, poses) and hands work/posed.blend on
+#   render  a matrix of shards renders in parallel (hero/head/hand shots; close tier by
+#           direction; field tier + every field variant by direction); quick runs use one "all" shard
+#   pack    merges the shards' frames and reports into atlases, manifest, contact sheet, previews
 name: Bake
 
 on:
@@ -21,11 +27,8 @@ on:
       elevation:
         description: Camera elevation in degrees above horizontal
         default: '35'
-      budget_min:
-        description: Render budget in minutes before directions are reduced
-        default: '23'
       quick:
-        description: '1 = quick check set (hero, close-up, variants, a few frames) instead of the full matrix'
+        description: '1 = quick check set (one shard: hero, portrait, hands, heads, a few frames) instead of the full matrix'
         default: '0'
   push:
     branches: [bake]
@@ -56,24 +59,19 @@ env:
   SAMPLES_HERO: ${{ inputs.samples_hero || '96' }}
   DIRECTIONS: ${{ inputs.directions || '16' }}
   ELEVATION: ${{ inputs.elevation || '35' }}
-  BUDGET_MIN: ${{ inputs.budget_min || '23' }}
   # push runs: put [quick] in the commit message for the quick check set
   QUICK: ${{ inputs.quick || (contains(github.event.head_commit.message, '[quick]') && '1') || '0' }}
+  # full run: 1 hero shard + 3 close-tier shards + 4 field-tier shards (directions d % n == k)
+  SHARDS_FULL: '["hero","c0of3","c1of3","c2of3","f0of4","f1of4","f2of4","f3of4"]'
 
 jobs:
-  bake:
+  prep:
     runs-on: ubuntu-latest
-    timeout-minutes: 34
+    timeout-minutes: 30
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
-
-      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
-        with:
-          node-version: lts/*
-          cache: npm
-
-      - name: Install Node deps (pngjs is already a devDependency)
-        run: npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Prepare output and print runner
         run: |
@@ -141,7 +139,7 @@ jobs:
           path: ~/dl/${{ env.BEARD_FILE }}
           key: mh-bodyparts05-cc0-2024-04-14
 
-      - name: Download MakeHuman bodyparts05 beard pack (CC0, second face variant)
+      - name: Download MakeHuman bodyparts05 beard pack (CC0, head presets)
         if: steps.beard-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p ~/dl
@@ -166,11 +164,10 @@ jobs:
           "$BLENDER" --command extension install-file -r user_default -e "$RUNNER_TEMP/mpfb.zip"
           rc=$?
           echo "extension install-file exit $rc"
-          ls ~/.config/blender/4.2/extensions/user_default/ 2>/dev/null || true
           printf 'install MPFB2 extension\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "cli exit $rc (probe retries)")" >> "$BAKE_OUT/timing.tsv"
           exit 0
 
-      - name: 1 probe_mpfb.py (MPFB2 human, default rig, CC0 skin)
+      - name: 1 probe_mpfb.py (MPFB2 human, default rig, CC0 head presets)
         run: |
           set +e
           "$BLENDER" -b --factory-startup -noaudio --python-exit-code 1 -P tools/bake/probe_mpfb.py -- \
@@ -188,7 +185,7 @@ jobs:
           printf 'uniform.py\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc")" >> "$BAKE_OUT/timing.tsv"
           exit $rc
 
-      - name: 3 poses.py (stand, walk, fire, fallen)
+      - name: 3 poses.py (stand, walk, fire, fallen, load; grip solve)
         run: |
           set +e
           "$BLENDER" -b --factory-startup -noaudio --python-exit-code 1 -P tools/bake/poses.py -- --out "$BAKE_OUT"
@@ -196,24 +193,154 @@ jobs:
           printf 'poses.py\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc")" >> "$BAKE_OUT/timing.tsv"
           exit $rc
 
-      - name: 4 render.py (Cycles CPU, ortho, directions x frames x tiers, hero)
-        timeout-minutes: 27
+      - name: Plan the render shards
+        id: plan
+        run: |
+          if [ "$QUICK" = "1" ]; then s='["all"]'; else s="$SHARDS_FULL"; fi
+          echo "shards=$s" >> "$GITHUB_OUTPUT"
+          echo "shards: $s"
+          ls -l "$BAKE_OUT/work"
+
+      - name: Hand the posed soldier to the render jobs (1 day)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: work-${{ github.run_number }}
+          path: .out/bake/work/posed.blend
+          retention-days: 1
+          compression-level: 1
+          if-no-files-found: error
+
+      - name: Upload prep reports (also when a stage fails)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: reports-${{ github.run_number }}
+          path: |
+            .out/bake/report/
+            .out/bake/timing.tsv
+          retention-days: 7
+          if-no-files-found: warn
+
+  render:
+    needs: prep
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.prep.outputs.shards) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Prepare output
+        run: |
+          mkdir -p "$BAKE_OUT/work"
+          echo "cpus: $(nproc)"; free -g
+
+      - name: Cache Blender tarball
+        id: blender-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/dl/blender-${{ env.BLENDER_VERSION }}-linux-x64.tar.xz
+          key: blender-${{ env.BLENDER_VERSION }}-linux-x64
+
+      - name: Download Blender (cache miss only)
+        if: steps.blender-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/dl
+          f=~/dl/blender-${BLENDER_VERSION}-linux-x64.tar.xz
+          for base in https://download.blender.org/release https://mirrors.ocf.berkeley.edu/blender/release https://ftp.nluug.nl/pub/graphics/blender/release; do
+            if curl -fsSL --retry 3 --retry-delay 5 -o "$f" "$base/Blender4.2/blender-${BLENDER_VERSION}-linux-x64.tar.xz" && echo "${BLENDER_SHA256}  $f" | sha256sum -c -; then exit 0; fi
+            rm -f "$f"
+          done
+          exit 1
+
+      - name: Unpack Blender
+        run: |
+          f=~/dl/blender-${BLENDER_VERSION}-linux-x64.tar.xz
+          echo "${BLENDER_SHA256}  $f" | sha256sum -c -
+          mkdir -p ~/blender && tar -xf "$f" -C ~/blender
+          B=~/blender/blender-${BLENDER_VERSION}-linux-x64/blender
+          echo "BLENDER=$B" >> "$GITHUB_ENV"
+          if ! "$B" -b --factory-startup -noaudio --version; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq --no-install-recommends libxi6 libxxf86vm1 libxfixes3 libxrender1 libgl1 libegl1 libxkbcommon0 libsm6 libice6 libx11-6
+            "$B" -b --factory-startup -noaudio --version
+          fi
+
+      - name: Fetch the posed soldier
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: work-${{ github.run_number }}
+          path: .out/bake/work
+
+      - name: Fetch the prep reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: reports-${{ github.run_number }}
+          path: .out/bake
+
+      - name: 4 render.py shard ${{ matrix.shard }}
+        timeout-minutes: 36
         run: |
           set +e
+          start=$SECONDS
           "$BLENDER" -b --factory-startup -noaudio --python-exit-code 1 -P tools/bake/render.py -- --out "$BAKE_OUT" \
             --samples-close "$SAMPLES_CLOSE" --samples-field "$SAMPLES_FIELD" --samples-hero "$SAMPLES_HERO" \
-            --directions "$DIRECTIONS" --elevation "$ELEVATION" --budget-min "$BUDGET_MIN" --quick "$QUICK" 2>&1 \
+            --directions "$DIRECTIONS" --elevation "$ELEVATION" --quick "$QUICK" --shard "${{ matrix.shard }}" 2>&1 \
             | grep -v -E '^Fra:|^Saved:|^ Time:|^$'
           rc=${PIPESTATUS[0]}
-          printf 'render.py\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc")" >> "$BAKE_OUT/timing.tsv"
+          printf 'render.py %s\t%s\t%s\n' "${{ matrix.shard }}" "$((SECONDS - start))" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc")" > "$BAKE_OUT/timing-${{ matrix.shard }}.tsv"
+          rm -f "$BAKE_OUT/timing.tsv"
           exit $rc
 
-      - name: 5 pack.mjs (atlas, manifest, contact sheet, hero preview)
+      - name: Upload the shard (1 day)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: shard-${{ github.run_number }}-${{ matrix.shard }}
+          path: |
+            .out/bake/
+            !.out/bake/work/**
+          retention-days: 1
+          if-no-files-found: warn
+
+  pack:
+    needs: [prep, render]
+    if: always() && needs.prep.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install Node deps (pngjs is already a devDependency)
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Fetch every shard
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: shard-${{ github.run_number }}-*
+          merge-multiple: true
+          path: .out/bake
+
+      - name: Fetch the prep reports
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: reports-${{ github.run_number }}
+          path: .out/bake
+
+      - name: 5 pack.mjs (merge shards, atlas, manifest, contact sheet, previews)
         run: |
           set +e
+          start=$SECONDS
           node tools/bake/pack.mjs --out "$BAKE_OUT"
           rc=$?
-          printf 'pack.mjs\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc")" >> "$BAKE_OUT/timing.tsv"
+          printf 'pack.mjs\t%s\t%s\n' "$((SECONDS - start))" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc")" > "$BAKE_OUT/timing-pack.tsv"
           exit $rc
 
       - name: Job summary
@@ -241,7 +368,9 @@ jobs:
             .out/bake/contact-sheet.png
             .out/bake/hero-preview.png
             .out/bake/hero-closeup-preview.png
+            .out/bake/portrait-preview.png
+            .out/bake/hands-preview.png
             .out/bake/report/
-            .out/bake/timing.tsv
+            .out/bake/timing*.tsv
           retention-days: 7
           if-no-files-found: warn

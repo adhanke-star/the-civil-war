@@ -62,11 +62,6 @@ MACROS = {"gender": 1.0, "age": 0.5, "muscle": 0.55, "weight": 0.42, "height": 0
 
 SKIN_CANDIDATES = ["young_caucasian_male.mhmat", "middleage_caucasian_male.mhmat",
                    "default.mhmat"]
-PROXY_ASSETS = [  # (subdir, file, asset_type, subdiv)
-    ("eyes", "low-poly.mhclo", "Eyes", 0),
-    ("eyebrows", "eyebrow001.mhclo", "Eyebrows", 0),
-    ("hair", "short02.mhclo", "Hair", 0),
-]
 
 
 def attempt(name, fn):
@@ -177,89 +172,188 @@ def install_assets(LocationService, AssetService):
     return "extracted %s into %s" % (os.path.basename(zip_path), data_dir)
 
 
-VARIANT_HAIR = ["short04.mhclo", "short01.mhclo", "short03.mhclo"]
-VARIANT_SKIN = ["middleage_caucasian_male.mhmat", "old_caucasian_male.mhmat", "young_caucasian_male.mhmat"]
-# MakeHuman "bodyparts05" pack, CC0 per its page (static.makehumancommunity.org/assets/assetpacks/
-# bodyparts05.html): wdg_scruffy_beard by WDG. Fetched on the runner only (--beard-zip).
-VARIANT_BEARDS = ["wdg_scruffy_beard.mhclo"]
+EYES_CANDIDATES = ["high-poly.mhclo", "low-poly.mhclo"]
 
 
-def add_variant_face(HumanService, AssetService, body, skin1):
-    """Second face preset for later tinting/swapping (render.py variant "face2"): another skin
-    texture, another hair, and a CC0 beard proxy. Each part is tagged tcw_variant=face2; the
-    first hair is tagged face1. Failures are recorded, never fatal."""
-    rep = REPORT.setdefault("variant_assets", {})
+def heads_table():
+    """HEADS / EXPR / HEAD_DEFAULT from the table at the top of uniform.py (read as literals with
+    ast, so the table lives in one place and uniform.py is not executed here)."""
+    import ast
+    src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "uniform.py")).read()
+    out = {}
+    for node in ast.parse(src).body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1:
+            name = getattr(node.targets[0], "id", None)
+            if name in ("HEADS", "EXPR", "HEAD_DEFAULT"):
+                out[name] = ast.literal_eval(node.value)
+    return out
+
+
+def find_asset(AssetService, fname, subdir, roots=()):
+    p = AssetService.find_asset_absolute_path(fname, asset_subdir=subdir)
+    if p:
+        return p
+    for root in roots:
+        for dp, _dn, fns in os.walk(root):
+            if fname in fns:
+                return os.path.join(dp, fname)
+    return None
+
+
+def build_heads(HumanService, TargetService, AssetService, LocationService, body):
+    """Third pass: the head presets of uniform.py HEADS. Each preset is
+      - one shape key on the body, tcw_head_<name>: the weighted sum of its CC0 face-shape
+        targets and the CC0 expression-unit targets (EXPR x expr_scale), relative to the basis;
+      - its own CC0 eyes, eyebrows, eyelashes, hair and (bodyparts05, CC0) beard proxies, fitted
+        by MPFB while that shape key is on, tagged tcw_head=<name> and tcw_role=<part>;
+      - copies of every body material slot after MPFB applies its CC0 skin (tcw_skin_<name>_<i>).
+    render.py turns one preset on per variant. Failures are recorded per part, never fatal."""
+    import numpy as np
+    tab = heads_table()
+    HEADS, EXPR = tab["HEADS"], tab["EXPR"]
+    default = tab.get("HEAD_DEFAULT") or list(HEADS)[0]
+    rep = REPORT.setdefault("heads", {})
+    REPORT["heads_default"] = default
+    data_root = LocationService.get_user_data()
+    tdir = LocationService.get_mpfb_data("targets")
+    # beard pack (CC0): unzip into the same user data dir, refresh the lists
+    zp = C.arg("beard-zip", "")
+    if zp and os.path.exists(zp):
+        def unpack():
+            with zipfile.ZipFile(zp) as z:
+                names = z.namelist()
+                z.extractall(data_root)
+            AssetService.update_all_asset_lists()
+            return [n for n in names if n.endswith(".mhclo")][:20]
+        ok, res = attempt("unpack beard pack " + os.path.basename(zp), unpack)
+        REPORT["beard_pack_mhclo"] = res
     listing = {}
-    for sub in ("hair", "clothes", "skins", "eyebrows"):
+    for sub in ("hair", "skins", "eyebrows", "eyelashes", "eyes"):
         try:
             fn = AssetService.list_mhmat_assets if sub == "skins" else AssetService.list_mhclo_assets
             listing[sub] = sorted(os.path.basename(str(p)) for p in fn(sub))[:80]
         except Exception as e:  # noqa: BLE001
             listing[sub] = "list failed: %s" % e
     REPORT["asset_listing"] = listing
-    # beard pack: unzip into the same user data dir, refresh the lists
-    zp = C.arg("beard-zip", "")
-    if zp and os.path.exists(zp):
-        def unpack():
-            LocationService = dyn("mpfb.services.locationservice", "LocationService")
-            with zipfile.ZipFile(zp) as z:
-                names = z.namelist()
-                z.extractall(LocationService.get_user_data())
-            AssetService.update_all_asset_lists()
-            return [n for n in names if n.endswith(".mhclo")][:20]
-        ok, res = attempt("unpack beard pack " + os.path.basename(zp), unpack)
-        rep["beard_pack_mhclo"] = res
-    # second skin: load it, copy the material, then restore the first skin
-    skin2 = None
-    for name in VARIANT_SKIN:
-        p = AssetService.find_asset_absolute_path(name, asset_subdir="skins")
-        if p and (not skin1 or os.path.basename(p) != os.path.basename(skin1)):
-            skin2 = p
-            break
-    if skin2 and skin1:
-        def swap():
-            m1 = body.material_slots[0].material.copy()
-            m1.name = "tcw_skin_face1"
-            m1.use_fake_user = True
-            HumanService.set_character_skin(skin2, body, skin_type="MAKESKIN")
-            m2 = body.material_slots[0].material
-            m2.name = "tcw_skin_face2"
-            m2.use_fake_user = True
-            body.material_slots[0].material = m1
-            body["tcw_skin_face1"] = m1.name
-            body["tcw_skin_face2"] = m2.name
-            return "%s -> %s / %s" % (os.path.basename(skin2), m1.name, m2.name)
-        ok, res = attempt("second skin", swap)
-        rep["skin2"] = res if ok else None
-    # second hair
-    for name in VARIANT_HAIR:
-        p = AssetService.find_asset_absolute_path(name, asset_subdir="hair")
-        if p:
-            ok, obj = attempt("variant hair " + name, lambda p=p: HumanService.add_mhclo_asset(
-                p, body, asset_type="Hair", subdiv_levels=0, material_type="MAKESKIN"))
+    # material slot roles, from MPFB's own slot names (Human.lips, Human.fingernails, ...)
+    roles = []
+    for i, s in enumerate(body.material_slots):
+        nm = s.material.name if s.material else ""
+        roles.append("skin" if i == 0 else nm.split(".")[-1].lower())
+    body["tcw_slot_roles"] = C.json.dumps(roles)
+    REPORT["slot_roles"] = roles
+    # ---- shape keys: one per preset
+    keys = body.data.shape_keys
+    basis = keys.reference_key
+    n = len(body.data.vertices)
+    base = np.empty(n * 3, dtype=np.float64)
+    basis.data.foreach_get("co", base)
+    cache = {}
+
+    def delta(tname, race):
+        unit = tname in EXPR
+        ck = (tname, race if unit else "")
+        if ck in cache:
+            return cache[ck]
+        if unit:
+            path = os.path.join(tdir, "expression", "units", race, tname + ".target.gz")
+        else:
+            path = TargetService.target_full_path(tname)
+        if not path or not os.path.exists(path):
+            cache[ck] = None
+            return None
+        sk = TargetService.load_target(body, path, weight=0.0, name="tcw_tmp_target")
+        arr = np.empty(n * 3, dtype=np.float64)
+        sk.data.foreach_get("co", arr)
+        body.shape_key_remove(sk)
+        cache[ck] = arr - base
+        return cache[ck]
+
+    for h, cfg in HEADS.items():
+        r = rep.setdefault(h, {"label": cfg.get("label"), "use": cfg.get("use"), "missing": []})
+        tot = np.zeros(n * 3, dtype=np.float64)
+        applied = {}
+        weights = dict(cfg.get("targets", {}))
+        for k, w in EXPR.items():
+            weights[k] = w * cfg.get("expr_scale", 1.0)
+        for tname, w in weights.items():
+            try:
+                d = delta(tname, cfg.get("race", "caucasian"))
+            except Exception as e:  # noqa: BLE001
+                r["missing"].append("%s: %s" % (tname, e))
+                continue
+            if d is None:
+                r["missing"].append(tname + ": not found")
+                continue
+            tot += w * d
+            applied[tname] = round(w, 3)
+        sk = body.shape_key_add(name="tcw_head_" + h, from_mix=False)
+        sk.data.foreach_set("co", base + tot)
+        sk.relative_key = basis
+        sk.value = 0.0
+        r["targets_applied"] = applied
+        r["max_offset_m"] = round(float(np.abs(tot).max()), 4)
+    # ---- per preset: skin copies and fitted proxies
+    out = {}
+    roots = [data_root, os.path.join(data_root, "clothes")]
+    for h, cfg in HEADS.items():
+        r = rep[h]
+        for k in body.data.shape_keys.key_blocks:
+            if k.name.startswith("tcw_head_"):
+                k.value = 1.0 if k.name == "tcw_head_" + h else 0.0
+        C.update()
+        rec = {"key": "tcw_head_" + h, "skins": [], "objects": []}
+        sp = find_asset(AssetService, cfg["skin"], "skins")
+        if sp:
+            ok, _ = attempt("skin %s %s" % (h, cfg["skin"]),
+                            lambda sp=sp: HumanService.set_character_skin(sp, body, skin_type="MAKESKIN"))
+            for i, s in enumerate(body.material_slots):
+                if s.material is None:
+                    rec["skins"].append(None)
+                    continue
+                cp = s.material.copy()
+                cp.name = "tcw_skin_%s_%d" % (h, i)
+                cp.use_fake_user = True
+                rec["skins"].append(cp.name)
+            r["skin"] = os.path.basename(sp) if ok else "FAILED " + cfg["skin"]
+        else:
+            r["missing"].append("skin " + cfg["skin"])
+        parts = [("eyes", "eyes", EYES_CANDIDATES, "Eyes"), ("brows", "eyebrows", [cfg.get("brows")], "Eyebrows"),
+                 ("lashes", "eyelashes", [cfg.get("lashes")], "Eyelashes"), ("hair", "hair", [cfg.get("hair")], "Hair"),
+                 ("beard", "clothes", [cfg.get("beard")], "Clothes")]
+        for role, sub, cands, atype in parts:
+            p = None
+            for fname in cands:
+                if fname:
+                    p = find_asset(AssetService, fname, sub, roots if role == "beard" else ())
+                    if p:
+                        break
+            if not p:
+                if any(cands):
+                    r["missing"].append("%s %s" % (role, cands))
+                continue
+            ok, obj = attempt("head %s %s %s" % (h, role, os.path.basename(p)),
+                              lambda p=p, atype=atype: HumanService.add_mhclo_asset(
+                                  p, body, asset_type=atype, subdiv_levels=0, material_type="MAKESKIN"))
             if ok and obj is not None:
-                obj["tcw_variant"] = "face2"
-                obj.hide_render = True
-                rep["hair2"] = name
-            break
-    # beard
-    for name in VARIANT_BEARDS:
-        p = AssetService.find_asset_absolute_path(name, asset_subdir="clothes")
-        if not p:
-            root = os.path.dirname(os.path.dirname(skin1)) if skin1 else ""
-            for dp, _dn, fns in os.walk(root or "."):
-                if name in fns:
-                    p = os.path.join(dp, name)
-                    break
-        if p:
-            ok, obj = attempt("variant beard " + name, lambda p=p: HumanService.add_mhclo_asset(
-                p, body, asset_type="Clothes", subdiv_levels=0, material_type="MAKESKIN"))
-            if ok and obj is not None:
-                obj["tcw_variant"] = "face2"
-                obj.hide_render = True
-                rep["beard"] = name
-            break
-        rep["beard"] = "not found: " + name
+                obj.name = "hd_%s_%s" % (h, role)
+                obj["tcw_head"] = h
+                obj["tcw_role"] = role
+                obj.hide_render = h != default
+                rec["objects"].append(obj.name)
+                r[role] = os.path.basename(p)
+        out[h] = rec
+    # ---- leave the default preset on
+    for k in body.data.shape_keys.key_blocks:
+        if k.name.startswith("tcw_head_"):
+            k.value = 1.0 if k.name == "tcw_head_" + default else 0.0
+    for i, mname in enumerate(out.get(default, {}).get("skins", [])):
+        if mname and i < len(body.material_slots):
+            body.material_slots[i].material = bpy.data.materials[mname]
+    body["tcw_heads"] = C.json.dumps(out)
+    body["tcw_head_default"] = default
+    REPORT["body_modifiers_after_heads"] = [(m.name, m.type) for m in body.modifiers]
+    return out
 
 
 def main():
@@ -312,22 +406,12 @@ def main():
         REPORT["skins_seen"] = "none of %s" % SKIN_CANDIDATES
     T.mark("skin")
 
-    proxies = []
-    for subdir, fname, atype, subdiv in PROXY_ASSETS:
-        p = AssetService.find_asset_absolute_path(fname, asset_subdir=subdir)
-        if not p:
-            REPORT["attempts"].append({"name": "find " + fname, "ok": False, "error": "not found"})
-            continue
-        ok, obj = attempt("add_mhclo_asset " + fname,
-                          lambda p=p, atype=atype, subdiv=subdiv: HumanService.add_mhclo_asset(
-                              p, body, asset_type=atype, subdiv_levels=subdiv, material_type="MAKESKIN"))
-        if ok and obj is not None:
-            proxies.append(getattr(obj, "name", str(obj)))
-            if atype == "Hair":
-                obj["tcw_variant"] = "face1"
-    T.mark("proxies")
-    add_variant_face(HumanService, AssetService, body, skin)
-    T.mark("variant face")
+    # third pass: every head preset (eyes, brows, lashes, hair, beard, skin, face shape) is built
+    # by build_heads; the second pass's single proxy set and "face2" are gone
+    ok, heads = attempt("build head presets", lambda: build_heads(HumanService, TargetService, AssetService,
+                                                                  LocationService, body))
+    proxies = [o for rec in (heads or {}).values() for o in rec.get("objects", [])]
+    T.mark("head presets")
 
     # ---- facts about the result
     C.update()

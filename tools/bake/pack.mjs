@@ -158,14 +158,67 @@ function packTier(tier, framing = {}) {
   return { frameSize: items[0]?.size ?? 0, count: items.length, pages: pageInfo, frames: ordered, rawFrameBytes: rawBytes };
 }
 
+// Third pass: the render runs as parallel shards (render.py --shard), each writing
+// report/render-<shard>.json. Merge them into one render.json with the second pass's shape:
+// tiers.<tier> sums renders and seconds and unions directions; field_variants unions variants.
+function mergeShards() {
+  const rdir = path.join(OUT, 'report');
+  const files = fs.existsSync(rdir) ? fs.readdirSync(rdir).filter((f) => /^render-.+\.json$/.test(f)).sort() : [];
+  if (!files.length) return null;
+  const shards = files.map((f) => readJSON(path.join(rdir, f)));
+  const base = shards.find((s) => s.shard === 'hero') || shards[0];
+  const merged = JSON.parse(JSON.stringify(base));
+  merged.tiers = {};
+  merged.field_variants = { planned: [] };
+  merged.shards = {};
+  merged.variants = {};
+  const mismatch = [];
+  for (const s of shards) {
+    merged.shards[s.shard] = { wall_seconds: s.wall_seconds, renders: Object.fromEntries(Object.entries(s.tiers || {}).map(([k, v]) => [k, v.renders])), timing: s.timing };
+    Object.assign(merged.variants, s.variants || {});
+    for (const [clip, fr] of Object.entries(s.framing || {})) {
+      const b = base.framing?.[clip];
+      if (b && Math.abs(b.orthoM - fr.orthoM) > 1e-3) mismatch.push(`${s.shard}:${clip} ${fr.orthoM} vs ${b.orthoM}`);
+    }
+    for (const [tier, t] of Object.entries(s.tiers || {})) {
+      const m = merged.tiers[tier] || (merged.tiers[tier] = { ...JSON.parse(JSON.stringify(t)), renders: 0, seconds_total: 0, directions: [], directions_by_clip: {}, _medians: [], _firsts: [] });
+      m.renders += t.renders || 0;
+      m.seconds_total = Math.round((m.seconds_total + (t.seconds_total || 0)) * 100) / 100;
+      m.directions = [...new Set([...m.directions, ...(t.directions || [])])].sort((a, b) => a - b);
+      for (const [clip, ds] of Object.entries(t.directions_by_clip || {})) {
+        m.directions_by_clip[clip] = [...new Set([...(m.directions_by_clip[clip] || []), ...ds])].sort((a, b) => a - b);
+      }
+      if (t.seconds_per_frame_median != null) m._medians.push(t.seconds_per_frame_median);
+      if (t.seconds_first_frame != null) m._firsts.push(t.seconds_first_frame);
+    }
+    for (const [v, info] of Object.entries(s.field_variants || {})) {
+      if (v === 'planned') { merged.field_variants.planned = [...new Set([...merged.field_variants.planned, ...info])]; continue; }
+      if (v === 'dropped_for_budget') continue;
+      const m = merged.field_variants[v] || (merged.field_variants[v] = { renders: 0, seconds_total: 0, composition: info.composition });
+      m.renders += info.renders || 0;
+      m.seconds_total = Math.round((m.seconds_total + (info.seconds_total || 0)) * 100) / 100;
+    }
+  }
+  for (const t of Object.values(merged.tiers)) {
+    t.seconds_per_frame_mean = t.renders ? Math.round((t.seconds_total / t.renders) * 1000) / 1000 : null;
+    const med = [...t._medians].sort((a, b) => a - b);
+    t.seconds_per_frame_median = med.length ? med[med.length >> 1] : null;
+    t.seconds_first_frame = t._firsts.length ? Math.min(...t._firsts) : null;
+    delete t._medians; delete t._firsts;
+  }
+  merged.framing_mismatch = mismatch;
+  merged.reduced = null;
+  fs.writeFileSync(path.join(rdir, 'render.json'), JSON.stringify(merged, null, 2));
+  return { shards: files.length, mismatch };
+}
+
 function contactSheet(render, clips) {
   const dir = path.join(OUT, 'frames', 'close');
   const S = render?.tiers?.close?.px ?? 256;
   const N = render?.camera?.directions ?? 16;
-  const have = new Set(fs.existsSync(dir) ? fs.readdirSync(dir) : []);
   const rendered = render?.tiers?.close?.directions ?? [];
   const pref = render?.params?.hero_dir ?? 2;
-  const wd = rendered.includes(pref) ? pref : (rendered[1] ?? rendered[0] ?? 0);
+  const wd = rendered.includes(pref) ? pref : (rendered[1] ?? rendered[0] ?? pref);
   const dd = (d) => String(d).padStart(2, '0');
   const cell = (row, col, file, scale = 1) => ({ row, col, file, scale });
   const cells = [];
@@ -184,14 +237,24 @@ function contactSheet(render, clips) {
   ];
   row4.forEach((f, i) => cells.push(cell(4, i, f)));
   const fdir = path.join(OUT, 'frames', 'field');
+  const fvars = Object.keys(render?.field_variants || {}).filter((v) => v !== 'planned' && v !== 'dropped_for_budget');
+  const fv = (v) => path.join(OUT, 'frames', `field_${v}`, `stand_0_d${dd(wd)}.png`);
   const row5 = [
     path.join(fdir, `stand_0_d${dd(0)}.png`), path.join(fdir, `stand_0_d${dd(wd)}.png`),
     path.join(fdir, `walk_0_d${dd(wd)}.png`), path.join(fdir, `fire_1_d${dd(wd)}.png`),
-    path.join(fdir, `load_2_d${dd(wd)}.png`),
-    ...['slouch', 'face2', 'mixed'].map((v) => path.join(OUT, 'frames', `field_${v}`, `stand_0_d${dd(wd)}.png`)),
+    path.join(fdir, `load_2_d${dd(wd)}.png`), ...fvars.slice(0, 3).map(fv),
   ];
   row5.forEach((f, i) => cells.push(cell(5, i, f)));
-  const sheet = new PNG({ width: 8 * S, height: 6 * S });
+  // third pass: every head preset (close tier, stand), then each at 256 px head-and-shoulders
+  const heads = Object.keys(render?.heads_info || {}).sort().slice(0, 8);
+  heads.forEach((h, i) => cells.push(cell(6, i, path.join(OUT, 'variants', `head_${h}.png`))));
+  heads.forEach((h, i) => cells.push(cell(7, i, path.join(OUT, 'heads', `${h}.png`))));
+  // third pass: a 256 px hand close-up for every grip frame
+  const shots = Object.keys(render?.hand_shots || {});
+  shots.slice(0, 8).forEach((k, i) => cells.push(cell(8, i, path.join(OUT, 'hands', `${k}.png`))));
+  const row9 = [...shots.slice(8, 10).map((k) => path.join(OUT, 'hands', `${k}.png`)), ...fvars.slice(3, 9).map(fv)];
+  row9.forEach((f, i) => cells.push(cell(9, i, f)));
+  const sheet = new PNG({ width: 8 * S, height: 10 * S });
   fill(sheet, hex('#7f8d4e'));
   let placed = 0;
   for (const c of cells) {
@@ -219,9 +282,13 @@ function contactSheet(render, clips) {
       'row 1: stand, directions 0-7 (0 faces the viewer, 4 faces screen-right)',
       'row 2: stand, directions 8-15',
       `row 3: walk cycle frames 0-7, direction ${wd}`,
-      `row 4: aim, fire, recover, fallen; load 0-3: hand to cartridge box, charge, draw rammer, ram (direction ${wd})`,
-      `row 5: load 4 (prime); variants (stand, d${wd}): slouch hat, fixed bayonet, no blanket roll, second face, mixed (slouch + second face + no roll)`,
-      `row 6: field tier (96 px) at 1:1: stand d0 and d${wd}, walk, fire, load (d${wd}); field-tier variants slouch, face2, mixed (stand d${wd}) where rendered`,
+      `row 4: aim, fire, recover, fallen; load 0-3: cartridge from the box, charge, draw rammer, ram (direction ${wd})`,
+      `row 5: load 4 (prime); variants (stand, d${wd}): slouch hat, fixed bayonet, no blanket roll, face2 (head h2), mixed (h3 + slouch + no roll)`,
+      `row 6: field tier (96 px) at 1:1: stand d0 and d${wd}, walk, fire, load (d${wd}); field variants ${fvars.slice(0, 3).join(', ')} (stand d${wd})`,
+      `row 7: head presets ${heads.join(', ')} at the close tier (256 px, stand, d${render?.params?.head_dir ?? 1})`,
+      `row 8: the same head presets, 256 px head-and-shoulders (portrait camera)`,
+      `row 9: hand close-ups ${shots.slice(0, 8).join(', ')}`,
+      `row 10: hand close-ups ${shots.slice(8, 10).join(', ')}; field variants ${fvars.slice(3, 9).join(', ')} (96 px, stand d${wd})`,
     ],
   };
 }
@@ -275,9 +342,27 @@ function measureColours(render) {
   return out;
 }
 
+// A variant's composition: head preset (with its CC0 assets), hat, blanket roll.
+function variantComposition(name, render, probe) {
+  let c = render?.field_variants?.[name]?.composition;
+  if (!c) {
+    const m = /^(h\d+)_(cap|slouch)_(roll|noroll)$/.exec(name);
+    c = m ? { head: m[1], hat: m[2], roll: m[3] === 'roll' } : { head: probe?.heads_default || 'h1', hat: 'cap', roll: true };
+  }
+  const h = probe?.heads?.[c.head] || {};
+  return {
+    head: c.head, headLabel: h.label ?? null, use: h.use ?? null, hat: c.hat === 'slouch' ? 'slouch hat' : 'forage cap',
+    blanketRoll: !!c.roll,
+    assets: { skin: h.skin ?? null, hair: h.hair ?? null, eyebrows: h.brows ?? null, eyelashes: h.lashes ?? null, eyes: h.eyes ?? null, beard: h.beard ?? null },
+  };
+}
+
 function pack() {
+  const mergeInfo = mergeShards();
+  if (mergeInfo) console.log(`merged ${mergeInfo.shards} shard reports${mergeInfo.mismatch.length ? '; FRAMING MISMATCH ' + mergeInfo.mismatch.join('; ') : ''}`);
   const render = readJSON(path.join(OUT, 'report', 'render.json'));
   const poses = readJSON(path.join(OUT, 'report', 'poses.json'));
+  const probe = readJSON(path.join(OUT, 'report', 'probe.json'));
   const clips = render.clips || poses.clips || {};
   const tiers = {};
   for (const tier of ['close', 'field']) {
@@ -297,13 +382,17 @@ function pack() {
   const framesDir = path.join(OUT, 'frames');
   for (const d of (fs.existsSync(framesDir) ? fs.readdirSync(framesDir) : []).filter((x) => x.startsWith('field_')).sort()) {
     const t = packTier(d, render.tiers?.field?.clips || {});
-    if (t) fieldVariants[d.slice('field_'.length)] = { count: t.count, pages: t.pages, rawFrameBytes: t.rawFrameBytes, frames: t.frames };
+    const name = d.slice('field_'.length);
+    // composition added (third pass): which head preset, hat and blanket roll this variant shows
+    if (t) fieldVariants[name] = { count: t.count, pages: t.pages, rawFrameBytes: t.rawFrameBytes, frames: t.frames, composition: variantComposition(name, render, probe) };
   }
   if (tiers.field && Object.keys(fieldVariants).length) tiers.field.variants = fieldVariants;
+  if (tiers.field) tiers.field.baseComposition = variantComposition('base', render, probe);
+  if (tiers.close) tiers.close.baseComposition = variantComposition('base', render, probe);
   const measuredColours = measureColours(render);
   const manifest = {
     version: 1,
-    subject: 'Union infantry private, Western theater, 1862 (second-pass bake; uniform and kit are placeholder/Inferred)',
+    subject: 'Union infantry private, Western theater, 1862 (third-pass bake; uniform and kit are placeholder/Inferred)',
     generated: new Date().toISOString(),
     frameKey: '<clip>_<index>_d<direction, 2 digits>',
     rectRule: 'draw atlas rect (x,y,w,h) at (screenAnchor - (ax,ay) + (ox,oy)) where (ax,ay) and ppm are the frame record\'s own fields (feet anchor in the untrimmed frame, px per metre); scale the rect by (game px per metre) / ppm. One ppm per clip; one anchor per clip and direction. tiers.<tier>.anchor/pxPerMetre are the stand clip at direction 0, kept for older readers',
@@ -313,19 +402,31 @@ function pack() {
     lights: render.lights, quick: render.quick, variantsFraming: render.variants_framing,
     measuredColours,
     readability: 'field tier only: musket cross-section thickened x' + (render.params?.field_musket_scale ?? '?') + ' (length unchanged) so it survives at 96 px',
+    // added (third pass)
+    heads: Object.fromEntries(Object.entries(probe.heads || {}).map(([k, h]) => [k, {
+      label: h.label, use: h.use, skin: h.skin ?? null, hair: h.hair ?? null, eyebrows: h.brows ?? null,
+      eyelashes: h.lashes ?? null, eyes: h.eyes ?? null, beard: h.beard ?? null, targets: h.targets_applied ?? {},
+      missing: h.missing ?? [],
+    }])),
+    headsNote: 'every head preset is built only from CC0 assets (MakeHuman system assets; bodyparts05 beards) and MPFB2 CC0 targets; use "usct" heads only for United States Colored Troops regiments',
+    grips: poses.grip_mesh || {},
+    gripsNote: 'per clip frame and hand: finger segments (of 15) whose real skinned mesh is within ' + (poses.constants?.contact_mm ?? 3) + ' mm of the held surface, and the deepest penetration (mm) into the musket, rammer or cartridge',
+    shards: render.shards || null,
   };
   fs.mkdirSync(path.join(OUT, 'atlas'), { recursive: true });
   fs.writeFileSync(path.join(OUT, 'atlas', 'soldier.json'), JSON.stringify(manifest, null, 1));
   const sheet = contactSheet(render, clips);
   const hero = heroPreview();
   const closeup = heroPreview('hero-closeup.png', 'hero-closeup-preview.png');
+  const portrait = heroPreview('portrait.png', 'portrait-preview.png');
+  const handsPrev = heroPreview('hands.png', 'hands-preview.png');
   const pack = {
     tiers: Object.fromEntries(Object.entries(tiers).map(([k, v]) => [k, {
       count: v.count, pages: v.pages, rawFrameBytes: v.rawFrameBytes,
       atlasBytes: v.pages.reduce((s, p) => s + p.bytes, 0),
     }])),
     manifestBytes: fs.statSync(path.join(OUT, 'atlas', 'soldier.json')).size,
-    contactSheet: sheet, heroPreview: hero, closeupPreview: closeup, measuredColours,
+    contactSheet: sheet, heroPreview: hero, closeupPreview: closeup, portraitPreview: portrait, handsPreview: handsPrev, measuredColours,
     fieldVariants: Object.fromEntries(Object.entries(fieldVariants).map(([k, v]) => [k, {
       count: v.count, pages: v.pages, atlasBytes: v.pages.reduce((s, p) => s + p.bytes, 0) }])),
   };
@@ -349,17 +450,18 @@ function dirBytes(p) {
 function summary() {
   const lines = [];
   const mb = (b) => (b / 1048576).toFixed(2) + ' MB';
-  const tsv = path.join(OUT, 'timing.tsv');
+  // timing.tsv is the prep job (per step); timing-<shard>.tsv one line per render shard and pack
+  const tsvs = fs.readdirSync(OUT).filter((f) => /^timing.*\.tsv$/.test(f)).sort((p, q) => (p === 'timing.tsv' ? -1 : q === 'timing.tsv' ? 1 : p.localeCompare(q)));
   lines.push('## Bake timing', '', '| step | seconds | status |', '|---|---:|---|');
   let total = 0;
-  if (fs.existsSync(tsv)) {
-    for (const row of fs.readFileSync(tsv, 'utf8').trim().split('\n')) {
+  for (const f of tsvs) {
+    for (const row of fs.readFileSync(path.join(OUT, f), 'utf8').trim().split('\n').filter(Boolean)) {
       const [step, secs, status] = row.split('\t');
       total += Number(secs) || 0;
       lines.push(`| ${step} | ${Number(secs).toFixed(1)} | ${status} |`);
     }
   }
-  lines.push(`| **timed total** | **${total.toFixed(1)}** (${(total / 60).toFixed(1)} min) | |`, '');
+  lines.push(`| **timed total (CPU-job seconds, summed over parallel jobs)** | **${total.toFixed(1)}** (${(total / 60).toFixed(1)} min) | |`, '');
   const probe = readJSON(path.join(OUT, 'report', 'probe.json'));
   lines.push('## Body route', '');
   if (probe.route === 'mpfb2-headless') {
@@ -386,12 +488,27 @@ function summary() {
     lines.push('', '| clip | ortho m | close px/m | close anchor |', '|---|---:|---:|---|');
     for (const [k, v] of Object.entries(fr)) lines.push(`| ${k} | ${v.orthoM} | ${v.pxPerMetre} | ${JSON.stringify(v.anchor)} |`);
     const po = readJSON(path.join(OUT, 'report', 'poses.json'));
+    if (po.grip_mesh) {
+      lines.push('', '### Grips (real skinned hand mesh vs the held surface)', '', '| frame | hand | segments in contact /15 | thumb | max penetration mm | verts >1 mm inside | model wrist bend deg |', '|---|---|---:|---:|---:|---:|---:|');
+      for (const [k, sides] of Object.entries(po.grip_mesh)) {
+        for (const [s, v] of Object.entries(sides)) lines.push(`| ${k} | ${s} | ${v.segments_touching} | ${v.thumb_segments} | ${v.max_penetration_mm} | ${v.vertices_over_1mm_inside} | ${po.grips?.[k]?.[s]?.wrist_bend_deg ?? '-'} |`);
+      }
+    }
+    if (po.grip_mesh_error) lines.push('', '**grip mesh measurement failed**', '```', po.grip_mesh_error, '```');
+    if (po.hand_model) lines.push('', `hand model: ${JSON.stringify(po.hand_model).slice(0, 900)}`);
+    if (render.shards) {
+      lines.push('', '### Shards', '', '| shard | wall s | renders |', '|---|---:|---|');
+      for (const [k, v] of Object.entries(render.shards)) lines.push(`| ${k} | ${v.wall_seconds} | ${JSON.stringify(v.renders)} |`);
+      if (render.framing_mismatch?.length) lines.push('', `**framing mismatch between shards**: ${render.framing_mismatch.join('; ')}`);
+    }
+    const pr0 = probe;
+    if (pr0.heads) lines.push('', '### Heads', '', ...Object.entries(pr0.heads).map(([k, h]) => `- ${k} (${h.use}): ${h.label}; skin ${h.skin}, hair ${h.hair}, brows ${h.brows}, lashes ${h.lashes}, eyes ${h.eyes}, beard ${h.beard ?? 'none'}; missing ${JSON.stringify(h.missing)}`));
     if (po.checks) lines.push('', '### Pose checks', '', '```', JSON.stringify(po.checks, null, 1).slice(0, 3000), '```');
     const un = readJSON(path.join(OUT, 'report', 'uniform.json'));
     if (un.timing) lines.push('', `uniform.py objects: ${Object.keys(un.objects || {}).length}; render triangles (viewport levels): ${un.render_triangles_viewport_levels}`);
     const pr = readJSON(path.join(OUT, 'report', 'probe.json'));
     if (pr.variant_assets) lines.push('', `variant assets: ${JSON.stringify(pr.variant_assets)}`);
-    if (render.reduced) lines.push('', `**Directions reduced**: ${render.reduced.reason}; rendered ${JSON.stringify(render.reduced.directions_rendered)}`);
+    if (render.reduced) lines.push('', `**Directions reduced**: ${render.reduced.reason}`);
     const c = render.tiers.close, f = render.tiers.field;
     if (c) {
       const perDir = (c.renders / c.directions.length);

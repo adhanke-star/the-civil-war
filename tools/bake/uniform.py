@@ -100,12 +100,34 @@ D = {
     "cap_crown_front":     0.045,   # crown rise above band at the front       placeholder
     "cap_crown_forward":   0.062,   # how far the floppy crown slumps forward  placeholder
     "cap_visor":           0.050,   # visor depth                              placeholder
-    "cap_tilt_deg":        7.0,     # band plane tipped forward (lower at the brow) placeholder
-    "stubble_face1":       0.45,    # a few days' stubble                      placeholder
-    "stubble_face2":       0.85,    # heavier, plus the CC0 scruffy-beard proxy placeholder
-    "cap_seat":            -0.006,  # band bottom relative to the brow line    placeholder
+    # third pass: the cap is tipped back a little and seated higher so light reaches the eyes
+    # (pass 2: tilt 7, seat -0.006, visor dip 28 put the eyes in black shadow)
+    "cap_tilt_deg":        1.5,     # band plane tipped forward (lower at the brow) placeholder
+    "cap_seat":            0.004,   # band bottom relative to the brow line    placeholder
     "cap_top_sag":         0.007,   # the crown top sags in the middle         placeholder
-    "cap_visor_dip_deg":   28.0,    # visor angled down from the band plane    placeholder
+    "cap_visor_dip_deg":   18.0,    # visor angled down from the band plane    placeholder
+    "cap_pad":             0.010,   # band clearance over the head (all head presets fit) placeholder
+    # -- face (third pass) ------------------------------------------------------------------
+    "iris_deg":            27.0,    # iris angular radius seen from the eyeball centre (~11.5 mm iris) placeholder
+    "pupil_deg":           8.5,     # pupil angular radius (~3.5 mm, daylight)  placeholder
+    "sclera_hex":          "#d6cabb",  # eye white: warm, never pure white      placeholder
+    "sideburn_fwd":        (-0.078, -0.050),  # sideburn band in front of the ear, metres from the eyes placeholder
+    "sideburn_dz":         (-0.060, 0.030),   # from below the ear top to under the cap band            placeholder
+    # -- cartridge (paper, ball and powder) ---------------------------------------------------
+    "cartridge_len":       0.068,   # paper cartridge length                   placeholder estimate
+    "cartridge_r":         0.0075,  # paper cartridge radius                   placeholder estimate
+    # -- blanket roll (third pass) -------------------------------------------------------------
+    "roll_turns":          3.5,     # spiral turns visible at the roll ends    placeholder
+    "roll_tie_squeeze":    0.20,    # radius lost under a tie                  placeholder
+    "roll_tie_width":      0.014,   # half-width of the squeeze at a tie (m)   placeholder
+    "roll_flatten":        0.22,    # flattening where it lies on the shoulder/hip placeholder
+    "roll_sag":            0.010,   # mid-span sag away from the body (m)      placeholder
+    "roll_stripe":         (0.055, 0.085),  # dark band near each roll end (fraction of length) placeholder estimate
+    "roll_stripe_hex":     "#2f2a24",       # the band colour                  placeholder estimate
+    # -- kit weight (third pass): haversack and canteen hang toward plumb from their straps ------
+    "hang_plumb":          0.75,    # share of the body's tilt the bag swings back toward vertical placeholder
+    "hang_swing_deg":      5.0,     # march swing amplitude                    placeholder
+    "hang_lag":            0.15,    # swing lags the stride by this cycle fraction placeholder
     # -- brogans (ankle-high laced shoes) ------------------------------------------------
     "shoe_heel_ext":       0.008,   # shoe beyond the heel of the foot         placeholder
     "shoe_toe_ext":        0.014,   # shoe beyond the toes (round toe)         placeholder
@@ -144,7 +166,79 @@ COL = {
     "pewter":      ("#8f8e88", 0.45),   # canteen spout
     "cork":        ("#8b6a45", 0.90),   # canteen stopper
     "bone":        ("#cfc5ab", 0.50),   # haversack button (material unsourced)
+    "paper":       ("#d2c5a6", 0.85),   # cartridge paper (placeholder estimate)
 }
+
+# =====================================================================================
+# HEAD PRESETS (third pass). probe_mpfb.py reads this literal (ast) to build the heads; uniform.py
+# shades them; render.py picks one per variant. Every asset is CC0: skins, hair, eyebrows,
+# eyelashes and eyes from the MakeHuman system assets pack; beards and the moustache from the
+# MakeHuman "bodyparts05" pack (each asset listed CC0 on its page). Face shapes are MPFB2 bundled
+# CC0 targets (weight 0..1); EXPR are MPFB2 bundled CC0 expression-unit targets
+# (targets/expression/units/<race>/). Shapes, colours and expressions are placeholder estimates
+# judged by eye; no real person is depicted. "use": "any" = any Union infantry regiment;
+# "usct" = only for United States Colored Troops regiments (segregated units; never mix this head
+# into a white regiment, and never use it for a unit before that regiment was raised).
+# Facial-hair styles (full beard, chin beard, moustache, clean-shaven) are recalled as common in
+# period photographs: Inferred, not cited.
+# =====================================================================================
+EXPR = {   # neutral, tired, alert: lids a little narrowed, brows a touch down, lips pressed
+    "eye-left-slit": 0.20, "eye-right-slit": 0.26,
+    "eyebrows-left-down": 0.14, "eyebrows-right-down": 0.10,
+    "eyebrows-left-inner-up": 0.12, "eyebrows-right-inner-up": 0.14,
+    "mouth-compression": 0.16, "mouth-depression": 0.08,
+}
+HEADS = {
+    "h1": {"label": "young, clean-shaven, a few days' stubble", "race": "caucasian",
+           "skin": "young_caucasian_male.mhmat", "hair": "short02.mhclo", "brows": "eyebrow001.mhclo",
+           "lashes": "eyelashes01.mhclo", "beard": None,
+           "targets": {"head-oval": 0.30, "chin-prominent-incr": 0.20, "nose-hump-incr": 0.20,
+                       "l-cheek-bones-incr": 0.15, "r-cheek-bones-incr": 0.15},
+           "expr_scale": 1.0, "hair_hex": "#3a2616", "beard_hex": "#3a2616", "stubble": 0.50,
+           "sideburn": 0.55, "iris_hex": "#55707e", "use": "any"},
+    "h2": {"label": "full beard, dark brown", "race": "caucasian",
+           "skin": "middleage_caucasian_male.mhmat", "hair": "short04.mhclo", "brows": "eyebrow003.mhclo",
+           "lashes": "eyelashes02.mhclo", "beard": "grinsegold_beard_sigmund_wip.mhclo",
+           "targets": {"head-square": 0.35, "head-fat-incr": 0.12, "nose-width1-incr": 0.25,
+                       "nose-point-down": 0.20, "chin-width-incr": 0.20},
+           "expr_scale": 1.1, "hair_hex": "#2a1b11", "beard_hex": "#2e1d12", "stubble": 0.60,
+           "sideburn": 0.80, "iris_hex": "#4a3322", "use": "any"},
+    "h3": {"label": "chin beard (shaved upper lip), sandy", "race": "caucasian",
+           "skin": "young_caucasian_male2.mhmat", "hair": "short01.mhclo", "brows": "eyebrow005.mhclo",
+           "lashes": "eyelashes01.mhclo", "beard": "culturalibre_faun_beard.mhclo",
+           "targets": {"head-rectangular": 0.40, "chin-height-incr": 0.20, "nose-scale-vert-incr": 0.25,
+                       "l-cheek-volume-decr": 0.20, "r-cheek-volume-decr": 0.20},
+           "expr_scale": 0.9, "hair_hex": "#6a4e2e", "beard_hex": "#5e4228", "stubble": 0.25,
+           "sideburn": 0.40, "iris_hex": "#6a7a52", "use": "any"},
+    "h4": {"label": "moustache, near-black hair", "race": "caucasian",
+           "skin": "middleage_caucasian_male.mhmat", "hair": "short03.mhclo", "brows": "eyebrow007.mhclo",
+           "lashes": "eyelashes02.mhclo", "beard": "rehmanpolanski_moustache_viking.mhclo",
+           "targets": {"head-round": 0.30, "nose-hump-incr": 0.35, "mouth-scale-horiz-decr": 0.15,
+                       "eyebrows-trans-down": 0.20},
+           "expr_scale": 1.0, "hair_hex": "#1c1410", "beard_hex": "#1e1611", "stubble": 0.55,
+           "sideburn": 0.65, "iris_hex": "#3d2a1a", "use": "any"},
+    "h5": {"label": "older, grizzled short beard", "race": "caucasian",
+           "skin": "old_caucasian_male.mhmat", "hair": "short04.mhclo", "brows": "eyebrow009.mhclo",
+           "lashes": "eyelashes03.mhclo", "beard": "wdg_scruffy_beard.mhclo",
+           "targets": {"head-age-incr": 0.50, "head-diamond": 0.25, "l-eye-bag-incr": 0.40,
+                       "r-eye-bag-incr": 0.40, "nose-volume-incr": 0.20},
+           "expr_scale": 1.2, "hair_hex": "#6c665d", "beard_hex": "#77716a", "stubble": 0.70,
+           "sideburn": 0.70, "iris_hex": "#5d6a72", "use": "any"},
+    "h6": {"label": "young, auburn, heavy stubble", "race": "caucasian",
+           "skin": "young_caucasian_male.mhmat", "hair": "short01.mhclo", "brows": "eyebrow011.mhclo",
+           "lashes": "eyelashes01.mhclo", "beard": None,
+           "targets": {"head-invertedtriangular": 0.35, "chin-bones-incr": 0.25, "nose-greek-incr": 0.20,
+                       "l-ear-flap-incr": 0.20, "r-ear-flap-incr": 0.20},
+           "expr_scale": 0.8, "hair_hex": "#6b3520", "beard_hex": "#6b3520", "stubble": 0.85,
+           "sideburn": 0.60, "iris_hex": "#4f6340", "use": "any"},
+    "h7": {"label": "moustache (USCT regiments only)", "race": "african",
+           "skin": "middleage_african_male.mhmat", "hair": "short02.mhclo", "brows": "eyebrow002.mhclo",
+           "lashes": "eyelashes02.mhclo", "beard": "rehmanpolanski_moustache_viking.mhclo",
+           "targets": {"head-oval": 0.25, "chin-prominent-incr": 0.15},
+           "expr_scale": 1.0, "hair_hex": "#120e0b", "beard_hex": "#120e0b", "stubble": 0.45,
+           "sideburn": 0.55, "iris_hex": "#2e2016", "use": "usct"},
+}
+HEAD_DEFAULT = "h1"
 
 T = C.Timer()
 REP = {"table": {k: v for k, v in D.items()}, "colours": COL, "objects": {}}
@@ -156,11 +250,29 @@ FADE = {"coat": "#2e3a66", "cap": "#2c3658", "trousers": "#8ea6cc", "blanket": "
         "canteen": "#857c6c", "felt": "#3a3631", "webbing": "#958a72", "haversack": "#3a3832"}
 
 
+def add_attr_tint(mat, attr, hex_colour, amount):
+    """Mix the material's base colour toward hex_colour by a per-vertex float attribute."""
+    nt = mat.node_tree
+    bsdf = next((nd for nd in nt.nodes if nd.type == "BSDF_PRINCIPLED"), None)
+    if bsdf is None:
+        return
+    sock = bsdf.inputs["Base Color"]
+    base = sock.links[0].from_socket if sock.is_linked else tuple(sock.default_value)
+    f = C.node_math(nt, "MULTIPLY", C.node_attr(nt, attr), amount, clamp=True)
+    nt.links.new(C.node_mix(nt, "MIX", f, base, (*C.hex_rgb(hex_colour), 1.0)), sock)
+
+
 def mats():
     m = {}
     for k, (hexc, rough) in COL.items():
         name = "tcw_" + k
-        if k in ("coat", "cap", "trousers", "blanket", "canteen", "felt"):
+        if k == "blanket":
+            # third pass: heavier felted wool (fuzz sheen, deeper nap) and a dark band near each
+            # end of the roll (the blanket's end stripes, placeholder estimate)
+            m[k] = C.weathered_material(name, hexc, rough, kind="wool", fade_hex=FADE.get(k), fade=0.3,
+                                        mottle=0.12, sheen=0.28, weave_scale=180.0, bump=0.6)
+            add_attr_tint(m[k], "tcw_stripe", D["roll_stripe_hex"], 0.85)
+        elif k in ("coat", "cap", "trousers", "canteen", "felt"):
             # sheen kept low: at 0.55 (run 4) it greyed the dark-blue coat to #353945 on screen
             m[k] = C.weathered_material(name, hexc, rough, kind="wool", fade_hex=FADE.get(k), fade=0.3,
                                         mottle=0.08, sheen=0.12, weave_scale=330.0, bump=0.35)
@@ -173,7 +285,7 @@ def mats():
         elif k == "wood":
             m[k] = C.weathered_material(name, hexc, rough, kind="wood", mottle=0.10, bump=0.15,
                                         edge_wear_hex="#6b4428")
-        elif k in ("cork", "bone"):
+        elif k in ("cork", "bone", "paper"):
             m[k] = C.weathered_material(name, hexc, rough, kind="plain", mottle=0.12, bump=0.2)
         else:  # steel, brass, pewter
             m[k] = C.weathered_material(name, hexc, rough, kind="metal", mottle=0.06, metallic=1.0,
@@ -1052,7 +1164,7 @@ def build_cap(m, rig, rm, lm, head_cloud, brow_z):
     sel = hc[np.abs(hc[:, 2] - brow_z) < 0.015]
     c0 = Vector(sel.mean(axis=0).tolist()) if len(sel) else lm["headb"].copy()
     c0.z = brow_z + D["cap_seat"]
-    base, outs, _w = section_loop(hc, c0, n, F, band=0.012, bins=40, pad=0.007, smooth=2)
+    base, outs, _w = section_loop(hc, c0, n, F, band=0.012, bins=40, pad=D["cap_pad"], smooth=2)
     front = [max(-1.0, min(1.0, o.dot(F))) for o in outs]
     bh = D["cap_band_h"]
     r0 = [p.copy() for p in base]
@@ -1162,16 +1274,21 @@ def build_slouch(m, rig, rm, lm, head_cloud, brow_z):
 # ------------------------------------------------------------------------------ face and hair
 
 OBST = []   # arm-clearance obstacles for poses.py: {"name", "bone", "p" (rest world), "r"}
+HANG = []   # third pass: kit that swings toward plumb in poses.py: {"prefix", "bone", "p" (pivot, rest world), "up"}
 
 
 def face_attributes(body, rest_w, nrm_w, region, lm):
     """Per-vertex masks on the body for the skin shader: stubble (lower face and jaw, not the
-    lips), sun (nose, cheeks, upper lip, back of the neck, backs of the hands), grime."""
+    lips), sideburns (in front of the ears, under the cap band), sun (nose, cheeks, upper lip,
+    back of the neck, backs of the hands), grime. Masks are per vertex index, so they follow
+    every head preset's shape key."""
     eyes = lm.get("eyes") or []
     F, U, Lv = lm["F"], lm["U"], lm["L"]
     E = (sum(eyes, Vector()) / len(eyes)) if eyes else lm["headb"] + U * 0.07
     n = len(rest_w)
-    beard, sun, dirt = [0.0] * n, [0.0] * n, [0.0] * n
+    beard, sun, dirt, side = [0.0] * n, [0.0] * n, [0.0] * n, [0.0] * n
+    f0, f1 = D["sideburn_fwd"]
+    z0, z1 = D["sideburn_dz"]
     for i, p in enumerate(rest_w):
         r = region[i]
         if r is None:
@@ -1185,6 +1302,11 @@ def face_attributes(body, rest_w, nrm_w, region, lm):
             lip = (max(0.0, 1 - abs(dz + 0.072) / 0.011) * C.smoothstep(0.03, 0.017, abs(lat)) *
                    C.smoothstep(0.03, 0.06, fwd))
             beard[i] = w * (1 - 0.85 * lip)
+            # sideburn: a band in front of the ear, on the side of the head facing outward
+            sb = (C.smoothstep(f0 - 0.008, f0 + 0.004, fwd) * C.smoothstep(f1 + 0.006, f1 - 0.004, fwd) *
+                  C.smoothstep(z0 - 0.006, z0 + 0.010, dz) * C.smoothstep(z1 + 0.010, z1 - 0.004, dz) *
+                  C.smoothstep(0.045, 0.060, abs(lat)) * C.smoothstep(0.2, 0.5, abs(nn.dot(Lv))))
+            side[i] = sb
             s = max(0.0, 0.55 * nn.dot(U) + 0.6 * nn.dot(F)) * C.smoothstep(-0.12, -0.03, dz)
             if r == "neck":
                 s = max(s, 0.8 * max(0.0, -nn.dot(F)))
@@ -1195,35 +1317,263 @@ def face_attributes(body, rest_w, nrm_w, region, lm):
             dirt[i] = 0.7
     C.stamp_attrs(body, rest=rest_w, dirt=dirt)
     me = body.data
-    for key, vals in (("tcw_beard", beard), ("tcw_sun", sun)):
+    for key, vals in (("tcw_beard", beard), ("tcw_sun", sun), ("tcw_sideburn", side)):
         a = me.attributes.get(key) or me.attributes.new(key, "FLOAT", "POINT")
         a.data.foreach_set("value", vals)
-    REP["face_masks"] = {"beard_vertices": sum(1 for b in beard if b > 0.3), "sun_vertices": sum(1 for s in sun if s > 0.3)}
+    REP["face_masks"] = {"beard_vertices": sum(1 for b in beard if b > 0.3), "sun_vertices": sum(1 for s in sun if s > 0.3),
+                         "sideburn_vertices": sum(1 for s in side if s > 0.3)}
 
 
-def tweak_skin(mat, beard_strength):
-    """Sunburn, stubble and grime layered over the CC0 skin texture (no new image files)."""
+def _bsdf(mat):
+    if mat is None or not mat.use_nodes:
+        return None, None
     nt = mat.node_tree
-    bsdf = next((nd for nd in nt.nodes if nd.type == "BSDF_PRINCIPLED"), None)
+    return nt, next((nd for nd in nt.nodes if nd.type == "BSDF_PRINCIPLED"), None)
+
+
+def _chain_bump(nt, bsdf, height, strength, distance):
+    """Add a Bump node on top of whatever already drives the BSDF normal (MakeSkin normal map)."""
+    bp = nt.nodes.new("ShaderNodeBump")
+    bp.inputs["Strength"].default_value = strength
+    bp.inputs["Distance"].default_value = distance
+    nt.links.new(height, bp.inputs["Height"])
+    nin = bsdf.inputs["Normal"]
+    if nin.is_linked:
+        nt.links.new(nin.links[0].from_socket, bp.inputs["Normal"])
+    nt.links.new(bp.outputs["Normal"], nin)
+
+
+def tweak_skin(mat, cfg, hands=True):
+    """Weathered skin over the CC0 texture (no new image files): sunburn, stubble in the head's own
+    colour, sideburns, grime that collects in creases (concave pointiness), reddened knuckles and
+    cheekbones (convex pointiness), pores, and a little subsurface scattering."""
+    nt, bsdf = _bsdf(mat)
     if bsdf is None:
-        return "no Principled BSDF in " + mat.name
+        return "no Principled BSDF in " + (mat.name if mat else "None")
     sock = bsdf.inputs["Base Color"]
     base = sock.links[0].from_socket if sock.is_linked else tuple(sock.default_value)
     rest = C.node_attr(nt, "tcw_rest", "Vector")
     beard = C.node_attr(nt, "tcw_beard")
     sun = C.node_attr(nt, "tcw_sun")
     dirt = C.node_attr(nt, "tcw_dirt")
-    col = C.node_mix(nt, "MULTIPLY", C.node_math(nt, "MULTIPLY", sun, 0.45, clamp=True), base, (1.0, 0.66, 0.55, 1.0))
+    sideb = C.node_attr(nt, "tcw_sideburn")
+    hair = (*C.hex_rgb(cfg["hair_hex"]), 1.0)
+    bc = C.hex_rgb(cfg.get("beard_hex", cfg["hair_hex"]))
+    stub_rgb = (*(c * 0.75 for c in bc), 1.0)
+    strength = cfg["stubble"]
+    col = C.node_mix(nt, "MULTIPLY", C.node_math(nt, "MULTIPLY", sun, 0.40, clamp=True), base, (1.0, 0.68, 0.56, 1.0))
     dots = C.node_ramp(nt, C.node_noise(nt, rest, 1500.0, 1.0), 0.42, 0.58).outputs["Color"]
     stub = C.node_math(nt, "MULTIPLY", beard, dots)
-    col = C.node_mix(nt, "MIX", C.node_math(nt, "MULTIPLY", stub, beard_strength, clamp=True), col, (0.06, 0.045, 0.035, 1.0))
-    col = C.node_mix(nt, "MULTIPLY", C.node_math(nt, "MULTIPLY", beard, 0.45 * beard_strength, clamp=True), col,
-                     (0.70, 0.66, 0.66, 1.0))
+    col = C.node_mix(nt, "MIX", C.node_math(nt, "MULTIPLY", stub, strength, clamp=True), col, stub_rgb)
+    # the shadow of a shaved beard: a cool, darker cast over the whole jaw
+    col = C.node_mix(nt, "MULTIPLY", C.node_math(nt, "MULTIPLY", beard, 0.40 * strength, clamp=True), col,
+                     (0.72, 0.68, 0.70, 1.0))
+    # sideburns: fine vertical strands in the hair colour
+    sm = nt.nodes.new("ShaderNodeVectorMath")
+    sm.operation = "MULTIPLY"
+    nt.links.new(rest, sm.inputs[0])
+    sm.inputs[1].default_value = (1.0, 1.0, 0.25)
+    strands = C.node_ramp(nt, C.node_noise(nt, sm.outputs[0], 900.0, 2.0), 0.35, 0.65).outputs["Color"]
+    sbm = C.node_math(nt, "MULTIPLY", sideb, cfg.get("sideburn", 0.5))
+    sbm = C.node_math(nt, "MULTIPLY", sbm, C.node_math(nt, "ADD", 0.45, C.node_math(nt, "MULTIPLY", strands, 0.55)), clamp=True)
+    col = C.node_mix(nt, "MIX", sbm, col, hair)
+    # grime: patchy, and gathered in the creases (concave = low pointiness)
+    geo = nt.nodes.new("ShaderNodeNewGeometry")
+    concave = C.node_ramp(nt, geo.outputs["Pointiness"], 0.40, 0.495, (1, 1, 1, 1), (0, 0, 0, 1)).outputs["Color"]
+    convex = C.node_ramp(nt, geo.outputs["Pointiness"], 0.52, 0.62).outputs["Color"]
     grime = C.node_ramp(nt, C.node_noise(nt, rest, 30.0, 3.0), 0.45, 0.72).outputs["Color"]
-    g = C.node_math(nt, "MULTIPLY", dirt, grime)
-    col = C.node_mix(nt, "MIX", C.node_math(nt, "MULTIPLY", g, 0.35, clamp=True), col, (0.30, 0.24, 0.17, 1.0))
+    g = C.node_math(nt, "MULTIPLY", dirt, C.node_math(nt, "ADD", grime, C.node_math(nt, "MULTIPLY", concave, 0.8)))
+    col = C.node_mix(nt, "MIX", C.node_math(nt, "MULTIPLY", g, 0.38, clamp=True), col, (0.26, 0.20, 0.14, 1.0))
+    # knuckles, cheekbones, nose tip: a little redder where the skin is stretched over bone
+    col = C.node_mix(nt, "MULTIPLY", C.node_math(nt, "MULTIPLY", convex, 0.30, clamp=True), col, (1.0, 0.80, 0.74, 1.0))
     nt.links.new(col, sock)
+    # pores and fine wrinkles
+    pores = C.node_math(nt, "ADD", C.node_noise(nt, rest, 2200.0, 2.0),
+                        C.node_math(nt, "MULTIPLY", C.node_noise(nt, rest, 420.0, 3.0), 0.5))
+    _chain_bump(nt, bsdf, pores, 0.06, 0.0005)
+    C._set_input(bsdf, ["Subsurface Weight", "Subsurface"], 0.12)
+    C._set_input(bsdf, ["Subsurface Scale"], 0.004)
+    if "Subsurface Radius" in bsdf.inputs:
+        bsdf.inputs["Subsurface Radius"].default_value = (1.0, 0.35, 0.18)
+    if not bsdf.inputs["Roughness"].is_linked:
+        bsdf.inputs["Roughness"].default_value = 0.52
     return "ok"
+
+
+def tint_hair(mat, hex_colour):
+    """Recolour a CC0 hair/brow/beard/lash texture: its luminance drives a ramp in the head's
+    hair colour (dark roots to lighter tips); the texture's alpha is untouched."""
+    nt, bsdf = _bsdf(mat)
+    if bsdf is None:
+        return "no Principled BSDF"
+    sock = bsdf.inputs["Base Color"]
+    if not sock.is_linked:
+        sock.default_value = (*C.hex_rgb(hex_colour), 1.0)
+        return "flat"
+    src = sock.links[0].from_socket
+    bw = nt.nodes.new("ShaderNodeRGBToBW")
+    nt.links.new(src, bw.inputs[0])
+    rgb = C.hex_rgb(hex_colour)
+    r = nt.nodes.new("ShaderNodeValToRGB")
+    els = r.color_ramp.elements
+    els[0].position, els[0].color = 0.0, (*(c * 0.25 for c in rgb), 1.0)
+    els[1].position, els[1].color = 0.55, (*(min(1.0, c * 1.7) for c in rgb), 1.0)
+    e = els.new(0.15)
+    e.color = (*rgb, 1.0)
+    nt.links.new(bw.outputs[0], r.inputs["Fac"])
+    nt.links.new(r.outputs["Color"], sock)
+    if not bsdf.inputs["Roughness"].is_linked:
+        bsdf.inputs["Roughness"].default_value = 0.55
+    return "ok"
+
+
+def eye_material(name, iris_hex, F):
+    """Procedural eye (no image): warm sclera darkening toward the corners, a striated iris with a
+    dark limbal ring, a black pupil, and a glossy clear coat for the catch-light. The iris is
+    found per pixel from the angle between (rest position - this eye's centre) and the gaze F."""
+    mat = bpy.data.materials.get(name)
+    if mat:
+        return mat
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    nt = mat.node_tree
+    bsdf = nt.nodes.get("Principled BSDF")
+    rest = C.node_attr(nt, "tcw_rest", "Vector")
+    cen = C.node_attr(nt, "tcw_eyec", "Vector")
+    sub = nt.nodes.new("ShaderNodeVectorMath")
+    sub.operation = "SUBTRACT"
+    nt.links.new(rest, sub.inputs[0])
+    nt.links.new(cen, sub.inputs[1])
+    nrm = nt.nodes.new("ShaderNodeVectorMath")
+    nrm.operation = "NORMALIZE"
+    nt.links.new(sub.outputs[0], nrm.inputs[0])
+    dot = nt.nodes.new("ShaderNodeVectorMath")
+    dot.operation = "DOT_PRODUCT"
+    nt.links.new(nrm.outputs[0], dot.inputs[0])
+    dot.inputs[1].default_value = tuple(F)
+    c = dot.outputs["Value"]
+    ci, cp = math.cos(math.radians(D["iris_deg"])), math.cos(math.radians(D["pupil_deg"]))
+    lo = 0.70
+    mr = nt.nodes.new("ShaderNodeMapRange")
+    mr.inputs["From Min"].default_value = lo
+    mr.inputs["From Max"].default_value = 1.0
+    nt.links.new(c, mr.inputs["Value"])
+    t = lambda x: (x - lo) / (1.0 - lo)  # noqa: E731
+    scl = C.hex_rgb(D["sclera_hex"])
+    iris = C.hex_rgb(iris_hex)
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    els = ramp.color_ramp.elements
+    els[0].position, els[0].color = 0.0, (*(x * 0.62 for x in scl), 1.0)   # corners in shadow
+    els[1].position, els[1].color = 1.0, (0.01, 0.01, 0.012, 1.0)
+    for pos, col in ((t(ci) - 0.18, scl), (t(ci) - 0.012, scl),
+                     (t(ci) - 0.002, tuple(x * 0.35 for x in iris)),     # limbal ring
+                     (t(ci) + 0.03, iris), (t(cp) - 0.05, tuple(min(1.0, x * 1.25) for x in iris)),
+                     (t(cp) - 0.004, tuple(x * 0.6 for x in iris)), (t(cp) + 0.002, (0.01, 0.01, 0.012))):
+        e = els.new(max(0.001, min(0.999, pos)))
+        e.color = (*col, 1.0)
+    nt.links.new(mr.outputs["Result"], ramp.inputs["Fac"])
+    # iris striation and sclera veins: noise on the rest position
+    stri = C.node_ramp(nt, C.node_noise(nt, rest, 2600.0, 3.0), 0.3, 0.7, (0.72, 0.72, 0.72, 1), (1.12, 1.12, 1.12, 1)).outputs["Color"]
+    col = C.node_mix(nt, "MULTIPLY", 1.0, ramp.outputs["Color"], stri)
+    nt.links.new(col, bsdf.inputs["Base Color"])
+    C._set_input(bsdf, ["Roughness"], 0.30)
+    C._set_input(bsdf, ["Coat Weight", "Clearcoat"], 1.0)
+    C._set_input(bsdf, ["Coat Roughness", "Clearcoat Roughness"], 0.02)
+    C._set_input(bsdf, ["Specular IOR Level", "Specular"], 0.6)
+    return mat
+
+
+def stamp_eye(obj, mid_l, Lv):
+    """tcw_rest and tcw_eyec (the centre of this vertex's own eyeball) on an eyes proxy."""
+    mw = obj.matrix_world
+    pts = [mw @ v.co for v in obj.data.vertices]
+    sides = [1 if (p.dot(Lv) - mid_l) > 0 else -1 for p in pts]
+    cen = {}
+    for s in (1, -1):
+        ps = [p for p, k in zip(pts, sides) if k == s]
+        if ps:
+            lo = Vector((min(p.x for p in ps), min(p.y for p in ps), min(p.z for p in ps)))
+            hi = Vector((max(p.x for p in ps), max(p.y for p in ps), max(p.z for p in ps)))
+            cen[s] = (lo + hi) / 2
+    me = obj.data
+    C.stamp_attrs(obj, rest=pts)
+    a = me.attributes.get("tcw_eyec") or me.attributes.new("tcw_eyec", "FLOAT_VECTOR", "POINT")
+    flat = []
+    for k in sides:
+        c = cen.get(k, Vector())
+        flat.extend((c.x, c.y, c.z))
+    a.data.foreach_set("vector", flat)
+    return {str(k): [round(x, 4) for x in v] for k, v in cen.items()}
+
+
+def setup_heads(body, lm, roles):
+    """Shade every head preset built by probe_mpfb.py: skin per slot, hair/brow/beard/lash
+    colour, procedural eyes. Returns the report."""
+    info = C.json.loads(body.get("tcw_heads", "{}"))
+    out = {}
+    mid_l = lm["mid"].dot(lm["L"])
+    for h, rec in info.items():
+        cfg = HEADS.get(h)
+        if cfg is None:
+            continue
+        r = {"skin": {}, "objects": {}}
+        for i, mname in enumerate(rec.get("skins", [])):
+            mat = bpy.data.materials.get(mname or "")
+            role = roles[i] if i < len(roles) else "?"
+            if mat is None:
+                continue
+            if role in ("skin", "lips", "ears"):
+                r["skin"][mname] = tweak_skin(mat, cfg)
+            elif role == "fingernails":
+                nt, bsdf = _bsdf(mat)
+                if bsdf is not None:
+                    sock = bsdf.inputs["Base Color"]
+                    b0 = sock.links[0].from_socket if sock.is_linked else tuple(sock.default_value)
+                    nt.links.new(C.node_mix(nt, "MULTIPLY", 1.0, b0, (0.72, 0.64, 0.55, 1.0)), sock)
+                    r["skin"][mname] = "grimed nails"
+        emat = eye_material("tcw_eye_" + h, cfg["iris_hex"], lm["F"])
+        for oname in rec.get("objects", []):
+            o = bpy.data.objects.get(oname)
+            if o is None:
+                r["objects"][oname] = "missing"
+                continue
+            role = o.get("tcw_role", "")
+            if role == "eyes":
+                r["objects"][oname] = {"eye_centres": stamp_eye(o, mid_l, lm["L"])}
+                o.data.materials.clear()
+                o.data.materials.append(emat)
+            elif role in ("hair", "brows", "beard", "lashes"):
+                hexc = cfg["beard_hex"] if role == "beard" else cfg["hair_hex"]
+                if role == "lashes":
+                    hexc = "#1a1410"
+                res = [tint_hair(s.material, hexc) for s in o.material_slots if s.material]
+                r["objects"][oname] = res
+        out[h] = r
+    return out
+
+
+def head_clouds(body, rest_w, head_idx):
+    """Rest positions of the head vertices for EVERY head preset (the default's rest positions
+    plus each preset's shape-key difference), so the cap and slouch hat fit them all."""
+    keys = body.data.shape_keys
+    info = C.json.loads(body.get("tcw_heads", "{}"))
+    if keys is None or not info:
+        return [rest_w[i][:] for i in head_idx]
+    kb = keys.key_blocks
+    cur = [k for k in kb if k.name.startswith("tcw_head_") and k.value > 0.5]
+    cur = cur[0] if cur else None
+    MW = body.matrix_world.to_3x3()
+    out = []
+    for h, rec in info.items():
+        k = kb.get(rec.get("key", ""))
+        for i in head_idx:
+            d = Vector()
+            if k is not None:
+                d = k.data[i].co - k.relative_key.data[i].co
+            if cur is not None:
+                d = d - (cur.data[i].co - cur.relative_key.data[i].co)
+            out.append((rest_w[i] + MW @ d)[:])
+    return out
 
 
 def mask_hair_under(c0, n, base_pts):
@@ -1231,10 +1581,7 @@ def mask_hair_under(c0, n, base_pts):
     R = sum(((p - c0) - n * (p - c0).dot(n)).length for p in base_pts) / len(base_pts) + 0.004
     done = {}
     for o in bpy.data.objects:
-        nm = o.name.lower()
-        if o.type != "MESH" or o.name.startswith("tcw_") or "beard" in nm:
-            continue
-        if not (o.get("tcw_variant") in ("face1", "face2") or "hair" in nm or "short0" in nm):
+        if o.type != "MESH" or o.get("tcw_role") != "hair":
             continue
         mw = o.matrix_world
         idx = []
@@ -1316,33 +1663,68 @@ def ribbon_point(pts, outs, target):
 
 
 def build_blanket_roll(m, pts, outs, across, rig, skin, obst_bone=None):
-    """Horseshoe blanket roll: open at the hip with two capped ends that show the rolled layers,
-    a spiral layer edge winding along it, and three ties. Bin 0 of `pts` is at the bottom
+    """Horseshoe blanket roll (third pass). Along the roll: squeezed where each tie binds it and
+    slightly fuller between ties; flattened where it lies on the shoulder and at the hip ends; a
+    small sag away from the body between them; a dark band near each end (tcw_stripe). Each end is
+    a disc with a stepped spiral (the edges of the rolled layers). Bin 0 of `pts` is at the bottom
     (hip) end of the loop, so dropping the first/last bins opens it there."""
     R = D["blanket_roll_r"]
+    U = Vector((0, 0, 1))
     n = len(pts)
-    # run 5: with the ends at the hip the roll crossed the hanging right forearm; the ends now
-    # stop higher on the flank and taper, so the arm hangs outside them
     gap = max(3, n // 10)
     idx = list(range(gap, n - gap))
-    seg = 18
-    rings, cents, axes = [], [], []
+    seg = 20
+    K = len(idx)
+    # centres along the roll, before shaping, and arc length
+    c0 = [pts[i] + outs[i] * (R * 0.82) for i in idx]
+    arc = [0.0]
+    for k in range(1, K):
+        arc.append(arc[-1] + (c0[k] - c0[k - 1]).length)
+    Ltot = arc[-1] or 1.0
+    s_of = [a / Ltot for a in arc]
+    tie_fr = (0.05, 0.32, 0.68, 0.95)
+    tie_m = [f * Ltot for f in tie_fr]
+    k_top = max(range(K), key=lambda k: c0[k].z)
+    w_tie = D["roll_tie_width"]
+
+    def squeeze(a):
+        return 1.0 - D["roll_tie_squeeze"] * sum(math.exp(-((a - t) / w_tie) ** 2) for t in tie_m)
+
+    def fuller(a):
+        # +3% between ties, nothing at the ties
+        nearest = min(abs(a - t) for t in tie_m)
+        return 1.0 + 0.03 * C.smoothstep(0.0, 0.08, nearest)
+
+    rings, cents, axes, stripe = [], [], [], []
+    a0, a1 = D["roll_stripe"]
     for k, i in enumerate(idx):
-        c = pts[i] + outs[i] * (R * 0.82)
         u = outs[i]
         v = across
-        axes.append((u, v))
-        tw = 2 * math.pi * 3.0 * k / len(idx)       # the layer edge winds three times round
-        e = min(k, len(idx) - 1 - k) / max(1, len(idx) - 1)
-        wob = (1.0 + 0.04 * noise.noise(Vector((k * 0.35, 0.0, 0.0)))) * (0.80 + 0.20 * C.smoothstep(0.0, 0.08, e))
+        s = s_of[k]
+        e = min(k, K - 1 - k) / max(1, K - 1)
+        taper = 0.80 + 0.20 * C.smoothstep(0.0, 0.08, e)
+        on_top = C.smoothstep(0.35, 0.85, max(0.0, u.dot(U)))          # lying on the shoulder
+        at_end = C.smoothstep(0.16, 0.02, min(s, 1.0 - s))               # lying on the hip / flank
+        flat = 1.0 - D["roll_flatten"] * max(on_top, 0.7 * at_end)
+        span = (k / max(1, k_top)) if k <= k_top else ((K - 1 - k) / max(1, K - 1 - k_top))
+        sag = D["roll_sag"] * math.sin(math.pi * min(1.0, max(0.0, span)))
+        sq = squeeze(arc[k]) * fuller(arc[k])
+        wob = (1.0 + 0.035 * noise.noise(Vector((k * 0.35, 0.0, 0.0)))) * taper * sq
+        ru, rv = R * 0.82 * wob * flat, R * 1.08 * wob * (1.0 + 0.45 * (1.0 - flat))
+        c = pts[i] + u * (ru + 0.0005) - U * sag + u * (0.4 * sag)
+        axes.append((u, v, ru, rv))
+        tw = 2 * math.pi * 3.0 * k / K       # the outer layer edge winds three times round
         ring = []
         for j in range(seg):
             a = 2 * math.pi * j / seg
             frac = ((a + tw) % (2 * math.pi)) / (2 * math.pi)
-            rr = R * wob * (0.93 + 0.07 * frac)
-            ring.append(c + u * (math.cos(a) * rr * 0.82) + v * (math.sin(a) * rr * 1.08))
+            lip = 0.94 + 0.06 * frac
+            ring.append(c + u * (math.cos(a) * ru * lip) + v * (math.sin(a) * rv * lip))
         rings.append(ring)
         cents.append(c)
+        st = (C.smoothstep(a0 - 0.006, a0 + 0.004, s) * C.smoothstep(a1 + 0.006, a1 - 0.004, s) +
+              C.smoothstep(a0 - 0.006, a0 + 0.004, 1 - s) * C.smoothstep(a1 + 0.006, a1 - 0.004, 1 - s))
+        stripe.extend([min(1.0, st)] * seg)
     if obst_bone:
         for c in cents[::3]:
             OBST.append({"name": "roll", "bone": obst_bone, "p": list(c), "r": R * 1.05})
@@ -1353,48 +1735,64 @@ def build_blanket_roll(m, pts, outs, across, rig, skin, obst_bone=None):
         for j in range(seg):
             j2 = (j + 1) % seg
             faces.append((k * seg + j, k * seg + j2, (k + 1) * seg + j2, (k + 1) * seg + j))
-    # layered end caps: concentric steps recessed in turn, so the rolled layers read
+    nt_ = len(verts)
+    cav = [0.0] * nt_
+    # spiral end discs: polar grid, recessed in a sawtooth that steps once per layer
+    turns = D["roll_turns"]
+    na, nr = 72, 18
     for end, sgn in ((0, -1), (len(rings) - 1, 1)):
         c = cents[end]
         t = (cents[min(len(cents) - 1, end + 1)] - cents[max(0, end - 1)]).normalized() * sgn
-        prev = list(range(end * seg, end * seg + seg))
-        for li, (s, dz) in enumerate(((0.8, -0.004), (0.62, 0.0), (0.44, -0.004), (0.26, 0.0))):
-            base = len(verts)
-            for j in range(seg):
-                verts.append(c + (verts[prev[j]] - c) * s + t * dz - t * (verts[prev[j]] - c).dot(t))
-            for j in range(seg):
-                j2 = (j + 1) % seg
-                f = (prev[j], prev[j2], base + j2, base + j) if sgn > 0 else (prev[j], base + j, base + j2, prev[j2])
-                faces.append(f)
-            prev = list(range(base, base + seg))
-        ci = len(verts)
-        verts.append(c - t * 0.002)
-        for j in range(seg):
-            j2 = (j + 1) % seg
-            faces.append((prev[j], prev[j2], ci) if sgn > 0 else (prev[j2], prev[j], ci))
+        u, v, ru, rv = axes[end]
+        base = len(verts)
+        verts.append(c - t * 0.001)
+        cav.append(0.0)
+        stripe.append(0.0)
+        for ri in range(1, nr + 1):
+            rho = ri / nr
+            for ai in range(na):
+                th = 2 * math.pi * ai / na
+                ph = rho * turns - th / (2 * math.pi)
+                fr_ = ph - math.floor(ph)
+                rec = 0.0035 * fr_ * C.smoothstep(0.0, 0.12, rho) + 0.0015 * (1 - rho)
+                p = c + (u * (math.cos(th) * ru) + v * (math.sin(th) * rv)) * rho * 0.985 - t * (rec - 0.0015)
+                verts.append(p)
+                cav.append(C.smoothstep(0.18, 0.0, fr_) * 0.9)
+                stripe.append(0.0)
+        for ai in range(na):
+            a2 = (ai + 1) % na
+            f = (base, base + 1 + ai, base + 1 + a2)
+            faces.append(f if sgn > 0 else f[::-1])
+        for ri in range(1, nr):
+            r0 = base + 1 + (ri - 1) * na
+            r1 = base + 1 + ri * na
+            for ai in range(na):
+                a2 = (ai + 1) % na
+                f = (r0 + ai, r1 + ai, r1 + a2, r0 + a2)
+                faces.append(f if sgn > 0 else f[::-1])
     obj = C.mesh_object("tcw_blanket_roll", verts, faces)
     C.assign(obj, m["blanket"])
-    C.stamp_attrs(obj, wear=0.35, dirt=0.12)
+    C.stamp_attrs(obj, wear=0.35, dirt=0.12, cavity=cav)
+    a = obj.data.attributes.get("tcw_stripe") or obj.data.attributes.new("tcw_stripe", "FLOAT", "POINT")
+    a.data.foreach_set("value", stripe[:len(verts)])
     skin.apply(obj, 12)
     C.add_modifier(obj, "SUBSURF", "Smooth", levels=0, render_levels=1)
     obj["tcw_variant"] = "roll"
-    REP["objects"][obj.name] = {"verts": len(verts), "rings": len(rings)}
-    # ties: near both ends and over the chest and back (cord, natural colour)
+    REP["objects"][obj.name] = {"verts": len(verts), "rings": len(rings), "length_m": round(Ltot, 3),
+                                "top_ring": k_top}
+    # ties: tight cords round the squeezed section, at the tie stations
     tparts = []
-    for fr in (0.05, 0.32, 0.68, 0.95):
-        k = int(fr * (len(cents) - 1))
+    for fr in tie_fr:
+        k = min(range(K), key=lambda kk: abs(arc[kk] - fr * Ltot))
         k2 = min(len(cents) - 1, k + 1)
         ax = (cents[k2] - cents[max(0, k - 1)]).normalized()
-        u, v = axes[k]
-        e = min(k, len(cents) - 1 - k) / max(1, len(cents) - 1)
-        sc_ = 0.80 + 0.20 * C.smoothstep(0.0, 0.08, e)
-        # a cord drawn tight round the (squashed) roll: an ellipse matching its section
+        u, v, ru, rv = axes[k]
         tv_, tf_ = [], []
-        nn_, mm_ = 20, 6
+        nn_, mm_ = 24, 6
         for a_i in range(nn_):
             a = 2 * math.pi * a_i / nn_
-            cc = cents[k] + u * (math.cos(a) * R * 0.82 * sc_ * 0.97) + v * (math.sin(a) * R * 1.08 * sc_ * 0.97)
-            dd = (u * (math.cos(a) * 0.82) + v * (math.sin(a) * 1.08)).normalized()
+            cc = cents[k] + u * (math.cos(a) * ru * 0.97) + v * (math.sin(a) * rv * 0.97)
+            dd = (u * (math.cos(a) / max(1e-6, ru)) + v * (math.sin(a) / max(1e-6, rv))).normalized()
             for b_i in range(mm_):
                 b = 2 * math.pi * b_i / mm_
                 tv_.append(cc + (dd * math.cos(b) + ax * math.sin(b)) * 0.0035)
@@ -1410,6 +1808,35 @@ def build_blanket_roll(m, pts, outs, across, rig, skin, obst_bone=None):
     C.stamp_attrs(ties, dirt=0.3, wear=0.3)
     skin.apply(ties, 12)
     ties["tcw_variant"] = "roll"
+    return obj
+
+
+def build_cartridge(m, rig):
+    """A paper cartridge (ball and powder), local axis X, centred; the tail end twisted shut.
+    poses.py keys it into the right hand in the load clip and scales it to nothing elsewhere."""
+    X, Y, Z = Vector((1, 0, 0)), Vector((0, 1, 0)), Vector((0, 0, 1))
+    cl, cr = D["cartridge_len"], D["cartridge_r"]
+    prof = [(-cl / 2, 0.45), (-cl / 2 + 0.002, 0.85), (-cl / 2 + 0.007, 1.0), (cl / 2 - 0.018, 1.0),
+            (cl / 2 - 0.012, 0.86), (cl / 2 - 0.007, 0.50), (cl / 2 - 0.003, 0.34), (cl / 2, 0.30)]
+    rings = []
+    for x, s in prof:
+        tw = 0.0 if x < cl / 2 - 0.013 else (x - (cl / 2 - 0.013)) * 120.0   # the twist
+        ring = []
+        for j in range(14):
+            a = 2 * math.pi * j / 14 + tw
+            pinch = 1.0 + (0.12 * math.sin(5 * a) if x > cl / 2 - 0.012 else 0.0)
+            ring.append(Vector((x, 0, 0)) + Y * (math.cos(a) * cr * s * pinch) + Z * (math.sin(a) * cr * s * pinch))
+        rings.append(ring)
+    v, f = C.loft(rings)
+    obj = C.mesh_object("tcw_cartridge", v, f)
+    C.assign(obj, m["paper"])
+    C.stamp_attrs(obj, dirt=0.25, wear=0.2)
+    C.add_modifier(obj, "SUBSURF", "Smooth", levels=0, render_levels=1)
+    obj.parent = rig
+    obj.matrix_parent_inverse = Matrix()
+    obj.rotation_mode = "QUATERNION"
+    obj.scale = (0.0, 0.0, 0.0)
+    REP["objects"][obj.name] = {"length_m": cl, "radius_m": cr}
     return obj
 
 
@@ -1486,6 +1913,7 @@ def build_haversack(m, rig, bone, top_c, across, up, out, size):
         front_z.append(dz)
     v, f = C.loft(rings, cap_start=True, cap_end=True)
     bag = rigid("tcw_haversack", v, f, m["haversack"], rig, bone, smooth=True)
+    HANG.append({"prefix": "tcw_haversack", "bone": bone, "p": list(top_c), "up": list(up)})
     for xx in (-w * 0.28, 0.0, w * 0.28):
         OBST.append({"name": "haversack", "bone": bone, "r": 0.065,
                      "p": list(top_c + across * xx - up * (h * 0.6) + out * (d * 0.5))})
@@ -1531,6 +1959,7 @@ def build_canteen(m, rig, bone, cen, tang, up, o):
                for s, k in ((-1, 0.80), (-0.75, 0.93), (-0.4, 0.985), (0, 1.0), (0.4, 0.985), (0.75, 0.93), (1, 0.80))]
     cv, cf = C.loft(rings_c)
     body = rigid("tcw_canteen", cv, cf, m["canteen"], rig, bone, smooth=True)
+    HANG.append({"prefix": "tcw_canteen", "bone": bone, "p": list(cen + up * (r * 1.03)), "up": list(up)})
     OBST.append({"name": "canteen", "bone": bone, "p": list(cen), "r": r * 1.02})
     C.stamp_attrs(body, dirt=0.2, wear=0.45)
     sv, sf = torus(cen, o, r * 1.0, 0.0045, n=40, m=6)
@@ -1850,7 +2279,9 @@ def main():
 
     # headgear
     head_idx = [i for i, r in enumerate(region) if r == "head"]
-    head_cloud = [rest_w[i][:] for i in head_idx]
+    # third pass: the cap and slouch hat are fitted over the union of every head preset
+    head_cloud = head_clouds(body, rest_w, head_idx)
+    REP["head_cloud_points"] = len(head_cloud)
     eyes = lm.get("eyes")
     eye_z = (sum(e.z for e in eyes) / len(eyes)) if eyes else (max(p[2] for p in head_cloud) - 0.11)
     brow_z = eye_z + 0.028
@@ -1859,23 +2290,27 @@ def main():
     mask_hair_under(cap_c0, cap_n, cap_base)
     T.mark("headgear")
 
-    # face: stubble, sun and grime masks; skin shading on both face presets
+    # face: stubble, sideburn, sun and grime masks; skin, hair and eyes for every head preset
     nrm_w = [(MW.to_3x3() @ q).normalized() for q in nrm]
     face_attributes(body, rest_w, nrm_w, region, lm)
-    skins = {"face1": body.get("tcw_skin_face1"), "face2": body.get("tcw_skin_face2")}
-    REP["skin_tweak"] = {}
-    if not skins["face1"] and body.material_slots and body.material_slots[0].material:
-        skins["face1"] = body.material_slots[0].material.name
-    for key, strength in (("face1", D["stubble_face1"]), ("face2", D["stubble_face2"])):
-        mat = bpy.data.materials.get(skins[key] or "")
-        REP["skin_tweak"][key] = tweak_skin(mat, strength) if mat else "missing"
+    roles = C.json.loads(body.get("tcw_slot_roles", "[]"))
+    REP["slot_roles"] = roles
+    try:
+        REP["heads"] = setup_heads(body, lm, roles)
+    except Exception as e:  # noqa: BLE001 - recorded; the default skin is still shaded below
+        import traceback
+        REP["heads_error"] = traceback.format_exc()[-1500:]
+        C.log("setup_heads FAILED:", e)
+    if not body.get("tcw_heads") and body.material_slots and body.material_slots[0].material:
+        REP["skin_tweak_fallback"] = tweak_skin(body.material_slots[0].material, HEADS[HEAD_DEFAULT])
     T.mark("face")
 
     musket = build_musket(m)
     musket.parent = rig
     musket.matrix_parent_inverse = Matrix()
     musket.location = lm["hipR"] + F * 0.1 - Lv * 0.1
-    T.mark("musket")
+    build_cartridge(m, rig)
+    T.mark("musket, cartridge")
 
     # hide the body under the clothes (one-ring erosion so seams never open)
     covered = coat_set | trouser_set | shoe_set
@@ -1891,6 +2326,10 @@ def main():
     mk.vertex_group = "tcw_covered"
     mk.invert_vertex_group = True
     REP["hidden_body_vertices"] = len(inner)
+    # third pass: smoother face and fingers in the renders (render level only; posing and
+    # framing use the base mesh)
+    C.add_modifier(body, "SUBSURF", "Smooth", levels=0, render_levels=1)
+    REP["body_modifiers"] = [(md.name, md.type) for md in body.modifiers]
     for o in bpy.data.objects:
         if o.type == "MESH" and o.parent is None and o.name.startswith("tcw_"):
             C.log("unparented tcw object:", o.name)
@@ -1911,6 +2350,10 @@ def main():
     REP["render_triangles_viewport_levels"] = tris
     REP["landmark_heights"] = {"hip_z": hip_z, "waist_z": waist_z, "hem_z": hem_z, "brow_z": brow_z}
     bpy.context.scene["tcw_obstacles"] = C.json.dumps(OBST)
+    bpy.context.scene["tcw_hang"] = C.json.dumps(HANG)
+    bpy.context.scene["tcw_uniform_consts"] = C.json.dumps({k: D[k] for k in (
+        "cartridge_len", "cartridge_r", "hang_plumb", "hang_swing_deg", "hang_lag")})
+    REP["hang"] = HANG
     REP["obstacles"] = {k: sum(1 for o in OBST if o["name"] == k) for k in set(o["name"] for o in OBST)}
     out = os.path.join(C.WORK, "soldier.blend")
     bpy.ops.wm.save_as_mainfile(filepath=out, compress=False)
