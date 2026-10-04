@@ -262,9 +262,15 @@ function measureColours(render) {
       rs.push(png.data[i]); gs.push(png.data[i + 1]); bs.push(png.data[i + 2]);
     }
     if (!rs.length) continue;
-    const med = (a) => a.sort((p, q) => p - q)[a.length >> 1];
+    const toHex = (c) => '#' + c.map((v) => v.toString(16).padStart(2, '0')).join('');
+    // lit side: the brightest third of the samples (by luminance), channel medians
+    const idx = rs.map((_, i) => i).sort((a, b) => (0.2126 * rs[b] + 0.7152 * gs[b] + 0.0722 * bs[b]) - (0.2126 * rs[a] + 0.7152 * gs[a] + 0.0722 * bs[a]));
+    const top = idx.slice(0, Math.max(1, Math.ceil(idx.length / 3)));
+    const medOf = (arr, ids) => ids.map((i) => arr[i]).sort((p, q) => p - q)[ids.length >> 1];
+    const lit = [medOf(rs, top), medOf(gs, top), medOf(bs, top)];
+    const med = (a) => [...a].sort((p, q) => p - q)[a.length >> 1];
     const c = [med(rs), med(gs), med(bs)];
-    out[label] = { hex: '#' + c.map((v) => v.toString(16).padStart(2, '0')).join(''), samples: rs.length };
+    out[label] = { hex: toHex(c), lit: toHex(lit), samples: rs.length };
   }
   return out;
 }
@@ -374,7 +380,7 @@ function summary() {
     }
     lines.push('', `hero ${render.hero?.px}px @ ${render.hero?.samples} spp: ${render.hero?.seconds}s; close-up @ ${render.closeup?.samples} spp: ${render.closeup?.seconds}s. Variants: ${JSON.stringify(render.variants)}`);
     if (render.quick) lines.push('', '**Quick run** (check set only, not the full matrix).');
-    if (pack.measuredColours) lines.push('', `measured sRGB in hero.png: ${Object.entries(pack.measuredColours).map(([k, v]) => `${k} ${v.hex} (${v.samples})`).join('; ')}`);
+    if (pack.measuredColours) lines.push('', `measured sRGB in hero.png: ${Object.entries(pack.measuredColours).map(([k, v]) => `${k} median ${v.hex}, lit ${v.lit} (${v.samples})`).join('; ')}`);
     if (pack.fieldVariants) lines.push('', `field variants: ${JSON.stringify(pack.fieldVariants)}; plan ${JSON.stringify(render.field_variants)}`);
     const fr = render.tiers.close?.clips || {};
     lines.push('', '| clip | ortho m | close px/m | close anchor |', '|---|---:|---:|---|');

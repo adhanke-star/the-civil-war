@@ -543,8 +543,8 @@ class Garments:
                 R = D["sleeve_r_top"] + (D["sleeve_r_cuff"] - D["sleeve_r_top"]) * min(1.0, s / Ltot)
                 w = C.smoothstep(0.04, 0.12, s)
                 rn = rc + w * max(0.0, R - rc)
-                if Ltot - s < D["cuff_len"]:
-                    rn += 0.0025
+                # cuff: a smooth step out (run 7: a hard step plus folds at the edge left a ragged cuff)
+                rn += 0.0025 * C.smoothstep(D["cuff_len"], D["cuff_len"] - 0.012, Ltot - s)
                 ref = self.f2 - tdir * float(self.f2 @ tdir)
                 ref /= max(1e-6, np.linalg.norm(ref))
                 th = math.atan2(float(ru @ np.cross(tdir, ref)), float(ru @ ref))
@@ -559,6 +559,9 @@ class Garments:
                 wu = C.smoothstep(0.08, 0.14, s) * C.smoothstep(s_el - 0.02, s_el - 0.10, s)
                 d += D["fold_upperarm"] * wu * math.sin(3 * th + 2.0 * nz(p, 4))
                 d += D["fold_lumps"] * nz(p, 7)
+                d *= C.smoothstep(0.004, 0.025, ew)        # folds die out before the cuff edge
+                if boundary[i]:
+                    d = 0.0
                 out[i] = q + ru * (rn + d)
                 dirt[i] = 0.35 * C.smoothstep(D["cuff_len"] + 0.03, 0.0, ew) + 0.15 * we * inner
                 wear[i] = 0.35 * max(0.0, float(N[i][2])) * C.smoothstep(0.25, 0.05, s) + 0.25 * we * (1 - inner)

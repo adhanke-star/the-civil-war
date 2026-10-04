@@ -72,12 +72,12 @@ P = {
     # frontal fill from the camera side, soldier only: lifts faces out of the cap's shadow
     "fill_el": C.arg("fill-el", 12.0),
     "fill_strength": C.arg("fill-strength", 0.9),
-    "fill_rgb": (1.0, 0.97, 0.92),
+    "fill_rgb": (1.0, 1.0, 1.0),
     # field tier only: thicken the musket's cross-section so it survives at 96 px (readability choice)
     "field_musket_scale": C.arg("field-musket-scale", 1.7),
     # extra figure variants rendered into the FIELD tier atlas (the game can pick per man)
-    "field_variants": C.arg("field-variants", "mixed,face2"),
-    "sun_rgb": (1.0, 0.90, 0.78),                 # warm key
+    "field_variants": C.arg("field-variants", "mixed,face2,slouch"),
+    "sun_rgb": (1.0, 0.94, 0.86),                 # warm key (less orange than run 7: it greyed the blues)
     "sky_strength": C.arg("sky-strength", 0.45),
     "sky_hex": "#a9bdd6",                         # cool sky fill (world)
     # fills: never cast a ground shadow (light-linked to the soldier)
@@ -553,8 +553,8 @@ def main():
         plan = {"close": {c: ([0, hd, N // 4, N // 2, 3 * N // 4] if c == "stand" else [hd]) for c in clips},
                 "field": {c: [hd] for c in clips if c in ("stand", "walk")}}
     else:
-        plan = {"close": {c: (all_d if c == "stand" else list(range(0, N, 2))) for c in clips},
-                "field": {c: all_d for c in clips}}
+        plan = {"close": {c: list(all_d) for c in clips},
+                "field": {c: list(all_d) for c in clips}}
     if P["skip_field"]:
         plan.pop("field")
     budget_s = P["budget_min"] * 60.0
@@ -577,25 +577,40 @@ def main():
             if check_budget and clip != "stand" and times and not P["quick"]:
                 # budget check after the stand clip: per-frame time is now measured
                 per = statistics.median(times)
-                n_close_left = sum(len(clips[c]["frames"]) for c in clips if c != "stand") * len(dirs)
-                field_ratio = 0.2
+                n_other = sum(len(clips[c]["frames"]) for c in clips if c != "stand")
+                field_ratio = 0.19   # measured run 7: field 0.415 s vs close 2.26 s per frame
 
-                def est_for(nv, n_close):
-                    return (time.time() - t_start) + per * n_close + per * field_ratio * n_field_frames * (1 + nv)
-                est = est_for(len(fvars), n_close_left)
+                def est_for(nv, n_dirs):
+                    return ((time.time() - t_start) + per * n_other * n_dirs +
+                            per * field_ratio * n_field_frames * (1 + nv))
+                # order of sacrifice: close non-stand 16 -> 8 directions, then field variants,
+                # then close non-stand 8 -> 4 directions
+                n_dirs = len(dirs)
+                est = est_for(len(fvars), n_dirs)
                 C.log("budget: %.2fs/frame close; estimated stage total %.0fs (budget %.0fs)" % (per, est, budget_s))
+                steps = []
+                if est > budget_s and n_dirs > N // 2:
+                    n_dirs = N // 2
+                    steps.append("close non-stand -> %d directions" % n_dirs)
+                    est = est_for(len(fvars), n_dirs)
                 while est > budget_s and fvars:
                     dropped = fvars.pop()
                     REP["field_variants"].setdefault("dropped_for_budget", []).append(dropped)
-                    est = est_for(len(fvars), n_close_left)
-                if est > budget_s and reduced is None:
+                    steps.append("dropped field variant " + dropped)
+                    est = est_for(len(fvars), n_dirs)
+                if est > budget_s and n_dirs > N // 4:
+                    n_dirs = N // 4
+                    steps.append("close non-stand -> %d directions" % n_dirs)
+                    est = est_for(len(fvars), n_dirs)
+                if n_dirs != len(dirs):
                     for c in plan_t:
                         if c != "stand":
-                            plan_t[c] = list(range(0, N, 4))
+                            plan_t[c] = list(range(0, N, N // n_dirs))
                     dirs = plan_t[clip]
-                    reduced = {"reason": "estimated %.0fs > budget %.0fs" % (est, budget_s),
-                               "close_directions_non_stand": dirs}
-                    C.log("REDUCING close-tier directions for non-stand clips to", dirs)
+                if steps and reduced is None:
+                    reduced = {"reason": "estimated stage time over budget %.0fs" % budget_s, "steps": steps,
+                               "estimate_after_s": round(est), "close_directions_non_stand": dirs}
+                    C.log("BUDGET:", steps)
             if not dirs:
                 continue
             for d in dirs:

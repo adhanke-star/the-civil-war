@@ -23,7 +23,7 @@ on:
         default: '35'
       budget_min:
         description: Render budget in minutes before directions are reduced
-        default: '21'
+        default: '23'
       quick:
         description: '1 = quick check set (hero, close-up, variants, a few frames) instead of the full matrix'
         default: '0'
@@ -56,7 +56,7 @@ env:
   SAMPLES_HERO: ${{ inputs.samples_hero || '96' }}
   DIRECTIONS: ${{ inputs.directions || '16' }}
   ELEVATION: ${{ inputs.elevation || '35' }}
-  BUDGET_MIN: ${{ inputs.budget_min || '21' }}
+  BUDGET_MIN: ${{ inputs.budget_min || '23' }}
   # push runs: put [quick] in the commit message for the quick check set
   QUICK: ${{ inputs.quick || (contains(github.event.head_commit.message, '[quick]') && '1') || '0' }}
 
@@ -197,7 +197,7 @@ jobs:
           exit $rc
 
       - name: 4 render.py (Cycles CPU, ortho, directions x frames x tiers, hero)
-        timeout-minutes: 26
+        timeout-minutes: 27
         run: |
           set +e
           "$BLENDER" -b --factory-startup -noaudio --python-exit-code 1 -P tools/bake/render.py -- --out "$BAKE_OUT" \
