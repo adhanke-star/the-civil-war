@@ -62,7 +62,8 @@ P = {
     "samples_closeup": C.arg("samples-closeup", 96),
     # the ONE standard light: warm key sun, upper-left on screen, slightly toward the viewer
     "sun_az": C.arg("sun-az", 200.0),             # deg, ground plane, from screen-right CCW
-    "sun_el": C.arg("sun-el", 64.0),              # high sun: shadow ~0.5x figure height
+    "sun_el": C.arg("sun-el", 52.0),              # key elevation: models folds from upper-left
+    "shadow_el": C.arg("shadow-el", 74.0),        # ground-shadow sun: same azimuth, ~0.29 m per metre
     "sun_strength": C.arg("sun-strength", 4.2),
     "sun_soft_deg": C.arg("sun-soft", 3.0),
     "sun_rgb": (1.0, 0.90, 0.78),                 # warm key
@@ -70,8 +71,8 @@ P = {
     "sky_hex": "#a9bdd6",                         # cool sky fill (world)
     # fills: never cast a ground shadow (light-linked to the soldier)
     "rim_az": C.arg("rim-az", 55.0),              # behind-right of the figure, from screen-right CCW
-    "rim_el": C.arg("rim-el", 28.0),
-    "rim_strength": C.arg("rim-strength", 2.4),
+    "rim_el": C.arg("rim-el", 22.0),
+    "rim_strength": C.arg("rim-strength", 3.6),
     "rim_rgb": (0.68, 0.80, 1.0),                 # cool rim
     "bounce_w": C.arg("bounce-w", 7.0),           # ground-bounce area light power
     "bounce_rgb": (0.42, 0.55, 0.20),             # green field bounce
@@ -165,43 +166,59 @@ def setup_scene():
             lit.objects.link(o)
     lit.hide_viewport = False
 
-    # key sun (the one standard light; casts the only ground shadow)
-    sun_d = bpy.data.lights.new("tcw_sun", "SUN")
-    sun_d.energy = P["sun_strength"]
-    sun_d.color = P["sun_rgb"]
-    sun_d.angle = math.radians(P["sun_soft_deg"])
-    sun = bpy.data.objects.new("tcw_sun", sun_d)
-    C.link(sun)
-    to_sun = dir_vec(P["sun_az"], P["sun_el"])
-    sun.rotation_mode = "QUATERNION"
-    sun.rotation_quaternion = (-to_sun).to_track_quat("-Z", "Y")
-
     linked = {}
 
-    def link_only_soldier(obj, label):
+    def link_to(obj, coll, label):
         try:
-            obj.light_linking.receiver_collection = lit
-            linked[label] = "light-linked to soldier"
+            obj.light_linking.receiver_collection = coll
+            linked[label] = "light-linked to " + coll.name
+            return True
         except Exception as e:  # noqa: BLE001
-            try:
-                obj.data.use_shadow = False
-            except Exception:  # noqa: BLE001
-                pass
-            linked[label] = "no light linking (%s); shadows off" % e
+            linked[label] = "no light linking (%s)" % e
+            return False
 
-    # cool rim from behind-right
-    rim_d = bpy.data.lights.new("tcw_rim", "SUN")
-    rim_d.energy = P["rim_strength"]
-    rim_d.color = P["rim_rgb"]
-    rim_d.angle = math.radians(8.0)
-    rim = bpy.data.objects.new("tcw_rim", rim_d)
-    C.link(rim)
+    def sun_light(name, to_light, strength, rgb, soft_deg):
+        d = bpy.data.lights.new(name, "SUN")
+        d.energy = strength
+        d.color = rgb
+        d.angle = math.radians(soft_deg)
+        o = bpy.data.objects.new(name, d)
+        C.link(o)
+        o.rotation_mode = "QUATERNION"
+        o.rotation_quaternion = (-to_light).to_track_quat("-Z", "Y")
+        return o
+
+    # the shadow catcher (transparent ground that only keeps shadows), in its own collection
+    bpy.ops.mesh.primitive_plane_add(size=16.0, location=(0, 0, 0))
+    g = bpy.context.active_object
+    g.name = "tcw_shadow_catcher"
+    g.is_shadow_catcher = True
+    C.assign(g, C.material("tcw_ground", P["ground_hex"], roughness=1.0))
+    if g.name in lit.objects:
+        lit.objects.unlink(g)
+    ground = bpy.data.collections.new("tcw_ground")
+    sc.collection.children.link(ground)
+    ground.objects.link(g)
+
+    # KEY: the one standard light. Warm sun, upper-left on screen. It lights the soldier only
+    # (self-shadowing included); the ground shadow comes from a steeper sun with the SAME
+    # azimuth that lights only the ground, so the shadow points the same way but stays compact.
+    to_sun = dir_vec(P["sun_az"], P["sun_el"])
+    sun = sun_light("tcw_sun", to_sun, P["sun_strength"], P["sun_rgb"], P["sun_soft_deg"])
+    to_shadow = dir_vec(P["sun_az"], P["shadow_el"])
+    if link_to(sun, lit, "key"):
+        shs = sun_light("tcw_shadow_sun", to_shadow, P["sun_strength"], (1.0, 1.0, 1.0), P["sun_soft_deg"] + 2.0)
+        link_to(shs, ground, "shadow")
+    else:
+        to_shadow = to_sun  # no linking: the key also casts the ground shadow (long)
+
+    # cool rim from behind-right, soldier only
     to_rim = dir_vec(P["rim_az"], P["rim_el"])
-    rim.rotation_mode = "QUATERNION"
-    rim.rotation_quaternion = (-to_rim).to_track_quat("-Z", "Y")
-    link_only_soldier(rim, "rim")
+    rim = sun_light("tcw_rim", to_rim, P["rim_strength"], P["rim_rgb"], 8.0)
+    if not link_to(rim, lit, "rim"):
+        rim.data.use_shadow = False
 
-    # green ground bounce: a large area light lying on the ground, facing up
+    # green ground bounce: a large area light lying on the ground, facing up, soldier only
     b_d = bpy.data.lights.new("tcw_bounce", "AREA")
     b_d.shape = "SQUARE"
     b_d.size = 4.0
@@ -211,7 +228,8 @@ def setup_scene():
     C.link(bounce)
     bounce.location = (0, 0, 0.01)
     bounce.rotation_euler = (math.pi, 0, 0)   # area lights emit along local -Z; flip to face up
-    link_only_soldier(bounce, "bounce")
+    if not link_to(bounce, lit, "bounce"):
+        b_d.use_shadow = False
     for lo in (bounce, rim):
         try:
             lo.visible_camera = False
@@ -223,29 +241,23 @@ def setup_scene():
     REP["sun"] = {"to_sun_world": [round(x, 4) for x in to_sun],
                   "to_sun_screen": [round(to_sun.x, 4), round(to_sun.dot(up_s), 4)],
                   "azimuth_deg": P["sun_az"], "elevation_deg": P["sun_el"],
-                  "shadow_length_per_metre_height": round(1.0 / math.tan(math.radians(P["sun_el"])), 3),
                   "colour": P["sun_rgb"],
-                  "note": "world: x = screen right, y = away from viewer, z = up. The key sun is the "
-                          "only light that casts a ground shadow."}
+                  "ground_shadow": {"to_light_world": [round(x, 4) for x in to_shadow],
+                                    "length_per_metre_height": round(math.hypot(to_shadow.x, to_shadow.y) / to_shadow.z, 3),
+                                    "note": "compact contact shadow: same azimuth as the key, steeper"},
+                  "note": "world: x = screen right, y = away from viewer, z = up. to_sun_* is the key light "
+                          "that shades the figure; the ground shadow follows ground_shadow (same azimuth)."}
     REP["lights"] = {
         "key": {"type": "sun", "to_light_world": [round(x, 4) for x in to_sun], "strength": P["sun_strength"],
-                "colour": P["sun_rgb"], "soft_deg": P["sun_soft_deg"]},
+                "colour": P["sun_rgb"], "soft_deg": P["sun_soft_deg"], "linking": linked.get("key")},
+        "shadow": {"type": "sun", "to_light_world": [round(x, 4) for x in to_shadow], "linking": linked.get("shadow")},
         "rim": {"type": "sun", "to_light_world": [round(x, 4) for x in to_rim], "strength": P["rim_strength"],
                 "colour": P["rim_rgb"], "linking": linked.get("rim")},
         "bounce": {"type": "area 4 m square on the ground, facing up", "watts": P["bounce_w"],
                    "colour": P["bounce_rgb"], "linking": linked.get("bounce")},
         "sky": {"hex": P["sky_hex"], "strength": P["sky_strength"]},
     }
-    # transparent ground that only keeps shadows; its albedo tints any indirect bounce green
-    bpy.ops.mesh.primitive_plane_add(size=16.0, location=(0, 0, 0))
-    g = bpy.context.active_object
-    g.name = "tcw_shadow_catcher"
-    g.is_shadow_catcher = True
-    gm = C.material("tcw_ground", P["ground_hex"], roughness=1.0)
-    C.assign(g, gm)
-    if g.name in lit.objects:
-        lit.objects.unlink(g)
-    return sc, to_sun
+    return sc, to_shadow
 
 
 def ortho_camera():
@@ -261,10 +273,11 @@ def ortho_camera():
     return cam
 
 
-def frame_ortho(cam, fr):
+def frame_ortho(cam, fr, d):
     _e, view, up_s = e_vectors()
     cam.data.ortho_scale = fr["orthoM"]
-    centre = Vector((fr["centre"][0], 0, 0)) + up_s * fr["centre"][1]
+    cx, cy = fr["centres"][d]
+    centre = Vector((cx, 0, 0)) + up_s * cy
     cam.location = centre - view * 30.0
 
 
@@ -356,12 +369,14 @@ def figure_points(stride=3):
     return np.concatenate(out) if out else np.zeros((1, 3))
 
 
-def clip_framing(sc, tt, base, frames, to_sun, N):
-    """One ortho scale + centre for the clip: union over its frames and all N directions of the
-    figure and its ground shadow, projected to the screen."""
+def clip_framing(sc, tt, base, frames, to_shadow, N):
+    """One ortho scale per clip, one centre per direction. For each direction: the screen box
+    of the figure and its ground shadow over all the clip's frames. The clip's scale is the
+    largest box side over all directions (plus margin), so every frame of a clip shares one
+    pixels-per-metre; each direction is centred on its own box (its own feet anchor)."""
     e, _view, _up = e_vectors()
     se, ce = math.sin(e), math.cos(e)
-    ts = np.array(to_sun[:])
+    ts = np.array(to_shadow[:])
     tt.rotation_euler = (0, 0, base)
     pts = []
     for f in frames:
@@ -369,8 +384,7 @@ def clip_framing(sc, tt, base, frames, to_sun, N):
         pts.append(figure_points())
     P0 = np.concatenate(pts)
     zpos = np.clip(P0[:, 2], 0.0, None)
-    lo = np.array([1e9, 1e9])
-    hi = -lo
+    side, centres, boxes = 0.0, [], []
     for d in range(N):
         a = 2 * math.pi * d / N
         ca, sa = math.cos(a), math.sin(a)
@@ -379,20 +393,18 @@ def clip_framing(sc, tt, base, frames, to_sun, N):
         z = P0[:, 2]
         sx = np.concatenate([x, x - ts[0] * zpos / ts[2]])
         sy = np.concatenate([y * se + z * ce, (y - ts[1] * zpos / ts[2]) * se])
-        lo = np.minimum(lo, [sx.min(), sy.min()])
-        hi = np.maximum(hi, [sx.max(), sy.max()])
-    w, h = float(hi[0] - lo[0]), float(hi[1] - lo[1])
-    ortho = max(w, h) * (1.0 + P["margin"]) + P["pad_m"]
-    centre = [float(lo[0] + hi[0]) / 2, float(lo[1] + hi[1]) / 2]
-    return {"orthoM": round(ortho, 4), "centre": [round(c, 4) for c in centre],
-            "box_m": [round(w, 3), round(h, 3)]}
+        w, h = float(sx.max() - sx.min()), float(sy.max() - sy.min())
+        side = max(side, w, h)
+        centres.append([round(float(sx.max() + sx.min()) / 2, 4), round(float(sy.max() + sy.min()) / 2, 4)])
+        boxes.append([round(w, 3), round(h, 3)])
+    ortho = side * (1.0 + P["margin"]) + P["pad_m"]
+    return {"orthoM": round(ortho, 4), "centres": centres, "boxes_m": boxes}
 
 
 def tier_framing(fr, px):
     o = fr["orthoM"]
-    cx, cy = fr["centre"]
-    return {"orthoM": o, "pxPerMetre": round(px / o, 4),
-            "anchor": [round(px / 2.0 - cx / o * px, 3), round(px / 2.0 + cy / o * px, 3)]}
+    anchors = [[round(px / 2.0 - cx / o * px, 2), round(px / 2.0 + cy / o * px, 2)] for cx, cy in fr["centres"]]
+    return {"orthoM": o, "pxPerMetre": round(px / o, 4), "anchors": anchors, "anchor": anchors[0]}
 
 
 def render_to(sc, path):
@@ -407,7 +419,7 @@ def main():
     bpy.ops.wm.open_mainfile(filepath=os.path.join(C.WORK, "posed.blend"))
     T.mark("open posed.blend")
     clips = C.read_report("poses")["clips"]
-    sc, to_sun = setup_scene()
+    sc, to_sun = setup_scene()   # to_sun here = the ground-shadow light (what framing needs)
     cam = ortho_camera()
     rig = C.find_rig()
     tt, base = turntable(rig)
@@ -465,7 +477,7 @@ def main():
         set_variant(v)
         vf = clip_framing(sc, tt, base, clips["stand"]["frames"], to_sun, N)
         REP["variants_framing"][v] = tier_framing(vf, P["close_px"])
-        frame_ortho(cam, vf)
+        frame_ortho(cam, vf, hd)
         tt.rotation_euler = (0, 0, base + 2 * math.pi * hd / N)
         sc.frame_set(clips["stand"]["frames"][0])
         REP["variants"][v] = round(render_to(sc, os.path.join(C.OUT, "variants", v + ".png")), 2)
@@ -512,8 +524,8 @@ def main():
                     C.log("REDUCING close-tier directions for non-stand clips to", dirs)
             if not dirs:
                 continue
-            frame_ortho(cam, framing[clip])
             for d in dirs:
+                frame_ortho(cam, framing[clip], d)
                 tt.rotation_euler = (0, 0, base + 2 * math.pi * d / N)
                 for i, f in enumerate(clips[clip]["frames"]):
                     sc.frame_set(f)
@@ -537,8 +549,9 @@ def main():
     REP["quick"] = bool(P["quick"])
     REP["camera"] = {"type": "orthographic", "elevation_deg": P["elevation"],
                      "ortho_m": framing["stand"]["orthoM"],
-                     "ortho_rule": "per clip: tiers.<tier>.clips.<clip> (orthoM, pxPerMetre, anchor); "
-                                   "ortho_m here is the stand clip's",
+                     "ortho_rule": "one scale per clip, one centre per direction: tiers.<tier>.clips.<clip> "
+                                   "(orthoM, pxPerMetre, anchors[d]); every frame record also carries its "
+                                   "own ax, ay, ppm. ortho_m here is the stand clip's",
                      "directions": N,
                      "direction_rule": "d faces d*360/N deg CCW (from above) from toward-camera; d=N/4 faces screen-right"}
     REP["clips"] = clips

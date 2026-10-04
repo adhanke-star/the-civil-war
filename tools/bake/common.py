@@ -213,6 +213,214 @@ def assign(obj, mat):
     obj.data.materials.append(mat)
 
 
+# ---------------------------------------------------------------- procedural cloth/leather/wood
+#
+# All textures are procedural (no image files, no external assets). They read the garment's
+# REST position from the point attribute "tcw_rest" (metres), so the pattern sticks to the cloth
+# while the armature deforms it (Object coordinates would swim from frame to frame).
+# Per-vertex float attributes written by uniform.py drive the weathering:
+#   tcw_dirt   0..1 dust and mud (lower trousers, shoes, cuffs)
+#   tcw_wear   0..1 sun fading / rubbing (shoulders, knees, edges)
+#   tcw_cavity 0..1 fold creases (darkened a little; dirt collects there)
+
+
+def _sock(nt, socket, value):
+    if hasattr(value, "is_output"):
+        nt.links.new(value, socket)
+    else:
+        socket.default_value = value
+
+
+def node_math(nt, op, a, b=0.0, clamp=False):
+    m = nt.nodes.new("ShaderNodeMath")
+    m.operation = op
+    m.use_clamp = clamp
+    _sock(nt, m.inputs[0], a)
+    _sock(nt, m.inputs[1], b)
+    return m.outputs[0]
+
+
+def node_mix(nt, blend, fac, a, b):
+    """Colour mix (ShaderNodeMix in RGBA mode; legacy MixRGB if that is unavailable)."""
+    try:
+        m = nt.nodes.new("ShaderNodeMix")
+        m.data_type = "RGBA"
+        m.blend_type = blend
+        m.clamp_result = True
+        f_in = m.inputs["Factor"]
+        a_in = [s for s in m.inputs if s.name == "A" and s.type == "RGBA"][0]
+        b_in = [s for s in m.inputs if s.name == "B" and s.type == "RGBA"][0]
+        out = [s for s in m.outputs if s.type == "RGBA"][0]
+    except Exception:  # noqa: BLE001
+        m = nt.nodes.new("ShaderNodeMixRGB")
+        m.blend_type = blend
+        f_in, a_in, b_in, out = m.inputs["Fac"], m.inputs["Color1"], m.inputs["Color2"], m.outputs["Color"]
+    _sock(nt, f_in, fac)
+    _sock(nt, a_in, a if not isinstance(a, tuple) or len(a) == 4 else (*a, 1.0))
+    _sock(nt, b_in, b if not isinstance(b, tuple) or len(b) == 4 else (*b, 1.0))
+    return out
+
+
+def node_noise(nt, vec, scale, detail=2.0, rough=0.5):
+    n = nt.nodes.new("ShaderNodeTexNoise")
+    n.inputs["Scale"].default_value = scale
+    n.inputs["Detail"].default_value = detail
+    if "Roughness" in n.inputs:
+        n.inputs["Roughness"].default_value = rough
+    nt.links.new(vec, n.inputs["Vector"])
+    return n.outputs["Fac"]
+
+
+def node_ramp(nt, fac, lo_pos, hi_pos, lo=(0, 0, 0, 1), hi=(1, 1, 1, 1)):
+    r = nt.nodes.new("ShaderNodeValToRGB")
+    r.color_ramp.elements[0].position = lo_pos
+    r.color_ramp.elements[1].position = hi_pos
+    r.color_ramp.elements[0].color = lo
+    r.color_ramp.elements[1].color = hi
+    nt.links.new(fac, r.inputs["Fac"])
+    return r
+
+
+def node_attr(nt, name, out="Fac"):
+    a = nt.nodes.new("ShaderNodeAttribute")
+    a.attribute_type = "GEOMETRY"
+    a.attribute_name = name
+    return a.outputs[out]
+
+
+def weathered_material(name, hex_colour, roughness=0.9, kind="wool", fade_hex=None, fade=0.0,
+                       dust_hex="#8c7b5c", mud_hex="#4b3b27", mottle=0.08, sheen=0.0,
+                       weave_scale=300.0, bump=0.3, metallic=0.0, edge_wear_hex=None):
+    """Principled material with procedural colour variation, fading, dust/mud and fine relief.
+    kind: "wool" (felted nap + diagonal twill), "leather" (pebbled grain, edge wear from
+    pointiness), "canvas" (plain weave), "wood" (grain bands along local Z), "metal"."""
+    mat = bpy.data.materials.get(name)
+    if mat:
+        return mat
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    nt = mat.node_tree
+    bsdf = nt.nodes.get("Principled BSDF")
+    base = hex_rgb(hex_colour)
+    rest = node_attr(nt, "tcw_rest", "Vector")
+    dirt = node_attr(nt, "tcw_dirt")
+    wear = node_attr(nt, "tcw_wear")
+    cav = node_attr(nt, "tcw_cavity")
+    # large-scale mottling: dyed wool and leather are never one flat colour
+    lo = tuple(max(0.0, c * (1.0 - mottle)) for c in base)
+    hi = tuple(min(1.0, c * (1.0 + mottle)) for c in base)
+    col = node_ramp(nt, node_noise(nt, rest, 2.5, 3.0), 0.3, 0.7, (*lo, 1), (*hi, 1)).outputs["Color"]
+    # fine fleck (fibre / grain)
+    fl = node_ramp(nt, node_noise(nt, rest, 420.0 if kind != "wood" else 60.0, 1.0), 0.25, 0.75,
+                   (0.93, 0.93, 0.93, 1), (1.07, 1.07, 1.07, 1)).outputs["Color"]
+    col = node_mix(nt, "MULTIPLY", 1.0, col, fl)
+    if kind == "wood":
+        wv = nt.nodes.new("ShaderNodeTexWave")
+        wv.wave_type = "BANDS"
+        wv.bands_direction = "Z"
+        wv.inputs["Scale"].default_value = 9.0
+        wv.inputs["Distortion"].default_value = 7.0
+        wv.inputs["Detail"].default_value = 3.0
+        coord = nt.nodes.new("ShaderNodeTexCoord")
+        nt.links.new(coord.outputs["Object"], wv.inputs["Vector"])
+        g = node_ramp(nt, wv.outputs["Fac"], 0.2, 0.9, (0.70, 0.66, 0.62, 1), (1.12, 1.1, 1.08, 1)).outputs["Color"]
+        col = node_mix(nt, "MULTIPLY", 1.0, col, g)
+    # fading (sun and rubbing): toward a lighter, greyer shade, patchy
+    if fade_hex and fade > 0:
+        patch = node_noise(nt, rest, 9.0, 2.0)
+        wf = node_math(nt, "MULTIPLY", wear, patch)
+        wf = node_math(nt, "MULTIPLY", wf, 2.0 * fade, clamp=True)
+        col = node_mix(nt, "MIX", wf, col, (*hex_rgb(fade_hex), 1.0))
+    # edge wear on leather (pointiness: convex edges get scuffed lighter)
+    if edge_wear_hex:
+        geo = nt.nodes.new("ShaderNodeNewGeometry")
+        pr = node_ramp(nt, geo.outputs["Pointiness"], 0.53, 0.62, (0, 0, 0, 1), (1, 1, 1, 1)).outputs["Color"]
+        ew = node_math(nt, "MULTIPLY", pr, 0.55)
+        col = node_mix(nt, "MIX", ew, col, (*hex_rgb(edge_wear_hex), 1.0))
+        col = node_mix(nt, "MIX", node_math(nt, "MULTIPLY", wear, 0.5), col, (*hex_rgb(edge_wear_hex), 1.0))
+    # dust: patchy, follows the dirt attribute
+    dn = node_ramp(nt, node_noise(nt, rest, 14.0, 3.0), 0.35, 0.65).outputs["Color"]
+    dfac = node_math(nt, "MULTIPLY", dirt, dn)
+    col = node_mix(nt, "MIX", node_math(nt, "MULTIPLY", dfac, 0.75, clamp=True), col, (*hex_rgb(dust_hex), 1.0))
+    # mud: only where dirt is high, in splashes
+    mn = node_ramp(nt, node_noise(nt, rest, 26.0, 2.0), 0.48, 0.62).outputs["Color"]
+    mfac = node_math(nt, "MULTIPLY", node_math(nt, "SUBTRACT", node_math(nt, "MULTIPLY", dirt, 2.5), 1.4,
+                                               clamp=True), mn)
+    col = node_mix(nt, "MIX", node_math(nt, "MULTIPLY", mfac, 0.85, clamp=True), col, (*hex_rgb(mud_hex), 1.0))
+    # creases a little darker
+    col = node_mix(nt, "MULTIPLY", node_math(nt, "MULTIPLY", cav, 0.5, clamp=True), col, (0.55, 0.55, 0.6, 1.0))
+    nt.links.new(col, bsdf.inputs["Base Color"])
+    rough = node_math(nt, "ADD", roughness, node_math(nt, "MULTIPLY", dirt, 0.12), clamp=True)
+    nt.links.new(rough, bsdf.inputs["Roughness"])
+    _set_input(bsdf, ["Metallic"], metallic)
+    if sheen > 0:
+        _set_input(bsdf, ["Sheen Weight", "Sheen"], sheen)
+        _set_input(bsdf, ["Sheen Roughness"], 0.45)
+    # relief
+    if bump > 0:
+        if kind == "wool":
+            tw = nt.nodes.new("ShaderNodeTexWave")
+            tw.wave_type = "BANDS"
+            tw.bands_direction = "DIAGONAL"
+            tw.inputs["Scale"].default_value = weave_scale
+            nt.links.new(rest, tw.inputs["Vector"])
+            h = node_math(nt, "ADD", node_math(nt, "MULTIPLY", tw.outputs["Fac"], 0.35),
+                          node_noise(nt, rest, 160.0, 3.0))
+        elif kind == "canvas":
+            tw = nt.nodes.new("ShaderNodeTexChecker")
+            tw.inputs["Scale"].default_value = weave_scale
+            nt.links.new(rest, tw.inputs["Vector"])
+            h = node_math(nt, "ADD", node_math(nt, "MULTIPLY", tw.outputs["Fac"], 0.3),
+                          node_noise(nt, rest, 90.0, 3.0))
+        elif kind == "leather":
+            vor = nt.nodes.new("ShaderNodeTexVoronoi")
+            vor.inputs["Scale"].default_value = 260.0
+            nt.links.new(rest, vor.inputs["Vector"])
+            h = node_math(nt, "ADD", vor.outputs["Distance"], node_noise(nt, rest, 40.0, 3.0))
+        else:
+            h = node_noise(nt, rest, 120.0, 2.0)
+        bp = nt.nodes.new("ShaderNodeBump")
+        bp.inputs["Strength"].default_value = bump
+        bp.inputs["Distance"].default_value = 0.0008
+        nt.links.new(h, bp.inputs["Height"])
+        nt.links.new(bp.outputs["Normal"], bsdf.inputs["Normal"])
+    return mat
+
+
+def stamp_attrs(obj, rest=None, dirt=None, wear=None, cavity=None):
+    """Write the per-vertex attributes the weathered materials read. rest defaults to the mesh's
+    own vertex positions in world space (correct for objects built in world rest space)."""
+    me = obj.data
+    n = len(me.vertices)
+    if rest is None:
+        mw = obj.matrix_world
+        rest = [mw @ v.co for v in me.vertices]
+    flat = []
+    for p in rest:
+        flat.extend((p[0], p[1], p[2]))
+    a = me.attributes.get("tcw_rest") or me.attributes.new("tcw_rest", "FLOAT_VECTOR", "POINT")
+    a.data.foreach_set("vector", flat)
+    for key, vals in (("tcw_dirt", dirt), ("tcw_wear", wear), ("tcw_cavity", cavity)):
+        if vals is None:
+            continue
+        if not hasattr(vals, "__len__"):
+            vals = [float(vals)] * n
+        a = me.attributes.get(key) or me.attributes.new(key, "FLOAT", "POINT")
+        a.data.foreach_set("value", [float(x) for x in vals])
+
+
+def smoothstep(a, b, x):
+    if a == b:
+        return 1.0 if x >= b else 0.0
+    t = min(1.0, max(0.0, (x - a) / (b - a)))
+    return t * t * (3.0 - 2.0 * t)
+
+
+def crease(x):
+    """Cloth fold profile: rounded bulges, sharp creases, zero mean."""
+    return abs(math.sin(math.pi * x)) - 0.6366
+
+
 # ---------------------------------------------------------------- geometry helpers
 
 

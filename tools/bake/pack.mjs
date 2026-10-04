@@ -115,7 +115,7 @@ function shelfPack(items, width, maxH) {
   return pages;
 }
 
-function packTier(tier) {
+function packTier(tier, framing = {}) {
   const dir = path.join(OUT, 'frames', tier);
   if (!fs.existsSync(dir)) return null;
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.png')).sort();
@@ -140,6 +140,13 @@ function packTier(tier) {
     for (const { it, x, y } of pg.items) {
       blit(atlas, it.png, it.rect.x, it.rect.y, it.rect.w, it.rect.h, x, y);
       frames[it.key] = { page: pi, x, y, w: it.rect.w, h: it.rect.h, ox: it.rect.x, oy: it.rect.y };
+      // added (second pass): this frame's own feet anchor (px, untrimmed frame) and px per metre
+      const m = /^(.+)_(\d+)_d(\d+)$/.exec(it.key);
+      const fc = m && framing[m[1]];
+      if (fc && fc.anchors && fc.anchors[Number(m[3])]) {
+        const [ax, ay] = fc.anchors[Number(m[3])];
+        Object.assign(frames[it.key], { ax, ay, ppm: fc.pxPerMetre });
+      }
     }
     const file = `soldier_${tier}_${pi}.png`;
     const bytes = writePNG(path.join(OUT, 'atlas', file), atlas);
@@ -236,9 +243,9 @@ function pack() {
   const clips = render.clips || poses.clips || {};
   const tiers = {};
   for (const tier of ['close', 'field']) {
-    const t = packTier(tier);
-    if (!t) continue;
     const r = render.tiers?.[tier] || {};
+    const t = packTier(tier, r.clips || {});
+    if (!t) continue;
     tiers[tier] = {
       frameSize: t.frameSize, pxPerMetre: r.px_per_m, anchor: r.anchor_px, samples: r.samples,
       directionsRendered: r.directions, count: t.count, pages: t.pages, rawFrameBytes: t.rawFrameBytes,
@@ -252,7 +259,7 @@ function pack() {
     subject: 'Union infantry private, Western theater, 1862 (second-pass bake; uniform and kit are placeholder/Inferred)',
     generated: new Date().toISOString(),
     frameKey: '<clip>_<index>_d<direction, 2 digits>',
-    rectRule: 'draw atlas rect (x,y,w,h) at (screenAnchor - anchor + (ox,oy)), using the anchor and pxPerMetre of the frame\'s clip (tiers.<tier>.clips.<clip>); scale the rect by (game px per metre) / pxPerMetre. anchor = the feet on the ground',
+    rectRule: 'draw atlas rect (x,y,w,h) at (screenAnchor - (ax,ay) + (ox,oy)) where (ax,ay) and ppm are the frame record\'s own fields (feet anchor in the untrimmed frame, px per metre); scale the rect by (game px per metre) / ppm. One ppm per clip; one anchor per clip and direction. tiers.<tier>.anchor/pxPerMetre are the stand clip at direction 0, kept for older readers',
     camera: render.camera, sun: render.sun, colour: render.colour, clips, tiers,
     variants: Object.keys(render.variants || {}),
     // added (second pass)
