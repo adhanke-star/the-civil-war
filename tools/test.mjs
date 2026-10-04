@@ -20,15 +20,18 @@
 //   baked figures (look.figureStyle 'baked', src/units/impostor.js): baked-draws (sprites + the crews and officers
 //      still rigged >= the rigged count, canvas not blank and different from the rigged picture), baked-rects
 //      (every instance's atlas rect inside its page), baked-direction (the camera turned 180 degrees moves a
-//      man's baked direction by 8 of 16), baked-compare (both styles drawn, rigged left / baked right),
+//      man's baked direction by 8 of 16), baked-load (a reloading brigade draws the load frames, a loaded one
+//      none), baked-compare (both styles drawn, rigged left / baked right),
 //      men-per-figure (look.menPerFigure 5 gives 1.7-2.3x the figures; back to 10 restores the count)
 //   8. axe: no serious or critical accessibility violations
 // Then, with the first page closed (one page at a time on an 8 GB Mac):
 //   settings (Node, before the browser): src/settings.js define/get/set/reset/on/lock/exportText/importText
 //      round-trip, range clamping and snapping, unknown keys and bad values ignored
 //   baked-maths (Node): the bake's direction rule (0 faces the camera, 4 screen-right, 180-degree camera turn
-//      = +8), pose and walk-frame selection, every manifest rect inside its page; each with a deliberately
-//      broken control that must fail with the expected text
+//      = +8), pose, walk- and load-frame selection, every manifest rect inside its page; baked-direction-per-clip
+//      (a clip baked in fewer directions never gets one it lacks), baked-height (stand, walk and load drawn the
+//      same height, feet on the anchor), baked-variants (a man's look is fixed by his index; looks are mixed);
+//      each with a deliberately broken control that must fail with the expected text
 //   sandbox-*: index.html?sandbox&quality=low: the panel has 5 tabs; the Interface size slider moves
 //      --ui-scale; "Lock this" disables it and set() is refused; Copy/Paste settings; the round button hides
 //      the panel; Units/Moments tools spawn, shell, rout and remove a generic brigade; the order line compares
@@ -179,11 +182,16 @@ async function bakedUnit() {
     // the walk advances one cycle per metres_per_cycle of life-size ground (scaled like the figure)
     const s = 4.4, metres = L.walkMetres * s * 0.25;
     if (slotFor(C.WALK, metres / (s * L.walkMetres)) !== walk.start + Math.floor(walk.count * 0.25)) bad.push('a quarter of metres_per_cycle walked is not a quarter of the cycle');
-    const want = { [C.STAND]: 'stand_0', [C.AIM]: 'fire_0', [C.FIRE]: 'fire_1', [C.RECOVER]: 'fire_2', [C.FALLEN]: 'fallen_0' };
+    const want = { [C.STAND]: 'stand_0', [C.AIM]: 'fire_0', [C.FIRE]: 'fire_1', [C.RECOVER]: 'fire_2', [C.FALLEN]: 'fallen_0', [C.LOAD]: 'load_0' };
     for (const [code, key] of Object.entries(want)) {
       const [name, k] = [key.slice(0, key.lastIndexOf('_')), Number(key.slice(key.lastIndexOf('_') + 1))];
       if (slotFor(Number(code), 0) !== L.clips[name].start + k) bad.push(`pose ${code} gave slot ${slotFor(Number(code), 0)} (want ${key})`);
     }
+    // loading steps through every load frame in order as his loading goes from 0 to 1
+    const load = L.clips.load;
+    const lseen = [];
+    for (let i = 0; i < load.count; i++) lseen.push(slotFor(C.LOAD, (i + 0.5) / load.count) - load.start);
+    if (lseen.join() !== [...Array(load.count).keys()].join() || slotFor(C.LOAD, 1) !== load.start + load.count - 1) bad.push(`loading 0..1 gave load frames ${lseen.join(',')} (want 0..${load.count - 1} in order)`);
     return bad;
   };
   const offByOne = (clip, phase) => { const v = L.slotFor(clip, phase); return clip === C.WALK ? L.clips.walk.start + ((v - L.clips.walk.start + 1) % L.clips.walk.count) : v; };
@@ -198,9 +206,138 @@ async function bakedUnit() {
   const ok = dReal.length === 0 && dCtl.some((t) => /screen-right/.test(t)) && fReal.length === 0 && fCtl.some((t) => /walk phases/.test(t))
     && L.missing.length === 0 && rReal.length === 0 && rCtl.length === 1;
   check('baked-maths', ok, ok
-    ? `direction rule (0 toward the camera, 4 screen-right, 8 away, +8 on a 180-degree camera turn), walk frames by ground walked, aim/fire/recover/fallen poses, ${L.slots * L.n} frames per tier inside their pages; controls fail as they must: mirrored rule "${dCtl[0]}", off-by-one walk "${fCtl[0]}", rect off the page caught (${rCtl.length})`
+    ? `direction rule (0 toward the camera, 4 screen-right, 8 away, +8 on a 180-degree camera turn), walk frames by ground walked, load frames by loading done, aim/fire/recover/fallen/load poses, ${L.slots * L.n} records per tier and look inside their pages; controls fail as they must: mirrored rule "${dCtl[0]}", off-by-one walk "${fCtl[0]}", rect off the page caught (${rCtl.length})`
     : [...dReal, ...fReal, ...L.missing.map((m) => `missing frame ${m}`), ...rReal.map((r) => `rect off its page: ${r}`),
       dCtl.length ? '' : 'CONTROL: the mirrored direction rule passed', fCtl.length ? '' : 'CONTROL: the off-by-one walk passed', rCtl.length === 1 ? '' : `CONTROL: the off-page rect gave ${rCtl.length} problems (want 1)`].filter(Boolean).join(' | '));
+
+  // directions per clip: every direction chosen exists for that clip in that tier and is the nearest it has
+  const dirSel = (Lx, pick) => {
+    const bad = [];
+    for (const tier of Object.keys(Lx.tiers)) {
+      const T = Lx.tiers[tier], frames = manifest.tiers[tier].frames;
+      for (const [name, c] of Object.entries(Lx.clips)) {
+        const av = T.avail[name];
+        let lacks = 0, notNearest = 0, first = '';
+        for (let k = 0; k < 720; k++) {
+          const yaw = -Math.PI + (k + 0.37) * (TAU / 720), cx = 130 * Math.sin(k * 0.7), cz = 130 * Math.cos(k * 0.7);
+          const d = pick(tier, c.start, yaw, 0, 0, cx, cz);
+          if (!av.includes(d) || !frames[`${name}_0_d${String(d).padStart(2, '0')}`]) { lacks++; if (!first) first = `${tier}:${name} returned direction ${d}, which ${tier}:${name} lacks (has ${av.join(',')})`; continue; }
+          let u = (yaw - Math.atan2(cx, cz)) / TAU; u = (u - Math.floor(u)) * Lx.n;
+          const dist = (e) => Math.abs((((u - e) % Lx.n) + Lx.n * 1.5) % Lx.n - Lx.n / 2);
+          if (dist(d) > Math.min(...av.map(dist)) + 1e-6) notNearest++;
+        }
+        if (lacks) bad.push(`${first} (${lacks} of 720 headings)`);
+        if (notNearest) bad.push(`${tier}:${name} picked a direction that is not the nearest available for ${notNearest} of 720 headings`);
+      }
+    }
+    return bad;
+  };
+  const counts = Object.entries(L.tiers).map(([t, T]) => `${t} ${Object.entries(T.avail).map(([c, a]) => `${c} ${a.length}`).join('/')}`).join('; ');
+  const sReal = dirSel(L, (t, slot, ...a) => L.direction(t, slot, ...a));
+  const sCtl = dirSel(L, (t, slot, yaw, x, z, cx, cz) => I.directionIndex(yaw, x, z, cx, cz, L.n)); // assumes 16 for every clip
+  const reduced = Object.values(L.tiers).some((T) => Object.values(T.avail).some((a) => a.length < L.n));
+  const sOk = sReal.length === 0 && (!reduced || sCtl.some((t) => /lacks/.test(t)));
+  check('baked-direction-per-clip', sOk, sOk
+    ? `directions per clip read from the manifest (${counts}); 720 headings per clip and tier never pick a missing direction and always the nearest available; control "assume ${L.n} for every clip" fails as it must: "${sCtl[0] || '(no reduced clip in this manifest)'}"`
+    : [...sReal, reduced && !sCtl.some((t) => /lacks/.test(t)) ? 'CONTROL: the assume-16 picker passed on a manifest with reduced clips' : ''].filter(Boolean).join(' | '));
+
+  // drawn height: one man pushed through ImpostorPool in stand, walk and load is the same height on the ground
+  const pngs = {};
+  const pageOf = async (Lx, tier, page) => {
+    const file = Lx.tiers[tier].pages[page].file;
+    if (!pngs[file]) pngs[file] = PNG.sync.read(await fs.readFile(path.join(ROOT, 'assets', 'figures', 'union-infantry', file)));
+    return pngs[file];
+  };
+  const S = 4.4;
+  const measure = async (Lx, tier, clip, phase, yaw = 0, man = 0) => {
+    const pool = new I.ImpostorPool(4, { side: 'US' });
+    pool.attach({ layout: Lx, textures: { [tier]: Lx.tiers[tier].pages.map(() => null), field: Lx.tiers.field.pages.map(() => null) }, pools: [], state: { close: true } });
+    pool.allowClose = tier === 'close';
+    pool.cam.set(0, 70, 100); // 122 m away, in front: yaw 0 is direction 0 (facing the viewer), pi/2 direction 4
+    pool.begin();
+    if (!pool.push(0, 0, 0, yaw, S, clip, phase, 0.5, 0, man)) return null;
+    const b = pool.batches[tier].find((x) => x.n > 0);
+    const a = b.data, mpp = a[3], [rx, ry, rw, rh] = [a[4], a[5], a[6], a[7]], dy = a[9];
+    const png = await pageOf(Lx, tier, b.page);
+    const minRun = (0.1 * S) / mpp; // a row at least 10 cm (life) of solid figure wide is the head, not the musket
+    let top = -1, bottom = -1;
+    for (let r = 0; r < rh; r++) {
+      let run = 0, best = 0;
+      for (let c = 0; c < rw; c++) {
+        run = png.data[((ry + r) * png.width + rx + c) * 4 + 3] >= 225 ? run + 1 : 0;
+        if (run > best) best = run;
+      }
+      if (best >= minRun) { if (top < 0) top = r; bottom = r; }
+    }
+    return { head: (-(dy + top) * mpp) / S, feet: ((dy + bottom) * mpp) / S };
+  };
+  // Measured side-on (direction 4, facing screen-right; also 12): seen from the front, a striding man's head
+  // and leading foot are nearer the camera than his feet anchor and project lower, which is not a scale error.
+  // A clip's height is its tallest frame (the walk's passing position, legs together; load 0): the walk's
+  // stride frames dip a few per cent below it by pose (the bob), which the cycle mean also bounds.
+  const heights = async (Lx, yaw) => {
+    const bad = [], seen = [];
+    const dn = `d${(Math.round(yaw / (Math.PI / 8)) + 16) % 16}`;
+    for (const tier of ['close', 'field']) {
+      const st = await measure(Lx, tier, C.STAND, 0, yaw);
+      const walk = [];
+      for (let k = 0; k < Lx.clips.walk.count; k++) walk.push(await measure(Lx, tier, C.WALK, (k + 0.5) / Lx.clips.walk.count, yaw));
+      const load0 = await measure(Lx, tier, C.LOAD, 0.05, yaw);
+      const wMax = Math.max(...walk.map((m) => m.head)), wMean = walk.reduce((a, m) => a + m.head, 0) / walk.length;
+      for (const [label, h] of [['walk (passing frame)', wMax], ['walk (cycle mean)', wMean], ['load 0', load0.head]]) {
+        const ratio = h / st.head;
+        if (Math.abs(ratio - 1) > 0.05) bad.push(`${tier} ${dn} ${label} drawn ${(ratio * 100 - 100).toFixed(0)}% from stand (${h.toFixed(2)} vs ${st.head.toFixed(2)} life m: ${ratio > 1 ? 'taller' : 'shorter'})`);
+      }
+      for (const [label, m] of [['stand', st], ...walk.map((m, k) => [`walk ${k}`, m]), ['load 0', load0]]) {
+        if (Math.abs(m.feet) > 0.15) bad.push(`${tier} ${dn} ${label} feet ${m.feet.toFixed(2)} m off the ground anchor`);
+      }
+      seen.push(`${tier} ${dn}: stand ${st.head.toFixed(2)}, walk ${walk.map((m) => m.head.toFixed(2)).join('/')} (max ${wMax.toFixed(2)}, mean ${wMean.toFixed(2)}), load 0 ${load0.head.toFixed(2)}`);
+    }
+    return { bad, seen };
+  };
+  const side4 = await heights(L, Math.PI / 2), side12 = await heights(L, -Math.PI / 2), front = await heights(L, 0);
+  const hReal = { bad: [...side4.bad, ...side12.bad], seen: [...side4.seen, ...side12.seen] };
+  const old = JSON.parse(JSON.stringify(manifest)); // an old reader: one anchor and px per metre (stand's) for every clip
+  for (const T of Object.values(old.tiers)) { delete T.clips; for (const f of Object.values(T.frames)) { delete f.ax; delete f.ay; delete f.ppm; } for (const V of Object.values(T.variants || {})) for (const f of Object.values(V.frames)) { delete f.ax; delete f.ay; delete f.ppm; } }
+  const hCtl = await heights(new I.AtlasLayout(old), Math.PI / 2);
+  const hOk = hReal.bad.length === 0 && hCtl.bad.some((t) => /walk \(passing frame\) drawn -?\d+% from stand/.test(t));
+  check('baked-height', hOk, hOk
+    ? `head-top height in life metres seen side-on, drawn through ImpostorPool.push with each frame's own anchor and scale: ${hReal.seen.join(' | ')} (all within 5% of stand, feet within 15 cm of the anchor; seen from the front, for reference: ${front.seen.join(' | ')}); control "stand's scale for every clip" fails as it must: "${hCtl.bad[0]}"`
+    : [...hReal.bad, ...hReal.seen, hCtl.bad.some((t) => /walk \(passing frame\) drawn -?\d+% from stand/.test(t)) ? '' : `CONTROL: one scale for every clip did not fail as expected (${hCtl.bad.slice(0, 2).join('; ') || 'passed'})`].filter(Boolean).join(' | '));
+
+  // looks: each man keeps one look from his index; more than one look in use when the tier has more than one
+  const looksCheck = (pick) => {
+    const bad = [];
+    for (const count of [1, 2, 3]) {
+      const a = [...Array(400).keys()].map((i) => pick(i, count)), b = [...Array(400).keys()].map((i) => pick(i, count));
+      if (a.some((v, i) => v !== b[i])) bad.push(`with ${count} looks a man's look changed between two calls`);
+      if (a.some((v) => !(v >= 0 && v < count))) bad.push(`with ${count} looks a look out of range was returned`);
+      const used = new Set(a);
+      if (count > 1 && used.size < count) bad.push(`with ${count} looks only ${used.size} were used by 400 men`);
+      if (count > 1 && Math.min(...[...Array(count).keys()].map((v) => a.filter((x) => x === v).length)) < 400 / count * 0.6) bad.push(`with ${count} looks the shares are lopsided`);
+      if (count > 1 && a.slice(0, 40).every((v, i) => v === i % count)) bad.push(`with ${count} looks the ranks just alternate (i mod ${count})`);
+    }
+    return bad;
+  };
+  const vReal = looksCheck(I.variantIndex), vRand = looksCheck((i, n) => Math.floor(Math.random() * n)), vOne = looksCheck(() => 0);
+  const nLooks = L.tiers.field.looks.length;
+  // through the pool: the same 200 men twice land in the same batches; with more than one look, both are used
+  const perLook = async () => {
+    const pool = new I.ImpostorPool(400, { side: 'US' });
+    pool.attach({ layout: L, textures: { field: L.tiers.field.pages.map(() => null) }, pools: [], state: { close: true } });
+    pool.allowClose = false;
+    pool.cam.set(0, 300, 500);
+    pool.begin();
+    for (let i = 0; i < 200; i++) pool.push(i * 2, 0, 0, 0.3, S, C.STAND, 0, 0.5, 0, i);
+    return pool.batches.field.map((b) => `${b.look}:${b.n}`).join(' ');
+  };
+  const p1 = await perLook(), p2 = await perLook();
+  const usedLooks = p1.split(' ').filter((x) => !x.endsWith(':0')).length;
+  const vOk = vReal.length === 0 && vRand.some((t) => /changed/.test(t)) && vOne.some((t) => /only 1 were used/.test(t)) && p1 === p2 && (nLooks < 2 || usedLooks >= 2);
+  check('baked-variants', vOk, vOk
+    ? `field looks ${L.tiers.field.looks.join(', ')}; 200 men by index -> ${p1} (same again: ${p1 === p2}); 1-3 looks: stable, all used, shares within 40%; controls fail as they must: random "${vRand[0]}", constant "${vOne[0]}"`
+    : [...vReal, p1 === p2 ? '' : `pushing the same men twice gave ${p1} then ${p2}`, nLooks >= 2 && usedLooks < 2 ? `only one look used: ${p1}` : '',
+      vRand.length ? '' : 'CONTROL: a random look passed', vOne.length ? '' : 'CONTROL: a single look passed'].filter(Boolean).join(' | '));
 }
 
 /**
@@ -263,6 +400,40 @@ async function bakedFigures(page) {
   const after = await page.evaluate(() => { const g = window.__game.game; const u = g.units.find((v) => v.id === window.__bk.id); return Array.from(g.impostors[u.side].batches.field[0].data.subarray(0, 120)); });
   const changed = after.some((v, i) => v !== dir.before[i]);
   check('baked-direction', (dir.b - dir.a + 16) % 16 === 8 && changed, `a man's baked direction ${dir.a} -> ${dir.b} after the camera turned 180 degrees (want +8 mod 16); sprite buffer changed=${changed}`);
+
+  // loading: a firing brigade that has fired and is reloading draws its men in the load frames, stepping through
+  // them as the reload fills; the same brigade loaded (reload 1) draws none (it aims)
+  const ld = await page.evaluate(async () => {
+    const I = await import('./src/units/impostor.js');
+    const g = window.__game.game;
+    const u = g.units.find((v) => v.id === window.__bk.id);
+    const imp = g.impostors[u.side];
+    const keep = { firing: u.firing, reload: u.reload };
+    const frames = (reload) => {
+      u.firing = true;
+      u.reload = reload;
+      for (const f of u.figures) { f.fireAt = -1; f.fireT = -1; }
+      imp.begin();
+      u.animate(0.016, g.simTime);
+      const slots = new Set();
+      const L = imp.layout, C = L.clips.load;
+      for (const tier of ['field', 'close']) for (const b of imp.batches[tier]) {
+        for (let i = 0; i < b.n; i++) {
+          const k = i * 12, x = b.data[k + 4], y = b.data[k + 5];
+          for (let s = C.start; s < C.start + C.count; s++) for (let d = 0; d < L.n; d++) for (let look = 0; look < L.tiers[tier].looks.length; look++) {
+            const o = L.entry(s, d, look), R = L.tiers[tier].rects;
+            if (R[o + 1] === x && R[o + 2] === y && R[o] === b.page) slots.add(s - C.start);
+          }
+        }
+      }
+      return { load: imp.poses[I.BAKE_CLIP.LOAD], aim: imp.poses[I.BAKE_CLIP.AIM], stand: imp.poses[I.BAKE_CLIP.STAND], loadFrames: [...slots].sort().join(',') };
+    };
+    const early = frames(0.05), late = frames(0.3), loaded = frames(1);
+    u.firing = keep.firing; u.reload = keep.reload;
+    return { early, late, loaded, men: u.figures.filter((f) => f.alive).length };
+  });
+  check('baked-load', ld.early.load >= ld.men * 0.9 && ld.loaded.load === 0 && ld.loaded.aim >= ld.men * 0.9 && ld.early.loadFrames !== ld.late.loadFrames,
+    `reloading (reload 0.05): ${ld.early.load} of ${ld.men} men in load frames ${ld.early.loadFrames}; later (0.3): ${ld.late.load} in frames ${ld.late.loadFrames}; loaded (reload 1): ${ld.loaded.load} loading, ${ld.loaded.aim} aiming (want 0 and all)`);
 
   // split-screen compare: both styles drawn, each with its clip side
   const cmp = await page.evaluate(async () => {

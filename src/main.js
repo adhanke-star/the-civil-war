@@ -81,9 +81,15 @@ motion.addEventListener('change', (e) => { effects.reducedMotion = e.matches; })
 }
 const game = new Game({ scene, terrain, scenario, world, effects, playerSide: 'US' });
 {
-  // profiling switches for the baked sprites: ?bakesoft=0 skips the soft edge/shadow pass, ?bakeclose=0 the close tier
+  // profiling switches for the baked sprites: ?bakesoft=0 skips the soft edge/shadow pass, ?bakeclose=0 the close
+  // tier, ?bakesoftfar=<m> draws the soft pass (edges and baked shadow) only for men within m metres of the camera
   const q = new URLSearchParams(location.search);
-  for (const p of [game.impostors.US, game.impostors.CS]) { p.softPass = q.get('bakesoft') !== '0'; p.allowClose = q.get('bakeclose') !== '0'; }
+  const softFar = Number(q.get('bakesoftfar'));
+  for (const p of [game.impostors.US, game.impostors.CS]) {
+    p.softPass = q.get('bakesoft') !== '0';
+    p.allowClose = q.get('bakeclose') !== '0';
+    if (softFar > 0) p.softFar = softFar;
+  }
 }
 const arrows = new ArrowLayer(scene, terrain);
 

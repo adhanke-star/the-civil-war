@@ -62,18 +62,25 @@ const BLEND_RATE = 5; // 1/s crossfade between clips
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 /**
- * The baked pose for a figure's rigged clip. Only stand, an 8-frame walk, aim/fire/recover and the lying
- * frame are baked: run and charge use the walk (its cycle follows the ground walked), loading shows the
- * stand (shoulder arms), the fire clip is the firing frame then the recover.
+ * The baked pose for a figure's rigged clip. Baked: stand, an 8-frame walk, aim/fire/recover, a 5-frame load
+ * and the lying frame. Run and charge use the walk (its cycle follows the ground walked); the fire clip is the
+ * firing (recoil) frame then the recover; loading steps through the load frames as the reload fills
+ * (bakedPhase).
  */
 function bakedClip(f) {
   switch (f.clip) {
     case 'walk': case 'run': case 'charge': return BAKE_CLIP.WALK;
     case 'aim': return BAKE_CLIP.AIM;
+    case 'load': return BAKE_CLIP.LOAD;
     case 'fire': return f.clipT < 0.45 ? BAKE_CLIP.FIRE : BAKE_CLIP.RECOVER;
     case 'fall-front': case 'fall-back': return BAKE_CLIP.FALLEN;
     default: return BAKE_CLIP.STAND;
   }
+}
+
+/** The baked clip's phase: walk cycles (ground walked / metres per cycle), or how far his loading has got (0..1). */
+function bakedPhase(f, s, walkM) {
+  return f.clip === 'load' ? f.loadT : f.stride / (s * walkM);
 }
 
 export class Unit {
@@ -182,6 +189,7 @@ export class Unit {
         lx: 0, lz: 0, rank: 0, skirmisher: false, order: i,
         coatVar: this.rnd(), trouserVar: this.rnd(),
         stride: 0, // world metres walked (scaled by pace): drives the baked walk cycle
+        load0: 0, loadT: 0, // the unit's reload when he began loading; how far his loading has got (0..1)
       });
     }
     if (this.type === 'infantry' && n >= SKIRMISH_MIN_FIGURES) {
@@ -582,7 +590,7 @@ export class Unit {
           this.setClip(f, f.front ? 'fall-front' : 'fall-back');
           f.blend = 0;
           if (rigged) pool.push(f.x, y, f.z, f.dieYaw, s, framePos(f.clip, p), f.prevPos, 0, 0, f.coatVar, f.trouserVar, infantry ? 1 : 0, 0, rc);
-          if (baked) imp.push(f.x, y, f.z, f.dieYaw, s, BAKE_CLIP.FALLEN, 0, f.coatVar, bc); // only the lying frame is baked
+          if (baked) imp.push(f.x, y, f.z, f.dieYaw, s, BAKE_CLIP.FALLEN, 0, f.coatVar, bc, f.i); // only the lying frame is baked
         } else {
           f.gone = true;
           const fp = this.fallenPool;
@@ -590,7 +598,7 @@ export class Unit {
             const j = fp.alloc();
             if (j >= 0) fp.set(j, f.x, y, f.z, f.dieYaw, s, f.front, f.coatVar, f.trouserVar, infantry);
           }
-          if (imp) imp.addFallen(f.x, y, f.z, f.dieYaw, s, f.coatVar);
+          if (imp) imp.addFallen(f.x, y, f.z, f.dieYaw, s, f.coatVar, f.i);
         }
         continue;
       }
@@ -629,12 +637,17 @@ export class Unit {
         f.stride += step * f.pace;
       } else if (infantry && this.firing && !routing) {
         if (f.fireAt >= 0 && time >= f.fireAt) { f.flash = 1; f.fireT = time; f.fireAt = -1; }
+        const ready = 0.5 + (f.phase - 0.5) * 0.3; // the reload at which this man has loaded
         if (f.fireT >= 0 && time - f.fireT < 0.35) {
           this.setClip(f, 'fire');
           f.clipT = (time - f.fireT) / 0.35;
-        } else if (this.reload < 0.5 + (f.phase - 0.5) * 0.3) {
+        } else if (f.fireAt < 0 && this.reload < ready) {
+          // loading (a man whose shot is still to come in this volley keeps aiming): the baked load frames
+          // follow the unit's reload, so their pace is the weapon's reload time
+          if (f.clip !== 'load') f.load0 = Math.min(this.reload, ready - 0.02);
           this.setClip(f, 'load');
           f.clipT = 0;
+          f.loadT = Math.min(1, Math.max(0, (this.reload - f.load0) / (ready - f.load0)));
         } else {
           this.setClip(f, 'aim');
           f.clipT = 0;
@@ -650,7 +663,7 @@ export class Unit {
       f.flash = Math.max(0, f.flash - dt * 9);
       const y = T.heightAt(f.x, f.z);
       if (rigged) pool.push(f.x, y, f.z, f.yaw, s, framePos(f.clip, f.clipT), f.prevPos, f.blend, f.flash, f.coatVar, f.trouserVar, f.prop ?? (infantry ? 1 : 0), 0, rc);
-      if (baked) imp.push(f.x, y, f.z, f.yaw, s, bakedClip(f), f.stride / (s * walkM), f.coatVar, bc);
+      if (baked) imp.push(f.x, y, f.z, f.yaw, s, bakedClip(f), bakedPhase(f, s, walkM), f.coatVar, bc, f.i);
       // one ellipse per man (files are 2.35 m apart); a sprite carries its own baked shadow, so no blob for it
       if (halos && (haloKind || rigged)) halos.push(f.x, y, f.z, f.yaw, (haloKind ? 1.45 : 1.7) * V.scale, (haloKind ? 1.2 : 1.1) * V.scale, haloKind, haloStr, haloKind ? 0 : rc);
     }

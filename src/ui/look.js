@@ -30,8 +30,8 @@ const SPECS = {
   figureStyle: ['look.figureStyle', {
     tab: 'Look', type: 'choice', default: 'rigged', compare: true, label: 'Soldier figures',
     options: [{ value: 'rigged', label: 'Rigged: today\'s 3D figures' }, { value: 'baked', label: 'Baked: sprites rendered in Blender' }],
-    note: 'Baked sprites carry the bake\'s lighting and shadow (the shadow does not turn with the camera) and load about 0.8 MB, '
-      + 'plus 3.6 MB when you zoom in close. Only a Union infantryman is baked: Confederates are the same man tinted grey (a placeholder); '
+    note: 'Baked sprites carry the bake\'s lighting and short soft shadow (the shadow does not turn with the camera) and load about 2.7 MB '
+      + '(two looks, mixed through the ranks), plus 3.5 MB when you zoom in close. Only a Union infantryman is baked: Confederates are the same man tinted grey (a placeholder); '
       + 'officers, gun crews and horses stay 3D.',
   }],
   menPerFigure: ['look.menPerFigure', {
