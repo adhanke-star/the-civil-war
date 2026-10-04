@@ -53,7 +53,7 @@ G = {
     "step_m": 0.711,            # 28 in step                                  Inferred
     "stance_frac": 0.60,        # walking stance share of the cycle           placeholder
     "stance_half_m": 0.30,      # ankle travel each side of the hip in stance (pass 2: 0.36 made the pelvis dip 6-8%) placeholder
-    "walk_drop_max_m": 0.030,   # pelvis drop below standing, capped (~1.7% of height)     placeholder
+    "walk_drop_max_m": 0.042,   # pelvis drop below standing, capped (~2.4% of height; 0.030 left the feet 1.9 cm short) placeholder
     "walk_bob_m": 0.005,        # vertical bob amplitude on the march                    placeholder
     "march_half_width": 0.085,  # ankle offset from the centre line, marching placeholder
     "fire_half_width": 0.13,    # ankle offset from the centre line, firing   placeholder
@@ -181,7 +181,8 @@ class MeshProbe:
     def palm_min_gap(self, s, surf, P=None):
         P = P or self.coords(s)
         g = [surf.gap(p) for b, ps_ in P.items() for p in ps_
-             if b.startswith("metacarpal") or b == self.ps.S[s]["hand"]]
+             if b.startswith("metacarpal") or b == self.ps.S[s]["hand"]
+             or (b.startswith("finger") and b.split(".")[0].endswith("-1") and not b.startswith("finger1"))]
         return min(g) if g else 1.0
 
 
@@ -560,7 +561,7 @@ class Poser:
         self.set_hand_rot(s, R)
         return err, roll
 
-    def grip(self, s, surf, axis_pt, A, nv, pole, key, frame, cands=None, extra=()):
+    def grip(self, s, surf, axis_pt, A, nv, pole, key, frame, cands=None, extra=(), palm_off=0.0, skip=()):
         """Grip solve on an object with axis A through axis_pt; nv = side the palm should be on.
         Tries the candidate placements, keeps the best, logs it for the mesh measurement."""
         A = A.normalized()
@@ -585,15 +586,15 @@ class Poser:
                     hi_ = mid
                 else:
                     lo_ = mid
-            Pc = Q + n2 * (hi_ + 0.001)      # the palm-centre point is on the palm skin
+            Pc = Q + n2 * (hi_ + 0.001 + palm_off)      # the palm-centre point is on the palm skin
             Tw = A.cross(n2) * sg
             H = (Tw * math.cos(math.radians(tl)) + A * math.sin(math.radians(tl))).normalized()
             err, roll = self.place_hand(s, Pc, H, -n2, pole)
-            g = self.close_fingers(s, surf)
+            g = self.close_fingers(s, surf, skip=skip)
             bend = self.wrist_bend(s)
             score = (g["touching"] + 1.5 * min(g["thumb"], 2) - 60.0 * max(0.0, err - 0.008)
                      - G["wrist_bend_cost"] * max(0.0, bend - G["wrist_bend_ok_deg"]) - 0.02 * max(0.0, abs(roll) - 60.0)
-                     - 0.25 * g["worst_model_pen_mm"])
+                     - 1.0 * g["worst_model_pen_mm"])     # run 15: 0.25/mm let 20 mm through
             if best is None or score > best[0]:
                 best = (score, cand, err, roll, bend, g, Pc)
             if g["touching"] >= 13 and g["thumb"] >= 2 and err < 0.008 and bend < G["wrist_bend_ok_deg"]:
@@ -605,17 +606,22 @@ class Poser:
         Tw = A.cross(n2) * sg
         H = (Tw * math.cos(math.radians(tl)) + A * math.sin(math.radians(tl))).normalized()
         err, roll = self.place_hand(s, Pc, H, -n2, pole)
-        g = self.close_fingers(s, surf)
+        g = self.close_fingers(s, surf, skip=skip)
         ref = {}
         probe = PROBE.get("p")
         if probe is not None:
-            pg = probe.palm_min_gap(s, surf)
-            if pg < -0.0015:      # the real palm skin is inside the wood: back the hand out
-                Pc = Pc + n2 * (-pg)
+            push = 0.0
+            for _ in range(3):   # palm and knuckles (real skin) inside the wood: back the hand out
+                pg = probe.palm_min_gap(s, surf)
+                if pg >= -0.0012:
+                    break
+                Pc = Pc + n2 * (-pg + 0.0005)
+                push += -pg
                 err, roll = self.place_hand(s, Pc, H, -n2, pole)
-                g = self.close_fingers(s, surf)
-                ref["palm_push_mm"] = round(-pg * 1000, 1)
-            ref.update(self.refine(s, surf))
+                g = self.close_fingers(s, surf, skip=skip)
+            if push:
+                ref["palm_push_mm"] = round(push * 1000, 1)
+            ref.update(self.refine(s, surf, chains=[c for c in range(5) if c not in skip]))
         res = {"candidate": {"rot_deg": r, "wrap": sg, "tilt_deg": tl, "slide_m": dz}, "score": round(score, 2),
                "refine": ref,
                "ik_err_m": round(err, 4), "forearm_roll_deg": round(roll, 1),
@@ -1089,53 +1095,31 @@ def pose_load(ps, musket, frame, step, rr, cart):
         ps.look(F - U * 0.28 + L * 0.08)
         if step in (0, 1):
             key_ramrod(rr, frame)
-            shR = ps.ph(ps.S["R"]["upper"][0])
+            # the cartridge is placed in the world first (above the open box; then over the muzzle,
+            # torn end down) and the right hand grips it like any object, but with the palm held
+            # off so only the thumb and first two fingers close on it (ring and little curl
+            # relaxed): a fingertip pinch that leaves most of the cartridge in view
+            cl, cr = UNI.get("cartridge_len", 0.068), UNI.get("cartridge_r", 0.0075)
             if step == 0:
                 box = next((c for n, c, r in ps.obstacles() if n == "cartridge box"), None)
-                tgt = (box + U * 0.14) if box is not None else ps.ph(ps.S["R"]["thigh"][0]) - F * 0.12
-                d = (tgt - shR).normalized()
-                Hd, Pd, pole = (d - U * 0.35).normalized(), -F - U * 0.3, -L - F * 0.3
+                centre = (box + U * 0.10) if box is not None else ps.ph(ps.S["R"]["thigh"][0]) - F * 0.12
+                X = (L * 0.8 + F * 0.3).normalized()
+                nv, pole = (U - F * 0.3).normalized(), -L - F * 0.3
             else:
-                tgt = muzzle + U * 0.10 - F * 0.04 - L * 0.05
-                d = (tgt - shR).normalized()
-                # run 14: fingers pointing down at the muzzle bent the wrist 150 deg; the hand now
-                # continues the forearm and tips down a little, palm down
-                Hd, Pd, pole = (d - U * 0.45).normalized(), -U * 0.7 + L * 0.3 - F * 0.2, -U - L * 0.5
-            # pinch a paper cartridge between the thumb and the first two fingers: place the hand,
-            # pre-curl thumb, index and middle, put the cartridge between the thumb pad and the
-            # index pad (across the fingers), then close those three on it; ring and little relax
-            ps.reset_arm("R")
-            R = ps.hand_rot("R", Hd, Pd)
-            W = tgt - R @ Vector(HM["hand"]["R"]["pc_local"])
-            err["armR"] = ps.arm("R", W, pole)
-            ps.roll_forearm("R", R)
-            ps.set_hand_rot("R", R)
-            fing = ps.S["R"]["fingers"]
-            for ci, angs in ((0, (8.0, 12.0, 12.0)), (1, (30.0, 40.0, 25.0)), (2, (36.0, 46.0, 28.0)),
-                             (3, (45.0, 55.0, 35.0)), (4, (50.0, 55.0, 35.0))):
-                for k, bn in enumerate(fing[ci]):
-                    ax = ps.flex_axis("R", ci, k, bn)
-                    if ax is not None:
-                        ps.rotate_about(bn, ps.ph(bn), C.rot(ax, angs[k]))
-            H, Pn = ps.hand_frame("R")
-            tip_t, tip_i = ps.pt(fing[0][-1]), ps.pt(fing[1][-1])
-            centre = (tip_t + tip_i) / 2 + Pn * 0.004
-            pinch = (tip_i - tip_t)
-            X = H.cross(Pn).normalized()
-            if pinch.length > 1e-6:
-                pn = pinch.normalized()
-                X = (X - pn * X.dot(pn)).normalized()
-            cl, cr = UNI.get("cartridge_len", 0.068), UNI.get("cartridge_r", 0.0075)
-            centre = centre + X * (cl * 0.18)     # more of it shows past the index finger
+                centre = muzzle + U * (cl / 2 + 0.015)
+                X = gz.copy()                              # upright, torn end toward the muzzle
+                nv, pole = (-F * 0.6 - L * 0.5 + U * 0.2).normalized(), -U - L * 0.5
             a = centre - X * (cl / 2)
             surf = CylSurf(a, X, cr, cl)
-            g = ps.close_fingers("R", surf, relax=(0.0, 0.0, 0.0), skip=(3, 4))
-            ref = ps.refine("R", surf, chains=(0, 1, 2))
-            REP["grips"].setdefault(key, {})["R"] = {"object": "cartridge", "model": g, "refine": ref,
-                                                    "pinch_mm": round(pinch.length * 1000, 1),
-                                                    "wrist_bend_deg": round(ps.wrist_bend("R"), 1)}
-            GRIPLOG.append((key, frame, "R", surf, (GunSurf(M),)))
-            key_cartridge(cart, frame, centre, X, Pn)
+            err["armR"], res, _c = ps.grip("R", surf, centre, X, nv, pole, key, frame, extra=(GunSurf(M),),
+                                           palm_off=0.024, skip=(3, 4))
+            for ci in (3, 4):
+                for k, bn in enumerate(ps.S["R"]["fingers"][ci]):
+                    ax = ps.flex_axis("R", ci, k, bn)
+                    if ax is not None:
+                        ps.rotate_about(bn, ps.ph(bn), C.rot(ax, (55.0, 60.0, 40.0)[k]))
+            res["object"] = "cartridge"
+            key_cartridge(cart, frame, centre, X, nv)
         elif step == 2:
             key_ramrod(rr, frame, drawn=True)
             z0, z1 = ramrod_span(drawn=True)
@@ -1332,6 +1316,7 @@ def measure_contacts(ps, body):
             Mx = ps.rig.matrix_world.inverted() @ body.matrix_world
             seg_min = {}
             worst, n_pen, n_v = 0.0, 0, 0
+            pen_by = {}
             for i, b in owner.items():
                 if not b.endswith("." + s) or i >= n:
                     continue
@@ -1341,6 +1326,7 @@ def measure_contacts(ps, body):
                 n_v += 1
                 if ga < -0.001:
                     n_pen += 1
+                    pen_by[b] = max(pen_by.get(b, 0.0), -ga)
                 worst = max(worst, -ga)
                 if b in seg_of:
                     seg_min[b] = min(seg_min.get(b, 1.0), gt)
@@ -1349,7 +1335,8 @@ def measure_contacts(ps, body):
             thumb = sum(1 for b in touching if seg_of[b][1] == 0)
             out.setdefault(key, {})[s] = {"segments_touching": len(touching), "segments": 15, "thumb_segments": thumb,
                                           "max_penetration_mm": round(max(0.0, worst) * 1000, 1),
-                                          "vertices_over_1mm_inside": n_pen, "hand_vertices": n_v}
+                                          "vertices_over_1mm_inside": n_pen, "hand_vertices": n_v,
+                                          "penetration_by_bone_mm": {b: round(v * 1000, 1) for b, v in sorted(pen_by.items(), key=lambda x: -x[1])[:5]}}
     finally:
         for m, v in state:
             m.show_viewport = v

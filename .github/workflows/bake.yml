@@ -194,6 +194,14 @@ jobs:
           printf 'poses.py\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc")" >> "$BAKE_OUT/timing.tsv"
           exit $rc
 
+      - name: 3b cloth.py (settle the cloth per pose; never fails the job)
+        run: |
+          set +e
+          "$BLENDER" -b --factory-startup -noaudio --python-exit-code 1 -P tools/bake/cloth.py -- --out "$BAKE_OUT" --budget-min 14
+          rc=$?
+          printf 'cloth.py\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc (armature-posed cloth kept)")" >> "$BAKE_OUT/timing.tsv"
+          exit 0
+
       - name: Plan the render shards
         id: plan
         run: |
