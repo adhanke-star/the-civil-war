@@ -671,7 +671,9 @@ def pose_load(ps, musket, frame, step, rr):
         M = gun_matrix(heel, zdir, -F)
         place_gun(musket, M, frame)
         muzzle = M @ Vector((0.0, GUN.get("barrel_y", 0.006), Lg))
-        ps.look((muzzle - ps.ph(ps.rm["head"])).normalized() * 0.7 + F * 0.3)
+        # run 6: aiming the face straight at the muzzle bent the neck sideways; a gentle look
+        # forward and down toward the muzzle reads better
+        ps.look(F - U * 0.28 + L * 0.08)
         err["armL"], grips["L"] = ps.place_on_gun("L", M, 0.98, L * 0.8 - F * 0.4, -U + L * 0.6)
         if step == 0:
             box = next((c for n, c, r in ps.obstacles() if n == "cartridge box"), None)
