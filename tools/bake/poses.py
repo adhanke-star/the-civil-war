@@ -88,7 +88,7 @@ G = {
     "thumb_lim_deg": (60.0, 60.0, 70.0),    # thumb: opposition, then flexion                          placeholder
     "relax_deg": (28.0, 38.0, 24.0),        # a finger that finds nothing to hold curls this far       placeholder
     "wrist_bend_ok_deg": 30.0,  # wrist bend that costs nothing in the score                           placeholder
-    "wrist_bend_cost": 0.15,    # score lost per degree beyond that                                    placeholder
+    "wrist_bend_cost": 0.30,    # score lost per degree beyond that (run 16: 0.15 kept 80 deg walk wrists) placeholder
     "pad_percentile": 50.0,     # finger pad thickness: percentile of pad-side skin distance (run 14: 80 left 3-8 mm gaps) placeholder
     "contact_mm": 3.0,          # a mesh vertex this close to the surface is in contact                placeholder
     "refine_iters": 8,          # mesh refine passes per hand                                          placeholder
@@ -218,6 +218,7 @@ class Poser:
         self.rest_ank = {s: self.rh(self.S[s]["foot"]) for s in ("L", "R")}
         self.rest_hip = {s: self.rh(self.S[s]["thigh"][0]) for s in ("L", "R")}
         self.ank_mid = (self.rest_ank["L"] + self.rest_ank["R"]) / 2
+        self.flex = {}   # flexion applied per finger joint since its arm was reset (deg)
         for p in rig.pose.bones:
             p.rotation_mode = "QUATERNION"
 
@@ -237,6 +238,7 @@ class Poser:
         return self.P(n).tail.copy()
 
     def reset(self):
+        self.flex = {}
         for p in self.rig.pose.bones:
             p.matrix_basis = Matrix()
         C.update()
@@ -251,6 +253,7 @@ class Poser:
     def reset_arm(self, s):
         for n in self.arm_bones(s):
             self.P(n).matrix_basis = Matrix()
+            self.flex.pop(n, None)
         C.update()
 
     def rotate_about(self, n, pivot, q):
@@ -494,6 +497,7 @@ class Poser:
                 out["worst_model_pen_mm"] = max(out["worst_model_pen_mm"], round(pen * 1000, 2))
                 if a:
                     self.rotate_about(bn, head, C.rot(axis, a))
+                self.flex[bn] = self.flex.get(bn, 0.0) + a
                 if contact:
                     out["touching"] += 1
                     if ci == 0:
@@ -516,7 +520,6 @@ class Poser:
             return {"iters": 0}
         lo, hi = G["refine_band_mm"][0] / 1000.0, G["refine_band_mm"][1] / 1000.0
         it, moves = 0, 0
-        total = {}
         for it in range(1, G["refine_iters"] + 1):
             P = probe.coords(s)
             changed = False
@@ -539,10 +542,12 @@ class Poser:
                         break
                     lever = max(0.012, (pts[j] - self.ph(bn)).length)
                     d = max(-12.0, min(15.0, math.degrees((g - 0.0002) / lever)))
-                    d = max(d, G["back_out_min_deg"] - total.get(bn, 0.0))
+                    # never open past straight + back_out_min (run 16: a cap counted from the curled
+                    # angle left fingertips 10-17 mm inside the wood)
+                    d = max(d, G["back_out_min_deg"] - self.flex.get(bn, 0.0))
                     if abs(d) < 0.3:
                         continue
-                    total[bn] = total.get(bn, 0.0) + d
+                    self.flex[bn] = self.flex.get(bn, 0.0) + d
                     self.rotate_about(bn, self.ph(bn), C.rot(ax, d))
                     changed = True
                     moves += 1

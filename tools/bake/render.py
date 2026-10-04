@@ -113,6 +113,7 @@ P = {
     "hands_lens": 90.0,
     "hands_el": 16.0,
     "head_dir": C.arg("head-dir", 1),
+    "kit_dir": C.arg("kit-dir", 5),
     "skip_field": C.arg("skip-field", False),
     "quick": C.arg("quick", False),
     "shard": C.arg("shard", "all"),
@@ -701,6 +702,29 @@ def main():
             info["seconds"] = round(render_to(sc, os.path.join(C.OUT, "hands", "%s_%d.png" % (clip, i))), 2)
             REP["hand_shots"]["%s_%d" % (clip, i)] = info
         T.mark("hand shots")
+        # ---- kit close-up 1024 px: blanket roll ends, ties and stripes, haversack and canteen
+        try:
+            sc.render.resolution_x = sc.render.resolution_y = P["hero_px"]
+            sc.cycles.samples = P["samples_closeup"]
+            kcam = persp_camera("tcw_kit", 85.0)
+            sc.camera = kcam
+            tt.rotation_euler = (0, 0, base + 2 * math.pi * P["kit_dir"] / N)
+            sc.frame_set(clips["stand"]["frames"][0])
+            dg = bpy.context.evaluated_depsgraph_get()
+            kp = []
+            for nm in ("tcw_blanket_roll", "tcw_haversack", "tcw_canteen"):
+                o = bpy.data.objects.get(nm)
+                if o is None:
+                    continue
+                ev = o.evaluated_get(dg)
+                me = ev.to_mesh()
+                kp += [(ev.matrix_world @ v.co)[:] for v in me.vertices[::4]]
+                ev.to_mesh_clear()
+            REP["kit"] = fit_persp(kcam, kp, 12.0, margin=0.06)
+            REP["kit"]["seconds"] = round(render_to(sc, os.path.join(C.OUT, "kit.png")), 2)
+        except Exception as e:  # noqa: BLE001
+            REP["kit_error"] = str(e)
+        T.mark("kit close-up")
 
         # ---- close-tier variants and heads, standing (each variant with its own stand framing)
         sc.camera = cam

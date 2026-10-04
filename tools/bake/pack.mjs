@@ -429,13 +429,14 @@ function pack() {
   const closeup = heroPreview('hero-closeup.png', 'hero-closeup-preview.png');
   const portrait = heroPreview('portrait.png', 'portrait-preview.png');
   const handsPrev = heroPreview('hands.png', 'hands-preview.png');
+  const kitPrev = heroPreview('kit.png', 'kit-preview.png');
   const pack = {
     tiers: Object.fromEntries(Object.entries(tiers).map(([k, v]) => [k, {
       count: v.count, pages: v.pages, rawFrameBytes: v.rawFrameBytes,
       atlasBytes: v.pages.reduce((s, p) => s + p.bytes, 0),
     }])),
     manifestBytes: fs.statSync(path.join(OUT, 'atlas', 'soldier.json')).size,
-    contactSheet: sheet, heroPreview: hero, closeupPreview: closeup, portraitPreview: portrait, handsPreview: handsPrev, measuredColours,
+    contactSheet: sheet, heroPreview: hero, closeupPreview: closeup, portraitPreview: portrait, handsPreview: handsPrev, kitPreview: kitPrev, measuredColours,
     fieldVariants: Object.fromEntries(Object.entries(fieldVariants).map(([k, v]) => [k, {
       count: v.count, pages: v.pages, atlasBytes: v.pages.reduce((s, p) => s + p.bytes, 0) }])),
     closeVariants: Object.fromEntries(Object.entries(tierVariants.close).map(([k, v]) => [k, {

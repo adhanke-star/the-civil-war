@@ -379,6 +379,7 @@ jobs:
             .out/bake/hero-closeup-preview.png
             .out/bake/portrait-preview.png
             .out/bake/hands-preview.png
+            .out/bake/kit-preview.png
             .out/bake/report/
             .out/bake/timing*.tsv
           retention-days: 7

@@ -1597,8 +1597,9 @@ def mask_hair_under(c0, n, base_pts):
             q = mw @ v.co - c0
             h = q.dot(n)
             rad = (q - n * h).length
-            if (h > 0.004 and rad < R) or (h > -0.012 and rad > R + 0.001):
-                idx.append(v.index)   # under the cap, or poking out past the band (run 14 spikes)
+            if (h > 0.004 and rad < R) or (h > 0.001 and rad >= R):
+                idx.append(v.index)   # under the cap, or poking out past the band (run 14 spikes); the
+                # cut sits at the band bottom so the band hides it (run 16: a cut 1 cm lower showed jagged)
         if not idx:
             continue
         vg = o.vertex_groups.get("tcw_under_cap") or o.vertex_groups.new(name="tcw_under_cap")
