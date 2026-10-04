@@ -138,6 +138,7 @@ D = {
     "shoe_lace_pairs":     4,       # lace holes up the instep                 placeholder
     "slouch_crown_h":      0.105,   # slouch hat crown                         placeholder
     "slouch_brim":         0.075,   # brim width                               placeholder
+    "slouch_brim_field":   0.105,   # FIELD TIER ONLY: wider brim so the hat reads at 96 px (readability choice) placeholder
     # -- rifle-musket (Model 1861 pattern) -------------------------------------------
     "musket_length":       1.422,   # 56 in overall                            Inferred
     "barrel_length":       1.016,   # 40 in barrel                             Inferred
@@ -158,6 +159,7 @@ COL = {
     "webbing":     ("#7a705c", 0.90),   # natural cotton strap, darkened so it never out-shines the coat
     "blanket":     ("#5a5246", 0.95),   # mid grey-brown wool blanket (in game the first pass read white)
     "felt":        ("#151413", 0.85),   # black felt slouch hat
+    "felt_field":  ("#5a5045", 0.90),   # FIELD TIER ONLY: lighter felt so the brim reads at 96 px (readability choice)
     "wood":        ("#4a2c18", 0.45),   # oiled black walnut stock
     "steel":       ("#8e9297", 0.32),   # bright (unblued) iron and steel
     "brass":       ("#b08a3e", 0.35),   # belt plates and buttons
@@ -266,7 +268,10 @@ def mats():
     m = {}
     for k, (hexc, rough) in COL.items():
         name = "tcw_" + k
-        if k == "blanket":
+        if k == "felt_field":
+            m[k] = C.weathered_material(name, hexc, rough, kind="wool", fade_hex="#7a6e5e", fade=0.3,
+                                        mottle=0.08, sheen=0.12, weave_scale=330.0, bump=0.35)
+        elif k == "blanket":
             # third pass: heavier felted wool (fuzz sheen, deeper nap) and a dark band near each
             # end of the roll (the blanket's end stripes, placeholder estimate)
             m[k] = C.weathered_material(name, hexc, rough, kind="wool", fade_hex=FADE.get(k), fade=0.3,
@@ -1238,8 +1243,11 @@ def build_cap(m, rig, rm, lm, head_cloud, brow_z):
     return cap, c0, n, base
 
 
-def build_slouch(m, rig, rm, lm, head_cloud, brow_z):
+def build_slouch(m, rig, rm, lm, head_cloud, brow_z, field=False):
+    """Black felt slouch hat. field=True (third pass, readability choice): a field-tier-only twin
+    with a wider brim in a lighter felt, so the hat still reads at 96 px."""
     F, U, Lv = lm["F"], lm["U"], lm["L"]
+    brim = D["slouch_brim_field"] if field else D["slouch_brim"]
     base, outs, centre = head_ring(head_cloud, lm, brow_z + 0.012, 0.008)
     base = [p - U * 0.008 for p in base]
     r1 = [Vector((q.x, q.y, base[0].z + D["slouch_crown_h"] * 0.85)) for q in
@@ -1258,15 +1266,15 @@ def build_slouch(m, rig, rm, lm, head_cloud, brow_z):
     for p, o in zip(base, outs):
         oh = Vector((o.x, o.y, 0)).normalized()
         fr, sd = o.dot(F), o.dot(Lv)
-        brim_out.append(p + oh * D["slouch_brim"] - U * (0.016 * fr * fr + 0.004) + U * 0.006 * sd * sd)
+        brim_out.append(p + oh * brim - U * (0.016 * fr * fr + 0.004) + U * 0.006 * sd * sd)
     bv, bf = C.loft([brim_in, brim_out], cap_start=False, cap_end=False)
     v2, f2 = C.merge([(v, f), (bv, bf)])
-    hat = C.mesh_object("tcw_slouch", v2, f2)
+    hat = C.mesh_object("tcw_slouch_field" if field else "tcw_slouch", v2, f2)
     C.add_modifier(hat, "SOLIDIFY", "Thick", thickness=0.004, offset=1.0)
     C.add_modifier(hat, "SUBSURF", "Smooth", levels=0, render_levels=1)
-    C.assign(hat, m["felt"])
+    C.assign(hat, m["felt_field"] if field else m["felt"])
     C.parent_to_bone(hat, rig, rm["head"])
-    hat["tcw_variant"] = "slouch"
+    hat["tcw_variant"] = "slouch_field" if field else "slouch"
     hat.hide_render = True
     return hat
 
@@ -1588,8 +1596,9 @@ def mask_hair_under(c0, n, base_pts):
         for v in o.data.vertices:
             q = mw @ v.co - c0
             h = q.dot(n)
-            if h > 0.004 and (q - n * h).length < R:
-                idx.append(v.index)
+            rad = (q - n * h).length
+            if (h > 0.004 and rad < R) or (h > -0.012 and rad > R + 0.001):
+                idx.append(v.index)   # under the cap, or poking out past the band (run 14 spikes)
         if not idx:
             continue
         vg = o.vertex_groups.get("tcw_under_cap") or o.vertex_groups.new(name="tcw_under_cap")
@@ -2287,6 +2296,7 @@ def main():
     brow_z = eye_z + 0.028
     _cap, cap_c0, cap_n, cap_base = build_cap(m, rig, rm, lm, head_cloud, brow_z)
     build_slouch(m, rig, rm, lm, head_cloud, brow_z)
+    build_slouch(m, rig, rm, lm, head_cloud, brow_z, field=True)
     mask_hair_under(cap_c0, cap_n, cap_base)
     T.mark("headgear")
 

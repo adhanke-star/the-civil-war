@@ -170,6 +170,7 @@ function mergeShards() {
   const merged = JSON.parse(JSON.stringify(base));
   merged.tiers = {};
   merged.field_variants = { planned: [] };
+  merged.close_variants = { planned: [] };
   merged.shards = {};
   merged.variants = {};
   const mismatch = [];
@@ -191,12 +192,16 @@ function mergeShards() {
       if (t.seconds_per_frame_median != null) m._medians.push(t.seconds_per_frame_median);
       if (t.seconds_first_frame != null) m._firsts.push(t.seconds_first_frame);
     }
-    for (const [v, info] of Object.entries(s.field_variants || {})) {
-      if (v === 'planned') { merged.field_variants.planned = [...new Set([...merged.field_variants.planned, ...info])]; continue; }
-      if (v === 'dropped_for_budget') continue;
-      const m = merged.field_variants[v] || (merged.field_variants[v] = { renders: 0, seconds_total: 0, composition: info.composition });
-      m.renders += info.renders || 0;
-      m.seconds_total = Math.round((m.seconds_total + (info.seconds_total || 0)) * 100) / 100;
+    for (const key of ['field_variants', 'close_variants']) {
+      const tgt = merged[key];
+      for (const [v, info] of Object.entries(s[key] || {})) {
+        if (v === 'planned') { tgt.planned = [...new Set([...tgt.planned, ...info])]; continue; }
+        if (v === 'dropped_for_budget') continue;
+        const m = tgt[v] || (tgt[v] = { renders: 0, seconds_total: 0, composition: info.composition, directions: [] });
+        m.renders += info.renders || 0;
+        m.seconds_total = Math.round((m.seconds_total + (info.seconds_total || 0)) * 100) / 100;
+        m.directions = [...new Set([...(m.directions || []), ...(info.directions || [])])].sort((a, b) => a - b);
+      }
     }
   }
   for (const t of Object.values(merged.tiers)) {
@@ -377,16 +382,20 @@ function pack() {
       clips: r.clips, directionsByClip: r.directions_by_clip,
     };
   }
-  // added (second pass): extra figure variants in the field tier, same keys/anchors as the base
-  const fieldVariants = {};
+  // added (second pass): extra figure variants in the field tier, same keys/anchors as the base.
+  // Third pass: the close tier carries the SAME variant names (tiers.close.variants), so a man keeps
+  // one variant at every distance; each variant also records its composition.
+  const tierVariants = { field: {}, close: {} };
   const framesDir = path.join(OUT, 'frames');
-  for (const d of (fs.existsSync(framesDir) ? fs.readdirSync(framesDir) : []).filter((x) => x.startsWith('field_')).sort()) {
-    const t = packTier(d, render.tiers?.field?.clips || {});
-    const name = d.slice('field_'.length);
-    // composition added (third pass): which head preset, hat and blanket roll this variant shows
-    if (t) fieldVariants[name] = { count: t.count, pages: t.pages, rawFrameBytes: t.rawFrameBytes, frames: t.frames, composition: variantComposition(name, render, probe) };
+  for (const tier of ['field', 'close']) {
+    for (const d of (fs.existsSync(framesDir) ? fs.readdirSync(framesDir) : []).filter((x) => x.startsWith(tier + '_')).sort()) {
+      const t = packTier(d, render.tiers?.[tier]?.clips || {});
+      const name = d.slice(tier.length + 1);
+      if (t) tierVariants[tier][name] = { count: t.count, pages: t.pages, rawFrameBytes: t.rawFrameBytes, frames: t.frames, composition: variantComposition(name, render, probe) };
+    }
+    if (tiers[tier] && Object.keys(tierVariants[tier]).length) tiers[tier].variants = tierVariants[tier];
   }
-  if (tiers.field && Object.keys(fieldVariants).length) tiers.field.variants = fieldVariants;
+  const fieldVariants = tierVariants.field;
   if (tiers.field) tiers.field.baseComposition = variantComposition('base', render, probe);
   if (tiers.close) tiers.close.baseComposition = variantComposition('base', render, probe);
   const measuredColours = measureColours(render);
@@ -401,7 +410,7 @@ function pack() {
     // added (second pass)
     lights: render.lights, quick: render.quick, variantsFraming: render.variants_framing,
     measuredColours,
-    readability: 'field tier only: musket cross-section thickened x' + (render.params?.field_musket_scale ?? '?') + ' (length unchanged) so it survives at 96 px',
+    readability: 'field tier only: musket cross-section thickened x' + (render.params?.field_musket_scale ?? '?') + ' (length unchanged) so it survives at 96 px; field tier only (third pass): the slouch hat is a twin with a wider brim (0.105 m vs 0.075 m) in a lighter felt (#5a5045 vs #151413)',
     // added (third pass)
     heads: Object.fromEntries(Object.entries(probe.heads || {}).map(([k, h]) => [k, {
       label: h.label, use: h.use, skin: h.skin ?? null, hair: h.hair ?? null, eyebrows: h.brows ?? null,
@@ -428,6 +437,8 @@ function pack() {
     manifestBytes: fs.statSync(path.join(OUT, 'atlas', 'soldier.json')).size,
     contactSheet: sheet, heroPreview: hero, closeupPreview: closeup, portraitPreview: portrait, handsPreview: handsPrev, measuredColours,
     fieldVariants: Object.fromEntries(Object.entries(fieldVariants).map(([k, v]) => [k, {
+      count: v.count, pages: v.pages, atlasBytes: v.pages.reduce((s, p) => s + p.bytes, 0) }])),
+    closeVariants: Object.fromEntries(Object.entries(tierVariants.close).map(([k, v]) => [k, {
       count: v.count, pages: v.pages, atlasBytes: v.pages.reduce((s, p) => s + p.bytes, 0) }])),
   };
   fs.writeFileSync(path.join(OUT, 'report', 'pack.json'), JSON.stringify(pack, null, 2));

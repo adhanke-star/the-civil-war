@@ -61,8 +61,9 @@ env:
   ELEVATION: ${{ inputs.elevation || '35' }}
   # push runs: put [quick] in the commit message for the quick check set
   QUICK: ${{ inputs.quick || (contains(github.event.head_commit.message, '[quick]') && '1') || '0' }}
-  # full run: 1 hero shard + 3 close-tier shards + 4 field-tier shards (directions d % n == k)
-  SHARDS_FULL: '["hero","c0of3","c1of3","c2of3","f0of4","f1of4","f2of4","f3of4"]'
+  # full run: 1 hero shard + 16 close-tier shards + 3 field-tier shards. Each tier renders the base
+  # figure and every variant; a shard takes the (variant, direction) units with index % n == k.
+  SHARDS_FULL: '["hero","c0of16","c1of16","c2of16","c3of16","c4of16","c5of16","c6of16","c7of16","c8of16","c9of16","c10of16","c11of16","c12of16","c13of16","c14of16","c15of16","f0of3","f1of3","f2of3"]'
 
 jobs:
   prep:

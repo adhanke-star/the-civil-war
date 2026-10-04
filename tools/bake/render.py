@@ -89,9 +89,9 @@ P = {
     "face_bounce_rgb": (1.0, 0.86, 0.68),
     # field tier only: thicken the musket's cross-section so it survives at 96 px (readability choice)
     "field_musket_scale": C.arg("field-musket-scale", 1.7),
-    # field-tier variants: <head>_<cap|slouch>_<roll|noroll> (see variant_comp)
-    "field_variants": C.arg("field-variants", "h2_cap_roll,h3_slouch_roll,h4_cap_noroll,h5_slouch_noroll,"
-                                              "h6_cap_roll,h1_slouch_noroll,h4_slouch_roll,h5_cap_roll,h7_cap_roll"),
+    # variants in BOTH tiers (same names): <head>_<cap|slouch>_<roll|noroll> (see variant_comp)
+    "variants": C.arg("variants", "h2_cap_roll,h3_slouch_roll,h4_cap_noroll,h5_slouch_noroll,"
+                                   "h6_cap_roll,h1_slouch_noroll,h4_slouch_roll,h7_cap_roll"),
     "sun_rgb": (1.0, 0.94, 0.86),                 # warm key
     "sky_strength": C.arg("sky-strength", 0.45),
     "sky_hex": "#a9bdd6",                         # cool sky fill (world)
@@ -378,11 +378,12 @@ def turntable(rig):
 HEADS_INFO = {}
 
 
-def set_variant(v):
+def set_variant(v, tier="close"):
     """Show one composition: head preset (shape key, skin per slot, its eyes/brows/lashes/hair/
-    beard), hat, blanket roll, bayonet."""
+    beard), hat, blanket roll, bayonet. In the field tier the slouch hat is its wider, lighter
+    twin (readability choice)."""
     c = v if isinstance(v, dict) else variant_comp(v)
-    feats = {c["hat"]}
+    feats = {"slouch_field" if (c["hat"] == "slouch" and tier == "field") else c["hat"]}
     if c.get("roll"):
         feats.add("roll")
     if c.get("bayonet"):
@@ -487,6 +488,10 @@ def colour_probes(sc, cam, px, lm):
     out = {}
     for label, name in targets.items():
         o = bpy.data.objects.get(name)
+        if o is not None and o.hide_render:
+            # third pass: a settled-cloth copy may stand in for the garment at this frame
+            o = bpy.data.objects.get("%s@%d" % (name, sc.frame_current))
+            name = o.name if o is not None else name
         if o is None or o.hide_render:
             continue
         ev = o.evaluated_get(dg)
@@ -720,80 +725,87 @@ def main():
         set_variant("base")
         T.mark("variants")
 
-    # ---- the sprite frames
+    # ---- the sprite frames. Both tiers render the base figure AND every variant (third pass,
+    # in-play finding: with variants only in the field tier a man changed hat at 300 m). A shard
+    # renders the (variant, direction) units with index % n == k, so the load is even.
     all_d = list(range(N))
-    fvars = [v for v in str(P["field_variants"]).split(",") if v]
-    for v in fvars:
+    vlist = [v for v in str(P["variants"]).split(",") if v]
+    for v in vlist:
         variant_comp(v)   # fail early on a bad name
+    names = ["base"] + vlist
+    units = [(v, d) for v in names for d in all_d]
     plan = {}
     if quick:
         if kind in ("all", "hero"):
-            plan = {"close": {c: ([0, hd, N // 4, N // 2, 3 * N // 4] if c == "stand" else [hd]) for c in clips},
-                    "field": {c: [hd] for c in clips if c in ("stand", "walk")}}
-            fvars = fvars[:2]
+            plan = {"close": [("base", d) for d in [0, hd, N // 4, N // 2, 3 * N // 4]] + [(v, hd) for v in vlist[:2]],
+                    "field": [("base", hd)] + [(v, hd) for v in vlist[:2]]}
     elif kind == "all":
-        plan = {"close": {c: list(all_d) for c in clips}, "field": {c: list(all_d) for c in clips}}
+        plan = {"close": list(units), "field": list(units)}
     elif kind == "c":
-        plan = {"close": {c: [d for d in all_d if d % sn == sk] for c in clips}}
+        plan = {"close": [u for i, u in enumerate(units) if i % sn == sk]}
     elif kind == "f":
-        plan = {"field": {c: [d for d in all_d if d % sn == sk] for c in clips}}
+        plan = {"field": [u for i, u in enumerate(units) if i % sn == sk]}
     if P["skip_field"]:
         plan.pop("field", None)
-    REP["plan"] = {t: {c: v for c, v in p.items()} for t, p in plan.items()}
+    REP["plan"] = {t: ["%s:d%d" % u for u in us] for t, us in plan.items()}
+    REP["variant_list"] = vlist
     musket = bpy.data.objects.get("tcw_musket")
 
-    def render_set(out, px, spp, plan_t, times, done):
+    def render_set(out, px, spp, dirs_all, times, done):
         sc.camera = cam
         sc.render.resolution_x = sc.render.resolution_y = px
         sc.cycles.samples = spp
         os.makedirs(out, exist_ok=True)
         order = ["stand"] + [c for c in clips if c != "stand"]
         for clip in order:
-            dirs = plan_t.get(clip, [])
-            for d in dirs:
+            for d in dirs_all:
                 frame_ortho(cam, framing[clip], d)
                 tt.rotation_euler = (0, 0, base + 2 * math.pi * d / N)
                 for i, f in enumerate(clips[clip]["frames"]):
                     sc.frame_set(f)
                     times.append(render_to(sc, os.path.join(out, "%s_%d_d%02d.png" % (clip, i, d))))
-            if dirs:
-                done[clip] = dirs
+            if dirs_all:
+                done[clip] = list(dirs_all)
 
     tiers = [("close", P["close_px"], P["samples_close"]), ("field", P["field_px"], P["samples_field"])]
-    REP["field_variants"] = {"planned": list(fvars) if "field" in plan else []}
+    REP["field_variants"] = {"planned": list(vlist) if "field" in plan else []}
+    REP["close_variants"] = {"planned": list(vlist) if "close" in plan else []}
     for tier, px, spp in tiers:
         if tier not in plan:
             continue
-        if tier == "field" and musket is not None:
-            s = P["field_musket_scale"]
+        if musket is not None:
+            # readability choice: a thicker musket cross-section at 96 px only (length unchanged)
+            s = P["field_musket_scale"] if tier == "field" else 1.0
             musket.scale = (s, s, 1.0)
-        times, done = [], {}
-        set_variant("base")
-        render_set(os.path.join(C.OUT, "frames", tier), px, spp, plan[tier], times, done)
+        by_v = {}
+        for v, d in plan[tier]:
+            by_v.setdefault(v, []).append(d)
+        vrep = REP["field_variants" if tier == "field" else "close_variants"]
+        times_b, done_b = [], {}
+        for v in names:
+            if v not in by_v:
+                continue
+            comp = set_variant(v, tier)
+            times, done = ([], {}) if v != "base" else (times_b, done_b)
+            out = os.path.join(C.OUT, "frames", tier if v == "base" else "%s_%s" % (tier, v))
+            render_set(out, px, spp, sorted(by_v[v]), times, done)
+            if v != "base":
+                vrep[v] = {"renders": len(times), "seconds_total": round(sum(times), 2), "composition": comp,
+                           "directions": sorted(by_v[v])}
+            T.mark("%s %s" % (tier, v))
         REP["tiers"][tier] = {
-            "px": px, "samples": spp, "renders": len(times),
-            "directions": sorted(set(d for v in done.values() for d in v)),
-            "directions_by_clip": done,
-            "seconds_total": round(sum(times), 2),
-            "seconds_per_frame_mean": round(statistics.mean(times), 3) if times else None,
-            "seconds_per_frame_median": round(statistics.median(times), 3) if times else None,
-            "seconds_first_frame": round(times[0], 3) if times else None,
+            "px": px, "samples": spp, "renders": len(times_b),
+            "directions": sorted(set(d for v in done_b.values() for d in v)),
+            "directions_by_clip": done_b,
+            "seconds_total": round(sum(times_b), 2),
+            "seconds_per_frame_mean": round(statistics.mean(times_b), 3) if times_b else None,
+            "seconds_per_frame_median": round(statistics.median(times_b), 3) if times_b else None,
+            "seconds_first_frame": round(times_b[0], 3) if times_b else None,
             "clips": {c: tier_framing(framing[c], px) for c in clips},
             "px_per_m": tier_framing(framing["stand"], px)["pxPerMetre"],
             "anchor_px": tier_framing(framing["stand"], px)["anchor"],
         }
-        T.mark("tier " + tier)
-        if tier == "field":
-            # extra figure variants in the FIELD tier (same framing and anchors as the base)
-            for v in fvars:
-                comp = set_variant(v)
-                times, done = [], {}
-                render_set(os.path.join(C.OUT, "frames", "field_" + v), P["field_px"], P["samples_field"],
-                           plan["field"], times, done)
-                REP["field_variants"][v] = {"renders": len(times), "seconds_total": round(sum(times), 2),
-                                            "composition": comp}
-                T.mark("field variant " + v)
-            set_variant("base")
+        set_variant("base")
     if musket is not None:
         musket.scale = (1.0, 1.0, 1.0)
     REP["reduced"] = None
