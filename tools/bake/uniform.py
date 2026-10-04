@@ -95,11 +95,25 @@ D = {
     "scabbard":            (0.045, 0.52, 0.02),  # bayonet scabbard w l t       placeholder
     "blanket_roll_r":      0.038,   # radius of the horseshoe roll             placeholder
     # -- headgear -------------------------------------------------------------
-    "cap_band_h":          0.045,   # forage cap band                          placeholder
-    "cap_crown_back":      0.085,   # crown rise above band at the back        placeholder
+    "cap_band_h":          0.042,   # forage cap band                          placeholder
+    "cap_crown_back":      0.095,   # crown rise above band at the back        placeholder
     "cap_crown_front":     0.045,   # crown rise above band at the front       placeholder
-    "cap_crown_forward":   0.055,   # how far the floppy crown slumps forward  placeholder
+    "cap_crown_forward":   0.062,   # how far the floppy crown slumps forward  placeholder
     "cap_visor":           0.050,   # visor depth                              placeholder
+    "cap_tilt_deg":        7.0,     # band plane tipped forward (lower at the brow) placeholder
+    "stubble_face1":       0.45,    # a few days' stubble                      placeholder
+    "stubble_face2":       0.85,    # heavier, plus the CC0 scruffy-beard proxy placeholder
+    "cap_seat":            -0.006,  # band bottom relative to the brow line    placeholder
+    "cap_top_sag":         0.007,   # the crown top sags in the middle         placeholder
+    "cap_visor_dip_deg":   28.0,    # visor angled down from the band plane    placeholder
+    # -- brogans (ankle-high laced shoes) ------------------------------------------------
+    "shoe_heel_ext":       0.008,   # shoe beyond the heel of the foot         placeholder
+    "shoe_toe_ext":        0.014,   # shoe beyond the toes (round toe)         placeholder
+    "shoe_heel_h":         0.024,   # stacked leather heel, ~1 in              placeholder
+    "shoe_sole_t":         0.011,   # forefoot sole                            placeholder
+    "shoe_toe_spring":     0.008,   # toe lifts off the ground                 placeholder
+    "shoe_welt":           0.0045,  # sole edge beyond the upper               placeholder
+    "shoe_lace_pairs":     4,       # lace holes up the instep                 placeholder
     "slouch_crown_h":      0.105,   # slouch hat crown                         placeholder
     "slouch_brim":         0.075,   # brim width                               placeholder
     # -- rifle-musket (Model 1861 pattern) -------------------------------------------
@@ -112,9 +126,9 @@ D = {
 
 COL = {
     # name          sRGB hex   roughness  note (all placeholder colours judged by eye)
-    "coat":        ("#1d2540", 0.92),   # dark (indigo) blue wool flannel sack coat
-    "cap":         ("#1b2238", 0.90),   # dark blue forage cap, a shade darker
-    "trousers":    ("#7d93ad", 0.92),   # sky-blue kersey
+    "coat":        ("#1a2550", 0.92),   # dark (indigo) blue wool flannel sack coat (more saturated, pass 2)
+    "cap":         ("#18213f", 0.90),   # dark blue forage cap, a shade darker
+    "trousers":    ("#7393c4", 0.92),   # sky-blue kersey (more saturated, pass 2)
     "leather":     ("#121110", 0.40),   # blackened leather belts and boxes
     "brogans":     ("#16120f", 0.55),   # black rough-out / blacked brogans
     "haversack":   ("#1e1d1a", 0.65),   # tarred black canvas
@@ -125,6 +139,8 @@ COL = {
     "wood":        ("#4a2c18", 0.45),   # oiled black walnut stock
     "steel":       ("#8e9297", 0.32),   # bright (unblued) iron and steel
     "brass":       ("#b08a3e", 0.35),   # belt plates and buttons
+    "sole":        ("#1e1712", 0.80),   # brogan soles and heels
+    "lace":        ("#3a2a1c", 0.75),   # leather thong laces
     "pewter":      ("#8f8e88", 0.45),   # canteen spout
     "cork":        ("#8b6a45", 0.90),   # canteen stopper
     "bone":        ("#cfc5ab", 0.50),   # haversack button (material unsourced)
@@ -136,7 +152,7 @@ REP = {"table": {k: v for k, v in D.items()}, "colours": COL, "objects": {}}
 
 # Weathering colours (placeholder, judged by eye): faded indigo goes greyer and lighter; dust is
 # a light tan; mud a dark brown.
-FADE = {"coat": "#3a4560", "cap": "#363f58", "trousers": "#9aa9bb", "blanket": "#8a8272",
+FADE = {"coat": "#2e3a66", "cap": "#2c3658", "trousers": "#8ea6cc", "blanket": "#8a8272",
         "canteen": "#857c6c", "felt": "#3a3631", "webbing": "#958a72", "haversack": "#3a3832"}
 
 
@@ -145,14 +161,15 @@ def mats():
     for k, (hexc, rough) in COL.items():
         name = "tcw_" + k
         if k in ("coat", "cap", "trousers", "blanket", "canteen", "felt"):
-            m[k] = C.weathered_material(name, hexc, rough, kind="wool", fade_hex=FADE.get(k), fade=0.55,
-                                        mottle=0.09, sheen=0.55, weave_scale=330.0, bump=0.35)
+            # sheen kept low: at 0.55 (run 4) it greyed the dark-blue coat to #353945 on screen
+            m[k] = C.weathered_material(name, hexc, rough, kind="wool", fade_hex=FADE.get(k), fade=0.3,
+                                        mottle=0.08, sheen=0.12, weave_scale=330.0, bump=0.35)
         elif k in ("webbing", "haversack"):
             m[k] = C.weathered_material(name, hexc, rough, kind="canvas", fade_hex=FADE.get(k), fade=0.4,
                                         mottle=0.10, weave_scale=420.0, bump=0.3)
-        elif k in ("leather", "brogans"):
+        elif k in ("leather", "brogans", "sole", "lace"):
             m[k] = C.weathered_material(name, hexc, rough, kind="leather", mottle=0.12, bump=0.25,
-                                        edge_wear_hex="#4a3a2c")
+                                        edge_wear_hex="#33291f")
         elif k == "wood":
             m[k] = C.weathered_material(name, hexc, rough, kind="wood", mottle=0.10, bump=0.15,
                                         edge_wear_hex="#6b4428")
@@ -834,10 +851,15 @@ def build_musket(m):
     for zc, yc in ((D["barrel_bands_z"][1], -0.032), (0.37, -0.058)):
         tv_, tf_ = torus(Vector((0.0, yc, zc)), X, 0.008, 0.0016, n=10, m=5)
         parts.append((tv_, tf_))
-    # ramrod with a tulip head at the muzzle end
-    parts.append(C.loft([C.ring(Vector((0, -0.017, z)), X, Y, 0.0045, 0.0045, 6) for z in (0.55, L - 0.02)]))
-    parts.append(C.loft([C.ring(Vector((0, -0.017, z)), X, Y, rr, rr, 8) for z, rr in
-                         ((L - 0.03, 0.0045), (L - 0.018, 0.0062), (L - 0.006, 0.0058), (L - 0.004, 0.004))]))
+    # ramrod with a tulip head at the muzzle end: its own object so the load clip can draw it
+    rv, rf = C.merge([C.loft([C.ring(Vector((0, -0.017, z)), X, Y, 0.0045, 0.0045, 6) for z in (0.55, L - 0.02)]),
+                      C.loft([C.ring(Vector((0, -0.017, z)), X, Y, rr, rr, 8) for z, rr in
+                              ((L - 0.03, 0.0045), (L - 0.018, 0.0062), (L - 0.006, 0.0058), (L - 0.004, 0.004))])])
+    ramrod = C.mesh_object("tcw_ramrod", rv, rf)
+    C.assign(ramrod, m["steel"])
+    bpy.context.scene["tcw_musket"] = C.json.dumps({
+        "prof": prof, "br0": br0, "L": L, "barrel_r": 0.0145, "barrel_y": 0.006,
+        "ramrod_y": -0.017, "ramrod_bottom": 0.55, "ramrod_top": L - 0.004})
     parts.append(C.box(Vector((0, 0.019, L - 0.03)), (X, Y, Z), (0.0015, 0.004, 0.006)))     # front sight
     parts.append(C.box(Vector((0, 0.022, br0 + 0.10)), (X, Y, Z), (0.008, 0.006, 0.012)))   # rear sight
     v, f = C.merge(parts)
@@ -871,6 +893,8 @@ def build_musket(m):
     bay = C.mesh_object("tcw_bayonet", v, f, smooth=False)
     C.assign(bay, m["steel"])
     bay.parent = stock
+    ramrod.parent = stock
+    ramrod.rotation_mode = "QUATERNION"
     bay["tcw_variant"] = "bayonet"
     REP["objects"]["tcw_musket"] = {"length_m": L, "with_bayonet_m": round(L + D["bayonet_blade"], 3)}
     stock.rotation_mode = "QUATERNION"
@@ -890,8 +914,10 @@ def head_ring(cloud_head, lm, z, pad, bins=32):
 
 
 def build_brogan(m, rig, rm, lm, side, sg, shoe_idx, rest_w, info):
-    """A convex envelope of the foot, lofted heel to toe: the toes merge into one blunt shoe.
-    (A shell offset from the foot kept every toe, even after 40 smoothing passes.)"""
+    """Laced ankle brogan, built parametrically in the foot's frame from the foot's own extents:
+    a round-toed upper that rises to an ankle-high collar, a vamp seam, a leather sole with a
+    welt edge and a low stacked heel, toe spring, and leather laces across the instep.
+    Rigid on the foot bone (the toes are never posed)."""
     U = lm["U"]
     mid_x = lm["mid"].dot(lm["L"])
     pts = [rest_w[i] for i in shoe_idx if (rest_w[i].dot(lm["L"]) - mid_x) * sg > 0]
@@ -900,71 +926,193 @@ def build_brogan(m, rig, rm, lm, side, sg, shoe_idx, rest_w, info):
     bone = rig.data.bones[fb]
     ax = bone.tail_local - bone.head_local
     ax = Vector((ax.x, ax.y, 0)).normalized()
-    proj = cloud @ np.array(ax[:])
+    lat = U.cross(ax).normalized()
+    A, LA = np.array(ax[:]), np.array(lat[:])
+    proj = cloud @ A
+    latp = cloud @ LA
     lo, hi = float(proj.min()), float(proj.max())
-    origin = Vector(cloud.mean(axis=0).tolist())
-    origin -= ax * origin.dot(ax)
-    rings = []
-    n_st = 12
-    for k in range(n_st):
-        t = 0.04 + 0.92 * k / (n_st - 1)
-        c = origin + ax * (lo + (hi - lo) * t)
-        sel = cloud[np.abs(proj - (lo + (hi - lo) * t)) < 0.02]
-        if len(sel) < 8:
-            continue
-        cc = Vector(sel.mean(axis=0).tolist())
-        cc = cc - ax * (cc.dot(ax)) + ax * c.dot(ax)
-        r, _o, _w = section_loop(cloud, cc, ax, U, band=0.02, bins=24, pad=D["shoe_offset"], smooth=2)
-        rings.append([Vector((p.x, p.y, max(p.z, 0.0))) for p in r])
-    v, f = C.loft(rings)
+    ank = lm["ank" + side]
+    s_ank = (ank.dot(ax) - lo) / (hi - lo)
+    S = 18
+    xs, lmin, lmax, ztop = [], [], [], []
+    for k in range(S):
+        s = k / (S - 1)
+        x = lo - D["shoe_heel_ext"] + (hi - lo + D["shoe_heel_ext"] + D["shoe_toe_ext"]) * s
+        sel = np.abs(proj - min(max(x, lo + 0.01), hi - 0.01)) < 0.016
+        if sel.sum() >= 3:
+            lmin.append(float(latp[sel].min()))
+            lmax.append(float(latp[sel].max()))
+            ztop.append(float(cloud[sel, 2].max()))
+        else:
+            lmin.append(lmin[-1] if lmin else float(latp.mean()) - 0.03)
+            lmax.append(lmax[-1] if lmax else float(latp.mean()) + 0.03)
+            ztop.append(ztop[-1] if ztop else 0.05)
+        xs.append(x)
+    for arr in (lmin, lmax, ztop):
+        for _ in range(2):
+            arr[:] = [arr[0]] + [(arr[i - 1] + 2 * arr[i] + arr[i + 1]) / 4 for i in range(1, S - 1)] + [arr[-1]]
+
+    def plan(s):   # plan-view rounding at toe and heel
+        if s > 0.78:
+            return math.sqrt(max(0.06, 1 - ((s - 0.78) / 0.22) ** 2))
+        if s < 0.12:
+            return math.sqrt(max(0.25, 1 - ((0.12 - s) / 0.12) ** 2))
+        return 1.0
+
+    def sole_top(s):
+        return D["shoe_heel_h"] + (D["shoe_sole_t"] - D["shoe_heel_h"]) * C.smoothstep(0.26, 0.31, s)
+
+    def spring(s):
+        return D["shoe_toe_spring"] * C.smoothstep(0.80, 1.0, s) ** 1.5
+
+    def top(s, k):
+        collar = ank.z + D["shoe_top_above_ankle"]
+        inst = ztop[k] + D["shoe_offset"]
+        w = C.smoothstep(s_ank + 0.08, s_ank + 0.22, s)
+        h = collar * (1 - w) + inst * w
+        if s > 0.86:
+            h = sole_top(s) + spring(s) + (h - sole_top(s) - spring(s)) * math.sqrt(max(0.15, 1 - ((s - 0.86) / 0.14) ** 2))
+        return h
+
+    up_rings, sole_rings, tops, cls = [], [], [], []
+    seg = 22
+    for k, s in enumerate([k / (S - 1) for k in range(S)]):
+        cl = (lmin[k] + lmax[k]) / 2
+        hw = ((lmax[k] - lmin[k]) / 2 + D["shoe_offset"]) * plan(s)
+        seam = 1.0 + 0.012 * max(0.0, 1 - abs(s - 0.62) / 0.03)
+        zs = sole_top(s) + spring(s)
+        zt = top(s, k) * seam
+        zc, hz = (zs + zt) / 2, (zt - zs) / 2
+        ring = []
+        for j in range(seg):
+            a = 2 * math.pi * j / seg
+            ca, sa = math.cos(a), math.sin(a)
+            y = cl + hw * seam * math.copysign(abs(ca) ** 0.7, ca)
+            z = zc + hz * math.copysign(abs(sa) ** (0.45 if sa < 0 else 0.8), sa)
+            ring.append(ax * xs[k] + lat * y + U * z)
+        up_rings.append(ring)
+        sw = hw + D["shoe_welt"]
+        zb = spring(s)
+        sring = []
+        for y, z in ((cl - sw, zb), (cl + sw, zb), (cl + sw, zs + 0.002), (cl - sw, zs + 0.002)):
+            sring.append(ax * xs[k] + lat * y + U * z)
+        sole_rings.append(sring)
+        tops.append(zt)
+        cls.append(cl)
+    v, f = C.loft(up_rings)
     obj = C.mesh_object("tcw_brogan_" + side, v, f)
     C.assign(obj, m["brogans"])
-    C.stamp_attrs(obj, dirt=0.4, wear=0.3)
-    Skinner(rig, rest_w, info, ("foot", "shin")).apply(obj, k=12)
+    C.stamp_attrs(obj, dirt=0.18, wear=0.12)   # run 4: 0.4 dust turned the black brogans grey
     C.add_modifier(obj, "SUBSURF", "Smooth", levels=0, render_levels=2)
-    REP["objects"][obj.name] = {"verts": len(v), "rings": len(rings)}
+    C.parent_to_bone(obj, rig, fb)
+    sv, sf = C.loft(sole_rings)
+    sole = C.mesh_object("tcw_brogan_sole_" + side, sv, sf, smooth=False)
+    C.add_modifier(sole, "BEVEL", "Bevel", width=0.002, segments=2, limit_method="ANGLE")
+    C.assign(sole, m["sole"])
+    C.stamp_attrs(sole, dirt=0.6, wear=0.5)
+    C.parent_to_bone(sole, rig, fb)
+    # laces: bars across the opening over the instep, and the two edges of the quarters
+    parts = []
+    n_l = D["shoe_lace_pairs"]
+    for i in range(n_l):
+        s = s_ank - 0.02 + (0.20 * i / max(1, n_l - 1))
+        k = min(S - 1, max(0, int(round(s * (S - 1)))))
+        p = ax * (lo + (hi - lo) * s) + lat * cls[k] + U * (tops[k] + 0.0022)
+        parts.append(C.box(p, (lat, ax, U), (0.012, 0.0016, 0.0016)))
+        for e in (-1, 1):
+            parts.append(C.box(p + lat * (e * 0.0125) - U * 0.0008, (lat, ax, U), (0.0022, 0.0022, 0.0022)))
+    v, f = C.merge(parts)
+    laces = C.mesh_object("tcw_brogan_laces_" + side, v, f, smooth=False)
+    C.assign(laces, m["lace"])
+    C.parent_to_bone(laces, rig, fb)
+    REP["objects"][obj.name] = {"verts": len(up_rings) * seg, "s_ankle": round(s_ank, 3)}
     return obj
 
 
 def build_cap(m, rig, rm, lm, head_cloud, brow_z):
-    F, U = lm["F"], lm["U"]
-    base, outs, centre = head_ring(head_cloud, lm, brow_z + 0.01, 0.007)
-    base = [p - U * 0.01 for p in base]
+    """Forage cap seated on the head: the band sits on a plane tipped forward (lower at the
+    brow), the soft crown rises higher at the back and slumps forward over the visor with a
+    sagging top, a crease where crown meets band, a leather visor angled down, and a leather
+    chin strap above the visor held by two small side buttons."""
+    F, U, Lv = lm["F"], lm["U"], lm["L"]
+    tilt = math.radians(D["cap_tilt_deg"])
+    n = (U * math.cos(tilt) + F * math.sin(tilt)).normalized()
+    hc = np.array(head_cloud)
+    sel = hc[np.abs(hc[:, 2] - brow_z) < 0.015]
+    c0 = Vector(sel.mean(axis=0).tolist()) if len(sel) else lm["headb"].copy()
+    c0.z = brow_z + D["cap_seat"]
+    base, outs, _w = section_loop(hc, c0, n, F, band=0.012, bins=40, pad=0.007, smooth=2)
     front = [max(-1.0, min(1.0, o.dot(F))) for o in outs]
+    bh = D["cap_band_h"]
     r0 = [p.copy() for p in base]
-    r1 = [p + U * D["cap_band_h"] for p in base]
+    r1 = [p + n * bh for p in base]
+    r1b = [c0 + (p - c0) * 0.975 + n * (bh + 0.004) for p in base]   # crease between band and crown
     r2, r3 = [], []
-    for p, o, fr in zip(base, outs, front):
-        rise = D["cap_band_h"] + (D["cap_crown_back"] * (1 - fr) + D["cap_crown_front"] * (1 + fr)) / 2
-        q = centre + (p - centre) * 1.04
-        r2.append(Vector((q.x, q.y, p.z)) + U * (D["cap_band_h"] + 0.55 * (rise - D["cap_band_h"]))
-                  + F * (0.45 * D["cap_crown_forward"]))
-        q = centre + (p - centre) * 0.86
-        r3.append(Vector((q.x, q.y, p.z)) + U * rise + F * D["cap_crown_forward"])
-    v, f = C.loft([r0, r1, r2, r3], cap_start=False, cap_end=True)
+    for p, fr in zip(base, front):
+        rise = bh + (D["cap_crown_back"] * (1 - fr) + D["cap_crown_front"] * (1 + fr)) / 2
+        r2.append(c0 + (p - c0) * 1.07 + n * (bh + 0.5 * (rise - bh)) + F * (0.45 * D["cap_crown_forward"]))
+        r3.append(c0 + (p - c0) * 0.92 + n * rise + F * D["cap_crown_forward"])
+    v, f = C.loft([r0, r1, r1b, r2, r3], cap_start=False, cap_end=False)
+    tc = sum(r3, Vector()) / len(r3) - n * D["cap_top_sag"]
+    ci = len(v)
+    v.append(tc)
+    N3 = len(r3)
+    b3 = 4 * N3
+    for i in range(N3):
+        f.append((ci, b3 + i, b3 + (i + 1) % N3))
     cap = C.mesh_object("tcw_cap", v, f)
     C.add_modifier(cap, "SOLIDIFY", "Thick", thickness=0.003, offset=1.0)
-    C.add_modifier(cap, "SUBSURF", "Smooth", levels=0, render_levels=1)
+    C.add_modifier(cap, "SUBSURF", "Smooth", levels=0, render_levels=2)
     C.assign(cap, m["cap"])
+    C.stamp_attrs(cap, wear=[0.0] * (3 * N3) + [0.6] * (2 * N3) + [0.7])
     C.parent_to_bone(cap, rig, rm["head"])
     cap["tcw_variant"] = "cap"
-    # visor: the front part of the base ring pushed out and down
-    idx = [i for i, fr in enumerate(front) if fr > 0.30]
-    idx.sort(key=lambda i: math.atan2(outs[i].dot(lm["L"]), outs[i].dot(F)))
+    # visor: the front of the base ring pushed out and down, slightly curved
+    idx = [i for i, fr in enumerate(front) if fr > 0.28]
+    idx.sort(key=lambda i: math.atan2(outs[i].dot(Lv), outs[i].dot(F)))
     vv, ff = [], []
+    dip = math.radians(D["cap_visor_dip_deg"])
     for i in idx:
         p = base[i]
-        oh = Vector((outs[i].x, outs[i].y, 0)).normalized()
-        depth = D["cap_visor"] * (0.35 + 0.65 * (front[i] - 0.30) / 0.70)
-        vv += [p + U * 0.002, p + oh * depth - U * 0.016]
+        oh = (outs[i] - n * outs[i].dot(n)).normalized()
+        depth = D["cap_visor"] * (0.30 + 0.70 * (front[i] - 0.28) / 0.72)
+        tip = p + (oh * math.cos(dip) - n * math.sin(dip)) * depth
+        mid = p + (oh * math.cos(dip * 0.6) - n * math.sin(dip * 0.6)) * (depth * 0.5)
+        vv += [p + n * 0.002, mid, tip]
     for j in range(len(idx) - 1):
-        ff.append((2 * j, 2 * j + 2, 2 * j + 3, 2 * j + 1))
+        a, b = 3 * j, 3 * (j + 1)
+        ff += [(a, b, b + 1, a + 1), (a + 1, b + 1, b + 2, a + 2)]
     visor = C.mesh_object("tcw_cap_visor", vv, ff)
     C.add_modifier(visor, "SOLIDIFY", "Thick", thickness=0.004)
+    C.add_modifier(visor, "SUBSURF", "Smooth", levels=0, render_levels=1)
     C.assign(visor, m["leather"])
     C.parent_to_bone(visor, rig, rm["head"])
     visor["tcw_variant"] = "cap"
-    return cap
+    # chin strap: a narrow leather band on the band, above the visor, ending at two buttons
+    sidx = [i for i, fr in enumerate(front) if fr > 0.05]
+    sidx.sort(key=lambda i: math.atan2(outs[i].dot(Lv), outs[i].dot(F)))
+    sv_, sf_ = [], []
+    for i in sidx:
+        p = base[i] + outs[i] * 0.0025 + n * 0.008
+        sv_ += [p - n * 0.005, p + n * 0.005]
+    for j in range(len(sidx) - 1):
+        sf_.append((2 * j, 2 * j + 2, 2 * j + 3, 2 * j + 1))
+    strap = C.mesh_object("tcw_cap_chinstrap", sv_, sf_)
+    C.add_modifier(strap, "SOLIDIFY", "Thick", thickness=0.0018)
+    C.assign(strap, m["leather"])
+    C.parent_to_bone(strap, rig, rm["head"])
+    strap["tcw_variant"] = "cap"
+    for k, i in enumerate((sidx[0], sidx[-1])):
+        o = outs[i]
+        bp = base[i] + o * 0.004 + n * 0.008
+        a1 = o.cross(n).normalized()
+        bv, bf = plate_profile(bp, a1, n, o, 0.011, 0.011, DOME_PROFILE, n=12)
+        btn = C.mesh_object("tcw_cap_button_%d" % k, bv, bf)
+        C.assign(btn, m["brass"])
+        C.parent_to_bone(btn, rig, rm["head"])
+        btn["tcw_variant"] = "cap"
+    REP["cap"] = {"tilt_deg": D["cap_tilt_deg"], "seat_z": round(c0.z, 4)}
+    return cap, c0, n, base
 
 
 def build_slouch(m, rig, rm, lm, head_cloud, brow_z):
@@ -998,6 +1146,105 @@ def build_slouch(m, rig, rm, lm, head_cloud, brow_z):
     hat["tcw_variant"] = "slouch"
     hat.hide_render = True
     return hat
+
+
+# ------------------------------------------------------------------------------ face and hair
+
+OBST = []   # arm-clearance obstacles for poses.py: {"name", "bone", "p" (rest world), "r"}
+
+
+def face_attributes(body, rest_w, nrm_w, region, lm):
+    """Per-vertex masks on the body for the skin shader: stubble (lower face and jaw, not the
+    lips), sun (nose, cheeks, upper lip, back of the neck, backs of the hands), grime."""
+    eyes = lm.get("eyes") or []
+    F, U, Lv = lm["F"], lm["U"], lm["L"]
+    E = (sum(eyes, Vector()) / len(eyes)) if eyes else lm["headb"] + U * 0.07
+    n = len(rest_w)
+    beard, sun, dirt = [0.0] * n, [0.0] * n, [0.0] * n
+    for i, p in enumerate(rest_w):
+        r = region[i]
+        if r is None:
+            continue
+        q = p - E
+        dz, fwd, lat = q.z, q.dot(F), q.dot(Lv)
+        nn = nrm_w[i]
+        if r in ("head", "neck"):
+            w = (C.smoothstep(-0.035, -0.055, dz) * C.smoothstep(-0.165, -0.125, dz) *
+                 C.smoothstep(-0.085, -0.035, fwd) * C.smoothstep(0.088, 0.066, abs(lat)))
+            lip = (max(0.0, 1 - abs(dz + 0.072) / 0.011) * C.smoothstep(0.03, 0.017, abs(lat)) *
+                   C.smoothstep(0.03, 0.06, fwd))
+            beard[i] = w * (1 - 0.85 * lip)
+            s = max(0.0, 0.55 * nn.dot(U) + 0.6 * nn.dot(F)) * C.smoothstep(-0.12, -0.03, dz)
+            if r == "neck":
+                s = max(s, 0.8 * max(0.0, -nn.dot(F)))
+            sun[i] = min(1.0, s)
+            dirt[i] = 0.3
+        elif r == "hand":
+            sun[i] = min(1.0, 0.5 * max(0.0, nn.dot(U)) + 0.2)
+            dirt[i] = 0.7
+    C.stamp_attrs(body, rest=rest_w, dirt=dirt)
+    me = body.data
+    for key, vals in (("tcw_beard", beard), ("tcw_sun", sun)):
+        a = me.attributes.get(key) or me.attributes.new(key, "FLOAT", "POINT")
+        a.data.foreach_set("value", vals)
+    REP["face_masks"] = {"beard_vertices": sum(1 for b in beard if b > 0.3), "sun_vertices": sum(1 for s in sun if s > 0.3)}
+
+
+def tweak_skin(mat, beard_strength):
+    """Sunburn, stubble and grime layered over the CC0 skin texture (no new image files)."""
+    nt = mat.node_tree
+    bsdf = next((nd for nd in nt.nodes if nd.type == "BSDF_PRINCIPLED"), None)
+    if bsdf is None:
+        return "no Principled BSDF in " + mat.name
+    sock = bsdf.inputs["Base Color"]
+    base = sock.links[0].from_socket if sock.is_linked else tuple(sock.default_value)
+    rest = C.node_attr(nt, "tcw_rest", "Vector")
+    beard = C.node_attr(nt, "tcw_beard")
+    sun = C.node_attr(nt, "tcw_sun")
+    dirt = C.node_attr(nt, "tcw_dirt")
+    col = C.node_mix(nt, "MULTIPLY", C.node_math(nt, "MULTIPLY", sun, 0.45, clamp=True), base, (1.0, 0.66, 0.55, 1.0))
+    dots = C.node_ramp(nt, C.node_noise(nt, rest, 1500.0, 1.0), 0.42, 0.58).outputs["Color"]
+    stub = C.node_math(nt, "MULTIPLY", beard, dots)
+    col = C.node_mix(nt, "MIX", C.node_math(nt, "MULTIPLY", stub, beard_strength, clamp=True), col, (0.06, 0.045, 0.035, 1.0))
+    col = C.node_mix(nt, "MULTIPLY", C.node_math(nt, "MULTIPLY", beard, 0.45 * beard_strength, clamp=True), col,
+                     (0.70, 0.66, 0.66, 1.0))
+    grime = C.node_ramp(nt, C.node_noise(nt, rest, 30.0, 3.0), 0.45, 0.72).outputs["Color"]
+    g = C.node_math(nt, "MULTIPLY", dirt, grime)
+    col = C.node_mix(nt, "MIX", C.node_math(nt, "MULTIPLY", g, 0.35, clamp=True), col, (0.30, 0.24, 0.17, 1.0))
+    nt.links.new(col, sock)
+    return "ok"
+
+
+def mask_hair_under(c0, n, base_pts):
+    """Hide hair-proxy vertices that would poke through the cap (inside the band, above it)."""
+    R = sum(((p - c0) - n * (p - c0).dot(n)).length for p in base_pts) / len(base_pts) + 0.004
+    done = {}
+    for o in bpy.data.objects:
+        nm = o.name.lower()
+        if o.type != "MESH" or o.name.startswith("tcw_") or "beard" in nm:
+            continue
+        if not (o.get("tcw_variant") in ("face1", "face2") or "hair" in nm or "short0" in nm):
+            continue
+        mw = o.matrix_world
+        idx = []
+        for v in o.data.vertices:
+            q = mw @ v.co - c0
+            h = q.dot(n)
+            if h > 0.004 and (q - n * h).length < R:
+                idx.append(v.index)
+        if not idx:
+            continue
+        vg = o.vertex_groups.get("tcw_under_cap") or o.vertex_groups.new(name="tcw_under_cap")
+        vg.add(idx, 1.0, "REPLACE")
+        mod = o.modifiers.new("Under cap", "MASK")
+        mod.vertex_group = "tcw_under_cap"
+        mod.invert_vertex_group = True
+        try:
+            o.modifiers.move(len(o.modifiers) - 1, 0)
+        except Exception:  # noqa: BLE001
+            pass
+        done[o.name] = len(idx)
+    REP["hair_masked"] = done
 
 
 # ------------------------------------------------------------------------------ kit (second pass)
@@ -1057,7 +1304,7 @@ def ribbon_point(pts, outs, target):
     return pts[i], outs[i], along
 
 
-def build_blanket_roll(m, pts, outs, across, rig, skin):
+def build_blanket_roll(m, pts, outs, across, rig, skin, obst_bone=None):
     """Horseshoe blanket roll: open at the hip with two capped ends that show the rolled layers,
     a spiral layer edge winding along it, and three ties. Bin 0 of `pts` is at the bottom
     (hip) end of the loop, so dropping the first/last bins opens it there."""
@@ -1081,6 +1328,9 @@ def build_blanket_roll(m, pts, outs, across, rig, skin):
             ring.append(c + u * (math.cos(a) * rr * 0.82) + v * (math.sin(a) * rr * 1.08))
         rings.append(ring)
         cents.append(c)
+    if obst_bone:
+        for c in cents[::3]:
+            OBST.append({"name": "roll", "bone": obst_bone, "p": list(c), "r": R * 1.05})
     verts, faces = [], []
     for r in rings:
         verts.extend(r)
@@ -1203,6 +1453,9 @@ def build_haversack(m, rig, bone, top_c, across, up, out, size):
         front_z.append(dz)
     v, f = C.loft(rings, cap_start=True, cap_end=True)
     bag = rigid("tcw_haversack", v, f, m["haversack"], rig, bone, smooth=True)
+    for xx in (-w * 0.28, 0.0, w * 0.28):
+        OBST.append({"name": "haversack", "bone": bone, "r": 0.065,
+                     "p": list(top_c + across * xx - up * (h * 0.6) + out * (d * 0.5))})
     C.add_modifier(bag, "SUBSURF", "Smooth", levels=0, render_levels=1)
     C.stamp_attrs(bag, dirt=0.25, wear=0.3)
     # flap: follows the front face down 72% of the bag, rounded bottom edge
@@ -1245,6 +1498,7 @@ def build_canteen(m, rig, bone, cen, tang, up, o):
                for s, k in ((-1, 0.80), (-0.75, 0.93), (-0.4, 0.985), (0, 1.0), (0.4, 0.985), (0.75, 0.93), (1, 0.80))]
     cv, cf = C.loft(rings_c)
     body = rigid("tcw_canteen", cv, cf, m["canteen"], rig, bone, smooth=True)
+    OBST.append({"name": "canteen", "bone": bone, "p": list(cen), "r": r * 1.02})
     C.stamp_attrs(body, dirt=0.2, wear=0.45)
     sv, sf = torus(cen, o, r * 1.0, 0.0045, n=40, m=6)
     rigid("tcw_canteen_seam", sv, sf, m["steel"], rig, bone, smooth=True)
@@ -1489,7 +1743,7 @@ def main():
     buckle("tcw_cartridge_belt_buckle", m["steel"], p_ + o_ * 0.003, al_, cb_n, o_, 0.066, 0.04, sk_torso)
     roll_pts, roll_outs, roll_n = diag_loop("L", "R", -0.01, 0.0, D["strap_thickness"] + 0.006,
                                             bottom_z=waist_z + 0.02)
-    build_blanket_roll(m, roll_pts, roll_outs, roll_n, rig, sk_torso)
+    build_blanket_roll(m, roll_pts, roll_outs, roll_n, rig, sk_torso, obst_bone=rm["chest"])
     for j, (shift, mat_name) in enumerate(((0.025, "haversack"), (-0.025, "webbing"))):
         p_, o_, n_ = diag_loop("R", "L", shift, D["sling_strap_width"], D["strap_thickness"] + 0.003 + 0.002 * j)
         ribbon("tcw_strap_" + mat_name, p_, o_, n_, D["sling_strap_width"], m[mat_name], sk_torso)
@@ -1541,19 +1795,21 @@ def main():
     cb = D["cartridge_box"]
     cen, acr, up_, o_ = side_frame((-Lv) * 0.55 + back * 0.85, 0.0, D["strap_thickness"] + 0.004, cb[2])
     build_box_kit("tcw_cartridge_box", m, rig, anchor, cen, acr, up_, o_, cb, plate=D["box_plate"])
+    OBST.append({"name": "cartridge box", "bone": anchor, "p": list(cen), "r": 0.085})
     cp = D["cap_pouch"]
     cen, acr, up_, o_ = side_frame(F * 0.8 + (-Lv) * 0.6, waist_z - hz - 0.02, 0.006, cp[2])
     build_box_kit("tcw_cap_pouch", m, rig, anchor, cen, acr, up_, o_, cp, plate=None, flap_frac=0.7)
+    # left hip, second pass: haversack and canteen hang BEHIND the hip so the left arm hangs in
+    # front of them; the scabbard sits on the side (placement placeholder, judged by eye)
     hs = D["haversack"]
-    cen, acr, up_, o_ = side_frame(Lv * 0.95 + F * 0.2, -0.10, 0.010, 0.0)
+    kit_dir = Lv * 0.72 + back * 0.70
+    cen, acr, up_, o_ = side_frame(kit_dir, -0.10, 0.010, 0.0)
     build_haversack(m, rig, anchor, cen + U * (hs[1] / 2), acr, up_, o_, hs)
-    # canteen: outside the haversack, a little behind it
-    p, o = surface(Lv * 0.9 + back * 0.45, -0.07)
+    p, o = surface(kit_dir, -0.07)
     o = Vector((o.x, o.y, 0)).normalized()
     cen = p + o * (0.012 + hs[2] + 0.01 + D["canteen_t"] / 2)
     build_canteen(m, rig, anchor, cen, o.cross(U).normalized(), U.copy(), o)
-    # bayonet scabbard on the left hip, angled back
-    p, o = surface(Lv * 0.6 + back * 0.8, -0.02)
+    p, o = surface(Lv * 0.95 + back * 0.25, -0.02)
     o = Vector((o.x, o.y, 0)).normalized()
     down = (-U * math.cos(math.radians(25)) + back.normalized() * math.sin(math.radians(25))).normalized()
     build_scabbard(m, rig, anchor, p, o, U.cross(o).normalized(), down)
@@ -1565,9 +1821,22 @@ def main():
     eyes = lm.get("eyes")
     eye_z = (sum(e.z for e in eyes) / len(eyes)) if eyes else (max(p[2] for p in head_cloud) - 0.11)
     brow_z = eye_z + 0.028
-    build_cap(m, rig, rm, lm, head_cloud, brow_z)
+    _cap, cap_c0, cap_n, cap_base = build_cap(m, rig, rm, lm, head_cloud, brow_z)
     build_slouch(m, rig, rm, lm, head_cloud, brow_z)
+    mask_hair_under(cap_c0, cap_n, cap_base)
     T.mark("headgear")
+
+    # face: stubble, sun and grime masks; skin shading on both face presets
+    nrm_w = [(MW.to_3x3() @ q).normalized() for q in nrm]
+    face_attributes(body, rest_w, nrm_w, region, lm)
+    skins = {"face1": body.get("tcw_skin_face1"), "face2": body.get("tcw_skin_face2")}
+    REP["skin_tweak"] = {}
+    if not skins["face1"] and body.material_slots and body.material_slots[0].material:
+        skins["face1"] = body.material_slots[0].material.name
+    for key, strength in (("face1", D["stubble_face1"]), ("face2", D["stubble_face2"])):
+        mat = bpy.data.materials.get(skins[key] or "")
+        REP["skin_tweak"][key] = tweak_skin(mat, strength) if mat else "missing"
+    T.mark("face")
 
     musket = build_musket(m)
     musket.parent = rig
@@ -1608,6 +1877,8 @@ def main():
             ev.to_mesh_clear()
     REP["render_triangles_viewport_levels"] = tris
     REP["landmark_heights"] = {"hip_z": hip_z, "waist_z": waist_z, "hem_z": hem_z, "brow_z": brow_z}
+    bpy.context.scene["tcw_obstacles"] = C.json.dumps(OBST)
+    REP["obstacles"] = {k: sum(1 for o in OBST if o["name"] == k) for k in set(o["name"] for o in OBST)}
     out = os.path.join(C.WORK, "soldier.blend")
     bpy.ops.wm.save_as_mainfile(filepath=out, compress=False)
     T.mark("saved soldier.blend")

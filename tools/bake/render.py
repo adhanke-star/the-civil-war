@@ -59,7 +59,7 @@ P = {
     "samples_close": C.arg("samples-close", 48),
     "samples_field": C.arg("samples-field", 24),
     "samples_hero": C.arg("samples-hero", 128),
-    "samples_closeup": C.arg("samples-closeup", 96),
+    "samples_closeup": C.arg("samples-closeup", 72),
     # the ONE standard light: warm key sun, upper-left on screen, slightly toward the viewer
     "sun_az": C.arg("sun-az", 200.0),             # deg, ground plane, from screen-right CCW
     "sun_el": C.arg("sun-el", 52.0),              # key elevation: models folds from upper-left
@@ -76,7 +76,7 @@ P = {
     # field tier only: thicken the musket's cross-section so it survives at 96 px (readability choice)
     "field_musket_scale": C.arg("field-musket-scale", 1.7),
     # extra figure variants rendered into the FIELD tier atlas (the game can pick per man)
-    "field_variants": C.arg("field-variants", "slouch,face2,mixed"),
+    "field_variants": C.arg("field-variants", "mixed,face2"),
     "sun_rgb": (1.0, 0.90, 0.78),                 # warm key
     "sky_strength": C.arg("sky-strength", 0.45),
     "sky_hex": "#a9bdd6",                         # cool sky fill (world)

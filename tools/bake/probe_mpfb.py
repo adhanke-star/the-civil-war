@@ -177,6 +177,91 @@ def install_assets(LocationService, AssetService):
     return "extracted %s into %s" % (os.path.basename(zip_path), data_dir)
 
 
+VARIANT_HAIR = ["short04.mhclo", "short01.mhclo", "short03.mhclo"]
+VARIANT_SKIN = ["middleage_caucasian_male.mhmat", "old_caucasian_male.mhmat", "young_caucasian_male.mhmat"]
+# MakeHuman "bodyparts05" pack, CC0 per its page (static.makehumancommunity.org/assets/assetpacks/
+# bodyparts05.html): wdg_scruffy_beard by WDG. Fetched on the runner only (--beard-zip).
+VARIANT_BEARDS = ["wdg_scruffy_beard.mhclo"]
+
+
+def add_variant_face(HumanService, AssetService, body, skin1):
+    """Second face preset for later tinting/swapping (render.py variant "face2"): another skin
+    texture, another hair, and a CC0 beard proxy. Each part is tagged tcw_variant=face2; the
+    first hair is tagged face1. Failures are recorded, never fatal."""
+    rep = REPORT.setdefault("variant_assets", {})
+    listing = {}
+    for sub in ("hair", "clothes", "skins", "eyebrows"):
+        try:
+            fn = AssetService.list_mhmat_assets if sub == "skins" else AssetService.list_mhclo_assets
+            listing[sub] = sorted(os.path.basename(str(p)) for p in fn(sub))[:80]
+        except Exception as e:  # noqa: BLE001
+            listing[sub] = "list failed: %s" % e
+    REPORT["asset_listing"] = listing
+    # beard pack: unzip into the same user data dir, refresh the lists
+    zp = C.arg("beard-zip", "")
+    if zp and os.path.exists(zp):
+        def unpack():
+            LocationService = dyn("mpfb.services.locationservice", "LocationService")
+            with zipfile.ZipFile(zp) as z:
+                names = z.namelist()
+                z.extractall(LocationService.get_user_data())
+            AssetService.update_all_asset_lists()
+            return [n for n in names if n.endswith(".mhclo")][:20]
+        ok, res = attempt("unpack beard pack " + os.path.basename(zp), unpack)
+        rep["beard_pack_mhclo"] = res
+    # second skin: load it, copy the material, then restore the first skin
+    skin2 = None
+    for name in VARIANT_SKIN:
+        p = AssetService.find_asset_absolute_path(name, asset_subdir="skins")
+        if p and (not skin1 or os.path.basename(p) != os.path.basename(skin1)):
+            skin2 = p
+            break
+    if skin2 and skin1:
+        def swap():
+            m1 = body.material_slots[0].material.copy()
+            m1.name = "tcw_skin_face1"
+            m1.use_fake_user = True
+            HumanService.set_character_skin(skin2, body, skin_type="MAKESKIN")
+            m2 = body.material_slots[0].material
+            m2.name = "tcw_skin_face2"
+            m2.use_fake_user = True
+            body.material_slots[0].material = m1
+            body["tcw_skin_face1"] = m1.name
+            body["tcw_skin_face2"] = m2.name
+            return "%s -> %s / %s" % (os.path.basename(skin2), m1.name, m2.name)
+        ok, res = attempt("second skin", swap)
+        rep["skin2"] = res if ok else None
+    # second hair
+    for name in VARIANT_HAIR:
+        p = AssetService.find_asset_absolute_path(name, asset_subdir="hair")
+        if p:
+            ok, obj = attempt("variant hair " + name, lambda p=p: HumanService.add_mhclo_asset(
+                p, body, asset_type="Hair", subdiv_levels=0, material_type="MAKESKIN"))
+            if ok and obj is not None:
+                obj["tcw_variant"] = "face2"
+                obj.hide_render = True
+                rep["hair2"] = name
+            break
+    # beard
+    for name in VARIANT_BEARDS:
+        p = AssetService.find_asset_absolute_path(name, asset_subdir="clothes")
+        if not p:
+            root = os.path.dirname(os.path.dirname(skin1)) if skin1 else ""
+            for dp, _dn, fns in os.walk(root or "."):
+                if name in fns:
+                    p = os.path.join(dp, name)
+                    break
+        if p:
+            ok, obj = attempt("variant beard " + name, lambda p=p: HumanService.add_mhclo_asset(
+                p, body, asset_type="Clothes", subdiv_levels=0, material_type="MAKESKIN"))
+            if ok and obj is not None:
+                obj["tcw_variant"] = "face2"
+                obj.hide_render = True
+                rep["beard"] = name
+            break
+        rep["beard"] = "not found: " + name
+
+
 def main():
     for o in list(bpy.data.objects):
         bpy.data.objects.remove(o, do_unlink=True)
@@ -238,7 +323,11 @@ def main():
                               p, body, asset_type=atype, subdiv_levels=subdiv, material_type="MAKESKIN"))
         if ok and obj is not None:
             proxies.append(getattr(obj, "name", str(obj)))
+            if atype == "Hair":
+                obj["tcw_variant"] = "face1"
     T.mark("proxies")
+    add_variant_face(HumanService, AssetService, body, skin)
+    T.mark("variant face")
 
     # ---- facts about the result
     C.update()

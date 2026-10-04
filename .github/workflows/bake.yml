@@ -8,13 +8,13 @@ on:
     inputs:
       samples_close:
         description: Cycles samples for the 256 px close tier
-        default: '48'
+        default: '32'
       samples_field:
         description: Cycles samples for the 96 px field tier
-        default: '24'
+        default: '16'
       samples_hero:
         description: Cycles samples for the 1024 px hero render
-        default: '128'
+        default: '96'
       directions:
         description: Yaw directions
         default: '16'
@@ -23,7 +23,7 @@ on:
         default: '35'
       budget_min:
         description: Render budget in minutes before directions are reduced
-        default: '20'
+        default: '21'
       quick:
         description: '1 = quick check set (hero, close-up, variants, a few frames) instead of the full matrix'
         default: '0'
@@ -46,13 +46,17 @@ env:
   MPFB_REF: v2.0.17
   MH_ASSETS_URL: https://files.makehumancommunity.org/asset_packs/makehuman_system_assets/makehuman_system_assets_cc0.zip
   MH_ASSETS_FILE: makehuman_system_assets_cc0.zip
+  # CC0 beards and moustaches (page: https://static.makehumancommunity.org/assets/assetpacks/bodyparts05.html)
+  BEARD_URL: https://files.makehumancommunity.org/asset_packs/bodyparts05/bodyparts05_cc0.zip
+  BEARD_URL2: https://files2.makehumancommunity.org/asset_packs/bodyparts05/bodyparts05_cc0.zip
+  BEARD_FILE: bodyparts05_cc0.zip
   BAKE_OUT: ${{ github.workspace }}/.out/bake
-  SAMPLES_CLOSE: ${{ inputs.samples_close || '48' }}
-  SAMPLES_FIELD: ${{ inputs.samples_field || '24' }}
-  SAMPLES_HERO: ${{ inputs.samples_hero || '128' }}
+  SAMPLES_CLOSE: ${{ inputs.samples_close || '32' }}
+  SAMPLES_FIELD: ${{ inputs.samples_field || '16' }}
+  SAMPLES_HERO: ${{ inputs.samples_hero || '96' }}
   DIRECTIONS: ${{ inputs.directions || '16' }}
   ELEVATION: ${{ inputs.elevation || '35' }}
-  BUDGET_MIN: ${{ inputs.budget_min || '20' }}
+  BUDGET_MIN: ${{ inputs.budget_min || '21' }}
   # push runs: put [quick] in the commit message for the quick check set
   QUICK: ${{ inputs.quick || (contains(github.event.head_commit.message, '[quick]') && '1') || '0' }}
 
@@ -130,6 +134,21 @@ jobs:
           ls -l ~/dl/$MH_ASSETS_FILE
           printf 'download MakeHuman CC0 assets\t%s\tok\n' "$SECONDS" >> "$BAKE_OUT/timing.tsv"
 
+      - name: Cache MakeHuman bodyparts05 beard pack (CC0)
+        id: beard-cache
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/dl/${{ env.BEARD_FILE }}
+          key: mh-bodyparts05-cc0-2024-04-14
+
+      - name: Download MakeHuman bodyparts05 beard pack (CC0, second face variant)
+        if: steps.beard-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/dl
+          curl -fsSL --retry 3 --retry-delay 5 -o ~/dl/$BEARD_FILE "$BEARD_URL" \
+            || curl -fsSL --retry 3 --retry-delay 5 -o ~/dl/$BEARD_FILE "$BEARD_URL2" || rm -f ~/dl/$BEARD_FILE
+          ls -l ~/dl/ || true
+
       - name: Fetch MPFB2 source (GPL add-on, used as a tool)
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -156,7 +175,7 @@ jobs:
           set +e
           "$BLENDER" -b --factory-startup -noaudio --python-exit-code 1 -P tools/bake/probe_mpfb.py -- \
             --out "$BAKE_OUT" --assets-zip ~/dl/$MH_ASSETS_FILE --mpfb-zip "$RUNNER_TEMP/mpfb.zip" \
-            --mpfb-src "$GITHUB_WORKSPACE/_mpfb2/src/mpfb"
+            --mpfb-src "$GITHUB_WORKSPACE/_mpfb2/src/mpfb" --beard-zip ~/dl/$BEARD_FILE
           rc=$?
           printf 'probe_mpfb.py\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc")" >> "$BAKE_OUT/timing.tsv"
           exit $rc
@@ -178,7 +197,7 @@ jobs:
           exit $rc
 
       - name: 4 render.py (Cycles CPU, ortho, directions x frames x tiers, hero)
-        timeout-minutes: 25
+        timeout-minutes: 26
         run: |
           set +e
           "$BLENDER" -b --factory-startup -noaudio --python-exit-code 1 -P tools/bake/render.py -- --out "$BAKE_OUT" \

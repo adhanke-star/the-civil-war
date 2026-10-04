@@ -2,27 +2,35 @@
 # bundled interpreter on GitHub Actions (bake leg). Never shipped; never run on the Mac.
 #
 # Stage 3 of the bake: key the poses on the rig by script (no motion data) and save
-# work/posed.blend plus report/poses.json (clip -> frame numbers, fps, ground speed).
+# work/posed.blend plus report/poses.json (clip -> frame numbers, fps, ground speed, checks).
 #
 #   stand   frame 1        shoulder arms, position of the soldier
 #   walk    frames 11-18   8-frame march, musket at right shoulder shift
-#   fire    frames 21-23   aim, fire (recoil), recover
+#   fire    frames 21-23   aim, fire (recoil: shoulders back, muzzle kicks up), recover (piece down)
 #   fallen  frame 31       lying on the back, musket dropped
+#   load    frames 41-45   (second pass) butt on the ground: hand to the cartridge box, charge at
+#                          the muzzle, draw the rammer, ram, prime at the right side
 #
-# Limbs are placed with an analytic two-bone IK toward world targets; hands are solved onto
-# grip points of the musket, so the musket and hands stay together in every frame.
+# Limbs are placed with an analytic two-bone IK toward world targets. Second pass: the fingers
+# on the musket close until they touch the stock (a contact solve against the stock's real
+# cross-section), and arms are pushed clear of the blanket roll, haversack, canteen and
+# cartridge box (spheres written by uniform.py). report/poses.json "checks" holds the measured
+# foot slip, musket-to-shoulder distance, head pitch and arm clearance.
 #
 # HISTORY STATUS: drill positions follow the commonly described Hardee/Casey manual of arms
 # (Inferred, recalled, not yet cited twice). Cadence 110 steps/min and 28 in step for quick
-# time are Inferred. Everything else is a placeholder estimate.
+# time are Inferred. The loading sequence is a reduced, recalled version of the loading drill
+# (Inferred). Everything else is a placeholder estimate.
 #
 # Run:  blender -b --factory-startup -noaudio --python-exit-code 1 -P tools/bake/poses.py -- --out .out/bake
 
+import json
 import math
 import os
 import sys
 
 import bpy
+import numpy as np
 from mathutils import Matrix, Quaternion, Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -40,12 +48,17 @@ G = {
     "pelvis_yaw_deg": 4.0,      #                                             placeholder
     "arm_swing_deg": 16.0,      # free (left) arm swing                       placeholder
     "aim_body_yaw_deg": -40.0,  # body turned right of the line of fire       placeholder
-    "recoil_deg": 7.0,          # muzzle rise at the shot                     placeholder
+    "recoil_deg": 12.0,         # muzzle rise at the shot (second pass: was 7) placeholder
+    "recoil_back_m": 0.05,      # shoulders driven back at the shot           placeholder
+    "finger_r": (0.0095, 0.0085, 0.0075),  # finger radius by segment, for the grip contact placeholder
 }
-FR = {"stand": [1], "walk": list(range(11, 19)), "fire": [21, 22, 23], "fallen": [31]}
+FR = {"stand": [1], "walk": list(range(11, 19)), "fire": [21, 22, 23], "fallen": [31],
+      "load": [41, 42, 43, 44, 45]}
 
 T = C.Timer()
-REP = {"constants": G, "frames": {}, "ik_error_m": {}}
+REP = {"constants": G, "frames": {}, "ik_error_m": {}, "checks": {}}
+GUN = {}
+OBST = []
 
 
 class Poser:
@@ -99,6 +112,18 @@ class Poser:
     def reset(self):
         for p in self.rig.pose.bones:
             p.matrix_basis = Matrix()
+        C.update()
+
+    def arm_bones(self, s):
+        d = self.S[s]
+        names = list(d["upper"]) + list(d["lower"]) + [d["hand"]]
+        for chain in d["fingers"]:
+            names += chain
+        return [n for n in names if n in self.B]
+
+    def reset_arm(self, s):
+        for n in self.arm_bones(s):
+            self.P(n).matrix_basis = Matrix()
         C.update()
 
     def rotate_about(self, n, pivot, q):
@@ -218,6 +243,111 @@ class Poser:
                 ang = thumb * (1.0 if k == 0 else 0.6) if ci == 0 else degs[min(k, 2)]
                 self.rotate_about(bn, self.ph(bn), C.rot(axis, ang))
 
+    # ---- second pass: fingers close on the stock until they touch it
+    def grip_curl(self, s, M, amax=(80.0, 95.0, 75.0), thumb_max=(55.0, 45.0, 40.0)):
+        Minv = M.inverted()
+        touched, total = 0, 0
+        for ci, chain in enumerate(self.S[s]["fingers"]):
+            for k, bn in enumerate(chain):
+                if bn not in self.B:
+                    continue
+                total += 1
+                pb = self.P(bn)
+                base = pb.matrix_basis.copy()
+                palm, _ = self.palm(s)
+                head = self.ph(bn)
+                dvec = (self.pt(bn) - head).normalized()
+                axis = dvec.cross(palm)
+                if axis.length < 1e-6:
+                    continue
+                axis.normalize()
+                lim = (thumb_max if ci == 0 else amax)[min(k, 2)]
+                rad = G["finger_r"][min(k, 2)]
+
+                def test(a, bn=bn, pb=pb, base=base, axis=axis, rad=rad):
+                    pb.matrix_basis = base
+                    C.update()
+                    if a:
+                        self.rotate_about(bn, self.ph(bn), C.rot(axis, a))
+                    return gun_gap(Minv, self.pt(bn)) - rad
+
+                if test(0.0) <= 0.0:
+                    touched += 1
+                    continue
+                if test(lim) > 0.0:
+                    continue
+                lo, hi = 0.0, lim
+                for _ in range(8):
+                    mid = (lo + hi) / 2
+                    if test(mid) > 0.0:
+                        lo = mid
+                    else:
+                        hi = mid
+                test(hi)
+                touched += 1
+        return {"segments_touching": touched, "segments": total}
+
+    def place_on_gun(self, s, M, zg, want_dir, pole, tilt_deg=0.0):
+        """Wrist placed so the palm sits against the stock (or barrel) at gun-local z = zg, on the
+        side given by want_dir (world), fingers wrapping round; then the contact curl."""
+        gx, gy, gz = gun_axes(M)
+        h, w, cy = stock_at(zg)
+        A = M @ Vector((0.0, cy, zg))
+        nv = want_dir - gz * want_dir.dot(gz)
+        nv.normalize()
+        r = (h + w) / 4
+        pc = A + nv * (r + 0.022)
+        t = gz.cross(nv).normalized()
+        sh = self.ph(self.S[s]["upper"][0])
+        if t.dot(pc - sh) < 0:
+            t = -t
+        if tilt_deg:
+            t = (t * math.cos(math.radians(tilt_deg)) + gz * math.sin(math.radians(tilt_deg))).normalized()
+        wrist = pc - t * 0.055
+        err = self.arm(s, wrist, pole)
+        self.hand(s, t, palm_want=-nv)
+        g = self.grip_curl(s, M)
+        return err, g
+
+    # ---- clearance against the kit
+    def obstacles(self):
+        out = []
+        for o in OBST:
+            b = o["bone"]
+            if b not in self.B:
+                continue
+            delta = self.P(b).matrix @ self.B[b].matrix_local.inverted()
+            out.append((o["name"], delta @ Vector(o["p"]), o["r"]))
+        return out
+
+    def arm_pen(self, s):
+        d = self.S[s]
+        sh, el, wr = self.ph(d["upper"][0]), self.ph(d["lower"][0]), self.ph(d["hand"])
+        worst, what = -1.0, None
+        for name, c, r in self.obstacles():
+            for a, b, rs in ((sh, el, 0.052), (el, wr, 0.043)):
+                ab = b - a
+                t = max(0.0, min(1.0, (c - a).dot(ab) / max(1e-9, ab.dot(ab))))
+                pen = r + rs - (a + ab * t - c).length
+                if pen > worst:
+                    worst, what = pen, name
+        return worst, what
+
+    def clear(self, s, solve, kicks=(0.0, 0.02, 0.04, 0.06, 0.08, 0.10, 0.13, 0.16)):
+        best = None
+        for k in kicks:
+            self.reset_arm(s)
+            solve(k)
+            pen, what = self.arm_pen(s)
+            if best is None or pen < best[0]:
+                best = (pen, k, what)
+            if pen < 0.004:
+                break
+        if best[1] != k:
+            self.reset_arm(s)
+            solve(best[1])
+        return {"penetration_m": round(best[0], 4), "kick_m": best[1], "nearest": best[2]}
+
     def key(self, frame):
         for p in self.rig.pose.bones:
             p.keyframe_insert("rotation_quaternion", frame=frame)
@@ -237,10 +367,50 @@ def gun_axes(M):
     return (M.col[0].xyz.normalized(), M.col[1].xyz.normalized(), M.col[2].xyz.normalized())
 
 
+def stock_at(z):
+    """(height, width, centre-y) of the musket cross-section at gun-local z."""
+    prof = GUN.get("prof") or [[0.0, 0.11, 0.042, -0.05], [1.22, 0.03, 0.028, -0.01]]
+    if z >= prof[-1][0]:
+        r = GUN.get("barrel_r", 0.0145)
+        return 2 * r, 2 * r, GUN.get("barrel_y", 0.006)
+    if z <= prof[0][0]:
+        return prof[0][1], prof[0][2], prof[0][3]
+    for a, b in zip(prof[:-1], prof[1:]):
+        if a[0] <= z <= b[0]:
+            t = (z - a[0]) / max(1e-6, b[0] - a[0])
+            return tuple(a[i] + (b[i] - a[i]) * t for i in (1, 2, 3))
+    return prof[-1][1], prof[-1][2], prof[-1][3]
+
+
+def gun_gap(Minv, p):
+    """Distance from a world point to the musket's surface (stock ellipse, barrel circle)."""
+    q = Minv @ p
+    h, w, cy = stock_at(q.z)
+    e = math.hypot(q.x / (w / 2), (q.y - cy) / (h / 2))
+    gap = (e - 1.0) * min(w, h) / 2
+    if q.z >= GUN.get("br0", 0.4) - 0.01 and q.z <= GUN.get("L", 1.42):
+        gb = math.hypot(q.x, q.y - GUN.get("barrel_y", 0.006)) - GUN.get("barrel_r", 0.0145)
+        gap = min(gap, gb)
+    return gap
+
+
 def place_gun(musket, M, frame):
     musket.matrix_basis = M
     musket.keyframe_insert("location", frame=frame)
     musket.keyframe_insert("rotation_quaternion", frame=frame)
+
+
+def key_ramrod(rr, frame, dz=0.0, drawn=False):
+    if rr is None:
+        return
+    L = GUN.get("L", 1.42)
+    if drawn:   # pulled clean out and held above the muzzle, in line with the bore
+        rr.location = (0.0, 0.023, L - GUN.get("ramrod_bottom", 0.55) + 0.03)
+    elif dz:
+        rr.location = (0.0, 0.023, dz)
+    else:
+        rr.location = (0.0, 0.0, 0.0)
+    rr.keyframe_insert("location", frame=frame)
 
 
 # ------------------------------------------------------------------------------ poses
@@ -255,7 +425,7 @@ def pose_stand(ps, musket, frame):
         ank.z = ps.rest_ank[s].z
         err["leg" + s] = ps.leg(s, ank, F)
         ps.foot(s, ps.foot_rest_dir(s, yaw_deg=sg * 28.0))
-    ps.look(F)
+    ps.look(F + U * 0.06)   # second pass: head up, eyes to the front
     shR = ps.ph(ps.S["R"]["upper"][0])
     reach = ps.len["R"]["upper"] + ps.len["R"]["lower"]
     zg = (U - F * 0.05).normalized()
@@ -266,14 +436,24 @@ def pose_stand(ps, musket, frame):
     M = gun_matrix(heel, zg, -F)            # trigger guard to the front
     place_gun(musket, M, frame)
     guard = heel + zg * 0.34
-    err["armR"] = ps.arm("R", guard - L * 0.035 - F * 0.01 + U * 0.065, -F - L * 0.3)
-    ps.hand("R", -U + F * 0.15, palm_want=L)
-    ps.curl("R")
+    grips = {}
+
+    def solve_r(k):
+        err["armR"] = ps.arm("R", guard - L * 0.035 - F * 0.01 + U * 0.065, -F - L * (0.3 + 6.0 * k))
+        ps.hand("R", -U + F * 0.15, palm_want=L)
+        grips["R"] = ps.grip_curl("R", M)
+    REP["checks"].setdefault("clearance", {})["stand_R"] = ps.clear("R", solve_r)
     shL = ps.ph(ps.S["L"]["upper"][0])
     reachL = ps.len["L"]["upper"] + ps.len["L"]["lower"]
-    err["armL"] = ps.arm("L", shL - U * (0.95 * reachL) + F * 0.02 + L * 0.03, -F + L * 0.3)
-    ps.hand("L", -U, palm_want=-L)
-    ps.curl("L", degs=(12, 18, 12), thumb=8)
+
+    def solve_l(k):
+        # arm hangs in front of the haversack, little finger toward the trouser seam
+        err["armL"] = ps.arm("L", shL - U * (0.93 * reachL) + F * (0.05 + 0.4 * k) + L * (0.06 + k),
+                             -F + L * 0.3)
+        ps.hand("L", -U, palm_want=-L)
+        ps.curl("L", degs=(14, 22, 14), thumb=8)
+    REP["checks"]["clearance"]["stand_L"] = ps.clear("L", solve_l)
+    REP.setdefault("grips", {})["stand@%d" % frame] = grips
     ps.key(frame)
     return err
 
@@ -297,7 +477,6 @@ def pose_walk(ps, musket, frame, k):
             lift = G["foot_lift"] * math.sin(math.pi * u)
             pitch = -30.0 * (1 - u) + 12.0 * u
         feet[s] = (x, lift, pitch)
-    # how far down must the pelvis drop for both ankles to be reachable?
     drop = 0.0
     for s in ("L", "R"):
         x, lift, pitch = feet[s]
@@ -321,7 +500,7 @@ def pose_walk(ps, musket, frame, k):
         ank.z += lift + (0.06 * math.sin(math.radians(-pitch)) if pitch < 0 else 0.0)
         err["leg" + s] = ps.leg(s, ank, F)
         ps.foot(s, ps.foot_rest_dir(s, pitch_deg=pitch, yaw_deg=(6.0 if s == "L" else -6.0)))
-    ps.look(F - U * 0.05)
+    ps.look(F + U * 0.02)
     # right shoulder shift
     shR = ps.ph(ps.S["R"]["upper"][0])
     B = shR + F * 0.17 - U * 0.27 + L * 0.07
@@ -331,30 +510,44 @@ def pose_walk(ps, musket, frame, k):
     place_gun(musket, M, frame)
     gx, gy, gz = gun_axes(M)
     grip = M @ Vector((0, -0.07, 0.035))
-    err["armR"] = ps.arm("R", grip - gy * 0.035 - gz * 0.05, -U - L * 0.4)
-    ps.hand("R", gz, palm_want=gy)
-    ps.curl("R")
+    grips = {}
+
+    def solve_r(kk):
+        err["armR"] = ps.arm("R", grip - gy * 0.035 - gz * 0.05, -U - L * (0.4 + 6.0 * kk))
+        ps.hand("R", gz, palm_want=gy)
+        grips["R"] = ps.grip_curl("R", M)
+    REP["checks"].setdefault("clearance", {})["walk%d_R" % k] = ps.clear("R", solve_r)
     shL = ps.ph(ps.S["L"]["upper"][0])
     reachL = ps.len["L"]["upper"] + ps.len["L"]["lower"]
     swing = G["arm_swing_deg"] * math.cos(2 * math.pi * p)
     down = C.rot(L, swing) @ (-U)
-    err["armL"] = ps.arm("L", shL + down * (0.93 * reachL) + L * 0.03, -F + L * 0.2)
-    ps.hand("L", down + F * 0.1, palm_want=-L)
-    ps.curl("L", degs=(15, 25, 15), thumb=8)
+
+    def solve_l(kk):
+        err["armL"] = ps.arm("L", shL + down * (0.93 * reachL) + L * (0.03 + kk) + F * (0.3 * kk), -F + L * 0.2)
+        ps.hand("L", down + F * 0.1, palm_want=-L)
+        ps.curl("L", degs=(15, 25, 15), thumb=8)
+    REP["checks"]["clearance"]["walk%d_L" % k] = ps.clear("L", solve_l)
+    # check: the musket's axis passes over the shoulder
+    a = M.translation
+    sh_top = shR + U * 0.06
+    d_axis = ((sh_top - a) - gz * (sh_top - a).dot(gz)).length
+    REP["checks"].setdefault("musket_axis_to_shoulder_top_m", {})["walk%d" % k] = round(d_axis, 4)
+    REP.setdefault("grips", {})["walk@%d" % frame] = grips
     ps.key(frame)
     return err
 
 
 def pose_fire(ps, musket, frame, stage):
+    """stage 0 aim, 1 fire (recoil), 2 recover (piece brought down to the priming position)."""
     F, L, U = ps.F, ps.L, ps.U
     ps.reset()
-    yaw = G["aim_body_yaw_deg"]
-    back = {0: 0.0, 1: 0.022, 2: 0.010}[stage]
-    rise = {0: -1.0, 1: G["recoil_deg"], 2: 3.0}[stage]
+    yaw = G["aim_body_yaw_deg"] + (4.0 if stage == 1 else 0.0)
+    back = {0: 0.0, 1: G["recoil_back_m"], 2: 0.0}[stage]
+    rise = {0: -1.0, 1: G["recoil_deg"], 2: 0.0}[stage]
     ps.translate(ps.rm["root"], -U * 0.025 - F * back)
     ps.root_rotate(C.rot(U, yaw))
     ps.spine(U, -yaw * 0.30)
-    ps.spine(L, 6.0 - 3.0 * (stage == 1))
+    ps.spine(L, {0: 6.0, 1: -4.0, 2: 3.0}[stage])     # leans into the aim; rocked back at the shot
     err = {}
     ankL = ps.ank_mid + L * G["fire_half_width"] + F * 0.20
     ankR = ps.ank_mid - L * G["fire_half_width"] - F * 0.16
@@ -362,23 +555,38 @@ def pose_fire(ps, musket, frame, stage):
     err["legR"] = ps.leg("R", ankR, F - L * 0.6)
     ps.foot("L", ps.foot_rest_dir("L", yaw_deg=-12.0))
     ps.foot("R", ps.foot_rest_dir("R", yaw_deg=-72.0))
-    ps.look(F - U * 0.12, roll_deg=-14.0)
-    shR = ps.ph(ps.S["R"]["upper"][0])
-    P = shR + F * 0.03 + L * 0.07 + U * 0.03
-    zdir = C.rot(L, -rise) @ F
-    M0 = gun_matrix(P, zdir, U)
-    gx, gy, gz = gun_axes(M0)
-    M = gun_matrix(P + gy * 0.05, zdir, U)
-    place_gun(musket, M, frame)
-    gx, gy, gz = gun_axes(M)
-    gripL = M @ Vector((0, -0.02, 0.62))
-    err["armL"] = ps.arm("L", gripL - gy * 0.04 + gx * 0.035 - gz * 0.03, -U + L * 0.2)
-    ps.hand("L", (-gx + gy * 0.3), palm_want=gy)
-    ps.curl("L", degs=(40, 50, 40), thumb=25)
-    gripR = M @ Vector((0, -0.02, 0.30))
-    err["armR"] = ps.arm("R", gripR - gx * 0.04 - gy * 0.03 - gz * 0.06, -L - U * 0.3)
-    ps.hand("R", (gx * 0.5 - gy * 0.5 + gz * 0.6), palm_want=gx)
-    ps.curl("R")
+    grips = {}
+    if stage < 2:
+        ps.look(F - U * (0.12 if stage == 0 else 0.02), roll_deg=-14.0 if stage == 0 else -8.0)
+        shR = ps.ph(ps.S["R"]["upper"][0])
+        P0 = shR + F * 0.03 + L * 0.07 + U * 0.03
+        zdir = C.rot(L, -rise) @ F
+        M0 = gun_matrix(P0, zdir, U)
+        gx, gy, gz = gun_axes(M0)
+        M = gun_matrix(P0 + gy * 0.05, zdir, U)
+        place_gun(musket, M, frame)
+        gx, gy, gz = gun_axes(M)
+        gripL = M @ Vector((0, -0.02, 0.62))
+        err["armL"] = ps.arm("L", gripL - gy * 0.04 + gx * 0.035 - gz * 0.03, -U + L * 0.2)
+        ps.hand("L", (-gx + gy * 0.3), palm_want=gy)
+        grips["L"] = ps.grip_curl("L", M)
+        gripR = M @ Vector((0, -0.02, 0.30))
+        err["armR"] = ps.arm("R", gripR - gx * 0.04 - gy * 0.03 - gz * 0.06, -L - U * 0.3)
+        ps.hand("R", (gx * 0.5 - gy * 0.5 + gz * 0.6), palm_want=gx)
+        grips["R"] = ps.grip_curl("R", M)
+    else:
+        # recover: the piece comes down off the shoulder, butt at the right hip, muzzle up and
+        # forward, ready to load again
+        ps.look(F * 0.9 - U * 0.25)
+        hipR = ps.ph(ps.S["R"]["thigh"][0])
+        Fy = C.rot(U, yaw * 0.7) @ F
+        heel = hipR + Fy * 0.16 + U * 0.04 - L * 0.02
+        zdir = (Fy * 0.62 + U * 0.75 + L * 0.22).normalized()
+        M = gun_matrix(heel, zdir, U)
+        place_gun(musket, M, frame)
+        err["armL"], grips["L"] = ps.place_on_gun("L", M, 0.62, -U + L * 0.3, -U + L * 0.5)
+        err["armR"], grips["R"] = ps.place_on_gun("R", M, 0.33, -L - U * 0.2, -U - L * 0.6)
+    REP.setdefault("grips", {})["fire%d@%d" % (stage, frame)] = grips
     ps.key(frame)
     return err
 
@@ -427,12 +635,115 @@ def pose_fallen(ps, musket, frame):
     return err
 
 
+def pose_load(ps, musket, frame, step, rr):
+    """0 hand to the cartridge box, 1 charge at the muzzle, 2 draw the rammer, 3 ram, 4 prime."""
+    F, L, U = ps.F, ps.L, ps.U
+    ps.reset()
+    err = {}
+    ankL = ps.ank_mid + L * 0.08 + F * 0.04
+    ankL.z = ps.rest_ank["L"].z
+    ankR = ps.ank_mid - L * 0.10 - F * 0.12
+    ankR.z = ps.rest_ank["R"].z
+    ps.translate(ps.rm["root"], -U * 0.012)
+    err["legL"] = ps.leg("L", ankL, F)
+    err["legR"] = ps.leg("R", ankR, F - L * 0.3)
+    ps.foot("L", ps.foot_rest_dir("L", yaw_deg=10.0))
+    ps.foot("R", ps.foot_rest_dir("R", yaw_deg=-35.0))
+    ps.spine(L, 5.0 if step < 4 else 2.0)
+    Lg = GUN.get("L", 1.42)
+    grips = {}
+    if step < 4:
+        heel = ps.ank_mid + F * 0.20 + L * 0.06
+        heel.z = 0.0
+        zdir = (U - F * 0.12 + L * 0.03).normalized()
+        M = gun_matrix(heel, zdir, -F)
+        place_gun(musket, M, frame)
+        muzzle = M @ Vector((0.0, GUN.get("barrel_y", 0.006), Lg))
+        ps.look((muzzle - ps.ph(ps.rm["head"])).normalized() * 0.7 + F * 0.3)
+        err["armL"], grips["L"] = ps.place_on_gun("L", M, 0.98, L * 0.8 - F * 0.4, -U + L * 0.6)
+        if step == 0:
+            box = next((c for n, c, r in ps.obstacles() if n == "cartridge box"), None)
+            tgt = (box + U * 0.10) if box is not None else ps.ph(ps.S["R"]["thigh"][0]) - F * 0.12
+            err["armR"] = ps.arm("R", tgt, -L - F * 0.3)
+            ps.hand("R", -U - F * 0.3, palm_want=-F)
+            ps.curl("R", degs=(30, 40, 30), thumb=25)
+            key_ramrod(rr, frame)
+        elif step == 1:
+            err["armR"] = ps.arm("R", muzzle + U * 0.07 - F * 0.04 - L * 0.03, -U - L * 0.5)
+            ps.hand("R", -U + F * 0.4, palm_want=L)
+            ps.curl("R", degs=(35, 45, 35), thumb=30)
+            key_ramrod(rr, frame)
+        elif step == 2:
+            key_ramrod(rr, frame, drawn=True)
+            hold = M @ Vector((0.0, GUN.get("barrel_y", 0.006), Lg + 0.62))
+            err["armR"] = ps.arm("R", hold - F * 0.05 - L * 0.04, -L - U * 0.2)
+            ps.hand("R", U * 0.2 + L, palm_want=-L)
+            ps.curl("R", degs=(60, 70, 50), thumb=40)
+        else:
+            key_ramrod(rr, frame, dz=0.20)
+            head = M @ Vector((0.0, GUN.get("barrel_y", 0.006), Lg + 0.20))
+            err["armR"] = ps.arm("R", head + U * 0.07 - F * 0.02, -L - U * 0.3)
+            ps.hand("R", -U + L * 0.2, palm_want=-U)
+            ps.curl("R", degs=(30, 40, 30), thumb=20)
+    else:
+        key_ramrod(rr, frame)
+        hipR = ps.ph(ps.S["R"]["thigh"][0])
+        heel = hipR + F * 0.18 + U * 0.02 + L * 0.02
+        zdir = (F * 0.55 + U * 0.80 + L * 0.22).normalized()
+        M = gun_matrix(heel, zdir, U)
+        place_gun(musket, M, frame)
+        ps.look(F * 0.8 - U * 0.4)
+        err["armL"], grips["L"] = ps.place_on_gun("L", M, 0.60, -U + L * 0.3, -U + L * 0.5)
+        err["armR"], grips["R"] = ps.place_on_gun("R", M, 0.36, -L, -U - L * 0.6)
+    REP.setdefault("grips", {})["load%d@%d" % (step, frame)] = grips
+    ps.key(frame)
+    return err
+
+
+# ------------------------------------------------------------------------------ checks
+
+def sole_points(side):
+    o = bpy.data.objects.get("tcw_brogan_sole_" + side)
+    if o is None:
+        return None
+    mw = o.matrix_world
+    return np.array([(mw @ v.co)[:] for v in o.data.vertices])
+
+
+def foot_slip(soles, F, shift):
+    """Ground-relative slip of sole vertices that touch the ground in two consecutive walk
+    frames. The treadmill ground moves `shift` metres backward (-F) per frame."""
+    f2 = np.array([F.x, F.y, 0.0])
+    out = {}
+    for s, frames in soles.items():
+        worst, n = 0.0, 0
+        for k in range(len(frames)):
+            a, b = frames[k], frames[(k + 1) % len(frames)]
+            if a is None or b is None:
+                continue
+            m = (a[:, 2] < 0.006) & (b[:, 2] < 0.006)
+            if not m.any():
+                continue
+            disp = (b - a)[m]
+            disp[:, 2] = 0.0
+            err = disp + f2 * shift
+            worst = max(worst, float(np.linalg.norm(err, axis=1).max()))
+            n += int(m.sum())
+        out[s] = {"max_slip_m": round(worst, 4), "contact_samples": n}
+    return out
+
+
 def main():
     bpy.ops.wm.open_mainfile(filepath=os.path.join(C.WORK, "soldier.blend"))
     T.mark("open soldier.blend")
+    sc = bpy.context.scene
+    GUN.update(json.loads(sc.get("tcw_musket", "{}")))
+    OBST.extend(json.loads(sc.get("tcw_obstacles", "[]")))
+    REP["obstacles"] = len(OBST)
     rig, rm = C.find_rig(), C.rigmap()
     musket = bpy.data.objects["tcw_musket"]
     musket.rotation_mode = "QUATERNION"
+    rr = bpy.data.objects.get("tcw_ramrod")
     # pose fast: switch off every mesh modifier while bones are solved (render state restored below)
     saved = []
     for o in bpy.data.objects:
@@ -444,24 +755,37 @@ def main():
     ps = Poser(rig, rm)
     REP["frame_basis"] = {"F": list(ps.F), "L": list(ps.L)}
     REP["limb_lengths_m"] = ps.len
-    scene = bpy.context.scene
 
     def run(name, frame, fn):
         t = C.time.time()
-        scene.frame_set(frame)
+        sc.frame_set(frame)
         err = fn()
         REP["ik_error_m"]["%s@%d" % (name, frame)] = {k: round(v, 4) for k, v in err.items()}
         REP["frames"]["%s@%d" % (name, frame)] = round(C.time.time() - t, 2)
 
     run("stand", 1, lambda: pose_stand(ps, musket, 1))
+    key_ramrod(rr, 1)
+    hd = ps.face_dir()
+    REP["checks"]["stand_head"] = {"pitch_deg": round(math.degrees(math.asin(max(-1, min(1, hd.dot(ps.U))))), 1),
+                                   "yaw_deg": round(math.degrees(math.atan2(hd.dot(ps.L), hd.dot(ps.F))), 1)}
+    soles = {"L": [], "R": []}
     for k, f in enumerate(FR["walk"]):
         run("walk", f, lambda k=k, f=f: pose_walk(ps, musket, f, k))
+        key_ramrod(rr, f)
+        C.update()
+        for s in ("L", "R"):
+            soles[s].append(sole_points(s))
     for st, f in enumerate(FR["fire"]):
         run("fire", f, lambda st=st, f=f: pose_fire(ps, musket, f, st))
+        key_ramrod(rr, f)
     run("fallen", 31, lambda: pose_fallen(ps, musket, 31))
+    key_ramrod(rr, 31)
+    for st, f in enumerate(FR["load"]):
+        run("load", f, lambda st=st, f=f: pose_load(ps, musket, f, st, rr))
     T.mark("posed all frames")
 
-    for ob in (rig, musket):
+    ad_objs = [rig, musket] + ([rr] if rr else [])
+    for ob in ad_objs:
         ad = ob.animation_data
         if ad and ad.action:
             for fc in ad.action.fcurves:
@@ -469,19 +793,23 @@ def main():
                     kp.interpolation = "CONSTANT"
     for md in saved:
         md.show_viewport = True
-    scene.frame_start, scene.frame_end = 1, 31
+    sc.frame_start, sc.frame_end = 1, 45
     worst = max((v for d in REP["ik_error_m"].values() for v in d.values()), default=0.0)
     REP["ik_error_worst_m"] = worst
     cycle_s = 2.0 * 60.0 / G["steps_per_min"]
     metres_cycle = 2 * G["stance_half_m"] / G["stance_frac"]  # what the planted feet actually cover
+    REP["checks"]["walk_foot_slip"] = foot_slip(soles, ps.F, metres_cycle / len(FR["walk"]))
     clips = {
         "stand": {"frames": FR["stand"], "fps": 1, "loop": False},
         "walk": {"frames": FR["walk"], "fps": round(8 / cycle_s, 3), "loop": True,
                  "metres_per_cycle": round(metres_cycle, 3),
                  "speed_mps": round(metres_cycle / cycle_s, 3),
                  "drill_metres_per_cycle": round(2 * G["step_m"], 3)},
-        "fire": {"frames": FR["fire"], "fps": 8, "loop": False},
+        "fire": {"frames": FR["fire"], "fps": 8, "loop": False,
+                 "note": "0 aim, 1 fire (recoil; the game adds the flash), 2 recover"},
         "fallen": {"frames": FR["fallen"], "fps": 1, "loop": False},
+        "load": {"frames": FR["load"], "fps": 2, "loop": False,
+                 "note": "0 hand to cartridge box, 1 charge at the muzzle, 2 draw rammer, 3 ram, 4 prime"},
     }
     REP["clips"] = clips
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(C.WORK, "posed.blend"), compress=False)
