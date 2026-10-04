@@ -48,8 +48,8 @@ G = {
     "pelvis_yaw_deg": 4.0,      #                                             placeholder
     "arm_swing_deg": 16.0,      # free (left) arm swing                       placeholder
     "aim_body_yaw_deg": -40.0,  # body turned right of the line of fire       placeholder
-    "recoil_deg": 12.0,         # muzzle rise at the shot (second pass: was 7) placeholder
-    "recoil_back_m": 0.05,      # shoulders driven back at the shot           placeholder
+    "recoil_deg": 16.0,         # muzzle rise at the shot (second pass: was 7) placeholder
+    "recoil_back_m": 0.07,      # shoulders driven back at the shot           placeholder
     "finger_r": (0.0095, 0.0085, 0.0075),  # finger radius by segment, for the grip contact placeholder
 }
 FR = {"stand": [1], "walk": list(range(11, 19)), "fire": [21, 22, 23], "fallen": [31],
@@ -289,7 +289,10 @@ class Poser:
 
     def place_on_gun(self, s, M, zg, want_dir, pole, tilt_deg=0.0):
         """Wrist placed so the palm sits against the stock (or barrel) at gun-local z = zg, on the
-        side given by want_dir (world), fingers wrapping round; then the contact curl."""
+        side given by want_dir (world), fingers wrapping round; then the contact curl. Run 5
+        showed some hands never touching the stock, so four hand orientations (which way the
+        fingers point round the stock, which way the palm faces) are tried and the one with the
+        most finger segments in contact is kept."""
         gx, gy, gz = gun_axes(M)
         h, w, cy = stock_at(zg)
         A = M @ Vector((0.0, cy, zg))
@@ -297,16 +300,30 @@ class Poser:
         nv.normalize()
         r = (h + w) / 4
         pc = A + nv * (r + 0.022)
-        t = gz.cross(nv).normalized()
+        t0 = gz.cross(nv).normalized()
         sh = self.ph(self.S[s]["upper"][0])
-        if t.dot(pc - sh) < 0:
-            t = -t
-        if tilt_deg:
-            t = (t * math.cos(math.radians(tilt_deg)) + gz * math.sin(math.radians(tilt_deg))).normalized()
-        wrist = pc - t * 0.055
-        err = self.arm(s, wrist, pole)
-        self.hand(s, t, palm_want=-nv)
-        g = self.grip_curl(s, M)
+        if t0.dot(pc - sh) < 0:
+            t0 = -t0
+
+        def attempt(tsign, psign):
+            self.reset_arm(s)
+            t = t0 * tsign
+            if tilt_deg:
+                t = (t * math.cos(math.radians(tilt_deg)) + gz * math.sin(math.radians(tilt_deg))).normalized()
+            err = self.arm(s, pc - t * 0.055, pole)
+            self.hand(s, t, palm_want=-nv * psign)
+            return err, self.grip_curl(s, M)
+
+        best = None
+        for tsign, psign in ((1, 1), (-1, 1), (1, -1), (-1, -1)):
+            err, g = attempt(tsign, psign)
+            score = g["segments_touching"] - 20.0 * max(0.0, err - 0.01)
+            if best is None or score > best[0]:
+                best = (score, tsign, psign)
+            if g["segments_touching"] >= 10 and err < 0.01:
+                break
+        err, g = attempt(best[1], best[2])
+        g["orientation"] = [best[1], best[2]]
         return err, g
 
     # ---- clearance against the kit
@@ -333,7 +350,7 @@ class Poser:
                     worst, what = pen, name
         return worst, what
 
-    def clear(self, s, solve, kicks=(0.0, 0.02, 0.04, 0.06, 0.08, 0.10, 0.13, 0.16)):
+    def clear(self, s, solve, kicks=(0.0, 0.02, 0.04, 0.06, 0.08, 0.10, 0.13, 0.16, 0.20, 0.24)):
         best = None
         for k in kicks:
             self.reset_arm(s)
@@ -547,7 +564,7 @@ def pose_fire(ps, musket, frame, stage):
     ps.translate(ps.rm["root"], -U * 0.025 - F * back)
     ps.root_rotate(C.rot(U, yaw))
     ps.spine(U, -yaw * 0.30)
-    ps.spine(L, {0: 6.0, 1: -4.0, 2: 3.0}[stage])     # leans into the aim; rocked back at the shot
+    ps.spine(L, {0: 6.0, 1: -7.0, 2: 3.0}[stage])     # leans into the aim; rocked back at the shot
     err = {}
     ankL = ps.ank_mid + L * G["fire_half_width"] + F * 0.20
     ankR = ps.ank_mid - L * G["fire_half_width"] - F * 0.16
@@ -566,14 +583,9 @@ def pose_fire(ps, musket, frame, stage):
         M = gun_matrix(P0 + gy * 0.05, zdir, U)
         place_gun(musket, M, frame)
         gx, gy, gz = gun_axes(M)
-        gripL = M @ Vector((0, -0.02, 0.62))
-        err["armL"] = ps.arm("L", gripL - gy * 0.04 + gx * 0.035 - gz * 0.03, -U + L * 0.2)
-        ps.hand("L", (-gx + gy * 0.3), palm_want=gy)
-        grips["L"] = ps.grip_curl("L", M)
-        gripR = M @ Vector((0, -0.02, 0.30))
-        err["armR"] = ps.arm("R", gripR - gx * 0.04 - gy * 0.03 - gz * 0.06, -L - U * 0.3)
-        ps.hand("R", (gx * 0.5 - gy * 0.5 + gz * 0.6), palm_want=gx)
-        grips["R"] = ps.grip_curl("R", M)
+        # left hand cradles the forestock from below; right hand round the wrist of the stock
+        err["armL"], grips["L"] = ps.place_on_gun("L", M, 0.62, -gy + gx * 0.25, -U + L * 0.2)
+        err["armR"], grips["R"] = ps.place_on_gun("R", M, 0.31, -gx - gy * 0.3, -L - U * 0.3)
     else:
         # recover: the piece comes down off the shoulder, butt at the right hip, muzzle up and
         # forward, ready to load again
@@ -675,7 +687,7 @@ def pose_load(ps, musket, frame, step, rr):
             key_ramrod(rr, frame)
         elif step == 2:
             key_ramrod(rr, frame, drawn=True)
-            hold = M @ Vector((0.0, GUN.get("barrel_y", 0.006), Lg + 0.62))
+            hold = M @ Vector((0.0, GUN.get("barrel_y", 0.006), Lg + 0.38))   # run 5: +0.62 was out of reach
             err["armR"] = ps.arm("R", hold - F * 0.05 - L * 0.04, -L - U * 0.2)
             ps.hand("R", U * 0.2 + L, palm_want=-L)
             ps.curl("R", degs=(60, 70, 50), thumb=40)

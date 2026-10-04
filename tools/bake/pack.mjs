@@ -175,18 +175,23 @@ function contactSheet(render, clips) {
   const row3 = [
     path.join(dir, `fire_0_d${dd(wd)}.png`), path.join(dir, `fire_1_d${dd(wd)}.png`),
     path.join(dir, `fire_2_d${dd(wd)}.png`), path.join(dir, `fallen_0_d${dd(wd)}.png`),
-    ...['slouch', 'bayonet', 'noroll', 'face2'].map((v) => path.join(OUT, 'variants', `${v}.png`)),
+    ...[0, 1, 2, 3].map((i) => path.join(dir, `load_${i}_d${dd(wd)}.png`)),
   ];
   row3.forEach((f, i) => cells.push(cell(3, i, f)));
-  const fdir = path.join(OUT, 'frames', 'field');
   const row4 = [
+    path.join(dir, `load_4_d${dd(wd)}.png`),
+    ...['slouch', 'bayonet', 'noroll', 'face2', 'mixed'].map((v) => path.join(OUT, 'variants', `${v}.png`)),
+  ];
+  row4.forEach((f, i) => cells.push(cell(4, i, f)));
+  const fdir = path.join(OUT, 'frames', 'field');
+  const row5 = [
     path.join(fdir, `stand_0_d${dd(0)}.png`), path.join(fdir, `stand_0_d${dd(wd)}.png`),
     path.join(fdir, `walk_0_d${dd(wd)}.png`), path.join(fdir, `fire_1_d${dd(wd)}.png`),
     path.join(fdir, `load_2_d${dd(wd)}.png`),
     ...['slouch', 'face2', 'mixed'].map((v) => path.join(OUT, 'frames', `field_${v}`, `stand_0_d${dd(wd)}.png`)),
   ];
-  row4.forEach((f, i) => cells.push(cell(4, i, f)));
-  const sheet = new PNG({ width: 8 * S, height: 5 * S });
+  row5.forEach((f, i) => cells.push(cell(5, i, f)));
+  const sheet = new PNG({ width: 8 * S, height: 6 * S });
   fill(sheet, hex('#7f8d4e'));
   let placed = 0;
   for (const c of cells) {
@@ -214,8 +219,9 @@ function contactSheet(render, clips) {
       'row 1: stand, directions 0-7 (0 faces the viewer, 4 faces screen-right)',
       'row 2: stand, directions 8-15',
       `row 3: walk cycle frames 0-7, direction ${wd}`,
-      `row 4: aim, fire, recover, fallen (direction ${wd}); variants: slouch hat, fixed bayonet, no blanket roll, second face`,
-      `row 5: field tier (96 px) at 1:1: stand d0 and d${wd}, walk, fire, load (d${wd}); field variants slouch, face2, mixed (stand d${wd})`,
+      `row 4: aim, fire, recover, fallen; load 0-3: hand to cartridge box, charge, draw rammer, ram (direction ${wd})`,
+      `row 5: load 4 (prime); variants (stand, d${wd}): slouch hat, fixed bayonet, no blanket roll, second face, mixed (slouch + second face + no roll)`,
+      `row 6: field tier (96 px) at 1:1: stand d0 and d${wd}, walk, fire, load (d${wd}); field-tier variants slouch, face2, mixed (stand d${wd}) where rendered`,
     ],
   };
 }

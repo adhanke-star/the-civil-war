@@ -1310,7 +1310,9 @@ def build_blanket_roll(m, pts, outs, across, rig, skin, obst_bone=None):
     (hip) end of the loop, so dropping the first/last bins opens it there."""
     R = D["blanket_roll_r"]
     n = len(pts)
-    gap = max(2, n // 24)
+    # run 5: with the ends at the hip the roll crossed the hanging right forearm; the ends now
+    # stop higher on the flank and taper, so the arm hangs outside them
+    gap = max(3, n // 10)
     idx = list(range(gap, n - gap))
     seg = 18
     rings, cents, axes = [], [], []
@@ -1318,8 +1320,10 @@ def build_blanket_roll(m, pts, outs, across, rig, skin, obst_bone=None):
         c = pts[i] + outs[i] * (R * 0.82)
         u = outs[i]
         v = across
+        axes.append((u, v))
         tw = 2 * math.pi * 3.0 * k / len(idx)       # the layer edge winds three times round
-        wob = 1.0 + 0.04 * noise.noise(Vector((k * 0.35, 0.0, 0.0)))
+        e = min(k, len(idx) - 1 - k) / max(1, len(idx) - 1)
+        wob = (1.0 + 0.04 * noise.noise(Vector((k * 0.35, 0.0, 0.0)))) * (0.80 + 0.20 * C.smoothstep(0.0, 0.08, e))
         ring = []
         for j in range(seg):
             a = 2 * math.pi * j / seg
@@ -1370,7 +1374,25 @@ def build_blanket_roll(m, pts, outs, across, rig, skin, obst_bone=None):
         k = int(fr * (len(cents) - 1))
         k2 = min(len(cents) - 1, k + 1)
         ax = (cents[k2] - cents[max(0, k - 1)]).normalized()
-        tparts.append(torus(cents[k], ax, R * 1.04 + 0.002, 0.0035, n=18, m=6))
+        u, v = axes[k]
+        e = min(k, len(cents) - 1 - k) / max(1, len(cents) - 1)
+        sc_ = 0.80 + 0.20 * C.smoothstep(0.0, 0.08, e)
+        # a cord drawn tight round the (squashed) roll: an ellipse matching its section
+        tv_, tf_ = [], []
+        nn_, mm_ = 20, 6
+        for a_i in range(nn_):
+            a = 2 * math.pi * a_i / nn_
+            cc = cents[k] + u * (math.cos(a) * R * 0.82 * sc_ * 0.97) + v * (math.sin(a) * R * 1.08 * sc_ * 0.97)
+            dd = (u * (math.cos(a) * 0.82) + v * (math.sin(a) * 1.08)).normalized()
+            for b_i in range(mm_):
+                b = 2 * math.pi * b_i / mm_
+                tv_.append(cc + (dd * math.cos(b) + ax * math.sin(b)) * 0.0035)
+        for a_i in range(nn_):
+            a2 = (a_i + 1) % nn_
+            for b_i in range(mm_):
+                b2 = (b_i + 1) % mm_
+                tf_.append((a_i * mm_ + b_i, a_i * mm_ + b2, a2 * mm_ + b2, a2 * mm_ + b_i))
+        tparts.append((tv_, tf_))
     v, f = C.merge(tparts)
     ties = C.mesh_object("tcw_blanket_ties", v, f)
     C.assign(ties, m["webbing"])

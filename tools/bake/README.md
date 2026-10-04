@@ -12,11 +12,14 @@ interpreter on CI. Each file says so at the top. Everything outside Blender is N
 
 - Push to the `bake` branch with a change under `tools/bake/**` or `.github/workflows/bake.yml`.
   This triggers `.github/workflows/bake.yml`.
-- Or run `gh workflow run bake.yml --ref bake -f samples_close=48 -f directions=16`. GitHub only
+- Or run `gh workflow run bake.yml --ref bake -f samples_close=32 -f directions=16`. GitHub only
   lists `workflow_dispatch` once the workflow file is on the default branch. Until then, the push
   trigger is the way in.
-- Watch it with `gh run watch <id>`. Fetch results with `gh run download <id> -D .out/bake-run`.
-  Download only into `.out/`.
+- Put `[quick]` in the commit message for a quick check run (hero, close-up, variants and a few
+  frames, about 6 minutes) instead of the full matrix.
+- Watch it with `gh run watch <id>`. Each run uploads two artifacts: `bake-<n>` (everything) and
+  `preview-<n>` (contact sheet, hero preview, close-up preview, reports; under 3 MB). Fetch the
+  small one with `gh run download <id> -n preview-<n> -D .out/<folder>`. Download only into `.out/`.
 
 Stages (each one is a separate Blender process, timed in the job summary):
 
