@@ -107,7 +107,56 @@ Direction rule: direction `d` faces `d * 360/N` degrees counter-clockwise, seen 
 "toward the camera". So 0 faces the viewer, 4 faces screen-right and 8 faces away. The camera
 never moves. The figure turns, so the one standard light always reads as upper-left on screen.
 
-## Measured numbers
+## Measured numbers, second pass
+
+Two full runs on the same pipeline, one runner fast and one slow (ubuntu-latest, 4 vCPU, Cycles CPU;
+runner speed varied **1.9x** between them):
+
+| | run 37168455918 (final code, slow runner) | run 37167400762 (fast runner) |
+|---|---|---|
+| job wall time | **22.0 min** | 18.9 min |
+| close tier, 256 px @ 32 spp | 4.28 s/frame, 152 frames (stand 16 dirs, other clips 8) | 2.26 s/frame, 216 frames (stand and walk 16, others 8) |
+| field tier, 96 px @ 16 spp | 0.72 s/frame, 288 frames (all clips, 16 dirs) | 0.43 s/frame, 288 frames |
+| hero 1024 px @ 96 spp / close-up 1024 px @ 72 spp | 82 s / 81 s | 46 s / 45 s |
+| field-tier variants | `mixed` only (`face2`, `slouch` dropped by the budget) | `mixed`, `face2`, `slouch` (about 2 min each) |
+| close atlas | 3 pages: 2048x1804, 2048x1960, 2048x196; 3.35 MB | 3 pages, 4.63 MB |
+| field atlas (each variant the same) | 1024x1736, 1.27 MB | 1024x1728, 1.27 MB |
+| manifest | 162 KB | 295 KB |
+
+The fast run cut directions one clip late because of an estimator bug (it counted clips already
+rendered); the final code counts only clips still to render. **Cost of each field-tier variant**:
+288 frames, about 2 min on a fast runner and about 3.5 min on a slow one, plus 1.3 MB of atlas.
+
+- **Framing**: the stand clip is now framed at 1.93 m (132 px/m close, 49.6 px/m field), against
+  3.0 m (85 px/m) in the first pass, so **+56% pixels per metre**. The other clips: walk 2.71 m,
+  fire 2.51 m, fallen 2.26 m, load 2.52 m (the musket's reach sets their scale).
+- **Ground shadow**: 0.29 m per metre of height (first pass 0.70).
+- **Pose checks** (`poses.json` `checks`):
+  - walk foot slip: at most **1.65 cm** for sole points in ground contact in consecutive frames;
+  - musket axis: 2.4 cm from the shoulder-top point in every walk frame;
+  - stand head: pitch +3.4 degrees, yaw 0;
+  - arm clearance: every arm clears the kit, except the left arm in walk frames 3-5, which grazes
+    the roll/canteen by 6-7 mm;
+  - worst IK miss: 4.7 cm, the left hand in the aim frame.
+- **Grip** (finger segments touching the stock, of 15): stand 6, walk 11, fire 2-5, load 1-4.
+  The fire and load hands close into a fist next to the stock rather than round it.
+- **Geometry**: 101,806 triangles at viewport levels (the render adds subdivision).
+
+### Colours the parts land at (sRGB in `hero.png`, Standard view transform)
+
+Median of all directly visible pixels, and "lit" = the brightest third (the side the key light hits):
+
+| part | median | lit | albedo in `uniform.py` |
+|---|---|---|---|
+| sack coat | #24293e | #3f4760 | #1a2550 |
+| trousers | #51677d | #758fb2 | #7393c4 |
+| cartridge belt (leather) | #212023 | #3d3835 | #121110 |
+| blanket roll | #4e4b43 | #71685a | #5a5246 |
+| skin (face) | #7e5744 | #876851 | MakeHuman CC0 texture + sunburn/stubble |
+
+The waist belt had too few visible samples (2) to report.
+
+## Measured numbers, first pass (for comparison)
 
 Measured on run 37160936587 (2026-10-03). The runner was ubuntu-latest with 4 vCPU and Cycles on
 CPU. Speed varies between runners by about 30% (close tier: 3.1 s, 3.7 s and 4.0 s per frame on
