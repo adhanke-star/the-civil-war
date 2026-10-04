@@ -91,6 +91,7 @@ G = {
     "wrist_bend_cost": 0.30,    # score lost per degree beyond that (run 16: 0.15 kept 80 deg walk wrists) placeholder
     "pad_percentile": 50.0,     # finger pad thickness: percentile of pad-side skin distance (run 14: 80 left 3-8 mm gaps) placeholder
     "contact_mm": 3.0,          # a mesh vertex this close to the surface is in contact                placeholder
+    "mesh_top": 5,             # best model placements finished and judged on the real skin          placeholder
     "refine_iters": 8,          # mesh refine passes per hand                                          placeholder
     "refine_band_mm": (-0.8, 1.2),  # a segment whose nearest skin is inside this band is done         placeholder
 }
@@ -556,6 +557,27 @@ class Poser:
                 break
         return {"iters": it, "moves": moves}
 
+    def mesh_eval(self, s, surf, extra=()):
+        """Real-skin contact for one hand: segments within contact_mm of surf, thumb segments,
+        deepest penetration into surf or any extra surface (mm)."""
+        P = PROBE["p"].coords(s)
+        cmm = G["contact_mm"] / 1000.0
+        touching, thumb, pen = 0, 0, 0.0
+        for ci, chain in enumerate(self.S[s]["fingers"]):
+            for bn in chain:
+                pts = P.get(bn) or []
+                if not pts:
+                    continue
+                gt = [surf.gap(p) for p in pts]
+                if min(gt) <= cmm:
+                    touching += 1
+                    thumb += 1 if ci == 0 else 0
+        for b, pts in P.items():
+            for p in pts:
+                ga = min([surf.gap(p)] + [x.gap(p) for x in extra])
+                pen = max(pen, -ga)
+        return {"touching": touching, "thumb": thumb, "pen_mm": round(max(0.0, pen) * 1000, 1)}
+
     def place_hand(self, s, Pc, H, Pn, pole):
         """Palm-contact point Pc, hand direction H, palm normal Pn: wrist by IK, roll, exact hand."""
         self.reset_arm(s)
@@ -575,6 +597,7 @@ class Poser:
             cands = [(r, sg, tl, dz) for dz in G["cand_slide_m"] for r in G["cand_rot_deg"]
                      for tl in G["cand_tilt_deg"] for sg in (1, -1)]
         best = None
+        scored = []
         for cand in cands:
             r, sg, tl, dz = cand
             n2 = (C.rot(A, r) @ nv).normalized()
@@ -602,31 +625,60 @@ class Poser:
                      - 1.0 * g["worst_model_pen_mm"])     # run 15: 0.25/mm let 20 mm through
             if best is None or score > best[0]:
                 best = (score, cand, err, roll, bend, g, Pc)
+            scored.append((score, cand, Pc))
             if g["touching"] >= 13 and g["thumb"] >= 2 and err < 0.008 and bend < G["wrist_bend_ok_deg"]:
                 break
-        score, cand, *_ = best
-        r, sg, tl, dz = cand
-        n2 = (C.rot(A, r) @ nv).normalized()
-        Pc = best[6]
-        Tw = A.cross(n2) * sg
-        H = (Tw * math.cos(math.radians(tl)) + A * math.sin(math.radians(tl))).normalized()
-        err, roll = self.place_hand(s, Pc, H, -n2, pole)
-        g = self.close_fingers(s, surf, skip=skip)
-        ref = {}
         probe = PROBE.get("p")
-        if probe is not None:
-            push = 0.0
-            for _ in range(3):   # palm and knuckles (real skin) inside the wood: back the hand out
-                pg = probe.palm_min_gap(s, surf)
-                if pg >= -0.0012:
-                    break
-                Pc = Pc + n2 * (-pg + 0.0005)
-                push += -pg
-                err, roll = self.place_hand(s, Pc, H, -n2, pole)
-                g = self.close_fingers(s, surf, skip=skip)
-            if push:
-                ref["palm_push_mm"] = round(push * 1000, 1)
-            ref.update(self.refine(s, surf, chains=[c for c in range(5) if c not in skip]))
+
+        def finalize(cand, Pc):
+            r, sg, tl, dz = cand
+            n2 = (C.rot(A, r) @ nv).normalized()
+            Tw = A.cross(n2) * sg
+            H = (Tw * math.cos(math.radians(tl)) + A * math.sin(math.radians(tl))).normalized()
+            err, roll = self.place_hand(s, Pc, H, -n2, pole)
+            g = self.close_fingers(s, surf, skip=skip)
+            ref = {}
+            if probe is not None:
+                push = 0.0
+                for _ in range(3):   # palm and knuckles (real skin) inside the wood: back the hand out
+                    pg = probe.palm_min_gap(s, surf)
+                    if pg >= -0.0012:
+                        break
+                    Pc = Pc + n2 * (-pg + 0.0005)
+                    push += -pg
+                    err, roll = self.place_hand(s, Pc, H, -n2, pole)
+                    g = self.close_fingers(s, surf, skip=skip)
+                if push:
+                    ref["palm_push_mm"] = round(push * 1000, 1)
+                ref.update(self.refine(s, surf, chains=[c for c in range(5) if c not in skip]))
+            return err, roll, g, ref
+
+        # run 17: the bone model kept placements whose fingers lay 10-16 mm sideways inside the
+        # stock. The best few model placements are finished on the REAL skin (push-out, refine)
+        # and the one with the best measured contact and least penetration is kept.
+        top = []
+        for sc_, cand_, Pc_ in sorted(scored, key=lambda x: -x[0]):
+            if cand_ not in [t[1] for t in top]:
+                top.append((sc_, cand_, Pc_))
+            if len(top) >= (G["mesh_top"] if probe is not None else 1):
+                break
+        mesh_pick = []
+        if probe is not None and len(top) > 1:
+            for sc_, cand_, Pc_ in top:
+                err_, roll_, g_, ref_ = finalize(cand_, Pc_)
+                m = self.mesh_eval(s, surf, extra)
+                bend_ = self.wrist_bend(s)
+                ms = (m["touching"] + 1.5 * min(m["thumb"], 2) - 0.8 * m["pen_mm"] - 60.0 * max(0.0, err_ - 0.008)
+                      - G["wrist_bend_cost"] * max(0.0, bend_ - G["wrist_bend_ok_deg"]))
+                mesh_pick.append((ms, cand_, Pc_, m))
+            mesh_pick.sort(key=lambda x: -x[0])
+            score, cand, Pc = mesh_pick[0][0], mesh_pick[0][1], mesh_pick[0][2]
+        else:
+            score, cand, Pc = top[0]
+        r, sg, tl, dz = cand
+        err, roll, g, ref = finalize(cand, Pc)
+        if mesh_pick:
+            ref["mesh_candidates"] = [{"score": round(x[0], 2), "touching": x[3]["touching"], "pen_mm": x[3]["pen_mm"]} for x in mesh_pick]
         res = {"candidate": {"rot_deg": r, "wrap": sg, "tilt_deg": tl, "slide_m": dz}, "score": round(score, 2),
                "refine": ref,
                "ik_err_m": round(err, 4), "forearm_roll_deg": round(roll, 1),

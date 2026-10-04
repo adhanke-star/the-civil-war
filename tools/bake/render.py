@@ -718,7 +718,7 @@ def main():
                     continue
                 ev = o.evaluated_get(dg)
                 me = ev.to_mesh()
-                kp += [(ev.matrix_world @ v.co)[:] for v in me.vertices[::4]]
+                kp += [(ev.matrix_world @ v.co)[:] for i, v in enumerate(me.vertices) if i % 4 == 0]
                 ev.to_mesh_clear()
             REP["kit"] = fit_persp(kcam, kp, 12.0, margin=0.06)
             REP["kit"]["seconds"] = round(render_to(sc, os.path.join(C.OUT, "kit.png")), 2)
