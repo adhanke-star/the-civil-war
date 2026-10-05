@@ -83,6 +83,7 @@ G = {
     "rammer_ram_dz": 0.40,      # rammer withdrawn this far for the ramming stroke                       placeholder
     # -- fixed hands (fourth pass) -------------------------------------------------------------
     "grip_channel_r": 0.020,    # GRIP channel radius the curl factor is fitted to (40 mm, about the stock)  placeholder
+    "grip_small_r": 0.0065,     # the same fist closed on the rammer (9 mm) and cartridge (15 mm)          placeholder
     "walk_toe_in": 0.90,        # walk: the butt's toe edge sits this many channel radii in from the fist's centre  placeholder
     "wrist_ok_deg": 25.0,       # wrist bend that costs nothing when a fist placement is chosen             placeholder
     "reach_ok_m": 0.010,        # the second hand must reach the stock axis within this                     placeholder
@@ -935,7 +936,7 @@ def pose_load(ps, musket, frame, step, rr, cart):
     by = GUN.get("barrel_y", 0.006)
     key = "load%d@%d" % (step, frame)
     park = ps.ph(ps.S["R"]["hand"])
-    small = "grip"                            # cartridge and rammer: the same closed fist
+    small = "grip_small"                      # cartridge and rammer: the GRIP angles closed on a 13 mm channel
     if step < 4:
         heel = ps.ank_mid + F * 0.20 + L * 0.06
         heel.z = 0.0
@@ -1115,7 +1116,7 @@ def measure_hands(ps, body):
     REP["hand_rest"] = report
 
 
-def shape_quats(ps, s, spec, kf=1.0, kt=1.0, scaled=(1, 2, 3, 4)):
+def shape_quats(ps, s, spec, kf=1.0, kt=1.0, scaled=(1, 2, 3, 4), thumb=None):
     """Bone-local rotations of one fixed shape for hand s. Fingers flex about their own joint axis
     (fingernail side out); MCPs also swing toward the middle finger by spec["together"] of the rest
     spread. The thumb flexes toward the palm and swings across it, then its two joints flex.
@@ -1137,7 +1138,7 @@ def shape_quats(ps, s, spec, kf=1.0, kt=1.0, scaled=(1, 2, 3, 4)):
             Bi = Bm.inverted()
             pal = Vector(HM["palmar_local"].get(bn, list(Bi @ P0))).normalized()
             if ci == 0:
-                fl, op, m1, m2 = spec["thumb"]
+                fl, op, m1, m2 = thumb if thumb is not None else spec["thumb"]
                 if k == 0:
                     ax_f = Y.cross((Bi @ P0).normalized())
                     q_f = Quaternion(ax_f.normalized(), math.radians(fl * kt)) if ax_f.length > 1e-6 else Quaternion()
@@ -1148,7 +1149,8 @@ def shape_quats(ps, s, spec, kf=1.0, kt=1.0, scaled=(1, 2, 3, 4)):
                 else:
                     q = Quaternion(Y.cross(pal).normalized(), math.radians((m1, m2)[min(k, 2) - 1] * kt))
             else:
-                ang = spec["fingers"][ci - 1][min(k, 2)] * (kf if ci in scaled else 1.0)
+                f_ = kf[ci - 1] if isinstance(kf, (tuple, list)) else kf     # one factor, or one per finger
+                ang = spec["fingers"][ci - 1][min(k, 2)] * (f_ if ci in scaled else 1.0)
                 q = Quaternion(Y.cross(pal).normalized(), math.radians(ang))
                 if k == 0 and spec.get("together"):
                     pa = (Bm @ pal).normalized()
@@ -1232,84 +1234,127 @@ def cyl_gap(pts, cen, ax, r):
     return np.sqrt(np.maximum((q * q).sum(1) - t * t, 0.0)) - r
 
 
-def calibrate_hands(ps, body):
-    """Once, at the rest pose: build the fixed shapes for each hand, fit GRIP's single four-finger
-    curl factor to the channel radius and its thumb factor so the thumb just closes on the
-    channel, and store the hold frame (centre, axis, palm side,
-    knuckle side) in the wrist bone's frame. No pose ever changes a finger."""
-    rep = {}
+def fit_grip(ps, body, s, name, target):
+    """Fit one closed fist, once, at rest, on the real skin: the authored GRIP angles x one curl
+    factor for a channel of radius `target`; then x one factor per finger so each fingertip just
+    meets that channel (run 22: the shorter index and little fingers ended 12 mm inside the wood);
+    then one thumb factor so the thumb just closes on it. Stores SQ[s][name] and HF[s][name]."""
+    d = ps.S[s]
+    ps.reset()
+    Mw = ps.P(d["hand"]).matrix.copy()
+    Mi, R3i = Mw.inverted(), Mw.to_3x3().inverted()
+    H0w, P0w = ps.hand_frame(s)
+    pc = ps.palm_centre(s)
+    kn = [ps.ph(d["fingers"][c][0]) for c in (1, 2, 3, 4)]
+    a0 = (kn[0] - kn[3]).normalized()                      # little -> index knuckle
+    kmid = sum(kn, Vector()) / 4
+    thumb_b = [b for b in d["fingers"][0][1:] if b in ps.B]
+    tip_b = [d["fingers"][c][-1] for c in (1, 2, 3, 4)]
     names = ("thumb", "index", "middle", "ring", "little")
+
+    def at(kf, kt):
+        SQ[s][name] = shape_quats(ps, s, SHAPES["grip"], kf=kf, kt=kt)
+        ps.set_shape(s, name)
+        V = hand_verts(ps, body, s)
+        return fist_channel(ps, s, V, a0), V
+
+    # 1. one curl factor -> channel radius (thumb open while fitting)
+    lo, hi, hist = 0.4, 1.6, []
+    for _ in range(10):
+        k = (lo + hi) / 2
+        res, _V = at(k, 0.0)
+        hist.append([round(k, 3), round(res[2] * 1000, 1) if res else None])
+        if res is None or res[2] > target:
+            lo = k
+        else:
+            hi = k
+    kg = (lo + hi) / 2
+    res, V = at(kg, 0.0)
+    found = res is not None
+    cen, ax, r, rings = res if found else (pc + P0w * target, a0.copy(), target, [])
+    # 2. one factor per finger -> its fingertip just meets the channel (+0.5 mm); twice, refitting
+    #    the channel in between
+    kf = [kg] * 4
+    for _round in range(2):
+        lo4, hi4 = [0.3 * kg] * 4, [min(1.9, 1.8 * kg)] * 4
+        for _ in range(9):
+            mid = [(a + b) / 2 for a, b in zip(lo4, hi4)]
+            _res, Vt = at(mid, 0.0)
+            for i, b in enumerate(tip_b):
+                if b not in Vt:
+                    continue
+                if float(cyl_gap(Vt[b], cen, ax, target).min()) > 0.0005:
+                    lo4[i] = mid[i]
+                else:
+                    hi4[i] = mid[i]
+        kf = [(a + b) / 2 for a, b in zip(lo4, hi4)]
+        res, V = at(kf, 0.0)
+        if res is not None:
+            cen, ax, r, rings = res
+
+    # 3. the thumb, chosen once from a small grid (run 22: one factor on the authored thumb left
+    #    it straight and sticking out): closed over the fingers (its tip as near the forefinger's
+    #    middle segment as it gets) without entering the channel (the held object)
+    ib = d["fingers"][1][1] if len(d["fingers"][1]) > 1 else d["fingers"][1][-1]
+    tt = d["fingers"][0][-1]
+    tgrid = []
+    for fl in (0.0, 15.0, 30.0, 45.0, 60.0):
+        for op in (0.0, 20.0, 40.0, 60.0):
+            for m1, m2 in ((0.0, 0.0), (20.0, 20.0), (40.0, 30.0), (60.0, 45.0)):
+                th = (fl, op, m1, m2)
+                SQ[s][name] = shape_quats(ps, s, SHAPES["grip"], kf=kf, thumb=th)
+                ps.set_shape(s, name)
+                Vt = hand_verts(ps, body, s)
+                if tt not in Vt or ib not in Vt:
+                    continue
+                gap = min(float(cyl_gap(Vt[b], cen, ax, target).min()) for b in thumb_b if b in Vt)
+                A_, B_ = Vt[tt], Vt[ib]
+                reach = float(np.sqrt(((A_[:, None, :] - B_[None, :, :]) ** 2).sum(2)).min())
+                sc = reach + 5.0 * max(0.0, -gap - 0.002) + 0.00002 * (fl + op + m1 + m2)
+                tgrid.append((sc, th, reach, gap))
+    tgrid.sort(key=lambda x: x[0])
+    thumb = tgrid[0][1] if tgrid else SHAPES["grip"]["thumb"]
+    SQ[s][name] = shape_quats(ps, s, SHAPES["grip"], kf=kf, thumb=thumb)
+    ps.set_shape(s, name)
+    V = hand_verts(ps, body, s)
+    tpick = tgrid[0] if tgrid else (None, thumb, None, None)
+    cen = cen + ax * (kmid - cen).dot(ax)                  # the middle of the fist's width
+    pv = pc - cen
+    pv = (pv - ax * pv.dot(ax)).normalized()
+    prox = sum(((ps.ph(c[0]) + ps.pt(c[0])) / 2 for c in d["fingers"][1:]), Vector()) / 4 - cen
+    kv = (prox - ax * prox.dot(ax) - pv * prox.dot(pv)).normalized()
+    HF[s][name] = {"c": list(Mi @ cen), "a": list(R3i @ ax), "p": list(R3i @ pv), "k": list(R3i @ kv), "r": target}
+    tips = {names[ci]: round(float(cyl_gap(V[c[-1]], cen, ax, target).min()) * 1000, 1)
+            for ci, c in enumerate(d["fingers"]) if c[-1] in V}
+    ps.reset()
+    return {"channel_diameter_mm": round(2 * target * 1000, 1), "fitted_ring_diameter_mm": round(2 * r * 1000, 1),
+            "ring_radii_mm": rings, "curl_factor": round(kg, 3), "finger_factors": [round(x, 3) for x in kf],
+            "thumb_deg": {"flex": thumb[0], "opposition": thumb[1], "mcp": thumb[2], "ip": thumb[3],
+                          "tip_to_forefinger_mm": None if tpick[2] is None else round(tpick[2] * 1000, 1),
+                          "into_channel_mm": None if tpick[3] is None else round(max(0.0, -tpick[3]) * 1000, 1)},
+            "channel_found": found,
+            "joint_angles_deg": {names[ci]: [round(a * kf[ci - 1], 1) for a in SHAPES["grip"]["fingers"][ci - 1]] for ci in (1, 2, 3, 4)},
+            "channel_axis_to_knuckle_line_deg": round(math.degrees(ax.angle(a0)), 1),
+            "channel_axis_to_hand_axis_deg": round(math.degrees(ax.angle(H0w)), 1),
+            "tips_to_channel_mm": tips, "fit": hist}
+
+
+def calibrate_hands(ps, body):
+    """Once, at the rest pose: RELAXED as authored; GRIP fitted to the stock (40 mm channel) and
+    the same GRIP angles closed tighter, "grip_small", for the rammer and cartridge (13 mm).
+    No pose ever changes a finger."""
+    rep = {}
     for s in ("L", "R"):
-        d = ps.S[s]
         ps.reset()
         SQ[s]["relaxed"] = shape_quats(ps, s, SHAPES["relaxed"])
-        Mw = ps.P(d["hand"]).matrix.copy()
-        Mi, R3i = Mw.inverted(), Mw.to_3x3().inverted()
-        H0w, _P0w = ps.hand_frame(s)
-        pc = ps.palm_centre(s)
-        kn = [ps.ph(d["fingers"][c][0]) for c in (1, 2, 3, 4)]
-        a0 = (kn[0] - kn[3]).normalized()                      # little -> index knuckle
-        kmid = sum(kn, Vector()) / 4
-        thumb_b = [b for b in d["fingers"][0][1:] if b in ps.B]
-
-        def grip_at(kf, kt):
-            SQ[s]["grip"] = shape_quats(ps, s, SHAPES["grip"], kf=kf, kt=kt)
-            ps.set_shape(s, "grip")
-            V = hand_verts(ps, body, s)
-            return fist_channel(ps, s, V, a0), V
-
-        # four-finger curl factor -> channel radius (thumb open while fitting)
-        lo, hi, hist = 0.4, 1.6, []
-        for _ in range(10):
-            k = (lo + hi) / 2
-            res, _V = grip_at(k, 0.0)
-            hist.append([round(k, 3), round(res[2] * 1000, 1) if res else None])
-            if res is None or res[2] > G["grip_channel_r"]:
-                lo = k
-            else:
-                hi = k
-        kg = (lo + hi) / 2
-        res, V = grip_at(kg, 0.0)
-        found = res is not None
-        cen, ax, r, rings = res if found else (pc + _P0w * G["grip_channel_r"], a0.copy(), G["grip_channel_r"], [])
-
-        # thumb factor -> the thumb's outer two segments just touch the channel (+1 mm)
-        def thumb_gap(kt):
-            _r, Vt = grip_at(kg, kt)
-            return min(float(cyl_gap(Vt[b], cen, ax, r).min()) for b in thumb_b if b in Vt)
-        tlo, thi = 0.0, 1.5
-        if thumb_gap(thi) > 0.001:
-            kt = thi
-        elif thumb_gap(tlo) < 0.001:
-            kt = tlo
-        else:
-            for _ in range(8):
-                kt = (tlo + thi) / 2
-                if thumb_gap(kt) > 0.001:
-                    tlo = kt
-                else:
-                    thi = kt
-            kt = tlo
-        _r, V = grip_at(kg, kt)
-        cen = cen + ax * (kmid - cen).dot(ax)                # the middle of the fist's width
-        pv = pc - cen
-        pv = (pv - ax * pv.dot(ax)).normalized()
-        prox = sum(((ps.ph(c[0]) + ps.pt(c[0])) / 2 for c in d["fingers"][1:]), Vector()) / 4 - cen
-        kv = (prox - ax * prox.dot(ax) - pv * prox.dot(pv)).normalized()
-        HF[s]["grip"] = {"c": list(Mi @ cen), "a": list(R3i @ ax), "p": list(R3i @ pv), "k": list(R3i @ kv), "r": r}
-        tips = {names[ci]: round(float(cyl_gap(V[c[-1]], cen, ax, r).min()) * 1000, 1)
-                for ci, c in enumerate(d["fingers"]) if c[-1] in V}
-        rep[s] = {"grip": {"curl_factor": round(kg, 3), "thumb_factor": round(kt, 3), "channel_found": found,
-                           "channel_diameter_mm": round(2 * r * 1000, 1), "ring_radii_mm": rings,
-                           "channel_axis_to_knuckle_line_deg": round(math.degrees(ax.angle(a0)), 1),
-                           "channel_axis_to_hand_axis_deg": round(math.degrees(ax.angle(H0w)), 1),
-                           "tips_to_channel_mm": tips, "fit": hist}}
+        rep[s] = {"grip": fit_grip(ps, body, s, "grip", G["grip_channel_r"]),
+                  "grip_small": fit_grip(ps, body, s, "grip_small", G["grip_small_r"])}
         ps.reset()
     REP["hand_shapes"] = {
         "shapes": SHAPES, "fitted": rep,
-        "note": "fixed hand shapes, the same joint angles in every clip and for both hands (mirrored); "
-                "GRIP's four-finger curl x curl_factor and its thumb x thumb_factor, "
-                "each fitted once at rest on the real skin"}
+        "note": "fixed hand shapes, the same joint angles in every clip and for both hands (mirrored). GRIP: the "
+                "authored angles x one curl factor and one factor per finger, fitted once at rest on the real "
+                "skin to a 40 mm channel (the stock); grip_small: the same, to a 13 mm channel (rammer, cartridge)"}
 
 
 def shape_dev(ps, s, shape):

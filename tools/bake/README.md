@@ -234,11 +234,17 @@ attached to the hand. Nothing else changed in this pass.
     fallen).
   - A third shape, PINCH (thumb and two fingers) for the cartridge and rammer, was tried once
     (run 21) and read as an open, splayed hand, so it was removed: GRIP holds them too.
-- **Fitted once, at rest, on the real skin.** GRIP's four-finger curl is multiplied by one factor
-  so the channel through the fist is 40 mm across (each finger's pad skin and the palm under it
-  give a ring; the channel axis runs through the four ring centres, its radius is their mean);
-  the thumb gets one factor so its outer two segments just close on that channel. The fitted
-  factors and the channel are in `poses.json` `hand_shapes.fitted`.
+  - **grip_small**: the same GRIP angles closed on a 13 mm channel, for the rammer (9 mm) and the
+    cartridge (15 mm), so the fist is not loose on them.
+- **Fitted once, at rest, on the real skin** (never per pose). GRIP's authored four-finger curl
+  is multiplied by one factor so the channel through the fist is 40 mm across (each finger's pad
+  skin and the palm under it give a ring; the channel axis runs through the four ring centres,
+  its radius is their mean), then by one factor per finger so each fingertip just meets that
+  channel (run 22: the shorter index and little fingers otherwise ended 12 mm inside the wood).
+  The thumb is chosen once from an 80-pose grid (flex, opposition, two joints) as the one whose
+  tip comes closest to the forefinger's middle segment without entering the channel (run 22: a
+  scaled thumb stayed straight and stuck out). Everything fitted is in `poses.json`
+  `hand_shapes.fitted`.
 - **The object is attached to the hand.** The first hand is placed by arm IK with its fist
   channel on the stock axis; the musket is then keyed from where that channel actually ended up,
   so the wood always runs through the middle of the fist. The second hand is the same rigid fist,
