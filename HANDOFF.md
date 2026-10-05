@@ -35,16 +35,15 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
   the wrong spot". He likes the pass-3 faces and variants. Nothing from passes 3-4 is in the game.
 
 ## Next, in order
-1. **Hand references first, no building.** Collect public-domain drill references showing where each hand
-   holds the rifle-musket: Hardee's *Rifle and Light Infantry Tactics* (1855/1861) and Casey's *Infantry
-   Tactics* (1862) plates (Internet Archive / HathiTrust / Wikimedia Commons), plus period photographs.
-   Positions: shoulder arms, marching, ready/aim, loading (butt on ground, cartridge, rammer), order arms.
-   Save to `.out/reference/drill/`, show them to Aaron, and get his approval of the target position per
-   clip (quote the manual's text where found; cite page; anything read off a picture is "seen in plate").
-2. Then on `bake`: start from pass 3 (`git checkout a50968f -- tools/bake .github/workflows/bake.yml`),
-   remove the per-finger solver and the pass-4 fist system, pose hands and musket to the approved references
-   with one simple natural hand shape. Check renders yourself, then show Aaron the hero, hands close-up and
-   contact sheet. Field only after he approves.
+1. **DONE 2026-10-05: hand references approved.** `docs/drill-reference.md` holds the sources, the plate
+   per clip, the manual's words for each hand, and Aaron's choice: aim and loading as drawn in the 1861
+   plates; shoulder arms and march on the RIGHT shoulder per Hardee's text (no correct plate exists).
+   Re-download the plates into `.out/reference/drill/` from the URLs there (`.out/` is pruned).
+2. **Next: rebuild the hands on `bake`.** Start from pass 3 (`git checkout a50968f -- tools/bake
+   .github/workflows/bake.yml`), remove the per-finger solver and the pass-4 fist system, and pose hands and
+   musket to `docs/drill-reference.md` with one simple natural closed hand. Check renders yourself against
+   the plates, then show Aaron each clip's render beside its plate, plus the contact sheet. Field only after
+   he approves.
 3. Fielding a new bake: `src/units/impostor.js` reads per-frame `ax/ay/ppm`, `directionsByClip`,
    `tiers.<tier>.variants` (keep these manifest fields; the tier-level `pxPerMetre`/`anchor` mean the stand
    clip only). Close-tier variants are new in pass 3: assign the same variant per man at both tiers.
@@ -67,8 +66,10 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
 - After every push: `gh run list --limit 3`; a red CI is the next task.
 
 ## Loose ends
-- `.claude/worktrees/` holds five leftover Claude helper worktrees, all on `bake` at e41d05e (everything is
-  pushed; their staged diffs are older pass states). Safe to remove with `git worktree remove --force <path>`.
+- Claude's helper worktrees and branches were removed (they held no unpushed work). Local branches left:
+  `main`, `bake`, `figures-detail` (old, merged).
+- Showing images: Aaron could not see images sent through Claude's file panel; `open -a Preview <files>`
+  on his Mac worked. Use whatever actually puts the picture on his screen, and confirm he saw it.
 - `NEW-civil-war-video-game.code-workspace` is Aaron's editor file: leave it alone, uncommitted.
 - `git fetch` in the main checkout hung twice on 2026-10-04/05 while GitHub answered; kill and retry.
 - Commit trailers: Claude used `Co-Authored-By: Claude ...`; use your own tool's convention.

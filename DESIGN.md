@@ -153,6 +153,7 @@ first playable campaign near.
 | Polish priority | How the battlefield looks reaches "excellent" first (baked figures, terrain, effects to the Total War bar); rewards and controls reach "good" first |
 | Future hooks | Stored from the start: real dates on a war calendar; manpower, wagons and stores as real quantities; coordinates and routes for battles and camps; reputation also kept as standing with Washington |
 | Music | Period tunes on period instruments (public-domain compositions, CC0/PD recordings); sombre hymns and laments after heavy losses; nothing over battle |
+| Hand poses | Posed to the 1861 drill-book plates (aim, loading) and Hardee 1861 text (shoulder arms and march on the right shoulder) with one simple natural closed hand; docs/drill-reference.md. Aaron, 2026-10-05 |
 | Hero soldier route | MakeHuman/MPFB2 body (CC0) + scripted uniform, baked on GitHub Actions (branch `bake`; proven 2026-10-03). First pass reads as a clean mannequin up close: second pass = cloth folds, real kit, gripping hands, brogans, weathering, tighter framing |
 | Art next step | Put the baked soldier on the field now (split-screen against the current figures, fps measured at 1:5) while the model is improved in parallel |
 | Sprite budget | Whole game up to about 200 MB; each battle under about 250 MB of graphics memory on the iPad, using GPU-compressed atlases (ASTC/KTX2) and per-battle loading; directions trimmed only on field-size sprites. To be checked on the iPad before locking. Supersedes the 60-100 MB load budget |

@@ -9,8 +9,8 @@
   Union infantryman; Confederates are the Union sprite tinted (placeholder).
 - **Real GPU, UHD 617, Auto, opening/fight (2026-10-04):** baked 1:10 42.6/40.7, baked 1:5 40.7/38.7 fps;
   rigged 1:5 40.6/36.8. 1:5 holds 30 fps.
-- **Art (branch `bake`):** Aaron likes pass-3 faces/variants, rejected every hand version. Next: drill-manual
-  references -> his approval -> repose (HANDOFF.md).
+- **Art (branch `bake`):** Aaron likes pass-3 faces/variants, rejected every hand version; approved drill
+  targets in docs/drill-reference.md. Next: repose hands to them on pass 3 (HANDOFF.md).
 - **Known in play:** front-on firing poses hard to tell apart; halos louder than the baked shadow; walk bob;
   uniform details are placeholders. **Unverified:** iPad; pinch, twist-to-face, box select, minimap input.
 - **Awaiting Aaron:** sandbox and reward page Copy-settings from Mac and iPad; device.html results;
