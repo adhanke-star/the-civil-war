@@ -418,10 +418,8 @@ function pack() {
       missing: h.missing ?? [],
     }])),
     headsNote: 'every head preset is built only from CC0 assets (MakeHuman system assets; bodyparts05 beards) and MPFB2 CC0 targets; use "usct" heads only for United States Colored Troops regiments',
-    grips: poses.holds || {},
-    gripsNote: 'fourth pass: per clip frame and holding hand, its fixed shape (grip) and the real-skin check: shape_dev_deg (largest joint deviation from the fixed shape), axis_mm/axis_deg (fist channel to the held object\'s axis), tips_mm (each fingertip to the held surface, + outside), tip_gap_max_mm, penetration_mm, ik_err_m, wrist_bend_deg',
-    handShapes: poses.hand_shapes || null,
-    freeHands: poses.free_hands || {},
+    grips: poses.grip_mesh || {},
+    gripsNote: 'per clip frame and hand: finger segments (of 15) whose real skinned mesh is within ' + (poses.constants?.contact_mm ?? 3) + ' mm of the held surface, and the deepest penetration (mm) into the musket, rammer or cartridge',
     shards: render.shards || null,
   };
   fs.mkdirSync(path.join(OUT, 'atlas'), { recursive: true });
@@ -502,15 +500,14 @@ function summary() {
     lines.push('', '| clip | ortho m | close px/m | close anchor |', '|---|---:|---:|---|');
     for (const [k, v] of Object.entries(fr)) lines.push(`| ${k} | ${v.orthoM} | ${v.pxPerMetre} | ${JSON.stringify(v.anchor)} |`);
     const po = readJSON(path.join(OUT, 'report', 'poses.json'));
-    if (po.holds) {
-      lines.push('', '### Hands (fixed shapes; real skinned hand vs the held object)', '', '| frame | hand | shape | object | shape dev deg | channel to axis mm | deg | worst fingertip gap mm | penetration mm | IK miss mm | wrist deg | ok |', '|---|---|---|---|---:|---:|---:|---:|---:|---:|---:|---|');
-      for (const [k, sides] of Object.entries(po.holds)) {
-        for (const [s, v] of Object.entries(sides)) lines.push(`| ${k} | ${s} | ${v.shape} | ${v.object} | ${v.shape_dev_deg ?? '-'} | ${v.axis_mm ?? '-'} | ${v.axis_deg ?? '-'} | ${v.tip_gap_max_mm ?? '-'} | ${v.penetration_mm ?? '-'} | ${Math.round((v.ik_err_m ?? 0) * 10000) / 10} | ${v.wrist_bend_deg} | ${v.ok === false ? '**no**' : (v.ok ? 'yes' : '-')} |`);
+    if (po.grip_mesh) {
+      lines.push('', '### Grips (real skinned hand mesh vs the held surface)', '', '| frame | hand | segments in contact /15 | thumb | max penetration mm | verts >1 mm inside | model wrist bend deg |', '|---|---|---:|---:|---:|---:|---:|');
+      for (const [k, sides] of Object.entries(po.grip_mesh)) {
+        for (const [s, v] of Object.entries(sides)) lines.push(`| ${k} | ${s} | ${v.segments_touching} | ${v.thumb_segments} | ${v.max_penetration_mm} | ${v.vertices_over_1mm_inside} | ${po.grips?.[k]?.[s]?.wrist_bend_deg ?? '-'} |`);
       }
-      if (po.hand_acceptance) lines.push('', `hand acceptance: ${JSON.stringify(po.hand_acceptance)}`);
-      if (po.hand_shapes?.fitted) lines.push('', `fitted shapes: ${JSON.stringify(po.hand_shapes.fitted).slice(0, 1500)}`);
     }
-    if (po.hand_check_error) lines.push('', '**hand check failed**', '```', po.hand_check_error, '```');
+    if (po.grip_mesh_error) lines.push('', '**grip mesh measurement failed**', '```', po.grip_mesh_error, '```');
+    if (po.hand_model) lines.push('', `hand model: ${JSON.stringify(po.hand_model).slice(0, 900)}`);
     if (render.shards) {
       lines.push('', '### Shards', '', '| shard | wall s | renders |', '|---|---:|---|');
       for (const [k, v] of Object.entries(render.shards)) lines.push(`| ${k} | ${v.wall_seconds} | ${JSON.stringify(v.renders)} |`);

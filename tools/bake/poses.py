@@ -5,7 +5,7 @@
 # work/posed.blend plus report/poses.json (clip -> frame numbers, fps, ground speed, checks).
 #
 #   stand   frame 1        shoulder arms, position of the soldier
-#   walk    frames 11-18   8-frame march, musket at right shoulder shift
+#   walk    frames 11-18   8-frame march, same right-shoulder shoulder arms
 #   fire    frames 21-23   aim, fire (recoil: shoulders back, muzzle kicks up), recover (piece down)
 #   fallen  frame 31       lying on the back, musket dropped
 #   load    frames 41-45   butt on the ground: 0 cartridge from the box, 1 charge at the muzzle,
@@ -13,31 +13,12 @@
 #
 # Limbs are placed with an analytic two-bone IK toward world targets.
 #
-# FOURTH PASS, hands (simple and robust; the third pass's per-finger grip solver is gone).
-#   * Two FIXED, hand-authored hand shapes, applied identically in every clip and mirrored L/R
-#     (SHAPES below): GRIP (the four fingers curled together as one unit round a ~40 mm
-#     cylinder, thumb closed over them) and RELAXED (a free hand, fingers together, half curled).
-#     (A PINCH for the cartridge and rammer was tried in run 21: it read as an open hand, so GRIP
-#     holds them too.)
-#   * Once, at the rest pose, the real skinned GRIP hand is measured: the channel through the
-#     fist (axis, centre, radius, from a ring fitted to each finger's pad skin and the palm),
-#     stored in the wrist bone's frame. One four-finger curl factor is fitted once so the channel
-#     is 40 mm across, one thumb factor so the thumb just closes on it.
-#   * The OBJECT is attached to the hand: the first hand is placed with its channel on the stock
-#     axis and the musket is then keyed from that hand's actual channel (it follows any IK miss).
-#     The second hand is a rigid fist placed by wrist IK so its channel lies on the stock axis;
-#     if it cannot reach, it slides along the stock toward the body instead of opening.
-#     The cartridge and the rammer are keyed from the right fist the same way.
-#   * The report (poses.json "holds") measures every held hand on the real skin: deviation from
-#     its shape, channel-to-object-axis distance, fingertip-to-surface gaps, penetration.
-# Haversack and canteen swing toward plumb from their strap point (and swing on the march).
-#
-# HISTORY STATUS: drill positions follow the commonly described Hardee/Casey manual of arms
-# (Inferred, recalled, not yet cited twice). Cadence 110 steps/min and 28 in step for quick
-# time are Inferred. The loading sequence is a reduced, recalled version of the loading drill
-# (Inferred). Everything else is a placeholder estimate.
-#
-# Run:  blender -b --factory-startup -noaudio --python-exit-code 1 -P tools/bake/poses.py -- --out .out/bake
+# DRILL REBUILD: one manually keyed closed hand, not a contact optimiser or a fist channel.
+# Positions follow the targets Aaron approved in docs/drill-reference.md on main:
+# Baxter 1861 pp.45-48, 51-53; Hardee 1861 paras 121, 163, 171-174.
+# Stand AND walk are right-shoulder shoulder arms (not shoulder shift).
+# History remains Inferred: one source per drill item, geometry is an art estimate.
+# Hand surface measurements below are diagnostics only; they never change a pose.
 
 import json
 import math
@@ -65,59 +46,37 @@ G = {
     "pelvis_yaw_deg": 4.0,      #                                             placeholder
     "arm_swing_deg": 16.0,      # free (left) arm swing                       placeholder
     "aim_body_yaw_deg": -40.0,  # body turned right of the line of fire       placeholder
-    "recoil_deg": 26.0,         # muzzle rise at the shot (pass 3: 16 read like aim at 150 m) placeholder
-    "recoil_back_m": 0.11,      # shoulders driven back at the shot           placeholder
-    # -- grip solve (third pass) -------------------------------------------------------------
-    # where each hand holds the piece, gun-local z (m from the heel of the butt)
-    "grip_stand_R": 0.300,      # swell of the stock under the lock, thumb and forefinger at the guard  Inferred (Hardee "shoulder arms", recalled)
-    "grip_walk_R": 0.060,       # the butt, right shoulder shift                                         placeholder
-    "grip_aim_L": 0.620,        # forestock at the lower band                                           placeholder
-    "grip_aim_R": 0.300,        # wrist (small) of the stock, forefinger to the trigger                 placeholder
-    "grip_recover_L": 0.620,    #                                                                        placeholder
-    "grip_recover_R": 0.330,    #                                                                        placeholder
-    "grip_load_L": 1.000,       # barrel and forestock below the upper band, piece upright               placeholder
-    "grip_prime_L": 0.600,      #                                                                        placeholder
-    "grip_prime_R": 0.360,      #                                                                        placeholder
-    "grip_rammer_drawn": 0.38,  # m above the muzzle where the drawn rammer is held                      placeholder
-    "grip_rammer_ram": 0.36,    # m above the muzzle on the rammer, arm raised clear of the body (readability) placeholder
-    "rammer_ram_dz": 0.40,      # rammer withdrawn this far for the ramming stroke                       placeholder
-    # -- fixed hands (fourth pass) -------------------------------------------------------------
-    "grip_channel_r": 0.020,    # GRIP channel radius the curl factor is fitted to (40 mm, about the stock)  placeholder
-    "grip_small_r": 0.0065,     # the same fist closed on the rammer (9 mm) and cartridge (15 mm)          placeholder
-    "walk_toe_in": 0.90,        # walk: the butt's toe edge sits this many channel radii in from the fist's centre  placeholder
-    "wrist_ok_deg": 25.0,       # wrist bend that costs nothing when a fist placement is chosen             placeholder
-    "reach_ok_m": 0.010,        # the second hand must reach the stock axis within this                     placeholder
-    # run 21: +-40 deg left wrists bent 80 deg; the whole turn is offered, the authored side only preferred
-    "rolls_deg": tuple(float(a) for a in range(0, 360, 30)),   # fist turned about the object from the authored palm side placeholder
-    "slides_m": (0.0, -0.02, -0.04, -0.06, -0.08, 0.02),  # second hand slid along the stock (- = toward the body) placeholder
+    "recoil_deg": 3.0,          # small recoil; retain the plate's head-on-stock pose      art estimate
+    "recoil_back_m": 0.025,      # modest recoil                                      art estimate
+    # Stations measured from the model's butt; target semantics from the approved manual.
+    "grip_stand_R": 0.350,      # swell just under the cock / guard
+    "grip_walk_R": 0.350,       # same shoulder arms on the march
+    "grip_aim_L": 0.620,        # lower band
+    "grip_aim_R": 0.300,        # small of stock / trigger
+    "grip_recover_L": 0.620,
+    "grip_recover_R": 0.300,
+    "grip_load_L": 0.920,       # middle band (pass 3 held too high)
+    "grip_prime_L": 0.620,
+    "grip_prime_R": 0.350,
+    "grip_rammer_drawn": 0.100, # above muzzle, elbow near body
+    "grip_rammer_ram": 0.100,
+    "rammer_ram_dz": 0.200,
+    "closed_deg": (48.0, 68.0, 42.0), # ONE authored grip, reused without fitting
+    "thumb_deg": (25.0, 32.0, 22.0),
+    "pad_percentile": 50.0,     # report only
+    "contact_mm": 3.0,         # report only
 }
 FR = {"stand": [1], "walk": list(range(11, 19)), "fire": [21, 22, 23], "fallen": [31],
       "load": [41, 42, 43, 44, 45]}
 
-# The fixed hand shapes (fourth pass). Fingers index..little: (MCP, PIP, DIP) flexion in degrees.
-# Thumb: (flex toward the palm, opposition swing across the palm, MCP, IP). "together": share of
-# the rest-pose finger spread closed, so the fingers lie side by side. The same numbers are used
-# for both hands (each hand's own joint axes are measured from its fingernails, which mirrors
-# them). GRIP's four-finger curl is multiplied by one factor fitted once to a 40 mm channel;
-# its thumb by one factor so it just closes on that channel.
-SHAPES = {
-    "grip":    {"fingers": ((55, 75, 40), (60, 78, 42), (65, 80, 42), (70, 82, 42)),
-                "thumb": (30.0, 35.0, 25.0, 25.0), "together": 1.0},           # placeholder, judged by eye
-    "relaxed": {"fingers": ((20, 30, 15), (24, 34, 17), (28, 38, 19), (32, 42, 21)),
-                "thumb": (12.0, 15.0, 10.0, 10.0), "together": 0.8},           # placeholder, judged by eye
-}
-
 T = C.Timer()
-REP = {"constants": G, "frames": {}, "ik_error_m": {}, "checks": {}, "holds": {}}
+REP = {"constants": G, "frames": {}, "ik_error_m": {}, "checks": {}, "grips": {}}
 GUN = {}
 OBST = []
 HANG = []
 UNI = {}
-HM = {}          # measured hand rest frame (palm, finger pad sides, vertex owners)
-SQ = {"L": {}, "R": {}}   # side -> shape -> bone -> Quaternion (bone-local)
-HF = {"L": {}, "R": {}}   # side -> shape -> {"c", "a", "p", ...} hold frame in the wrist bone's frame
-HOLDLOG = []     # every held hand (dicts, see log_hold)
-FREELOG = []     # every free (RELAXED) hand: (key, frame, side)
+HM = {}          # rest-hand orientation and diagnostic mesh ownership
+GRIPLOG = []     # (key, frame, side, target surface, all surfaces)
 
 
 # ------------------------------------------------------------------------------ surfaces
@@ -148,34 +107,12 @@ class CylSurf:
         return radial
 
 
-def hand_verts(ps, body, s):
-    """The posed body's real skin (armature on) for one hand: bone -> (n, 3) array, rig space."""
-    arm = [m for m in body.modifiers if m.type == "ARMATURE"]
-    state = [(m, m.show_viewport) for m in arm]
-    for m in arm:
-        m.show_viewport = True
-    try:
-        C.update()
-        dg = bpy.context.evaluated_depsgraph_get()
-        ev = body.evaluated_get(dg)
-        me = ev.to_mesh()
-        n = len(me.vertices)
-        co = np.empty(n * 3, dtype=np.float64)
-        me.vertices.foreach_get("co", co)
-        ev.to_mesh_clear()
-    finally:
-        for m, v in state:
-            m.show_viewport = v
-        C.update()
-    co = co.reshape(-1, 3)
-    Mx = np.array(ps.rig.matrix_world.inverted() @ body.matrix_world)
-    co = co @ Mx[:3, :3].T + Mx[:3, 3]
-    out = {}
-    for b, idx in HM["by_bone"][s].items():
-        idx = [i for i in idx if i < n]
-        if idx:
-            out[b] = co[idx]
-    return out
+class Union:
+    def __init__(self, *s):
+        self.s = [x for x in s if x is not None]
+
+    def gap(self, p):
+        return min(x.gap(p) for x in self.s)
 
 
 # ------------------------------------------------------------------------------ the poser
@@ -207,6 +144,7 @@ class Poser:
         self.rest_ank = {s: self.rh(self.S[s]["foot"]) for s in ("L", "R")}
         self.rest_hip = {s: self.rh(self.S[s]["thigh"][0]) for s in ("L", "R")}
         self.ank_mid = (self.rest_ank["L"] + self.rest_ank["R"]) / 2
+        self.flex = {}   # flexion applied per finger joint since its arm was reset (deg)
         for p in rig.pose.bones:
             p.rotation_mode = "QUATERNION"
 
@@ -226,6 +164,7 @@ class Poser:
         return self.P(n).tail.copy()
 
     def reset(self):
+        self.flex = {}
         for p in self.rig.pose.bones:
             p.matrix_basis = Matrix()
         C.update()
@@ -240,6 +179,7 @@ class Poser:
     def reset_arm(self, s):
         for n in self.arm_bones(s):
             self.P(n).matrix_basis = Matrix()
+            self.flex.pop(n, None)
         C.update()
 
     def rotate_about(self, n, pivot, q):
@@ -324,19 +264,34 @@ class Poser:
         lat = self.U.cross(fh).normalized()
         return C.rot(self.U, yaw_deg) @ (C.rot(lat, -pitch_deg) @ v)
 
-    # ---- the hand (fourth pass: fixed shapes, placed as a rigid hand)
+    # ---- the measured hand (third pass)
+    def palmar(self, bn):
+        """World (armature-space) pad-side direction of a finger segment, from the hand model."""
+        loc = HM.get("palmar_local", {}).get(bn)
+        if loc is None:
+            return self.palm_world(self.side_of(bn))
+        return (self.P(bn).matrix.to_3x3() @ Vector(loc)).normalized()
+
+    def side_of(self, bn):
+        return "L" if bn.endswith(".L") else "R"
+
     def hand_frame(self, s):
-        """(hand direction, palm normal) of the posed hand, from the measured rest frame."""
+        """(hand direction, palm normal) of the posed hand, from the measured model."""
         h = HM["hand"][s]
         R = self.P(self.S[s]["hand"]).matrix.to_3x3()
         return (R @ Vector(h["H0"])).normalized(), (R @ Vector(h["P0"])).normalized()
+
+    def palm_world(self, s):
+        if s not in HM.get("hand", {}):
+            return self.palm(s)[0]
+        return self.hand_frame(s)[1]
 
     def palm_centre(self, s):
         h = HM["hand"][s]
         return self.P(self.S[s]["hand"]).matrix @ Vector(h["pc_local"])
 
     def palm(self, s):
-        """Palm estimate from the bones (fallback when no fingernails were found)."""
+        """Second-pass palm estimate (fallback only)."""
         d = self.S[s]
         f = d["fingers"]
         wr = self.ph(d["hand"])
@@ -364,8 +319,7 @@ class Poser:
         C.update()
 
     def roll_forearm(self, s, R):
-        """Take the wrist's twist in the forearm (lowerarm02 rolls about the forearm axis).
-        Returns (roll applied, twist needed), degrees."""
+        """Take the wrist's twist in the forearm (lowerarm02 rolls about the forearm axis)."""
         d = self.S[s]
         lo = d["lower"][-1]
         f = (self.ph(d["hand"]) - self.ph(d["lower"][0])).normalized()
@@ -375,13 +329,13 @@ class Poser:
         a = cur - f * cur.dot(f)
         b = want - f * want.dot(f)
         if a.length < 1e-6 or b.length < 1e-6:
-            return 0.0, 0.0
+            return 0.0
         a.normalize()
         b.normalize()
-        need = math.atan2(a.cross(b).dot(f), a.dot(b))
-        ang = max(-math.radians(110), min(math.radians(110), need)) * 0.85
+        ang = math.atan2(a.cross(b).dot(f), a.dot(b))
+        ang = max(-math.radians(110), min(math.radians(110), ang)) * 0.85
         self.rotate_about(lo, self.ph(lo), Quaternion(f, ang))
-        return math.degrees(ang), math.degrees(need)
+        return math.degrees(ang)
 
     def wrist_bend(self, s):
         d = self.S[s]
@@ -389,74 +343,50 @@ class Poser:
         H, _P = self.hand_frame(s)
         return math.degrees(f.angle(H))
 
-    def set_shape(self, s, name):
-        """Key one of the fixed hand shapes on every finger joint of hand s (bone-local)."""
-        for bn, q in SQ[s][name].items():
-            p = self.P(bn)
-            p.matrix_basis = Matrix()
-            p.rotation_quaternion = q
-        C.update()
-
-    def place_rigid(self, s, shape, Q, A, nv, pole):
-        """Hand s in its fixed shape, its hold frame (the fist's channel) at Q, the frame axis
-        (little finger -> index side) along A, the palm on the nv side: wrist by IK, forearm roll,
-        exact hand rotation. Pa is where the hold frame actually ended up."""
-        fr = HF[s][shape]
-        a0 = Vector(fr["a"]).normalized()
-        p0 = Vector(fr["p"])
-        x0 = a0.cross(p0).normalized()
-        p0 = x0.cross(a0).normalized()
-        A = A.normalized()
-        Pv = nv - A * nv.dot(A)
-        if Pv.length < 1e-6:
-            Pv = A.orthogonal()
-        Pv.normalize()
-        X = A.cross(Pv)
-        R = Matrix((A, Pv, X)).transposed() @ Matrix((a0, p0, x0))
-        W = Q - R @ Vector(fr["c"])
+    def place_hand(self, s, contact, direction, palm_normal, pole):
+        """One explicit palm placement; arm IK only, no finger search or fitting."""
         self.reset_arm(s)
-        err = self.arm(s, W, pole)
-        roll, need = self.roll_forearm(s, R)
+        R = self.hand_rot(s, direction, palm_normal)
+        wrist = contact - R @ Vector(HM["hand"][s]["pc_local"])
+        err = self.arm(s, wrist, pole)
+        self.roll_forearm(s, R)
         self.set_hand_rot(s, R)
-        self.set_shape(s, shape)
-        Pa = self.P(self.S[s]["hand"]).matrix @ Vector(fr["c"])
-        return {"err": err, "roll": roll, "need": need, "R": R, "Pa": Pa, "Q": Q.copy(), "A": A.copy(),
-                "nv": Pv.copy(), "shape": shape}
+        return err
 
-    def hold(self, s, shape, Q, A, nv, pole, thumbs=(1,), rolls=None, slides=(0.0,), kpref=None, kweight=10.0, fixed=None):
-        """Place hand s, rigid in its fixed shape, on an object whose axis runs along A through Q.
-        The only choices are the hand's turn about the object (rolls), which way its thumb side
-        faces along it (thumbs) and, for a second hand, a slide along it (slides); they are judged
-        by reach, wrist bend and forearm twist. No finger is ever moved."""
-        rolls = G["rolls_deg"] if rolls is None else rolls
-        A = A.normalized()
-        nv = nv - A * nv.dot(A)
-        nv.normalize()
-        cands = [fixed] if fixed is not None else [(sl, td, r) for sl in slides for td in thumbs for r in rolls]
-        best = None
-        if len(cands) > 1:
-            for sl, td, r in cands:
-                h = self.place_rigid(s, shape, Q + A * sl, A * td, C.rot(A, r) @ nv, pole)
-                bend = self.wrist_bend(s)
-                turn = min(abs(r) % 360.0, 360.0 - abs(r) % 360.0)
-                sc = (400.0 * max(0.0, h["err"] - 0.002) + max(0.0, bend - G["wrist_ok_deg"])
-                      + 0.3 * max(0.0, abs(h["need"]) - 80.0) + 0.03 * turn + 100.0 * abs(sl)
-                      + (4.0 if td != thumbs[0] else 0.0))
-                if kpref is not None:
-                    kw = h["R"] @ Vector(HF[s][shape]["k"])
-                    sc += kweight * (1.0 - kw.dot(kpref.normalized()))
-                if best is None or sc < best[0]:
-                    best = (sc, (sl, td, r))
-            sl, td, r = best[1]
-        else:
-            sl, td, r = cands[0]
-        h = self.place_rigid(s, shape, Q + A * sl, A * td, C.rot(A, r) @ nv, pole)
-        h.update({"cand": (sl, td, r), "bend": self.wrist_bend(s), "tried": len(cands),
-                  "score": round(best[0], 2) if best else None})
-        return h
+    def closed_hand(self, s, kind="grip"):
+        """Fixed natural closure; only the manual's trigger/thumb and pinch exceptions."""
+        for ci, chain in enumerate(self.S[s]["fingers"]):
+            degs = G["thumb_deg"] if ci == 0 else G["closed_deg"]
+            if kind == "trigger" and ci == 0:
+                degs = (8.0, 10.0, 8.0)  # thumb laid along the stock
+            elif kind == "trigger" and ci == 1:
+                degs = (12.0, 45.0, 25.0) # forefinger to the trigger
+            elif kind == "pinch" and ci in (0, 1):
+                degs = (18.0, 45.0, 35.0) if ci == 1 else (32.0, 38.0, 20.0)
+            for k, bn in enumerate(chain):
+                if bn not in self.B:
+                    continue
+                d = (self.pt(bn) - self.ph(bn)).normalized()
+                axis = d.cross(self.palmar(bn))
+                if axis.length > 1e-6:
+                    self.rotate_about(bn, self.ph(bn), C.rot(axis.normalized(), degs[min(k, 2)]))
+
+    def curl(self, s, degs=(35, 50, 40), thumb=20):
+        """A relaxed hand (nothing held): every joint flexes toward its pad side."""
+        for ci, chain in enumerate(self.S[s]["fingers"]):
+            for k, bn in enumerate(chain):
+                if bn not in self.B:
+                    continue
+                dvec = (self.pt(bn) - self.ph(bn)).normalized()
+                pal = self.palm_world(s) if (ci == 0 and k == 0) else self.palmar(bn)
+                axis = dvec.cross(pal)
+                if axis.length < 1e-6:
+                    continue
+                ang = thumb * (1.0 if k == 0 else 0.6) if ci == 0 else degs[min(k, 2)]
+                self.rotate_about(bn, self.ph(bn), C.rot(axis.normalized(), ang))
 
     def hand(self, s, direction, palm_want=None):
-        """Point the hand along `direction` with the palm toward palm_want (free hands)."""
+        """Point the hand along `direction` with the palm toward palm_want (relaxed hands)."""
         if s in HM.get("hand", {}) and palm_want is not None:
             R = self.hand_rot(s, direction, palm_want)
             self.roll_forearm(s, R)
@@ -563,23 +493,22 @@ def place_gun(musket, M, frame):
     musket.keyframe_insert("rotation_quaternion", frame=frame)
 
 
-def ramrod_span(dz=0.0, drawn=False, extra=0.0):
-    """(z0, z1) of the rammer in gun-local coordinates for a key_ramrod state (axis on the bore).
-    extra: the rammer slid along its axis so it sits in the hand that holds it."""
+def ramrod_span(dz=0.0, drawn=False):
+    """(z0, z1) of the rammer in gun-local coordinates for a key_ramrod state (axis on the bore)."""
     L = GUN.get("L", 1.42)
     rb, rt = GUN.get("ramrod_bottom", 0.55), GUN.get("ramrod_top", L - 0.004)
-    off = ((L - rb + 0.03) if drawn else dz) + extra
+    off = (L - rb + 0.03) if drawn else dz
     return rb + off, rt + off
 
 
-def key_ramrod(rr, frame, dz=0.0, drawn=False, extra=0.0):
+def key_ramrod(rr, frame, dz=0.0, drawn=False):
     if rr is None:
         return
     L = GUN.get("L", 1.42)
     if drawn:   # pulled clean out and held above the muzzle, in line with the bore
-        rr.location = (0.0, 0.023, L - GUN.get("ramrod_bottom", 0.55) + 0.03 + extra)
+        rr.location = (0.0, 0.023, L - GUN.get("ramrod_bottom", 0.55) + 0.03)
     elif dz:
-        rr.location = (0.0, 0.023, dz + extra)
+        rr.location = (0.0, 0.023, dz)
     else:
         rr.location = (0.0, 0.0, 0.0)
     rr.keyframe_insert("location", frame=frame)
@@ -640,46 +569,51 @@ def hang_kit(ps, frame, swing_deg=0.0, plumb=True):
 
 # ------------------------------------------------------------------------------ poses
 
-def section_centre(z):
-    """Gun-local centre of the musket's cross-section at z (stock, and barrel where it lies on it)."""
+def fixed_grip(ps, s, contact, axis, outside, pole, surf, key, frame, kind="grip", extra=(), direction=None):
+    """Art-directed station and wrist frame; one shape, no solver, no channel/radius fitting."""
+    A = axis.normalized()
+    nv = (outside - A * outside.dot(A)).normalized()
+    H = A.cross(nv) * (-1 if s == "L" else 1)
+    H = (H + A * 0.25).normalized()
+    if direction is not None:
+        H = direction.normalized()
+    err = ps.place_hand(s, contact, H, -nv, pole)
+    ps.closed_hand(s, kind)
+    GRIPLOG.append((key, frame, s, surf, extra))
+    REP["grips"].setdefault(key, {})[s] = {"kind": kind, "contact": list(contact),
+        "wrist_bend_deg": round(ps.wrist_bend(s), 1), "method": "authored closed hand"}
+    return err, REP["grips"][key][s]
+
+
+def gun_grip(ps, s, M, z, side_dir, pole, key, frame, kind="grip", extra=(), direction=None):
+    gx, gy, gz = gun_axes(M)
+    nv = (side_dir - gz * side_dir.dot(gz)).normalized()
     h, w, cy = stock_at(z)
-    top, bot = cy + h / 2, cy - h / 2
-    if z >= GUN.get("br0", 0.4):
-        by, rb = GUN.get("barrel_y", 0.006), GUN.get("barrel_r", 0.0145)
-        top, bot = max(top, by + rb), min(bot, by - rb)
-    return Vector((0.0, (top + bot) / 2, z))
+    # The chosen cross-section is explicit. Diagnostics never push the hand into another station.
+    nx, ny = nv.dot(gx), nv.dot(gy)
+    radius = 1.0 / math.sqrt((nx / (w / 2)) ** 2 + (ny / (h / 2)) ** 2)
+    axis_pt = M @ Vector((0.0, cy, z))
+    return fixed_grip(ps, s, axis_pt + nv * (radius + 0.001), gz, nv, pole,
+                      GunSurf(M), key, frame, kind, extra, direction)
 
 
-def gun_hold(ps, s, M, z, shape, thumbs, nv, pole, centre=None, **kw):
-    """Hand s holds the musket at gun-local z: its fist's channel on the stock axis there."""
-    gz = gun_axes(M)[2]
-    loc = centre if centre is not None else section_centre(z)
-    h = ps.hold(s, shape, M @ loc, gz, nv, pole, thumbs=thumbs, **kw)
-    h["gun_loc"] = loc
-    return h
-
-
-def follow(M, h):
-    """The musket is attached to the first hand: it moves with that hand's hold frame."""
-    return Matrix.Translation(h["Pa"] - h["Q"]) @ M
-
-
-def log_hold(key, frame, s, h, surf, axis_pt, axis_dir, obj, extra=()):
-    """Record a held hand for the real-skin acceptance check (measure_holds)."""
-    HOLDLOG.append({"key": key, "frame": frame, "side": s, "shape": h["shape"], "surf": surf,
-                    "extra": tuple(extra), "axis_pt": axis_pt.copy(), "axis_dir": axis_dir.normalized(),
-                    "obj": obj})
-    sl, td, r = h.get("cand", (0.0, 1, 0.0))
-    REP["holds"].setdefault(key, {})[s] = {
-        "shape": h["shape"], "object": obj, "ik_err_m": round(h["err"], 4),
-        "wrist_bend_deg": round(h.get("bend", 0.0), 1), "forearm_roll_deg": round(h["roll"], 1),
-        "twist_needed_deg": round(h["need"], 1), "turn_deg": r, "thumb": "+" if td > 0 else "-",
-        "slide_m": sl, "placements_tried": h.get("tried", 1)}
-
-
-def free_hand(ps, s, key, frame):
-    ps.set_shape(s, "relaxed")
-    FREELOG.append((key, frame, s))
+def shoulder_arms(ps, musket, frame, key):
+    """Hardee para 121: right shoulder hollow, guard to front, arm nearly extended."""
+    F, L, U = ps.F, ps.L, ps.U
+    sh = ps.ph(ps.S["R"]["upper"][0])
+    reach = ps.len["R"]["upper"] + ps.len["R"]["lower"]
+    zg = (U - F * 0.035).normalized()
+    seat = sh + F * 0.045 + L * 0.020
+    contact_z = sh.z - reach * 0.90 - 0.035
+    heel = seat + zg * ((contact_z - G["grip_stand_R"] - seat.z) / zg.z)
+    M = gun_matrix(heel, zg, -F)
+    place_gun(musket, M, frame)
+    e, _ = gun_grip(ps, "R", M, G["grip_stand_R"], -L, -F - L * 0.25, key, frame, direction=-U)
+    REP["checks"].setdefault("right_shoulder_arms", {})[key] = {
+        "side": "R", "station_m": G["grip_stand_R"], "barrel_tilt_deg": round(math.degrees(zg.angle(U)), 2),
+        "axis_to_shoulder_m": round(((sh - heel) - zg * (sh - heel).dot(zg)).length, 4),
+        "guard_faces_front": gun_axes(M)[1].dot(-F) > 0.99}
+    return e
 
 
 def pose_stand(ps, musket, frame):
@@ -693,31 +627,8 @@ def pose_stand(ps, musket, frame):
         err["leg" + s] = ps.leg(s, ank, F)
         ps.foot(s, ps.foot_rest_dir(s, yaw_deg=sg * 28.0))
     ps.look(F + U * 0.06)
-    shR = ps.ph(ps.S["R"]["upper"][0])
-    reach = ps.len["R"]["upper"] + ps.len["R"]["lower"]
-    zg = (U - F * 0.05).normalized()
-    S0 = shR + F * 0.075 + L * 0.03
-    palm_z = shR.z - 0.93 * reach - 0.07
-    heel_z = palm_z - 0.34
-    heel = S0 + zg * ((heel_z - S0.z) / zg.z)
-    M = gun_matrix(heel, zg, -F)            # trigger guard to the front
     key = "stand0@%d" % frame
-    st = {}
-    gy0 = gun_axes(M)[1]
-
-    # run 23: the best-reaching fist showed only the back of the hand (read as a flat hand); the
-    # knuckles are asked to face the front, fingers round the swell and guard (Hardee, recalled)
-    def solve_r(k):
-        pole = -F - L * (0.3 + 6.0 * k)
-        st["h"] = gun_hold(ps, "R", M, G["grip_stand_R"], "grip", (1, -1), -L, pole, slides=(0.0, -0.03, 0.03),
-                           kpref=-gy0, kweight=25.0, fixed=st.get("cand"))
-        st.setdefault("cand", st["h"]["cand"])
-        err["armR"] = st["h"]["err"]
-    REP["checks"].setdefault("clearance", {})["stand_R"] = ps.clear("R", solve_r)
-    M = follow(M, st["h"])
-    place_gun(musket, M, frame)
-    gz = gun_axes(M)[2]
-    log_hold(key, frame, "R", st["h"], GunSurf(M), M @ st["h"]["gun_loc"], gz, "musket")
+    err["armR"] = shoulder_arms(ps, musket, frame, key)
     shL = ps.ph(ps.S["L"]["upper"][0])
     reachL = ps.len["L"]["upper"] + ps.len["L"]["lower"]
 
@@ -725,9 +636,8 @@ def pose_stand(ps, musket, frame):
         err["armL"] = ps.arm("L", shL - U * (0.93 * reachL) + F * (0.05 + 0.4 * k) + L * (0.06 + k),
                              -F + L * 0.3)
         ps.hand("L", -U, palm_want=-L)
-        ps.set_shape("L", "relaxed")
+        ps.curl("L", degs=(14, 22, 14), thumb=8)
     REP["checks"]["clearance"]["stand_L"] = ps.clear("L", solve_l)
-    FREELOG.append((key, frame, "L"))
     ps.key(frame)
     return err
 
@@ -776,31 +686,8 @@ def pose_walk(ps, musket, frame, k):
         err["leg" + s] = ps.leg(s, ank, F)
         ps.foot(s, ps.foot_rest_dir(s, pitch_deg=pitch, yaw_deg=(6.0 if s == "L" else -6.0)))
     ps.look(F + U * 0.02)
-    shR = ps.ph(ps.S["R"]["upper"][0])
-    B = shR + F * 0.17 - U * 0.27 + L * 0.07
-    Cp = shR + U * 0.075 + F * 0.02
-    zg = (Cp - B).normalized()
-    M = gun_matrix(B, zg, -F)
-    gx, gy, gz = gun_axes(M)
     key = "walk%d@%d" % (k, frame)
-    # the butt (110 mm deep) cannot pass through a fist: the fist closes on its toe edge, the
-    # knuckles under the toe, the palm on one face, the rest of the butt rising out of the fist
-    zw = G["grip_walk_R"]
-    hh, _w, cy = stock_at(zw)
-    loc = Vector((0.0, cy - hh / 2 + G["walk_toe_in"] * HF["R"]["grip"]["r"], zw))
-    st = {}
-
-    def solve_r(kk):
-        pole = -U - L * (0.4 + 6.0 * kk)
-        st["h"] = gun_hold(ps, "R", M, zw, "grip", (1, -1), -gx, pole, centre=loc,
-                           kpref=-gy, fixed=st.get("cand"))
-        st.setdefault("cand", st["h"]["cand"])
-        err["armR"] = st["h"]["err"]
-    REP["checks"].setdefault("clearance", {})["walk%d_R" % k] = ps.clear("R", solve_r)
-    M = follow(M, st["h"])
-    place_gun(musket, M, frame)
-    gx, gy, gz = gun_axes(M)
-    log_hold(key, frame, "R", st["h"], GunSurf(M), M @ loc, gz, "musket butt (toe edge)")
+    err["armR"] = shoulder_arms(ps, musket, frame, key)
     shL = ps.ph(ps.S["L"]["upper"][0])
     reachL = ps.len["L"]["upper"] + ps.len["L"]["lower"]
     swing = G["arm_swing_deg"] * math.cos(2 * math.pi * p)
@@ -809,13 +696,8 @@ def pose_walk(ps, musket, frame, k):
     def solve_l(kk):
         err["armL"] = ps.arm("L", shL + down * (0.93 * reachL) + L * (0.03 + kk) + F * (0.3 * kk), -F + L * 0.2)
         ps.hand("L", down + F * 0.1, palm_want=-L)
-        ps.set_shape("L", "relaxed")
+        ps.curl("L", degs=(15, 25, 15), thumb=8)
     REP["checks"]["clearance"]["walk%d_L" % k] = ps.clear("L", solve_l)
-    FREELOG.append((key, frame, "L"))
-    a = M.translation
-    sh_top = shR + U * 0.06
-    d_axis = ((sh_top - a) - gz * (sh_top - a).dot(gz)).length
-    REP["checks"].setdefault("musket_axis_to_shoulder_top_m", {})["walk%d" % k] = round(d_axis, 4)
     ps.key(frame)
     return err
 
@@ -824,13 +706,13 @@ def pose_fire(ps, musket, frame, stage):
     """stage 0 aim, 1 fire (recoil), 2 recover (piece brought down to the priming position)."""
     F, L, U = ps.F, ps.L, ps.U
     ps.reset()
-    yaw = G["aim_body_yaw_deg"] + (4.0 if stage == 1 else 0.0)
+    yaw = G["aim_body_yaw_deg"]
     back = {0: 0.0, 1: G["recoil_back_m"], 2: 0.0}[stage]
     rise = {0: 0.0, 1: G["recoil_deg"], 2: 0.0}[stage]       # aim: level barrel
     ps.translate(ps.rm["root"], -U * 0.025 - F * back)
     ps.root_rotate(C.rot(U, yaw))
     ps.spine(U, -yaw * 0.30)
-    ps.spine(L, {0: 9.0, 1: -12.0, 2: 3.0}[stage])    # aim leans in; the shot rocks him back
+    ps.spine(L, {0: 9.0, 1: 9.0, 2: 3.0}[stage])    # aim leans in; the shot rocks him back
     err = {}
     ankL = ps.ank_mid + L * G["fire_half_width"] + F * 0.20
     ankR = ps.ank_mid - L * G["fire_half_width"] - F * 0.16
@@ -840,19 +722,20 @@ def pose_fire(ps, musket, frame, stage):
     ps.foot("R", ps.foot_rest_dir("R", yaw_deg=-72.0))
     key = "fire%d@%d" % (stage, frame)
     if stage < 2:
-        # aim: head down on the stock; fire: head thrown up with the recoil
-        ps.look(F - U * (0.30 if stage == 0 else -0.10), roll_deg=-20.0 if stage == 0 else -6.0)
+        # Aim and fire: keep the head inclined on the butt (Baxter p53).
+        ps.look(F - U * 0.30, roll_deg=-20.0)
         shR = ps.ph(ps.S["R"]["upper"][0])
         P0 = shR + F * 0.03 + L * 0.07 + U * 0.03
         zdir = C.rot(L, -rise) @ F
         M0 = gun_matrix(P0, zdir, U)
         gx, gy, gz = gun_axes(M0)
         M = gun_matrix(P0 + gy * 0.05, zdir, U)
-        zR, zL = G["grip_aim_R"], G["grip_aim_L"]
-        # right hand: a fist round the wrist of the stock, palm on the lock side, knuckles under,
-        # thumb over the comb; left hand: a fist round the forestock from below
-        nR, poleR = lambda gx, gy: -gx + gy * 0.2, -L - U * 0.3
-        nL, poleL = lambda gx, gy: -gy + gx * 0.25, -U + L * 0.2
+        place_gun(musket, M, frame)
+        gx, gy, gz = gun_axes(M)
+        # left hand cradles the forestock from below; right hand round the wrist of the stock,
+        # palm on the lock (right, -x) side
+        err["armL"], _ = gun_grip(ps, "L", M, G["grip_aim_L"], -gy + gx * 0.25, -U + L * 0.2, key, frame)
+        err["armR"], _ = gun_grip(ps, "R", M, G["grip_aim_R"], -gx + gy * 0.2, -L + U * 0.10, key, frame, kind="trigger")
     else:
         ps.look(F * 0.9 - U * 0.25)
         hipR = ps.ph(ps.S["R"]["thigh"][0])
@@ -860,18 +743,10 @@ def pose_fire(ps, musket, frame, stage):
         heel = hipR + Fy * 0.16 + U * 0.04 - L * 0.02
         zdir = (Fy * 0.62 + U * 0.75 + L * 0.22).normalized()
         M = gun_matrix(heel, zdir, U)
-        zR, zL = G["grip_recover_R"], G["grip_recover_L"]
-        nR, poleR = lambda gx, gy: -gx, -U - L * 0.6
-        nL, poleL = lambda gx, gy: -gy + gx * 0.3, -U + L * 0.5
-    gx, gy, gz = gun_axes(M)
-    hR = gun_hold(ps, "R", M, zR, "grip", (1, -1), nR(gx, gy), poleR)
-    M = follow(M, hR)                      # the musket is in the right hand
-    place_gun(musket, M, frame)
-    gx, gy, gz = gun_axes(M)
-    hL = gun_hold(ps, "L", M, zL, "grip", (1, -1), nL(gx, gy), poleL, slides=G["slides_m"])
-    err["armR"], err["armL"] = hR["err"], hL["err"]
-    log_hold(key, frame, "R", hR, GunSurf(M), M @ hR["gun_loc"], gz, "musket")
-    log_hold(key, frame, "L", hL, GunSurf(M), hL["Q"], gz, "musket")
+        place_gun(musket, M, frame)
+        gx, gy, gz = gun_axes(M)
+        err["armL"], _ = gun_grip(ps, "L", M, G["grip_recover_L"], -gy + gx * 0.3, -U + L * 0.5, key, frame)
+        err["armR"], _ = gun_grip(ps, "R", M, G["grip_recover_R"], -gx, -U - L * 0.6, key, frame)
     ps.key(frame)
     return err
 
@@ -910,9 +785,8 @@ def pose_fallen(ps, musket, frame):
     err["armL"] = ps.arm("L", wL, Lb + U * 0.5)
     ps.hand("R", -Lb - Fb * 0.3, palm_want=U)
     ps.hand("L", -Lb, palm_want=-U)
-    key = "fallen0@%d" % frame
-    free_hand(ps, "R", key, frame)
-    free_hand(ps, "L", key, frame)
+    ps.curl("R", degs=(25, 30, 20), thumb=10)
+    ps.curl("L", degs=(20, 25, 15), thumb=10)
     heel = ps.pelvis() - Lb * 0.55 + Fb * 0.35
     heel.z = 0.022
     M = gun_matrix(heel, C.rot(U, -25.0) @ (-Fb), -Lb)
@@ -940,27 +814,21 @@ def pose_load(ps, musket, frame, step, rr, cart):
     by = GUN.get("barrel_y", 0.006)
     key = "load%d@%d" % (step, frame)
     park = ps.ph(ps.S["R"]["hand"])
-    small = "grip_small"                      # cartridge and rammer: the GRIP angles closed on a 13 mm channel
     if step < 4:
-        heel = ps.ank_mid + F * 0.20 + L * 0.06
+        heel = ps.ank_mid + F * 0.10 + L * 0.09
         heel.z = 0.0
-        zdir = (U - F * 0.12 + L * 0.03).normalized()
+        zdir = (U - L * 0.063).normalized()
         M = gun_matrix(heel, zdir, -F)
-        gx, gy, gz = gun_axes(M)
-        # the left hand holds the upright piece by the barrel and forestock; the piece is in it
-        hL = gun_hold(ps, "L", M, G["grip_load_L"], "grip", (1, -1), L * 0.8 - F * 0.4, -U + L * 0.6,
-                      slides=(0.0, -0.03, 0.03, -0.06))
-        M = follow(M, hL)
         place_gun(musket, M, frame)
         gx, gy, gz = gun_axes(M)
-        err["armL"] = hL["err"]
-        log_hold(key, frame, "L", hL, GunSurf(M), M @ hL["gun_loc"], gz, "musket")
         muzzle = M @ Vector((0.0, by, Lg))
         ps.look(F - U * 0.28 + L * 0.08)
         if step in (0, 1):
             key_ramrod(rr, frame)
-            # the cartridge is held in the right fist and keyed from it:
-            # above the open box, then over the muzzle, torn end down
+            # the cartridge is placed in the world first (above the open box; then over the muzzle,
+            # torn end down) and the right hand grips it like any object, but with the palm held
+            # off so only the thumb and first two fingers close on it (ring and little curl
+            # relaxed): a fingertip pinch that leaves most of the cartridge in view
             cl, cr = UNI.get("cartridge_len", 0.068), UNI.get("cartridge_r", 0.0075)
             if step == 0:
                 box = next((c for n, c, r in ps.obstacles() if n == "cartridge box"), None)
@@ -971,28 +839,35 @@ def pose_load(ps, musket, frame, step, rr, cart):
                 centre = muzzle + U * (cl / 2 + 0.015)
                 X = gz.copy()                              # upright, torn end toward the muzzle
                 nv, pole = (-F * 0.6 - L * 0.5 + U * 0.2).normalized(), -U - L * 0.5
-            h = ps.hold("R", small, centre, X, nv, pole, thumbs=(1, -1))
-            Aw = h["R"] @ Vector(HF["R"][small]["a"])
-            if Aw.dot(X) < 0:
-                Aw = -Aw
-            key_cartridge(cart, frame, h["Pa"], Aw, h["nv"])
-            surf = CylSurf(h["Pa"] - Aw * (cl / 2), Aw, cr, cl)
-            log_hold(key, frame, "R", h, surf, h["Pa"], Aw, "cartridge", extra=(GunSurf(M),))
-            err["armR"] = h["err"]
-        else:
-            drawn = step == 2
-            dz = 0.0 if drawn else G["rammer_ram_dz"]
-            z0, z1 = ramrod_span(dz=dz, drawn=drawn)
-            hold_at = M @ Vector((0.0, by, Lg + G["grip_rammer_drawn" if drawn else "grip_rammer_ram"]))
-            h = ps.hold("R", small, hold_at, gz, -F - L * 0.4, -L - U * (0.2 if drawn else 0.3), thumbs=(1, -1))
-            ex = (h["Pa"] - hold_at).dot(gz)          # the rammer slides to sit in the hand
-            key_ramrod(rr, frame, dz=dz, drawn=drawn, extra=ex)
-            a = M @ Vector((0.0, by, z0 + ex))
+            a = centre - X * (cl / 2)
+            surf = CylSurf(a, X, cr, cl)
+            err["armR"], res = fixed_grip(ps, "R", centre + nv * (cr + 0.014), X, nv, pole,
+                surf, key, frame, kind="pinch", extra=(GunSurf(M),))
+            res["object"] = "cartridge"
+            key_cartridge(cart, frame, centre, X, nv)
+        elif step == 2:
+            key_ramrod(rr, frame, drawn=True)
+            z0, z1 = ramrod_span(drawn=True)
+            a = M @ Vector((0.0, by, z0))
             surf = CylSurf(a, gz, 0.0045, z1 - z0)
-            log_hold(key, frame, "R", h, surf, a, gz, "rammer", extra=(GunSurf(M),))
-            REP["holds"][key]["R"]["rammer_slid_m"] = round(ex, 4)
-            err["armR"] = h["err"]
+            hold = M @ Vector((0.0, by, Lg + G["grip_rammer_drawn"]))
+            nv = (-F - L * 0.4).normalized()
+            e_, res = fixed_grip(ps, "R", hold + nv * 0.018, gz, nv, -U - L * 0.10,
+                surf, key, frame, kind="pinch", extra=(GunSurf(M),))
+            err["armR"] = e_
             key_cartridge(cart, frame, park=park)
+        else:
+            key_ramrod(rr, frame, dz=G["rammer_ram_dz"])
+            z0, z1 = ramrod_span(dz=G["rammer_ram_dz"])
+            a = M @ Vector((0.0, by, z0))
+            surf = CylSurf(a, gz, 0.0045, z1 - z0)
+            hold = M @ Vector((0.0, by, Lg + G["grip_rammer_ram"]))
+            nv = (-F - L * 0.4).normalized()
+            e_, res = fixed_grip(ps, "R", hold + nv * 0.018, gz, nv, -U - L * 0.10,
+                surf, key, frame, kind="pinch", extra=(GunSurf(M),))
+            err["armR"] = e_
+            key_cartridge(cart, frame, park=park)
+        err["armL"], _ = gun_grip(ps, "L", M, G["grip_load_L"], L * 0.8 - F * 0.4, -U + L * 0.6, key, frame, direction=U)
     else:
         key_ramrod(rr, frame)
         key_cartridge(cart, frame, park=park)
@@ -1000,17 +875,11 @@ def pose_load(ps, musket, frame, step, rr, cart):
         heel = hipR + F * 0.18 + U * 0.02 + L * 0.02
         zdir = (F * 0.55 + U * 0.80 + L * 0.22).normalized()
         M = gun_matrix(heel, zdir, U)
-        gx, gy, gz = gun_axes(M)
-        ps.look(F * 0.8 - U * 0.4)
-        hR = gun_hold(ps, "R", M, G["grip_prime_R"], "grip", (1, -1), -gx, -U - L * 0.6)
-        M = follow(M, hR)
         place_gun(musket, M, frame)
         gx, gy, gz = gun_axes(M)
-        hL = gun_hold(ps, "L", M, G["grip_prime_L"], "grip", (1, -1), -gy + gx * 0.3, -U + L * 0.5,
-                      slides=G["slides_m"])
-        err["armR"], err["armL"] = hR["err"], hL["err"]
-        log_hold(key, frame, "R", hR, GunSurf(M), M @ hR["gun_loc"], gz, "musket")
-        log_hold(key, frame, "L", hL, GunSurf(M), hL["Q"], gz, "musket")
+        ps.look(F * 0.8 - U * 0.4)
+        err["armL"], _ = gun_grip(ps, "L", M, G["grip_prime_L"], -gy + gx * 0.3, -U + L * 0.5, key, frame)
+        err["armR"], _ = gun_grip(ps, "R", M, G["grip_prime_R"], -gx, -U - L * 0.6, key, frame)
     ps.key(frame)
     return err
 
@@ -1018,9 +887,9 @@ def pose_load(ps, musket, frame, step, rr, cart):
 # ------------------------------------------------------------------------------ hand model
 
 def measure_hands(ps, body):
-    """From the rest mesh (shape keys on, no armature): each finger segment's pad side (opposite
-    its fingernail), the palm normal, the palm centre on the skin, the hand's rest frame (all in
-    bone-local coordinates) and which hand vertices belong to which bone."""
+    """From the rest mesh (shape keys on, no armature): per finger segment the pad thickness and
+    the pad-side direction (opposite the fingernail), the palm thickness, the palm centre and
+    the hand's rest frame, all stored in bone-local coordinates."""
     rig = ps.rig
     C.update()
     dg = bpy.context.evaluated_depsgraph_get()
@@ -1051,7 +920,7 @@ def measure_hands(ps, body):
             hand_bones.update(chain)
         for k in range(1, 5):
             hand_bones.add("metacarpal%d.%s" % (k, s))
-    by_bone = {"L": {}, "R": {}}
+    owner = {}
     for v in body.data.vertices:
         best, bw = None, 0.3
         for g in v.groups:
@@ -1059,8 +928,11 @@ def measure_hands(ps, body):
             if nm in hand_bones and g.weight > bw:
                 best, bw = nm, g.weight
         if best:
-            by_bone["L" if best.endswith(".L") else "R"].setdefault(best, []).append(v.index)
-    pal_local, report, hands = {}, {}, {}
+            owner[v.index] = best
+    by_bone = {}
+    for i, b in owner.items():
+        by_bone.setdefault(b, []).append(i)
+    pal_local, pad, rad, report = {}, {}, {}, {}
 
     def axis_pt(b, p):
         h, t = ps.rh(b), ps.rt(b)
@@ -1068,13 +940,13 @@ def measure_hands(ps, body):
         u = max(0.0, min(1.0, (p - h).dot(ab) / max(1e-9, ab.dot(ab))))
         return h + ab * u, ab.normalized()
 
+    hands = {}
     for s in ("L", "R"):
         d = ps.S[s]
-        bb = by_bone[s]
         dorsal = {}
         for ci, chain in enumerate(d["fingers"]):
             dist_b = chain[-1]
-            nv = [i for i in bb.get(dist_b, []) if i in nail_verts]
+            nv = [i for i in by_bone.get(dist_b, []) if i in nail_verts]
             if len(nv) >= 3:
                 nc = Vector(Pw[nv].mean(axis=0).tolist())
                 q, ax = axis_pt(dist_b, nc)
@@ -1083,29 +955,45 @@ def measure_hands(ps, body):
                 if dv.length > 1e-6:
                     dorsal[ci] = dv.normalized()
         report[s] = {"nails_found": sorted(dorsal.keys())}
-        fb_pal, _fb_hd = ps.palm(s)
+        fb_pal, fb_hd = ps.palm(s)
         H0 = (ps.rh(d["fingers"][2][0]) - ps.rh(d["hand"])).normalized()
         if dorsal:
             ph_ = -sum((dorsal[c] for c in dorsal if c > 0), Vector()) if any(c > 0 for c in dorsal) else -dorsal[0]
         else:
             ph_ = fb_pal
         P0 = (ph_ - H0 * ph_.dot(H0)).normalized()
+        report[s]["palmar_vs_second_pass_deg"] = round(math.degrees(P0.angle(fb_pal)), 1)
         for ci, chain in enumerate(d["fingers"]):
             dv = dorsal.get(ci, -P0)
             for b in chain:
                 if b not in ps.B:
                     continue
-                ax = (ps.rt(b) - ps.rh(b)).normalized()
+                h, t = ps.rh(b), ps.rt(b)
+                ax = (t - h).normalized()
                 pw = -(dv - ax * dv.dot(ax))
                 if pw.length < 1e-6:
                     pw = P0.copy()
                 pw.normalize()
-                pal_local[b] = list(ps.B[b].matrix_local.to_3x3().inverted() @ pw)
+                Bm = ps.B[b].matrix_local.to_3x3()
+                pal_local[b] = list(Bm.inverted() @ pw)
+                ds, dp = [], []
+                for i in by_bone.get(b, []):
+                    p = Vector(Pw[i].tolist())
+                    q, _ax = axis_pt(b, p)
+                    r = p - q
+                    ds.append(r.length)
+                    if r.dot(pw) > 0.3 * r.length:
+                        dp.append(r.length)
+                if ds:
+                    rad[b] = float(np.percentile(ds, 60))
+                    pad[b] = float(np.percentile(dp, G["pad_percentile"])) if len(dp) >= 3 else rad[b]
+                else:
+                    rad[b] = pad[b] = 0.0085
         kn = [ps.rh(d["fingers"][c][0]) for c in (1, 2, 3, 4)]
         pc0 = sum(kn, Vector()) / 4 * 0.55 + ps.rh(d["hand"]) * 0.45
         palm_ds = []
         for k in range(1, 5):
-            for i in bb.get("metacarpal%d.%s" % (k, s), []):
+            for i in by_bone.get("metacarpal%d.%s" % (k, s), []):
                 dd = (Vector(Pw[i].tolist()) - pc0).dot(P0)
                 if dd > 0:
                     palm_ds.append(dd)
@@ -1113,319 +1001,74 @@ def measure_hands(ps, body):
         pcr = pc0 + P0 * palm_pad
         Bw = ps.B[d["hand"]].matrix_local
         hands[s] = {"H0": list(Bw.to_3x3().inverted() @ H0), "P0": list(Bw.to_3x3().inverted() @ P0),
-                    "pc_local": list(Bw.inverted() @ pcr)}
+                    "pc_local": list(Bw.inverted() @ pcr), "palm_pad": palm_pad}
         report[s].update({"palm_pad_mm": round(palm_pad * 1000, 1),
-                          "hand_vertices": sum(len(v) for v in bb.values())})
-    HM.update({"palmar_local": pal_local, "hand": hands, "by_bone": by_bone})
-    REP["hand_rest"] = report
+                          "pad_mm": {b: round(pad[b] * 1000, 1) for c in d["fingers"] for b in c if b in pad},
+                          "hand_vertices": sum(len(by_bone.get(b, [])) for b in hand_bones if b.endswith("." + s))})
+    HM.update({"palmar_local": pal_local, "pad": pad, "radius": rad, "hand": hands, "owner": owner})
+    REP["hand_model"] = report
 
 
-def shape_quats(ps, s, spec, kf=1.0, kt=1.0, scaled=(1, 2, 3, 4), thumb=None):
-    """Bone-local rotations of one fixed shape for hand s. Fingers flex about their own joint axis
-    (fingernail side out); MCPs also swing toward the middle finger by spec["together"] of the rest
-    spread. The thumb flexes toward the palm and swings across it, then its two joints flex.
-    kf scales the flexion of the fingers in `scaled`; kt scales the thumb (one-time fits)."""
-    d = ps.S[s]
-    h = HM["hand"][s]
-    Bw = ps.B[d["hand"]].matrix_local.to_3x3()
-    H0 = (Bw @ Vector(h["H0"])).normalized()
-    P0 = (Bw @ Vector(h["P0"])).normalized()
-    mid = d["fingers"][2][0]
-    ref = (ps.rt(mid) - ps.rh(mid)).normalized()
-    Y = Vector((0.0, 1.0, 0.0))
-    out = {}
-    for ci, chain in enumerate(d["fingers"]):
-        for k, bn in enumerate(chain):
-            if bn not in ps.B:
-                continue
-            Bm = ps.B[bn].matrix_local.to_3x3()
-            Bi = Bm.inverted()
-            pal = Vector(HM["palmar_local"].get(bn, list(Bi @ P0))).normalized()
-            if ci == 0:
-                fl, op, m1, m2 = thumb if thumb is not None else spec["thumb"]
-                if k == 0:
-                    ax_f = Y.cross((Bi @ P0).normalized())
-                    q_f = Quaternion(ax_f.normalized(), math.radians(fl * kt)) if ax_f.length > 1e-6 else Quaternion()
-                    d1 = (Bm @ (q_f @ Y)).normalized()
-                    tgt = (ps.rh(mid) - ps.rh(bn)).normalized()
-                    sg = 1.0 if (C.rot(H0, op) @ d1).dot(tgt) >= (C.rot(H0, -op) @ d1).dot(tgt) else -1.0
-                    q = Quaternion((Bi @ H0).normalized(), math.radians(sg * op * kt)) @ q_f
-                else:
-                    q = Quaternion(Y.cross(pal).normalized(), math.radians((m1, m2)[min(k, 2) - 1] * kt))
-            else:
-                f_ = kf[ci - 1] if isinstance(kf, (tuple, list)) else kf     # one factor, or one per finger
-                ang = spec["fingers"][ci - 1][min(k, 2)] * (f_ if ci in scaled else 1.0)
-                q = Quaternion(Y.cross(pal).normalized(), math.radians(ang))
-                if k == 0 and spec.get("together"):
-                    pa = (Bm @ pal).normalized()
-                    dk = (Bm @ Y).normalized()
-                    t = ref - pa * ref.dot(pa)
-                    if t.length > 1e-6:
-                        t.normalize()
-                        al = math.atan2(dk.cross(t).dot(pa), dk.dot(t))
-                        q = Quaternion(pal, al * spec["together"]) @ q
-            out[bn] = q
-    return out
-
-
-def pad_side(pts, h, t, pal, cos_min=0.5):
-    """The skin points of one segment (bone h->t) that face the pad direction pal."""
-    ab = np.array((t - h)[:])
-    q = pts - np.array(h[:])
-    u = np.clip((q @ ab) / max(float(ab @ ab), 1e-12), 0.0, 1.0)
-    rad = q - u[:, None] * ab
-    nr = np.linalg.norm(rad, axis=1) + 1e-12
-    return pts[(rad @ np.array(pal[:])) > cos_min * nr]
-
-
-def circle2d(x, y):
-    """Least-squares circle through 2-D points -> (cx, cy, r)."""
-    A = np.c_[x, y, np.ones_like(x)]
-    sol = np.linalg.lstsq(A, -(x * x + y * y), rcond=None)[0]
-    cx, cy = -sol[0] / 2, -sol[1] / 2
-    return float(cx), float(cy), float(math.sqrt(max(cx * cx + cy * cy - sol[2], 0.0)))
-
-
-def fist_channel(ps, s, V, a0):
-    """The channel of the closed hand, measured on its real skin: for each finger (index..little)
-    the circle that its pad skin and the palm skin under it wrap round (fitted in that finger's
-    curl plane); the channel's axis is the line through the four ring centres, its radius their
-    mean. -> (centre, axis, radius, per-finger radii)."""
-    d = ps.S[s]
-    Hw, Pw = ps.hand_frame(s)
-    mets = [b for b in V if b.startswith("metacarpal")]
-    cs, rs = [], []
-    for ci in (1, 2, 3, 4):
-        chain = d["fingers"][ci]
-        b0 = chain[0]
-        y0 = (ps.pt(b0) - ps.ph(b0)).normalized()
-        pal0 = (ps.P(b0).matrix.to_3x3() @ Vector(HM["palmar_local"][b0])).normalized()
-        n = y0.cross(pal0).normalized()
-        o = ps.ph(b0)
-        e1 = (Hw - n * Hw.dot(n)).normalized()
-        e2 = n.cross(e1)
-        pts = []
-        for bn in chain:
-            if bn in V:
-                pal = (ps.P(bn).matrix.to_3x3() @ Vector(HM["palmar_local"][bn])).normalized()
-                pts.append(pad_side(V[bn], ps.ph(bn), ps.pt(bn), pal))
-        if mets:
-            mb = min(mets, key=lambda b: (ps.pt(b) - o).length)
-            pts.append(pad_side(V[mb], ps.ph(mb), ps.pt(mb), Pw))
-        q = np.concatenate(pts) - np.array(o[:])
-        q = q[np.abs(q @ np.array(n[:])) < 0.012]
-        if len(q) < 8:
-            continue
-        cx, cy, r = circle2d(q @ np.array(e1[:]), q @ np.array(e2[:]))
-        cs.append(o + e1 * cx + e2 * cy)
-        rs.append(r)
-    if len(cs) < 2:
-        return None
-    Cm = np.array([c[:] for c in cs])
-    m = Cm.mean(axis=0)
-    ax = Vector(np.linalg.svd(Cm - m)[2][0].tolist()).normalized()
-    if ax.dot(a0) < 0:
-        ax = -ax
-    if math.degrees(ax.angle(a0)) > 40.0:       # ring centres too scattered to trust: knuckle line
-        ax = a0.copy()
-    return Vector(m.tolist()), ax, float(np.mean(rs)), [round(r * 1000, 1) for r in rs]
-
-
-def cyl_gap(pts, cen, ax, r):
-    """Signed distance (m) of points to the cylinder (cen, ax, r); + outside."""
-    q = pts - np.array(cen[:])
-    t = q @ np.array(ax[:])
-    return np.sqrt(np.maximum((q * q).sum(1) - t * t, 0.0)) - r
-
-
-def fit_grip(ps, body, s, name, target, per_finger=False, thumb_in=0.004):
-    """Fit one closed fist, once, at rest, on the real skin: the authored GRIP angles x one curl
-    factor for a channel of radius `target`; with per_finger, then x one factor per finger so
-    each fingertip just meets that channel (used for grip_small only: run 23 showed it loosened the
-    40 mm fist); then the thumb, picked once from a grid. Stores SQ[s][name] and HF[s][name]."""
-    d = ps.S[s]
-    ps.reset()
-    Mw = ps.P(d["hand"]).matrix.copy()
-    Mi, R3i = Mw.inverted(), Mw.to_3x3().inverted()
-    H0w, P0w = ps.hand_frame(s)
-    pc = ps.palm_centre(s)
-    kn = [ps.ph(d["fingers"][c][0]) for c in (1, 2, 3, 4)]
-    a0 = (kn[0] - kn[3]).normalized()                      # little -> index knuckle
-    kmid = sum(kn, Vector()) / 4
-    thumb_b = [b for b in d["fingers"][0][1:] if b in ps.B]
-    tip_b = [d["fingers"][c][-1] for c in (1, 2, 3, 4)]
-    names = ("thumb", "index", "middle", "ring", "little")
-
-    def at(kf, kt):
-        SQ[s][name] = shape_quats(ps, s, SHAPES["grip"], kf=kf, kt=kt)
-        ps.set_shape(s, name)
-        V = hand_verts(ps, body, s)
-        return fist_channel(ps, s, V, a0), V
-
-    # 1. one curl factor -> channel radius (thumb open while fitting)
-    lo, hi, hist = 0.4, 1.6, []
-    for _ in range(10):
-        k = (lo + hi) / 2
-        res, _V = at(k, 0.0)
-        hist.append([round(k, 3), round(res[2] * 1000, 1) if res else None])
-        if res is None or res[2] > target:
-            lo = k
-        else:
-            hi = k
-    kg = (lo + hi) / 2
-    res, V = at(kg, 0.0)
-    found = res is not None
-    cen, ax, r, rings = res if found else (pc + P0w * target, a0.copy(), target, [])
-    # 2. one factor per finger -> its fingertip just meets the channel (+0.5 mm); twice, refitting
-    #    the channel in between
-    kf = [kg] * 4
-    for _round in range(2 if per_finger else 0):
-        lo4, hi4 = [0.3 * kg] * 4, [min(1.9, 1.8 * kg)] * 4
-        for _ in range(9):
-            mid = [(a + b) / 2 for a, b in zip(lo4, hi4)]
-            _res, Vt = at(mid, 0.0)
-            for i, b in enumerate(tip_b):
-                if b not in Vt:
-                    continue
-                if float(cyl_gap(Vt[b], cen, ax, target).min()) > 0.0005:
-                    lo4[i] = mid[i]
-                else:
-                    hi4[i] = mid[i]
-        kf = [(a + b) / 2 for a, b in zip(lo4, hi4)]
-        res, V = at(kf, 0.0)
-        if res is not None:
-            cen, ax, r, rings = res
-
-    # 3. the thumb, chosen once from a small grid (run 22: one factor on the authored thumb left
-    #    it straight and sticking out): closed over the fingers (its tip as near the forefinger's
-    #    middle segment as it gets) without entering the channel (the held object)
-    ib = d["fingers"][1][1] if len(d["fingers"][1]) > 1 else d["fingers"][1][-1]
-    tt = d["fingers"][0][-1]
-    tgrid = []
-    for fl in (0.0, 15.0, 30.0, 45.0, 60.0):
-        for op in (0.0, 20.0, 40.0, 60.0):
-            for m1, m2 in ((0.0, 0.0), (20.0, 20.0), (40.0, 30.0), (60.0, 45.0)):
-                th = (fl, op, m1, m2)
-                SQ[s][name] = shape_quats(ps, s, SHAPES["grip"], kf=kf, thumb=th)
-                ps.set_shape(s, name)
-                Vt = hand_verts(ps, body, s)
-                if tt not in Vt or ib not in Vt:
-                    continue
-                gap = min(float(cyl_gap(Vt[b], cen, ax, target).min()) for b in thumb_b if b in Vt)
-                A_, B_ = Vt[tt], Vt[ib]
-                reach = float(np.sqrt(((A_[:, None, :] - B_[None, :, :]) ** 2).sum(2)).min())
-                sc = reach + 5.0 * max(0.0, -gap - thumb_in) + 0.00002 * (fl + op + m1 + m2)
-                tgrid.append((sc, th, reach, gap))
-    tgrid.sort(key=lambda x: x[0])
-    thumb = tgrid[0][1] if tgrid else SHAPES["grip"]["thumb"]
-    SQ[s][name] = shape_quats(ps, s, SHAPES["grip"], kf=kf, thumb=thumb)
-    ps.set_shape(s, name)
-    V = hand_verts(ps, body, s)
-    tpick = tgrid[0] if tgrid else (None, thumb, None, None)
-    cen = cen + ax * (kmid - cen).dot(ax)                  # the middle of the fist's width
-    pv = pc - cen
-    pv = (pv - ax * pv.dot(ax)).normalized()
-    prox = sum(((ps.ph(c[0]) + ps.pt(c[0])) / 2 for c in d["fingers"][1:]), Vector()) / 4 - cen
-    kv = (prox - ax * prox.dot(ax) - pv * prox.dot(pv)).normalized()
-    HF[s][name] = {"c": list(Mi @ cen), "a": list(R3i @ ax), "p": list(R3i @ pv), "k": list(R3i @ kv), "r": target}
-    tips = {names[ci]: round(float(cyl_gap(V[c[-1]], cen, ax, target).min()) * 1000, 1)
-            for ci, c in enumerate(d["fingers"]) if c[-1] in V}
-    ps.reset()
-    return {"channel_diameter_mm": round(2 * target * 1000, 1), "fitted_ring_diameter_mm": round(2 * r * 1000, 1),
-            "ring_radii_mm": rings, "curl_factor": round(kg, 3), "finger_factors": [round(x, 3) for x in kf],
-            "thumb_deg": {"flex": thumb[0], "opposition": thumb[1], "mcp": thumb[2], "ip": thumb[3],
-                          "tip_to_forefinger_mm": None if tpick[2] is None else round(tpick[2] * 1000, 1),
-                          "into_channel_mm": None if tpick[3] is None else round(max(0.0, -tpick[3]) * 1000, 1)},
-            "channel_found": found,
-            "joint_angles_deg": {names[ci]: [round(a * kf[ci - 1], 1) for a in SHAPES["grip"]["fingers"][ci - 1]] for ci in (1, 2, 3, 4)},
-            "channel_axis_to_knuckle_line_deg": round(math.degrees(ax.angle(a0)), 1),
-            "channel_axis_to_hand_axis_deg": round(math.degrees(ax.angle(H0w)), 1),
-            "tips_to_channel_mm": tips, "fit": hist}
-
-
-def calibrate_hands(ps, body):
-    """Once, at the rest pose: RELAXED as authored; GRIP fitted to the stock (40 mm channel) and
-    the same GRIP angles closed tighter, "grip_small", for the rammer and cartridge (13 mm).
-    No pose ever changes a finger."""
-    rep = {}
-    for s in ("L", "R"):
-        ps.reset()
-        SQ[s]["relaxed"] = shape_quats(ps, s, SHAPES["relaxed"])
-        rep[s] = {"grip": fit_grip(ps, body, s, "grip", G["grip_channel_r"], per_finger=False, thumb_in=0.004),
-                  "grip_small": fit_grip(ps, body, s, "grip_small", G["grip_small_r"], per_finger=True, thumb_in=0.002)}
-        ps.reset()
-    REP["hand_shapes"] = {
-        "shapes": SHAPES, "fitted": rep,
-        "note": "fixed hand shapes, the same joint angles in every clip and for both hands (mirrored). GRIP: the "
-                "authored angles x one curl factor and one factor per finger, fitted once at rest on the real "
-                "skin to a 40 mm channel (the stock); grip_small: the same, to a 13 mm channel (rammer, cartridge)"}
-
-
-def shape_dev(ps, s, shape):
-    """Largest angle (deg) between any finger joint's keyed rotation and its fixed shape."""
-    worst = 0.0
-    for bn, q in SQ[s][shape].items():
-        cur = ps.P(bn).rotation_quaternion
-        worst = max(worst, math.degrees(cur.rotation_difference(q).angle))
-    return round(worst, 2)
-
-
-def measure_holds(ps, body):
-    """The acceptance check, on the real skinned hand at every keyed frame: deviation from the
-    fixed shape, hold frame (fist channel) to the held object's axis, each fingertip's
-    distance to the held surface (+ outside, - inside) and the deepest penetration."""
+def measure_contacts(ps, body):
+    """The real skinned hand mesh against each logged grip surface: segments in contact (a vertex
+    of that segment within contact_mm of the surface) and the deepest penetration (into the
+    target or any other surface logged for that frame, e.g. the musket while holding the rammer)."""
     sc = bpy.context.scene
-    names = ("thumb", "index", "middle", "ring", "little")
-    summary, worst = {}, {"shape_dev_deg": 0.0, "axis_mm": 0.0, "tip_gap_max_mm": 0.0, "penetration_mm": 0.0}
-    for e in HOLDLOG:
-        sc.frame_set(e["frame"])
-        C.update()
-        s, shape = e["side"], e["shape"]
-        dev = shape_dev(ps, s, shape)
-        V = hand_verts(ps, body, s)
-        fr = HF[s][shape]
-        Mw = ps.P(ps.S[s]["hand"]).matrix
-        cen = Mw @ Vector(fr["c"])
-        ax = (Mw.to_3x3() @ Vector(fr["a"])).normalized()
-        D = e["axis_dir"]
-        v = cen - e["axis_pt"]
-        dist = (v - D * v.dot(D)).length
-        ang = math.degrees(math.acos(min(1.0, abs(ax.dot(D)))))
-        tips = {}
+    arm = [m for m in body.modifiers if m.type == "ARMATURE"]
+    other = [m for m in body.modifiers if m.type != "ARMATURE"]
+    state = [(m, m.show_viewport) for m in body.modifiers]
+    for m in arm:
+        m.show_viewport = True
+    for m in other:
+        m.show_viewport = False
+    owner = HM.get("owner", {})
+    seg_of = {}
+    for s in ("L", "R"):
         for ci, chain in enumerate(ps.S[s]["fingers"]):
-            pts = V.get(chain[-1])
-            if pts is not None and len(pts):
-                tips[names[ci]] = round(min(e["surf"].gap(Vector(p.tolist())) for p in pts) * 1000, 1)
-        used = names
-        tip_max = max([max(0.0, tips[n]) for n in used if n in tips] or [0.0])
-        pen, pen_by = 0.0, {}
-        for bn, pts in V.items():
-            for p in pts:
-                pv = Vector(p.tolist())
-                ga = min([e["surf"].gap(pv)] + [x.gap(pv) for x in e["extra"]])
-                pen = max(pen, -ga)
+            for b in chain:
+                seg_of[b] = (s, ci)
+    out = {}
+    try:
+        for key, frame, s, surf, extra in GRIPLOG:
+            sc.frame_set(frame)
+            C.update()
+            dg = bpy.context.evaluated_depsgraph_get()
+            ev = body.evaluated_get(dg)
+            me = ev.to_mesh()
+            n = len(me.vertices)
+            co = np.empty(n * 3, dtype=np.float64)
+            me.vertices.foreach_get("co", co)
+            ev.to_mesh_clear()
+            co = co.reshape(-1, 3)
+            Mx = ps.rig.matrix_world.inverted() @ body.matrix_world
+            seg_min = {}
+            worst, n_pen, n_v = 0.0, 0, 0
+            pen_by = {}
+            for i, b in owner.items():
+                if not b.endswith("." + s) or i >= n:
+                    continue
+                p = Mx @ Vector(co[i].tolist())
+                gt = surf.gap(p)
+                ga = min([gt] + [x.gap(p) for x in extra])
+                n_v += 1
                 if ga < -0.001:
-                    pen_by[bn] = max(pen_by.get(bn, 0.0), -ga)
-        rec = {"shape_dev_deg": dev, "axis_mm": round(dist * 1000, 1), "axis_deg": round(ang, 1),
-               "tips_mm": tips, "tip_gap_max_mm": round(tip_max, 1), "penetration_mm": round(pen * 1000, 1),
-               "penetration_by_bone_mm": {b: round(v * 1000, 1) for b, v in sorted(pen_by.items(), key=lambda x: -x[1])[:4]}}
-        rec["ok"] = bool(dev <= 3.0 and rec["axis_mm"] <= 5.0 and rec["tip_gap_max_mm"] <= 10.0)
-        REP["holds"][e["key"]][s].update(rec)
-        for k_ in worst:
-            worst[k_] = max(worst[k_], rec[k_])
-        summary["%s %s" % (e["key"], s)] = "%s on %s: shape dev %.1f deg, channel %.1f mm / %.1f deg off the axis, worst fingertip gap %.1f mm, penetration %.1f mm, wrist %.0f deg%s" % (
-            shape.upper(), e["obj"], dev, rec["axis_mm"], rec["axis_deg"], rec["tip_gap_max_mm"], rec["penetration_mm"],
-            REP["holds"][e["key"]][s]["wrist_bend_deg"], "" if rec["ok"] else "  ** FAILS **")
-    free = {}
-    for key, frame, s in FREELOG:
-        sc.frame_set(frame)
-        C.update()
-        free.setdefault(key, {})[s] = {"shape": "relaxed", "shape_dev_deg": shape_dev(ps, s, "relaxed")}
-        worst["shape_dev_deg"] = max(worst["shape_dev_deg"], free[key][s]["shape_dev_deg"])
-    REP["free_hands"] = free
-    REP["hand_summary"] = summary
-    REP["hand_acceptance"] = {"worst": worst, "holds": len(HOLDLOG), "free": len(FREELOG),
-                              "failing": [k for k, v in summary.items() if v.endswith("**")]}
+                    n_pen += 1
+                    pen_by[b] = max(pen_by.get(b, 0.0), -ga)
+                worst = max(worst, -ga)
+                if b in seg_of:
+                    seg_min[b] = min(seg_min.get(b, 1.0), gt)
+            cmm = G["contact_mm"] / 1000.0
+            touching = sorted(b for b, gmin in seg_min.items() if gmin <= cmm)
+            thumb = sum(1 for b in touching if seg_of[b][1] == 0)
+            out.setdefault(key, {})[s] = {"segments_touching": len(touching), "segments": 15, "thumb_segments": thumb,
+                                          "max_penetration_mm": round(max(0.0, worst) * 1000, 1),
+                                          "vertices_over_1mm_inside": n_pen, "hand_vertices": n_v,
+                                          "penetration_by_bone_mm": {b: round(v * 1000, 1) for b, v in sorted(pen_by.items(), key=lambda x: -x[1])[:5]}}
+    finally:
+        for m, v in state:
+            m.show_viewport = v
+    REP["grip_mesh"] = out
+    return out
 
 
 def sole_points(side):
@@ -1483,9 +1126,7 @@ def main():
     REP["frame_basis"] = {"F": list(ps.F), "L": list(ps.L)}
     REP["limb_lengths_m"] = ps.len
     measure_hands(ps, body)
-    T.mark("hand rest frame")
-    calibrate_hands(ps, body)
-    T.mark("fixed hand shapes measured")
+    T.mark("hand model")
 
     def run(name, frame, fn, swing=0.0, plumb=True):
         t = C.time.time()
@@ -1533,12 +1174,12 @@ def main():
                 for kp in fc.keyframe_points:
                     kp.interpolation = "CONSTANT"
     try:
-        measure_holds(ps, body)
+        measure_contacts(ps, body)
     except Exception as e:  # noqa: BLE001
         import traceback
-        REP["hand_check_error"] = traceback.format_exc()[-1500:]
-        C.log("measure_holds FAILED:", e)
-    T.mark("hand acceptance check")
+        REP["grip_mesh_error"] = traceback.format_exc()[-1500:]
+        C.log("measure_contacts FAILED:", e)
+    T.mark("mesh contact measurement")
     for md in saved:
         md.show_viewport = True
     sc.frame_start, sc.frame_end = 1, 45
@@ -1561,6 +1202,18 @@ def main():
                          "2 draw rammer, 3 ram, 4 prime"},
     }
     REP["clips"] = clips
+    REP["drill_reference"] = {"status": "Inferred", "approved": "2026-10-05",
+        "plates": "https://archive.org/details/volunteersmanual01baxt",
+        "text": "https://archive.org/details/riflelightinfant01hard",
+        "stand_walk": "Hardee 121, right shoulder arms (not shoulder shift)",
+        "aim_fire": "Baxter p53 Fig93; Hardee 174", "load": "Baxter pp45-48"}
+    # a compact per-clip summary of the mesh-measured grips
+    summ = {}
+    for key, sides in REP.get("grip_mesh", {}).items():
+        for s, v in sides.items():
+            summ["%s %s" % (key, s)] = "%d/15 segments (thumb %d), max penetration %.1f mm" % (
+                v["segments_touching"], v["thumb_segments"], v["max_penetration_mm"])
+    REP["grip_summary"] = summ
     bpy.ops.wm.save_as_mainfile(filepath=os.path.join(C.WORK, "posed.blend"), compress=False)
     T.mark("saved posed.blend")
     REP["timing"] = T.marks

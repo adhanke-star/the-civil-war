@@ -186,7 +186,7 @@ jobs:
           printf 'uniform.py\t%s\t%s\n' "$SECONDS" "$([ $rc = 0 ] && echo ok || echo "FAIL $rc")" >> "$BAKE_OUT/timing.tsv"
           exit $rc
 
-      - name: 3 poses.py (stand, walk, fire, fallen, load; grip solve)
+      - name: 3 poses.py (approved drill targets; authored closed hand)
         run: |
           set +e
           "$BLENDER" -b --factory-startup -noaudio --python-exit-code 1 -P tools/bake/poses.py -- --out "$BAKE_OUT"
@@ -380,6 +380,8 @@ jobs:
             .out/bake/portrait-preview.png
             .out/bake/hands-preview.png
             .out/bake/kit-preview.png
+            .out/bake/review/
+            .out/bake/hands/
             .out/bake/report/
             .out/bake/timing*.tsv
           retention-days: 7

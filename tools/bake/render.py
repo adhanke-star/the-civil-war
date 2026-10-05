@@ -685,8 +685,7 @@ def main():
         sc.camera = hcam
         cands = [hd, 1, 3, 14, 13, 4]
         f_aim = clips["fire"]["frames"][0]
-        # fourth pass: pinned to direction 3 (the yaw the third pass chose) for a direct before/after
-        REP["hands"] = hand_shot(sc, tt, base, N, hcam, rig, rm, f_aim, "LR", 0.30, P["hands_el"], [3])
+        REP["hands"] = hand_shot(sc, tt, base, N, hcam, rig, rm, f_aim, "LR", 0.30, P["hands_el"], cands)
         sc.render.resolution_x = sc.render.resolution_y = P["hero_px"]
         sc.cycles.samples = P["samples_hero"]
         REP["hands"].update({"px": P["hero_px"], "frame": f_aim,
@@ -703,6 +702,23 @@ def main():
             info["seconds"] = round(render_to(sc, os.path.join(C.OUT, "hands", "%s_%d.png" % (clip, i))), 2)
             REP["hand_shots"]["%s_%d" % (clip, i)] = info
         T.mark("hand shots")
+        # Drill review: full figures at near plate-eye elevation, from front and right side.
+        # Review every walk frame too; a correct stand does not prove the marching carry.
+        review = persp_camera("tcw_drill_review", 90.0)
+        sc.camera = review
+        sc.render.resolution_x = sc.render.resolution_y = 512
+        sc.cycles.samples = P["samples_close"]
+        REP["drill_review"] = {}
+        for clip, data in clips.items():
+            for i, f in enumerate(data["frames"]):
+                for d in (0, N // 4):
+                    sc.frame_set(f)
+                    tt.rotation_euler = (0, 0, base + 2 * math.pi * d / N)
+                    info = fit_persp(review, figure_points(stride=2), 3.0, margin=0.07)
+                    name = "%s_%d_d%02d" % (clip, i, d)
+                    info["seconds"] = round(render_to(sc, os.path.join(C.OUT, "review", name + ".png")), 2)
+                    REP["drill_review"][name] = info
+        T.mark("drill review figures")
         # ---- kit close-up 1024 px: blanket roll ends, ties and stripes, haversack and canteen
         try:
             sc.render.resolution_x = sc.render.resolution_y = P["hero_px"]
