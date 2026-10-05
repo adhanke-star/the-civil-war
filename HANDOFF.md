@@ -100,7 +100,7 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
    Real upload/base/identity controls and complete allocations must pass; every route keeps the original
    pixel thresholds. `diagnosticComplete` is evidence completion, never quality or fielding clearance;
    `quality.json` stays `ok:false, fieldable:false`. Diagnostic mode cannot publish optimized assets.
-   Diagnostic readback is complete (below). Next bounded task: resolve the codec experiment boundary;
+   Diagnostic readback and read-only feasibility are complete (below). Next bounded task: Aaron's scope decision;
    do not weaken thresholds, rerender the approved poses or field.
    Do not rerun the unchanged 24-minute encoder as a diagnostic. Prepare only the required small diagnostic
    outputs on Actions; full bake archives/raw frames/.blend never belong on the Mac.
@@ -133,7 +133,7 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
    Runner failures remain separate: CI 37374692590 at 283ed16 attempt 1 and CI 37364379516 at a663090
    attempt 2 failed with no steps; annotations say hosted runner not acquired. Retried those exact runs
    once after successful hosted diagnostic/CI execution. CI 37374692590 attempt 2 at 283ed16 now passes;
-   reconcile 37364379516 attempt 3 before retrying. Local syntax/unit checks and `npm test` pass again
+   CI 37364379516 attempt 3 at a663090 also passes (reverified during feasibility). Local syntax/unit checks and `npm test` pass again
    (168071 ms) for this documentation-only readback; no diagnostic or runtime code changed.
    GitHub status still reported degraded performance at 21:31 UTC (incident 3q1yb5m7ltvb); do not assume
    global recovery. Pages 37374692540 at 283ed16 passed. No local conversion/GPU diagnosis/Blender ran.
@@ -168,6 +168,216 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
   manifest on Actions before local fielding if the full archive is over 100 MB. Never download .blend or
   run Blender on the Mac. A push to bake paths cancels the active bake; do not interrupt it for doc edits.
 - After every push: `gh run list --limit 3`; a red CI is the next task.
+
+## Direct-format feasibility proposal (2026-10-05; awaiting scope decision)
+
+Read-only feasibility is complete. **No encoder experiment, codec switch, threshold change or new art
+fielding has been authorized.** The recommendation is one Actions-only two-page experiment, encoding
+the approved bytes directly to **BC7 UNORM and ASTC 4x4 UNORM**, bypassing UASTC. It is a diagnostic
+tool change, not a runtime replacement. Keep existing defaults and full packaging unchanged. The
+following commands are a proposed implementation contract; they were source-reviewed, NOT executed.
+
+### Tools, pins and licenses
+
+- **BC7:** `richgel999/bc7enc_rdo`, CLI version **1.08**, immutable commit
+  `b9438627eef73a1157e84201b6fa6eb2ffd6d9f0`. Choose its MIT license; retain bundled LodePNG's zlib
+  notice and miniz's Apache-2.0 notice (checked in the actual pinned headers, not inferred from the
+  top-level LICENSE). Build the C++ encoder with `SUPPORT_BC7E=OFF`: no ISPC download/execution.
+  Upstream documents Linux clang and Windows MSVC builds; its CMake uses OpenMP. Mac compilation is
+  not verified or needed. This commit has no binary release/checksum; the source archive was streamed
+  and hashed without saving/building it locally: **15,085,185 B**, SHA256
+  `bbb33d1dbb6178a3a2c044956c3cc0b8ea9fc2f2903824379dd86f87d53b64c6`.
+  This is an independently measured archive pin, not an upstream signed release checksum.
+- **ASTC and KTX container tools:** retain **KTX-Software 4.4.2**, Apache-2.0, Linux x86_64 archive
+  SHA256 `a8781bad05f9624edbf910b7f258cd0a4ba7d3e63b49ecc0a0ab440bf6a0a245` (existing workflow pin).
+  Its bundled ASTC encoder identifies itself as **5.3.0** in its CMakeLists. `ktx encode` supports
+  direct ASTC from raw RGBA KTX; `ktx create --raw` packages preencoded BC7 blocks without reencoding.
+  This avoids adding a second ASTC installation or writing a new KTX container implementation.
+- Standalone **Arm astcenc 5.3.0**, Apache-2.0, is a feasible alternative, not a second candidate run:
+  it supports RGBA PNG input and direct LDR `-cl input.png output.astc 4x4 -exhaustive` encoding.
+  Official Linux x64 release SHA256:
+  `495b2f0cf0357ae05728a727e3d0e81d6e7f27b242c21cb5ef6254dd56dba5ff`.
+  Official binaries also exist for Linux arm64, macOS universal and Windows arm64/x64.
+  No standalone binary was downloaded or run.
+- AMD Compressonator 4.5.52 is another direct BC7 encoder (MIT), but its latest release API supplies
+  no asset digest, and its release notes flag a source-build dependency issue. Do not add a third
+  encoder to this slice or imply its release/toolchain was verified.
+
+Source references (primary, pinned where applicable):
+[BC7 CLI/build](https://github.com/richgel999/bc7enc_rdo/tree/b9438627eef73a1157e84201b6fa6eb2ffd6d9f0),
+[BC7 license](https://github.com/richgel999/bc7enc_rdo/blob/b9438627eef73a1157e84201b6fa6eb2ffd6d9f0/LICENSE),
+[LodePNG notice](https://github.com/richgel999/bc7enc_rdo/blob/b9438627eef73a1157e84201b6fa6eb2ffd6d9f0/lodepng.cpp),
+[miniz notice](https://github.com/richgel999/bc7enc_rdo/blob/b9438627eef73a1157e84201b6fa6eb2ffd6d9f0/miniz.h),
+[ASTC release/checksums](https://github.com/ARM-software/astc-encoder/releases/tag/5.3.0),
+[KTX encode](https://github.com/KhronosGroup/KTX-Software/blob/v4.4.2/tools/ktx/command_encode.cpp),
+[KTX raw create](https://github.com/KhronosGroup/KTX-Software/blob/v4.4.2/tools/ktx/command_create.cpp),
+[ASTC options](https://github.com/KhronosGroup/KTX-Software/blob/v4.4.2/tools/ktx/encode_utils_astc.h),
+[ASTC implementation](https://github.com/KhronosGroup/KTX-Software/blob/v4.4.2/lib/astc_codec.cpp),
+[bundled ASTC version](https://github.com/KhronosGroup/KTX-Software/blob/v4.4.2/external/astc-encoder/CMakeLists.txt),
+[Compressonator release](https://github.com/GPUOpen-Tools/compressonator/releases/tag/V4.5.52).
+
+### Proposed Actions commands and byte contract
+
+Use `ubuntu-24.04`, one page/candidate at a time, a fresh guarded runner output, and existing approved
+source retrieval (run 37347072866 / 820846f / bake-33). Source and build pins fix the recipe; record
+runner image, `cmake --version`, `g++ --version`, tool versions, complete argv and output hashes.
+Build success and binary reproducibility are still UNRUN; do not call reviewed commands proven.
+
+```bash
+# PROPOSED ONLY: after explicit two-page experiment authorization, on Actions.
+curl -fsSL --retry 3 -o "$RUNNER_TEMP/bc7-source.tar.gz" https://codeload.github.com/richgel999/bc7enc_rdo/tar.gz/b9438627eef73a1157e84201b6fa6eb2ffd6d9f0
+echo "bbb33d1dbb6178a3a2c044956c3cc0b8ea9fc2f2903824379dd86f87d53b64c6  $RUNNER_TEMP/bc7-source.tar.gz" | sha256sum -c -
+mkdir "$RUNNER_TEMP/bc7-source"
+tar -xf "$RUNNER_TEMP/bc7-source.tar.gz" -C "$RUNNER_TEMP/bc7-source" --strip-components=1
+cmake -S "$RUNNER_TEMP/bc7-source" -B "$RUNNER_TEMP/bc7-build" -DCMAKE_BUILD_TYPE=Release -DSUPPORT_BC7E=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+cmake --build "$RUNNER_TEMP/bc7-build" --parallel 2
+# Install/check KTX 4.4.2 using the exact existing workflow URL/SHA256; do not use latest.
+# Node orchestration invokes this once per original raw mip, preserving dimensions and RGBA bytes:
+"$RUNNER_TEMP/bc7-build/bc7enc" -C -u4 -p64 -g level.png level.dds
+# Extract only the DX10 DDS BC7_UNORM payload in Node, assert original w/h and exact block byte count.
+# In a Node spawnSync argv array: ordered mip0.raw ... mip11.raw, then the destination (no ellipsis argument):
+ktx create --raw --format BC7_UNORM_BLOCK --width 2048 --height 1808 --levels 12 --assign-tf linear --assign-primaries none mip0.raw mip1.raw mip2.raw mip3.raw mip4.raw mip5.raw mip6.raw mip7.raw mip8.raw mip9.raw mip10.raw mip11.raw close-bc7.ktx2
+# Field uses 1024x1912, 11 inputs (mip0.raw through mip10.raw), and its own destination.
+ktx encode --format ASTC_4x4_UNORM_BLOCK --astc-quality exhaustive close-raw.ktx2 close-astc.ktx2
+ktx encode --format ASTC_4x4_UNORM_BLOCK --astc-quality exhaustive field-raw.ktx2 field-astc.ktx2
+# Software ASTC reconstruction only; repeat --level 0, 1 and 2 for each page:
+ktx extract --level 0 close-astc.ktx2 close-astc-mip0.png
+```
+
+BC7 uses linear byte-error metrics, no perceptual option, RDO, entropy reduction, Y flip or alpha
+replacement. This deliberately tests its C++ encoder (modes 1/5/6/7), not the higher-quality all-mode
+BC7E/ISPC encoder. Failure would be specific to this candidate, not proof that direct BC7 cannot pass.
+ASTC uses LDR linear encoding, identity RGBA swizzle, no normal/perceptual mode. No encoder makes mips.
+
+Generate the raw KTX with the unchanged `toktx --t2 --genmipmap --filter box --assign_oetf linear
+--assign_primaries none` recipe from the same once-premultiplied PNG. Extract its actual level bytes
+with the pinned local KTX parser into minimal PNGs for BC7. Assert decoded PNG RGBA equals each raw
+level byte-for-byte; do not recompute mips, gamma-convert, unpremultiply, threshold alpha or resample.
+ASTC encodes that same raw KTX's complete chain directly. Re-mark output metadata after encoding:
+UNORM vkFormat, linear DFD transfer, primaries none, ALPHA_PREMULTIPLIED; modifying metadata must
+leave encoded payload hashes unchanged. KTX's ASTC implementation replaces the DFD, so preservation
+of flags/primaries cannot be assumed. The existing markPremultiplied validator accepts only raw/UASTC;
+extend validation explicitly for BC7/ASTC rather than bypassing it.
+
+Require original PNG hashes:
+close `1de135f0fbc9ed8623a929346048bcd20c9a323d45200a8c667d26b5d4e419fa`;
+field `02a8e58dbfb6455eb206015613cc6ad48d128818188a831efac72f322ef09a3a`.
+Regenerated raw KTX must match diagnostic raw hashes before candidate encoding:
+close `18336770eb41febff52259f0dde6ee505a541b23644723924e99af23a0115cbf`;
+field `ffd0fb7596ccbe2505d67022f7db1dc54e0f8e2f48b2d6dffda25ba50415f60f`.
+HALT on mismatch; explain whether container metadata or actual mip bytes differ, without weakening
+the bind. Do not rerun unchanged UASTC: use the already measured 37374456139 reports/hashes as the
+historical comparator, clearly label them as that, and keep its six-route readback contract intact.
+
+### Pinned loader and actual device requirements
+
+Local `node_modules/three/examples/jsm/loaders/KTX2Loader.js` at three **0.186.1** contradicts its own
+introductory comment that hardware-specific formats are unparsed: `_createTexture` dispatches defined
+vkFormat to `createRawTexture`; FORMAT_MAP includes BC7 and ASTC 4x4/6x6 UNORM. It supports complete
+chains and optional Zstd. The raw path ignores premultiplied DFD flags and does not choose/decompress
+an unsupported direct format. Verify actual texture.format, mip bytes and GL errors, not the header
+comment or current web docs. Keep `NoColorSpace`, `flipY=false`, `generateMipmaps=false`, linear filters
+and typed uploads with `premultiplyAlpha=false`; the existing shader unpremultiplies/decodes sRGB once.
+No vendoring or runtime change is part of this diagnostic.
+
+- Desktop BC7 upload requires actual `EXT_texture_compression_bptc`, the linear RGBA BPTC format in
+  COMPRESSED_TEXTURE_FORMATS, dimensions within MAX_TEXTURE_SIZE, and successful complete-chain
+  upload/readback with no GL error. Prior SwiftShader BC7 evidence is software only; native UHD 617
+  browser/driver support and performance are still unverified for these assets. Never infer support
+  from GPU name, WebGL2 alone, or force detector flags.
+- Aaron's recorded iPad is A10X (2017 Pro). Apple's tables put A10-series in Apple3: ASTC LDR is
+  supported, BC is unavailable in that family. This supports ASTC as the hardware target, but is NOT
+  live Safari/iPad proof. Require `WEBGL_compressed_texture_astc`, `getSupportedProfiles()` including
+  `ldr`, linear RGBA ASTC 4x4 in COMPRESSED_TEXTURE_FORMATS, size limits and real upload/readback.
+- Actions can read back BC7 when supported. ASTC reconstruction via `ktx extract` is **software byte
+  evidence only**. If the actual runner exposes safe ASTC support, add separately labeled GPU readback;
+  otherwise report ASTC GPU UNRUN. Do not enable an unsupported/emulated format to manufacture it.
+  Passing software ASTC cannot clear the iPad, native rendering, filtering or performance.
+
+Primary device sources:
+[BPTC WebGL specification](https://registry.khronos.org/webgl/extensions/EXT_texture_compression_bptc/),
+[ASTC WebGL specification](https://registry.khronos.org/webgl/extensions/WEBGL_compressed_texture_astc/),
+[Apple GPU family/format tables](https://developer.apple.com/metal/Metal-Feature-Set-Tables.pdf).
+
+### Allocation, downloads and fallback
+
+For both BC7 and ASTC 4x4, every level costs `ceil(w/4)*ceil(h/4)*16` bytes. Include non-square
+dimensions and minimum one-block tails. Proposed complete payloads are exact arithmetic from the
+verified source dimensions, not measurements of new encodings:
+
+| Page | Complete levels | BC7 / ASTC 4x4 bytes | RGBA8 bytes |
+|---|---:|---:|---:|
+| close 2048x1808 | 12 | 4,937,968 | 19,747,996 |
+| field 1024x1912 | 11 | 2,611,264 | 10,441,740 |
+| two-page sum | 23 | 7,549,232 (7.20 MiB) | 30,189,736 (28.79 MiB) |
+
+No supercompression in the first candidate experiment: each direct-format download is its block
+payload plus KTX overhead; both format families stored together cost about 14.40 MiB for two pages.
+Current two-page UASTC files total 1,942,713 B (1.85 MiB); direct-file size reduction must be measured,
+not assumed. Optional lossless Zstd/container/HTTP compression can later shrink downloads without
+changing GPU allocation, but is held outside the initial candidate to keep the comparison bounded.
+
+Extrapolating the existing 45-page dimensions, either 4x4 format uses **209,085,952 B (199.40 MiB)**
+of block payload, same as measured BC7; both stored sets approach 398.80 MiB before compression.
+Even one uncompressed container family exceeds the nominal 200 MB whole-game download budget before
+other assets; two approach 418 MB decimal. A later lossless download-compression decision needs actual
+sizes and caching measurements. Bypassing UASTC does not guarantee either candidate meets pixel limits.
+Only select/fetch one supported format per device; loading both doubles residency. Loading all looks
+leaves only 40,914,048 B under a decimal 250 MB cap (or 53,058,048 B under 250 MiB). DESIGN says
+approximately 250 MB: do not silently redefine units or count this as admission. Account for loaded
+AND pending textures, terrain, geometry, render targets and transient duplication; even one set has
+no total-scene clearance. Whole-pack download/residency remains a later decision.
+
+Direct KTX has **no automatic cross-format or RGBA fallback** in this loader. Future runtime selection
+must probe before fetching. A separate raw/lossless per-battle pack can be a fallback only with admission:
+full RGBA mip payload remains 797.24 MiB and cannot be loaded wholesale. For this experiment only, test
+raw RGBA8 controls independently and simulate unsupported-candidate rejection before upload, with no
+second format fetched. The previously failing UASTC pack is not a quality-approved fallback. Existing
+second-pass runtime assets remain the fallback until separately authorized integration.
+
+### Controls, scope and exit
+
+Exactly `soldier_close_0.png` and `soldier_field_0.png`; validate the full manifest first (45 pages,
+5,184 frames, 18 pose frames, 16 directions, nine looks EACH tier; all names/use/rect/ax/ay/ppm intact).
+Both candidate formats encode the full mip chains. Compare mips 0/1/2, separately for every candidate:
+raw->direct isolates encoding; PNG->direct preserves the end-to-end standard; retain PNG->premul,
+PNG->raw and raw->raw controls. Historical UASTC routes stay labeled historical, not freshly RUN.
+BC7 requires actual GPU readback; ASTC software decode is a separate route with GPU UNRUN if unavailable.
+Both pages and all route/mip combinations must be unique, present, nonempty and finite. Require real
+upload/base/identity/missing/changed-colour controls, severe body clipping zero, complete actual format/
+allocation checks, unchanged metadata and payload checksums. Test broken page/route, tail-level, alpha,
+automatic-sRGB, double-premultiplication and unsupported-format cases; never force compressed support.
+
+Unchanged limits: RGB mean <=2, alpha mean <=1, edge RGB p95 <=8, edge alpha p95 <=8 (0–255 bytes).
+No threshold tuning, denoise, alpha dilation, mip removal, atlas resizing, pose rerender or source mutation.
+If an authorized later A/B needs temporary files, bind inputs by hashes and restore byte-for-byte.
+No new encoder sweep or all-mode BC7E escalation after a failure without another bounded decision.
+Keep `diagnosticOnly:true`, `fieldable:false`, `ok:false`; record per-route quality separately from evidence
+completion. Extend a dedicated candidate-completion predicate in the existing review seam; do not change
+the existing six-route diagnostic predicate to mislabel old/new reports. Reports and both comparison
+sheets only, no optimized asset publication. Inspect all metrics and both actual images after one run.
+
+Allowed files AFTER explicit authorization: `tools/bake/compress.mjs`, `tools/bake/review-compression.mjs`,
+`.github/workflows/pack-figures.yml`, meaningful existing `tools/test.mjs` checks, HANDOFF/STATE/DECISIONS.
+No src/assets/sw.js/DESIGN/approved-pose edits. Keep legacy diagnostic/full recipes available unchanged;
+add an explicit candidate workflow mode, never redirect full mode to an unevaluated codec.
+Gates: source/contract read -> both `node --check` -> `node tools/test.mjs --unit` with broken controls ->
+`npm test` (one local browser) -> `git diff --check` -> docs/staged review -> commit/push -> exact-SHA
+CI/Pages readback -> one explicit candidate dispatch -> logs/reports/BOTH sheets -> documented HALT.
+Any failed non-obvious gate, changed source/raw hash, codec/threshold/runtime choice, or missing actual
+format proof is a HALT. Candidate evidence completion never grants full-pack/runtime/device clearance.
+
+Scope options for Aaron: **recommended two-page direct BC7 + ASTC experiment**, because it bypasses the
+measured failing stage without changing the art or limits; lossless per-battle residency is a larger
+runtime/memory task; revised acceptance requires Aaron to see actual differences and explicitly choose
+new limits. Current packet authorizes only this proposal/documentation and the scope popup.
+
+Read-only verification here: live main/origin 6e1d31a and bake/origin 820846f reconciled; prior exact-SHA
+CI/Pages and earlier retried CI runs pass. Both actual diagnostic sheets inspected; the actual
+diagnosticEvidenceOkay returns true, while ok/fieldable remain false. Source archive hashing and primary
+upstream/local loader reads completed. Encoder/build/GPU/device experiments remain UNRUN.
+Local syntax/unit checks and `npm test` passed for this documentation-only slice (174578 ms);
+the existing smoke/prune kept the 300 MiB cap. STATE remains 19 lines. No diagnostic was dispatched.
 
 ## Loose ends
 - Claude's helper worktrees and branches were removed (they held no unpushed work). Local branches left:

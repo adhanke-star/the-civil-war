@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0019 — Direct-format proposal ready; experiment remains held (2026-10-05)
+Read-only feasibility found pinned OSI direct BC7/ASTC encoders and direct-format paths in three 0.186.1.
+Recommend one two-page Actions experiment using bc7enc_rdo 1.08 at b943862 and KTX 4.4.2's ASTC 5.3.0,
+sharing unchanged raw box mip bytes and limits. Direct formats require separate capability-selected
+files; loader support is not device proof or automatic fallback. Either 4x4 pack still costs 199.40 MiB
+in atlas blocks alone. HANDOFF carries source pins, proposed commands, controls and memory consequences.
+Scope decision pending: no encoder run, codec/runtime switch, new art fielding or threshold change.
+
 ## 0018 — Measured UASTC reconstruction failure; codec boundary held (2026-10-05)
 Diagnostic 37374456139 at 47d248c passed all actual upload/base/identity and allocation controls; both
 source and encoded hashes, and end-to-end metrics, match the failed full run. Offline raw mip differences
