@@ -604,7 +604,10 @@ def shoulder_arms(ps, musket, frame, key):
     reach = ps.len["R"]["upper"] + ps.len["R"]["lower"]
     zg = (U - F * 0.035).normalized()
     seat = sh + F * 0.045 + L * 0.020
-    contact_z = sh.z - reach * 0.90 - 0.035
+    # Place the wrist near full extension; account for the measured wrist-to-palm offset.
+    hand = HM["hand"]["R"]
+    along = Vector(hand["pc_local"]).dot(Vector(hand["H0"]))
+    contact_z = sh.z - reach * 0.97 - along
     heel = seat + zg * ((contact_z - G["grip_stand_R"] - seat.z) / zg.z)
     M = gun_matrix(heel, zg, -F)
     place_gun(musket, M, frame)
@@ -734,8 +737,8 @@ def pose_fire(ps, musket, frame, stage):
         gx, gy, gz = gun_axes(M)
         # left hand cradles the forestock from below; right hand round the wrist of the stock,
         # palm on the lock (right, -x) side
-        err["armL"], _ = gun_grip(ps, "L", M, G["grip_aim_L"], -gy + gx * 0.25, -U + L * 0.2, key, frame)
-        err["armR"], _ = gun_grip(ps, "R", M, G["grip_aim_R"], -gx + gy * 0.2, -L + U * 0.10, key, frame, kind="trigger")
+        err["armL"], _ = gun_grip(ps, "L", M, G["grip_aim_L"], -gy + gx * 0.25, -U + L * 0.2, key, frame, direction=F * 0.65 - L * 0.75)
+        err["armR"], _ = gun_grip(ps, "R", M, G["grip_aim_R"], -gx + gy * 0.2, -L + U * 0.10, key, frame, kind="trigger", direction=F - U * 0.3)
     else:
         ps.look(F * 0.9 - U * 0.25)
         hipR = ps.ph(ps.S["R"]["thigh"][0])
@@ -842,7 +845,7 @@ def pose_load(ps, musket, frame, step, rr, cart):
             a = centre - X * (cl / 2)
             surf = CylSurf(a, X, cr, cl)
             err["armR"], res = fixed_grip(ps, "R", centre + nv * (cr + 0.014), X, nv, pole,
-                surf, key, frame, kind="pinch", extra=(GunSurf(M),))
+                surf, key, frame, kind="pinch", extra=(GunSurf(M),), direction=(-U - F * 0.5) if step == 0 else U)
             res["object"] = "cartridge"
             key_cartridge(cart, frame, centre, X, nv)
         elif step == 2:
@@ -853,7 +856,7 @@ def pose_load(ps, musket, frame, step, rr, cart):
             hold = M @ Vector((0.0, by, Lg + G["grip_rammer_drawn"]))
             nv = (F - L * 0.2).normalized()  # back of hand to front (Hardee 163)
             e_, res = fixed_grip(ps, "R", hold + nv * 0.018, gz, nv, -U - L * 0.10,
-                surf, key, frame, kind="pinch", extra=(GunSurf(M),))
+                surf, key, frame, kind="pinch", extra=(GunSurf(M),), direction=U)
             err["armR"] = e_
             key_cartridge(cart, frame, park=park)
         else:
@@ -864,10 +867,10 @@ def pose_load(ps, musket, frame, step, rr, cart):
             hold = M @ Vector((0.0, by, Lg + G["grip_rammer_ram"]))
             nv = (F - L * 0.2).normalized()  # back of hand to front (Hardee 163)
             e_, res = fixed_grip(ps, "R", hold + nv * 0.018, gz, nv, -U - L * 0.10,
-                surf, key, frame, kind="pinch", extra=(GunSurf(M),))
+                surf, key, frame, kind="pinch", extra=(GunSurf(M),), direction=U)
             err["armR"] = e_
             key_cartridge(cart, frame, park=park)
-        err["armL"], _ = gun_grip(ps, "L", M, G["grip_load_L"], L * 0.8 - F * 0.4, -U + L * 0.6, key, frame, direction=U)
+        err["armL"], _ = gun_grip(ps, "L", M, G["grip_load_L"], L * 0.8 - F * 0.4, -U + L * 0.6, key, frame, direction=-U)
     else:
         key_ramrod(rr, frame)
         key_cartridge(cart, frame, park=park)
@@ -1003,6 +1006,7 @@ def measure_hands(ps, body):
         hands[s] = {"H0": list(Bw.to_3x3().inverted() @ H0), "P0": list(Bw.to_3x3().inverted() @ P0),
                     "pc_local": list(Bw.inverted() @ pcr), "palm_pad": palm_pad}
         report[s].update({"palm_pad_mm": round(palm_pad * 1000, 1),
+                          "wrist_to_palm_along_m": round(Vector(hands[s]["pc_local"]).dot(Vector(hands[s]["H0"])), 4),
                           "pad_mm": {b: round(pad[b] * 1000, 1) for c in d["fingers"] for b in c if b in pad},
                           "hand_vertices": sum(len(by_bone.get(b, [])) for b in hand_bones if b.endswith("." + s))})
     HM.update({"palmar_local": pal_local, "pad": pad, "radius": rad, "hand": hands, "owner": owner})
@@ -1132,6 +1136,17 @@ def main():
         t = C.time.time()
         sc.frame_set(frame)
         err = fn()
+        joints = {}
+        for side in ("L", "R"):
+            d = ps.S[side]
+            sh, el, wr = ps.ph(d["upper"][0]), ps.ph(d["lower"][0]), ps.ph(d["hand"])
+            reach = ps.len[side]["upper"] + ps.len[side]["lower"]
+            joints[side] = {"shoulder": list(sh), "elbow": list(el), "wrist": list(wr),
+                "elbow_above_shoulder_m": round(el.z - sh.z, 4),
+                "reach_fraction": round((wr - sh).length / reach, 4),
+                "elbow_angle_deg": round(math.degrees((sh - el).angle(wr - el)), 1),
+                "wrist_bend_deg": round(ps.wrist_bend(side), 1)}
+        REP["checks"].setdefault("joints", {})["%s@%d" % (name, frame)] = joints
         try:
             hang_kit(ps, frame, swing, plumb)
         except Exception as e:  # noqa: BLE001

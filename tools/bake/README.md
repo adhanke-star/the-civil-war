@@ -39,7 +39,7 @@ get approval before fielding. A quick bake is incomplete coverage and cannot shi
   portrait, hands, kit, heads, hand shots, variants and a few frames; about 17 minutes) instead of
   the full matrix.
 - Watch it with `gh run watch <id>`. Each run uploads `bake-<n>` (everything) and `preview-<n>`
-  (contact sheet, hero/close-up/portrait/hands/kit previews, reports; under 5 MB). Fetch the small
+  (contact sheet, hero/close-up/portrait/hands/kit previews, reports, drill views). Check its size, then fetch
   one with `gh run download <id> -n preview-<n> -D .out/<folder>`. Download only into `.out/`.
   `reports-<n>` (prep reports) is uploaded even when a prep stage fails.
 
@@ -158,15 +158,16 @@ split across the shard matrix instead. `render.json` `reduced` is always null.
 - Straps and blanket are darker than the first pass so they do not out-shine the coat.
 - Third pass, field tier only: the slouch hat is a twin with a wider brim (0.105 m against
   0.075 m) in a lighter felt (#5a5045 against #151413), so the hat still reads at 96 px.
-- Third pass, for silhouettes at about 150 m: aim has a level barrel and the head down on the stock;
-  fire has a 26 degree muzzle rise and the shoulders 11 cm back; the ram stroke holds the rammer
-  0.36 m above the muzzle with the arm raised clear of the body.
+- Drill rebuild: aim has a level barrel and the head down on the stock; fire keeps that head
+  placement, with only a 3 degree muzzle rise and 2.5 cm recoil (art estimates). The rammer
+  is held 0.10 m above the muzzle with the elbow near the body. These replace pass 3's
+  exaggerated shot and high rammer hold.
 
 Direction rule: direction `d` faces `d * 360/N` degrees counter-clockwise, seen from above, from
 "toward the camera". So 0 faces the viewer, 4 faces screen-right and 8 faces away. The camera
 never moves. The figure turns, so the one standard light always reads as upper-left on screen.
 
-## Third pass (2026-10-04)
+## Third pass (2026-10-04; historical methods, not the current hand rebuild)
 
 Owner's order: face and hands first, then blanket roll and kit weight, cloth, parallel jobs,
 variants. Plus five in-play findings from fielding the second-pass atlas (close-tier variants,
