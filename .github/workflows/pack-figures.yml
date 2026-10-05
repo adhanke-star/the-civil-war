@@ -1,0 +1,62 @@
+name: Package approved figures
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: package-approved-figures
+  cancel-in-progress: false
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Fetch the approved existing bake on the runner only
+        run: |
+          set -euo pipefail
+          gh api repos/adhanke-star/the-civil-war/actions/runs/37347072866 --jq '[.head_sha,.conclusion] | join(" ")' > "$RUNNER_TEMP/source.txt"
+          test "$(cat "$RUNNER_TEMP/source.txt")" = '820846fdc2fe11782a36b219220edcb16e222f92 success'
+          gh run download 37347072866 --repo adhanke-star/the-civil-war -n bake-33 -D "$RUNNER_TEMP/approved-bake"
+      - name: Pinned Khronos encoder (Apache-2.0; build tool only)
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/ktx.tar.bz2" https://github.com/KhronosGroup/KTX-Software/releases/download/v4.4.2/KTX-Software-4.4.2-Linux-x86_64.tar.bz2
+          echo "a8781bad05f9624edbf910b7f258cd0a4ba7d3e63b49ecc0a0ab440bf6a0a245  $RUNNER_TEMP/ktx.tar.bz2" | sha256sum -c -
+          mkdir "$RUNNER_TEMP/ktx"
+          tar -xf "$RUNNER_TEMP/ktx.tar.bz2" -C "$RUNNER_TEMP/ktx" --strip-components=1
+          echo "$RUNNER_TEMP/ktx/bin" >> "$GITHUB_PATH"
+      - name: Preserve all frames and identities; premultiply once; encode UASTC + mipmaps
+        run: node tools/bake/compress.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack
+      - name: GPU readback against every approved PNG and meaningful broken controls
+        run: node tools/bake/review-compression.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack
+      - name: Optimized atlases and manifest only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: approved-figures-ktx2
+          path: |
+            .out/figure-pack/*.ktx2
+            .out/figure-pack/soldier.json
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 0
+      - name: Small quality report and comparison sheets
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: compression-review
+          path: |
+            .out/figure-pack/compression.json
+            .out/figure-pack/quality.json
+            .out/figure-pack/compression-*.png
+          retention-days: 7
+          if-no-files-found: warn

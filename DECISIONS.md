@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0016 — Approved drill-hand bake; compress before fielding (Aaron, 2026-10-05)
+Aaron confirmed visibility of the twelve numbered sheets for 820846f, then explicitly approved the poses
+for fielding. Keep the approved existing render unchanged; repackage its atlases on Actions as UASTC KTX2
+with premultiplied display bytes and mipmaps, matching the current shader's manual colour decoding.
+Read back every compressed page against its PNG before integration. The 797.27 MiB RGBA/mipmap pack
+exceeds the iPad ceiling; real format/allocation, eligibility and total-scene admission remain required.
+Second-pass assets and rigged defaults remain until integration passes; iPad clearance is still unverified.
+
 ## 0015 — Device benchmark waits for its minimum sample (2026-10-05)
 CI twice produced only three measured frames in the six-second device benchmark under SwiftShader.
 Keep the existing five-frame minimum and extend slow runs up to 30 seconds after warm-up; an

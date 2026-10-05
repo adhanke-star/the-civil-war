@@ -44,8 +44,8 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
   guard. Full Bake 37347072866 and CI 37347072709 passed. Self-review passed every clip, including the
   eight-frame march cycle. Recovery and priming remain abbreviated game stages; sheet 7 shows the
   cartridge held above the muzzle BEFORE charging (the manual's Fig78 shows the OPEN hand afterward).
-  Twelve numbered sheets in `.out/bake5/review-33/` were opened in Preview. Visibility confirmation and
-  Aaron's visual approval are pending; neither has been inferred from opening the files.
+  Twelve numbered sheets in `.out/bake5/review-33/` were opened in Preview. Aaron confirmed visibility,
+  then explicitly approved this revision for fielding in separate popups (2026-10-05). Do not ask again.
   Run 37341611250 was superseded/cancelled. Local npm test passed at 820846f (94 s); no new art is fielded.
 - **Hands: Aaron rejected all three hand versions** (passes 2, 3 and 4): "fingers bent oddly" and "hands in
   the wrong spot". He likes the pass-3 faces and variants. Nothing from passes 3-4 is in the game.
@@ -55,7 +55,7 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
    per clip, the manual's words for each hand, and Aaron's choice: aim and loading as drawn in the 1861
    plates; shoulder arms and march on the RIGHT shoulder per Hardee's text (no correct plate exists).
    Re-download the plates into `.out/reference/drill/` from the URLs there (`.out/` is pruned).
-2. **Next: confirm Aaron saw the sheets, THEN obtain visual approval for 820846f.** Do not restore
+2. **DONE 2026-10-05: Aaron saw and approved sheets 1–12 for 820846f.** Do not restore
    a50968f again over the rebuild. Bake 37347072866 and CI 37347072709 passed; self-review passed. Earlier
    Bake 37342865320 and CI 37342865259 succeeded at d7c07b2, but the renders failed self-review.
    Download preview/reports only into `.out/`; never the posed
@@ -65,8 +65,8 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
    Current preview: `.out/bake5/preview-33/`. If pruned, download named `preview-33` from run 37347072866.
    `node tools/review-drill.mjs <preview-dir> <fresh-.out-review-dir> "Bake 37347072866 at 820846f"`
    creates 12 numbered sheets with the run/SHA printed on them.
-   Put all 12 on Aaron's screen with `open -a Preview <explicit files>`, confirm visibility in a popup,
-   THEN ask approval. Do not field before explicit approval; ask what is wrong before re-fixing rejection.
+   Approval covers the pictured poses, including abbreviated recovery/priming and the pre-charge cartridge
+   in sheet 7. Compression must preserve that look; quality readback and integration remain required.
 3. Fielding a new bake: `src/units/impostor.js` reads per-frame `ax/ay/ppm`, `directionsByClip`,
    `tiers.<tier>.variants` (keep these manifest fields; the tier-level `pxPerMetre`/`anchor` mean the stand
    clip only). Close-tier variants are new in pass 3: assign the same variant per man at both tiers.
@@ -79,6 +79,17 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
    across all tiers/looks (36 close pages + 9 field pages; manifest 1,142,071 bytes). It cannot be loaded
    wholesale under the iPad ceiling. Implement DESIGN's compressed atlases/per-battle loading before
    fielding the full set. Preserve all nine looks in both tiers; do not silently remove variants.
+   `.github/workflows/pack-figures.yml` repackages the approved existing run on Actions only (no rerender).
+   `tools/bake/compress.mjs` checks every frame/look/eligibility record, premultiplies display bytes once,
+   encodes with pinned KTX-Software 4.4.2 UASTC quality 4/Zstd 18/box mipmaps and marks the KTX DFD flag.
+   `tools/bake/review-compression.mjs` checks GPU readback of every page at mips 0/1/2, real decoded format,
+   complete mip allocation and missing-pixel/colour controls; it produces small numbered comparison sheets.
+   Dispatch: `gh workflow run pack-figures.yml --ref main`; inspect the exact run and download ONLY
+   `compression-review`, then `approved-figures-ktx2` after quality passes. Packaging is not fielding.
+   Runtime KTX vendoring, name-bound identity, ninth counters, eligibility and total-scene admission are next.
+   The local smoke exposed an existing count mismatch: rigged includes infantry still falling, while baked
+   standing excludes FALLEN. The comparison now separates standing/falling and checks fallen sprite coverage;
+   broken controls must still reject missing living or fallen figures. No runtime code changed for that fix.
 4. Waiting on Aaron (remind once): play the sandbox and reward page on Mac and iPad and paste the
    "Copy settings" blocks; paste `device.html` results from both; run `gh auth refresh -s project,read:project`
    so a GitHub Project board can be created (DESIGN: To do / Building / For your review / Done).

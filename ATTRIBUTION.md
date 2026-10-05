@@ -12,6 +12,10 @@
 - lil-gui 0.21.0 — MIT — https://github.com/georgealways/lil-gui (developer panel, only with ?tune)
 - detect-gpu 5.0.70 — MIT — https://github.com/pmndrs/detect-gpu (with its dist/benchmarks GPU tables)
 - geotiff.js 3.0.5 — MIT — https://github.com/geotiffjs/geotiff.js (dev tool only: tools/fetch-terrain.mjs; not shipped)
+- KTX-Software 4.4.2 — Apache-2.0 — https://github.com/KhronosGroup/KTX-Software/tree/v4.4.2
+  (Actions-only atlas encoder; not shipped). Basis Universal transcoder bundled with three.js —
+  Apache-2.0 — https://github.com/BinomialLLC/basis_universal/blob/master/LICENSE
+  (Actions compression review; runtime vendoring pending).
 
 ## Data and assets
 - `assets/terrain/henry-hill.bin` — elevation from the USGS 3D Elevation Program (3DEP) bare-earth DEM,

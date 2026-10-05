@@ -151,6 +151,57 @@ async function settingsUnit() {
  * manifest's rects. Each part also runs against a deliberately broken control, which must fail with the
  * text the real check would print, so a wrong sign or an off-by-one cannot pass unnoticed.
  */
+function bakedFigureCountsOkay(rig, baked) {
+  return baked.baked + baked.rigged >= rig.rigged - rig.fallingInfantry
+    && baked.sprites >= baked.baked + rig.fallingInfantry;
+}
+
+async function approvedPackUnit() {
+  const P = await import('./bake/compress.mjs');
+  const Q = await import('./bake/review-compression.mjs');
+  const names = ['base', 'h1_slouch_noroll', 'h2_cap_roll', 'h3_slouch_roll', 'h4_cap_noroll',
+    'h4_slouch_roll', 'h5_slouch_noroll', 'h6_cap_roll', 'h7_cap_roll'];
+  const counts = { stand: 1, walk: 8, fire: 3, fallen: 1, load: 5 };
+  const m = { camera: { directions: 16 }, clips: {}, heads: { h1: { use: 'union' }, h7: { use: 'usct' } }, tiers: {} };
+  for (const [clip, n] of Object.entries(counts)) m.clips[clip] = { frames: [...Array(n).keys()] };
+  for (const tier of ['close', 'field']) {
+    const T = { variants: {}, directionsByClip: {} }; m.tiers[tier] = T;
+    for (const clip of Object.keys(counts)) T.directionsByClip[clip] = [...Array(16).keys()];
+    for (const name of names) {
+      const G = name === 'base' ? T : (T.variants[name] = {});
+      const c = { head: name === 'h7_cap_roll' ? 'h7' : 'h1', use: name === 'h7_cap_roll' ? 'usct' : 'union' };
+      if (name === 'base') T.baseComposition = c; else G.composition = c;
+      G.pages = [...Array(tier === 'close' ? 4 : 1).keys()].map((i) => ({ file: `soldier_${tier}${name === 'base' ? '' : '_' + name}_${i}.png`, w: 2048, h: 2048 }));
+      G.count = 288; G.frames = {};
+      for (const [clip, n] of Object.entries(counts)) for (let k = 0; k < n; k++) for (let d = 0; d < 16; d++)
+        G.frames[`${clip}_${k}_d${String(d).padStart(2, '0')}`] = { page: 0, x: 2, y: 2, w: 8, h: 8, ox: 0, oy: 0, ax: 4, ay: 7, ppm: 8 };
+    }
+  }
+  const rejects = (mutate) => { const copy = structuredClone(m); mutate(copy); try { P.validateApproved(copy); return false; } catch { return true; } };
+  const real = P.validateApproved(m);
+  const controls = {
+    missingFrame: rejects((x) => { delete x.tiers.close.variants.h2_cap_roll.frames.walk_0_d15; }),
+    missingLook: rejects((x) => { delete x.tiers.field.variants.h7_cap_roll; }),
+    missingScale: rejects((x) => { delete x.tiers.field.frames.load_4_d00.ppm; }),
+    offPage: rejects((x) => { x.tiers.close.frames.fire_0_d00.x = 2048; }),
+    eligibility: rejects((x) => { x.tiers.field.variants.h7_cap_roll.composition.use = 'union'; }),
+    duplicateDirection: rejects((x) => { x.tiers.field.directionsByClip.walk[15] = 14; }),
+  };
+  check('approved-pack-contract', real.frames === 5184 && real.pages === 45 && Object.values(controls).every(Boolean),
+    `full pack ${JSON.stringify(real)}; broken missing-frame/look/scale, rect, eligibility and direction controls ${JSON.stringify(controls)}`);
+  const mip = P.mipBytes(4, 4), colour = Buffer.from([20, 100, 200, 255, 10, 20, 30, 128]);
+  const quality = Q.comparePixels(colour, colour).ok && !Q.comparePixels(colour, Buffer.alloc(8)).ok
+    && !Q.comparePixels(Buffer.alloc(8), Buffer.alloc(8)).ok
+    && !Q.comparePixels(colour, Buffer.from([200, 100, 20, 255, 30, 20, 10, 128])).ok;
+  check('compression-controls', mip.block16 === 48 && mip.rgba8 === 84 && mip.levels === 3 && quality,
+    `4x4 + 2x2 + 1x1 allocation ${JSON.stringify(mip)}; identical passes, missing pixels and changed colours fail`);
+  const rig = { rigged: 101, fallingInfantry: 1 }, baked = { baked: 90, rigged: 10, sprites: 91 };
+  check('baked-standing-count-control', bakedFigureCountsOkay(rig, baked)
+    && !bakedFigureCountsOkay(rig, { ...baked, baked: 89 })
+    && !bakedFigureCountsOkay(rig, { ...baked, sprites: 90 }),
+    'one falling infantry excluded from standing count, included in sprite count; missing living/fallen controls fail');
+}
+
 async function bakedUnit() {
   const I = await import(pathToFileURL(path.join(ROOT, 'src', 'units', 'impostor.js')).href);
   const manifest = JSON.parse(await fs.readFile(path.join(ROOT, 'assets', 'figures', 'union-infantry', 'soldier.json'), 'utf8'));
@@ -362,7 +413,14 @@ async function bakedFigures(page) {
   const frames = (n) => page.evaluate((n) => new Promise((res) => { let k = 0; const f = () => (++k >= n ? res() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n);
   await frames(3);
   const rigPng = await shot(page, 'rigged-view');
-  const rig = await page.evaluate(() => window.__game.game.figuresDrawn());
+  const rig = await page.evaluate(() => {
+    const g = window.__game.game;
+    // Rigged counts include infantry still falling; baked.standing deliberately excludes FALLEN poses.
+    // The simulation is paused, so this same set remains falling through both style captures.
+    const fallingInfantry = g.units.filter((u) => u.type === 'infantry')
+      .reduce((n, u) => n + u.figures.filter((f) => !f.alive && !f.gone).length, 0);
+    return { ...g.figuresDrawn(), fallingInfantry };
+  });
   await page.evaluate(async () => { (await import('./src/settings.js')).set('look.figureStyle', 'baked'); });
   await page.waitForFunction(() => { const g = window.__game.game; return g.baked.state === 'failed' || (g.baked.state === 'ready' && g.figuresDrawn().sprites > 0); }, null, { timeout: 90_000, polling: 250 }).catch(() => {});
   await frames(3);
@@ -377,8 +435,10 @@ async function bakedFigures(page) {
     if (Math.abs(bakedPng.data[i] - rigPng.data[i]) + Math.abs(bakedPng.data[i + 1] - rigPng.data[i + 1]) + Math.abs(bakedPng.data[i + 2] - rigPng.data[i + 2]) > 30) differ++;
   }
   const total = bk.drawn.baked + bk.drawn.rigged;
-  check('baked-draws', bk.state === 'ready' && total >= rig.rigged && bk.drawn.baked > 0 && colours.size > 50 && differ > sampled * 0.002,
-    `atlas ${bk.state}${bk.error ? ` (${bk.error})` : ''}; rigged style drew ${rig.rigged} figures, baked style ${bk.drawn.baked} sprites + ${bk.drawn.rigged} rigged (crews, officers) = ${total} (want >= ${rig.rigged}); ${bk.drawn.sprites} sprite instances in ${bk.drawn.calls} draw calls; ${colours.size} colours; ${differ} of ${sampled} sampled pixels changed from the rigged picture (want > 0.2%)`);
+  const expectedStanding = rig.rigged - rig.fallingInfantry;
+  check('baked-draws', bk.state === 'ready' && bakedFigureCountsOkay(rig, bk.drawn) && bk.drawn.baked > 0
+    && colours.size > 50 && differ > sampled * 0.002,
+    `atlas ${bk.state}${bk.error ? ` (${bk.error})` : ''}; rigged style drew ${rig.rigged} figures (${rig.fallingInfantry} falling infantry), baked style ${bk.drawn.baked} standing sprites + ${bk.drawn.rigged} rigged (crews, officers) = ${total} (want >= ${expectedStanding} standing); ${bk.drawn.sprites} sprite instances including fallen in ${bk.drawn.calls} draw calls; ${colours.size} colours; ${differ} of ${sampled} sampled pixels changed from the rigged picture (want > 0.2%)`);
   check('baked-rects', bk.drawn.sprites > 0 && bk.problems.length === 0, bk.problems.length === 0 ? `all ${bk.drawn.sprites} instances' atlas rects lie inside their pages` : `${bk.problems.length} outside: ${bk.problems.slice(0, 4).join('; ')}`);
 
   // direction: turn the camera 180 degrees about the brigade; the same man's baked direction moves by 8 of 16
@@ -831,6 +891,7 @@ async function sandboxAndDevice(browser, url) {
 async function main() {
   await settingsUnit();
   await bakedUnit();
+  await approvedPackUnit();
   await fs.mkdir(OUT_DIR, { recursive: true });
   const { server, url } = await startServer({ port: 0 });
   result.url = url;
@@ -1076,6 +1137,7 @@ if (process.argv.includes('--unit')) {
   }
   try {
     await bakedUnit();
+    await approvedPackUnit();
   } catch (err) {
     check('baked-maths', false, `src/units/impostor.js or the manifest failed to load or threw: ${err.message}`);
   }
