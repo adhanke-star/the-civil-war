@@ -1178,38 +1178,57 @@ def pad_side(pts, h, t, pal, cos_min=0.5):
     return pts[(rad @ np.array(pal[:])) > cos_min * nr]
 
 
-def fist_channel(ps, s, V, a0, pc, P0w):
-    """The channel of the closed hand, measured on its real skin (run 24: a ring fitted through
-    finger pads and palm put the axis 15 mm too near the palm). For each finger (index..little)
-    the inner height of the middle segment's pad skin above the palm skin; the channel is the
-    cylinder that touches the palm and those segments: its diameter the mean height, its axis
-    through the four points halfway up. -> (centre, axis, radius, per-finger heights mm)."""
+def circle2d(x, y):
+    """Least-squares circle through 2-D points -> (cx, cy, r)."""
+    A = np.c_[x, y, np.ones_like(x)]
+    sol = np.linalg.lstsq(A, -(x * x + y * y), rcond=None)[0]
+    cx, cy = -sol[0] / 2, -sol[1] / 2
+    return float(cx), float(cy), float(math.sqrt(max(cx * cx + cy * cy - sol[2], 0.0)))
+
+
+def fist_channel(ps, s, V, a0):
+    """The channel of the closed hand, measured on its real skin: for each finger (index..little)
+    the circle that its pad skin and the palm skin under it wrap round (fitted in that finger's
+    curl plane); the channel's axis is the line through the four ring centres, its radius their
+    mean. -> (centre, axis, radius, per-finger radii)."""
     d = ps.S[s]
-    hs, cs = [], []
+    Hw, Pw = ps.hand_frame(s)
+    mets = [b for b in V if b.startswith("metacarpal")]
+    cs, rs = [], []
     for ci in (1, 2, 3, 4):
         chain = d["fingers"][ci]
-        bn = chain[1] if len(chain) > 1 else chain[-1]
-        if bn not in V:
+        b0 = chain[0]
+        y0 = (ps.pt(b0) - ps.ph(b0)).normalized()
+        pal0 = (ps.P(b0).matrix.to_3x3() @ Vector(HM["palmar_local"][b0])).normalized()
+        n = y0.cross(pal0).normalized()
+        o = ps.ph(b0)
+        e1 = (Hw - n * Hw.dot(n)).normalized()
+        e2 = n.cross(e1)
+        pts = []
+        for bn in chain:
+            if bn in V:
+                pal = (ps.P(bn).matrix.to_3x3() @ Vector(HM["palmar_local"][bn])).normalized()
+                pts.append(pad_side(V[bn], ps.ph(bn), ps.pt(bn), pal))
+        if mets:
+            mb = min(mets, key=lambda b: (ps.pt(b) - o).length)
+            pts.append(pad_side(V[mb], ps.ph(mb), ps.pt(mb), Pw))
+        q = np.concatenate(pts) - np.array(o[:])
+        q = q[np.abs(q @ np.array(n[:])) < 0.012]
+        if len(q) < 8:
             continue
-        pal = (ps.P(bn).matrix.to_3x3() @ Vector(HM["palmar_local"][bn])).normalized()
-        pts = pad_side(V[bn], ps.ph(bn), ps.pt(bn), pal)
-        if len(pts) < 3:
-            continue
-        q = (pts - np.array(pc[:])) @ np.array(P0w[:])
-        h = float(np.percentile(q, 10))                   # its inner skin, nearest the palm
-        m = Vector(pts.mean(axis=0).tolist())
-        cs.append(m - P0w * ((m - pc).dot(P0w) - h / 2))
-        hs.append(h)
+        cx, cy, r = circle2d(q @ np.array(e1[:]), q @ np.array(e2[:]))
+        cs.append(o + e1 * cx + e2 * cy)
+        rs.append(r)
     if len(cs) < 2:
         return None
     Cm = np.array([c[:] for c in cs])
-    mid = Cm.mean(axis=0)
-    ax = Vector(np.linalg.svd(Cm - mid)[2][0].tolist()).normalized()
+    m = Cm.mean(axis=0)
+    ax = Vector(np.linalg.svd(Cm - m)[2][0].tolist()).normalized()
     if ax.dot(a0) < 0:
         ax = -ax
-    if math.degrees(ax.angle(a0)) > 40.0:       # points too scattered to trust: knuckle line
+    if math.degrees(ax.angle(a0)) > 40.0:       # ring centres too scattered to trust: knuckle line
         ax = a0.copy()
-    return Vector(mid.tolist()), ax, float(np.mean(hs)) / 2, [round(h * 1000, 1) for h in hs]
+    return Vector(m.tolist()), ax, float(np.mean(rs)), [round(r * 1000, 1) for r in rs]
 
 
 def cyl_gap(pts, cen, ax, r):
@@ -1241,26 +1260,19 @@ def fit_grip(ps, body, s, name, target, per_finger=False, thumb_in=0.004):
         SQ[s][name] = shape_quats(ps, s, SHAPES["grip"], kf=kf, kt=kt)
         ps.set_shape(s, name)
         V = hand_verts(ps, body, s)
-        return fist_channel(ps, s, V, a0, pc, P0w), V
+        return fist_channel(ps, s, V, a0), V
 
-    # 1. one curl factor -> channel diameter (thumb open while fitting). The fist's inner height
-    #    first rises then falls as the curl grows, so it is scanned from the closed end and the
-    #    first (most closed) factor that opens it to the target is taken.
-    hist, prev, kg = [], None, None
-    for i in range(25):
-        k = 1.6 - 0.05 * i
+    # 1. one curl factor -> channel radius (thumb open while fitting)
+    lo, hi, hist = 0.4, 1.6, []
+    for _ in range(10):
+        k = (lo + hi) / 2
         res, _V = at(k, 0.0)
-        r_ = res[2] if res else None
-        hist.append([round(k, 2), round(2 * r_ * 1000, 1) if r_ is not None else None])
-        if r_ is not None and r_ >= target:
-            if prev is not None and prev[1] is not None and prev[1] < target:
-                kg = k + (prev[0] - k) * (r_ - target) / max(1e-6, r_ - prev[1])
-            else:
-                kg = k
-            break
-        prev = (k, r_)
-    if kg is None:
-        kg = 0.4
+        hist.append([round(k, 3), round(res[2] * 1000, 1) if res else None])
+        if res is None or res[2] > target:
+            lo = k
+        else:
+            hi = k
+    kg = (lo + hi) / 2
     res, V = at(kg, 0.0)
     found = res is not None
     cen, ax, r, rings = res if found else (pc + P0w * target, a0.copy(), target, [])
@@ -1319,8 +1331,8 @@ def fit_grip(ps, body, s, name, target, per_finger=False, thumb_in=0.004):
     tips = {names[ci]: round(float(cyl_gap(V[c[-1]], cen, ax, target).min()) * 1000, 1)
             for ci, c in enumerate(d["fingers"]) if c[-1] in V}
     ps.reset()
-    return {"channel_diameter_mm": round(2 * target * 1000, 1), "measured_inner_height_mm": round(2 * r * 1000, 1),
-            "finger_inner_heights_mm": rings, "curl_factor": round(kg, 3), "finger_factors": [round(x, 3) for x in kf],
+    return {"channel_diameter_mm": round(2 * target * 1000, 1), "fitted_ring_diameter_mm": round(2 * r * 1000, 1),
+            "ring_radii_mm": rings, "curl_factor": round(kg, 3), "finger_factors": [round(x, 3) for x in kf],
             "thumb_deg": {"flex": thumb[0], "opposition": thumb[1], "mcp": thumb[2], "ip": thumb[3],
                           "tip_to_forefinger_mm": None if tpick[2] is None else round(tpick[2] * 1000, 1),
                           "into_channel_mm": None if tpick[3] is None else round(max(0.0, -tpick[3]) * 1000, 1)},
