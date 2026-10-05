@@ -238,7 +238,9 @@
             if (last) times.push(now - last);
             last = now;
           }
-          if (el < WARM_MS + MEASURE_MS) requestAnimationFrame(frame);
+          // Slow software renderers can produce fewer than five samples in the normal window.
+          // Keep measuring until the existing statistical minimum, with a bounded extension.
+          if (el < WARM_MS + MEASURE_MS || (times.length < 5 && el < WARM_MS + 30_000)) requestAnimationFrame(frame);
           else resolve(times);
         }
         requestAnimationFrame(frame);
@@ -260,9 +262,9 @@
         if (!renderer) build();
         put('r-bench1', 'Benchmark, ratio 1', 'running…');
         put('r-benchn', 'Benchmark, native', 'waiting…');
-        status('Benchmark at devicePixelRatio 1 (6 seconds)…');
+        status('Benchmark at devicePixelRatio 1 (about 6 seconds; longer on slow devices)…');
         put('r-bench1', 'Benchmark, ratio 1', summary(await run(1), 1));
-        status(`Benchmark at the native ratio ${dpr} (6 seconds)…`);
+        status(`Benchmark at the native ratio ${dpr} (about 6 seconds; longer on slow devices)…`);
         put('r-benchn', 'Benchmark, native', `${summary(await run(dpr), dpr)}${dpr === 1 ? '; the native ratio is 1 here' : ''}`);
         status('Done. The frame rate cannot exceed the screen refresh rate. Copy the results and paste them back.');
       } catch (err) {

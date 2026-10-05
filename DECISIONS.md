@@ -1,5 +1,12 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0015 — Device benchmark waits for its minimum sample (2026-10-05)
+CI twice produced only three measured frames in the six-second device benchmark under SwiftShader.
+Keep the existing five-frame minimum and extend slow runs up to 30 seconds after warm-up; an
+insufficient sample still reports that honestly. A controlled slow-frame check produces five samples
+where the old window produces four, and a stalled renderer still reaches the ceiling. Local npm test
+passes. This changes only device.html; the new drill-hand bake remains unapproved and unfielded.
+
 ## 0014 — Baked soldier on the field; hands to be posed from the drill manuals (Aaron, 2026-10-03..05)
 The bake pipeline (branch `bake`: MPFB2 CC0 body + script-built uniform, Blender headless on GitHub Actions,
 sprite atlases) is proven, and the second pass is the game's baked soldier (Look tab; rigged figures stay
