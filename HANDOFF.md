@@ -84,9 +84,26 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
    encodes with pinned KTX-Software 4.4.2 UASTC quality 4/Zstd 18/box mipmaps and marks the KTX DFD flag.
    `tools/bake/review-compression.mjs` checks GPU readback of every page at mips 0/1/2, real decoded format,
    complete mip allocation and missing-pixel/colour controls; it produces small numbered comparison sheets.
-   Dispatch: `gh workflow run pack-figures.yml --ref main`; inspect the exact run and download ONLY
-   `compression-review`, then `approved-figures-ktx2` after quality passes. Packaging is not fielding.
+   **HALT:** Package 37360904656 at 3f439b0 encoded all 45 pages, preserving 5,184 frames and nine looks/tier.
+   KTX files total 47.3972 MiB; actual SwiftShader format was `RGBA_BPTC_Format` (BC7), 199.3999 MiB with
+   all mip levels. Counts, DFD premultiplication and decoded allocations passed; quality failed 45/45 pages.
+   Field mip0 mean RGB error 2.26–2.37 (limit 2), alpha-edge 95th-percentile error 15 (limit 8); field mip2
+   mean RGB 4.01–4.18, mean alpha 2.09–2.27 (limit 1), edge-alpha 23–24. Severe body clipping was zero.
+   Identical/missing-pixel/changed-colour controls all behaved correctly. Main CI 37360906768 and Pages
+   37360907081 passed for 3f439b0. No optimized asset artifact was published because the quality gate failed.
+   Small `compression-review` artifact only (6,987,828 bytes); local readback:
+   `.out/figure-pack-review-37360904656/{compression,quality}.json` and ten numbered PNG sheets.
+   Sheets 1, 7 and 10 inspected locally; this is not whole-set visual or iPad clearance.
+   Next bounded task: diagnose using uncompressed KTX and UASTC-to-RGBA controls on Actions, with identical
+   premultiplied bytes, samplers and mip generation, before deciding whether the discrepancy comes from
+   upload/filtering, UASTC or BC7 transcoding. Do not weaken thresholds, rerender the approved poses or field.
+   Do not rerun the unchanged 24-minute encoder as a diagnostic. Prepare only the required small diagnostic
+   outputs on Actions; full bake archives/raw frames/.blend never belong on the Mac.
+   After a scoped fix: `gh workflow run pack-figures.yml --ref main`; inspect exact run, download ONLY
+   `compression-review`, then `approved-figures-ktx2` after every gate passes. Packaging is not fielding.
    Runtime KTX vendoring, name-bound identity, ninth counters, eligibility and total-scene admission are next.
+   The existing baked-height unit check decodes PNGs; adapt it using actual compressed GPU readback/geometry
+   evidence without discarding its feet/clip-scale assertions. Include geometry/render targets in admission.
    The local smoke exposed an existing count mismatch: rigged includes infantry still falling, while baked
    standing excludes FALLEN. The comparison now separates standing/falling and checks fallen sprite coverage;
    broken controls must still reject missing living or fallen figures. No runtime code changed for that fix.

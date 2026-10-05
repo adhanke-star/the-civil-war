@@ -7,6 +7,8 @@ with premultiplied display bytes and mipmaps, matching the current shader's manu
 Read back every compressed page against its PNG before integration. The 797.27 MiB RGBA/mipmap pack
 exceeds the iPad ceiling; real format/allocation, eligibility and total-scene admission remain required.
 Second-pass assets and rigged defaults remain until integration passes; iPad clearance is still unverified.
+First package run 37360904656: 47.40 MiB disk, actual BC7/mips 199.40 MiB; all 45 pages fail colour/alpha
+quality limits. Fielding is halted pending upload/mipmap/transcode controls; thresholds remain unchanged.
 
 ## 0015 — Device benchmark waits for its minimum sample (2026-10-05)
 CI twice produced only three measured frames in the six-second device benchmark under SwiftShader.

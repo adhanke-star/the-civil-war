@@ -9,8 +9,8 @@
 - **Real GPU, UHD 617, Auto, opening/fight (2026-10-04):** baked 1:10 42.6/40.7, baked 1:5 40.7/38.7 fps;
   rigged 1:5 40.6/36.8. 1:5 holds 30 fps.
 - **Art (`bake` 820846f):** simple authored hands; Full Bake 37347072866 + CI passed, 5,184 frames.
-  Aaron confirmed visibility and approved all 12 sheets. Compressed packaging is next; no pass-5 art fielded.
-  Full PNG set exceeds the iPad memory budget; Actions packaging/readback added. Resume: HANDOFF.md.
+  Aaron saw and approved all 12 sheets. Package 37360904656: 47.40 MiB disk, 199.40 MiB BC7/mips.
+  HALT: 45/45 pages fail pixel/alpha quality gates. No new art fielded; diagnose controls next (HANDOFF.md).
 - **Known in play:** front-on firing poses hard to tell apart; halos louder than the baked shadow; walk bob;
   uniform details are placeholders. **Unverified:** iPad; pinch, twist-to-face, box select, minimap input.
 - **Awaiting Aaron:** sandbox and reward page Copy-settings from Mac and iPad; device.html results;
