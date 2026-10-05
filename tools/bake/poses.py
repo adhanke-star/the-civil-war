@@ -423,7 +423,7 @@ class Poser:
         return {"err": err, "roll": roll, "need": need, "R": R, "Pa": Pa, "Q": Q.copy(), "A": A.copy(),
                 "nv": Pv.copy(), "shape": shape}
 
-    def hold(self, s, shape, Q, A, nv, pole, thumbs=(1,), rolls=None, slides=(0.0,), kpref=None, fixed=None):
+    def hold(self, s, shape, Q, A, nv, pole, thumbs=(1,), rolls=None, slides=(0.0,), kpref=None, kweight=10.0, fixed=None):
         """Place hand s, rigid in its fixed shape, on an object whose axis runs along A through Q.
         The only choices are the hand's turn about the object (rolls), which way its thumb side
         faces along it (thumbs) and, for a second hand, a slide along it (slides); they are judged
@@ -444,7 +444,7 @@ class Poser:
                       + (4.0 if td != thumbs[0] else 0.0))
                 if kpref is not None:
                     kw = h["R"] @ Vector(HF[s][shape]["k"])
-                    sc += 10.0 * (1.0 - kw.dot(kpref.normalized()))
+                    sc += kweight * (1.0 - kw.dot(kpref.normalized()))
                 if best is None or sc < best[0]:
                     best = (sc, (sl, td, r))
             sl, td, r = best[1]
@@ -703,10 +703,14 @@ def pose_stand(ps, musket, frame):
     M = gun_matrix(heel, zg, -F)            # trigger guard to the front
     key = "stand0@%d" % frame
     st = {}
+    gy0 = gun_axes(M)[1]
 
+    # run 23: the best-reaching fist showed only the back of the hand (read as a flat hand); the
+    # knuckles are asked to face the front, fingers round the swell and guard (Hardee, recalled)
     def solve_r(k):
         pole = -F - L * (0.3 + 6.0 * k)
-        st["h"] = gun_hold(ps, "R", M, G["grip_stand_R"], "grip", (1, -1), -L, pole, slides=(0.0, -0.03, 0.03), fixed=st.get("cand"))
+        st["h"] = gun_hold(ps, "R", M, G["grip_stand_R"], "grip", (1, -1), -L, pole, slides=(0.0, -0.03, 0.03),
+                           kpref=-gy0, kweight=25.0, fixed=st.get("cand"))
         st.setdefault("cand", st["h"]["cand"])
         err["armR"] = st["h"]["err"]
     REP["checks"].setdefault("clearance", {})["stand_R"] = ps.clear("R", solve_r)
@@ -1234,11 +1238,11 @@ def cyl_gap(pts, cen, ax, r):
     return np.sqrt(np.maximum((q * q).sum(1) - t * t, 0.0)) - r
 
 
-def fit_grip(ps, body, s, name, target):
+def fit_grip(ps, body, s, name, target, per_finger=False, thumb_in=0.004):
     """Fit one closed fist, once, at rest, on the real skin: the authored GRIP angles x one curl
-    factor for a channel of radius `target`; then x one factor per finger so each fingertip just
-    meets that channel (run 22: the shorter index and little fingers ended 12 mm inside the wood);
-    then one thumb factor so the thumb just closes on it. Stores SQ[s][name] and HF[s][name]."""
+    factor for a channel of radius `target`; with per_finger, then x one factor per finger so
+    each fingertip just meets that channel (used for grip_small only: run 23 showed it loosened the
+    40 mm fist); then the thumb, picked once from a grid. Stores SQ[s][name] and HF[s][name]."""
     d = ps.S[s]
     ps.reset()
     Mw = ps.P(d["hand"]).matrix.copy()
@@ -1275,7 +1279,7 @@ def fit_grip(ps, body, s, name, target):
     # 2. one factor per finger -> its fingertip just meets the channel (+0.5 mm); twice, refitting
     #    the channel in between
     kf = [kg] * 4
-    for _round in range(2):
+    for _round in range(2 if per_finger else 0):
         lo4, hi4 = [0.3 * kg] * 4, [min(1.9, 1.8 * kg)] * 4
         for _ in range(9):
             mid = [(a + b) / 2 for a, b in zip(lo4, hi4)]
@@ -1310,7 +1314,7 @@ def fit_grip(ps, body, s, name, target):
                 gap = min(float(cyl_gap(Vt[b], cen, ax, target).min()) for b in thumb_b if b in Vt)
                 A_, B_ = Vt[tt], Vt[ib]
                 reach = float(np.sqrt(((A_[:, None, :] - B_[None, :, :]) ** 2).sum(2)).min())
-                sc = reach + 5.0 * max(0.0, -gap - 0.002) + 0.00002 * (fl + op + m1 + m2)
+                sc = reach + 5.0 * max(0.0, -gap - thumb_in) + 0.00002 * (fl + op + m1 + m2)
                 tgrid.append((sc, th, reach, gap))
     tgrid.sort(key=lambda x: x[0])
     thumb = tgrid[0][1] if tgrid else SHAPES["grip"]["thumb"]
@@ -1347,8 +1351,8 @@ def calibrate_hands(ps, body):
     for s in ("L", "R"):
         ps.reset()
         SQ[s]["relaxed"] = shape_quats(ps, s, SHAPES["relaxed"])
-        rep[s] = {"grip": fit_grip(ps, body, s, "grip", G["grip_channel_r"]),
-                  "grip_small": fit_grip(ps, body, s, "grip_small", G["grip_small_r"])}
+        rep[s] = {"grip": fit_grip(ps, body, s, "grip", G["grip_channel_r"], per_finger=False, thumb_in=0.004),
+                  "grip_small": fit_grip(ps, body, s, "grip_small", G["grip_small_r"], per_finger=True, thumb_in=0.002)}
         ps.reset()
     REP["hand_shapes"] = {
         "shapes": SHAPES, "fitted": rep,
@@ -1394,14 +1398,17 @@ def measure_holds(ps, body):
                 tips[names[ci]] = round(min(e["surf"].gap(Vector(p.tolist())) for p in pts) * 1000, 1)
         used = names
         tip_max = max([max(0.0, tips[n]) for n in used if n in tips] or [0.0])
-        pen = 0.0
-        for pts in V.values():
+        pen, pen_by = 0.0, {}
+        for bn, pts in V.items():
             for p in pts:
                 pv = Vector(p.tolist())
                 ga = min([e["surf"].gap(pv)] + [x.gap(pv) for x in e["extra"]])
                 pen = max(pen, -ga)
+                if ga < -0.001:
+                    pen_by[bn] = max(pen_by.get(bn, 0.0), -ga)
         rec = {"shape_dev_deg": dev, "axis_mm": round(dist * 1000, 1), "axis_deg": round(ang, 1),
-               "tips_mm": tips, "tip_gap_max_mm": round(tip_max, 1), "penetration_mm": round(pen * 1000, 1)}
+               "tips_mm": tips, "tip_gap_max_mm": round(tip_max, 1), "penetration_mm": round(pen * 1000, 1),
+               "penetration_by_bone_mm": {b: round(v * 1000, 1) for b, v in sorted(pen_by.items(), key=lambda x: -x[1])[:4]}}
         rec["ok"] = bool(dev <= 3.0 and rec["axis_mm"] <= 5.0 and rec["tip_gap_max_mm"] <= 10.0)
         REP["holds"][e["key"]][s].update(rec)
         for k_ in worst:

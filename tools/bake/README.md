@@ -239,12 +239,15 @@ attached to the hand. Nothing else changed in this pass.
 - **Fitted once, at rest, on the real skin** (never per pose). GRIP's authored four-finger curl
   is multiplied by one factor so the channel through the fist is 40 mm across (each finger's pad
   skin and the palm under it give a ring; the channel axis runs through the four ring centres,
-  its radius is their mean), then by one factor per finger so each fingertip just meets that
-  channel (run 22: the shorter index and little fingers otherwise ended 12 mm inside the wood).
-  The thumb is chosen once from an 80-pose grid (flex, opposition, two joints) as the one whose
-  tip comes closest to the forefinger's middle segment without entering the channel (run 22: a
-  scaled thumb stayed straight and stuck out). Everything fitted is in `poses.json`
-  `hand_shapes.fitted`.
+  its radius is their mean). grip_small then gets one factor per finger so each fingertip just
+  meets its 13 mm channel (tried on GRIP too in run 23: it loosened the fist into a claw, so GRIP
+  keeps one factor and its index and little tips sit up to about 12 mm into the 40 mm channel,
+  i.e. pressed into the wood). The thumb is chosen once from an 80-pose grid (flex, opposition,
+  two joints) as the one whose tip comes closest to the forefinger's middle segment without
+  entering the channel by more than 4 mm (2 mm for grip_small) (run 22: a scaled thumb stayed
+  straight and stuck out). Everything fitted is in `poses.json` `hand_shapes.fitted`.
+- **Stand**: the fist is asked to show its knuckles at the front of the stock (fingers round the
+  swell and guard); run 23's best-reaching fist showed only the back of the hand.
 - **The object is attached to the hand.** The first hand is placed by arm IK with its fist
   channel on the stock axis; the musket is then keyed from where that channel actually ended up,
   so the wood always runs through the middle of the fist. The second hand is the same rigid fist,
