@@ -30,7 +30,7 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
   - `reward.html?sandbox` = loot reward sequence on placeholder data. `device.html` = GPU test page.
 - The game's baked soldier is the **second bake pass** (`assets/figures/union-infantry/`, Aaron approved
   it for fielding). Rigged 3D figures remain the default style.
-- Branch `bake` (d7c07b2) holds the bake pipeline (`tools/bake/`, `.github/workflows/bake.yml`, README with
+- Branch `bake` (820846f) holds the bake pipeline (`tools/bake/`, `.github/workflows/bake.yml`, README with
   every measured number and licence). Passes: 2 = af78b02/f0b845a (on the field); 3 = a50968f (new faces,
   8 variants in both tiers, all clips in 16 directions, sharded into 22 jobs, ~23 min); 4 = e41d05e
   (fixed-fist hands). Older previews were stored in `.out/bake2`, `.out/bake3`,
@@ -39,9 +39,14 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
   the approved trigger/pinch exceptions. Pass-5 baseline Bake 37336806292 at 58b9894 succeeded, but self-review
   found bent wrists; it is NOT an approval candidate. Full revised Bake 37342865320 at d7c07b2 succeeded,
   but self-review found loading hands hidden in the coat/face. It is NOT an approval candidate either.
-  Next: move the loading musket forward enough to clear the body while preserving ground contact,
-  centreline and middle-band station, then rebake and visually check every pose before Aaron's review.
-  Run 37341611250 was superseded/cancelled. Local npm test passed at d7c07b2 (95 s); no new art is fielded.
+  Latest 820846f adds a small forward loading lean (an art estimate) to clear the coat/face while
+  preserving ground contact, centreline and middle-band station; the trigger forefinger curls into the
+  guard. Full Bake 37347072866 and CI 37347072709 passed. Self-review passed every clip, including the
+  eight-frame march cycle. Recovery and priming remain abbreviated game stages; sheet 7 shows the
+  cartridge held above the muzzle BEFORE charging (the manual's Fig78 shows the OPEN hand afterward).
+  Twelve numbered sheets in `.out/bake5/review-33/` were opened in Preview. Visibility confirmation and
+  Aaron's visual approval are pending; neither has been inferred from opening the files.
+  Run 37341611250 was superseded/cancelled. Local npm test passed at 820846f (94 s); no new art is fielded.
 - **Hands: Aaron rejected all three hand versions** (passes 2, 3 and 4): "fingers bent oddly" and "hands in
   the wrong spot". He likes the pass-3 faces and variants. Nothing from passes 3-4 is in the game.
 
@@ -50,13 +55,16 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
    per clip, the manual's words for each hand, and Aaron's choice: aim and loading as drawn in the 1861
    plates; shoulder arms and march on the RIGHT shoulder per Hardee's text (no correct plate exists).
    Re-download the plates into `.out/reference/drill/` from the URLs there (`.out/` is pruned).
-2. **Next: repair loading clearance and inspect the next hand bake.** Do not restore a50968f again over
-   the rebuild. Bake 37342865320 and CI 37342865259 succeeded at d7c07b2, but the renders failed self-review.
+2. **Next: confirm Aaron saw the sheets, THEN obtain visual approval for 820846f.** Do not restore
+   a50968f again over the rebuild. Bake 37347072866 and CI 37347072709 passed; self-review passed. Earlier
+   Bake 37342865320 and CI 37342865259 succeeded at d7c07b2, but the renders failed self-review.
    Download preview/reports only into `.out/`; never the posed
    .blend. Confirm all 18 pose frames, 16 directions, base + 8 variants in EACH tier (2,592 frames per tier,
    5,184 total). A successful or partial bake is not visual acceptance. Check wrists, hand contact,
    trigger/thumb, elbow heights, head on stock, right-shoulder carry and the whole march cycle yourself.
-   Then `node tools/review-drill.mjs <preview-dir> <fresh-.out-review-dir>` creates 12 numbered sheets.
+   Current preview: `.out/bake5/preview-33/`. If pruned, download named `preview-33` from run 37347072866.
+   `node tools/review-drill.mjs <preview-dir> <fresh-.out-review-dir> "Bake 37347072866 at 820846f"`
+   creates 12 numbered sheets with the run/SHA printed on them.
    Put all 12 on Aaron's screen with `open -a Preview <explicit files>`, confirm visibility in a popup,
    THEN ask approval. Do not field before explicit approval; ask what is wrong before re-fixing rejection.
 3. Fielding a new bake: `src/units/impostor.js` reads per-frame `ax/ay/ppm`, `directionsByClip`,
@@ -67,6 +75,10 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
    appearance by name across tiers, filter h7 (`use: usct`) to eligible units, and account for actual loaded
    RGBA/mipmap memory before loading all nine looks. DESIGN's per-battle iPad ceiling is about 250 MB;
    compressed files on disk are not graphics memory. iPad performance remains unverified.
+   Pass-5 run 33 has 5,184 frames, 79.80 MiB of atlas PNGs and 797.27 MiB of RGBA8/mipmap texture memory
+   across all tiers/looks (36 close pages + 9 field pages; manifest 1,142,071 bytes). It cannot be loaded
+   wholesale under the iPad ceiling. Implement DESIGN's compressed atlases/per-battle loading before
+   fielding the full set. Preserve all nine looks in both tiers; do not silently remove variants.
 4. Waiting on Aaron (remind once): play the sandbox and reward page on Mac and iPad and paste the
    "Copy settings" blocks; paste `device.html` results from both; run `gh auth refresh -s project,read:project`
    so a GitHub Project board can be created (DESIGN: To do / Building / For your review / Done).

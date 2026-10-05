@@ -33,7 +33,7 @@ const spec=[
  ['04-fire','4. Fire — keep the head on the stock',53,'Same station and head placement as aim. Small recoil is an art estimate; the game adds muzzle flash and smoke.',['fire',1]],
  ['05-recover','5. Recover / ready',51,'Baxter 1861 p51 Figs88-90; Hardee paras171-173. Left hand at lower band; right hand at small/lock. This is the abbreviated game recovery frame.',['fire',2]],
  ['06-load-start','6. Load — cartridge from box',45,'Baxter p45 Fig76: butt on ground beside left thigh; muzzle opposite body centre; left hand at MIDDLE band; right hand to cartridge box.',['load',0]],
- ['07-charge-cartridge','7. Load — charge at muzzle',46,'Baxter p46 cartridge/hand instructions. The five-frame game clip abbreviates the full drill; tearing the cartridge is not a separate frame.',['load',1]],
+ ['07-charge-cartridge','7. Load — cartridge above muzzle',46,'Cartridge held upright above the muzzle before charging. Baxter p46 Fig78 shows the OPEN hand after charging, not this instant. The five-frame game clip abbreviates tearing, dropping the charge and opening the hand.',['load',1]],
  ['08-draw-rammer','8. Load — draw rammer',46,'Baxter p46 Fig79: thumb and forefinger bent, other fingers closed. The rod is drawn clear; right elbow remains near the body.',['load',2]],
  ['09-ram','9. Load — ram',48,'Baxter p48 ramming text; Hardee para163. Thumb/forefinger hold; other fingers closed; back of hand toward front, elbow down near piece. Fig84 illustrates return-rammer, not the ramming stroke.',['load',3]],
  ['10-prime','10. Load — prime / ready',51,'Abbreviated priming stage at lock; compare the hand stations to Baxter p51 ready sequence. The plate is contextual, not an exact frame match.',['load',4]],
