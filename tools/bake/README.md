@@ -36,7 +36,7 @@ Stages (each one is a separate Blender process, timed in the job summary):
 |---|---|---|
 | 1 | `probe_mpfb.py` | MPFB2 + CC0 packs -> `work/body.blend`, `report/probe.json` (adult male, default rig; third pass: the seven head presets of `uniform.py` `HEADS`, each a body shape key plus its own CC0 eyes, brows, lashes, hair, beard and skin) |
 | 2 | `uniform.py` | -> `work/soldier.blend`, `report/uniform.json`. Garments, kit, rifle-musket, cap, brogans, skin shading; **all dimensions/colours in one table at the top** |
-| 3 | `poses.py` | -> `work/posed.blend`, `report/poses.json`. Stand (shoulder arms), 8-frame march, aim/fire/recover, fallen, load (5); measured-hand grip solve with real-skin contact report; cartridge; kit hang; motion checks |
+| 3 | `poses.py` | -> `work/posed.blend`, `report/poses.json`. Stand (shoulder arms), 8-frame march, aim/fire/recover, fallen, load (5); fixed hand shapes with the musket, rammer and cartridge keyed from the holding hand, real-skin hand check (fourth pass); cartridge; kit hang; motion checks |
 | 3b | `cloth.py` | -> `work/posed.blend`, `report/cloth.json`. Blender cloth settled per pose for trousers, coat (sleeves) and coat skirt; never fails the job |
 | 4 | `render.py --shard <s>` | -> `frames/<tier>/*.png`, `frames/<tier>_<variant>/*.png` (both tiers), `variants/*.png`, `heads/*.png`, `hands/*.png`, `hero.png`, `hero-closeup.png`, `portrait.png`, `hands.png`, `kit.png`, `report/render[-<shard>].json` |
 | 5 | `pack.mjs` | -> `atlas/soldier_<tier>_<page>.png`, `atlas/soldier_<tier>_<variant>_<page>.png`, `atlas/soldier.json`, `contact-sheet.png`, `*-preview.png` |
@@ -101,7 +101,8 @@ uploaded.
   `tiers.<tier>.baseComposition`: the same for the base frames.
 - `heads`: every head preset with its CC0 assets, targets and `use` (`any`, or `usct` = only for
   United States Colored Troops regiments); `headsNote`.
-- `grips`, `gripsNote`: per clip frame and hand, the real-skin contact count and penetration.
+- `grips`, `gripsNote`: per clip frame and hand, the real-skin contact count and penetration
+  (fourth pass: now the fixed-hand check, see "Fourth pass: simple hands").
 - `shards`: per render shard, wall seconds and renders.
 - `readability` gains the field-tier slouch hat note. `measuredColours`, `lights` (now with
   `face_bounce`) as before. Per-frame `ax`, `ay`, `ppm`, `directionsByClip` and
@@ -182,23 +183,11 @@ walk bob, silhouettes, slouch hat at field size, manifest fields kept).
   dip 28 -> 18) and the warm face bounce (Lighting) reaches the eyes.
 - Body gets render-level subdivision (face and fingers).
 
-### Hands
+### Hands (replaced in the fourth pass, see "Fourth pass: simple hands")
 
-`poses.py` measures the hand from the rest mesh (pad thickness per finger segment, pad side =
-opposite its fingernail, palm thickness, palm centre), then for every gripping hand:
-1. tries 90 placements (palm side round the object, wrap direction, hand tilt up to 45 degrees,
-   slide along it): the palm skin goes against the surface, the wrist follows from the measured
-   hand, the arm reaches it by IK, the forearm rolls to take the twist, the hand is set exactly;
-2. curls each finger joint until its pad touches (bisection; the thumb is opposed by a fixed turn
-   and its outer joints close); a joint never opens past 10 degrees beyond straight;
-3. finishes the best 5 on the **real skinned mesh**: the palm and knuckles are pushed out of the
-   wood, then each joint is curled or opened until its nearest skin is within -0.8..+1.2 mm of
-   the surface; the placement with the best measured contact, least penetration and straightest
-   wrist is kept.
-The load clip's right hand pinches a paper cartridge (thumb and two fingers, palm held off) at
-the box and over the muzzle, then grips the drawn rammer and the rammer for the stroke.
-The report measures the real skin against the analytic surfaces (stock ellipse, barrel, rammer
-and cartridge cylinders). Not measured: contact with the musket's actual mesh.
+The third pass solved every finger joint per pose against the object (90 placements, bisection
+per joint, mesh refine). The owner judged the result bad (flat, splayed and open hands) and the
+solver is gone.
 
 ### Blanket roll and kit weight
 
@@ -229,6 +218,50 @@ off the belt line, 48 of 51 kept. The fallen frame keeps the procedural folds.
 ### Measured numbers, third pass
 
 Filled in from the final full run below.
+
+## Fourth pass: simple hands (2026-10-05)
+
+Owner's verdict on the third-pass hands: "the hands are bad. make less complicated if you can't
+make perfect." The per-finger grip solver (90 placements per hand, bisection per joint, mesh
+refine, contact counting) is removed. Hands are now three fixed shapes and the held object is
+attached to the hand. Nothing else changed in this pass.
+
+- **Fixed shapes** (`SHAPES` at the top of `poses.py`), the same joint angles in every clip and
+  for both hands (each hand's joint axes come from its own fingernails, which mirrors them):
+  - **GRIP**: the four fingers curled together as one unit (MCP, PIP, DIP per finger, the
+    rest-pose spread closed so they lie side by side), the thumb closed over them;
+  - **RELAXED**: a free hand, fingers together and half curled (stand and march left hand,
+    fallen).
+  - A third shape, PINCH (thumb and two fingers) for the cartridge and rammer, was tried once
+    (run 21) and read as an open, splayed hand, so it was removed: GRIP holds them too.
+- **Fitted once, at rest, on the real skin.** GRIP's four-finger curl is multiplied by one factor
+  so the channel through the fist is 40 mm across (each finger's pad skin and the palm under it
+  give a ring; the channel axis runs through the four ring centres, its radius is their mean);
+  the thumb gets one factor so its outer two segments just close on that channel. The fitted
+  factors and the channel are in `poses.json` `hand_shapes.fitted`.
+- **The object is attached to the hand.** The first hand is placed by arm IK with its fist
+  channel on the stock axis; the musket is then keyed from where that channel actually ended up,
+  so the wood always runs through the middle of the fist. The second hand is the same rigid fist,
+  placed by wrist IK with its channel on the stock axis; if it cannot reach, it slides along the
+  stock toward the body rather than opening. The only free choices are the fist's turn about the
+  object, which way its thumb faces along it and that slide, judged by reach, wrist bend and
+  forearm twist. The cartridge is keyed at the right fist's channel; the rammer slides along its axis to
+  sit in the hand.
+- **Which hand leads**: stand, march, aim, fire, recover, prime: the right hand; load 0-3: the left
+  hand on the upright barrel (the butt stays on the ground), the right hand holds the cartridge or
+  rammer. Trigger hand in aim/fire/recover: GRIP round the wrist of the stock, no separate trigger
+  finger. March (right shoulder shift): the butt is 110 mm deep and cannot pass through a fist, so
+  the fist closes on its toe edge (knuckles under the toe, the rest of the butt rising out of
+  the fist); this is the one hold whose object is not centred in the channel.
+- **Acceptance check** (`poses.json` `holds`, `hand_acceptance`; manifest `grips`): for every held
+  hand at its keyed frame, on the real skinned mesh: largest joint deviation from the fixed shape,
+  channel to the held object's axis, each fingertip to the held surface (+ outside),
+  deepest penetration, IK miss, wrist bend. Free hands: deviation from RELAXED (`free_hands`).
+- **Hands preview** `hands.png` is pinned to direction 3, the yaw the third pass chose, so the
+  two can be compared directly. The contact sheet keeps its hand close-up rows.
+
+Manifest (additive): `grips` now holds the fourth-pass check per clip frame and hand (the field
+had no reader in the game); new `handShapes` (the shapes and fitted factors) and `freeHands`.
 
 ## Measured numbers, second pass
 

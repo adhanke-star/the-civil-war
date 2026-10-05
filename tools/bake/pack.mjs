@@ -419,7 +419,7 @@ function pack() {
     }])),
     headsNote: 'every head preset is built only from CC0 assets (MakeHuman system assets; bodyparts05 beards) and MPFB2 CC0 targets; use "usct" heads only for United States Colored Troops regiments',
     grips: poses.holds || {},
-    gripsNote: 'fourth pass: per clip frame and holding hand, its fixed shape (grip or pinch) and the real-skin check: shape_dev_deg (largest joint deviation from the fixed shape), axis_mm/axis_deg (fist channel or pinch point to the held object\'s axis), tips_mm (each fingertip to the held surface, + outside), tip_gap_max_mm, penetration_mm, ik_err_m, wrist_bend_deg',
+    gripsNote: 'fourth pass: per clip frame and holding hand, its fixed shape (grip) and the real-skin check: shape_dev_deg (largest joint deviation from the fixed shape), axis_mm/axis_deg (fist channel to the held object\'s axis), tips_mm (each fingertip to the held surface, + outside), tip_gap_max_mm, penetration_mm, ik_err_m, wrist_bend_deg',
     handShapes: poses.hand_shapes || null,
     freeHands: poses.free_hands || {},
     shards: render.shards || null,
