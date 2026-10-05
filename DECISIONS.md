@@ -1,5 +1,14 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0014 — Baked soldier on the field; hands to be posed from the drill manuals (Aaron, 2026-10-03..05)
+The bake pipeline (branch `bake`: MPFB2 CC0 body + script-built uniform, Blender headless on GitHub Actions,
+sprite atlases) is proven, and the second pass is the game's baked soldier (Look tab; rigged figures stay
+default). Real GPU, UHD 617, Auto: baked 1:5 holds 40.7/38.7 fps (opening/fight), so 1 figure = 5 men is
+affordable. Aaron rejected three hand methods in a row (closing fingers to touch, a per-finger grip solver,
+fixed fists keyed to the musket): fingers bent oddly and hands in the wrong spot. Next: collect Hardee/Casey
+plates and period photographs, have him approve the target positions, then pose to them with one simple hand
+shape on top of pass 3's faces and variants. Sprite budget raised to ~200 MB with a per-battle iPad memory cap.
+
 ## 0013 — Redesign: "One Army, One War"; sandbox first (Aaron, 2026-10-03)
 About 130 choices made by Aaron in popups are recorded in DESIGN.md, now the design of record. In short: an
 army-commander franchise (Union Army of the Ohio/Cumberland) through Shiloh, Stones River and Chattanooga in

@@ -1,6 +1,7 @@
 # AGENTS.md — the canon for "The Civil War" (new build, 2026-10-02)
 
 `CLAUDE.md` imports this file, so every Claude Code version loads it without a hook. Keep it short.
+**Handing over or picking up work: read `HANDOFF.md` (2026-10-05) after this file.**
 Every line must change what a session does.
 
 ## 1 · What we are building
