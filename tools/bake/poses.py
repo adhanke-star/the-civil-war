@@ -738,7 +738,7 @@ def pose_fire(ps, musket, frame, stage):
         # left hand cradles the forestock from below; right hand round the wrist of the stock,
         # palm on the lock (right, -x) side
         err["armL"], _ = gun_grip(ps, "L", M, G["grip_aim_L"], -gy + gx * 0.25, -U + L * 0.2, key, frame, direction=F * 0.65 - L * 0.75)
-        err["armR"], _ = gun_grip(ps, "R", M, G["grip_aim_R"], -gx + gy * 0.2, -L + U * 0.10, key, frame, kind="trigger", direction=F - U * 0.3)
+        err["armR"], _ = gun_grip(ps, "R", M, G["grip_aim_R"], -gx + gy * 0.2, -L + U * 0.10, key, frame, kind="trigger", direction=F * 0.50 + L * 0.85 + U * 0.08)
     else:
         ps.look(F * 0.9 - U * 0.25)
         hipR = ps.ph(ps.S["R"]["thigh"][0])
@@ -845,7 +845,7 @@ def pose_load(ps, musket, frame, step, rr, cart):
             a = centre - X * (cl / 2)
             surf = CylSurf(a, X, cr, cl)
             err["armR"], res = fixed_grip(ps, "R", centre + nv * (cr + 0.014), X, nv, pole,
-                surf, key, frame, kind="pinch", extra=(GunSurf(M),), direction=(-U - F * 0.5) if step == 0 else U)
+                surf, key, frame, kind="pinch", extra=(GunSurf(M),), direction=(L * 0.85 - F * 0.15 - U * 0.50) if step == 0 else U)
             res["object"] = "cartridge"
             key_cartridge(cart, frame, centre, X, nv)
         elif step == 2:
@@ -870,7 +870,7 @@ def pose_load(ps, musket, frame, step, rr, cart):
                 surf, key, frame, kind="pinch", extra=(GunSurf(M),), direction=U)
             err["armR"] = e_
             key_cartridge(cart, frame, park=park)
-        err["armL"], _ = gun_grip(ps, "L", M, G["grip_load_L"], L * 0.8 - F * 0.4, -U + L * 0.6, key, frame, direction=-U)
+        err["armL"], _ = gun_grip(ps, "L", M, G["grip_load_L"], L * 0.8 - F * 0.4, -U + L * 0.6, key, frame, direction=-L * 0.75 + F * 0.25 - U * 0.55)
     else:
         key_ramrod(rr, frame)
         key_cartridge(cart, frame, park=park)
