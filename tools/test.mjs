@@ -195,6 +195,28 @@ async function approvedPackUnit() {
     && !Q.comparePixels(colour, Buffer.from([200, 100, 20, 255, 30, 20, 10, 128])).ok;
   check('compression-controls', mip.block16 === 48 && mip.rgba8 === 84 && mip.levels === 3 && quality,
     `4x4 + 2x2 + 1x1 allocation ${JSON.stringify(mip)}; identical passes, missing pixels and changed colours fail`);
+  const diag = { diagnosticOnly: true, fieldable: false, controls: {}, pages: P.DIAGNOSTIC_PAGES.map((source) => ({ source, integrity: true,
+    comparisons: ['png->premul', 'png->raw', 'raw->rgba', 'rgba->bc7', 'png->bc7', 'raw->raw'].flatMap((route) => [0, 1, 2].map((lod) => ({ route, lod, metrics: Q.comparePixels(colour, colour) }))) })) };
+  for (const tier of ['close', 'field']) for (const key of ['Upload', 'RawBase', 'Identity', 'Missing', 'Colour']) diag.controls[tier + key] = true;
+  const rejectsDiag = (mutate) => { const x = structuredClone(diag); mutate(x); return !Q.diagnosticEvidenceOkay(x); };
+  check('compression-diagnostic-contract', Q.diagnosticEvidenceOkay(diag)
+    && rejectsDiag((x) => { x.fieldable = true; }) && rejectsDiag((x) => { x.pages.pop(); })
+    && rejectsDiag((x) => { x.pages[1].source = x.pages[0].source; })
+    && rejectsDiag((x) => { x.pages[0].comparisons[1] = x.pages[0].comparisons[0]; })
+    && rejectsDiag((x) => { x.controls.fieldRawBase = false; }) && rejectsDiag((x) => { x.pages[0].integrity = false; })
+    && rejectsDiag((x) => { x.pages[0].comparisons[0].metrics.samples = 0; }),
+    'two fixed pages, all six routes/mips, real upload controls and allocation required; never fieldable');
+  const ktxControl = (raw) => {
+    const b = Buffer.alloc(112); Buffer.from([0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a]).copy(b);
+    b.writeUInt32LE(raw ? 37 : 0, 12); b.writeUInt32LE(4, 20); b.writeUInt32LE(4, 24); b.writeUInt32LE(3, 40);
+    b.writeUInt32LE(raw ? 0 : 2, 44); b.writeUInt32LE(80, 48); b.writeUInt32LE(28, 52); b[92] = raw ? 1 : 166; b[94] = 1;
+    return b;
+  };
+  const badKtx = ktxControl(true); badKtx[94] = 2;
+  let rejectsSrgb = false; try { P.markPremultiplied(badKtx, 4, 4, true); } catch { rejectsSrgb = true; }
+  check('compression-dfd-controls', P.markPremultiplied(ktxControl(true), 4, 4, true)[95] === 1
+    && P.markPremultiplied(ktxControl(false), 4, 4)[95] === 1 && rejectsSrgb,
+    'raw RGBA8 and UASTC metadata mark premultiplied bytes; automatic sRGB control rejects');
   const rig = { rigged: 101, fallingInfantry: 1 }, baked = { baked: 90, rigged: 10, sprites: 91 };
   check('baked-standing-count-control', bakedFigureCountsOkay(rig, baked)
     && !bakedFigureCountsOkay(rig, { ...baked, baked: 89 })

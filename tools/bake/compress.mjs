@@ -89,27 +89,36 @@ function freshOut(out) {
   if (!inside(fs.realpathSync(out), base)) fail('output escaped .out/');
 }
 
-export function markPremultiplied(buf, w, h) {
+export function markPremultiplied(buf, w, h, raw = false) {
   const magic = Buffer.from([0xab, 0x4b, 0x54, 0x58, 0x20, 0x32, 0x30, 0xbb, 0x0d, 0x0a, 0x1a, 0x0a]);
   if (!buf.subarray(0, 12).equals(magic) || buf.readUInt32LE(20) !== w || buf.readUInt32LE(24) !== h
     || buf.readUInt32LE(40) !== mipBytes(w, h).levels) fail('encoded KTX dimensions/mip count');
   const dfd = buf.readUInt32LE(48), length = buf.readUInt32LE(52);
-  if (dfd < 80 || length < 28 || dfd + length > buf.length || buf[dfd + 12] !== 166 || buf[dfd + 14] !== 1
-    || buf.readUInt32LE(12) !== 0 || buf.readUInt32LE(44) !== 2) fail('KTX must be linear byte data in UASTC/Zstd');
+  if (dfd < 80 || length < 28 || dfd + length > buf.length || buf[dfd + 12] !== (raw ? 1 : 166) || buf[dfd + 14] !== 1
+    || buf.readUInt32LE(12) !== (raw ? 37 : 0) || buf.readUInt32LE(44) !== (raw ? 0 : 2)) fail('KTX must be linear RGBA8 or UASTC/Zstd byte data');
   // KHR_DF_FLAG_ALPHA_PREMULTIPLIED; metadata only, pixels have ALREADY been premultiplied once.
   buf[dfd + 15] |= 1;
   return buf;
 }
 
+export const DIAGNOSTIC_PAGES = ['soldier_close_0.png', 'soldier_field_0.png'];
+export function diagnosticPagesOkay(pages) {
+  return pages.length === 2 && DIAGNOSTIC_PAGES.every((name) => pages.filter((p) => p.source === name).length === 1);
+}
+
 async function main() {
   if (process.env.GITHUB_ACTIONS !== 'true') fail('conversion runs on Actions only');
   const source = fs.realpathSync(process.argv[2]), out = path.resolve(process.argv[3]);
+  const diagnostic = process.argv[4] === '--diagnostic';
+  if (process.argv[4] && !diagnostic) fail('unknown mode');
   freshOut(out);
   const work = path.join(out, 'work'); fs.mkdirSync(work);
   const m = JSON.parse(regular(path.join(source, 'soldier.json')));
   const counts = validateApproved(m), report = { source: SOURCE, toolSha: process.env.GITHUB_SHA, counts, pages: [] };
+  if (diagnostic) Object.assign(report, { diagnosticOnly: true, fieldable: false, label: 'DIAGNOSTIC ONLY' });
   m.compression = { container: 'ktx2', codec: 'uastc', alpha: 'premultiplied-gamma-bytes', source: SOURCE };
   for (const [tier, T] of Object.entries(m.tiers)) for (const [look, G] of Object.entries(groupsOf(T))) for (const p of G.pages) {
+    if (diagnostic && !DIAGNOSTIC_PAGES.includes(p.file)) continue;
     const input = path.join(source, p.file), bytes = regular(input);
     if (!inside(fs.realpathSync(input), source)) fail('source page escapes atlas');
     const png = PNG.sync.read(bytes);
@@ -124,13 +133,25 @@ async function main() {
     if (r.status !== 0) fail(`toktx ${p.file}: ${r.error?.message || r.stderr || r.stdout}`);
     const encoded = markPremultiplied(regular(dest), p.w, p.h);
     fs.writeFileSync(dest, encoded);
+    let rawFile;
+    if (diagnostic) {
+      rawFile = p.file.replace(/\.png$/, '-raw.ktx2');
+      const rawDest = path.join(out, rawFile);
+      // Same input and mip recipe, with neither UASTC nor supercompression.
+      const rawArgs = ['--t2', ...args.slice(7, -2), rawDest, premul];
+      const rawResult = spawnSync('toktx', rawArgs, { encoding: 'utf8', timeout: 180000 });
+      if (rawResult.status !== 0) fail(`raw toktx ${p.file}: ${rawResult.error?.message || rawResult.stderr || rawResult.stdout}`);
+      fs.writeFileSync(rawDest, markPremultiplied(regular(rawDest), p.w, p.h, true));
+    }
     const allocation = mipBytes(p.w, p.h);
     report.pages.push({ tier, look, source: p.file, file, width: p.w, height: p.h, pngBytes: bytes.length,
       bytes: encoded.length, allocation, pngSha256: createHash('sha256').update(bytes).digest('hex'),
-      ktxSha256: createHash('sha256').update(encoded).digest('hex') });
+      ktxSha256: createHash('sha256').update(encoded).digest('hex'), ...(diagnostic ? { rawFile,
+        rawSha256: createHash('sha256').update(regular(path.join(out, rawFile))).digest('hex') } : {}) });
     Object.assign(p, { file, bytes: encoded.length, mipLevels: allocation.levels, encoding: 'uastc', alpha: 'premultiplied-gamma-bytes' });
     console.log(`${tier}:${look} ${file} ${(encoded.length / 1048576).toFixed(2)} MiB`);
   }
+  if (diagnostic && !diagnosticPagesOkay(report.pages)) fail('diagnostic requires exactly the fixed two pages');
   fs.writeFileSync(path.join(out, 'soldier.json'), JSON.stringify(m, null, 1));
   report.ktxBytes = report.pages.reduce((s, p) => s + p.bytes, 0);
   report.block16Bytes = report.pages.reduce((s, p) => s + p.allocation.block16, 0);

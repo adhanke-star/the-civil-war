@@ -94,12 +94,18 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
    Small `compression-review` artifact only (6,987,828 bytes); local readback:
    `.out/figure-pack-review-37360904656/{compression,quality}.json` and ten numbered PNG sheets.
    Sheets 1, 7 and 10 inspected locally; this is not whole-set visual or iPad clearance.
-   Next bounded task: diagnose using uncompressed KTX and UASTC-to-RGBA controls on Actions, with identical
-   premultiplied bytes, samplers and mip generation, before deciding whether the discrepancy comes from
-   upload/filtering, UASTC or BC7 transcoding. Do not weaken thresholds, rerender the approved poses or field.
+   The workflow now defaults to `mode=diagnostic`: ONLY `soldier_close_0.png` and `soldier_field_0.png`,
+   with the same premultiplied input and box mip recipe in raw RGBA8 KTX and UASTC. GPU readback separates
+   PNG/typed upload, PNG/raw offline mips, raw/UASTC→RGBA encoding and RGBA/BC7 transcoding at mips 0/1/2.
+   Real upload/base/identity controls and complete allocations must pass; every route keeps the original
+   pixel thresholds. `diagnosticComplete` is evidence completion, never quality or fielding clearance;
+   `quality.json` stays `ok:false, fieldable:false`. Diagnostic mode cannot publish optimized assets.
+   Next bounded task: dispatch/read back this diagnosis on Actions, then record the measured cause and
+   scoped recommendation. Do not weaken thresholds, rerender the approved poses or field.
    Do not rerun the unchanged 24-minute encoder as a diagnostic. Prepare only the required small diagnostic
    outputs on Actions; full bake archives/raw frames/.blend never belong on the Mac.
-   After a scoped fix: `gh workflow run pack-figures.yml --ref main`; inspect exact run, download ONLY
+   Diagnosis: `gh workflow run pack-figures.yml --ref main -f mode=diagnostic`.
+   After a scoped fix: `gh workflow run pack-figures.yml --ref main -f mode=full`; inspect exact run, download ONLY
    `compression-review`, then `approved-figures-ktx2` after every gate passes. Packaging is not fielding.
    Runtime KTX vendoring, name-bound identity, ninth counters, eligibility and total-scene admission are next.
    The existing baked-height unit check decodes PNGs; adapt it using actual compressed GPU readback/geometry

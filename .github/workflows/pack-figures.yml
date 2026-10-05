@@ -1,6 +1,14 @@
 name: Package approved figures
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Two-page diagnosis or complete packaging (never rerender)
+        type: choice
+        default: diagnostic
+        options:
+          - diagnostic
+          - full
 permissions:
   contents: read
   actions: read
@@ -36,10 +44,18 @@ jobs:
           tar -xf "$RUNNER_TEMP/ktx.tar.bz2" -C "$RUNNER_TEMP/ktx" --strip-components=1
           echo "$RUNNER_TEMP/ktx/bin" >> "$GITHUB_PATH"
       - name: Preserve all frames and identities; premultiply once; encode UASTC + mipmaps
-        run: node tools/bake/compress.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack
+        env:
+          PACK_MODE: ${{ inputs.mode }}
+        run: |
+          if [ "$PACK_MODE" = diagnostic ]; then
+            node tools/bake/compress.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack --diagnostic
+          else
+            node tools/bake/compress.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack
+          fi
       - name: GPU readback against every approved PNG and meaningful broken controls
         run: node tools/bake/review-compression.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack
       - name: Optimized atlases and manifest only
+        if: success() && inputs.mode == 'full'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: approved-figures-ktx2
