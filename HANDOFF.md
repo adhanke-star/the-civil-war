@@ -105,6 +105,16 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
    Do not rerun the unchanged 24-minute encoder as a diagnostic. Prepare only the required small diagnostic
    outputs on Actions; full bake archives/raw frames/.blend never belong on the Mac.
    Diagnosis: `gh workflow run pack-figures.yml --ref main -f mode=diagnostic`.
+   **Infrastructure HALT (2026-10-05):** diagnostic tool commit `47d248ca0a6ea9be81d19dfde333da6b4a637cf0`;
+   syntax/unit gates and local `npm test` passed (174800 ms). Pages 37374382736 passed at that exact SHA.
+   Diagnostic 37374456139 and CI 37374382896 are queued; GPU diagnostic controls have NOT run.
+   Earlier closeout CI 37364379516 failed without acquiring a runner; attempt 2 is queued. Pages
+   37364379625 passed. GitHub reports an active Actions major outage affecting runner assignment:
+   https://www.githubstatus.com/incidents/3q1yb5m7ltvb (checked 2026-10-05, 21:14 UTC).
+   Resume those exact runs before dispatching another. If failed solely for runner assignment, retry
+   after recovery; never change assertions or encoder settings to address infrastructure. No codec cause
+   is established. Download only their small `compression-review`, inspect both diagnostic sheets and
+   all six routes at each mip, then propose a measured remedy or document a broader codec HALT.
    After a scoped fix: `gh workflow run pack-figures.yml --ref main -f mode=full`; inspect exact run, download ONLY
    `compression-review`, then `approved-figures-ktx2` after every gate passes. Packaging is not fielding.
    Runtime KTX vendoring, name-bound identity, ninth counters, eligibility and total-scene admission are next.

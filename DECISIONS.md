@@ -1,5 +1,11 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0017 — Compression diagnosis cannot publish a fieldable pack (2026-10-05)
+Packaging defaults to two fixed diagnostic pages. Separate upload, offline mips, UASTC encoding and BC7
+transcoding without changing quality limits. Evidence completion requires real lossless controls and
+format/allocation checks; it stays `ok:false, fieldable:false`. Only explicit full mode may publish assets.
+Local gates pass; Actions readback is blocked by the runner outage. No codec verdict or new art fielded.
+
 ## 0016 — Approved drill-hand bake; compress before fielding (Aaron, 2026-10-05)
 Aaron confirmed visibility of the twelve numbered sheets for 820846f, then explicitly approved the poses
 for fielding. Keep the approved existing render unchanged; repackage its atlases on Actions as UASTC KTX2
