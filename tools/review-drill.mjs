@@ -8,6 +8,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { prune } from './prune.mjs';
 const dir=path.resolve(process.argv[2] || '.out/bake5/preview');
+const label=process.argv[4] || 'Pass 5 candidate';
 const out=path.resolve(process.argv[3] || '.out/bake5/review');
 const root=fs.realpathSync('.out');
 if (!out.startsWith(root+path.sep)) throw new Error('Review output must be inside .out/');
@@ -45,14 +46,14 @@ try {
   let left=c==='fallen'?card('Inherited pose — no drill plate',`<div class="text">${esc(note)}</div>`):p?card(`Approved source — Baxter p${p}`,img(plate(p),'plate')):card('Approved source — Hardee text',`<div class="text">${esc(note)}<p>Source: archive.org/details/riflelightinfant01hard</p><p>History status: Inferred (one source per drill item).</p></div>`);
   let body=left+card('Rebuilt — front',img(render(c,i,0)))+card('Rebuilt — right side',img(render(c,i,4))+(c==='fallen'?'':img(hands(c,i),'hand')));
   if(c==='walk') body+=`<div class="cycle">${Array.from({length:8},(_,k)=>card(`March frame ${k+1}`,img(render(c,k,4),'small'))).join('')}</div>`;
-  const html=`<!doctype html><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:0;padding:28px;font:20px -apple-system,BlinkMacSystemFont,sans-serif;color:#1d251b;background:#eee8da}h1{font-size:32px;margin:0 0 12px}p{line-height:1.4}h2{font-size:20px;margin:12px}main{display:grid;grid-template-columns: 540px 512px 512px;gap:14px}section{text-align:center;background:#d9ddc9;border:1px solid #969e83}.figure{width:510px;height:510px;object-fit:contain;background:#6d794a}.plate{width:538px;height:790px;object-fit:contain;background:#ece2c6}.hand{width:290px;height:290px;object-fit:contain;background:#6d794a}.text{text-align:left;padding:25px;line-height:1.6;font-size:26px}.cycle{grid-column:1/-1;display:grid;grid-template-columns:repeat(8,1fr);gap:5px}.small{width:190px;height:190px;object-fit:contain;background:#6d794a}footer{font-size:15px;margin-top:16px}</style><h1>${esc(title)}</h1><p>${esc(note)}</p><main>${body}</main><footer>Pass 5 candidate · NOT APPROVED / NOT IN GAME · geometry and timing are art estimates · original plates stay in .out/reference/drill/</footer>`;
+  const html=`<!doctype html><meta charset="utf-8"><style>*{box-sizing:border-box}body{margin:0;padding:28px;font:20px -apple-system,BlinkMacSystemFont,sans-serif;color:#1d251b;background:#eee8da}h1{font-size:32px;margin:0 0 12px}p{line-height:1.4}h2{font-size:20px;margin:12px}main{display:grid;grid-template-columns: 540px 512px 512px;gap:14px}section{text-align:center;background:#d9ddc9;border:1px solid #969e83}.figure{width:510px;height:510px;object-fit:contain;background:#6d794a}.plate{width:538px;height:790px;object-fit:contain;background:#ece2c6}.hand{width:290px;height:290px;object-fit:contain;background:#6d794a}.text{text-align:left;padding:25px;line-height:1.6;font-size:26px}.cycle{grid-column:1/-1;display:grid;grid-template-columns:repeat(8,1fr);gap:5px}.small{width:190px;height:190px;object-fit:contain;background:#6d794a}footer{font-size:15px;margin-top:16px}</style><h1>${esc(title)}</h1><p>${esc(note)}</p><main>${body}</main><footer>${esc(label)} · NOT APPROVED / NOT IN GAME · geometry and timing are art estimates · original plates stay in .out/reference/drill/</footer>`;
   await page.setContent(html);
   await page.evaluate(()=>Promise.all([...document.images].map(im=>im.decode())));
   await page.screenshot({path:path.join(out,`${name}.png`),fullPage:true});
 
   console.log(name);
  }
- await page.setContent('<style>body{background:#eee8da;font:24px sans-serif}img{max-width:1650px}</style><h1>12. Full contact sheet</h1><p>Candidate only — NOT APPROVED / NOT IN GAME</p>'+img(path.join(dir,'contact-sheet.png'),'contact'));
+ await page.setContent('<style>body{background:#eee8da;font:24px sans-serif}img{max-width:1650px}</style><h1>12. Full contact sheet</h1><p>'+esc(label)+' — NOT APPROVED / NOT IN GAME</p>'+img(path.join(dir,'contact-sheet.png'),'contact'));
  await page.evaluate(()=>Promise.all([...document.images].map(im=>im.decode())));
  await page.screenshot({path:path.join(out,'12-contact-sheet.png'),fullPage:true});
  await page.close();
