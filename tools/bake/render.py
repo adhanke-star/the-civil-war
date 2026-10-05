@@ -685,7 +685,8 @@ def main():
         sc.camera = hcam
         cands = [hd, 1, 3, 14, 13, 4]
         f_aim = clips["fire"]["frames"][0]
-        REP["hands"] = hand_shot(sc, tt, base, N, hcam, rig, rm, f_aim, "LR", 0.30, P["hands_el"], cands)
+        # fourth pass: pinned to direction 3 (the yaw the third pass chose) for a direct before/after
+        REP["hands"] = hand_shot(sc, tt, base, N, hcam, rig, rm, f_aim, "LR", 0.30, P["hands_el"], [3])
         sc.render.resolution_x = sc.render.resolution_y = P["hero_px"]
         sc.cycles.samples = P["samples_hero"]
         REP["hands"].update({"px": P["hero_px"], "frame": f_aim,
