@@ -851,7 +851,7 @@ def pose_load(ps, musket, frame, step, rr, cart):
             a = M @ Vector((0.0, by, z0))
             surf = CylSurf(a, gz, 0.0045, z1 - z0)
             hold = M @ Vector((0.0, by, Lg + G["grip_rammer_drawn"]))
-            nv = (-F - L * 0.4).normalized()
+            nv = (F - L * 0.2).normalized()  # back of hand to front (Hardee 163)
             e_, res = fixed_grip(ps, "R", hold + nv * 0.018, gz, nv, -U - L * 0.10,
                 surf, key, frame, kind="pinch", extra=(GunSurf(M),))
             err["armR"] = e_
@@ -862,7 +862,7 @@ def pose_load(ps, musket, frame, step, rr, cart):
             a = M @ Vector((0.0, by, z0))
             surf = CylSurf(a, gz, 0.0045, z1 - z0)
             hold = M @ Vector((0.0, by, Lg + G["grip_rammer_ram"]))
-            nv = (-F - L * 0.4).normalized()
+            nv = (F - L * 0.2).normalized()  # back of hand to front (Hardee 163)
             e_, res = fixed_grip(ps, "R", hold + nv * 0.018, gz, nv, -U - L * 0.10,
                 surf, key, frame, kind="pinch", extra=(GunSurf(M),))
             err["armR"] = e_
