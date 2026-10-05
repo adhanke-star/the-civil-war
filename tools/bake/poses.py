@@ -360,7 +360,7 @@ class Poser:
             if kind == "trigger" and ci == 0:
                 degs = (8.0, 10.0, 8.0)  # thumb laid along the stock
             elif kind == "trigger" and ci == 1:
-                degs = (12.0, 45.0, 25.0) # forefinger to the trigger
+                degs = (48.0, 65.0, 30.0) # forefinger down into the guard, not along the wood
             elif kind == "pinch" and ci in (0, 1):
                 degs = (18.0, 45.0, 35.0) if ci == 1 else (32.0, 38.0, 20.0)
             for k, bn in enumerate(chain):
@@ -820,7 +820,9 @@ def pose_load(ps, musket, frame, step, rr, cart):
     if step < 4:
         heel = ps.ank_mid + F * 0.10 + L * 0.09
         heel.z = 0.0
-        zdir = (U - L * 0.063).normalized()
+        # Clear the coat/face in depth while keeping the muzzle on the body's centreline.
+        # The butt stays beside the left foot; this small forward lean is an art estimate.
+        zdir = (U + F * 0.10 - L * 0.063).normalized()
         M = gun_matrix(heel, zdir, -F)
         place_gun(musket, M, frame)
         gx, gy, gz = gun_axes(M)
