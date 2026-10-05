@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0018 — Measured UASTC reconstruction failure; codec boundary held (2026-10-05)
+Diagnostic 37374456139 at 47d248c passed all actual upload/base/identity and allocation controls; both
+source and encoded hashes, and end-to-end metrics, match the failed full run. Offline raw mip differences
+pass; UASTC-to-RGBA already fails close mip1 and field mips0–2 before BC7, whose added error passes.
+Both actual sheets inspected. This identifies the failing stage for the current recipe/two pages, not
+every codec or device. Keep approved 820846f, thresholds and fielding HALT. Recommend a separately
+authorized two-page direct GPU-format encoding feasibility experiment; no codec/runtime switch here.
+
 ## 0017 — Compression diagnosis cannot publish a fieldable pack (2026-10-05)
 Packaging defaults to two fixed diagnostic pages. Separate upload, offline mips, UASTC encoding and BC7
 transcoding without changing quality limits. Evidence completion requires real lossless controls and

@@ -100,21 +100,43 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
    Real upload/base/identity controls and complete allocations must pass; every route keeps the original
    pixel thresholds. `diagnosticComplete` is evidence completion, never quality or fielding clearance;
    `quality.json` stays `ok:false, fieldable:false`. Diagnostic mode cannot publish optimized assets.
-   Next bounded task: dispatch/read back this diagnosis on Actions, then record the measured cause and
-   scoped recommendation. Do not weaken thresholds, rerender the approved poses or field.
+   Diagnostic readback is complete (below). Next bounded task: resolve the codec experiment boundary;
+   do not weaken thresholds, rerender the approved poses or field.
    Do not rerun the unchanged 24-minute encoder as a diagnostic. Prepare only the required small diagnostic
    outputs on Actions; full bake archives/raw frames/.blend never belong on the Mac.
-   Diagnosis: `gh workflow run pack-figures.yml --ref main -f mode=diagnostic`.
-   **Infrastructure HALT (2026-10-05):** diagnostic tool commit `47d248ca0a6ea9be81d19dfde333da6b4a637cf0`;
-   syntax/unit gates and local `npm test` passed (174800 ms). Pages 37374382736 passed at that exact SHA.
-   Diagnostic 37374456139 and CI 37374382896 are queued; GPU diagnostic controls have NOT run.
-   Earlier closeout CI 37364379516 failed without acquiring a runner; attempt 2 is queued. Pages
-   37364379625 passed. GitHub reports an active Actions major outage affecting runner assignment:
-   https://www.githubstatus.com/incidents/3q1yb5m7ltvb (checked 2026-10-05, 21:14 UTC).
-   Resume those exact runs before dispatching another. If failed solely for runner assignment, retry
-   after recovery; never change assertions or encoder settings to address infrastructure. No codec cause
-   is established. Download only their small `compression-review`, inspect both diagnostic sheets and
-   all six routes at each mip, then propose a measured remedy or document a broader codec HALT.
+   **Measured codec HALT (2026-10-05):** diagnostic 37374456139 attempt 1 at tool commit
+   `47d248ca0a6ea9be81d19dfde333da6b4a637cf0` succeeded, as did CI 37374382896 and Pages 37374382736.
+   Downloaded only `compression-review` (1,588,785 bytes, artifact 11371700695) into
+   `.out/figure-diagnostic-37374456139/`; inspected both actual sheets and every metric. Source PNG AND
+   encoded KTX hashes match the failed full run; all six end-to-end mip metrics reproduce it exactly.
+   Both pages have all six routes at mips 0/1/2. All ten actual upload/base/identity/missing/colour
+   controls pass; PNG/typed upload and raw identity have zero error. PNG/raw base has zero error;
+   offline mip differences stay within limits (RGB mean <= .127; RGB/alpha edge p95 <= 1).
+   Raw and UASTC-to-RGBA use RGBAFormat, 19,747,996 B/12 levels close and 10,441,740 B/11 levels field;
+   BC7 uses RGBA_BPTC_Format, 4,937,968 B close and 2,611,264 B field. Complete chains, premultiplied
+   metadata and GL integrity pass. `diagnosticComplete:true`, `ok:false`, `fieldable:false`; no asset artifact.
+   UASTC reconstruction already fails BEFORE BC7: close mip1 RGB/alpha edge p95 9/12 (limits 8/8);
+   field mip0 RGB mean 2.309 and edges 11/15; mip1 mean 3.309/1.212, edges 14/19; mip2 mean 4.157/2.106,
+   edges 17/23. Close mip2 also fails. Additional RGBA-to-BC7 loss passes at every measured mip
+   (RGB mean <= .529, edge RGB <= 2, edge alpha <= 4). Zero severe body clipping everywhere.
+   Conclusion is specific to this recipe and two pages: UASTC encode/decode reconstruction is the main
+   failing stage; upload, offline mip generation and BC7 conversion are not sufficient explanations.
+   Sheets preserve coarse pose/silhouette, with small-mip colour/edge differences; six crops/page are
+   not whole-pack or hand/pose clearance. Do not accept visual resemblance in place of the quality gate.
+   **Recommendation:** a separately authorized two-page feasibility experiment with direct GPU-format
+   encoding (bypassing UASTC), preserving the approved input, mip/colour/alpha semantics and thresholds.
+   Establish OSI encoder licenses, pinned tools, actual supported desktop/iPad targets, fallback and
+   total-memory implications before implementation; no codec success or device clearance is assumed.
+   Alternatives: assess lossless per-battle residency (larger runtime slice), or ask Aaron to explicitly
+   redefine acceptance after seeing the actual differences. Neither is authorized here. No more identical
+   diagnostic/full runs; quality 4 is already used. Removing unused close mip2 cannot fix active failures.
+   Runner failures remain separate: CI 37374692590 at 283ed16 attempt 1 and CI 37364379516 at a663090
+   attempt 2 failed with no steps; annotations say hosted runner not acquired. Retried those exact runs
+   once after successful hosted diagnostic/CI execution. CI 37374692590 attempt 2 at 283ed16 now passes;
+   reconcile 37364379516 attempt 3 before retrying. Local syntax/unit checks and `npm test` pass again
+   (168071 ms) for this documentation-only readback; no diagnostic or runtime code changed.
+   GitHub status still reported degraded performance at 21:31 UTC (incident 3q1yb5m7ltvb); do not assume
+   global recovery. Pages 37374692540 at 283ed16 passed. No local conversion/GPU diagnosis/Blender ran.
    After a scoped fix: `gh workflow run pack-figures.yml --ref main -f mode=full`; inspect exact run, download ONLY
    `compression-review`, then `approved-figures-ktx2` after every gate passes. Packaging is not fielding.
    Runtime KTX vendoring, name-bound identity, ninth counters, eligibility and total-scene admission are next.
