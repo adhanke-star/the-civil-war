@@ -637,7 +637,7 @@ def pose_stand(ps, musket, frame):
                              -F + L * 0.3)
         ps.hand("L", -U, palm_want=-L)
         ps.curl("L", degs=(14, 22, 14), thumb=8)
-    REP["checks"]["clearance"]["stand_L"] = ps.clear("L", solve_l)
+    REP["checks"].setdefault("clearance", {})["stand_L"] = ps.clear("L", solve_l)
     ps.key(frame)
     return err
 
