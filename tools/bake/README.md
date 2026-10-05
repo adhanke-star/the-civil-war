@@ -237,9 +237,10 @@ attached to the hand. Nothing else changed in this pass.
   - **grip_small**: the same GRIP angles closed on a 13 mm channel, for the rammer (9 mm) and the
     cartridge (15 mm), so the fist is not loose on them.
 - **Fitted once, at rest, on the real skin** (never per pose). GRIP's authored four-finger curl
-  is multiplied by one factor so the channel through the fist is 40 mm across (each finger's pad
-  skin and the palm under it give a ring; the channel axis runs through the four ring centres,
-  its radius is their mean). grip_small then gets one factor per finger so each fingertip just
+  is multiplied by one factor so the channel through the fist is 40 mm across: the channel is the
+  cylinder touching the palm skin and the inner skin of the four middle finger segments, its axis
+  through the four points halfway between them (run 24: a ring fitted through pads and palm put
+  the axis 15 mm too near the palm, so the palm sank into the wood). grip_small then gets one factor per finger so each fingertip just
   meets its 13 mm channel (tried on GRIP too in run 23: it loosened the fist into a claw, so GRIP
   keeps one factor and its index and little tips sit up to about 12 mm into the 40 mm channel,
   i.e. pressed into the wood). The thumb is chosen once from an 80-pose grid (flex, opposition,
