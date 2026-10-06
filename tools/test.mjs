@@ -57,6 +57,7 @@ import { prune, OUT_DIR } from './prune.mjs';
 import { practiceProgress } from './test-practice-ui.mjs';
 import { introPlay } from './test-intro-ui.mjs';
 import { entryProgress } from './test-entry-ui.mjs';
+import { campEquipment } from './test-camp-ui.mjs';
 import { saveCoordination } from './test-save-ui.mjs';
 import { probeProgress, progressRaw, seedProgress, holdProgressTransaction, releaseProgressTransaction } from './test-progress-browser.mjs';
 import { lookControls } from './test-look-ui.mjs';
@@ -1374,6 +1375,7 @@ async function main() {
     if (process.argv.includes('--moments')) { result.mode = 'field moments only'; await sandboxAndDevice(browser, url, { momentsOnly: true }); return; }
     if (process.argv.includes('--sandbox')) { result.mode = 'sandbox controls only'; await sandboxAndDevice(browser, url); return; }
     if (process.argv.includes('--entry')) { result.mode = 'title and camp only'; await entryProgress({ browser, url, check, shot, result, watchErrors }); return; }
+    if (process.argv.includes('--camp')) { result.mode = 'camp equipment only'; await campEquipment({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--intro')) { result.mode = 'unforced introductory play'; await introPlay({ browser, url, check, shot, result, watchErrors, native }); return; }
     if (process.argv.includes('--practice')) { result.mode = 'practice result bridge only'; await practiceProgress({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--reward')) { result.mode = 'reward progress only'; await rewardProgress(browser, url); return; }
@@ -1611,6 +1613,7 @@ async function main() {
     await practiceProgress({ browser, url, check, shot, result, watchErrors });
     await introPlay({ browser, url, check, shot, result, watchErrors, native });
     await entryProgress({ browser, url, check, shot, result, watchErrors });
+    await campEquipment({ browser, url, check, shot, result, watchErrors });
     await saveCoordination({ browser, url, check, shot, result, watchErrors });
   } finally {
     if (browser) await browser.close().catch(() => {});

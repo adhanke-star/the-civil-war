@@ -5,7 +5,48 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2j1 local candidate green; integration pending (2026-10-06)
+## Current boundary: P2j2 camp locally verified; integration next (2026-10-06)
+
+Autonomous v1 goal is active under DESIGN/DECISIONS0022/PLAN P1-P7. Root resumed interrupted
+camp WIP after live fetch/status/process reconciliation: HEAD/origin main6a83af01d206c69dc3df45edf93a6af94e641805,
+CI37543655283/Pages37543655090 green; no competing writer or browser. No COORDINATION.md.
+Root alone owns entry.js/entry.css, sequence.js itemLabel export, sw.js, tools/test.mjs,
+new tools/test-camp-ui.mjs and these status docs. Preserve workspace and unrelated Shiloh preflight.
+Camp depot comparisons recommend the highest OVR change among eligible formations, retain complete
+labels/ratings and issue one exchange through the existing database seam. Pending drafts retain their
+original baseline/brigade/item; retry never rebases. Cancel/Escape write nothing. One operation owner
+blocks all camp navigation/import/retry during queued-close/save; exports remain available and distinguish
+pending versus displayed saved armies. Pages remain bounded12+12, including200brigades/2000depot.
+Independent review found/fixed ungated other-mode links and strengthened pre-theme settings proof.
+Scoped button edge is #9b93a5, conservative brightest desk composite3.154:1. Source assets/art untouched.
+Focused r1 passed49/49; strengthened r2 failed only a test fixture passing full metadata to
+completedSnapshot. Retain .out/p2j2-camp-focused-r2-20261006.{log,json}; it is not acceptance.
+Use validateSnapshot for that existing envelope. Final focused r3 is
+.out/p2j2-camp-focused-r3-20261006.{log,json}:57/57 in28729ms at23:35:01.340Z,
+errors/warnings and all five axe scopes empty. Independent reviewer viewed all eight exact PNGs and
+cleared scoped source/test/WCAG/rendered review. Retained183+183 deterministic gates and unit pass.
+Six runtime/test source hashes+bytes are frozen in .out/p2j2-frozen-source-r3-20261006.json.
+First frozen full .out/p2j2-full-native-r3-20261006.{log,json} FAILED334/338 in481599ms,
+errors/warnings empty: second-tab import0writes, three consequent stale/refusal failures, then discard
+idle timeout. Independent inspection of installed Playwright press confirms no visibility/focus check;
+the test pressed a hidden Confirm before File.text/baseline settlement, potentially activating Cancel.
+Test-only importReviewed now awaits open native consent/exact file+counts, actual Confirm focus and
+exact saved snapshot/status/owner settlement, at both affected imports. Runtime and other five frozen
+files remain unchanged. Final focused r4 .out/p2j2-camp-focused-r4-20261006.{log,json} passes57/57
+in28966ms at23:45:47.561Z. Frozen full r4 .out/p2j2-full-native-r4-20261006.{log,json}
+passes392/392 in461193ms at23:46:45.742Z; errors/warnings and every axe scope are empty.
+Actual second-tab import commits once; first-tab stale consent/retry refuses without rebase.
+All six hashes/bytes in .out/p2j2-frozen-source-r4-20261006.json match live source; named full JSON
+matches last-result.json byte-for-byte. Independent review viewed all eight exact full-run camp PNGs
+and cleared source/receipt/scoped WCAG/rendered review. Intro first card47497ms, actual win45.46sim.
+Keep failed r2/r3 receipts distinct. No browser remains. Final syntax/unit/diff pass.
+Next: explicitly stage ten owned runtime/test/docs files, commit/push main and read exact-SHA
+CI/Pages, repairing red CI. P2j2 is not integrated yet. After green, take PLAN P2k1's optional named
+equipment/actual Combat foundation; do not start camp deployment before its separate P2k2 contract.
+Saved-gear deployment,
+living camp/title, campaigns, approved art fielding, native iPad and all P3-P7 remain open.
+
+## Previous boundary: P2j1 integrated; P2j2 camp equipment next (2026-10-06)
 
 P2j1 Web Lock proposal FAILED actual native UI coordination. Retain the lost-update trace
 .out/p2j1-coordination-trace-20261006.json and failed-source hashes; none are acceptance.
@@ -13,9 +54,11 @@ Root replaced the backend inside save.js with IndexedDB under DECISIONS0036, pre
 untouched legacy bytes and settings. Only a committed mutation adopts database authority; all callers
 await reads and writes. Helpers read only. P2j2 camp equipment modal has not started.
 
-HEAD/origin main7671f3f987d9f878c940adc280dfbb1bbacef9c1; CI37532456340 and Pages37532456245
-passed. Root owns tracked P2j1 runtime/tests/docs plus new tools/test-save.mjs, test-save-ui.mjs and
-test-progress-browser.mjs. Preserve unrelated workspace and root-owned untracked Shiloh preflight;
+HEAD/origin main6a83af01d206c69dc3df45edf93a6af94e641805; Pages37543655090 and
+CI37543655283 passed. Completed exact CI log is .out/p2j1-exact-ci-37543655283-20261006.log.
+P2j1's24 explicitly staged files are committed and pushed;
+all20 frozen runtime/test/CI hashes and sizes matched the index. Tracked tree was clean after push.
+Parent7671f3f CI37532456340/Pages37532456245 passed. Preserve unrelated workspace and root-owned untracked Shiloh preflight;
 no dawn numeric roster, georeference or runtime scenario is accepted. No competing provider/writer.
 
 Database diagnostics: initial coordination44/44, first serial147/147, then serialr2 failed two real
@@ -46,7 +89,7 @@ reviewer viewed all seven final narrow read/write/focus PNGs. Independent source
 WCAG/rendered reviews clear integration. Final19 syntax checks, unit and diff pass;183+183 retained
 deterministic gates remain green. Actual intro wins45.52sim/47112wallms, first card50381ms, saved
 survivors/captured gear and Continue preserve the real result. No local browser remains.
-Next: explicit staging/commit/push of24 owned files, then read exactSHA CI/Pages before P2j2. Native iPad, approved
+Next: implement P2j2's owned camp comparison/issue modal and actual UI gates in PLAN. Native iPad, approved
 art fielding, saved-gear deployment, campaign phases and all remaining P3-P7 remain open.
 
 ## Previous boundary: frame report accepted; P2i candidate

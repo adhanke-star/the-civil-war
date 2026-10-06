@@ -503,14 +503,26 @@ camp, all keyboard/UI polish or remaining P2/P3-P7. Do not invent division IDs f
 
 ### P2j: compare and issue saved depot equipment in camp (next dependency-ready slice)
 
-P2j1 local candidate is green: retained/new183+183, unit,19 syntax checks,diff andCI YAML pass.
+P2j1 integrated6a83af01d206c69dc3df45edf93a6af94e641805: exact CI37543655283 and
+Pages37543655090 passed. Retained/new183+183, unit,19 syntax checks,diff andCI YAML passed.
 Final focused database51/51 and practice47/47 precede frozen full349/349 in468490ms at22:45:33.518Z.
 All20 frozen hashes match; console errors/warnings and24 axe scopes empty. Root/independent review
 viewed seven final narrow read/write/focus PNGs and cleared scoped source/receipt/WCAG integration.
 Initial full266/268 exposed intro's premature saved-state read/null dereference; r2 full347/348 exposed
 practice's premature consent assertion. Test-only settlement repairs preserve every product gate;
 final consent and Escape also assert0 database puts/commits/legacy writes. Keep both failed receipts.
-Integration/exactSHA CI/Pages remain pending. P2j2 comparison/issue UI has not started.
+P2j2 root-owned camp comparison/issue candidate has focused native57/57 in28729ms at23:35:01.340Z,
+errors/warnings and all five axe scopes empty. Independent source/test/WCAG/rendered review clears
+all eight actual PNGs and six frozen hashes/bytes. Retained183+183 and unit pass. Strengthened r2
+failed only test-fixture envelope misuse; retain failed receipt distinct from passing r3. Frozen full
+native r4 now passes392/392 in461193ms at23:46:45.742Z; integration/exactSHA gates remain pending.
+First full r3 FAILED334/338: hidden Confirm press raced File.text/baseline/native consent; independent
+installed-driver inspection confirms press lacks visibility/focus checks. Test-only exact native consent,
+Confirm focus and snapshot/status/owner settlement repair both imports; focused r4 passes57/57
+in28966ms at23:45:47.561Z. Runtime and other five frozen files remain unchanged. All six r4
+hashes/bytes match; named full JSON equals last-result.json; errors/warnings and all axe scopes empty.
+Independent reviewer viewed eight exact full-run camp PNGs and cleared scoped source/receipt/WCAG.
+Retain failed r3 as nonacceptance. Intro first card47497ms; saved-gear deployment remains UNRUN.
 
 P2j1 repair replaces the failed Web Lock proposal (DECISIONS0036): actualnative
 trace .out/p2j1-coordination-trace-20261006.json proves correct lock order but stale localStorage
@@ -615,6 +627,75 @@ deterministic/unit gates with awaited rejection checks (no unhandled Promise or 
 focused native, one frozen full native, independent source/WCAG/rendered
 review, docs/decision, explicit commit/push and exact-SHA CI/Pages; repair red CI. Saved-gear deployment,
 living camp/title, named/campaign saves and all P3-P7 remain open.
+
+### P2k: deploy saved equipment into actual practice combat (next after P2j)
+
+Recommendation: establish named equipment profiles before camp deployment, because current Combat
+accepts only generic smooth/rifled/smbart/parrott categories; putting a named saved card on a unit
+without changing range/fire/reload would misrepresent its effect. Two green boundaries: P2k1 adds
+and proves the optional equipment/Combat seam while existing battles stay unchanged; P2k2 connects
+camp -> saved army fight -> conserved result/loot -> camp. Neither foundation alone closes P2 or P5.
+P2k1 begins only after P2j2 implementation exact-SHA CI/Pages are green. Shiloh research remains
+independent; the untracked preflight does not admit any dawn roster, numeric split or georeference.
+
+P2k1 ownership: one pure src/sim/equipment.js adapter using existing reward/data.js itemDef and
+CONDITION_BY_ID, actual Unit construction in src/units/unit.js, actual range/reload/fire in
+src/sim/combat.js, bounded shared tuning in the existing reward/model.js TUNING if needed,
+tools/test-equipment.mjs, CI, sw.js and status docs. Game.range/effRange and ArrowLayer may be
+tested/read but change only if a measured disconnect requires it. No camp/practice route, scenario,
+save schema/store, inventory mutation, art, terrain, battle pack, shop, training, badge or audio work.
+Keep named uniques visibly game items; their unimplemented special mechanics remain explicit P5 debt.
+
+Use one optional validated equipment instance/derived profile on the real Unit, cloned before
+construction; do not replace a saved identity or write derived profile values into progress. Resolve
+every ARMS/PRACTICE_ARMS/UNIQUES definition through itemDef, preserving its provenance. Known
+conditions are explicitly game modifiers. Reject unknown/incompatible/nonfinite profiles with useful
+errors before constructing a partial unit, allocating figures or mutating input. No permissive fallback
+for an explicitly supplied invalid item. Units without equipment must retain all existing behavior:
+generic range/effective range, reload/cadence, casualty/cover/ammo/morale/fatigue, moving/limber/fire
+restrictions, random draw order, target choice, march/attack arrival and sandbox rule multipliers.
+Do not change existing generic constants, scenario definitions or historical presence/labels.
+
+Named range, rate, power and accuracy must affect the actual shared Combat path, including direct
+sandbox volley calls and normal stepping; condition effect must be real. Keep units/metres/sim-time
+conversion explicit. Preserve period-consistent casualty arithmetic: increasing cadence must not be
+cancelled accidentally by multiplying every volley by its shorter reload period. Baseline tuning is
+a game calibration, not a sourced historical claim or permission for hidden difficulty bonuses.
+Effective-range halt and ghost geometry must use the same Combat profile as firing, through existing
+Game range methods. Clamp only declared derived game values, never survivor/item identities or
+persisted quantities. No independent weapon engine or duplicate numeric item catalogue.
+
+Meaningful deterministic gates use real Unit/Combat/Game/ArrowLayer and injected adapters only:
+all definitions/conditions resolve; input identity/provenance/immutability; invalid/incompatible
+refusal before effects; actual changed range/ghost/halt; actual cadence and casualties; condition
+effect; cover/fatigue/moving/hold-fire/limber/sandbox interactions; exact seeded generic A/B/A2 replay
+equivalence including random draws and terminal state. Each intended mutant must hit its named
+assertion; import/syntax/harness errors never count as a rejecting control. Do not mutate shipped
+source for controls. If isolation needs a copy, bind originals and require byte-for-byte restoration.
+
+Gates after implementation, in order:
+1. node --check each touched JS/MJS (equipment.js, unit.js, combat.js, model.js if changed,
+   test-equipment.mjs, sw.js); git diff --check; inspect CI YAML.
+2. node tools/test-equipment.mjs; node tools/test-equipment.mjs --prove-fail. Record actual case
+   counts plus all-definition/condition and seeded replay sample counts; reject empty samples.
+3. For each retained gate run its positive then --prove-fail: test-reward, test-save, test-practice,
+   test-captures, test-intro, test-sandbox-rules, test-look, test-view, test-spacing, test-residency,
+   test-moments, test-keyboard (.mjs in tools/); retain183+183 plus any justified new cases.
+   node tools/test.mjs --unit. Bind exact source hashes to the accepted logs.
+4. Independent engine/source review challenges the optional branch and generic equality. Freeze
+   all changed runtime/test/CI files; one npm test -- --native serially on the final tree. Read actual
+   .out/last-result.json, every failed check, errors/warnings, axe scopes and relevant PNGs; verify
+   frozen hashes/bytes. No simultaneous browser. Heavy cross-browser/balance work remains on Actions.
+5. Update PLAN/STATE(<20 lines)/HANDOFF and material DECISIONS, git diff --check, explicitly stage
+   only owned files, commit/push main; read CI/Pages for the exact SHA and repair red runs before P2k2.
+
+P2k2 requires its own bounded contract before route edits: validated saved baseline observed before
+field loading; compatible survivors/guns/equipment identities and depot/issued audit conserved;
+depleted records retained rather than invented reinforcements; admission/recovery for legal oversized
+inventories without partial writes or silent troop cuts; practice explicitly fictional; original intro
+and historical/sandbox no-loot routes preserved; fresh result award exactly once and old-baseline
+conflicts/pending export/retry retained. Prove actual equip -> changed combat -> losses -> loot ->
+save/reload/camp through the native UI. Until those gates, saved deployment is UNRUN.
 
 ### Required battle-system work (P3/P4; do not hide it inside “build Shiloh”)
 

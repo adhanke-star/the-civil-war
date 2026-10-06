@@ -25,11 +25,24 @@
 #front #camp-depot .rw-front { position: relative; min-height: 320px; }
 #front #camp-depot .rw-name, #front #camp-depot .rw-where, #front #camp-depot .rw-affix-fx { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
 #front #camp-depot .rw-where { font-size: 12px; }
+/* wcag-auditor: contrast fix from #827c8b to #9b93a5 for AA compliance. */
+#front .camp-compare-button { width: 100%; margin-top: 8px; border-color: #9b93a5; }
+#front a[aria-disabled="true"] { color: var(--rw-dim); cursor: default; }
 #front .entry-pages { margin-top: 18px; }
 #front dialog { max-width: min(480px, calc(100vw - 40px)); max-height: 85vh; overflow: auto; padding: 24px; color: var(--rw-ink); background: #1f1c24; border: 1px solid #827c8b; border-radius: 12px; }
 #front dialog::backdrop { background: rgba(0,0,0,0.75); }
 #front dialog button { margin: 5px; }
 #front dialog p { overflow-wrap: anywhere; }
+#front #camp-compare { box-sizing: border-box; width: min(560px, calc(100vw - 32px)); max-width: none; padding: 20px; }
+#front #camp-compare h2 { margin: 0 0 12px; overflow-wrap: anywhere; }
+#front #camp-compare label { display: block; margin-bottom: 6px; font-weight: 700; }
+#front #camp-recipient { box-sizing: border-box; width: 100%; min-height: 48px; font: inherit; font-size: 16px; color: var(--rw-ink); background: #29232c; border: 1px solid #827c8b; border-radius: 6px; }
+#front #camp-compare table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+#front #camp-compare caption { text-align: left; margin-bottom: 8px; font-weight: 700; }
+#front #camp-compare th, #front #camp-compare td { padding: 8px 3px; border-bottom: 1px solid var(--rw-rule); text-align: right; }
+#front #camp-compare th:first-child { text-align: left; }
+#front .camp-compare-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+#front .camp-compare-actions button { margin: 0; flex: 1 1 auto; }
 @media (max-width: 850px) { #front .rw-brigs, #front #camp-depot { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) {
   #front .entry-wrap { padding: 18px 14px 32px; }

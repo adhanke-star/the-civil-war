@@ -1,5 +1,16 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0037 — Camp equipment exchanges retain the exact reviewed army (2026-10-06)
+Each saved depot card opens one native comparison with eligible best-fit recommendation, full
+names and before/after game ratings. Confirm uses the existing validated IndexedDB issue seam;
+Cancel/Escape/read/export do not issue. Failure keeps stored/displayed progress and an immutable
+pending draft with original baseline and identities. Retry cannot change recipient or adopt newer
+progress; explicit discard reloads authority. Saved/pending exports are distinct. One owner spans
+modal close, queued transaction and cleanup, blocking all camp navigation/import/retry until settlement.
+Preserve12+12 paging, complete item/award identities, inventory cardinality, preferences and export v1.
+Actual stale-tab/blocked/quota/growth-limit and narrow keyboard proofs are required; this slice does
+not deploy saved gear or certify campaigns, art fielding, iPad, full accessibility or release.
+
 ## 0036 — Progress needs one database transaction, not a lock over cached localStorage (2026-10-06)
 Native two-tab P2j1 trace proves a lost update: A writes issued1 at1791323897832.3ms;
 B acquires the exclusive Web Lock at7833.0ms but reads issued0, overwrites it, and receives A's

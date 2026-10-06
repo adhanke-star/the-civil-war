@@ -154,7 +154,7 @@ function fullName(def) {
   const kindWords = def.kind.toLowerCase().split(/[\s-]+/);
   return kindWords.some((w) => words.includes(w)) ? def.name : `${def.name} ${def.kind}`;
 }
-function itemLabel(inst) {
+export function itemLabel(inst) {
   const def = itemDef(inst.itemId);
   const tier = TIER_BY_ID[tierId(inst)];
   const cond = CONDITION_BY_ID[inst.conditionId];
