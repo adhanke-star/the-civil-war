@@ -1,5 +1,14 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0030 — Marker scaling keeps visible controls tied to their ground anchors (2026-10-06)
+Flag/bar dimensions scale while text and hit minima remain; fractional caches refresh immediately.
+Rendered review caught top-strip and high-angle dock occlusion, so placement reserves actual visible
+panels and chooses nearby clear rectangles with a dashed true-ground tether. Focus details flip below
+top-edge controls. Dense-overfull fallback remains bounded, not a universal collision-free promise.
+Camera elevation adds to automatic/manual pitch consistently, keeping centre/distance/yaw and existing
+clamps/easing/terrain guard; default0 retains the view. Orders, progress, art and simulation stay separate.
+Formation spacing remains a separate geometry/combat calibration, not merely scaling soldier meshes.
+
 ## 0029 — Look controls change the existing grade and smoke pool (2026-10-06)
 Saturation and tilt-shift edit existing Post uniforms, preserving .86/.9 defaults and fixed exposure .66;
 no target resize, atlas, lighting or combat change. Smoke off/reduced motion stops and clears pooled

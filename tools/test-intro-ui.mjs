@@ -59,6 +59,18 @@ export async function introPlay({ browser, url, check, shot, result, watchErrors
         const r = n.getBoundingClientRect(); return flags.every((f) => r.left >= f.right || r.right <= f.left || r.top >= f.bottom || r.bottom <= f.top);
       });
     }), 'offset labels retain true-ground anchors without obscuring brigade information');
+    const enlargedCrates = await page.evaluate(async () => {
+      const S = await import('./src/settings.js'); S.set('look.markerScale', 1.75);
+      await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+      const flags = [...document.querySelectorAll('.marker:not(.hidden)')].map((n) => n.getBoundingClientRect());
+      const crates = [...document.querySelectorAll('.field-crate:not([hidden])')];
+      const clear = crates.length === 2 && crates.every((n) => { const b = n.getBoundingClientRect(); return flags.every((f) => b.left >= f.right || b.right <= f.left || b.top >= f.bottom || b.bottom <= f.top); });
+      const widths = [...document.querySelectorAll('.marker:not(.hidden) svg')].map((n) => n.getBoundingClientRect().width);
+      return { clear: clear && flags.length > 0 && widths.length === flags.length && widths.every((w) => Math.abs(w - 59.5) < 0.1), flags: flags.length, widths, crates: crates.length };
+    });
+    check('intro-enlarged-marker-crates', enlargedCrates.clear, `actual max-marker crate avoidance: ${JSON.stringify(enlargedCrates)}`);
+    await shot(page, 'intro-large-marker-crates');
+    await page.evaluate(async () => (await import('./src/settings.js')).reset('look.markerScale'));
     await shot(page, 'intro-capture');
     await page.waitForFunction(() => window.__game.game.over && document.getElementById('result').open, null, { timeout: 240000 });
     const end = await state(), resultMs = Date.now() - started;

@@ -5,7 +5,36 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2e test-only CI repair; P2f owned WIP (2026-10-06)
+## Current boundary: P2f green candidate, integration pending (2026-10-06)
+
+P2e test-only repair48a1f7273003c9d35f406338753f55c44afab63c is HEAD/origin main; exact CI37508495648
+and Pages37508497027 passed. No ledger/provider change; root sole writer, helpers read/review only.
+P2f WIP owns runtime/tests/CI plus new intro crate check and docs, workspace file remains untracked.
+Marker/camera defaults1/0; marker range.75..1.75, elevation-15..30. Edge-aware bounded search reserves
+actual visible dock/objective/hint/list/feed rectangles and other markers, draws two-colour dashed
+SVG tether to true projected ground point, and puts top-edge focus details below. Fractional DOM
+width/height cache refreshed; actual SVG endpoints bound in tests. Dense-overfull fallback remains
+limited; do not claim universal collision-free placement for an arbitrarily crowded view.
+Independent source13+13 and actual nine PNG review cleared both top-strip and high-angle Orders
+occlusion. Focused native78/78 in122486ms,18:17:20.777Z .out/p2f-focused-dock-fixed-20261006.json.
+Actual pointer hits/select Bee/Staunton/Rockbridge and high-angle Franklin, all eight high visible
+bodies avoid panels; source/narrow/axe/progress/resources pass. Two empty-every guards were tightened
+after focused module import; receipt confirms all rendered tethers have two paths, final run binds both.
+Before-dock real intro39/39,112046ms,18:14:38.449Z; enlarged actual crate avoidance passed, instructed
+first card47783ms/win45.47sim and idledefeat27.34sim. Retain .out/p2f-intro-crates-before-dock-repair-20261006.json.
+Final frozen npm test -- --native passed209/209 in369695ms/18:21:08.175Z;
+.out/p2f-full-native-final-20261006.json has errors[]/axe[]. Source hashes
+.out/p2f-frozen-source-sha256-20261006.txt bind all nine runtime/test files unchanged. Eleven tethers
+have two paths with actual bound endpoints; post-dock intro3flags59.5px/2crates clear, firstcard48045ms,
+win45.51sim and idledefeat27.22sim. Final nine view PNGs plus intro-large-marker-crates use
+18-21-08-175Z; root inspected relevant max/high/focus/intro, independent review inspected all ten.
+All retained positives/mutants/unit and syntax/diff passed; source receipt cleared. Browser closed.
+Finish independent final JSON binding, explicitly stage only P2f owned files/docs, commit/push main,
+then read exactfullSHA CI/Pages and repair red CI before next slice. cw-v12 candidate; no fullP2 claim.
+PLAN P2g now carries the next bounded shared-infantry spacing contract; do not edit its runtime during
+the frozen P2f run or before P2f source/receipt review/integration. All full v1/art/device locks remain.
+
+## Previous boundary: P2e test-only CI repair; P2f owned WIP (2026-10-06)
 
 Current HEAD/origin main2a9f86af3c168b8c3de5c85a5efa45443c454874. P2e Pages37505846093 passed;
 CI37505846001 failed only fixed-paused-view state comparison with restoredpixels0/52608:184/185 pass,

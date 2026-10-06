@@ -10,6 +10,33 @@ import { Minimap } from './minimap.js';
 const $ = (id) => document.getElementById(id);
 const _v = new THREE.Vector3();
 
+/** A nearby visible nonoverlapping marker rectangle; y is its bottom edge. */
+export function markerPosition(s, placed, bounds, obstacles = []) {
+  const x = Math.min(bounds.right - s.w / 2, Math.max(bounds.left + s.w / 2, s.x));
+  const y = Math.min(bounds.bottom, Math.max(bounds.top + s.h, s.y));
+  const candidates = [{ x, y }];
+  const occupied = [...placed, ...obstacles];
+  for (const p of occupied) candidates.push(
+    { x, y: p.y - p.h - 3 }, { x, y: p.y + s.h + 3 },
+    { x: p.x - (p.w + s.w) / 2 - 3, y }, { x: p.x + (p.w + s.w) / 2 + 3, y },
+  );
+  candidates.sort((a, b) => ((a.x - s.x) ** 2 + (a.y - s.y) ** 2) - ((b.x - s.x) ** 2 + (b.y - s.y) ** 2));
+  const fits = (c) => c.x - s.w / 2 >= bounds.left && c.x + s.w / 2 <= bounds.right && c.y - s.h >= bounds.top && c.y <= bounds.bottom;
+  const hits = (c, p) => Math.abs(p.x - c.x) < (p.w + s.w) / 2 + 2 && c.y > p.y - p.h - 2 && c.y - s.h < p.y + 2;
+  const free = (c) => fits(c) && !occupied.some((p) => hits(c, p));
+  const nearby = candidates.find(free);
+  if (nearby) return nearby;
+  // A dense cluster can need diagonal space; use a bounded grid only when the nearby candidates fail.
+  let best = null, distance = Infinity;
+  for (let yy = bounds.top + s.h; yy <= bounds.bottom; yy += s.h + 3) {
+    for (let xx = bounds.left + s.w / 2; xx <= bounds.right - s.w / 2; xx += s.w + 3) {
+      const p = { x: xx, y: yy }, d = (xx - s.x) ** 2 + (yy - s.y) ** 2;
+      if (d < distance && free(p)) { best = p; distance = d; }
+    }
+  }
+  return best || { x, y }; // physically overfull views still retain a visible control
+}
+
 // Flags for 21 July 1861: the US flag (34 stars from 4 July 1861) and the Confederate First National
 // flag ("Stars and Bars", 11 stars from 2 July 1861). The battle flag came only after this battle.
 function usFlag() {
@@ -112,6 +139,9 @@ export class Hud {
     Object.assign(this, { camera, canvas, terrain, units, playerSide, rts, game, onSelect, onOrder });
     this.selected = null;
     this.markers = new Map();
+    this.markerLinks = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    this.markerLinks.setAttribute('class', 'marker-link'); this.markerLinks.setAttribute('aria-hidden', 'true'); this.markerLinks.setAttribute('focusable', 'false');
+    $('markers').appendChild(this.markerLinks);
     this.onFocus = null; // (u) => fly to u (set by main.js)
     for (const u of units) this.addUnit(u);
     document.querySelector('#balance .flag.us').style.backgroundImage = flagDataUrl('US');
@@ -150,6 +180,15 @@ export class Hud {
     const applyFeed = (v) => { $('feed').hidden = !v; };
     applyFeed(LOOK.eventFeed);
     onSetting('look.eventFeed', applyFeed);
+    this.applyMarkerScale(LOOK.markerScale);
+    onSetting('look.markerScale', (v) => this.applyMarkerScale(v));
+  }
+
+  applyMarkerScale(v) {
+    $('markers').style.setProperty('--marker-scale', String(v));
+    // Stack/hit rectangles must use the new CSS dimensions on the next frame, including while paused.
+    for (const m of this.markers.values()) { m.w = 0; m.h = 0; }
+    this.sizeTimer = 0;
   }
 
   /** A marker for a unit (scenario units at start; sandbox spawns later). */
@@ -166,9 +205,12 @@ export class Hud {
     b.addEventListener('click', (e) => { e.stopPropagation(); if (e.detail === 0) this.onSelect(u, { fromMarker: true }); });
     b.addEventListener('dblclick', (e) => { e.stopPropagation(); if (this.onFocus) this.onFocus(u); });
     b.addEventListener('pointerdown', (e) => this.onMarkerDown && this.onMarkerDown(u, e));
+    const link = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    link.innerHTML = '<path class="marker-link-back"/><path class="marker-link-front"/>';
+    this.markerLinks.appendChild(link);
     $('markers').appendChild(b);
     this.markers.set(u.id, {
-      el: b, str: b.querySelector('.str'), act: b.querySelector('.act'), bar: b.querySelector('.sbar i'), glyph: b.querySelector('.glyph'), st: b.querySelector('.st'),
+      el: b, link, str: b.querySelector('.str'), act: b.querySelector('.act'), bar: b.querySelector('.sbar i'), glyph: b.querySelector('.glyph'), st: b.querySelector('.st'),
       last: '', lastAct: '', lastTip: '', lastState: '', lastBar: '', lastHf: null,
     });
     this.armyDirty = true;
@@ -176,7 +218,7 @@ export class Hud {
 
   removeUnit(u) {
     const m = this.markers.get(u.id);
-    if (m) m.el.remove();
+    if (m) { m.el.remove(); m.link.remove(); }
     this.markers.delete(u.id);
     if (this.selected === u) this.select(null);
     this.armyDirty = true;
@@ -291,16 +333,23 @@ export class Hud {
   /** Per frame: place markers (stacked so none hides another); every 0.25 s refresh numbers. */
   update(dt) {
     const w = window.innerWidth, h = window.innerHeight;
+    const bounds = { left: 4, right: w - 4, top: $('topbar').getBoundingClientRect().bottom + 4, bottom: h - 4 };
+    // Reserve the actual visible panels rather than the entire dock's transparent bounding box.
+    const obstacles = ['unitcard', 'orders', 'minimap-box', 'objective', 'tip', 'intro-hint', 'army', 'field-stores', 'feed'].flatMap((id) => {
+      const el = $(id), r = el.getBoundingClientRect();
+      return !el.hidden && r.width > 0 && r.height > 0 ? [{ x: r.x + r.width / 2, y: r.bottom, w: r.width, h: r.height }] : [];
+    });
     const shown = [];
     for (const u of this.units) {
       const m = this.markers.get(u.id);
       if (!m) continue;
-      if (!u.alive) { m.el.classList.add('hidden'); continue; }
+      if (!u.alive) { m.el.classList.add('hidden'); m.link.style.display = 'none'; continue; }
       _v.set(u.x, this.terrain.heightAt(u.x, u.z) + 16, u.z).project(this.camera);
       const off = _v.z > 1 || _v.x < -1.1 || _v.x > 1.1 || _v.y < -1.1 || _v.y > 1.1;
       m.el.classList.toggle('hidden', off);
+      m.link.style.display = 'none';
       if (off) continue;
-      if (!m.w || this.sizeTimer <= 0) { m.w = m.el.offsetWidth; m.h = m.el.offsetHeight; }
+      if (!m.w || this.sizeTimer <= 0) { const rect = m.el.getBoundingClientRect(); m.w = rect.width; m.h = rect.height; }
       shown.push({ u, m, x: (_v.x * 0.5 + 0.5) * w, y: (-_v.y * 0.5 + 0.5) * h });
     }
     this.sizeTimer = this.sizeTimer > 0 ? this.sizeTimer - dt : 1;
@@ -309,14 +358,16 @@ export class Hud {
     const placed = [];
     for (const s of shown) {
       const mw = s.m.w || 60, mh = s.m.h || 80;
-      let y = s.y;
-      for (let k = 0; k < 8; k++) {
-        const hit = placed.find((p) => Math.abs(p.x - s.x) < (p.w + mw) / 2 + 2 && y > p.y - p.h - 2 && y - mh < p.y + 2);
-        if (!hit) break;
-        y = hit.y - hit.h - 3;
+      const p = markerPosition({ x: s.x, y: s.y, w: mw, h: mh }, placed, bounds, obstacles);
+      placed.push({ ...p, w: mw, h: mh });
+      s.m.anchor = { x: s.x, y: s.y };
+      s.m.el.style.transform = `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px) translate(-50%, -100%)`;
+      s.m.el.classList.toggle('info-below', p.y - mh < bounds.top + 52);
+      if (Math.hypot(p.x - s.x, p.y - s.y) > 1) {
+        const d = `M${s.x.toFixed(1)},${s.y.toFixed(1)} L${p.x.toFixed(1)},${p.y.toFixed(1)}`;
+        for (const line of s.m.link.children) line.setAttribute('d', d);
+        s.m.link.style.display = '';
       }
-      placed.push({ x: s.x, y, w: mw, h: mh });
-      s.m.el.style.transform = `translate(${s.x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
     }
     this.placeGhostLabel();
     this.cardTimer -= dt;

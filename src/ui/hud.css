@@ -157,11 +157,15 @@ kbd { font-size: 11px; border: 1px solid #8a8580; border-radius: 3px; padding: 0
 
 /* ---- brigade markers: a small national flag on a staff, a strength bar tinted and patterned by morale --- */
 #markers { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+.marker-link { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 0; }
+.marker-link path { fill: none; stroke-linecap: round; }
+.marker-link-back { stroke: #17151a; stroke-width: 3.5px; }
+.marker-link-front { stroke: #eee7d8; stroke-width: 1.5px; stroke-dasharray: 3 3; }
 .marker { position: absolute; left: 0; top: 0; pointer-events: auto; background: none; border: 0; padding: 0 4px; min-width: 44px; min-height: 44px; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: flex-end;
-  color: #fff; text-shadow: 0 1px 2px #000, 0 0 4px rgba(0,0,0,0.9); will-change: transform; touch-action: none; -webkit-tap-highlight-color: transparent; }
-.marker svg { width: 34px; height: 30px; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
+  color: #fff; text-shadow: 0 1px 2px #000, 0 0 4px rgba(0,0,0,0.9); will-change: transform; touch-action: none; -webkit-tap-highlight-color: transparent; z-index: 1; }
+.marker svg { width: calc(34px * var(--marker-scale, 1)); height: calc(30px * var(--marker-scale, 1)); filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
 .marker .mstr { display: flex; align-items: center; gap: 3px; margin-top: 1px; }
-.marker .sbar { position: relative; width: 36px; height: 6px; border: 1px solid rgba(0,0,0,0.85); background: rgba(10,10,12,0.75); border-radius: 2px; overflow: hidden; box-sizing: content-box; }
+.marker .sbar { position: relative; width: calc(36px * var(--marker-scale, 1)); height: calc(6px * var(--marker-scale, 1)); border: 1px solid rgba(0,0,0,0.85); background: rgba(10,10,12,0.75); border-radius: 2px; overflow: hidden; box-sizing: content-box; }
 .marker .sbar i { position: absolute; left: 0; top: 0; bottom: 0; width: 100%; background: #5fbf3a; }
 .marker.m-shaken .sbar i { background: repeating-linear-gradient(-45deg, #e8c43a 0 3px, #8a6d12 3px 5px); }
 .marker.m-wavering .sbar i { background: repeating-linear-gradient(90deg, #f08a2a 0 4px, transparent 4px 7px); }
@@ -171,6 +175,7 @@ kbd { font-size: 11px; border: 1px solid #8a8580; border-radius: 3px; padding: 0
 .marker .hf { display: none; position: absolute; top: 0; right: 0; font: bold 10px "Helvetica Neue", Arial, sans-serif; background: #6a3a22; color: #ffe2c8; border-radius: 3px; padding: 0 3px; text-shadow: none; }
 .marker.holdfire .hf { display: block; }
 .marker .info { display: none; position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); padding: 2px 6px; border-radius: 4px; background: rgba(12, 10, 14, 0.85); white-space: nowrap; text-shadow: none; text-align: center; }
+.marker.info-below .info { top: 100%; bottom: auto; }
 .marker:hover .info, .marker.selected .info, .marker:focus-visible .info { display: block; }
 .marker .nm { display: block; font: bold 13px "Helvetica Neue", Arial, sans-serif; }
 .marker .cmd { display: block; font: 12px Georgia, serif; color: #e9dfc6; }

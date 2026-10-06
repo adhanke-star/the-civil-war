@@ -58,6 +58,7 @@ import { practiceProgress } from './test-practice-ui.mjs';
 import { introPlay } from './test-intro-ui.mjs';
 import { entryProgress } from './test-entry-ui.mjs';
 import { lookControls } from './test-look-ui.mjs';
+import { viewControls } from './test-view-ui.mjs';
 
 const READY_TIMEOUT_MS = 180_000;
 const VIEWPORT = { width: 1280, height: 720 };
@@ -898,6 +899,7 @@ async function sandboxAndDevice(browser, url) {
       }
       await sandboxRuleTools(page);
       await lookControls({ page, check, shot, result });
+      await viewControls({ page, check, shot, result });
       // look.orderLine compares split-screen: both styles are built, each clipped to its side of the divider
       {
         await page.getByRole('tab', { name: 'Look' }).click();

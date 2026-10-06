@@ -55,6 +55,14 @@ const SPECS = {
     tab: 'Look', type: 'toggle', default: true, label: 'Battle smoke',
     note: 'Shows musket and cannon smoke; off clears existing clouds and cancels queued puffs. Reduced motion also suppresses smoke; sound and combat stay unchanged.',
   }],
+  markerScale: ['look.markerScale', {
+    tab: 'Look', type: 'range', default: 1, min: 0.75, max: 1.75, step: 0.05, label: 'Marker size',
+    note: 'Sizes brigade flags and morale bars; 1 keeps the current size. Text and tap targets keep their minimum size; soldiers and formations stay unchanged.',
+  }],
+  cameraElevation: ['look.cameraElevation', {
+    tab: 'Look', type: 'range', default: 0, min: -15, max: 30, step: 1, label: 'Camera elevation',
+    note: 'Adds degrees to the zoom-dependent viewing angle; 0 keeps the current view. Positive looks farther down. Keeps view centre, distance and units; pointer projection follows the new angle.',
+  }],
 };
 
 export const LOOK = {};

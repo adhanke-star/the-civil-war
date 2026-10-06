@@ -286,7 +286,7 @@ can leave ground-height easing unsettled. Test-only repair settles the existing 
 baseline capture and records before/after camera/time/paused state; assertions/limits stay unchanged.
 Isolated software proof20/20 serves every P2f-changed runtime file from the exact committed P2e SHA,
 injects unsettled ground height and passes real Look UI: .out/p2e-ci-settle-software-proof-20261006.json.
-Separate repair commit must exclude P2f runtime/tests; exact repair CI/Pages still required.
+Separate test-only repair48a1f72 excludes P2f runtime/tests; exact CI37508495648 and Pages37508497027 pass.
 
 Register colour saturation, tilt-shift amount and smoke visibility in existing LOOK/settings.
 Preserve current saturation .86, tilt .9, center .46, band .24 and fixed exposure .66; no texture,
@@ -307,7 +307,7 @@ lock/reset/transfer/reload, keyboard/narrow targets/axe/screenshots and independ
 review. Run retained positives/mutants/unit, final native smoke, docs/commit/push and exact CI/Pages.
 No iPad/performance/fieldable-art or full P2 claim; spacing/marker/camera behavior remain separately bound.
 
-### P2f: marker dimensions and camera elevation (next bounded contract)
+### P2f: marker dimensions and camera elevation (implemented; exact CI pending)
 
 Reuse LOOK, Hud and RtsCamera; root sole writer. Own src/ui/look.js, src/ui/hud.js/CSS,
 src/render/rts-camera.js, focused view tests/tools/test.mjs, CI if needed, sw.js and docs.
@@ -319,12 +319,19 @@ keyboard/touch selection and crate rectangle avoidance. No simulation/formation/
 Rendered review confirmed enlargement exposes upward-only stacking: two Confederate markers visible
 at default move offscreen/under the top strip at max. Repair placement within visible bounds with an
 alternative nonoverlapping position and a connector to the true projected ground anchor; do not merely
-clamp into another marker. Actual unobscured hit areas/selection of those top markers and intro crate
+clamp into another marker. Reserve actual visible dock panels and persistent hints too: high-angle
+review found a Union marker under Orders. Actual unobscured hit areas/selection of those top markers and intro crate
 avoidance at enlarged size are required, in addition to full DOM rectangle dimensions.
 Camera elevation offset defaults0, adds to pitchForDist plus existing manual tilt, retains final
 pitch clamps. Initial constructor and later zoom/rotate/live preference agree; preserve easing9,
 target/distance/yaw, terrain collision protection and near/far limits. Explicit notes explain that a
 changed viewing angle can change pointer projection, not simulation coordinates. No split-screen promise.
+Pure13+13, focused native78/78 and frozen full209/209 pass. Final .out/p2f-full-native-final-20261006.json
+is369695ms/18:21:08.175Z with zero errors/axe; runtime/test source hashes unchanged. Exact nine final
+view images plus enlarged-marker intro independently reviewed, clearing top-strip/high-angle Orders
+occlusion. Eleven actual tethers have two bound paths; post-dock three flags59.5px avoid both crates.
+Real firstcard48045ms/win45.51sim, idledefeat27.22sim; paused progress and settled render resources
+unchanged. Bounded source/visual clearance; exact-SHA CI/Pages still required. No device/performance claim.
 
 Before visual edits refresh/view reference shots. Bind actual camera constructor/live/zoom/manual tilt,
 clamps/Reset to deterministic positives and intended mutants. Actual UI must prove marker flag/bar
@@ -337,6 +344,35 @@ Look positives+intended mutants, unit, focused native view, frozen final native 
 readback, independent source/WCAG/visual review, docs sync, explicit commit/push and exact CI/Pages.
 Red CI takes priority. Formation spacing, soldier's-eye, Moments/X-Factor, saved deployment/living camp
 and complete P2/P3-P7 remain separate; no device/performance/approved-art fielding claim.
+
+### P2g: shared infantry formation spacing (next after P2f integration)
+
+Reuse LOOK/settings and Unit's existing layout; no new store or renderer. Root owns src/ui/look.js,
+src/units/unit.js, src/game.js, meaningful spacing Node/UI tests, tools/test.mjs, CI, sw.js and docs.
+Default1 must preserve existing geometry exactly; range.75..1.5/step.05 scales infantry file/rank,
+skirmisher lateral/forward/stagger and column lateral/trail-resampling offsets. Keep random jitter,
+minimum footprint/picking/column safety padding and independent officer clearance unchanged except
+the rank-spacing component. Batteries/guns/crews and fixed brigade-centre group offsets remain unchanged.
+This is a game calibration: footprint, picking, fire/melee contact and destination ghosts follow actual
+spacing; do not label it combat-neutral or sourced historical spacing. Figure size/count/identities,
+RNG state, men, weapon/xp/ammo/morale/fatigue and casualty/speed coefficients remain unchanged.
+Live changes re-layout existing infantry and snap living figures into the changed slots even paused;
+fallen remain at exact positions. Never rebuild/reroll figures. Orders/path/facing/anchors remain exact.
+New placements and reload use saved spacing. Existing 1:5 vs1:10 frontage behavior is unchanged.
+
+Bind actual line/skirmisher/column slots and footprints at min/default/max, live same-formation refresh,
+true picking boundary, lineHalfFront in column and matching actual ghost geometry, unchanged batteries,
+identities/fallen/paused states/settings/progress. Exercise normal group-order preview and confirmed
+rotated destinations; preserve relative centre offsets even when larger neighboring formations overlap.
+Use actual movement through automatic column and redeployment with the scaled slots, not a label-only
+fixture. Actual UI slider/Reset/Lock/Copy/Paste/reload/new spawn, keyboard,320px targets/axe/screens and
+render resources must pass. No physical iPad/performance/art claim from those observations.
+Before edits refresh/view references. Run node --check for every owned module, git diff --check,
+spacing positives and per-invariant intended mutants, retained reward/practice/captures/intro/sandbox/
+Look/view positives+mutants, unit, focused native spacing and frozen full native npm test; inspect
+actual JSON/PNGs, independent source/WCAG/visual review, update docs, explicitly stage/commit/push,
+read fullSHA CI/Pages and repair red CI before the next slice. Moments/X-Factor, soldier's-eye/full
+keyboard/division selection, deployment/living camp and all P3-P7 scope remain open.
 
 ### Required battle-system work (P3/P4; do not hide it inside “build Shiloh”)
 

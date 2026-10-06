@@ -11,6 +11,8 @@
 // A released pan may glide on (inertia, rules.panInertia in ui/input.js).
 
 import * as THREE from 'three';
+import { LOOK } from '../ui/look.js';
+import { on } from '../settings.js';
 
 const _v = new THREE.Vector3();
 const _cam = new THREE.PerspectiveCamera();
@@ -29,7 +31,7 @@ export class RtsCamera {
     this.camera = camera;
     this.terrain = terrain;
     this.tilt = 0; // the player's own tilt on top of pitchForDist (right-drag up/down)
-    if (pitch === undefined) pitch = pitchForDist(dist);
+    pitch = THREE.MathUtils.clamp((pitch ?? pitchForDist(dist)) + LOOK.cameraElevation * Math.PI / 180, 0.3, 1.35);
     this.target = new THREE.Vector3(target[0], 0, target[1]);
     this.goal = { x: target[0], z: target[1], yaw, pitch, dist };
     this.yaw = yaw;
@@ -40,6 +42,7 @@ export class RtsCamera {
     this.keys = new Set();
     this.bound = terrain.half - 120;
     this.groundY = 0;
+    on('look.cameraElevation', () => { this.goal.pitch = this._pitch(this.goal.dist); });
     this.inertia = null; // { vx, vz } m/s of goal drift after a released pan
   }
 
@@ -73,7 +76,7 @@ export class RtsCamera {
   }
 
   _pitch(dist) {
-    return THREE.MathUtils.clamp(pitchForDist(dist) + this.tilt, 0.3, 1.35);
+    return THREE.MathUtils.clamp(pitchForDist(dist) + this.tilt + LOOK.cameraElevation * Math.PI / 180, 0.3, 1.35);
   }
 
   /** Pan by a screen-space drag in CSS pixels (two-finger trackpad scroll): the ground follows the fingers. */
