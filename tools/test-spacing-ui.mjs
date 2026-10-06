@@ -81,7 +81,8 @@ export async function spacingControls({ page, check, shot, result }) {
     `actual rotated group preview bar geometry/destinations match confirmed paused orders: ${JSON.stringify({ preview, group })}`);
   result.spacingGroup = { preview, group }; await shot(page, 'spacing-group-order');
   await panel(true); await page.getByRole('button', { name: 'Reset Formation spacing', exact: true }).click();
-  await page.waitForTimeout(200);
+  // Ghosts refresh in the render loop; a software-GPU frame can exceed 200 ms.
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const resetGhosts = await page.evaluate(() => {
     const { game, arrows } = window.__game;
     return ['franklin', 'willcox'].map((id) => { const u = game.units.find((v) => v.id === id), g = arrows.ghosts.get(id)?.g;

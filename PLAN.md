@@ -346,7 +346,15 @@ readback, independent source/WCAG/visual review, docs sync, explicit commit/push
 Red CI takes priority. Formation spacing, soldier's-eye, Moments/X-Factor, saved deployment/living camp
 and complete P2/P3-P7 remain separate; no device/performance/approved-art fielding claim.
 
-### P2g: shared infantry formation spacing (implemented 2026-10-06; integration pending)
+### P2g: shared infantry formation spacing (implemented 2026-10-06; CI fixture repair)
+
+Pushed39cc6175469a5d402dc394eee8c0a0cb6f4116fb; Pages37515738423 passed. CI37515738493
+passed222/223; only Reset ghost readback failed after a fixed200ms wait. The software renderer had
+not refreshed existing ghosts despite reset unit frontage. Test-only repair waits two real frames,
+preserving runtime/assertions/tolerances. Software30/30 in130987ms,19:20:42.479Z, retained
+.out/p2g-reset-frame-software-proof-20261006.json: actual216.200013/216.200007 vs216.2,
+unchanged9textures/26geometries, zero progress writes/axe/errors. Independent source/receipt clear;
+native224/224 remains bound to unchanged runtime. Repair exact-SHA CI/Pages required before P2h.
 
 Reuse LOOK/settings and Unit's existing layout; no new store or renderer. Root owns src/ui/look.js,
 src/units/unit.js, src/game.js, src/ui/arrows.js, meaningful spacing Node/UI tests, tools/test.mjs, CI, sw.js and docs.

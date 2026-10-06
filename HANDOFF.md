@@ -5,7 +5,25 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2g green candidate; integration pending (2026-10-06)
+## Current boundary: P2g test-only CI repair (2026-10-06)
+
+P2g is pushed at39cc6175469a5d402dc394eee8c0a0cb6f4116fb; Pages37515738423 passed.
+CI37515738493 failed only spacing-existing-ghost-reset:222/223 in925824ms, errors/axe empty.
+The 200ms test wait read the previous324.3m ghost before a software-rendered frame refreshed it;
+unit frontage already reset. Repair replaces only that wait with two actual animation frames.
+Runtime, geometry assertions and tolerances are unchanged. Actual software browser30/30 in130987ms,
+19:20:42.479Z, .out/p2g-reset-frame-software-proof-20261006.json: ghosts216.200013/216.200007
+vs216.2, textures/geometries9/26 unchanged, exact progress/zero writes and scoped axe/errors clear.
+Independent source/receipt review accepts the test-only repair. Existing native224/224 covers the
+unchanged runtime. Commit/push only test-spacing-ui plus repair docs; read repaired exact CI/Pages
+and repair any red result before P2h runtime. No local browser/test/provider competitor remains.
+Root-owned preparation remains untracked: tools/test-moments.mjs (nine proposed positives/mutants),
+tools/test-moments-ui.mjs (real UI proposal) and docs/shiloh-preflight.md (candidate source notes,
+not an accepted OOB). Both tests have syntax RUN, semantic tests UNRUN until APIs exist. Preserve
+these drafts and workspace file outside the repair commit. No P2h runtime edits. Reference refresh
+19shots complete; root viewed .out/reference/ugg-0.png. Root sole writer; no COORDINATION.md.
+
+## Previous boundary: P2g green candidate; integration pending (2026-10-06)
 
 Candidate parent main13a9ee90215985c9ff437c299a89fffcfacd8948. P2f CI37511709837 and Pages37511709840
 both passed. Root sole writer, helper source/WCAG review only; no COORDINATION.md. Preserve workspace

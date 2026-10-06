@@ -16,4 +16,4 @@
 - **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
 - **Proof:** reward21+21, outcome9+9, capture6+6, intro7+7; native full224/224, first card47.7s.
 - **Coordination:** no ledger; preserve workspace file; HANDOFF/PLAN P2-P7, active goal, no scheduler.
-- **Runtime:** cw-v13 P2g green candidate: pure13+13/focused31/full224; integration/exact CI pending.
+- **Runtime:** cw-v13/39cc617; native224; CI37515738493 222/223; test-only frame repair software30/30.
