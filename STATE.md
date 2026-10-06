@@ -3,7 +3,7 @@
 - **Finish:** all three v1 battles and all v1 functions/flow. No deadline, new spending or hands-on checks.
 - **P1:** a2c29d3; completed progress/transfer; CI 37483119128 and Pages 37483119093 green.
 - **P2a:** actual Henry Hill survivors -> rewards -> saved Continue; depleted/guns/recovery retained.
-- **Next:** P2a exact-SHA CI/Pages, then P2b two-vs-one intro, hints and capturable/retakable crates.
+- **Next:** P2a Linux weapon-name CI repair; P2b intro/crates WIP is independent and unaccepted.
 - **Art next:** Actions manifest/page-demand residency estimator; wholesale lossless tiers exceed budget.
 - **Current play:** connected Henry Hill practice/rewards; historical/sandbox isolated; explicit reward demo.
 - **Missing:** intro/crates, saved-gear deployment/camp, campaign saves, phase packs and progression.
@@ -16,4 +16,4 @@
 - **Coordination:** no COORDINATION.md; preserve untracked NEW-civil-war-video-game.code-workspace.
 - **Continuation:** HANDOFF current boundary + PLAN P2-P7; Codex goal active, no scheduler created.
 - **Later:** retain expansion roadmap; reuse frozen old strategy only after fun/flow proof; old repo read-only.
-- **Runtime:** sw.js cw-v6; no new assets/renderer/combat rebalance; native/device gates stay open.
+- **Runtime:** cw-v7 layout repair; no new assets/renderer/combat rebalance; native/device gates open.

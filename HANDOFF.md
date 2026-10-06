@@ -36,6 +36,14 @@ event with a deterministic casualty fixture; it is not introductory timing/fun o
 Intermediate focus/layout failures and pre-final smoke remain identifiable in .out while the cap permits.
 Before closing integration, read CI and Pages for this commit's exact SHA via PLAN's commands.
 
+P2a integration correction: `fbd4c915b9f3d7d0f70b47f3b22979f893e177b1` Pages 37489994896 succeeded,
+but CI 37489994912 failed only practice-counts-current-gear-readable on Linux font metrics. Its actual
+counts screenshot confirms truncation; no save/battle/recovery assertion failed. Current weapon names
+now wrap on a full row, condition occupies its own row, prior weapon remains separate. Local focused
+39/39 passed in 150095 ms (2026-10-06T15:52:21.845Z), retained .out/p2a-ci-repair-local-20261006.json.
+This focused run includes independent P2b WIP on the original `?practice` route; exact repair-commit CI
+must still pass before P2a integration closes. Runtime cache cw-v7. P2b WIP is deliberately uncommitted.
+
 Next bounded slice P2b: inspect DESIGN's first minute and crate rules, main scenario/result wiring,
 Game.step/checkObjective, input/HUD, reward/capture model and frozen old capture rules. Write a short
 acceptance contract, then build a clearly fictional two-vs-one intro with contextual hints and real
