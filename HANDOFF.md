@@ -5,6 +5,17 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
+## Current authorized boundary (2026-10-05)
+
+Aaron answered “authorize all recs” to the scope popup in this Codex session: the recommended
+two-page BC7 + ASTC Actions diagnostic is authorized under the complete proposal below. Earlier
+“scope pending” statements are historical. No full packaging/runtime fielding/threshold change is
+authorized. Candidate tooling passed syntax, unit broken-controls and local `npm test` (168540 ms);
+dispatch only `mode=candidate`, once, after exact-SHA
+CI and Pages succeed. Review all metrics and both sheets, document results, then HALT.
+The distinct completion predicate keeps `diagnosticOnly:true, fieldable:false, ok:false`; BC7 needs
+real GPU readback and ASTC software evidence has a separate GPU RUN/UNRUN status.
+
 ## Working with Aaron (his standing preferences)
 - First serious coding project. Explain what he would not know to ask; terse and direct; no emojis.
 - Every question carries options with **one recommendation first and a one-line reason**. (Claude used

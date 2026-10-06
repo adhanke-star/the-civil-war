@@ -1,5 +1,12 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0020 — Two-page direct-format diagnostic authorized (Aaron, 2026-10-05)
+Aaron selected “authorize all recs” in response to the scope popup: execute the recommended two-page
+Actions-only BC7 + ASTC diagnostic under the existing byte/quality contract. This authorizes tooling
+and one experiment, not full packaging, threshold changes, runtime integration or native/iPad clearance.
+Explicit candidate mode leaves legacy diagnostic/full recipes unchanged; complete raw mip/hash binds,
+separate software/GPU routes and rejecting controls are required. Inspect both sheets and HALT.
+
 ## 0019 — Direct-format proposal ready; experiment remains held (2026-10-05)
 Read-only feasibility found pinned OSI direct BC7/ASTC encoders and direct-format paths in three 0.186.1.
 Recommend one two-page Actions experiment using bc7enc_rdo 1.08 at b943862 and KTX 4.4.2's ASTC 5.3.0,

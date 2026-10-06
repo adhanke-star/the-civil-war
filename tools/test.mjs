@@ -217,6 +217,54 @@ async function approvedPackUnit() {
   check('compression-dfd-controls', P.markPremultiplied(ktxControl(true), 4, 4, true)[95] === 1
     && P.markPremultiplied(ktxControl(false), 4, 4)[95] === 1 && rejectsSrgb,
     'raw RGBA8 and UASTC metadata mark premultiplied bytes; automatic sRGB control rejects');
+
+  const K = await import('../node_modules/three/examples/jsm/libs/ktx-parse.module.js');
+  const candidateFixture = (format) => {
+    const k = K.createDefaultContainer(); Object.assign(k, { vkFormat: format === 'bc7' ? 145 : 157, pixelWidth: 4, pixelHeight: 4, levelCount: 3 });
+    Object.assign(k.dataFormatDescriptor[0], { colorModel: format === 'bc7' ? 134 : 162, colorPrimaries: 0, transferFunction: 1, flags: 1, texelBlockDimension: [3, 3, 0, 0], bytesPlane: [16, 0, 0, 0, 0, 0, 0, 0] });
+    k.levels = [0, 1, 2].map(() => ({ levelData: new Uint8Array(16), uncompressedByteLength: 16 })); return k;
+  };
+  const candidateBytes = (k) => Buffer.from(K.write(k));
+  const rejectKtx = (mutate) => { const k = candidateFixture('bc7'); mutate(k); try { P.candidateKtx(candidateBytes(k), 4, 4, 'bc7'); return false; } catch { return true; } };
+  check('direct-candidate-ktx-controls', ['bc7', 'astc'].every((f) => P.candidateKtx(candidateBytes(candidateFixture(f)), 4, 4, f).allocation === 48)
+    && rejectKtx((k) => { k.levels.pop(); }) && rejectKtx((k) => { k.dataFormatDescriptor[0].flags = 0; })
+    && rejectKtx((k) => { k.dataFormatDescriptor[0].transferFunction = 2; })
+    && rejectKtx((k) => { k.vkFormat = 146; }) && rejectKtx((k) => { k.levels[2].levelData = new Uint8Array(0); }),
+    'actual serialized BC7/ASTC containers require UNORM linear premultiplied complete chains; missing tail/alpha/sRGB/format/payload reject');
+
+  const dds = Buffer.alloc(164); dds.write('DDS '); dds.writeUInt32LE(124, 4); dds.writeUInt32LE(4, 12); dds.writeUInt32LE(4, 16);
+  dds.writeUInt32LE(32, 76); dds.write('DX10', 84); dds.writeUInt32LE(98, 128); dds.writeUInt32LE(3, 132); dds.writeUInt32LE(1, 140);
+  const rejectsDds = (mutate) => { const b = Buffer.from(dds); mutate(b); try { P.bc7DdsPayload(b, 4, 4); return false; } catch { return true; } };
+  const marked = candidateBytes(candidateFixture('astc')), initial = P.candidateKtx(marked, 4, 4, 'astc').levels.map((l) => l.sha256);
+  marked[marked.readUInt32LE(48) + 13] = 1; marked[marked.readUInt32LE(48) + 15] = 0;
+  check('direct-candidate-dds-metadata-controls', P.bc7DdsPayload(dds, 4, 4).length === 16
+    && rejectsDds((b) => b.writeUInt32LE(99, 128)) && rejectsDds((b) => b.writeUInt32LE(8, 16))
+    && P.markCandidate(marked, 4, 4, 'astc').levels.every((l, i) => l.sha256 === initial[i]),
+    'DDS original dimensions and UNORM payload required; ASTC re-marking preserves every payload hash');
+
+  const caps = { maxTextureSize: 2048, formats: [0x8e8c, 0x93b0], bptc: true, astc: true, profiles: ['ldr'] };
+  check('direct-candidate-capability-controls', Q.candidateSupported(caps, 'bc7', 2048, 1808) && Q.candidateSupported(caps, 'astc', 1024, 1912)
+    && !Q.candidateSupported({ ...caps, bptc: false }, 'bc7', 4, 4) && !Q.candidateSupported({ ...caps, profiles: [] }, 'astc', 4, 4)
+    && !Q.candidateSupported({ ...caps, formats: [] }, 'bc7', 4, 4) && !Q.candidateSupported(caps, 'astc', 4096, 4),
+    'extension, linear format enum, ASTC LDR and size required before hardware-format upload');
+  const cd = { mode: 'candidate', diagnosticOnly: true, fieldable: false, ok: false, sheets: ['close.png', 'field.png'], controls: {},
+    pages: P.DIAGNOSTIC_PAGES.map((source) => ({ source, integrity: true, bc7Gpu: 'RUN', astcGpu: 'UNRUN', allocation: mip,
+      metadata: Object.fromEntries(['raw', 'bc7', 'astc'].map((f) => [f, { allocation: f === 'raw' ? 84 : 48,
+        levels: [0, 1, 2].map((i) => ({ bytes: f === 'raw' ? [64, 16, 4][i] : 16, sha256: 'a'.repeat(64) })) }])),
+      comparisons: ['png->premul', 'png->raw', 'raw->raw', 'raw->bc7-gpu', 'png->bc7-gpu', 'raw->astc-software', 'png->astc-software']
+        .flatMap((route) => [0, 1, 2].map((lod) => ({ route, lod, status: 'RUN', metrics: Q.comparePixels(colour, colour) }))) })) };
+  for (const tier of ['close', 'field']) for (const key of ['Upload', 'RawBase', 'Identity', 'Missing', 'Colour', 'WrongAlpha', 'DoublePremul', 'AutomaticSrgb', 'Unsupported']) cd.controls[tier + key] = true;
+  const rejectsCandidate = (mutate) => { const x = structuredClone(cd); mutate(x); return !Q.candidateEvidenceOkay(x); };
+  check('direct-candidate-completion-controls', Q.candidateEvidenceOkay(cd)
+    && rejectsCandidate((x) => { x.pages.pop(); }) && rejectsCandidate((x) => { x.pages[1].source = x.pages[0].source; })
+    && rejectsCandidate((x) => { x.pages[0].comparisons[1] = x.pages[0].comparisons[0]; })
+    && rejectsCandidate((x) => { x.pages[0].comparisons[0].metrics.meanRgb = NaN; })
+    && rejectsCandidate((x) => { x.pages[0].comparisons[0].metrics.clipped = 1; })
+    && rejectsCandidate((x) => { x.pages[0].metadata.bc7.levels.pop(); })
+    && ['WrongAlpha', 'DoublePremul', 'AutomaticSrgb', 'Unsupported'].every((k) => rejectsCandidate((x) => { x.controls['field' + k] = false; }))
+    && rejectsCandidate((x) => { x.pages[0].bc7Gpu = 'UNRUN'; }) && rejectsCandidate((x) => { x.fieldable = true; }),
+    'candidate schema stays distinct: two pages, all routes/mips, actual BC7 GPU, separate ASTC status, complete bytes and rejecting broken controls');
+
   const rig = { rigged: 101, fallingInfantry: 1 }, baked = { baked: 90, rigged: 10, sprites: 91 };
   check('baked-standing-count-control', bakedFigureCountsOkay(rig, baked)
     && !bakedFigureCountsOkay(rig, { ...baked, baked: 89 })

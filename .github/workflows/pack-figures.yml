@@ -3,11 +3,12 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Two-page diagnosis or complete packaging (never rerender)
+        description: Two-page diagnosis, direct candidate experiment, or full legacy packaging
         type: choice
         default: diagnostic
         options:
           - diagnostic
+          - candidate
           - full
 permissions:
   contents: read
@@ -17,8 +18,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
-    runs-on: ubuntu-latest
-    timeout-minutes: 40
+    runs-on: ${{ inputs.mode == 'candidate' && 'ubuntu-24.04' || 'ubuntu-latest' }}
+    timeout-minutes: ${{ inputs.mode == 'candidate' && 90 || 40 }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -43,14 +44,32 @@ jobs:
           mkdir "$RUNNER_TEMP/ktx"
           tar -xf "$RUNNER_TEMP/ktx.tar.bz2" -C "$RUNNER_TEMP/ktx" --strip-components=1
           echo "$RUNNER_TEMP/ktx/bin" >> "$GITHUB_PATH"
-      - name: Preserve all frames and identities; premultiply once; encode UASTC + mipmaps
+      - name: Pinned direct BC7 C++ encoder (MIT; no ISPC)
+        if: inputs.mode == 'candidate'
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/bc7-source.tar.gz" https://codeload.github.com/richgel999/bc7enc_rdo/tar.gz/b9438627eef73a1157e84201b6fa6eb2ffd6d9f0
+          echo "bbb33d1dbb6178a3a2c044956c3cc0b8ea9fc2f2903824379dd86f87d53b64c6  $RUNNER_TEMP/bc7-source.tar.gz" | sha256sum -c -
+          mkdir "$RUNNER_TEMP/bc7-source"
+          tar -xf "$RUNNER_TEMP/bc7-source.tar.gz" -C "$RUNNER_TEMP/bc7-source" --strip-components=1
+          cmake -S "$RUNNER_TEMP/bc7-source" -B "$RUNNER_TEMP/bc7-build" -DCMAKE_BUILD_TYPE=Release -DSUPPORT_BC7E=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+          cmake --build "$RUNNER_TEMP/bc7-build" --parallel 2
+          echo "BC7_ENCODER=$RUNNER_TEMP/bc7-build/bc7enc" >> "$GITHUB_ENV"
+          gh run download 37374456139 --repo adhanke-star/the-civil-war -n compression-review -D "$RUNNER_TEMP/historical-uastc"
+          echo "HISTORICAL_REVIEW=$RUNNER_TEMP/historical-uastc" >> "$GITHUB_ENV"
+      - name: Preserve approved identities; encode only the selected mode
         env:
           PACK_MODE: ${{ inputs.mode }}
         run: |
           if [ "$PACK_MODE" = diagnostic ]; then
             node tools/bake/compress.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack --diagnostic
-          else
+          elif [ "$PACK_MODE" = candidate ]; then
+            node tools/bake/compress.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack --candidate
+          elif [ "$PACK_MODE" = full ]; then
             node tools/bake/compress.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack
+          else
+            echo 'Unknown package mode' >&2
+            exit 1
           fi
       - name: GPU readback against every approved PNG and meaningful broken controls
         run: node tools/bake/review-compression.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack
