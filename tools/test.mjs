@@ -55,6 +55,7 @@ import { PNG } from 'pngjs';
 import { startServer, ROOT } from './serve.mjs';
 import { prune, OUT_DIR } from './prune.mjs';
 import { practiceProgress } from './test-practice-ui.mjs';
+import { introPlay } from './test-intro-ui.mjs';
 
 const READY_TIMEOUT_MS = 180_000;
 const VIEWPORT = { width: 1280, height: 720 };
@@ -1167,8 +1168,11 @@ async function main() {
   result.url = url;
   let browser;
   try {
-    browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+    const native = process.argv.includes('--native');
+    browser = await chromium.launch(native ? { channel: 'chrome', headless: false }
+      : { headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     result.browser = `chromium ${browser.version()}`;
+    if (process.argv.includes('--intro')) { result.mode = 'unforced introductory play'; await introPlay({ browser, url, check, shot, result, watchErrors, native }); return; }
     if (process.argv.includes('--practice')) { result.mode = 'practice result bridge only'; await practiceProgress({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--reward')) { result.mode = 'reward progress only'; await rewardProgress(browser, url); return; }
     if (process.argv.includes('--s1')) {
@@ -1196,7 +1200,7 @@ async function main() {
     let readyOk = false, readyDetail;
     const t0 = Date.now();
     try {
-      await page.goto(`${url}?quality=low`, { waitUntil: 'load', timeout: READY_TIMEOUT_MS });
+      await page.goto(`${url}?practice&quality=low`, { waitUntil: 'load', timeout: READY_TIMEOUT_MS });
       await Promise.race([page.waitForFunction(() => window.__ready === true, null, { timeout: READY_TIMEOUT_MS, polling: 200 }), earlyError]);
       readyOk = true;
       readyDetail = `window.__ready after ${Date.now() - t0} ms`;
@@ -1397,6 +1401,7 @@ async function main() {
     await sandboxAndDevice(browser, url);
     await rewardProgress(browser, url);
     await practiceProgress({ browser, url, check, shot, result, watchErrors });
+    await introPlay({ browser, url, check, shot, result, watchErrors, native });
   } finally {
     if (browser) await browser.close().catch(() => {});
     await new Promise((resolve) => server.close(resolve));

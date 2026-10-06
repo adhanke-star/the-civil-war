@@ -38,6 +38,7 @@
     <canvas id="battlefield" tabindex="0" role="application"
             aria-label="Battlefield. Tap or click a blue brigade to select it, then drag from it to draw its march; release on an enemy to attack. Drag the ground or scroll with two fingers to pan, pinch or use the wheel to zoom, Q and E turn, W A S D pan."></canvas>
     <div id="markers" role="group" aria-label="Brigades"></div>
+    <div id="field-crates" role="group" aria-label="Field stores"></div>
     <div id="ticks" aria-hidden="true"></div>
     <p id="ghost-label" aria-hidden="true" hidden></p>
 
@@ -55,6 +56,7 @@
         <div class="progress" aria-hidden="true"><i id="clock-bar"></i></div>
       </section>
       <button id="army-btn" type="button" aria-expanded="false" aria-controls="army" title="Your brigades (L)">Army</button>
+      <button id="capture-count" type="button" aria-controls="field-stores" aria-expanded="false" hidden></button>
       <section id="balance" aria-label="Army strength">
         <span class="flag us" aria-hidden="true"></span>
         <div class="bar"><i id="bal-us"></i><b id="bal-mark"></b></div>
@@ -75,6 +77,13 @@
       <ul id="army-list"></ul>
     </aside>
     <ol id="feed" class="panel" aria-label="Recent events"></ol>
+    <aside id="field-stores" class="panel" aria-label="Field stores" hidden>
+      <h2>Field stores</h2>
+      <p id="stores-selection"></p>
+      <div id="stores-actions"></div>
+      <button id="stores-close" type="button">Close stores</button>
+    </aside>
+    <span id="capture-status" class="visually-hidden" role="status"></span>
 
     <div id="dock">
       <section id="unitcard" class="panel" aria-label="Selected brigade">
@@ -109,13 +118,15 @@
     </div>
 
     <p id="tip" class="panel" role="note">Tap or click a <b>blue flag</b>, then <b>drag from it</b> to draw its march; release on an enemy to attack it. Drag the ground to pan, pinch or wheel to zoom, Space to pause.</p>
+    <p id="intro-hint" class="panel" role="status" hidden></p>
+    <span id="intro-timer" class="visually-hidden" hidden></span>
     <div id="toasts" role="status" aria-live="polite"></div>
     <p id="status" class="visually-hidden" role="status">Loading the battlefield…</p>
 
     <dialog id="menu" aria-labelledby="menu-title">
       <h2 id="menu-title">Henry House Hill</h2>
       <p id="play-mode" class="sub"></p>
-      <p class="sub">First Bull Run · 21 July 1861 · 2:00 p.m.</p>
+      <p id="menu-subtitle" class="sub">First Bull Run · 21 July 1861 · 2:00 p.m.</p>
       <fieldset>
         <legend>Quality <kbd>G</kbd></legend>
         <label><input type="radio" name="quality" value="auto"> Auto</label>
@@ -125,7 +136,7 @@
       <label class="row"><input type="checkbox" id="sound-toggle" checked> Sound</label>
       <p class="row"><a href="?sandbox" style="color: var(--focus)">Sandbox</a>: try and change the look and play, then copy your settings</p>
       <p class="row"><a href="reward.html?sandbox" style="color: var(--focus)">Reward sequence</a>: open the loot, compare and issue it (placeholder data)</p>
-      <p class="row"><a href="?battle=henry-hill" style="color: var(--focus)">Historical battle</a> · <a href="?practice" style="color: var(--focus)">Fresh practice</a> · <a href="reward.html" style="color: var(--focus)">Saved army</a></p>
+      <p class="row"><a href="?battle=henry-hill" style="color: var(--focus)">Historical battle</a> · <a href="?practice" style="color: var(--focus)">Henry Hill practice</a> · <a href="?intro" style="color: var(--focus)">Introductory fight</a> · <a href="reward.html" style="color: var(--focus)">Saved army</a></p>
       <h3>Controls</h3>
       <ul class="keys">
         <li><b>Select</b>: click or tap a brigade or its flag (Tab cycles flags); Shift+drag on the ground, or hold a finger still then drag, to box-select several</li>
@@ -138,6 +149,13 @@
       <h3>History</h3>
       <p id="history-note" class="small"></p>
       <form method="dialog"><button type="submit">Close</button></form>
+    </dialog>
+    <dialog id="intro" aria-labelledby="intro-title" aria-describedby="intro-text">
+      <p class="sub">The Civil War · fictional practice</p>
+      <h2 id="intro-title">Your first command</h2>
+      <p id="intro-text">Two brigades. One approaching enemy. Hold the practice ground for 45 seconds and march onto stores to capture their loot.</p>
+      <p class="small">Crates need two seconds without an enemy nearby. If the enemy retakes them, their loot is lost. This exercise uses Henry Hill terrain; it does not recreate a historical engagement.</p>
+      <button type="button" id="intro-start">Continue</button>
     </dialog>
     <dialog id="result" aria-labelledby="result-title" aria-describedby="result-text">
       <h2 id="result-title"></h2>

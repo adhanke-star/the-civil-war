@@ -128,7 +128,9 @@ provide explicit replacement, unsaved export and retry. Sandbox/historical sessi
 Local proof: 9 outcome positives + 9 rejecting mutants; 21 reward/save positives + 21 mutants;
 final smoke 101/101 in 346689 ms, timestamp 2026-10-06T15:34:29.856Z. Result/counts/recovery axe are
 clear; 320/1024 actual screenshots reviewed. This is a clock-accelerated real result/UI test, not a
-one-minute introductory playthrough or native-device proof. Exact commit CI/Pages must still pass.
+one-minute introductory playthrough or native-device proof. P2a `fbd4c91` failed Linux weapon-name
+readability in CI 37489994912; repair `d228fb91c6c2e364d2204024e1c6e1b0b3d50bee` passed CI
+37491741829 and Pages 37491741950. Equipped names wrap; condition/history each have their own row.
 
 Connect the unaltered Henry Hill practice result to the same reward/save UI. Pause and snapshot at
 the terminal event once; include routed and depleted formations, floor fractional surviving men,
@@ -144,9 +146,46 @@ CI/Pages. Intro timing, actual crates and full P2 remain open for the next green
 
 Next P2b: a clearly fictional two-vs-one introductory fight with contextual first-use hints, actual
 capturable/retakable field crates and a measured first reward about a minute. Preserve the existing
-Henry Hill practice as a distinct route, historical no-loot isolation and all P1/P2a recovery rules.
-Write the bounded intro/crate acceptance contract before changing the scenario/result seams. Saved
+Henry Hill practice as a distinct route, historical no-loot isolation and all P1/P2a recovery rules. Saved
 equipment deployment, camp and the full title/campaign path remain open; P2a does not certify them.
+
+### P2b: introductory fight and field crates (implemented 2026-10-06)
+
+Final combined native full smoke: 125/125, 232973 ms, timestamp 2026-10-06T16:26:07.649Z; retained
+.out/p2b-full-native-final-20261006.json. Actual UHD617 ANGLE Metal instructed play revealed a first
+card in 47337 ms; unopposed idle play lost ground at 27.2803 simulation seconds. No forced play state.
+Capture 6+6, intro 7+7, outcome 9+9 and reward/save 21+21 positives/intended mutants pass. Five final
+intro PNGs including 320px briefing and scoped axe are reviewed. A prior full software run failed
+immediate keyboard ordering (123/124, 727018 ms); synchronous select refresh fixes the real disabled-
+button race, with immediate software readback and final full native proof. Minor hint/flag overlap
+remains HUD polish. Exact candidate CI/Pages pending; no Auto/1:5/full-battle or iPad certification.
+
+Default entry shows a short labelled fictional practice briefing; Continue starts two generic Union
+brigades against one approaching Confederate brigade on reused Henry Hill terrain. Original Henry
+Hill remains `?practice`; `?battle=henry-hill` and `?sandbox` retain original rosters/no progress awards.
+Use the same combat constants on both sides. A 45-simulation-second hold challenge gives a first reward
+about a minute after Continue at default 1x; record actual wall time and simulation time, without forced
+clock/casualty/rout fixtures for introductory play acceptance. Losing the held ground or all brigades
+must produce defeat; do not script a win. Three contextual hints cover selection, drag march and loot.
+
+Preplaced generic practice stores are explicit fictional held-ground drops. Reuse the frozen old
+exclusive-presence objective rule: living non-routing troops only, any opponent contests, no majority
+capture. Two continuous seconds of exclusive presence captures/retakes; empty/contested ground resets
+pending acquisition but retains the previous owner. Final contested crates grant no loot. Rewards come
+once from unique finally owned crate records, never from the number of capture events; defeat may keep
+uncontested stores still owned. No battery/wagon/surrender capture claim in this slice (P3 remains open).
+Markers show rarity colour plus distinct shape/name, ownership/contested words, a top-strip counter and
+capture cue. No in-fight card rolls. Freeze ownership with the same terminal army; fight-on cannot rebase.
+
+Owned seams: new modules in existing src/franchise and src/ui, scenario selection in main, Game's
+capture tick and generic practice objective text, index/HUD, existing practice result model/UI, focused
+Node/browser tests, CI and SW version. Do not change combat constants, Henry Hill data, art/renderer,
+settings locks, historical sources or P1's atomic envelope. One writer; serialize browser work.
+Gates: syntax/diff; field-capture positives and named assertion-rejecting mutants; retained reward and
+outcome positives/mutants; unit; actual fresh Continue/select/drag/fight/capture/loot/save/reload UI with
+measured elapsed time, separate contested/retake/no-duplicate tests; keyboard/touch/axe/screenshots;
+independent source and WCAG/play review; final npm test, docs, commit/push and exact-SHA CI/Pages.
+P2c must still introduce camp/title defaults and resolve complete sandbox/flow scope before full P2 closes.
 
 ### Required battle-system work (P3/P4; do not hide it inside “build Shiloh”)
 

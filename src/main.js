@@ -18,6 +18,8 @@ import { LOOK } from './ui/look.js';
 import { defineSandboxTools } from './ui/sandbox-tools.js';
 import { playMode } from './franchise/practice.js';
 import { attachPracticeFlow } from './franchise/practice-ui.js';
+import { introScenario } from './franchise/intro.js';
+import { attachPracticeField } from './ui/practice-field.js';
 
 const stats = { fps: 0, scale: 1, quality: 'auto', drawCalls: 0, triangles: 0, figures: 0 };
 window.__stats = stats;
@@ -62,12 +64,16 @@ const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerH
 
 statusEl.textContent = 'Loading the ground…';
 const terrain = await loadTerrainData('./assets/terrain');
-const scenario = await (await fetch('./assets/scenarios/henry-hill.json')).json();
+const mode = playMode(location.search);
+const ground = await (await fetch('./assets/scenarios/henry-hill.json')).json();
+const scenario = mode === 'practice' && !new URLSearchParams(location.search).has('practice') ? introScenario(ground) : ground;
 const world = buildWorld(scene, terrain, scenario);
 Object.assign(stats, world.stats);
 
 // Opening view: both armies between the clock and the bottom panels; the pitch follows the zoom.
-const rts = new RtsCamera(camera, terrain, { target: [-60, 200], yaw: -Math.PI / 2 - 0.12, dist: 1150 });
+const rts = new RtsCamera(camera, terrain, scenario.practiceIntro
+  ? { target: [-300, -610], yaw: -Math.PI / 2 - 0.12, dist: 740 }
+  : { target: [-60, 200], yaw: -Math.PI / 2 - 0.12, dist: 1150 });
 const effects = new Effects(scene, terrain, rts);
 await effects.init();
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
@@ -94,7 +100,6 @@ const game = new Game({ scene, terrain, scenario, world, effects, playerSide: 'U
   }
 }
 const arrows = new ArrowLayer(scene, terrain);
-const mode = playMode(location.search);
 let practiceFlow = null;
 
 const hud = new Hud({
@@ -118,6 +123,9 @@ function setQuality(mode) {
 }
 
 document.getElementById('history-note').textContent = scenario.historyNote;
+document.getElementById('menu-title').textContent = scenario.title;
+document.getElementById('menu-subtitle').textContent = scenario.practiceIntro ? 'Fictional teaching exercise · Henry Hill terrain' : 'First Bull Run · 21 July 1861 · 2:00 p.m.';
+document.title = `The Civil War — ${scenario.title}`;
 game.on('select', (u) => hud.select(u));
 game.on('log', (text) => hud.toast(text));
 game.on('event', (ev) => {
@@ -139,6 +147,7 @@ const input = new Input({
 const readout = new Readout({ scene, terrain, camera, game, layer: document.getElementById('ticks') });
 defineSandboxTools({ game, rts, effects, hud });
 practiceFlow = attachPracticeFlow({ game, scenario, hud, mode });
+const practiceField = attachPracticeField({ game, scenario, hud, camera, terrain, rts, effects });
 document.getElementById('play-mode').textContent = mode === 'practice'
   ? 'Practice · rewards enabled' : mode === 'historical' ? 'Historical battle · no franchise rewards' : 'Sandbox · no progress rewards';
 // keep the pause/speed buttons in step with keyboard changes
@@ -183,6 +192,7 @@ function frame(now) {
   hud.update(dt);
   readout.update(game.paused ? 0 : dt, mpp);
   if (game.orders && !tip.hidden) tip.hidden = true;
+  practiceField.update();
 
   renderer.info.reset();
   post.render(scene, camera);
@@ -223,13 +233,14 @@ function frame(now) {
   }
   if (!window.__ready) {
     window.__ready = true;
-    statusEl.textContent = 'Henry House Hill, 21 July 1861. Union brigades are below the hill; Jackson holds the crest.';
+    statusEl.textContent = scenario.practiceIntro ? 'Your first command is ready. Continue begins the fictional practice fight.'
+      : 'Henry House Hill, 21 July 1861. Union brigades are below the hill; Jackson holds the crest.';
   }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
-window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, readout, gpuTier, practice: practiceFlow };
+window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, readout, gpuTier, practice: practiceFlow, practiceField };
 
 // Developer tuning panel (lil-gui), only with ?tune in the URL; players never load it.
 if (new URLSearchParams(location.search).has('tune')) {

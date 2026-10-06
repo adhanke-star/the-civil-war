@@ -1,5 +1,14 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0026 — A fictional first command teaches holding and real field capture (2026-10-06)
+P2b reuses Henry Hill terrain for two generic brigades versus one approaching opponent, with unchanged
+combat constants. A 45-sim-second hold requires retaining ground; zero forces or contested/lost ground
+defeats the player before enemy-break victory. Instructed native play wins; idle play loses, without a
+forced clock/rout/casualty fixture. Generic stores use the frozen objective's exclusive-presence rule
+plus two continuous seconds, retakes and final contested exclusion. Rewards derive once from unique
+finally held records, including defeat-held stores. Rarity/name/shape/owner cues and keyboard march
+actions share ordinary orders. Henry practice/historical/sandbox remain explicit; camp/deployment later.
+
 ## 0025 — Practice rewards preserve the actual terminal army (2026-10-06)
 P2a pauses/snapshots the real result once, including routed/depleted identities, floored surviving men
 and live crewed guns. Losses conserve the original roster; generic practice arms make no historical

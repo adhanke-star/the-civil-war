@@ -5,7 +5,54 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2a actual practice-result bridge implemented (2026-10-06)
+## Current boundary: P2b intro and field stores implemented (2026-10-06)
+
+Codex goal remains active for the complete existing v1 under DESIGN/DECISIONS 0022 and PLAN P1-P7.
+Root is the sole product writer; bounded helpers review/read only. One browser workload at a time.
+No COORDINATION.md exists. Preserve NEW-civil-war-video-game.code-workspace. Old Desktop repo is frozen
+and read-only. P1 a2c29d3 and P2a repair d228fb9 are integrated; repair CI 37491741829 and Pages
+37491741950 are green. No scheduler or new progress store was created.
+
+P2b defaults to a clearly fictional two-Union-vs-one-Confederate teaching exercise on Henry terrain.
+Original Henry practice stays ?practice, historical ?battle=henry-hill and sandbox grant no loot.
+Same combat constants, actual enemy march and actual casualties; hold ground for 45 sim seconds at
+default 1x, or lose when ground is lost/contested or all brigades break. No scripted victory. Contextual
+selection/drag/capture hints, rarity shapes/names/owners and keyboard/touch crate march use normal orders.
+FieldCaptures requires two continuous seconds of exclusive living/nonrouting presence; any opponent
+contests, empty/contested resets pending capture, retakes change final ownership. Final contested stores
+grant no cards; finally owned unique records, including defeat-held stores, freeze with the terminal army.
+Battery/wagon/surrender captures, camp, saved-gear deployment and the full title/campaign path stay open.
+
+Capture 6+6, intro 7+7, practice outcome 9+9 and reward/save 21+21 positive/intended mutant gates pass.
+Native pre-final focused 37/37 (109406 ms, 2026-10-06T16:08:48.142Z) revealed first loot in 47086 ms;
+idle play lost at 27.40 sim seconds. Hardware renderer: Intel UHD617 through ANGLE Metal. This short
+Low-quality check does not certify Auto/1:5/full-battle performance, total memory or the physical iPad.
+Native access is established for this isolated Chrome profile only; iPad access remains unestablished.
+
+Full software smoke 123/124 (727018 ms, 2026-10-06T16:11:32.865Z) failed only immediate keyboard crate
+ordering. Real-key diagnostic showed March was still disabled until the next rendered frame, so Enter
+activated Close stores. refreshSelection now runs synchronously on select as well as per-frame; immediate
+software diagnostic passes paused move to [-350,-665] with battlefield focus and simTime=0. Retain
+.out/p2b-full-keyboard-fixture-failure-20261006.json and .out/p2b-keyboard-immediate-positive-20261006.json
+while the cap permits. Earlier hook/focus fixture failures also remain identifiable. No source mutation.
+Independent source review cleared intro/capture bindings, isolation and terminal freezing. WCAG review
+inspected five final full PNGs including 320px briefing and cleared the selection fix; minor hint/flag
+overlap is recorded HUD polish. Final npm test -- --native passes 125/125 in 232973 ms, timestamp
+2026-10-06T16:26:07.649Z, .out/p2b-full-native-final-20261006.json. First revealed card 47337 ms,
+instructed result 45.4701 sim seconds; idle defeat 27.2803. Immediate keyboard/touch and all old battle,
+sandbox, reward, recovery and outcome paths pass; zero errors and zero scoped axe violations. Five
+final intro PNGs carry timestamp 16-26-07-649Z. Exact-SHA CI/Pages remain pending. Runtime cache cw-v8.
+
+Next P2c: lightweight title Continue -> fresh intro / validated saved-army camp; reuse existing card and
+save seams, no sample roll or progress write on entry, recover blocked/corrupt reads explicitly. Preserve
+reward demo, Henry/historical/sandbox routes and P1/P2a safeguards. Complete sandbox/default scope must
+still be accounted for before P2 closes. P3/P4 then use early sourced Shiloh to exercise shared phases and
+missing combat, followed by Stones River/Chattanooga and all progression/presentation/release gates.
+Art next remains the Actions-only approved-manifest/page-demand transition/residency estimator. Approved
+820846f / 37347072866, all 5184 frames/9 looks/45 pages and eligibility/anchor/direction/byte locks remain;
+failed UASTC/direct packs are unfieldable. No new art, codec, renderer or combat-constant changes in P2b.
+
+## Previous boundary: P2a actual practice-result bridge implemented (2026-10-06)
 
 Codex goal remains active for complete existing v1, not just these slices. Main is the sole product
 writer; review helpers do not edit or launch competing browsers. No COORDINATION.md exists. Preserve
@@ -42,7 +89,8 @@ counts screenshot confirms truncation; no save/battle/recovery assertion failed.
 now wrap on a full row, condition occupies its own row, prior weapon remains separate. Local focused
 39/39 passed in 150095 ms (2026-10-06T15:52:21.845Z), retained .out/p2a-ci-repair-local-20261006.json.
 This focused run includes independent P2b WIP on the original `?practice` route; exact repair-commit CI
-must still pass before P2a integration closes. Runtime cache cw-v7. P2b WIP is deliberately uncommitted.
+passed as CI 37491741829 and Pages 37491741950 for d228fb9. Runtime cache cw-v7 at that boundary.
+P2b was deliberately uncommitted then; the current boundary above supersedes the next-task pointers.
 
 Next bounded slice P2b: inspect DESIGN's first minute and crate rules, main scenario/result wiring,
 Game.step/checkObjective, input/HUD, reward/capture model and frozen old capture rules. Write a short

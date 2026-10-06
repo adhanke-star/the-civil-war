@@ -30,6 +30,7 @@ import { Combat, CLOCK_RATIO } from './sim/combat.js';
 import { Ai } from './sim/ai.js';
 import { RULES } from './sim/rules.js';
 import { mulberry32, inWoods, PLAN } from './world/landscape.js';
+import { FieldCaptures } from './franchise/captures.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -105,6 +106,11 @@ export class Game {
     this.clockStart = hh * 3600 + mm * 60;
     this.clockEnd = eh * 3600 + em * 60;
     this.objective = scenario.objective;
+    this.fieldCaptures = new FieldCaptures(scenario.crates || []);
+    for (const opening of scenario.opening || []) {
+      const u = this.units.find((v) => v.id === opening.id && v.side !== playerSide);
+      if (u) u.orderMove(opening.points, { endFacing: opening.endFacing });
+    }
     this.logSeen = 0;
     this.slowT = 0;
     onSetting('look.menPerFigure', (v) => this.applyMenPerFigure(v));
@@ -351,7 +357,7 @@ export class Game {
 
   /** March time in historical minutes for `len` metres at the walking pace (the ghost's label). */
   marchMinutes(len) {
-    return (len / (SPEED.walk * RULES.marchSpeed)) * CLOCK_RATIO / 60;
+    return (len / (SPEED.walk * RULES.marchSpeed)) * (this.scenario.practiceIntro ? 1 : CLOCK_RATIO) / 60;
   }
 
   /** Attack order: close to effective range with line of sight, halt and fire; follow a target that moves. */
@@ -397,6 +403,9 @@ export class Game {
   setSpeed(s) { this.speed = s; }
 
   clockText() {
+    if (this.scenario.practiceIntro) return { date: 'Practice',
+      time: `${String(Math.floor(this.simTime / 60)).padStart(2, '0')}:${String(Math.floor(this.simTime % 60)).padStart(2, '0')}`,
+      frac: Math.min(1, this.simTime / 45) };
     const t = this.clockStart + this.simTime * CLOCK_RATIO;
     const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60);
     const [y, mo, d] = this.scenario.date.split('-').map(Number);
@@ -446,13 +455,17 @@ export class Game {
       this.event(e.text, e.unit, e.kind); // the feed shows it (or a toast with look.eventFeed off, main.js)
       if (e.kind === 'rout' && !e.forced && e.unit && e.unit.side === this.playerSide) this.alert(`${e.unit.short} is routing.`, e.unit.x, e.unit.z);
     }
+    if (!this.over) for (const e of this.fieldCaptures.step(this.units, h)) {
+      this.event(`${e.side === this.playerSide ? 'Your troops' : 'The enemy'} ${e.previous ? 'retake' : 'capture'} ${e.name}.`,
+        null, 'capture', e);
+    }
     this.checkObjective(h);
   }
 
   /** A line for the event feed (clock time, sentence, where). */
   event(text, unit, kind = 'info', at) {
     const p = at || (unit ? { x: unit.x, z: unit.z } : null);
-    this.emit('event', { text, time: this.clockText().time, x: p ? p.x : null, z: p ? p.z : null, side: unit ? unit.side : null, kind, unit: unit || null });
+    this.emit('event', { text, time: this.clockText().time, x: p ? p.x : null, z: p ? p.z : null, side: unit ? unit.side : at?.side || null, kind, unit: unit || null });
   }
 
   /** Auto-pause (rules.autoPause): pause and tell the HUD why (it shows a banner with "Fly there"). */
@@ -488,13 +501,20 @@ export class Game {
     if (this.over) return;
     const t = this.clockStart + this.simTime * CLOCK_RATIO;
     let result = null;
-    if (effective('CS') === 0) result = { winner: 'US', why: 'The Confederate line on Henry House Hill has broken.' };
+    if (this.scenario.practiceIntro) {
+      if (effective('US') === 0 || this.holder !== 'US') result = { winner: 'CS' };
+      else if (effective('CS') === 0 || t >= this.clockEnd) result = { winner: 'US' };
+    }
+    else if (effective('CS') === 0) result = { winner: 'US', why: 'The Confederate line on Henry House Hill has broken.' };
     else if (effective('US') === 0) result = { winner: 'CS', why: 'Every Union brigade is in retreat.' };
     else if (t >= this.clockEnd) {
       result = this.holder === 'US'
         ? { winner: 'US', why: 'Union troops hold Henry House Hill at nightfall.' }
         : { winner: 'CS', why: 'The Confederates still hold Henry House Hill. (In 1861 they held it, and the Union army fell back to Washington.)' };
     }
+    if (result && this.scenario.practiceIntro) result.why = result.winner === 'US'
+      ? 'Your brigades held the practice stores. The quartermaster is ready with your first issue.'
+      : 'Your brigades lost the practice ground. Survivors and any stores still held return for the issue.';
     if (result) {
       this.over = true;
       this.result = result;

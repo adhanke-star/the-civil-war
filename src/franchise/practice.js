@@ -10,7 +10,8 @@ export function playMode(search) {
 }
 
 export function practiceOutcome({ game, scenario, mode, awardId, seed }) {
-  if (mode !== 'practice' || scenario.id !== 'henry-hill' || game.playerSide !== 'US' || !game.over
+  if (mode !== 'practice' || !['henry-hill', 'first-command'].includes(scenario.id)
+    || (scenario.id === 'first-command' && scenario.practiceIntro !== true) || game.playerSide !== 'US' || !game.over
     || !['US', 'CS'].includes(game.result?.winner)) fail('only a completed, unaltered practice battle grants rewards.');
   const defs = new Map(scenario.units.map((d) => [d.id, d]));
   const seen = new Set();
@@ -44,6 +45,15 @@ export function practiceOutcome({ game, scenario, mode, awardId, seed }) {
   const grade = game.result.winner === game.playerSide ? 'Victory' : 'Defeat';
   const before = completedSnapshot({ awardId, army, depot: [], issued: [], seed, grade });
   const surviving = before.army.reduce((n, b) => n + b.men, 0);
-  return { ...before, captures: [], summary: { starting, surviving, losses: starting - surviving,
+  const held = game.fieldCaptures?.held(game.playerSide) || [];
+  const crateDefs = new Map((scenario.crates || []).map((c) => [c.id, c]));
+  const crateIds = new Set();
+  if (!Array.isArray(held) || held.length > crateDefs.size) fail('invalid field captures.');
+  for (const c of held) {
+    if (!c || !crateDefs.has(c.id) || crateIds.has(c.id) || c.tier !== crateDefs.get(c.id).tier) fail('invalid field captures.');
+    crateIds.add(c.id);
+  }
+  const captures = held.map((c) => ({ id: c.id, tier: c.tier, from: `Captured: ${crateDefs.get(c.id).name} (fictional practice stores)` }));
+  return { ...before, captures, summary: { starting, surviving, losses: starting - surviving,
     guns: before.army.reduce((n, b) => n + (b.guns || 0), 0), title: scenario.title, why: game.result.why } };
 }

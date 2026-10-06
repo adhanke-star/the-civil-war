@@ -49,6 +49,25 @@ kbd { font-size: 11px; border: 1px solid #8a8580; border-radius: 3px; padding: 0
 
 #objective { top: calc(var(--edge) + var(--top-h) + 6px + env(safe-area-inset-top)); left: calc(var(--edge) + env(safe-area-inset-left)); margin: 0; padding: 6px 10px; font-size: 13px; max-width: 46vw; }
 #objective:empty { display: none; }
+#capture-count { font-variant-numeric: tabular-nums; white-space: nowrap; }
+#capture-count[hidden], #intro-hint[hidden] { display: none; }
+#field-crates { position: fixed; inset: 0; pointer-events: none; }
+.crate-connector { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; opacity: 0.85; }
+.field-crate { position: absolute; margin: 0; display: flex; align-items: center; gap: 5px; max-width: 165px; padding: 5px 8px; border-radius: 6px;
+  color: #f1ece0; background: #181820; border: 2px solid var(--rarity); font-size: 12px; box-shadow: 0 2px 6px #0008; }
+.field-crate[hidden] { display: none; }
+.crate-shape { color: var(--rarity); font-size: 24px; flex: none; }
+.crate-label { overflow-wrap: anywhere; }
+#field-stores { top: calc(var(--edge) + var(--top-h) + 6px + env(safe-area-inset-top)); right: var(--edge); width: min(290px, calc(100vw - 32px)); padding: 10px; z-index: 13; }
+#field-stores[hidden] { display: none; }
+#field-stores h2 { margin: 0; font-size: 17px; }
+#stores-actions { display: grid; gap: 8px; }
+#field-stores button { width: 100%; min-height: 48px; padding: 8px; margin-bottom: 6px; color: var(--text); border: 1px solid var(--panel-edge); background: #302d38; border-radius: 6px; text-align: left; cursor: pointer; }
+#field-stores button:disabled { color: var(--dim); cursor: default; }
+#intro-hint { bottom: calc(var(--edge) + var(--dock-h) + 14px + env(safe-area-inset-bottom)); left: calc(var(--edge) + env(safe-area-inset-left));
+  max-width: min(430px, 47vw); margin: 0; padding: 9px 12px; border-color: var(--focus); pointer-events: none; }
+#intro { margin: auto; width: min(460px, calc(100vw - 64px)); max-height: calc(100vh - 64px); overflow: auto; }
+#intro button { min-height: 48px; min-width: 48px; padding: 10px 24px; background: #f1ece0; color: #17141a; cursor: pointer; border-radius: 6px; border: 1px solid #b4aa98; }
 #banner { top: calc(var(--edge) + var(--top-h) + 6px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
   padding: 4px 6px 4px 14px; font: 15px Georgia, serif; border-color: var(--focus); z-index: 12; max-width: 92vw; }
 #banner[hidden] { display: none; }

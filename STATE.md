@@ -2,18 +2,18 @@
 - **Authority (2026-10-06):** DESIGN + DECISIONS 0022; PLAN P1-P7 is the autonomous completion path.
 - **Finish:** all three v1 battles and all v1 functions/flow. No deadline, new spending or hands-on checks.
 - **P1:** a2c29d3; completed progress/transfer; CI 37483119128 and Pages 37483119093 green.
-- **P2a:** actual Henry Hill survivors -> rewards -> saved Continue; depleted/guns/recovery retained.
-- **Next:** P2a Linux weapon-name CI repair; P2b intro/crates WIP is independent and unaccepted.
+- **P2a:** d228fb9 repairs Linux font truncation; CI 37491741829 and Pages 37491741950 green.
+- **P2b:** intro/crates implemented; full native 125/125; instructed win + idle defeat; exact CI pending.
 - **Art next:** Actions manifest/page-demand residency estimator; wholesale lossless tiers exceed budget.
-- **Current play:** connected Henry Hill practice/rewards; historical/sandbox isolated; explicit reward demo.
-- **Missing:** intro/crates, saved-gear deployment/camp, campaign saves, phase packs and progression.
+- **Current play:** default fictional intro; ?practice Henry Hill rewards; historical/sandbox isolated.
+- **Missing:** title/camp defaults, saved-gear deployment, campaign saves, phase packs and progression.
 - **Figures:** rigged default; second-pass baked Union and tinted Confederate placeholders remain.
 - **Approved art:** bake 820846f / 37347072866, sheets 1-12, 5,184 frames, nine looks per tier.
 - **Failed candidates:** UASTC 37360904656 and direct BC7/ASTC 37404193171; limits stay unchanged.
 - **Historical native Mac (2026-10-04):** baked Auto 1:5 40.7/38.7 fps opening/fight; no new measurement.
 - **Unverified:** actual iPad access/performance, full touch/device acceptance, new assets and total memory.
-- **Proof:** reward 21+21, outcome 9+9; final smoke 101/101 (346689 ms), practice/reward axe clear.
+- **Proof:** reward 21+21, outcome 9+9, capture 6+6, intro 7+7; native full 125/125, first card 47.3s.
 - **Coordination:** no COORDINATION.md; preserve untracked NEW-civil-war-video-game.code-workspace.
 - **Continuation:** HANDOFF current boundary + PLAN P2-P7; Codex goal active, no scheduler created.
 - **Later:** retain expansion roadmap; reuse frozen old strategy only after fun/flow proof; old repo read-only.
-- **Runtime:** cw-v7 layout repair; no new assets/renderer/combat rebalance; native/device gates open.
+- **Runtime:** cw-v8; native UHD617 intro accessible; full performance/iPad gates still open.

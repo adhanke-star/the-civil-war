@@ -96,7 +96,7 @@ export function attachPracticeFlow({ game, scenario, hud, mode }) {
     if (saved) { showSaved(); return; }
     if (failure) { recover(); return; }
     const message = outcome
-      ? `${game.result.why} ${outcome.summary.surviving.toLocaleString()} surviving men; ${outcome.summary.losses.toLocaleString()} lost. Open the practice quartermaster issue. No field crates are awarded.`
+      ? `${game.result.why} ${outcome.summary.surviving.toLocaleString()} surviving men; ${outcome.summary.losses.toLocaleString()} lost. ${outcome.captures.length} held field crates. Open the practice quartermaster issue.`
       : `${game.result.why} ${mode === 'historical' ? 'Historical battles grant no franchise rewards.' : 'Sandbox or altered battles grant no progress rewards.'}`;
     panel(game.result.winner === 'US' ? 'Union victory' : 'Confederate victory', message, outcome ? 'Open the loot' : null, openLoot);
   }
