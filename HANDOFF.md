@@ -5,7 +5,44 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2e Look acceptance and integration (2026-10-06)
+## Current boundary: P2e test-only CI repair; P2f owned WIP (2026-10-06)
+
+Current HEAD/origin main2a9f86af3c168b8c3de5c85a5efa45443c454874. P2e Pages37505846093 passed;
+CI37505846001 failed only fixed-paused-view state comparison with restoredpixels0/52608:184/185 pass,
+with the native-only renderer check omitted on Linux. Evidence .out/p2e-ci-37505846001.zip(15.4MB)
+and -result.json. Slow frame cadence leaves
+RtsCamera ground-height easing unsettled. Repair tools/test-look-ui.mjs settles actualrts.update(1)x4
+before baseline, calls no simulation step and keeps all pixel/state/progress assertions unchanged;
+receipts now retain before/restored states and camera/time/paused settle values. Source review clears.
+Isolated software20/20 .out/p2e-ci-settle-software-proof-20261006.json serves all four P2f changed
+field modules/CSS from literal fullSHA2a9f86a via git show, injects groundY-.05, and verifies real UI,
+exact old runtime binding, identical paused simTime, restoredpixels0 and all controls/progress/axe.
+No source checkout/mutation; HTTP prevents dirty service worker participation. Browser closed.
+Finalize independent receipt review, explicitly stage ONLY test-look-ui and current STATE/PLAN/HANDOFF,
+commit/push this test-only repair, read exact repairCI/Pages and prioritize red CI. Do not stage P2f WIP.
+
+P2f root-owned WIP: src/ui/look.js, src/ui/hud.js/CSS, src/render/rts-camera.js, sw.js(cw-v12),
+tools/test-view.mjs, tools/test-view-ui.mjs, tools/test.mjs and CI(view positives/mutants). No other
+writer, no COORDINATION.md; preserve workspace file. LOOK.markerScale.75..1.75/default1 sizes flag/bar
+only, text/hit minimum44 unchanged. Hud CSSvar+all cached w/h/sizeTimer invalidate. Camera elevation
+-15..30degrees/default0 adds to automatic/manual pitch on construction/live/zoom, final clamps/easing
+unchanged. Pure camera/Hud10+10 passes, including real forced-ridge29.55->325 plus bypass rejection.
+Focused initial73/73; expanded76/76 in101847ms,17:54:48.769Z .out/p2f-focused-pre-edge-20261006.json
+and eight view PNGs. Real max-marker mouse drag/ghost, keyboard, synthetic touch,15degree wheel error
+.00044(view fraction) vs centre-only.19019, two-finger error<.00037, fly/minimap/locks/transfer/reload,
+progress/axe/narrow pass. Resource fixture failure retained: explicit order made ordinary route mesh;
+angle-only baseline proves textures9->9/geometries29->29, targetsunchanged (beforeorder26geometries).
+
+BLOCKER: independent actual pair review shows max up-stacking hides CS1900/firing100 markers visible
+at default. Computed44px rectangles/overlaps[]miss viewport/topstrip occlusion. After P2e repair push,
+implement bounded edge-aware nonoverlapping placement with true-ground connector; bind unobscured
+hit areas and actual top-marker pointer/focus at min/default/max. Add intro/max-marker crate-label
+avoidance proof (sandbox contains no crates). Refresh/view references already completed19shots.
+Do not claim P2f cleared or launch frozen full run until these gates/source/WCAG rendered review pass.
+Then retained positives/mutants/unit, full nativeJSON/PNGs, docs/commit/push/exactCI. Spacing remains
+separate combat/order geometry; all remaining P2/P3-P7/art/device/release limits below remain binding.
+
+## Previous boundary: P2e acceptance and integration (2026-10-06)
 
 Complete existing v1 remains active under the Codex goal objective and PLAN P1-P7; no partial release
 or complete P2 claim. Root is sole writer, helpers read/review only, one local browser at a time.

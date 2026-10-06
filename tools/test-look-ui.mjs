@@ -4,6 +4,15 @@ import { AxeBuilder } from '@axe-core/playwright';
 /** Existing sandbox, paused real scene; no product hooks or simulation stepping. */
 export async function lookControls({ page, check, shot, result }) {
   await page.getByRole('tab', { name: 'Look', exact: true }).click();
+  // Settle camera easing before the fixed-view comparison (slow CI may still be approaching ground height).
+  // Only the actual camera API advances; battle time/units stay paused and unchanged.
+  result.lookCameraSettle = await page.evaluate(() => {
+    const { game, rts, camera, terrain } = window.__game;
+    const before = { time: game.simTime, paused: game.paused, groundY: rts.groundY, ground: terrain.heightAt(rts.target.x, rts.target.z) };
+    for (let i = 0; i < 4; i++) rts.update(1);
+    camera.updateMatrixWorld(true);
+    return { before, after: { time: game.simTime, paused: game.paused, groundY: rts.groundY } };
+  });
   const live = () => page.evaluate(() => {
     const { game, post, effects, rts } = window.__game;
     return { saturation: post.finalMat.uniforms.uSaturation.value, tilt: post.finalMat.uniforms.uTilt.value,
@@ -16,7 +25,7 @@ export async function lookControls({ page, check, shot, result }) {
         // Camera easing approaches its ground height asymptotically; bind to micrometre precision.
         target: rts.target.toArray().map((v) => Number(v.toFixed(6))), camera: window.__game.camera.matrixWorld.toArray().map((v) => Number(v.toFixed(6))) }) };
   });
-  const before = await live();
+  const before = await live(); result.lookBefore = before;
   check('look-defaults', before.saturation === 0.86 && before.tilt === 0.9 && before.exposure === 0.66 && before.smoke && !before.reduced && before.visible,
     'actual Post .86/.9/exposure .66 and visible smoke-on match retained defaults');
   const sample = async () => PNG.sync.read(await page.locator('#battlefield').screenshot());
@@ -41,7 +50,7 @@ export async function lookControls({ page, check, shot, result }) {
   check('look-tilt-rendered', sharp.tilt === 0 && tiltDiff.fraction > 0.002, `real keyboard slider .9 -> 0; ${JSON.stringify(tiltDiff)}`);
   await page.getByRole('button', { name: 'Reset Tilt-shift blur', exact: true }).click();
   await page.locator('#sb-toggle').click(); const restoredPng = await sample(); await page.locator('#sb-toggle').click(); const restored = await live();
-  const restoreDiff = difference(baseline, restoredPng);
+  const restoreDiff = difference(baseline, restoredPng); result.lookRestored = restored;
   check('look-default-render-restored', restoreDiff.fraction < 0.01 && restored.battle === before.battle,
     `fixed paused camera/roster/orders/time, restored defaults: ${JSON.stringify(restoreDiff)}`);
   check('look-no-target-allocation', [muted, sharp, restored].every((s) => JSON.stringify(s.targets) === JSON.stringify(before.targets)

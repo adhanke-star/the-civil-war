@@ -263,7 +263,7 @@ axe/screenshots. Keep existing positives/mutants, unit and final native full smo
 WCAG review, docs/commit/push and exact-SHA CI/Pages. This does not close remaining Look/Moments,
 soldier's-eye/division selection, deployment, living camp or full P2.
 
-### P2e: existing post grade, tilt-shift and smoke controls (implementation candidate)
+### P2e: existing post grade, tilt-shift and smoke controls (implemented; CI fixture repair)
 
 Actual Post/Effects/quarks positives 10/10 and ten intended mutants pass, including in-place target
 resize rejection. Focused native 56/56 in 81327 ms, 2026-10-06T17:35:54.647Z; retained
@@ -279,7 +279,14 @@ Final native full smoke186/186 in300516ms,2026-10-06T17:37:39.593Z, retained
 .out/p2e-full-native-final-20261006.json and six full-run look PNGs. Default-on fight produces real
 casualties and eight puffs; actual intro first card48195ms, win45.50sim/idle defeat27.28sim. Full-run
 Reset again changes zero sampled pixels; all old save/flow checks pass. Independent final source/WCAG
-review read the receipt and all six exact full-run PNGs; no bounded blocker. Exact-SHA CI/Pages pending.
+review read the receipt and all six exact full-run PNGs; no bounded blocker. Commit2a9f86af3c168b8c3de5c85a5efa45443c454874
+passed Pages37505846093; CI37505846001 failed only the before/after paused-camera state comparison,
+with restored pixels0/52608. Retain .out/p2e-ci-37505846001.zip and -result.json. Slow frame cadence
+can leave ground-height easing unsettled. Test-only repair settles the existing camera API before
+baseline capture and records before/after camera/time/paused state; assertions/limits stay unchanged.
+Isolated software proof20/20 serves every P2f-changed runtime file from the exact committed P2e SHA,
+injects unsettled ground height and passes real Look UI: .out/p2e-ci-settle-software-proof-20261006.json.
+Separate repair commit must exclude P2f runtime/tests; exact repair CI/Pages still required.
 
 Register colour saturation, tilt-shift amount and smoke visibility in existing LOOK/settings.
 Preserve current saturation .86, tilt .9, center .46, band .24 and fixed exposure .66; no texture,
@@ -309,6 +316,11 @@ readable and every button >=44x44. Do not transform the entire button: Hud's pro
 is authoritative. Invalidate cached m.w/m.h/sizeTimer on changes; newly placed markers inherit the
 preference. Preserve ground anchors, stacking/hit rectangles/off-screen behavior, actual click/drag/
 keyboard/touch selection and crate rectangle avoidance. No simulation/formation/art/history change.
+Rendered review confirmed enlargement exposes upward-only stacking: two Confederate markers visible
+at default move offscreen/under the top strip at max. Repair placement within visible bounds with an
+alternative nonoverlapping position and a connector to the true projected ground anchor; do not merely
+clamp into another marker. Actual unobscured hit areas/selection of those top markers and intro crate
+avoidance at enlarged size are required, in addition to full DOM rectangle dimensions.
 Camera elevation offset defaults0, adds to pitchForDist plus existing manual tilt, retains final
 pitch clamps. Initial constructor and later zoom/rotate/live preference agree; preserve easing9,
 target/distance/yaw, terrain collision protection and near/far limits. Explicit notes explain that a
