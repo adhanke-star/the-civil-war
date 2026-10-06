@@ -1,19 +1,19 @@
 import { AxeBuilder } from '@axe-core/playwright';
 
 export async function viewControls({ page, check, shot, result }) {
-  if (!(await page.evaluate(() => window.__game.game.paused))) await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  if (!(await page.evaluate(async () => window.__game.game.paused))) await page.getByRole('button', { name: 'Pause', exact: true }).click();
   await page.getByRole('tab', { name: 'Look', exact: true }).click();
-  const state = () => page.evaluate(() => {
+  const state = () => page.evaluate(async () => {
     const { game, rts, post, camera } = window.__game;
     return { pitch: rts.goal.pitch, actualPitch: rts.pitch, goal: [rts.goal.x, rts.goal.z, rts.goal.dist, rts.goal.yaw],
       units: JSON.stringify(game.units.filter((u) => !u.id.startsWith('sandbox-')).map((u) => [u.id, u.x, u.z, u.men, u.ammo, u.xp, u.order])),
-      time: game.simTime, paused: game.paused, progress: localStorage.getItem('cw.progress'), writes: window.__sandboxWrites,
+      time: game.simTime, paused: game.paused, progress: await window.__progressFixture.raw(), writes: window.__progressPuts + window.__progressLegacyWrites,
       textures: post.renderer.info.memory.textures, geometries: post.renderer.info.memory.geometries,
       targets: [post.rtScene, post.rtSmall, post.rtBlur].map((t) => [t.uuid, t.width, t.height]), footprint: rts.footprint().map((p) => [...p]),
       matrix: camera.matrixWorld.toArray() };
   });
   const before = await state(), marker = page.getByRole('slider', { name: 'Marker size', exact: true });
-  const markers = () => page.evaluate(() => {
+  const markers = () => page.evaluate(async () => {
     const { hud, game, camera, terrain } = window.__game;
     return game.units.filter((u) => u.alive).map((u) => {
       const m = hud.markers.get(u.id), b = m.el.getBoundingClientRect(), s = getComputedStyle(m.el.querySelector('svg')), bar = getComputedStyle(m.el.querySelector('.sbar'));
@@ -58,7 +58,7 @@ export async function viewControls({ page, check, shot, result }) {
   for (const id of ['bee', 'staunton', 'rockbridge']) {
     const point = await page.evaluate((id) => { const el = window.__game.hud.markers.get(id).el, b = el.querySelector('svg').getBoundingClientRect(), x = b.x + b.width / 2, y = b.y + b.height / 2;
       return { x, y, hit: el.contains(document.elementFromPoint(x, y)) }; }, id);
-    await page.mouse.click(point.x, point.y); const selected = await page.evaluate(() => window.__game.game.selected?.id);
+    await page.mouse.click(point.x, point.y); const selected = await page.evaluate(async () => window.__game.game.selected?.id);
     const focus = await page.evaluate((id) => { const m = window.__game.hud.markers.get(id); m.el.focus(); const b = m.el.querySelector('.info').getBoundingClientRect();
       return { top: b.top, bottom: b.bottom, min: document.getElementById('topbar').getBoundingClientRect().bottom }; }, id);
     topHits.push({ id, ...point, selected, focus });
@@ -69,22 +69,22 @@ export async function viewControls({ page, check, shot, result }) {
   await shot(page, 'view-top-marker-focused'); await page.locator('#sb-toggle').click();
   const franklin = page.locator('.marker').filter({ has: page.locator('.nm', { hasText: 'Franklin' }) });
   await page.locator('#sb-toggle').click(); await franklin.focus(); await page.keyboard.press('Enter');
-  check('view-marker-keyboard', await page.evaluate(() => window.__game.game.selected?.id === 'franklin') && await franklin.locator('.info').isVisible(), 'large marker Enter selects real brigade and exposes readable unit information');
+  check('view-marker-keyboard', await page.evaluate(async () => window.__game.game.selected?.id === 'franklin') && await franklin.locator('.info').isVisible(), 'large marker Enter selects real brigade and exposes readable unit information');
   await shot(page, 'view-marker-selected');
   const flag = await franklin.locator('svg').boundingBox(), start = { x: flag.x + flag.width / 2, y: flag.y + flag.height / 2 }, end = { x: start.x + 90, y: start.y + 50 };
   await page.mouse.move(start.x, start.y); await page.mouse.down(); await page.mouse.move(end.x, end.y, { steps: 8 });
-  const preview = await page.evaluate(() => !!window.__game.arrows.preview); await page.mouse.up();
+  const preview = await page.evaluate(async () => !!window.__game.arrows.preview); await page.mouse.up();
   const ordered = await page.evaluate(({ x, y }) => { const { game, rts } = window.__game, u = game.selected, p = rts.pick(x, y, document.getElementById('battlefield'));
     return { id: u?.id, type: u?.order.type, gap: p && u?.order.dest ? Math.hypot(p.x - u.order.dest[0], p.z - u.order.dest[1]) : null }; }, end);
   check('view-marker-drag', preview && ordered.id === 'franklin' && ordered.type === 'move' && ordered.gap !== null && ordered.gap < 20, `large flag real mouse drag uses ordinary ghost/order path: ${JSON.stringify(ordered)}`);
   await page.waitForTimeout(450);
-  const touched = await page.evaluate(() => { const { game, hud } = window.__game, el = hud.markers.get('franklin').el, b = el.querySelector('svg').getBoundingClientRect(); game.select(null);
+  const touched = await page.evaluate(async () => { const { game, hud } = window.__game, el = hud.markers.get('franklin').el, b = el.querySelector('svg').getBoundingClientRect(); game.select(null);
     for (const type of ['pointerdown', 'pointerup']) el.dispatchEvent(new PointerEvent(type, { pointerId: 71, pointerType: 'touch', isPrimary: true, clientX: b.x + b.width / 2, clientY: b.y + b.height / 2,
       button: 0, buttons: type === 'pointerup' ? 0 : 1, bubbles: true, cancelable: true })); return game.selected?.id; });
   check('view-marker-touch', touched === 'franklin', 'large flag synthetic touch selects the same brigade through marker pointer handlers');
   await page.locator('#sb-toggle').click();
   await page.getByRole('tab', { name: 'Units', exact: true }).click(); await page.getByRole('button', { name: 'Spawn Union brigade at view centre', exact: true }).click();
-  const placed = await page.evaluate(() => { const { game, hud } = window.__game, u = game.selected, m = hud.markers.get(u.id); return { id: u.id, flag: parseFloat(getComputedStyle(m.el.querySelector('svg')).width) }; });
+  const placed = await page.evaluate(async () => { const { game, hud } = window.__game, u = game.selected, m = hud.markers.get(u.id); return { id: u.id, flag: parseFloat(getComputedStyle(m.el.querySelector('svg')).width) }; });
   check('view-marker-new-unit', placed.id.startsWith('sandbox-') && Math.abs(placed.flag - 59.5) < 0.1, 'new generic brigade inherits current marker size');
   await page.getByRole('button', { name: 'Remove selected', exact: true }).click(); await page.getByRole('tab', { name: 'Look', exact: true }).click();
   await page.getByRole('button', { name: 'Reset Marker size', exact: true }).click();
@@ -95,7 +95,7 @@ export async function viewControls({ page, check, shot, result }) {
   check('view-camera-live', Math.abs(high.pitch - Math.min(1.35, before.pitch + Math.PI / 6)) < 1e-8 && JSON.stringify(high.goal) === JSON.stringify(before.goal)
     && high.units === cameraBefore.units && high.time === cameraBefore.time && high.paused, 'keyboard elevation changes goal pitch by30degrees while centre/distance/yaw/paused units/time stay exact');
   await page.locator('#sb-toggle').click(); await page.waitForTimeout(900); const highSettled = await state();
-  const highMarkers = await page.evaluate(() => {
+  const highMarkers = await page.evaluate(async () => {
     const panels = ['unitcard', 'orders', 'minimap-box', 'objective', 'tip', 'intro-hint', 'army', 'field-stores', 'feed'].map((id) => document.getElementById(id))
       .filter((n) => !n.hidden).map((n) => n.getBoundingClientRect()).filter((r) => r.width && r.height);
     return [...window.__game.hud.markers.entries()].filter(([, m]) => !m.el.classList.contains('hidden')).map(([id, m]) => {
@@ -105,7 +105,7 @@ export async function viewControls({ page, check, shot, result }) {
   });
   const franklinHigh = highMarkers.find((m) => m.id === 'franklin');
   await page.mouse.click(franklinHigh.x, franklinHigh.y);
-  check('view-high-markers-clear-dock', highMarkers.length > 0 && highMarkers.every((m) => m.hit && m.clear) && await page.evaluate(() => window.__game.game.selected?.id === 'franklin'),
+  check('view-high-markers-clear-dock', highMarkers.length > 0 && highMarkers.every((m) => m.hit && m.clear) && await page.evaluate(async () => window.__game.game.selected?.id === 'franklin'),
     `high-angle marker bodies avoid visible HUD panels and Franklin accepts actual pointer: ${JSON.stringify(highMarkers)}`);
   result.viewHighMarkers = highMarkers;
   await shot(page, 'view-camera-high'); await page.locator('#sb-toggle').click();
@@ -116,7 +116,7 @@ export async function viewControls({ page, check, shot, result }) {
   await angle.focus(); for (let i = 0; i < 15; i++) await page.keyboard.press('ArrowRight');
   await page.locator('#sb-toggle').click();
   // Real ctrl-wheel event, actual terrain pick, and a centre-only negative comparison.
-  const zoom = await page.evaluate(() => { const { rts, camera } = window.__game; for (let i = 0; i < 4; i++) rts.update(1); camera.updateMatrixWorld();
+  const zoom = await page.evaluate(async () => { const { rts, camera } = window.__game; for (let i = 0; i < 4; i++) rts.update(1); camera.updateMatrixWorld();
     const p = rts.pick(410, 418, document.getElementById('battlefield')); return { p: p?.toArray(), goal: { ...rts.goal } }; });
   await page.mouse.move(410, 418); await page.keyboard.down('Control'); await page.mouse.wheel(0, -240); await page.keyboard.up('Control');
   const anchored = await page.evaluate(({ p, goal }) => {
@@ -129,7 +129,7 @@ export async function viewControls({ page, check, shot, result }) {
   const error = (p, x = 410, y = 418) => Math.max(Math.abs(p.x - x) / 1280, Math.abs(p.y - y) / 720);
   check('view-camera-zoom-anchor', zoom.p && anchored.actual.dist < zoom.goal.dist * 0.8 && error(anchored.actual) < 0.03 && error(anchored.broken) > 0.03,
     `15degree elevation real wheel error ${error(anchored.actual)}, centre-only control ${error(anchored.broken)}`);
-  const pinch = await page.evaluate(() => {
+  const pinch = await page.evaluate(async () => {
     const { rts, camera, input } = window.__game, canvas = document.getElementById('battlefield');
     const p = rts.pick(460, 418, canvas), start = rts.goal.dist;
     const fire = (type, id, x) => canvas.dispatchEvent(new PointerEvent(type, { pointerId: id, pointerType: 'touch', isPrimary: id === 81, clientX: x, clientY: 418, button: 0, buttons: type === 'pointerup' ? 0 : 1, bubbles: true, cancelable: true }));
@@ -141,7 +141,7 @@ export async function viewControls({ page, check, shot, result }) {
   check('view-camera-touch-pinch', pinch.mode === 'pinch' && pinch.dist < pinch.start * 0.8 && pinch.pointers === 0 && error(pinch, 460, 418) < 0.03,
     `synthetic two-finger input path at15degrees: ${JSON.stringify(pinch)}; no physical device claim`);
   result.viewAnchors = { wheel: anchored, touch: pinch };
-  const fly = await page.evaluate(() => { const { rts, hud } = window.__game; rts.flyTo(100, 200, 350); for (let i = 0; i < 4; i++) rts.update(1);
+  const fly = await page.evaluate(async () => { const { rts, hud } = window.__game; rts.flyTo(100, 200, 350); for (let i = 0; i < 4; i++) rts.update(1);
     window.__game.camera.updateMatrixWorld(); hud.minimap.draw(); return { ...rts.goal, footprint: rts.footprint().map((p) => [...p]), minimap: hud.minimap.foot }; });
   check('view-camera-fly-minimap', fly.x === 100 && fly.z === 200 && fly.dist <= 350 && fly.footprint.flat().every(Number.isFinite) && JSON.stringify(fly.footprint) === JSON.stringify(fly.minimap), 'fly-to and real survey minimap use the changed camera footprint');
   await page.locator('#sb-toggle').click();
@@ -149,7 +149,7 @@ export async function viewControls({ page, check, shot, result }) {
   for (const name of ['Marker size', 'Camera elevation']) await page.getByRole('checkbox', { name: `Lock this: ${name}`, exact: true }).check();
   await page.evaluate(async () => { const S = await import('./src/settings.js'); S.set('look.markerScale', 1.75); S.reset('look.markerScale'); S.set('look.cameraElevation', -15); S.reset('look.cameraElevation'); });
   check('view-lock', await marker.isDisabled() && await angle.isDisabled() && await page.evaluate(async () => { const S = await import('./src/settings.js'); return S.get('look.markerScale') === 1 && S.get('look.cameraElevation') === 15; }), 'locks refuse direct Set/Reset and disable both sliders');
-  await page.getByRole('button', { name: 'Copy settings', exact: true }).click(); const copied = await page.evaluate(() => navigator.clipboard.readText());
+  await page.getByRole('button', { name: 'Copy settings', exact: true }).click(); const copied = await page.evaluate(async () => navigator.clipboard.readText());
   await page.reload(); await page.waitForFunction(() => window.__ready && document.getElementById('sb-panel'), null, { timeout: 180000 });
   const loaded = await state();
   check('view-reload', Math.abs(loaded.pitch - before.pitch - Math.PI / 12) < 1e-8 && await marker.isDisabled() && await angle.isDisabled()

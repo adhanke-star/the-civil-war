@@ -1,27 +1,18 @@
 // Focused UI proof with accelerated terminal fixtures, not a full human-duration playthrough.
 import { promises as fs } from 'node:fs';
 import { AxeBuilder } from '@axe-core/playwright';
+import { probeProgress, progressRaw, seedProgress, holdProgressTransaction, releaseProgressTransaction } from './test-progress-browser.mjs';
 
 export async function practiceProgress({ browser, url, check, shot, result, watchErrors }) {
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, reducedMotion: 'reduce', acceptDownloads: true });
+  await probeProgress(ctx, { prefix: '__practice', readFlag: '__practiceBlocked', quotaFlag: '__practiceQuota' });
   const page = await ctx.newPage(), errors = [];
   watchErrors(page, url, errors);
-  const raw = () => page.evaluate(() => (window.__practiceGet || Storage.prototype.getItem).call(localStorage, 'cw.progress'));
+  const raw = () => progressRaw(page);
   async function load(query = '?practice&quality=low') {
     await page.goto(url + query, { waitUntil: 'load' });
     await page.waitForFunction(() => window.__ready && window.__game, null, { timeout: 180000 });
-    await page.evaluate(() => {
-      window.__practiceSet = Storage.prototype.setItem; window.__practiceGet = Storage.prototype.getItem;
-      window.__practiceWrites = 0;
-      Storage.prototype.setItem = function(k, v) {
-        if (k === 'cw.progress') { if (window.__practiceQuota) throw new DOMException('quota', 'QuotaExceededError'); window.__practiceWrites++; }
-        return window.__practiceSet.call(this, k, v);
-      };
-      Storage.prototype.getItem = function(k) {
-        if (k === 'cw.progress' && window.__practiceBlocked) throw new DOMException('blocked', 'SecurityError');
-        return window.__practiceGet.call(this, k);
-      };
-    });
+
   }
   async function terminal() {
     // Exercise Game's real clock/objective/result event path, with controlled fractional losses and
@@ -123,13 +114,31 @@ export async function practiceProgress({ browser, url, check, shot, result, watc
     check('practice-counts-current-gear-readable', readable, 'previous-weapon history gets its own row; equipped weapon names remain visible');
     await axe('.rw', 'practiceCountsAxe'); await shot(page, 'practice-counts');
     const expected = await page.evaluate(() => { const s = window.__game.practice.reward.state; return { army: s.army, depot: s.tray, issued: s.log, awardId: s.awardId }; });
+    await holdProgressTransaction(page);
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.waitForFunction(() => window.__game.practice.saving && window.__progressTransactions > window.__saveQueueBase);
+    const waitingArmy = await page.evaluate(() => window.__game.practice.pending);
+    check('practice-queued-export', JSON.stringify(await exported()) === JSON.stringify(waitingArmy)
+      && await page.evaluate(() => window.__practiceWrites === 0 && document.getElementById('result').getAttribute('aria-busy') === 'true'),
+      'actual completed army remains exportable while waiting behind the readwrite transaction');
+    await page.evaluate(() => { const p = window.__game.practice; p.reward.state.onDone({ ...p.pending, awardId: 'ignored-late-callback' }); });
+    check('practice-queued-result-owner', JSON.stringify(await page.evaluate(() => window.__game.practice.pending)) === JSON.stringify(waitingArmy),
+      'late duplicate callback cannot replace the immutable pending result while its write waits');
+    await page.setViewportSize({ width: 320, height: 480 });
+    await axe('#result', 'practiceWaitingAxe'); await shot(page, 'practice-saving-320');
+    await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.getElementById('result').open && document.activeElement.id === 'after-action');
+    await releaseProgressTransaction(page); await page.waitForFunction(() => !window.__game.practice.saving);
+    check('practice-queued-dismissal', await page.evaluate(() => !document.getElementById('result').open && window.__practiceWrites === 1
+      && document.activeElement.id === 'after-action'), 'Escape dismisses safely; settlement writes once and never forces the modal or focus back');
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.getByRole('button', { name: 'After action', exact: true }).click();
     await page.getByRole('dialog', { name: 'Army saved', exact: true }).waitFor();
     const firstRaw = await raw(), first = JSON.parse(firstRaw);
     check('practice-save-equipped', first.awardId === expected.awardId && first.army.length === 5 && first.issued.length === 1
       && JSON.stringify(first.army.map((b) => [b.id, b.men, b.weapon.uid])) === JSON.stringify(expected.army.map((b) => [b.id, b.men, b.weapon.uid])), 'equip -> completed save preserves actual survivor/equipment identities');
     await page.evaluate(() => { const p = window.__game.practice; const { awardId, army, depot, issued, seed, grade } = p.pending;
       p.reward.state.onDone({ awardId, army, depot, issued, seed, grade }); p.openResult(); });
+    await page.waitForFunction(() => !window.__game.practice.saving);
     check('practice-duplicate-completion', await raw() === firstRaw && await page.evaluate(() => window.__practiceWrites === 1)
       && await page.locator('.rw').count() === 0, 'repeat callbacks/result clicks do not write or roll a second award');
     await page.evaluate(async () => { const settings = await import('./src/settings.js');
@@ -145,9 +154,21 @@ export async function practiceProgress({ browser, url, check, shot, result, watc
 
     await load(); await terminal();
     await page.getByRole('button', { name: 'Open the loot', exact: true }).click();
-    check('practice-replace-confirm', await page.getByRole('dialog', { name: 'Replace saved army?', exact: true }).isVisible()
-      && await page.evaluate(() => document.activeElement.id === 'result-close') && await raw() === firstRaw, 'existing progress requires confirmation with Cancel focused before reward replacement');
+    const consent = page.getByRole('dialog', { name: 'Replace saved army?', exact: true });
+    await consent.waitFor(); // The click starts an awaited database read before consent exists.
+    const consentState = await page.evaluate(() => ({ reading: window.__game.practice.reading,
+      open: document.getElementById('result').open, heading: document.getElementById('result-title').textContent,
+      focus: document.activeElement.id, puts: window.__progressPuts, writes: window.__practiceWrites,
+      legacyWrites: window.__progressLegacyWrites }));
+    check('practice-replace-confirm', await consent.isVisible() && !consentState.reading
+      && consentState.focus === 'result-close' && consentState.puts === 0 && consentState.writes === 0
+      && consentState.legacyWrites === 0 && await raw() === firstRaw,
+      `existing progress requires settled native consent with Cancel focused and exact saved bytes: ${JSON.stringify(consentState)}`);
     await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.getElementById('result').open && document.activeElement.id === 'after-action');
+    check('practice-replace-cancel-focus', await raw() === firstRaw
+      && await page.evaluate(() => window.__progressPuts === 0 && window.__practiceWrites === 0 && window.__progressLegacyWrites === 0),
+      'Escape closes replacement consent, restores After action focus and preserves exact saved progress before another activation');
     await page.getByRole('button', { name: 'After action', exact: true }).click();
     await page.getByRole('button', { name: 'Open the loot', exact: true }).click();
     await page.getByRole('button', { name: 'Replace and open loot', exact: true }).click();
@@ -161,13 +182,15 @@ export async function practiceProgress({ browser, url, check, shot, result, watc
       && JSON.stringify(backup) === JSON.stringify(pending), 'failed save retains old bytes; actual download preserves pending army and unique award');
     await axe('#result', 'practiceRecoveryAxe'); await shot(page, 'practice-recovery');
     const external = { ...first, awardId: 'practice-external-test' }, externalRaw = JSON.stringify(external);
-    await page.evaluate((t) => { window.__practiceQuota = false; window.__practiceSet.call(localStorage, 'cw.progress', t); }, externalRaw);
+    await page.evaluate(() => { window.__practiceQuota = false; }); await seedProgress(page, externalRaw);
     await page.getByRole('button', { name: 'Retry saving', exact: true }).click();
+    await page.waitForFunction(() => !window.__game.practice.saving);
     check('practice-conflict-retained', await raw() === externalRaw && (await page.locator('#result-text').textContent()).includes('progress changed')
       && (await page.evaluate(() => window.__game.practice.pending.awardId)) === pending.awardId, 'external progress change rejects retry without replacing either result');
     // Restore only this context-owned test fixture byte-for-byte, then prove retry does not roll again.
-    await page.evaluate((t) => window.__practiceSet.call(localStorage, 'cw.progress', t), firstRaw);
+    await seedProgress(page, firstRaw);
     await page.getByRole('button', { name: 'Retry saving', exact: true }).click();
+    await page.waitForFunction(() => !window.__game.practice.saving);
     check('practice-retry-same-award', JSON.parse(await raw()).awardId === pending.awardId && await page.locator('.rw').count() === 0,
       'quota/conflict recovery commits the same pending result without reopening loot');
     const secondRaw = await raw();
@@ -181,6 +204,19 @@ export async function practiceProgress({ browser, url, check, shot, result, watc
     check('practice-blocked-read-export', await raw() === secondRaw && unsaved.awardId === await page.evaluate(() => window.__game.practice.pending.awardId),
       'blocked reads still allow loot completion/export and never grant replacement authority');
     await page.evaluate(() => { window.__practiceBlocked = false; });
+    await holdProgressTransaction(page);
+    await page.getByRole('button', { name: 'Retry loading', exact: true }).click();
+    await page.waitForFunction(() => window.__game.practice.reading);
+    await page.keyboard.press('Escape');
+    await releaseProgressTransaction(page); await page.waitForFunction(() => !window.__game.practice.reading);
+    check('practice-cancelled-read-no-mount', await page.evaluate(() => !document.getElementById('result').open
+      && document.activeElement.id === 'after-action') && await page.locator('.rw').count() === 0,
+      'cancelled pending-save read settles without mounting loot or forcing the modal back open');
+    await page.getByRole('button', { name: 'After action', exact: true }).click();
+    check('practice-cancelled-read-retains-pending', JSON.stringify(await exported()) === JSON.stringify(unsaved)
+      && await page.getByRole('button', { name: 'Retry loading', exact: true }).isVisible()
+      && await page.getByRole('button', { name: 'Open the loot', exact: true }).count() === 0,
+      'cancelled read keeps completed equipment/issued choices exportable and offers recovery rather than another roll');
     await page.getByRole('button', { name: 'Retry loading', exact: true }).click();
     await page.getByRole('dialog', { name: 'Replace saved army?', exact: true }).waitFor();
     await page.getByRole('button', { name: 'Cancel', exact: true }).click();
@@ -188,8 +224,12 @@ export async function practiceProgress({ browser, url, check, shot, result, watc
     check('practice-recovered-read-confirm', await raw() === secondRaw && await page.evaluate(() => document.activeElement.id === 'after-action'),
       'restored access still requires explicit replacement; Cancel preserves stored bytes and returns focus');
     await page.getByRole('button', { name: 'After action', exact: true }).click();
+    check('practice-cancelled-consent-retains-pending', JSON.stringify(await exported()) === JSON.stringify(unsaved)
+      && await page.getByRole('button', { name: 'Retry loading', exact: true }).isVisible() && await page.locator('.rw').count() === 0,
+      'cancelled replacement consent preserves the same pending export and cannot return to a new loot mount');
     await page.getByRole('button', { name: 'Retry loading', exact: true }).click();
     await page.getByRole('button', { name: 'Replace and save', exact: true }).click();
+    await page.waitForFunction(() => !window.__game.practice.saving);
     check('practice-recovered-read-save', JSON.parse(await raw()).awardId === unsaved.awardId, 'confirmed recovered baseline saves the original unsaved loot');
 
     const beforeHistorical = await raw();

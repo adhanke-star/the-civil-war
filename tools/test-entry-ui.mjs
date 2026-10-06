@@ -2,6 +2,7 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { readFile } from 'node:fs/promises';
 import { completedSnapshot } from '../src/franchise/save.js';
+import { probeProgress, progressRaw, seedProgress, holdProgressTransaction, releaseProgressTransaction } from './test-progress-browser.mjs';
 import { SAMPLE_ARMY, ARMS } from '../src/reward/data.js';
 
 function fixture(awardId, armyCount = 2, depotCount = 13) {
@@ -13,18 +14,13 @@ function fixture(awardId, armyCount = 2, depotCount = 13) {
 }
 export async function entryProgress({ browser, url, check, shot, result, watchErrors }) {
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, reducedMotion: 'reduce', hasTouch: true });
-  await ctx.addInitScript(() => {
-    window.__entryWrites = 0;
-    const get = Storage.prototype.getItem, set = Storage.prototype.setItem;
-    Storage.prototype.getItem = function (k) { if (k === 'cw.progress' && window.__entryReadBlocked) throw new Error('blocked read'); return get.call(this, k); };
-    Storage.prototype.setItem = function (k, v) { if (k === 'cw.progress') { if (window.__entryQuota) throw new Error('quota'); window.__entryWrites++; } return set.call(this, k, v); };
-  });
+  await probeProgress(ctx, { prefix: '__entry', readFlag: '__entryReadBlocked', quotaFlag: '__entryQuota' });
   const page = await ctx.newPage(), errors = []; watchErrors(page, url, errors);
   let requests = [], reads = [], measuring = true;
   page.on('request', (r) => { if (measuring) requests.push(new URL(r.url()).pathname); });
   page.on('response', (r) => { if (measuring && r.url().startsWith(url)) reads.push(r.body().then((b) => b.length).catch(() => 0)); });
-  const raw = () => page.evaluate(() => localStorage.getItem('cw.progress'));
-  const load = async (query = '') => { await page.goto(url + query); await page.waitForFunction(() => window.__entry); };
+  const raw = () => progressRaw(page);
+  const load = async (query = '') => { await page.goto(url + query); await page.waitForFunction(() => window.__entry && !window.__entry.importing); };
   const upload = (text, name = 'army.json') => page.locator('#entry-file').setInputFiles({ name, mimeType: 'application/json', buffer: Buffer.from(text) });
   const exported = async () => {
     const event = page.waitForEvent('download'); await page.locator('#entry-export').click();
@@ -49,10 +45,23 @@ export async function entryProgress({ browser, url, check, shot, result, watchEr
     check('entry-fresh-continue-intro', await page.evaluate(() => document.getElementById('intro').open && !window.__entry
       && window.__game.game.scenario.practiceIntro && window.__entryWrites === 0), 'fresh Continue reaches the paused real introductory briefing without a save');
     await page.setViewportSize({ width: 1024, height: 768 }); await load();
-    await page.evaluate((snapshot) => { localStorage.setItem('cw.progress', JSON.stringify(snapshot)); localStorage.setItem('cw.settings', '{"screens.cardStyle":"clean modern"}'); localStorage.setItem('cw.locks', '["screens.cardStyle"]'); }, original);
+    await page.evaluate(async (snapshot) => { await window.__progressFixture.seed(JSON.stringify(snapshot)); localStorage.setItem('cw.settings', '{"screens.cardStyle":"clean modern"}'); localStorage.setItem('cw.locks', '["screens.cardStyle"]'); }, original);
     await page.reload(); await page.waitForFunction(() => window.__entry?.saved);
     const before = await raw(), prefs = await page.evaluate(() => [localStorage.getItem('cw.settings'), localStorage.getItem('cw.locks')]);
-    await page.locator('#entry-continue').focus(); await page.keyboard.press('Enter'); await page.waitForFunction(() => window.__entry?.mode === 'camp');
+    await page.setViewportSize({ width: 320, height: 480 }); await holdProgressTransaction(page);
+    await page.locator('#entry-continue').focus(); await page.keyboard.press('Enter');
+    await page.waitForFunction(() => window.__entry.importing);
+    check('entry-delayed-read-feedback', await page.evaluate(() => document.getElementById('entry-status').textContent.includes('Loading saved progress')
+      && document.activeElement.id === 'entry-status' && document.getElementById('entry-continue').disabled
+      && (() => { const r = document.activeElement.getBoundingClientRect(); return r.y >= 0 && r.bottom <= innerHeight; })()),
+      'native delayed Continue read focuses a visible Loading status at320px and prevents repeated navigation');
+    await shot(page, 'entry-loading-320');
+    await releaseProgressTransaction(page); await page.waitForFunction(() => window.__entry?.mode === 'camp' && !window.__entry.importing);
+    check('entry-read-settlement-visible', await page.evaluate(() => document.activeElement.id === 'camp-practice'
+      && (() => { const r = document.activeElement.getBoundingClientRect(); return r.y >= 0 && r.bottom <= innerHeight; })()),
+      'completed read/navigation scrolls the focused Practice action into view at320px');
+    await shot(page, 'entry-loaded-focus-320');
+    await page.setViewportSize({ width: 1024, height: 768 });
     check('entry-saved-continue-camp', await raw() === before && await page.evaluate(() => window.__entryWrites === 0
       && window.__entry.saved.awardId === 'entry-original' && !window.__game && !window.__reward && document.activeElement.id === 'camp-practice'), 'saved Continue opens camp without writes/rolls and focuses a visible next action');
     check('entry-real-army-depot', await page.locator('#camp-army [data-brigade-id]').count() === 2
@@ -106,29 +115,30 @@ export async function entryProgress({ browser, url, check, shot, result, watchEr
       && await page.evaluate(() => window.__entryWrites === 1), 'confirmed file import replaces the complete army/depot once; no merge');
     const valid = await raw();
     await page.evaluate(() => { window.__entryQuota = true; }); await upload(JSON.stringify(original)); await page.locator('#entry-confirm').click();
-    await page.waitForFunction(() => !!window.__entry.pending);
+    await page.waitForFunction(() => !!window.__entry.pending && !window.__entry.importing
+      && document.getElementById('entry-status').textContent.includes('could not save'));
     check('entry-quota-retains-export', await raw() === valid && JSON.stringify(await exported()) === JSON.stringify(original), 'quota failure retains old bytes and exports the exact pending import');
     await upload(JSON.stringify(replacement), 'other-army.json'); await page.locator('#entry-cancel').click();
     await page.waitForFunction(() => !document.getElementById('entry-import').disabled);
-    await page.evaluate(() => { window.__entryQuota = false; }); await page.locator('#entry-retry').click();
+    await page.evaluate(() => { window.__entryQuota = false; }); await page.locator('#entry-retry').click(); await page.waitForFunction(() => document.getElementById('entry-replace').open);
     check('entry-quota-retry-confirms', await page.locator('#entry-cancel').evaluate((n) => n === document.activeElement), 'retry imports request current explicit replacement authority again');
     check('entry-retry-consent-pending-file', await page.locator('#entry-replace-note').textContent().then((s) => s.includes('Import army.json:') && s.includes('13 depot cards') && !s.includes('other-army.json')),
       'failed A / cancelled B / Retry describes the pending A file and inventory, not cancelled B');
     await page.locator('#entry-confirm').click(); await page.waitForFunction(() => window.__entry.saved.awardId === 'entry-original' && !window.__entry.pending);
     check('entry-quota-retry-exact', JSON.stringify(await page.evaluate(() => window.__entry.saved)) === JSON.stringify(original), 'retry saves the same validated import without changing identities');
     await load();
-    await page.evaluate(() => { window.__entryReadBlocked = true; }); await page.locator('#entry-continue').click();
+    await page.evaluate(() => { window.__entryReadBlocked = true; }); await page.locator('#entry-continue').click(); await page.waitForFunction(() => !window.__entry.importing);
     check('entry-blocked-read-no-fresh', await page.evaluate(() => window.__entry.failed && !window.__game && !window.__reward)
       && await page.locator('#entry-continue').isDisabled(), 'visible title Continue re-read prevents silent fresh navigation/roll and exposes recovery');
-    await page.evaluate(() => { window.__entryReadBlocked = false; }); await page.locator('#entry-retry').click();
+    await page.evaluate(() => { window.__entryReadBlocked = false; }); await page.locator('#entry-retry').click(); await page.waitForFunction(() => !window.__entry.importing);
     check('entry-read-retry', await raw() === before && await page.evaluate(() => !window.__entry.failed && window.__entry.saved.awardId === 'entry-original'), 'retry reloads existing army without changing progress');
-    await page.evaluate(() => localStorage.setItem('cw.progress', '{corrupt')); await load();
+    await seedProgress(page, '{corrupt'); await load();
     check('entry-corrupt-read-no-fresh', await page.evaluate(() => window.__entry.failed && !window.__reward && !window.__game)
       && await page.locator('#entry-continue').isDisabled(), 'corrupt initial progress never falls through to a fresh army');
     await upload(JSON.stringify(replacement)); await page.locator('#entry-confirm').click();
     await page.waitForFunction(() => window.__entry.saved?.awardId === 'entry-replacement' && !window.__entry.failed);
     check('entry-corrupt-import-recovery', JSON.stringify(await page.evaluate(() => window.__entry.saved)) === JSON.stringify(replacement), 'explicit valid import repairs corrupt progress atomically');
-    const large = fixture('entry-large', 200, 2000); await page.evaluate((s) => localStorage.setItem('cw.progress', JSON.stringify(s)), large);
+    const large = fixture('entry-large', 200, 2000); await seedProgress(page, JSON.stringify(large));
     requests = []; reads = []; measuring = true; await load('?camp'); measuring = false;
     check('entry-legal-large-bound', await page.locator('#camp-army [data-brigade-id]').count() === 12 && await page.locator('#camp-depot [data-item-uid]').count() === 12
       && await page.evaluate(() => window.__entry.saved.army.length === 200 && window.__entry.saved.depot.length === 2000 && window.__entryWrites === 0), 'legal maximum inventory renders only 12 brigade + 12 depot cards without a write');

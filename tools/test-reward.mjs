@@ -173,9 +173,21 @@ const clone = (v) => JSON.parse(JSON.stringify(v));
 const same = isDeepStrictEqual;
 function memoryStorage() {
   const data = new Map([['cw.settings', 'preferences'], ['cw.locks', 'locks']]);
-  return { data, writes: 0, getItem(k) { return data.has(k) ? data.get(k) : null; },
+  let tail = Promise.resolve();
+  const locks = { request(name, options, run) {
+    if (name !== realSave.SAVE_KEY || options.mode !== 'exclusive') throw new Error('unexpected lock');
+    const next = tail.then(() => {
+      const bytes = new Map(data), writes = memory.writes;
+      const rollback = (error) => { data.clear(); for (const [key, value] of bytes) data.set(key, value); memory.writes = writes; throw error; };
+      try { const value = run(); return value?.then ? value.then((result) => result, rollback) : value; }
+      catch (error) { return rollback(error); }
+    }); tail = next.catch(() => {}); return next;
+  } };
+  const memory = { data, locks, writes: 0, getItem(k) { return data.has(k) ? data.get(k) : null; },
     setItem(k, v) { this.writes++; data.set(k, v); } };
+  return memory;
 }
+const progress = (s, mem) => s.createProgressStore(mem, { locks: mem.locks });
 function sampleResult(m, d, seed = 72) {
   const army = clone(d.SAMPLE_ARMY), cards = m.rollLoot({ seed }).cards;
   const it = cards.find((c) => m.canCarry(army[0], c));
@@ -189,6 +201,11 @@ function rejected(fn, name, reason) {
   try { fn(); } catch (err) { error = err; }
   if (!error || !error.message.startsWith('Progress:') || !error.message.includes(reason)) fail(`${name}: expected rejection for ${reason}, got ${error?.message ?? 'success'}`);
 }
+async function rejectedAsync(fn, name, reason) {
+  let error;
+  try { await fn(); } catch (err) { error = err; }
+  if (!error || !error.message.startsWith('Progress:') || !error.message.includes(reason)) fail(`${name}: expected rejection for ${reason}, got ${error?.message ?? 'success'}`);
+}
 
 const SAVE_CHECKS = [
   ['save-export-limit', (m, d, s) => {
@@ -198,9 +215,9 @@ const SAVE_CHECKS = [
     if (new TextEncoder().encode(exported).length > s.MAX_SAVE_BYTES) fail('save-export-limit: accepted near-limit multibyte state exported an oversized file');
     if (!same(s.parseSnapshot(exported), snap)) fail('save-export-limit: near-limit export failed exact round-trip');
   }],
-  ['save-roundtrip', (m, d, s) => {
-    const mem = memoryStorage(), store = s.createProgressStore(mem), input = sampleResult(m, d);
-    const snap = store.complete(input).snapshot, loaded = store.load();
+  ['save-roundtrip', async (m, d, s) => {
+    const mem = memoryStorage(), store = progress(s, mem), input = sampleResult(m, d);
+    const snap = (await store.complete(input)).snapshot, loaded = await store.load();
     if (!same(snap, loaded) || !same(s.parseSnapshot(s.exportSnapshot(snap)), snap) || !same(snap.issued, input.issued)
       || !same(snap.depot, input.depot) || snap.awardId !== input.awardId) fail('save-roundtrip: identities, equipment or records changed');
     const tampered = clone(snap); tampered.army[0].ovr = 1;
@@ -250,54 +267,55 @@ const SAVE_CHECKS = [
     snap.issued.pop(); snap.issued[0].item = 'missing';
     rejected(() => s.validateSnapshot(snap), 'save-issued', 'reference');
   }],
-  ['save-atomic-import', (m, d, s) => {
-    const mem = memoryStorage(), store = s.createProgressStore(mem);
-    const old = store.complete(sampleResult(m, d)).snapshot, raw = mem.getItem(s.SAVE_KEY), writes = mem.writes;
+  ['save-atomic-import', async (m, d, s) => {
+    const mem = memoryStorage(), store = progress(s, mem);
+    const old = (await store.complete(sampleResult(m, d))).snapshot, raw = mem.getItem(s.SAVE_KEY), writes = mem.writes;
     for (const text of ['{', JSON.stringify({ ...old, version: 2 }), JSON.stringify({ ...old, depot: [...old.depot, old.army[0].weapon] })]) {
-      let error; try { store.import(text); } catch (err) { error = err; }
-      if (!error?.message.startsWith('Progress:') || mem.getItem(s.SAVE_KEY) !== raw || mem.writes !== writes || !same(store.load(), old)) fail('save-atomic-import: invalid input changed the previous save or did not reject');
+      let error; try { await store.import(text, { previousRaw: raw }); } catch (err) { error = err; }
+      if (!error?.message.startsWith('Progress:') || mem.getItem(s.SAVE_KEY) !== raw || mem.writes !== writes || !same(await store.load(), old)) fail('save-atomic-import: invalid input changed the previous save or did not reject');
     }
     const newer = realSave.completedSnapshot(sampleResult(m, d, 73));
-    store.import(JSON.stringify(newer)); store.import(JSON.stringify(old));
-    if (!same(store.load(), old)) fail('save-atomic-import: older export did not replace exactly');
+    await store.import(JSON.stringify(newer), { previousRaw: raw });
+    await store.import(JSON.stringify(old), { previousRaw: await store.readRawBaseline() });
+    if (!same(await store.load(), old)) fail('save-atomic-import: older export did not replace exactly');
   }],
-  ['save-idempotent', (m, d, s) => {
-    const mem = memoryStorage(), store = s.createProgressStore(mem), input = sampleResult(m, d);
-    const first = store.complete(input).snapshot, raw = mem.getItem(s.SAVE_KEY);
+  ['save-idempotent', async (m, d, s) => {
+    const mem = memoryStorage(), store = progress(s, mem), input = sampleResult(m, d);
+    const first = (await store.complete(input)).snapshot, raw = mem.getItem(s.SAVE_KEY);
     for (let n = 0; n < 5; n++) {
-      const replay = s.createProgressStore(mem).complete(input);
+      const replay = await progress(s, mem).complete(input);
       if (!replay.duplicate || !same(replay.snapshot, first) || mem.getItem(s.SAVE_KEY) !== raw || mem.writes !== 1) fail('save-idempotent: repeated callback rewrote or duplicated an award');
     }
   }],
-  ['save-storage-failure', (m, d, s) => {
-    const mem = memoryStorage(), store = s.createProgressStore(mem), input = sampleResult(m, d);
-    const first = store.complete(input).snapshot, raw = mem.getItem(s.SAVE_KEY);
+  ['save-storage-failure', async (m, d, s) => {
+    const mem = memoryStorage(), store = progress(s, mem), input = sampleResult(m, d);
+    const first = (await store.complete(input)).snapshot, raw = mem.getItem(s.SAVE_KEY);
     mem.setItem = () => { throw new Error('quota'); };
-    rejected(() => store.complete(sampleResult(m, d, 73), { previous: first }), 'save-storage-failure', 'could not save');
-    rejected(() => store.import(JSON.stringify(realSave.completedSnapshot(sampleResult(m, d, 73)))), 'save-storage-failure', 'could not save');
+    await rejectedAsync(() => store.complete(sampleResult(m, d, 73), { previous: first }), 'save-storage-failure', 'could not save');
+    await rejectedAsync(() => store.import(JSON.stringify(realSave.completedSnapshot(sampleResult(m, d, 73))), { previousRaw: raw }), 'save-storage-failure', 'could not save');
     if (mem.getItem(s.SAVE_KEY) !== raw || !s.exportSnapshot(first)) fail('save-storage-failure: erased progress or export unavailable');
     mem.getItem = () => { throw new Error('blocked'); };
-    rejected(() => store.load(), 'save-storage-failure', 'read');
-    rejected(() => store.complete(input), 'save-storage-failure', 'read');
-    rejected(() => s.createProgressStore(() => { throw new Error('blocked'); }).load(), 'save-storage-failure', 'unavailable');
+    await rejectedAsync(() => store.load(), 'save-storage-failure', 'read');
+    await rejectedAsync(() => store.complete(input), 'save-storage-failure', 'read');
+    await rejectedAsync(() => s.createProgressStore(() => { throw new Error('blocked'); }).load(), 'save-storage-failure', 'unavailable');
   }],
-  ['save-conflict', (m, d, s) => {
-    const mem = memoryStorage(), store = s.createProgressStore(mem);
-    const first = store.complete(sampleResult(m, d)).snapshot, raw = mem.getItem(s.SAVE_KEY);
-    rejected(() => store.complete(sampleResult(m, d, 73)), 'save-conflict', 'changed');
+  ['save-conflict', async (m, d, s) => {
+    const mem = memoryStorage(), store = progress(s, mem);
+    const first = (await store.complete(sampleResult(m, d))).snapshot, raw = mem.getItem(s.SAVE_KEY);
+    await rejectedAsync(() => store.complete(sampleResult(m, d, 73)), 'save-conflict', 'changed');
     if (mem.getItem(s.SAVE_KEY) !== raw) fail('save-conflict: unacknowledged fresh demo overwrote saved army');
-    const next = store.complete(sampleResult(m, d, 73), { previous: first }).snapshot;
-    rejected(() => store.complete(sampleResult(m, d, 74), { previous: first }), 'save-conflict', 'changed');
-    if (!same(next, store.load())) fail('save-conflict: stale callback overwrote new progress');
+    const next = (await store.complete(sampleResult(m, d, 73), { previous: first })).snapshot;
+    await rejectedAsync(() => store.complete(sampleResult(m, d, 74), { previous: first }), 'save-conflict', 'changed');
+    if (!same(next, await store.load())) fail('save-conflict: stale callback overwrote new progress');
   }],
 ];
 CHECKS.push(...SAVE_CHECKS);
 
-function runAll(m, d, quiet) {
+async function runAll(m, d, quiet) {
   const results = [];
   for (const [name, fn] of CHECKS) {
     try {
-      const note = fn(m, d, realSave);
+      const note = await fn(m, d, realSave);
       results.push({ name, ok: true, note });
       if (!quiet) console.log(`PASS ${name}${note ? ` (${note})` : ''}`);
     } catch (err) {
@@ -325,17 +343,17 @@ function mutants(m, d) {
     'no-rank-labels': [m, brokenData({ SAMPLE_ARMY: d.SAMPLE_ARMY.map((b, i) => (i === 0 ? { ...b, label: 'Brig. Gen. Example' } : b)) })],
   };
   const permissive = { ...realSave, parseSnapshot: (text) => { try { return JSON.parse(text); } catch { return null; } }, validateSnapshot: (v) => v };
-  const wrapStore = (patch) => ({ ...realSave, createProgressStore: (mem) => {
-    const store = realSave.createProgressStore(mem); return { ...store, ...patch(store, mem) };
+  const wrapStore = (patch) => ({ ...realSave, createProgressStore: (mem, options) => {
+    const store = realSave.createProgressStore(mem, options); return { ...store, ...patch(store, mem) };
   } });
   const saveMutants = {
     'save-export-limit': { ...realSave, exportSnapshot: (v) => JSON.stringify(realSave.validateSnapshot(v), null, 2) },
     'save-roundtrip': { ...realSave, parseSnapshot: (t) => { const v = realSave.parseSnapshot(t); v.army[0].ovr = 1; return v; } },
     'save-schema': permissive, 'save-gear': permissive, 'save-ownership': permissive, 'save-issued': permissive,
     'save-atomic-import': wrapStore((st, mem) => ({ import(t) { mem.setItem(realSave.SAVE_KEY, t); return JSON.parse(t); } })),
-    'save-idempotent': wrapStore((st, mem) => ({ complete(r, o) { const v = st.complete(r, o); mem.setItem(realSave.SAVE_KEY, JSON.stringify(v.snapshot)); return v; } })),
-    'save-storage-failure': wrapStore((st) => ({ complete(r, o) { try { return st.complete(r, o); } catch { return { saved: true }; } } })),
-    'save-conflict': wrapStore((st) => ({ complete(r) { return { snapshot: st.import(JSON.stringify(realSave.completedSnapshot(r))), saved: true }; } })),
+    'save-idempotent': wrapStore((st, mem) => ({ async complete(r, o) { const v = await st.complete(r, o); mem.setItem(realSave.SAVE_KEY, JSON.stringify(v.snapshot)); return v; } })),
+    'save-storage-failure': wrapStore((st) => ({ async complete(r, o) { try { return await st.complete(r, o); } catch { return { saved: true }; } } })),
+    'save-conflict': wrapStore((st) => ({ async complete(r) { return { snapshot: await st.import(JSON.stringify(realSave.completedSnapshot(r)), { previousRaw: await st.readRawBaseline() }), saved: true }; } })),
   };
   return { ...modelMutants, ...Object.fromEntries(Object.entries(saveMutants).map(([name, s]) => [name, [m, d, s]])) };
 }
@@ -347,7 +365,7 @@ if (process.argv.includes('--prove-fail')) {
     const pair = muts[name];
     if (!pair) { console.log(`NO-MUTANT ${name}`); bad++; continue; }
     try {
-      fn(pair[0], pair[1], pair[2] || realSave);
+      await fn(pair[0], pair[1], pair[2] || realSave);
       console.log(`NOT-CAUGHT ${name}: the check passed on its broken stand-in`);
       bad++;
     } catch (err) {
@@ -359,7 +377,7 @@ if (process.argv.includes('--prove-fail')) {
   process.exit(bad ? 1 : 0);
 }
 
-const results = runAll(realModel, realData, false);
+const results = await runAll(realModel, realData, false);
 const failed = results.filter((r) => !r.ok);
 console.log(failed.length ? `test-reward: ${failed.length} of ${results.length} checks FAILED` : `test-reward: all ${results.length} checks passed`);
 process.exit(failed.length ? 1 : 0);

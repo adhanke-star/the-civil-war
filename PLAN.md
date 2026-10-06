@@ -445,7 +445,7 @@ WCAG/visual review. Update docs/decision, explicitly stage owned files, commit/p
 CI/Pages; repair red CI. This does not close earned badges/X-Factors, cinematic charge/melee polish,
 soldier's-eye/fullkeyboard/division selection, campaign/deployment/art/device work or all remaining P2-P7.
 
-### P2i: keyboard march/attack targeting and shared help (locally green; integration pending)
+### P2i: keyboard march/attack targeting and shared help (integrated)
 
 Root-owned candidate:22actual Input/Game/Unit/ArrowLayer positives+22intended assertion mutants,
 retained deterministic gates and unit pass. Initial native39/40 exposed a stale-target fixture race;
@@ -459,8 +459,10 @@ contain focus and Close scrolls into view. Finalfocused45/45 in35585ms20:54:58.2
 Initialfull175/176 failed only a hidden Look-tab timeout after keyboardControls closed the sandbox.
 Test-only restoration through actual sb-toggle repairs the harness; all other nine hashes remain exact.
 Keep the initial failed receipt. Final six keyboard PNGs root/independently viewed; independent source,
-receipt and WCAG/rendered review clear. Integration/exactSHA CI/Pages pending. Retained/new
-deterministic165+165 and unit/syntax/diff pass.
+receipt and WCAG/rendered review clear. Integrated7671f3f987d9f878c940adc280dfbb1bbacef9c1;
+CI37532456340/Pages37532456245 green. Actual CI browser TEST OK1074615ms; keyboard/progress and
+real play/save paths pass, software first-card113553ms is not native timing acceptance. Retained/new
+deterministic165+165 and unit/syntax/diff pass. Next root-owned P2j1 foundation is in progress.
 
 After P2h exact CI/Pages are green, fill the concrete keyboard-only march/ranged-attack gap through
 existing Input, Game.orderGroup, ArrowLayer/Hud ghost and native menu seams. Root owns
@@ -501,10 +503,39 @@ camp, all keyboard/UI polish or remaining P2/P3-P7. Do not invent division IDs f
 
 ### P2j: compare and issue saved depot equipment in camp (next dependency-ready slice)
 
+P2j1 local candidate is green: retained/new183+183, unit,19 syntax checks,diff andCI YAML pass.
+Final focused database51/51 and practice47/47 precede frozen full349/349 in468490ms at22:45:33.518Z.
+All20 frozen hashes match; console errors/warnings and24 axe scopes empty. Root/independent review
+viewed seven final narrow read/write/focus PNGs and cleared scoped source/receipt/WCAG integration.
+Initial full266/268 exposed intro's premature saved-state read/null dereference; r2 full347/348 exposed
+practice's premature consent assertion. Test-only settlement repairs preserve every product gate;
+final consent and Escape also assert0 database puts/commits/legacy writes. Keep both failed receipts.
+Integration/exactSHA CI/Pages remain pending. P2j2 comparison/issue UI has not started.
+
+P2j1 repair replaces the failed Web Lock proposal (DECISIONS0036): actualnative
+trace .out/p2j1-coordination-trace-20261006.json proves correct lock order but stale localStorage
+visibility/lost update. No acceptance/commit of that proposal. Use a single IndexedDB database
+cw.progress, one progress object store and the existing cw.progress record identity; export schema
+stays unchanged. This replaces backend authority inside save.js, not a second progress system.
+Every read API becomes awaited. All writes read/check/put in one database readwrite transaction;
+only transaction.complete claims success, aborted/failed requests leave previous progress exact.
+No delays, event-propagation waits or localStorage write fallback. Snapshot/command/baseline copies
+precede queueing; transaction callback does synchronous validation/check/put only, never consent,
+File.text/rendering. Missing database record bootstraps from untouched legacy localStorage bytes;
+get+count in that transaction distinguishes absence from a stored malformed value, even undefined.
+first committed mutation seals database authority, later legacy changes are ignored. No legacy deletion
+or overwrite. Bind valid/corrupt/empty/blocked legacy, concurrent first adoption, failed first mutation,
+database open/upgrade/abort/quota failures, rollback, pending recovery and read-only settings isolation.
+Node fakes must model serial transaction commit/abort; actual two-tab IndexedDB proof must repeat both
+winner orders and native UI stale consent with no visibility waits. Test fixtures seed/read/count the
+actual database via owned-context helpers; isolated mode zero-write checks must observe it too.
+Reuse existing save seam/callers and two green P2j1/P2j2 boundaries; all prior failed receipts/source
+hashes remain non-acceptance. Gate sequence below still applies with real transaction coordination.
+
 After P2i exact CI/Pages pass, make saved depot gear useful without another reward roll. Root owns
 the existing src/franchise/save.js transaction seam, src/reward/model.js for bounded displaced provenance,
 src/ui/entry.js and entry.css, reward.html/src/franchise/practice-ui.js for awaited writer adaptation,
-focused reward/save and camp Node/UI coverage, tools/test.mjs, CI/sw.js/docs. No new store/key/schema, roster/stat editor,
+focused reward/save and camp Node/UI coverage, tools/test.mjs, CI/sw.js/docs. No additional progress authority or export schema, roster/stat editor,
 in-progress save, deployment, shop, campaign phase or art work in this slice. One writer/browser;
 independent source and WCAG reviewers only read. P2i source stays frozen until its full/native integration.
 
@@ -514,19 +545,27 @@ two-tab writer proofs plus retained native flow. P2j2 connects the bounded camp 
 and pending-exchange recovery. P2j is complete only after both boundaries and their exact-SHA CI/Pages;
 the transaction foundation alone is not camp-equipment acceptance. P2j1 owns no new comparison UI.
 
+P2j1 preparation/verification order: read save/model, reward.html, practice-ui, entry and retained save
+tests; implement the pure transaction and awaited APIs/callers together. Add meaningful deterministic
+issue/coordination controls and a renderer-free two-tab browser fixture. Run node --check on each owned
+JS/MJS and the extracted reward module, git diff --check, node tools/test-reward.mjs and --prove-fail,
+the new transaction positive and --prove-fail gates, retained deterministic gates and node tools/test.mjs
+--unit. Run the focused native coordination fixture plus retained reward/practice/entry flows serially;
+then freeze every changed runtime/test/CI file and run one full npm test -- --native. Inspect actual JSON,
+errors/warnings/axe and relevant PNGs, verify all frozen hashes and independent source/WCAG/receipt
+review. Update docs/decision, explicitly stage owned files, commit/push, read exact-SHA CI/Pages and
+repair red CI. P2j2 starts only after this boundary is green; no camp issue acceptance from a pure API.
+
 Expose one pure validated depot-exchange operation and one authoritative store operation taking
 brigade identity+depot item identity and the exact displayed baseline. Reuse actual model.equip,
 compare/canCarry/ratings; load validated current storage, reject missing/stale/corrupt baseline before
 mutation, and replace once only after full next-snapshot validation. Every complete/import/issue writer
-must participate in one origin-wide Web Lock named for the existing progress key; adapt all callers to
-await asynchronous writes while load remains synchronous. Read/check/write alone is not cross-tab
-compare-and-swap. Check the baseline inside the shared exclusive lock; no unsafe fallback writes when
-the browser lacks coordination. Capture the immutable draft/baseline before queueing; hold the lock only
-for synchronous storage read/validate/check/write, never file reads, confirmation, rendering or animation.
-Every resolution/rejection releases it. Coordination covers updated participating clients; an already-open
-older page or direct localStorage writer does not acquire this lock. Pure preparation validates without writing.
-Inject a stateful serial lock
-in Node controls, and prove real two-tab queued writes in one renderer-free native browser workload.
+must use one overlapping IndexedDB readwrite transaction for get/check/put and await its commit.
+All read APIs are asynchronous. Capture immutable drafts/baselines before queueing; no async work,
+consent, rendering or animation inside the transaction callback. Abort or unavailable coordination
+rejects without fallback writing. After first committed adoption, older localStorage writers cannot
+modify database authority. Pure preparation validates without writing. Stateful Node adapters prove
+queue ownership; actual database/native coverage proves commit/rollback and cross-tab visibility.
 Preserve format/version,
 completed award/seed/grade, brigade IDs/kind/men/guns/veterancy/base, all item identities/types/rarity/
 condition/source and inventory cardinality. Recompute OVR; one depot item becomes equipped, displaced
@@ -535,11 +574,15 @@ brigade names retain full UI text; displaced.from remains <=160). Append exactly
 record so reverse audit remains valid. Never use complete(sameAward) to persist camp edits; its
 idempotence must continue returning current saved state, including legitimate camp changes.
 Import uses readRawBaseline() and required import(text,{previousRaw}); read exact string/null bytes
-after file validation and before consent, then check strict equality inside the lock. Missing/undefined
+after file validation and before consent, then check strict equality inside the transaction. Missing/undefined
 is not an observed empty store. Do not parse the old bytes, so unchanged corrupt JSON remains repairable;
 changed corrupt or whitespace-only bytes reject. Retain the original baseline on quota retry; conflicts
 require a fresh explicit import/consent, never a silent retry rebase. A failed baseline read keeps the
 validated file exportable but grants no write; successful baseline read plus consent is still required.
+The reward workbench also captures whether its completion baseline was known per mounted callback.
+An unknown read retains/exportable completed loot without writing, even if reads recover to empty
+before completion. Explicit Retry observes the first baseline; an existing army requires native consent,
+Cancel preserves both results, and subsequent retries keep the authorized baseline without rebasing.
 Reject depleted/incompatible/missing gear, duplicates, oversized issued history and invalid commands
 before write. Concurrent/stale changes cannot merge or overwrite. Explicit older export import remains
 intentional replacement; no anti-cheat claim.

@@ -1,5 +1,22 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0036 — Progress needs one database transaction, not a lock over cached localStorage (2026-10-06)
+Native two-tab P2j1 trace proves a lost update: A writes issued1 at1791323897832.3ms;
+B acquires the exclusive Web Lock at7833.0ms but reads issued0, overwrites it, and receives A's
+storage event at7836.2ms. The failed Web Lock proposal is unshipped and retained as non-acceptance.
+Replace the backend inside existing save.js with one IndexedDB progress record and asynchronous
+reads/writes. Its read/check/put transaction resolves only on commit, with no timer/cache workaround.
+Closest artifact is the existing cw.progress localStorage snapshot; stronger cross-tab consistency
+requires the database boundary, not a second progress authority. Preserve the exact export schema,
+settings and old localStorage bytes. Until the first committed mutation, missing database progress
+reads the legacy bytes; get+count in one transaction distinguishes absence from stored malformed
+values, including undefined. The first successful mutation seals database authority. Subsequent reads
+ignore legacy changes. No legacy overwrite/delete or unsafe write fallback. Explicit corrupt repair,
+observed baselines, immutable queued commands and pending export/retry remain binding. Migration,
+transaction abort/quota/open failure and actual two-tab browser proof are required before acceptance.
+IndexedDB scheduling: https://www.w3.org/TR/IndexedDB/#transaction-scheduling
+Storage consistency gap: https://html.spec.whatwg.org/multipage/webstorage.html
+
 ## 0035 — Keyboard destinations use the same preview and order path as pointer orders (2026-10-06)
 B/T targeting reuses world-point preview and Game.orderGroup; march ghosts carry one finite facing
 and rotated group centres, ranged attacks retain the engine's target-facing behavior. Starting or

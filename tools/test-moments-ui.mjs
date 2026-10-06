@@ -2,11 +2,11 @@ import { AxeBuilder } from '@axe-core/playwright';
 
 export async function momentControls({ page, check, shot, result }) {
   await page.reload(); await page.waitForFunction(() => window.__ready && window.__game, null, { timeout: 180000 });
-  if (!(await page.evaluate(() => window.__game.game.paused))) await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  if (!(await page.evaluate(async () => window.__game.game.paused))) await page.getByRole('button', { name: 'Pause', exact: true }).click();
   const panel = async (open) => { if ((await page.locator('#sb-toggle').getAttribute('aria-expanded') === 'true') !== open) await page.locator('#sb-toggle').click(); };
   const flag = page.locator('.marker').filter({ has: page.locator('.nm', { hasText: /^Franklin$/ }) });
   await panel(false); await flag.dblclick(); await page.waitForTimeout(1200);
-  await page.evaluate(() => { for (let i = 0; i < 4; i++) window.__game.rts.update(1); window.__game.camera.updateMatrixWorld(); });
+  await page.evaluate(async () => { for (let i = 0; i < 4; i++) window.__game.rts.update(1); window.__game.camera.updateMatrixWorld(); });
   await panel(true); await page.getByRole('tab', { name: 'Moments', exact: true }).click();
   const preview = page.getByRole('button', { name: 'Selected: preview X-Factor', exact: true });
   const loot = page.getByRole('button', { name: 'Preview one loot card', exact: true });
@@ -30,7 +30,7 @@ export async function momentControls({ page, check, shot, result }) {
       window.__momentPreviewHandles.push(h); return h;
     };
   });
-  const cleaned = () => page.evaluate(() => {
+  const cleaned = () => page.evaluate(async () => {
     const h = window.__momentPreviewHandles.at(-1), s = h.reward.state;
     const snapshot = () => ({ dead: s.dead, timers: s.timers.size, rafs: s.rafs.size, waits: s.waiters.size,
       nativeCloses: h.nativeCloses, unsubs: h.unsubscribes, expected: h.unsubsExpected, keyRemoves: h.keyRemoves, keysExpected: h.keysExpected,
@@ -42,20 +42,20 @@ export async function momentControls({ page, check, shot, result }) {
   const cleanCheck = (name, value) => { const v = value.before; check(name, v.dead && v.detached && v.timers === 0 && v.rafs === 0 && v.waits === 0
     && v.nativeCloses === 1 && v.unsubs === v.expected && v.expected > 0 && v.keyRemoves === v.keysExpected && v.keysExpected === 1
     && JSON.stringify(value.before) === JSON.stringify(value.after), JSON.stringify(value)); };
-  const read = () => page.evaluate(() => {
+  const read = () => page.evaluate(async () => {
     const { game: g, effects: e, post } = window.__game;
-    return { time: g.simTime, paused: g.paused, progress: localStorage.getItem('cw.progress'), writes: window.__sandboxWrites,
+    return { time: g.simTime, paused: g.paused, progress: await window.__progressFixture.raw(), writes: window.__progressPuts + window.__progressLegacyWrites,
       preferences: [localStorage.getItem('cw.settings'), localStorage.getItem('cw.locks')],
       roster: JSON.stringify(g.units.map((u) => [u.id, u.x, u.z, u.men, u.morale, u.fatigue, u.ammo, u.order, u.path, u.facing, u.goalFacing])),
       resources: [post.renderer.info.memory.textures, post.renderer.info.memory.geometries], cues: e.moments.size,
       glow: g.selected?.momentGlow, sound: e.sound.enabled, reduced: e.reducedMotion };
   });
   await tone('Full').check(); const before = await read();
-  await preview.focus(); await page.keyboard.press('Enter'); await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+  await preview.focus(); await page.keyboard.press('Enter'); await page.evaluate(async () => new Promise((resolve) => requestAnimationFrame(resolve)));
   const full = await read(), banner = page.locator('#moment-banner');
   check('moments-xfactor-full', full.cues === 1 && full.glow && await banner.isVisible() && (await banner.textContent()).includes('X-Factor preview')
     && await preview.evaluate((n) => n === document.activeElement), 'real keyboard preview shows labelled banner/warm cue without moving focus');
-  const warm = await page.evaluate(() => {
+  const warm = await page.evaluate(async () => {
     const h = window.__game.game.halos; let n = 0; for (let i = 0; i < h.n; i++) {
       const o = i * 4; if (h.color.array[o] > 0.9 && h.color.array[o + 1] > 0.4 && h.color.array[o + 1] < 0.8 && h.color.array[o + 2] < 0.3) n++;
     } return n;
@@ -75,7 +75,7 @@ export async function momentControls({ page, check, shot, result }) {
     const zzfx = e.sound.zzfx; e.sound.zzfx = (...args) => { window.__momentAudioCalls++; return zzfx(...args); };
   });
   await preview.click();
-  const audioBeforeMute = await page.evaluate(() => window.__momentAudioCalls);
+  const audioBeforeMute = await page.evaluate(async () => window.__momentAudioCalls);
   await panel(false); await page.getByRole('button', { name: 'Menu', exact: true }).click(); await page.locator('#sound-toggle').uncheck();
   await page.locator('#menu').getByRole('button', { name: 'Close', exact: true }).click(); await panel(true); await preview.click();
   check('moments-real-mute', audioBeforeMute > 0 && await page.evaluate((n) => !window.__game.effects.sound.enabled
@@ -94,9 +94,9 @@ export async function momentControls({ page, check, shot, result }) {
   const previewBefore = await read();
   await loot.focus(); await page.keyboard.press('Enter');
   const dialog = page.getByRole('dialog', { name: 'Loot-card preview', exact: true });
-  check('moments-first-trigger-retained', await page.evaluate(() => window.__momentPreviewHandles.at(-1).triggerConnected), 'first mount retains the actual trigger; settings registration does not rebuild the panel');
+  check('moments-first-trigger-retained', await page.evaluate(async () => window.__momentPreviewHandles.at(-1).triggerConnected), 'first mount retains the actual trigger; settings registration does not rebuild the panel');
   await dialog.waitFor(); await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' });
-  const escapeInitial = await page.evaluate(() => ({ tag: document.activeElement?.tagName, id: document.activeElement?.id, class: document.activeElement?.className }));
+  const escapeInitial = await page.evaluate(async () => ({ tag: document.activeElement?.tagName, id: document.activeElement?.id, class: document.activeElement?.className }));
   await page.waitForFunction(() => document.activeElement === document.querySelector('[data-key="moments.lootCard"] button'), null, { timeout: 5000 }).catch(() => {});
   check('moments-loot-early-escape', await loot.evaluate((n) => n === document.activeElement) && await page.locator('.rw').count() === 0,
     `Escape during the deal disposes preview/restores trigger; initial focus ${JSON.stringify(escapeInitial)}`);
@@ -134,7 +134,7 @@ export async function momentControls({ page, check, shot, result }) {
   await tone('Subtle').check(); await page.getByRole('checkbox', { name: 'Lock this: X-Factor effects', exact: true }).check();
   await page.evaluate(async () => { const s = await import('./src/settings.js'); s.set('look.xFactorStyle', 'full'); s.reset('look.xFactorStyle'); });
   check('moments-style-lock', await tone('Subtle').isChecked() && await tone('Subtle').isDisabled(), 'Lock refuses Set/Reset and disables the actual choice');
-  await page.getByRole('button', { name: 'Copy settings', exact: true }).click(); const copied = await page.evaluate(() => navigator.clipboard.readText());
+  await page.getByRole('button', { name: 'Copy settings', exact: true }).click(); const copied = await page.evaluate(async () => navigator.clipboard.readText());
   check('moments-progress-before-reload', (await read()).progress === before.progress && (await read()).writes === 0, 'all moment/loot/lock operations preserve exact progress and zero writes before reload');
   await page.reload(); await page.waitForFunction(() => window.__ready && window.__game, null, { timeout: 180000 });
   check('moments-style-reload', await tone('Subtle').isChecked() && await tone('Subtle').isDisabled(), 'Subtle choice and lock survive reload');

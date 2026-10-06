@@ -26,6 +26,8 @@ jobs:
       - run: node tools/test-reward.mjs
 
       - run: node tools/test-reward.mjs --prove-fail
+      - run: node tools/test-save.mjs
+      - run: node tools/test-save.mjs --prove-fail
 
       - run: node tools/test-practice.mjs
 

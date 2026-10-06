@@ -1,9 +1,11 @@
 // Unforced introductory play: actual Continue/select/drag/fight/result/loot/save, no clock or casualty edits.
 // Separate controlled ownership fixtures below never stand in for introductory timing/play acceptance.
 import { AxeBuilder } from '@axe-core/playwright';
+import { probeProgress, progressRaw } from './test-progress-browser.mjs';
 
 export async function introPlay({ browser, url, check, shot, result, watchErrors, native = false }) {
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, reducedMotion: 'reduce', hasTouch: true });
+  await probeProgress(ctx, { prefix: '__intro', readFlag: '__introReadBlocked', quotaFlag: '__introQuota' });
   const page = await ctx.newPage(), errors = []; watchErrors(page, url, errors);
   const load = async () => { await page.goto(`${url}?intro&quality=low`, { waitUntil: 'load' }); await page.waitForFunction(() => window.__ready && window.__game, null, { timeout: 180000 }); };
   const state = () => page.evaluate(() => {
@@ -102,9 +104,13 @@ export async function introPlay({ browser, url, check, shot, result, watchErrors
     await page.getByRole('button', { name: 'Done', exact: true }).click();
     await page.waitForFunction(() => !window.__game.practice.reward.state.counting);
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.waitForFunction(() => !window.__game.practice.saving);
     const saved = await page.evaluate(() => window.__game.practice.saved);
-    check('intro-actual-save', saved && saved.army.length === 2 && saved.army.reduce((n, b) => n + b.men, 0) === end.outcome.summary.surviving,
+    const storedRaw = await progressRaw(page);
+    check('intro-actual-save', saved && storedRaw === JSON.stringify(saved) && saved.army.length === 2
+      && saved.army.reduce((n, b) => n + b.men, 0) === end.outcome.summary.surviving,
       'real survivors and captured issue reach the atomic completed store');
+    if (!saved) { result.introSaveFailure = await page.locator('#result-text').textContent(); return; }
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.waitForURL(/\?camp/); await page.waitForFunction(() => window.__entry?.mode === 'camp');
     check('intro-continue-no-roll', await page.evaluate((id) => window.__entry.saved.awardId === id && window.__entry.saved.army.length === 2 && !window.__reward, saved.awardId),

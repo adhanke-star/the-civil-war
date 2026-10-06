@@ -60,6 +60,7 @@
     <section>
       <h1 id="launch-title">Saved army &amp; rewards</h1>
       <p>Resume your completed army or explore a separate reward demo. Practice rewards, ratings, uniques and conditions are game values, not historical outcomes.</p>
+      <p class="last" id="last" role="status" aria-live="polite"></p>
       <div class="row">
         <button type="button" class="main" id="resume" disabled>Resume saved army</button>
         <button type="button" id="export" disabled>Export army</button>
@@ -67,7 +68,6 @@
         <button type="button" id="retry" hidden>Retry save</button>
         <input type="file" id="import-file" accept=".json,application/json" hidden>
       </div>
-      <p class="last" id="last" role="status" aria-live="polite"></p>
       <details id="demos" open><summary>Start a fresh reward demo</summary>
       <p>A fresh sample army and new loot. Saved progress is replaced only when you finish.</p>
       <div class="row" role="group" aria-label="Grade">
@@ -108,48 +108,69 @@
     const launch = document.getElementById('launch');
     const store = createProgressStore();
     let saved = null, pending = null, previous = null, pendingPrevious = null, loadFailed = false;
+    let busy = false, rewardActive = false, pendingImport = null;
+    let previousKnown = true, pendingKnown = false, phase = 'idle';
     const button = (id) => document.getElementById(id);
     const describe = (s) => `Seed ${s.seed}, ${s.grade}. ${s.issued.length} cards issued; ${s.depot.length} in the depot.`;
     function sync() {
-      button('resume').disabled = !saved || !!pending;
-      button('export').disabled = !(pending || saved);
-      button('retry').hidden = !pending && !loadFailed;
-      button('retry').textContent = pending ? 'Retry save' : 'Retry loading';
+      launch.setAttribute('aria-busy', String(busy));
+      launch.inert = rewardActive;
+      button('resume').disabled = busy || !saved || !!pending || !!pendingImport;
+      button('export').disabled = !(pendingImport || pending || saved);
+      button('retry').hidden = !pendingImport && !pending && !loadFailed;
+      button('retry').textContent = pendingImport ? 'Retry import' : pending && pendingKnown ? 'Retry save' : 'Retry loading';
+      button('retry').disabled = busy;
+      button('import').disabled = busy;
+      for (const b of document.querySelectorAll('#demos button')) b.disabled = busy;
       window.__rewardResult = pending || saved;
     }
-    function focusHome() { (pending ? button('retry') : saved ? button('resume') : button('play')).focus(); }
-    function savePending() {
+    function focusHome() { if (!rewardActive && !busy) (pendingImport || pending || loadFailed ? button('retry') : saved ? button('resume') : button('play')).focus(); }
+    function focusStatus() { last.tabIndex = -1; last.focus(); last.scrollIntoView({ block: 'nearest' }); }
+    function loading(message = 'Loading saved progress…') { phase = 'reading'; last.textContent = message; focusStatus(); }
+    async function savePending({ review = false } = {}) {
+      if (busy || !pending) return;
+      busy = true; sync();
       try {
-        const { snapshot } = store.complete(pending, { previous: pendingPrevious });
+        if (!pendingKnown) {
+          if (!review) { last.textContent = 'Progress was unavailable when this demo started. Export this army, or retry loading to review saved progress before replacing it.'; return; }
+          loading(); const baseline = await store.load();
+          if (baseline && !await confirmReplace('This unsaved reward result replaces your saved army. Export first to keep both.', 'Replace and save', button('retry'))) {
+            last.textContent = 'Unsaved army kept. Export it or retry loading to review replacement.'; return;
+          }
+          pendingPrevious = baseline; pendingKnown = true;
+        }
+        phase = 'writing'; last.textContent = 'Saving completed army…'; focusStatus();
+        const result = pending, baseline = pendingPrevious;
+        const { snapshot } = await store.complete(result, { previous: baseline });
         saved = snapshot; pending = null; loadFailed = false;
         last.textContent = `Saved army. ${describe(saved)}`;
       } catch (err) { last.textContent = err.message; }
-      sync(); focusHome();
+      finally { busy = false; phase = 'idle'; sync(); focusHome(); }
     }
     function showReward(opts) {
       // Keep the covered launcher out of the keyboard/screen-reader flow.
-      launch.inert = true;
-      const baseline = previous;
-      window.__reward = mountReward(document.body, { ...opts, onDone: (r) => onDone(r, baseline) });
+      rewardActive = true; sync();
+      const baseline = previous, baselineKnown = previousKnown;
+      window.__reward = mountReward(document.body, { ...opts, onDone: (r) => onDone(r, baseline, baselineKnown) });
       // One-card previews close without a completed army.
       const root = window.__reward.state.ui.root;
       const observer = new MutationObserver(() => {
         if (!root.isConnected) {
           observer.disconnect();
-          if (!document.querySelector('.rw')) { launch.inert = false; focusHome(); }
+          if (!document.querySelector('.rw')) { rewardActive = false; sync(); focusHome(); }
         }
       });
       observer.observe(document.body, { childList: true });
     }
     async function confirmReplace(message, label, returnTo) {
-      const dlg = button('replace');
+      phase = 'reviewing'; const dlg = button('replace');
       button('replace-note').textContent = message;
       button('replace-confirm').textContent = label;
       dlg.returnValue = 'cancel';
       dlg.showModal();
       button('replace-cancel').focus();
       const accepted = await new Promise((resolve) => dlg.addEventListener('close', () => resolve(dlg.returnValue === 'replace'), { once: true }));
-      returnTo.focus();
+      if (!returnTo.disabled) returnTo.focus();
       return accepted;
     }
     button('replace-cancel').onclick = () => button('replace').close('cancel');
@@ -162,26 +183,31 @@
     });
     const gradeButtons = [...document.querySelectorAll('[data-grade]')];
     const syncGrade = () => { for (const b of gradeButtons) b.setAttribute('aria-pressed', String(b.dataset.grade === grade)); };
-    for (const b of gradeButtons) b.addEventListener('click', () => { grade = b.dataset.grade; syncGrade(); });
+    for (const b of gradeButtons) b.addEventListener('click', () => { if (!busy) { grade = b.dataset.grade; syncGrade(); } });
     syncGrade();
     if (q.has('sandbox')) document.getElementById('sandbox-link').hidden = true;
 
-    function onDone(result, baseline) {
-      launch.inert = false;
-      try { pending = completedSnapshot(result); pendingPrevious = baseline; savePending(); }
-      catch (err) { last.textContent = err.message; focusHome(); }
+    function onDone(result, baseline, baselineKnown) {
+      if (busy) return;
+      rewardActive = false;
+      try { pending = completedSnapshot(result); pendingPrevious = baseline; pendingKnown = baselineKnown; savePending(); }
+      catch (err) { last.textContent = err.message; sync(); focusHome(); }
     }
     const randomSeed = () => Math.floor(Math.random() * 1e9);
     const start = async (extra = {}, trigger = button('play')) => {
-      if (extra.mode === 'one') { showReward({ seed: randomSeed(), grade, ...extra }); return; }
-      let baseline = null;
-      try { baseline = store.load(); saved = baseline; sync(); }
-      catch (err) { last.textContent = `${err.message} This demo can still be exported when completed.`; }
-      if ((saved || pending) && extra.mode !== 'one' && !await confirmReplace(
-        'Starting a fresh demo uses a sample army. Finishing replaces your current army. Export first to keep both.', 'Start fresh demo', trigger)) return;
-      previous = baseline; // only the exact snapshot shown/confirmed may be replaced
-      // An unsaved completed result stays recoverable until the next completion.
-      showReward({ seed: randomSeed(), grade, ...extra });
+      if (busy || rewardActive) return;
+      busy = true; sync();
+      try {
+        if (extra.mode === 'one') { showReward({ seed: randomSeed(), grade, ...extra }); return; }
+        let baseline = null, baselineKnown = false;
+        loading(); try { baseline = await store.load(); saved = baseline; baselineKnown = true; }
+        catch (err) { last.textContent = `${err.message} This demo can still be exported when completed.`; }
+        if ((saved || pending || pendingImport) && !await confirmReplace(
+          'Starting a fresh demo uses a sample army. Finishing replaces your current army. Export first to keep both.', 'Start fresh demo', trigger)) return;
+        previous = baseline; previousKnown = baselineKnown; pendingImport = null; // exact snapshot reviewed; failed results remain recoverable
+        showReward({ seed: randomSeed(), grade, ...extra });
+      } catch (err) { last.textContent = err.message; }
+      finally { busy = false; phase = 'idle'; sync(); if (!rewardActive && trigger?.isConnected && !trigger.disabled) trigger.focus(); else focusHome(); }
     };
     configureRewardReplay((opts) => start(opts, document.activeElement));
     defineRewardSettings();
@@ -189,48 +215,73 @@
     document.getElementById('play').addEventListener('click', () => start());
     document.getElementById('play-legendary').addEventListener('click', (e) => start({ legendary: true }, e.currentTarget));
     document.getElementById('deal-one').addEventListener('click', (e) => start({ mode: 'one' }, e.currentTarget));
-    button('resume').addEventListener('click', () => { previous = saved; showReward({ completed: saved }); });
-    button('retry').addEventListener('click', () => {
-      if (pending) { savePending(); return; }
+    button('resume').addEventListener('click', () => { if (saved && !busy && !rewardActive && !pending && !pendingImport) { previous = saved; previousKnown = true; showReward({ completed: saved }); } });
+    button('retry').addEventListener('click', async () => {
+      if (busy || rewardActive) return;
+      if (pendingImport) {
+        busy = true; sync();
+        try {
+          if (!pendingImport.baselineKnown) {
+            loading(); pendingImport.previousRaw = await store.readRawBaseline(); pendingImport.baselineKnown = true;
+          }
+          if (await confirmReplace('Import replaces your army and depot with the pending completed export. Export first to keep your current army.', 'Import and replace', button('retry'))) await writeImport();
+        } catch (err) { last.textContent = `${err.message} Export the pending import or retry. Current progress is unchanged.`; }
+        finally { busy = false; phase = 'idle'; sync(); focusHome(); }
+        return;
+      }
+      if (pending) { savePending({ review: true }); return; }
+      busy = true; sync();
       try {
-        saved = store.load(); loadFailed = false;
+        loading(); saved = await store.load(); loadFailed = false;
         last.textContent = saved ? `Saved army ready. ${describe(saved)}` : 'No completed army saved. Start a fresh demo.';
       } catch (err) { last.textContent = err.message; }
-      sync(); focusHome();
+      finally { busy = false; phase = 'idle'; sync(); focusHome(); }
     });
     button('export').addEventListener('click', () => {
-      const text = exportSnapshot(pending || saved);
+      const text = pendingImport?.text || exportSnapshot(pending || saved);
       const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
       const link = document.createElement('a');
       link.href = url; link.download = 'the-civil-war-army.json'; link.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
-      last.textContent = pending ? 'Exported the unsaved army. Keep the file; browser saving still needs a retry.' : 'Exported saved army.';
+      last.textContent = pendingImport ? busy ? phase === 'writing' ? 'Exported pending import. Saving is still waiting.' : 'Exported pending import. Review is still in progress.' : 'Exported pending import. Browser saving still needs a retry.' : pending ? busy ? phase === 'writing' ? 'Exported the completed army. Saving is still waiting.' : 'Exported the completed army. Review is still in progress.' : 'Exported the unsaved army. Keep the file; browser saving still needs a retry.' : 'Exported saved army.';
     });
-    button('import').addEventListener('click', () => button('import-file').click());
+    async function writeImport() {
+      const candidate = pendingImport; phase = 'writing';
+      last.textContent = 'Saving the imported army… You can export the pending import while saving waits.';
+      sync(); focusStatus();
+      saved = await store.import(candidate.text, { previousRaw: candidate.previousRaw });
+      pendingImport = null; pending = null; loadFailed = false;
+      last.textContent = `Imported and saved army. ${describe(saved)}`;
+    }
+    button('import').addEventListener('click', () => { if (!busy && !rewardActive) button('import-file').click(); });
     button('import-file').addEventListener('change', async (e) => {
       const file = e.target.files[0]; e.target.value = '';
-      if (!file) { button('import').focus(); return; }
+      if (!file || busy || rewardActive) { if (!busy) button('import').focus(); return; }
+      busy = true; sync(); loading('Reading the selected army…');
       try {
         if (file.size > MAX_SAVE_BYTES) throw new Error('Progress: file exceeds the 1 MB limit.');
         const text = await file.text();
         parseSnapshot(text); // reject before asking to replace or writing anything
+        const candidate = { text, previousRaw: undefined, baselineKnown: false };
+        try { candidate.previousRaw = await store.readRawBaseline(); candidate.baselineKnown = true; }
+        catch (err) { pendingImport = candidate; throw err; }
         if (!await confirmReplace('Import replaces your army and depot with this completed export. It does not merge loot. Export first to keep your current army.', 'Import and replace', button('import'))) return;
-        saved = store.import(text); pending = null; loadFailed = false;
-        last.textContent = `Imported and saved army. ${describe(saved)}`;
-        sync();
+        pendingImport = candidate; await writeImport();
       } catch (err) { last.textContent = `${err.message} Current progress is unchanged.`; }
-      button('import').focus();
+      finally { busy = false; phase = 'idle'; sync(); button('import').focus(); }
     });
 
     // mount the sequence at once (the URL can fix the seed, grade and a forced Legendary)
+    busy = true; sync(); loading();
     try {
-      saved = store.load(); previous = saved;
+      saved = await store.load(); previous = saved;
       if (saved) {
         button('demos').open = false;
         last.textContent = `Saved army ready. ${describe(saved)}`;
         sync(); focusHome();
       } else { sync(); showReward({ seed: firstSeed ?? randomSeed(), grade, legendary }); }
     } catch (err) { loadFailed = true; last.textContent = `${err.message} Import a valid export to recover, or start an explicit demo.`; sync(); }
+    finally { busy = false; phase = 'idle'; sync(); focusHome(); }
 
     if (q.has('sandbox')) {
       import('./src/sandbox/panel.js').then(({ mountSandbox }) => mountSandbox()).catch((err) => console.error('sandbox panel failed to load:', err));

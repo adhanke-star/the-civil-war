@@ -190,7 +190,11 @@ export function ovr(brigade) {
 export function equip(brigade, item) {
   if (brigade.men === 0 || (brigade.kind === 'battery' && brigade.guns === 0)) throw new Error('equip: depleted formations keep new arms in the depot');
   if (!canCarry(brigade, item)) throw new Error(`equip: ${brigade.label} cannot carry ${itemDef(item.itemId).name}`);
-  const displaced = { ...brigade.weapon, from: `Depot: from ${brigade.label}`, depot: true };
+  const origin = `Depot: from ${brigade.label}`;
+  // Save origins allow160 UTF-16 units. Keep the complete brigade label in the UI, not this provenance prefix.
+  let shortened = origin.slice(0, 159);
+  if (/[\uD800-\uDBFF]$/.test(shortened)) shortened = shortened.slice(0, -1);
+  const displaced = { ...brigade.weapon, from: origin.length <= 160 ? origin : `${shortened}…`, depot: true };
   const weapon = { ...item };
   delete weapon.depot;
   return { brigade: { ...brigade, base: { ...brigade.base }, weapon }, displaced };

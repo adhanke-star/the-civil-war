@@ -1,8 +1,10 @@
 // One progress-store seam. P1 stores only a completed reward, never a live battle.
 import { ARMS, PRACTICE_ARMS, UNIQUES, VETERANCY, GRADES, CONDITIONS, itemDef } from '../reward/data.js';
-import { ratings, canCarry } from '../reward/model.js';
+import { ratings, canCarry, equip } from '../reward/model.js';
 
 export const SAVE_KEY = 'cw.progress';
+export const PROGRESS_DB = 'cw.progress';
+export const PROGRESS_OBJECT_STORE = 'progress';
 export const MAX_SAVE_BYTES = 1024 * 1024;
 const knownGear = new Set([...ARMS, ...PRACTICE_ARMS, ...UNIQUES].map((x) => x.id));
 const vets = new Set(VETERANCY.map((x) => x.id));
@@ -113,8 +115,88 @@ export function parseSnapshot(text) {
 }
 export const exportSnapshot = (snapshot) => JSON.stringify(validateSnapshot(snapshot));
 
-/** Lazy storage access can throw (private/blocked windows). setItem is one atomic replacement. */
-export function createProgressStore(storage = () => window.localStorage) {
+/** One pure exchange. Identities, inventory cardinality and reverse transfer audit remain intact. */
+export function exchangeDepot(snapshot, command) {
+  const before = validateSnapshot(snapshot);
+  shape(command, ['brigadeId', 'itemUid']);
+  const brigadeId = id(command.brigadeId, 'brigade identity'), itemUid = id(command.itemUid, 'item identity');
+  const brigade = before.army.find((b) => b.id === brigadeId), selected = before.depot.find((it) => it.uid === itemUid);
+  if (!brigade || !selected) bad('selected brigade or depot item is no longer available.');
+  if (brigade.men === 0 || (brigade.kind === 'battery' && brigade.guns === 0)) bad('depleted formations cannot receive new gear.');
+  if (!canCarry(brigade, selected)) bad('selected gear is incompatible with this formation.');
+  const next = equip(brigade, selected);
+  return validateSnapshot({ ...before,
+    army: before.army.map((b) => b.id === brigadeId ? next.brigade : b),
+    depot: [...before.depot.filter((it) => it.uid !== itemUid), next.displaced],
+    issued: [...before.issued, { brigade: brigadeId, item: itemUid, displaced: next.displaced.uid }],
+  });
+}
+
+// IndexedDB owns both serialization and visibility. Web Locks cannot refresh another tab's
+// localStorage cache; the retained native lost-update trace is DECISIONS0036.
+function openProgressDatabase() {
+  return new Promise((resolve, reject) => {
+    let request, settled = false;
+    const unavailable = () => {
+      if (settled) return;
+      settled = true; reject(new Error('Progress: browser progress database is unavailable. Retry or export your army.'));
+    };
+    try { request = globalThis.indexedDB.open(PROGRESS_DB, 1); }
+    catch { unavailable(); return; }
+    request.onupgradeneeded = () => {
+      try { if (!request.result.objectStoreNames.contains(PROGRESS_OBJECT_STORE)) request.result.createObjectStore(PROGRESS_OBJECT_STORE); }
+      catch { request.transaction.abort(); unavailable(); }
+    };
+    request.onerror = unavailable;
+    request.onblocked = unavailable;
+    request.onsuccess = () => {
+      const db = request.result;
+      if (settled) { db.close(); return; }
+      settled = true; db.onversionchange = () => db.close(); resolve(db);
+    };
+  });
+}
+async function databaseTransaction(operation, mode) {
+  const db = await openProgressDatabase();
+  return new Promise((resolve, reject) => {
+    let transaction, answer, failure;
+    const fail = (message) => new Error(`Progress: ${message} Retry or export your army.`);
+    try {
+      transaction = db.transaction(PROGRESS_OBJECT_STORE, mode);
+      transaction.oncomplete = () => { db.close(); resolve(answer); };
+      transaction.onabort = () => { db.close(); reject(failure || fail('could not save; the progress transaction was aborted.')); };
+      const table = transaction.objectStore(PROGRESS_OBJECT_STORE), request = table.get(SAVE_KEY), presence = table.count(SAVE_KEY);
+      request.onerror = () => { failure = fail('cannot read browser progress.'); };
+      presence.onerror = () => { failure = fail('cannot read browser progress.'); };
+      presence.onsuccess = () => {
+        try {
+          // Legacy bytes are a bootstrap source only. Never overwrite/delete them or consult them
+          // after a committed database record exists. Failed first writes leave bootstrap intact.
+          let raw = request.result;
+          if (presence.result === 0) {
+            try { raw = globalThis.localStorage.getItem(SAVE_KEY); }
+            catch { bad('cannot read browser storage. Retry; existing progress has not been replaced.'); }
+          } else if (typeof raw !== 'string') bad('unsupported browser progress record.');
+          if (raw !== null && typeof raw !== 'string') bad('unsupported browser progress record.');
+          answer = operation({
+            getItem() { return raw; },
+            setItem(key, value) {
+              const write = table.put(value, SAVE_KEY);
+              write.onerror = () => { failure = fail('could not save.'); };
+              raw = value;
+            },
+          });
+        } catch (err) { failure = err; transaction.abort(); }
+      };
+    } catch {
+      if (transaction) { failure = fail('cannot read browser progress.'); transaction.abort(); }
+      else { db.close(); reject(fail('cannot open a progress transaction.')); }
+    }
+  });
+}
+
+/** One authority. Explicit memory storage + serial locks are a Node-only test adapter. */
+export function createProgressStore(storage, { locks } = {}) {
   function access() {
     try {
       const s = typeof storage === 'function' ? storage() : storage;
@@ -131,24 +213,51 @@ export function createProgressStore(storage = () => window.localStorage) {
     catch { bad('could not save. Keep this page open, retry, or export your completed army.'); }
     return snapshot;
   }
+  async function locked(operation) {
+    if (storage === undefined) return databaseTransaction(operation, 'readwrite');
+    let manager;
+    try { manager = typeof locks === 'function' ? locks() : locks; }
+    catch { bad('coordinated saving is unavailable. Retry or export your army.'); }
+    if (!manager || typeof manager.request !== 'function') bad('coordinated saving is unavailable. Retry or export your army.');
+    try { return await manager.request(SAVE_KEY, { mode: 'exclusive' }, () => operation(access())); }
+    catch (err) {
+      if (err?.message?.startsWith('Progress:')) throw err;
+      bad('could not coordinate saving. Retry or export your army.');
+    }
+  }
+  const reading = (operation) => storage === undefined ? databaseTransaction(operation, 'readonly') : Promise.resolve().then(() => operation(access()));
   return {
-    load() {
-      const raw = read(access());
-      return raw === null ? null : parseSnapshot(raw);
+    async readRawBaseline() { return reading((s) => read(s)); },
+    async load() {
+      return reading((s) => { const raw = read(s); return raw === null ? null : parseSnapshot(raw); });
     },
-    complete(result, { previous = null } = {}) {
+    async complete(result, { previous = null } = {}) {
+      // Canonical copies are made before waiting; caller mutation cannot change a queued command.
       const snapshot = result && has(result, 'format') ? validateSnapshot(result) : completedSnapshot(result);
-      const s = access(), raw = read(s);
-      const current = raw === null ? null : parseSnapshot(raw);
-      if (current?.awardId === snapshot.awardId) return { snapshot: current, saved: true, duplicate: true };
-      if (JSON.stringify(current) !== JSON.stringify(previous)) bad('progress changed since this demo started. Export this result before replacing the saved army.');
-      return { snapshot: write(s, snapshot), saved: true, duplicate: false };
+      const baseline = previous === null ? null : validateSnapshot(previous);
+      return locked((s) => {
+        const raw = read(s), current = raw === null ? null : parseSnapshot(raw);
+        if (current?.awardId === snapshot.awardId) return { snapshot: current, saved: true, duplicate: true };
+        if (JSON.stringify(current) !== JSON.stringify(baseline)) bad('progress changed since this demo started. Export this result before replacing the saved army.');
+        return { snapshot: write(s, snapshot), saved: true, duplicate: false };
+      });
     },
-    import(text) {
-      const snapshot = parseSnapshot(text); // no storage mutation before full validation
-      const s = access();
-      read(s); // fail safely when access is blocked; an explicit import may repair corrupt JSON
-      return write(s, snapshot);
+    async import(text, { previousRaw } = {}) {
+      const snapshot = parseSnapshot(text);
+      if (previousRaw !== null && typeof previousRaw !== 'string') bad('import requires an observed storage baseline.');
+      return locked((s) => {
+        // No parsing of old bytes: explicit imports can repair unchanged corrupt progress.
+        if (read(s) !== previousRaw) bad('progress changed since this import was reviewed. Export the pending file or choose it again.');
+        return write(s, snapshot);
+      });
+    },
+    async issue(command, { previous } = {}) {
+      const baseline = validateSnapshot(previous), draft = exchangeDepot(baseline, command);
+      return locked((s) => {
+        const raw = read(s), current = raw === null ? null : parseSnapshot(raw);
+        if (JSON.stringify(current) !== JSON.stringify(baseline)) bad('progress changed since this equipment was reviewed. Export the pending army or reload saved progress.');
+        return write(s, draft);
+      });
     },
   };
 }

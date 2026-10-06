@@ -57,6 +57,8 @@ import { prune, OUT_DIR } from './prune.mjs';
 import { practiceProgress } from './test-practice-ui.mjs';
 import { introPlay } from './test-intro-ui.mjs';
 import { entryProgress } from './test-entry-ui.mjs';
+import { saveCoordination } from './test-save-ui.mjs';
+import { probeProgress, progressRaw, seedProgress, holdProgressTransaction, releaseProgressTransaction } from './test-progress-browser.mjs';
 import { lookControls } from './test-look-ui.mjs';
 import { viewControls } from './test-view-ui.mjs';
 import { spacingControls } from './test-spacing-ui.mjs';
@@ -494,7 +496,7 @@ async function bakedFigures(page) {
   const frames = (n) => page.evaluate((n) => new Promise((res) => { let k = 0; const f = () => (++k >= n ? res() : requestAnimationFrame(f)); requestAnimationFrame(f); }), n);
   await frames(3);
   const rigPng = await shot(page, 'rigged-view');
-  const rig = await page.evaluate(() => {
+  const rig = await page.evaluate(async () => {
     const g = window.__game.game;
     // Rigged counts include infantry still falling; baked.standing deliberately excludes FALLEN poses.
     // The simulation is paused, so this same set remains falling through both style captures.
@@ -506,7 +508,7 @@ async function bakedFigures(page) {
   await page.waitForFunction(() => { const g = window.__game.game; return g.baked.state === 'failed' || (g.baked.state === 'ready' && g.figuresDrawn().sprites > 0); }, null, { timeout: 90_000, polling: 250 }).catch(() => {});
   await frames(3);
   const bakedPng = await shot(page, 'baked');
-  const bk = await page.evaluate(() => { const g = window.__game.game; return { state: g.baked.state, error: g.baked.error, drawn: g.figuresDrawn(), problems: [...g.impostors.US.rectProblems(), ...g.impostors.CS.rectProblems()] }; });
+  const bk = await page.evaluate(async () => { const g = window.__game.game; return { state: g.baked.state, error: g.baked.error, drawn: g.figuresDrawn(), problems: [...g.impostors.US.rectProblems(), ...g.impostors.CS.rectProblems()] }; });
   const colours = new Set();
   let differ = 0, sampled = 0;
   for (let y = 40; y < bakedPng.height; y += 12) for (let x = 40; x < bakedPng.width; x += 12) {
@@ -538,7 +540,7 @@ async function bakedFigures(page) {
     return { a, b, before };
   });
   await frames(2);
-  const after = await page.evaluate(() => { const g = window.__game.game; const u = g.units.find((v) => v.id === window.__bk.id); return Array.from(g.impostors[u.side].batches.field[0].data.subarray(0, 120)); });
+  const after = await page.evaluate(async () => { const g = window.__game.game; const u = g.units.find((v) => v.id === window.__bk.id); return Array.from(g.impostors[u.side].batches.field[0].data.subarray(0, 120)); });
   const changed = after.some((v, i) => v !== dir.before[i]);
   check('baked-direction', (dir.b - dir.a + 16) % 16 === 8 && changed, `a man's baked direction ${dir.a} -> ${dir.b} after the camera turned 180 degrees (want +8 mod 16); sprite buffer changed=${changed}`);
 
@@ -637,7 +639,7 @@ async function orderObedience(page) {
   });
 
   // a. move: ends at the ghost, facing as set
-  const a = await page.evaluate(() => {
+  const a = await page.evaluate(async () => {
     const g = window.__game.game;
     const u = g.spawnUnit({ side: 'US', men: 1500, weapon: 'rifled', x: -1100, z: -700, facing: Math.PI / 2 });
     const face = 0.4;
@@ -678,7 +680,7 @@ async function orderObedience(page) {
     `fight: halted ${bf.halts}x, first at (${bf.haltAt}) with ${bf.toGo} m still to go, fired while halted=${bf.firedHalted} (${bf.shots} volleys); march: halted ${bm.halts}x, reached x=${bm.x} (past the halt point, want > -1040), ${bm.shots} volleys on the move`);
 
   // c. attack: closes to effective range, halts, fires
-  const c = await page.evaluate(() => {
+  const c = await page.evaluate(async () => {
     const g = window.__game.game;
     const e = g.spawnUnit({ side: 'CS', men: 500, weapon: 'smooth', x: -900, z: -990, facing: 0 });
     const u = g.spawnUnit({ side: 'US', men: 1500, weapon: 'rifled', x: -1150, z: -700, facing: Math.PI / 2 });
@@ -701,7 +703,7 @@ async function orderObedience(page) {
     `from ${c.d0} m: halted at ${c.haltD} m from the target (weapon range ${c.rng} m, want ${Math.round(c.rng * 0.5)}-${c.rng}), fired=${c.fired}, charged=${c.charged}, order now ${c.order}`);
 
   // d. Hold fire through the dock button
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     const g = window.__game.game;
     const e = g.spawnUnit({ side: 'CS', men: 500, weapon: 'smooth', x: -900, z: -990, facing: 0 });
     const u = g.spawnUnit({ side: 'US', men: 1500, weapon: 'rifled', x: -900, z: -840, facing: Math.PI });
@@ -710,14 +712,14 @@ async function orderObedience(page) {
   });
   const hfBtn = page.getByRole('button', { name: 'Hold fire', exact: true });
   await hfBtn.click();
-  const d1 = await page.evaluate(() => {
+  const d1 = await page.evaluate(async () => {
     const { u } = window.__t;
     const s0 = u.shots || 0;
     window.__game.game.fastForward(30);
     return { set: u.holdFire, shots: (u.shots || 0) - s0, target: u.target ? u.target.short : null, pressed: document.querySelector('#orders [data-order=holdfire]').getAttribute('aria-pressed') };
   });
   await hfBtn.click();
-  const d2 = await page.evaluate(() => {
+  const d2 = await page.evaluate(async () => {
     const { u } = window.__t;
     const s0 = u.shots || 0;
     window.__game.game.fastForward(15);
@@ -727,7 +729,7 @@ async function orderObedience(page) {
     `Hold fire on (button pressed=${d1.pressed}): ${d1.shots} volleys in 30 sim s with ${d1.target || 'no target'} in range; off again: ${d2.shots} volleys in 15 s (want 0, then > 0)`);
 
   // e. orders given while paused are stored and run on Play
-  const e0 = await page.evaluate(() => {
+  const e0 = await page.evaluate(async () => {
     const g = window.__game.game;
     const { e, u } = window.__t;
     g.removeUnit(e); // nothing to halt for
@@ -736,12 +738,12 @@ async function orderObedience(page) {
     return { x: u.x, z: u.z, paused: g.paused, order: u.order.type, active: u.follow.active };
   });
   await page.waitForTimeout(800);
-  const e1 = await page.evaluate(() => { const { u } = window.__t; return { x: u.x, z: u.z, order: u.order.type }; });
-  const simAtPlay = await page.evaluate(() => window.__game.game.simTime);
+  const e1 = await page.evaluate(async () => { const { u } = window.__t; return { x: u.x, z: u.z, order: u.order.type }; });
+  const simAtPlay = await page.evaluate(async () => window.__game.game.simTime);
   await page.getByRole('button', { name: 'Play', exact: true }).click();
   // the real loop runs the sim (SwiftShader manages about 1-5 fps): wait for 3 sim seconds, not wall time
   await page.waitForFunction((t0) => window.__game.game.simTime >= t0 + 3, simAtPlay, { timeout: 60_000, polling: 200 }).catch(() => {});
-  const e2 = await page.evaluate(() => { const { u } = window.__t; const g = window.__game.game; const r = { x: u.x, z: u.z, paused: g.paused }; g.removeUnit(u); delete window.__t; return r; });
+  const e2 = await page.evaluate(async () => { const { u } = window.__t; const g = window.__game.game; const r = { x: u.x, z: u.z, paused: g.paused }; g.removeUnit(u); delete window.__t; return r; });
   const still = Math.hypot(e1.x - e0.x, e1.z - e0.z), moved = Math.hypot(e2.x - e1.x, e2.z - e1.z);
   check('order-while-paused', e0.paused && e0.order === 'move' && e0.active && still < 0.01 && e1.order === 'move' && !e2.paused && moved > 1,
     `paused=${e0.paused}, order stored=${e0.order} (marching flag ${e0.active}); moved ${still.toFixed(3)} m in 0.8 s paused, then ${moved.toFixed(1)} m in the first 3 sim s after Play (want 0, then > 1)`);
@@ -753,9 +755,9 @@ async function dockFit(page) {
   const seen = [];
   for (const vp of [{ width: 1024, height: 768 }, { width: 1440, height: 788 }]) {
     await page.setViewportSize(vp);
-    await page.evaluate(() => { const g = window.__game.game; const u = g.units.find((v) => v.alive && g.controls(v)); g.select(u || null); });
+    await page.evaluate(async () => { const g = window.__game.game; const u = g.units.find((v) => v.alive && g.controls(v)); g.select(u || null); });
     await page.waitForTimeout(500);
-    const r = await page.evaluate(() => {
+    const r = await page.evaluate(async () => {
       const box = (el) => { const b = el.getBoundingClientRect(); return { x: b.x, y: b.y, w: b.width, h: b.height }; };
       const q = (s) => box(document.querySelector(s));
       return {
@@ -795,11 +797,7 @@ function watchErrors(page, url, into) {
 /** The sandbox panel on ?sandbox&quality=low, then device.html. */
 async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly = false, keyboardOnly = false } = {}) {
   const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1, permissions: ['clipboard-read', 'clipboard-write'] });
-  await ctx.addInitScript(() => {
-    window.__sandboxWrites = 0;
-    const set = Storage.prototype.setItem;
-    Storage.prototype.setItem = function (key, value) { if (key === 'cw.progress') window.__sandboxWrites++; return set.call(this, key, value); };
-  });
+  await probeProgress(ctx, { prefix: '__sandbox', readFlag: '__sandboxReadBlocked', quotaFlag: '__sandboxQuota' });
   try {
     const page = await ctx.newPage();
     const errors = [];
@@ -816,11 +814,11 @@ async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly
       if (spacingOnly || momentsOnly || keyboardOnly) {
         await page.evaluate(async () => {
           const { completedSnapshot } = await import('./src/franchise/save.js'), { SAMPLE_ARMY } = await import('./src/reward/data.js');
-          localStorage.setItem('cw.progress', JSON.stringify(completedSnapshot({ awardId: 'spacing-preservation', army: structuredClone(SAMPLE_ARMY), depot: [], issued: [], seed: 19, grade: 'Victory' })));
+          await window.__progressFixture.seed(JSON.stringify(completedSnapshot({ awardId: 'spacing-preservation', army: structuredClone(SAMPLE_ARMY), depot: [], issued: [], seed: 19, grade: 'Victory' })));
           window.__sandboxWrites = 0;
         });
         if (process.argv.includes('--native')) {
-          const renderer = await page.evaluate(() => { const gl = document.getElementById('battlefield').getContext('webgl2'), e = gl.getExtension('WEBGL_debug_renderer_info'); return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); });
+          const renderer = await page.evaluate(async () => { const gl = document.getElementById('battlefield').getContext('webgl2'), e = gl.getExtension('WEBGL_debug_renderer_info'); return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); });
           check('spacing-native-renderer', !/swiftshader|llvmpipe|software/i.test(renderer), renderer);
         }
         if (keyboardOnly) await keyboardControls({ page, check, shot, result });
@@ -835,7 +833,7 @@ async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly
       await page.getByRole('tab', { name: 'Screens' }).click();
       const selected = await page.getByRole('tab', { name: 'Screens' }).getAttribute('aria-selected');
       const slider = page.getByRole('slider', { name: 'Interface size' });
-      const cssVar = () => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ui-scale').trim());
+      const cssVar = () => page.evaluate(async () => getComputedStyle(document.documentElement).getPropertyValue('--ui-scale').trim());
       const before = await cssVar();
       await slider.focus();
       await page.keyboard.press('ArrowRight');
@@ -864,7 +862,7 @@ async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly
       await page.getByRole('button', { name: 'Paste settings' }).click();
       await page.getByLabel('Paste a settings block, then Apply.').fill('look.panelSide = left\nnot.a.setting = 3');
       await page.getByRole('button', { name: 'Apply', exact: true }).click();
-      const pasted = await page.evaluate(() => ({ left: document.getElementById('sb-panel').classList.contains('sb-left'), status: document.querySelector('.sb-status').textContent }));
+      const pasted = await page.evaluate(async () => ({ left: document.getElementById('sb-panel').classList.contains('sb-left'), status: document.querySelector('.sb-status').textContent }));
       const copyOk = copied.text.includes('screens.uiScale = 1.05') && copied.text.includes('locked: screens.uiScale');
       check('sandbox-copy-paste', copyOk && pasted.left && /Applied 1 setting/.test(pasted.status),
         `copy via ${copied.via}: ${JSON.stringify(copied.text.slice(0, 160))}; paste moved the panel left=${pasted.left}, said "${pasted.status}"`);
@@ -900,14 +898,14 @@ async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly
         await page.getByRole('tab', { name: 'Units' }).click();
         const n0 = await page.locator('#markers .marker').count();
         await page.getByRole('button', { name: 'Spawn Union brigade at view centre' }).click();
-        const spawned = await page.evaluate(() => {
+        const spawned = await page.evaluate(async () => {
           const u = window.__game.game.selected;
           return { markers: document.querySelectorAll('#markers .marker').length, name: u ? u.name : null, commander: u ? u.commander : 'none', men: u ? u.men : 0, figs: u ? u.figures.length : 0 };
         });
         await page.getByRole('tab', { name: 'Moments' }).click();
         await page.getByRole('button', { name: 'Shell burst at view centre' }).click();
         await page.getByRole('button', { name: 'Selected: rout' }).click();
-        const routed = await page.evaluate(() => (window.__game.game.selected ? window.__game.game.selected.state : null));
+        const routed = await page.evaluate(async () => (window.__game.game.selected ? window.__game.game.selected.state : null));
         await page.getByRole('tab', { name: 'Units' }).click();
         await page.getByRole('button', { name: 'Remove selected' }).click();
         const n2 = await page.locator('#markers .marker').count();
@@ -926,7 +924,7 @@ async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly
       {
         await page.getByRole('tab', { name: 'Look' }).click();
         await page.getByRole('button', { name: 'Compare Order line side by side' }).click();
-        const during = await page.evaluate(() => {
+        const during = await page.evaluate(async () => {
           const a = window.__game.arrows;
           a.setPreview([[-200, 100], [-100, 160], [0, 140]], 'US', 14, 30);
           const r = { styles: a.styles(), meshes: a.preview ? a.preview.children.length : 0, clips: a.preview ? a.preview.children.map((m) => m.material.uniforms.uClip.value) : [] };
@@ -934,7 +932,7 @@ async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly
           return r;
         });
         await page.getByRole('button', { name: 'End compare' }).first().click();
-        const after = await page.evaluate(() => window.__game.arrows.styles());
+        const after = await page.evaluate(async () => window.__game.arrows.styles());
         check('sandbox-orderline-compare', JSON.stringify(during.styles) === '[["pencil",-1],["arrow",1]]' && during.meshes === 2 && during.clips.join() === '-1,1' && JSON.stringify(after) === '[["pencil",0]]',
           `comparing: styles ${JSON.stringify(during.styles)}, preview meshes ${during.meshes} with clips ${during.clips.join(',')}; after End compare ${JSON.stringify(after)}`);
       }
@@ -998,12 +996,12 @@ async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly
 
 /** Real controls for placement experience and shared charge/fatigue multipliers, in an owned context. */
 async function sandboxRuleTools(page) {
-  if (!(await page.evaluate(() => window.__game.game.paused))) await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  if (!(await page.evaluate(async () => window.__game.game.paused))) await page.getByRole('button', { name: 'Pause', exact: true }).click();
   const before = await page.evaluate(async () => {
     const { completedSnapshot } = await import('./src/franchise/save.js');
     const { SAMPLE_ARMY } = await import('./src/reward/data.js');
     const raw = JSON.stringify(completedSnapshot({ awardId: 'sandbox-preservation', army: structuredClone(SAMPLE_ARMY), depot: [], issued: [], seed: 19, grade: 'Victory' }));
-    localStorage.setItem('cw.progress', raw); window.__sandboxWrites = 0;
+    await window.__progressFixture.seed(raw); window.__sandboxWrites = 0;
     return { raw, xp: window.__game.game.units.filter((u) => !u.id.startsWith('sandbox-')).map((u) => [u.id, u.xp]) };
   });
   await page.getByRole('tab', { name: 'Units', exact: true }).click();
@@ -1014,16 +1012,16 @@ async function sandboxRuleTools(page) {
   const seen = [];
   for (const side of ['Union', 'Confederate']) {
     await page.getByRole('button', { name: `Spawn ${side} brigade at view centre`, exact: true }).click();
-    const u = await page.evaluate(() => { const g = window.__game.game, u = g.selected; return { id: u.id, side: u.side, xp: u.xp, defXp: u.def.xp, commander: u.commander, controlled: g.controls(u) }; });
+    const u = await page.evaluate(async () => { const g = window.__game.game, u = g.selected; return { id: u.id, side: u.side, xp: u.xp, defXp: u.def.xp, commander: u.commander, controlled: g.controls(u) }; });
     await page.getByRole('button', { name: 'Hold', exact: true }).click();
-    u.held = await page.evaluate(() => window.__game.game.selected.order.firm === true);
+    u.held = await page.evaluate(async () => window.__game.game.selected.order.firm === true);
     seen.push(u); await page.getByRole('button', { name: 'Remove selected', exact: true }).click();
   }
   check('sandbox-veterancy-both-sides', seen.every((u) => u.xp === 4 && u.defXp === 4 && u.commander === null && u.controlled && u.held) && seen.map((u) => u.side).join() === 'US,CS',
     `real Elite placement and Hold: ${JSON.stringify(seen)}`);
   await page.getByRole('button', { name: "Reset Next brigade's veterancy", exact: true }).click();
   await page.getByRole('button', { name: 'Spawn Union brigade at view centre', exact: true }).click();
-  const green = await page.evaluate(() => window.__game.game.selected.xp);
+  const green = await page.evaluate(async () => window.__game.game.selected.xp);
   await page.getByRole('button', { name: 'Remove selected', exact: true }).click();
   check('sandbox-veterancy-reset', green === 1 && await veterancy.getByRole('radio', { name: 'Green', exact: true }).isChecked(), 'Reset restores Green for the next placed brigade');
   await shot(page, 'sandbox-veterancy');
@@ -1034,7 +1032,7 @@ async function sandboxRuleTools(page) {
   for (const [name, field, want] of [['Charge effect', 'chargeEffect', 1.5], ['Fatigue gain', 'fatigueGain', 2]]) {
     const slider = page.getByRole('slider', { name, exact: true }); await slider.focus(); await page.keyboard.press('End');
     if (want === 1.5) for (let i = 0; i < 10; i++) await page.keyboard.press('ArrowLeft');
-    check(`sandbox-live-${field}`, (await live())[field] === want && await page.evaluate(() => window.__game.game.paused), `keyboard slider sets live ${field}=${want} while battle stays paused`);
+    check(`sandbox-live-${field}`, (await live())[field] === want && await page.evaluate(async () => window.__game.game.paused), `keyboard slider sets live ${field}=${want} while battle stays paused`);
     await page.getByRole('checkbox', { name: `Lock this: ${name}`, exact: true }).check();
     const kept = await page.evaluate(async ({ field }) => (await import('./src/settings.js')).set(`rules.${field}`, 0.5), { field });
     check(`sandbox-lock-${field}`, kept === want && await slider.isDisabled() && await page.getByRole('button', { name: `Reset ${name}`, exact: true }).isDisabled(), 'Lock keeps the live rule and disables editing/reset');
@@ -1058,16 +1056,16 @@ async function sandboxRuleTools(page) {
     && copied.includes('rules.chargeEffect = 1.5') && copied.includes('rules.fatigueGain = 2')
     && await page.getByRole('checkbox', { name: 'Lock this: Charge effect', exact: true }).isChecked()
     && await page.getByRole('checkbox', { name: 'Lock this: Fatigue gain', exact: true }).isChecked(), 'real Copy/Paste restores both values and locks after Reset');
-  const preserved = await page.evaluate(() => ({ raw: localStorage.getItem('cw.progress'), writes: window.__sandboxWrites,
+  const preserved = await page.evaluate(async () => ({ raw: await window.__progressFixture.raw(), writes: window.__progressPuts + window.__progressLegacyWrites,
     xp: window.__game.game.units.filter((u) => !u.id.startsWith('sandbox-')).map((u) => [u.id, u.xp]) }));
   check('sandbox-tuning-preserves-progress-roster', preserved.raw === before.raw && preserved.writes === 0 && JSON.stringify(preserved.xp) === JSON.stringify(before.xp),
     'controls/placement leave exact completed progress and original roster xp unchanged');
-  const terminal = await page.evaluate(() => {
+  const terminal = await page.evaluate(async () => {
     const { game, practice } = window.__game;
     game.over = true; game.result = { winner: 'US', why: 'Sandbox terminal isolation fixture' }; practice.finishResult();
     return { empty: practice.outcome === null && practice.pending === null && practice.saved === null && practice.reward === null,
       text: document.getElementById('result-text').textContent, actionHidden: document.getElementById('result-action').hidden,
-      raw: localStorage.getItem('cw.progress'), writes: window.__sandboxWrites };
+      raw: await window.__progressFixture.raw(), writes: window.__progressPuts + window.__progressLegacyWrites };
   });
   check('sandbox-terminal-no-award', terminal.empty && terminal.actionHidden && /no progress rewards/.test(terminal.text) && terminal.raw === before.raw && terminal.writes === 0,
     'actual terminal controller shows no-loot result and keeps progress unchanged (accelerated terminal fixture)');
@@ -1075,8 +1073,8 @@ async function sandboxRuleTools(page) {
   await page.reload(); await page.waitForFunction(() => window.__ready && document.getElementById('sb-panel'), null, { timeout: READY_TIMEOUT_MS });
   const loaded = await live();
   check('sandbox-rule-reload', loaded.chargeEffect === 1.5 && loaded.fatigueGain === 2 && await page.getByRole('slider', { name: 'Charge effect', exact: true }).isDisabled()
-    && await page.evaluate((raw) => localStorage.getItem('cw.progress') === raw && window.__sandboxWrites === 0, before.raw), 'reload retains rule values/locks without a progress write');
-  if (!(await page.evaluate(() => window.__game.game.paused))) await page.getByRole('button', { name: 'Pause', exact: true }).click();
+    && await page.evaluate(async (raw) => await window.__progressFixture.raw() === raw && window.__progressPuts === 0 && window.__progressLegacyWrites === 0, before.raw), 'reload retains rule values/locks without a progress write');
+  if (!(await page.evaluate(async () => window.__game.game.paused))) await page.getByRole('button', { name: 'Pause', exact: true }).click();
   for (const name of ['Charge effect', 'Fatigue gain']) {
     await page.getByRole('checkbox', { name: `Lock this: ${name}`, exact: true }).uncheck(); await page.getByRole('button', { name: `Reset ${name}`, exact: true }).click();
   }
@@ -1097,15 +1095,17 @@ async function sandboxRuleTools(page) {
 /** P1: actual controls, stable save readbacks, atomic imports and recoverable quota failure. */
 async function rewardProgress(browser, url) {
   const ctx = await browser.newContext({ viewport: VIEWPORT, reducedMotion: 'reduce', acceptDownloads: true });
+  await probeProgress(ctx, { prefix: '__p1', readFlag: '__p1ReadBlocked', quotaFlag: '__p1Quota', readSessionKey: 'p1.block' });
   const page = await ctx.newPage(), errors = [];
   watchErrors(page, url, errors);
-  const raw = () => page.evaluate(() => localStorage.getItem('cw.progress'));
-  const state = () => page.evaluate(() => window.__rewardResult);
-  async function finish() {
+  const raw = () => progressRaw(page);
+  const state = () => page.evaluate(async () => window.__rewardResult);
+  async function finish({ settle = true } = {}) {
     await page.getByRole('button', { name: 'Done', exact: true }).click();
     await page.waitForFunction(() => !window.__reward.state.counting);
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.waitForFunction(() => !document.querySelector('.rw'));
+    if (settle) await page.waitForFunction(() => document.getElementById('launch').getAttribute('aria-busy') === 'false');
   }
   async function reveal() {
     await page.getByRole('button', { name: /^Open the loot/ }).click();
@@ -1118,14 +1118,9 @@ async function rewardProgress(browser, url) {
   try {
     await page.goto(`${url}reward.html?seed=72`, { waitUntil: 'load' });
     await page.waitForSelector('.rw[data-step="a"]');
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       localStorage.setItem('cw.settings', '{"screens.sound":false}'); localStorage.setItem('cw.locks', '["screens.sound"]');
-      window.__p1Set = Storage.prototype.setItem;
-      window.__p1Writes = 0;
-      Storage.prototype.setItem = function(k, v) {
-        if (k === 'cw.progress') { if (window.__p1Quota) throw new DOMException('quota', 'QuotaExceededError'); window.__p1Writes++; }
-        return window.__p1Set.call(this, k, v);
-      };
+
     });
     await reveal();
     const pair = await page.evaluate(async () => {
@@ -1147,18 +1142,26 @@ async function rewardProgress(browser, url) {
     check('reward-compare-axe', compareAxe.violations.length === 0, JSON.stringify(result.rewardCompareAxe));
     await shot(page, 'reward-compare');
     await page.keyboard.press('Tab');
-    const tab1 = await page.evaluate(() => document.activeElement.textContent);
+    const tab1 = await page.evaluate(async () => document.activeElement.textContent);
     await page.keyboard.press('Tab');
-    const tab2 = await page.evaluate(() => document.activeElement.textContent);
+    const tab2 = await page.evaluate(async () => document.activeElement.textContent);
     await page.keyboard.press('Escape');
     check('reward-keyboard-compare', tab1.includes('Cancel') && tab2.includes('Issue to') && await tile().evaluate((n) => n === document.activeElement), 'keyboard compare wraps within dialog; Escape returns to loot tile');
     await tile().press('Enter'); await brigade().press('Enter');
     await compareDialog.getByRole('button', { name: new RegExp(`^Issue to ${pair.label}`) }).click();
-    const equipped = await page.evaluate(() => {
+    const equipped = await page.evaluate(async () => {
       const s = window.__reward.state;
       return { army: s.army, depot: s.tray, issued: s.log, seed: s.seed, grade: s.grade, awardId: s.awardId };
     });
-    await finish();
+    await holdProgressTransaction(page); await finish({ settle: false });
+    await page.waitForFunction(() => window.__progressTransactions > window.__saveQueueBase);
+    check('reward-queued-save-owner', await page.evaluate(async () => window.__p1Writes === 0
+      && document.getElementById('launch').getAttribute('aria-busy') === 'true' && document.getElementById('play').disabled
+      && document.getElementById('import').disabled && document.getElementById('retry').disabled
+      && !document.getElementById('export').disabled && document.activeElement.id === 'last'), 'queued actual reward completion guards mutators, focuses Saving status and retains export');
+    await page.evaluate(async () => { const settings = await import('./src/settings.js'); settings.all().find((e) => e.key === 'moments.rewardPlay').spec.run(); });
+    check('reward-queued-replay-guard', await page.locator('.rw').count() === 0 && await page.evaluate(async () => window.__p1Writes === 0), 'sandbox replay cannot replace a waiting completed result');
+    await releaseProgressTransaction(page); await page.waitForFunction(() => document.getElementById('launch').getAttribute('aria-busy') === 'false');
     const original = await state(), originalRaw = await raw();
     const matches = await page.evaluate(async (before) => {
       const { completedSnapshot } = await import('./src/franchise/save.js');
@@ -1168,20 +1171,22 @@ async function rewardProgress(browser, url) {
       `real keyboard/click equip ${pair.before}->${pair.after}; completed army, identities, depot, issued records, seed, grade and award saved exactly`);
     // Repeated completion callback with the identical completed result must do no further writes.
     await page.evaluate((r) => { window.__reward.state.onDone(r); window.__reward.state.onDone(r); }, equipped);
-    check('reward-callback-idempotent', await raw() === originalRaw && await page.evaluate(() => window.__p1Writes === 1), 'repeated callbacks keep the exact save and do not write another award');
+    await page.waitForFunction(() => document.getElementById('launch').getAttribute('aria-busy') === 'false');
+    check('reward-callback-idempotent', await raw() === originalRaw && await page.evaluate(async () => window.__p1Writes === 1), 'repeated callbacks keep the exact save and do not write another award');
     await page.reload();
     await page.waitForFunction(() => window.__rewardResult);
     check('reward-reload', JSON.stringify(await state()) === JSON.stringify(original) && await page.locator('.rw').count() === 0,
       'reload returns to completed army launcher; no new roll or overlay');
     await page.getByRole('button', { name: 'Resume saved army', exact: true }).press('Enter');
     await page.waitForSelector('.rw[data-step="d"]');
-    const resumed = await page.evaluate(() => ({ cards: window.__reward.state.cards.length, issued: window.__reward.state.log.length, title: document.getElementById('rw-counts-title').textContent }));
+    const resumed = await page.evaluate(async () => ({ cards: window.__reward.state.cards.length, issued: window.__reward.state.log.length, title: document.getElementById('rw-counts-title').textContent }));
     const resumeAxe = await new AxeBuilder({ page }).include('.rw-counts').analyze();
     result.rewardResumeAxe = resumeAxe.violations.map((v) => ({ id: v.id, impact: v.impact, targets: v.nodes.map((n) => n.target) }));
     check('reward-resume-axe', resumeAxe.violations.length === 0, JSON.stringify(result.rewardResumeAxe));
     await shot(page, 'reward-resume');
     await page.waitForFunction(() => !window.__reward.state.counting);
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.waitForFunction(() => document.getElementById('launch').getAttribute('aria-busy') === 'false');
     check('reward-resume-no-roll', resumed.cards === 0 && resumed.issued === 1 && resumed.title === 'Saved army' && await raw() === originalRaw,
       'resume shows existing equipment and depot, zero rolled cards, unchanged award/item counts');
     const downloadWait = page.waitForEvent('download');
@@ -1210,7 +1215,27 @@ async function rewardProgress(browser, url) {
     await page.waitForFunction(() => document.activeElement.id === 'import');
     check('reward-import-cancel-focus', focusCancel && focusWrapped && await page.locator('#import').evaluate((n) => n === document.activeElement) && await raw() === originalRaw,
       `native confirmation Cancel=${focusCancel}, Tab wrap=${focusWrapped}; Escape preserves save and returns focus`);
+    await page.setViewportSize({ width: 320, height: 480 });
+    await importFile(exported); await page.waitForSelector('#replace[open]'); await holdProgressTransaction(page); await page.locator('#replace-confirm').click();
+    await page.waitForFunction(() => window.__progressTransactions > window.__saveQueueBase);
+    check('reward-queued-import-owner', await page.evaluate(async () => document.getElementById('launch').getAttribute('aria-busy') === 'true'
+      && document.getElementById('import').disabled && document.getElementById('retry').disabled && document.getElementById('play').disabled
+      && !document.getElementById('export').disabled && document.activeElement.id === 'last'
+      && document.getElementById('last').textContent.includes('Saving the imported')
+      && (() => { const r = document.activeElement.getBoundingClientRect(); return r.y >= 0 && r.bottom <= innerHeight; })()), 'actual320px import retains one owner with visible focused status and pending export');
+    await shot(page, 'reward-import-waiting-320');
+    await importFile(JSON.stringify({ ...original, awardId: 'ignored-overlap' }));
+    const queuedExport = page.waitForEvent('download'); await page.locator('#export').click();
+    const queuedText = await fs.readFile(await (await queuedExport).path(), 'utf8');
+    check('reward-queued-import-export', JSON.stringify(JSON.parse(queuedText)) === JSON.stringify(original) && await page.evaluate((raw) => window.__saveHeldRaw === raw, originalRaw),
+      'overlapping file selection is ignored and the actual pending file remains exportable without a write');
+    check('reward-queued-export-waiting-copy', await page.locator('#last').textContent().then((t) => t.includes('Saving is still waiting') && !t.includes('retry')), 'export while queued reports waiting without falsely claiming failure');
+    await releaseProgressTransaction(page); await page.waitForFunction(() => document.getElementById('launch').getAttribute('aria-busy') === 'false');
+    await page.setViewportSize(VIEWPORT);
     await page.locator('#demos summary').click();
+    await page.locator('#play-legendary').click(); await page.waitForSelector('#replace[open]'); await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.activeElement.id === 'play-legendary' && !document.getElementById('play-legendary').disabled);
+    check('reward-fresh-cancel-trigger', await raw() === originalRaw && await page.locator('#play-legendary').evaluate((n) => document.activeElement === n), 'cancelled fresh demo restores its exact Legendary trigger after operation cleanup');
     await page.getByRole('button', { name: 'Play the reward sequence', exact: true }).click();
     await page.getByRole('button', { name: 'Start fresh demo', exact: true }).click();
     await reveal(); await finish();
@@ -1224,9 +1249,7 @@ async function rewardProgress(browser, url) {
     await page.getByRole('button', { name: 'Play the reward sequence', exact: true }).click();
     await page.getByRole('button', { name: 'Start fresh demo', exact: true }).click();
     await reveal();
-    await page.evaluate(() => {
-      window.__p1Set = Storage.prototype.setItem;
-      Storage.prototype.setItem = function(k, v) { if (k === 'cw.progress' && window.__p1Quota) throw new DOMException('quota', 'QuotaExceededError'); return window.__p1Set.call(this, k, v); };
+    await page.evaluate(async () => {
       window.__p1Quota = true;
     });
     await finish();
@@ -1238,25 +1261,27 @@ async function rewardProgress(browser, url) {
     const recovery = await recoveryWait, recoveryPath = path.join(OUT_DIR, `p1-unsaved-export-${stamp}.json`);
     await recovery.saveAs(recoveryPath);
     check('reward-quota-export', JSON.stringify(JSON.parse(await fs.readFile(recoveryPath, 'utf8'))) === JSON.stringify(pending), 'unsaved completed army exports exactly');
-    await page.evaluate(() => { window.__p1Quota = false; });
+    await page.evaluate(async () => { window.__p1Quota = false; });
     await page.getByRole('button', { name: 'Retry save', exact: true }).click();
+    await page.waitForFunction(() => document.getElementById('launch').getAttribute('aria-busy') === 'false');
     check('reward-quota-retry', JSON.stringify(await state()) === JSON.stringify(pending) && JSON.stringify(JSON.parse(await raw())) === JSON.stringify(pending) && /Saved army/.test(await page.locator('#last').textContent()),
       'retry saves the same pending award without reroll');
     // A new external save must not become authorized merely by opening a preview.
     await page.locator('#play').click(); await page.getByRole('button', { name: 'Start fresh demo', exact: true }).click();
     await reveal();
-    await page.evaluate((text) => localStorage.setItem('cw.progress', text), originalRaw);
+    await seedProgress(page, originalRaw);
     await finish();
     const conflicted = await state();
     await page.locator('#deal-one').click();
     await page.waitForSelector('.rw[data-step="b"]'); await page.keyboard.press('s');
     await page.getByRole('button', { name: /^Close/ }).click();
     await page.locator('#retry').click();
+    await page.waitForFunction(() => document.getElementById('launch').getAttribute('aria-busy') === 'false');
     check('reward-preview-keeps-conflict', await raw() === originalRaw && JSON.stringify(await state()) === JSON.stringify(conflicted) && /changed/.test(await page.locator('#last').textContent()),
       'conflicting external save survives one-card preview and Retry; pending result keeps its original baseline');
     await importFile(exported); await page.getByRole('button', { name: 'Import and replace', exact: true }).click();
     await page.waitForFunction((award) => window.__rewardResult.awardId === award, original.awardId);
-    const prefs = await page.evaluate(() => [localStorage.getItem('cw.settings'), localStorage.getItem('cw.locks')]);
+    const prefs = await page.evaluate(async () => [localStorage.getItem('cw.settings'), localStorage.getItem('cw.locks')]);
     check('reward-preferences-preserved', prefs[0] === '{"screens.sound":false}' && prefs[1] === '["screens.sound"]', 'save/import/retry leave preferences and locks byte-for-byte unchanged');
     const axe = await new AxeBuilder({ page }).analyze();
     result.rewardAxe = axe.violations.map((v) => ({ id: v.id, impact: v.impact, targets: v.nodes.map((n) => n.target) }));
@@ -1271,21 +1296,59 @@ async function rewardProgress(browser, url) {
       await shot(page, `reward-launcher-${viewport.width}`);
     }
     const beforeReadFailure = await raw();
-    await ctx.addInitScript(() => {
-      window.__p1RawGet = Storage.prototype.getItem;
-      Storage.prototype.getItem = function(k) {
-        if (k === 'cw.progress' && sessionStorage.getItem('p1.block') === '1') throw new DOMException('blocked', 'SecurityError');
-        return window.__p1RawGet.call(this, k);
-      };
-    });
-    await page.evaluate(() => sessionStorage.setItem('p1.block', '1'));
+    await page.evaluate(async () => sessionStorage.setItem('p1.block', '1'));
     await page.reload();
     await page.getByRole('button', { name: 'Retry loading', exact: true }).waitFor();
-    check('reward-read-failure-no-roll', await page.locator('.rw').count() === 0 && await page.evaluate((text) => window.__p1RawGet.call(localStorage, 'cw.progress') === text, beforeReadFailure),
+    check('reward-read-failure-no-roll', await page.locator('.rw').count() === 0 && await raw() === beforeReadFailure,
       'blocked startup read retains stored bytes, displays recovery controls, never rolls fresh loot');
-    await page.evaluate(() => sessionStorage.removeItem('p1.block'));
-    await page.getByRole('button', { name: 'Retry loading', exact: true }).click();
+    await page.evaluate(async () => sessionStorage.removeItem('p1.block'));
+    await page.getByRole('button', { name: 'Retry loading', exact: true }).click(); await page.waitForFunction(() => document.getElementById('launch').getAttribute('aria-busy') === 'false');
     check('reward-read-retry', await raw() === beforeReadFailure && (await state()).awardId === original.awardId && await page.locator('.rw').count() === 0, 'retry loads the original completed army without rolling');
+    // Unknown storage is distinct from an observed empty baseline, captured per reward callback.
+    await page.setViewportSize(VIEWPORT);
+    await page.evaluate(async () => {
+      window.__p1Writes = 0;
+      sessionStorage.setItem('p1.block', '1');
+    });
+    if (!await page.locator('#demos').evaluate((n) => n.open)) await page.locator('#demos summary').click();
+    await page.locator('#play').click(); await page.getByRole('button', { name: 'Start fresh demo', exact: true }).click();
+    await reveal(); await finish();
+    const unknown = await state();
+    check('reward-unknown-baseline-no-write', await page.evaluate(async () => window.__p1Writes === 0
+      && document.getElementById('last').textContent.includes('Progress was unavailable') && !document.getElementById('export').disabled), 'blocked start retains/exportable completed result and never treats unknown storage as empty');
+    await page.evaluate(async () => sessionStorage.removeItem('p1.block'));
+    await page.setViewportSize({ width: 320, height: 480 }); await holdProgressTransaction(page);
+    await page.getByRole('button', { name: 'Retry loading', exact: true }).click();
+    await page.waitForFunction(() => document.getElementById('last').textContent.includes('Loading saved progress'));
+    const readFeedback = await page.evaluate(() => { const r = document.getElementById('last').getBoundingClientRect();
+      return { focus: document.activeElement.id, top: r.y, bottom: r.bottom, viewport: innerHeight,
+        text: document.getElementById('last').textContent, scroll: document.getElementById('launch').scrollTop }; });
+    check('reward-delayed-read-feedback', readFeedback.focus === 'last' && readFeedback.top >= 0 && readFeedback.bottom <= readFeedback.viewport,
+      JSON.stringify(readFeedback));
+    await shot(page, 'reward-reading-320');
+    const readingExport = page.waitForEvent('download'); await page.locator('#export').click();
+    check('reward-export-reading-copy', JSON.stringify(JSON.parse(await fs.readFile(await (await readingExport).path(), 'utf8'))) === JSON.stringify(unknown)
+      && await page.locator('#last').textContent().then((text) => text.includes('Review is still in progress') && !text.includes('Saving')),
+      'actual pending export while reading reports review and never claims an unconfirmed save');
+    await releaseProgressTransaction(page);
+    await page.waitForSelector('#replace[open]'); await page.keyboard.press('Escape');
+    await page.waitForFunction(() => document.getElementById('launch').getAttribute('aria-busy') === 'false');
+    check('reward-unknown-recovered-cancel', await raw() === beforeReadFailure && await page.evaluate(async () => window.__p1Writes === 0)
+      && JSON.stringify(await state()) === JSON.stringify(unknown), 'recovered existing army still requires consent; Cancel preserves both stored and pending armies');
+    await page.getByRole('button', { name: 'Retry loading', exact: true }).click();
+    await page.getByRole('button', { name: 'Replace and save', exact: true }).click();
+    await page.waitForFunction(() => document.getElementById('launch').getAttribute('aria-busy') === 'false');
+    check('reward-unknown-recovered-confirm', await raw() === JSON.stringify(unknown) && await page.evaluate(async () => window.__p1Writes === 1), 'confirmed recovered baseline saves the original pending award once');
+    await page.setViewportSize(VIEWPORT);
+    await page.evaluate(async () => { sessionStorage.setItem('p1.block', '1'); });
+    await page.locator('#play').click(); await page.getByRole('button', { name: 'Start fresh demo', exact: true }).click();
+    await reveal(); await page.evaluate(async () => { await window.__progressFixture.clear(); localStorage.removeItem('cw.progress'); sessionStorage.removeItem('p1.block'); }); await finish();
+    const unknownEmpty = await state();
+    await page.evaluate(async () => sessionStorage.removeItem('p1.block'));
+    check('reward-unknown-empty-still-pending', await raw() === null && await page.evaluate(async () => window.__p1Writes === 1), 'recovery to empty storage itself grants no write; explicit Retry is still needed');
+    await page.getByRole('button', { name: 'Retry loading', exact: true }).click();
+    await page.waitForFunction(() => document.getElementById('launch').getAttribute('aria-busy') === 'false');
+    check('reward-unknown-empty-retry', await raw() === JSON.stringify(unknownEmpty) && await page.evaluate(async () => window.__p1Writes === 2), 'explicit Retry observes empty storage and saves the same completed result once');
     check('reward-no-console-errors', errors.length === 0, errors.join(' | ') || '0 errors');
   } finally { await ctx.close(); }
 }
@@ -1303,6 +1366,9 @@ async function main() {
     browser = await chromium.launch(native ? { channel: 'chrome', headless: false }
       : { headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     result.browser = `chromium ${browser.version()}`;
+    if (process.argv.includes('--save-coordination')) { result.mode = 'two-tab save coordination only';
+      await saveCoordination({ browser, url, check, shot, result, watchErrors, trace: process.argv.includes('--save-trace') }); return;
+    }
     if (process.argv.includes('--keyboard')) { result.mode = 'keyboard orders only'; await sandboxAndDevice(browser, url, { keyboardOnly: true }); return; }
     if (process.argv.includes('--spacing')) { result.mode = 'formation spacing only'; await sandboxAndDevice(browser, url, { spacingOnly: true }); return; }
     if (process.argv.includes('--moments')) { result.mode = 'field moments only'; await sandboxAndDevice(browser, url, { momentsOnly: true }); return; }
@@ -1311,6 +1377,12 @@ async function main() {
     if (process.argv.includes('--intro')) { result.mode = 'unforced introductory play'; await introPlay({ browser, url, check, shot, result, watchErrors, native }); return; }
     if (process.argv.includes('--practice')) { result.mode = 'practice result bridge only'; await practiceProgress({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--reward')) { result.mode = 'reward progress only'; await rewardProgress(browser, url); return; }
+    if (process.argv.includes('--save')) { result.mode = 'coordinated save and retained writer flows';
+      await saveCoordination({ browser, url, check, shot, result, watchErrors });
+      await rewardProgress(browser, url);
+      await practiceProgress({ browser, url, check, shot, result, watchErrors });
+      await entryProgress({ browser, url, check, shot, result, watchErrors }); return;
+    }
     if (process.argv.includes('--s1')) {
       result.mode = 's1 only (battle page skipped)';
       await sandboxAndDevice(browser, url);
@@ -1357,11 +1429,11 @@ async function main() {
       check('canvas-not-blank', colours.size > 50, `${colours.size} distinct colours in the sample grid`);
 
       // 4. figures and markers
-      const info = await page.evaluate(() => ({ figures: window.__game.game.figureCount(), units: window.__game.game.units.length, markers: document.querySelectorAll('#markers .marker').length }));
+      const info = await page.evaluate(async () => ({ figures: window.__game.game.figureCount(), units: window.__game.game.units.length, markers: document.querySelectorAll('#markers .marker').length }));
       check('figures', info.figures >= MIN_FIGURES && info.markers === info.units, `${info.figures} figures (need >= ${MIN_FIGURES}); ${info.markers} markers for ${info.units} units`);
 
       // 4b. every brigade and battery starts facing its nearest enemy (within 75 degrees)
-      const facing = await page.evaluate(() => {
+      const facing = await page.evaluate(async () => {
         const us = window.__game.game.units;
         return us.map((u) => {
           let best = null, bd = Infinity;
@@ -1392,9 +1464,9 @@ async function main() {
           await page.mouse.move(x, y);
           await page.waitForTimeout(30);
         }
-        const previewShown = await page.evaluate(() => !!window.__game.arrows.preview);
+        const previewShown = await page.evaluate(async () => !!window.__game.arrows.preview);
         await page.mouse.up();
-        const st = await page.evaluate(() => {
+        const st = await page.evaluate(async () => {
           const g = window.__game.game;
           const u = g.units.find((v) => v.id === 'franklin');
           return { selected: g.selected && g.selected.id, orders: g.orders || 0, type: u.order.type, active: u.follow.active, pathPts: u.path ? u.path.length : 0 };
@@ -1408,7 +1480,7 @@ async function main() {
 
       // 6. Hold button
       await page.getByRole('button', { name: 'Hold', exact: true }).click();
-      const held = await page.evaluate(() => { const u = window.__game.game.units.find((v) => v.id === 'franklin'); return { type: u.order.type, active: u.follow.active }; });
+      const held = await page.evaluate(async () => { const u = window.__game.game.units.find((v) => v.id === 'franklin'); return { type: u.order.type, active: u.follow.active }; });
       check('hold-button', held.type === 'hold' && !held.active, `after Hold: order=${held.type} moving=${held.active}`);
 
       // f. zoom: a trackpad pinch (ctrl + wheel) toward a point keeps the ground under it within 3% of the view
@@ -1493,7 +1565,7 @@ async function main() {
       }
 
       // 7. fight: march three brigades up the hill, fast-forward, look for casualties and smoke on both sides
-      const fight = await page.evaluate(() => {
+      const fight = await page.evaluate(async () => {
         const g = window.__game.game;
         const by = (id) => g.units.find((u) => u.id === id);
         g.order(by('franklin'), { type: 'move', points: [[by('franklin').x, by('franklin').z], [80, 470], [230, 500]] });
@@ -1506,7 +1578,7 @@ async function main() {
         return { cas, puffs: window.__game.effects.puffs, smoke: window.__game.effects.ok, franklin: [Math.round(fr.x), Math.round(fr.z), fr.state], simTime: Math.round(g.simTime),
           states: g.units.map((u) => `${u.id}:${Math.round(u.men)}:${u.state}`).join(' ') };
       });
-      await page.evaluate(() => { const r = window.__game.rts; r.goal.x = 150; r.goal.z = 420; r.goal.dist = 520; });
+      await page.evaluate(async () => { const r = window.__game.rts; r.goal.x = 150; r.goal.z = 420; r.goal.dist = 520; });
       await page.waitForTimeout(3000);
       await shot(page, 'fight');
       check('fight', fight.cas.US > 0 && fight.cas.CS > 0 && (fight.puffs > 0 || !fight.smoke),
@@ -1530,7 +1602,7 @@ async function main() {
     } catch (err) {
       check('axe', false, `axe-core could not run: ${err.message.split('\n')[0]}`);
     }
-    result.stats = await page.evaluate(() => window.__stats ?? null).catch(() => null);
+    result.stats = await page.evaluate(async () => window.__stats ?? null).catch(() => null);
     if (result.stats) console.log(`stats: ${JSON.stringify(result.stats)}`);
     await page.context().close().catch(() => {}); // one game page at a time
     if (process.argv.includes('--field')) { result.mode = 'field only (sandbox and device pages skipped)'; return; }
@@ -1539,6 +1611,7 @@ async function main() {
     await practiceProgress({ browser, url, check, shot, result, watchErrors });
     await introPlay({ browser, url, check, shot, result, watchErrors, native });
     await entryProgress({ browser, url, check, shot, result, watchErrors });
+    await saveCoordination({ browser, url, check, shot, result, watchErrors });
   } finally {
     if (browser) await browser.close().catch(() => {});
     await new Promise((resolve) => server.close(resolve));

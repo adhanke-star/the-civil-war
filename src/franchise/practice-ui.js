@@ -15,9 +15,18 @@ export function attachPracticeFlow({ game, scenario, hud, mode }) {
   const unsavedButton = document.getElementById('result-unsaved');
   const after = document.getElementById('after-action');
   let captured = false, outcome = null, pending = null, saved = null, previous = null, failure = null, reward = null, baselineKnown = false;
+  let saving = false, reviewing = false, rewardActive = false;
+  let reading = false, readCancelled = false;
 
   configureRewardReplay(() => hud.toast('Open the separate reward demo from the menu. Practice rewards use the completed battlefield.'));
-  dialog.addEventListener('close', () => after.focus({ preventScroll: true }));
+  dialog.addEventListener('close', () => {
+    if (!dialog.open && !rewardActive) {
+      if (!saving) reviewing = false;
+      sync(); after.focus({ preventScroll: true });
+    }
+  });
+  dialog.addEventListener('cancel', () => { if (reading) readCancelled = true; });
+  back.addEventListener('click', () => { if (reading) readCancelled = true; });
   dialog.addEventListener('keydown', (e) => {
     if (e.key !== 'Tab') return;
     const buttons = [...dialog.querySelectorAll('button, a[href]')].filter((n) => !n.hidden && !n.disabled);
@@ -28,6 +37,12 @@ export function attachPracticeFlow({ game, scenario, hud, mode }) {
   after.addEventListener('click', openResult);
   exportButton.addEventListener('click', () => download(pending || previous));
   unsavedButton.addEventListener('click', () => startLoot(false));
+
+  function sync() {
+    dialog.setAttribute('aria-busy', String(saving || reading));
+    after.disabled = reviewing || rewardActive;
+    action.disabled = saving || reading; back.disabled = false; unsavedButton.disabled = saving || reading;
+  }
 
   function download(snapshot) {
     if (!snapshot) return;
@@ -46,55 +61,97 @@ export function attachPracticeFlow({ game, scenario, hud, mode }) {
     const menu = document.getElementById('menu');
     if (menu.open) menu.close();
     if (!dialog.open) dialog.showModal();
-    (focusCancel || !label ? back : action).focus({ preventScroll: true });
+    sync();
+    if (saving || reading) { title.tabIndex = -1; title.focus(); }
+    else (focusCancel || !label ? back : action).focus({ preventScroll: true });
   }
   function showSaved() {
     panel('Army saved', `${saved.army.reduce((n, b) => n + b.men, 0).toLocaleString()} surviving men and ${saved.depot.length} depot cards are saved. Continue opens your saved army in camp. Fresh practice starts with its original troops and gear.`,
       'Continue', () => location.assign('./?camp'));
   }
   function recover() {
-    panel(pending ? 'Army not saved' : 'Progress unavailable', failure,
+    panel(pending ? 'Army not saved' : 'Progress unavailable', failure || 'Your completed army is waiting to be saved. Retry loading to review saved progress, or export this army.',
       pending && baselineKnown ? 'Retry saving' : 'Retry loading', pending ? (baselineKnown ? savePending : reviewForSave) : openLoot, { exportable: !!pending });
     unsavedButton.hidden = !!pending || baselineKnown;
   }
-  function reviewForSave() {
-    try { previous = store.load(); }
-    catch (err) { failure = err.message; recover(); return; }
+  async function readForReview() {
+    reading = true; readCancelled = false;
+    panel('Loading saved progress', 'Keep this page open while saved progress is read. Inspecting the field cancels this review.', null, null, { exportable: !!pending });
+    let baseline;
+    try { baseline = await store.load(); }
+    catch (err) { failure = err.message; }
+    finally { reading = false; sync(); }
+    if (readCancelled || !dialog.open) { if (dialog.open) openResult(); return false; }
+    if (failure) { recover(); return false; }
+    previous = baseline; return true;
+  }
+  async function reviewForSave() {
+    if (saving || reading || reviewing || rewardActive) return;
+    failure = null;
+    if (!await readForReview()) return;
     if (previous) {
+      reviewing = true;
       panel('Replace saved army?', 'Your unsaved practice result will replace this saved army. Export the practice result before cancelling if you want to keep both.',
-        'Replace and save', () => { baselineKnown = true; savePending(); }, { cancel: 'Cancel', exportable: true, focusCancel: true });
+        'Replace and save', () => { reviewing = false; baselineKnown = true; savePending(); }, { cancel: 'Cancel', exportable: true, focusCancel: true });
     } else { baselineKnown = true; savePending(); }
   }
-  function savePending() {
+  async function savePending() {
+    if (saving || reading || rewardActive || !pending) return;
     if (!baselineKnown) {
       failure = 'Storage was unavailable when loot started. Export this army, or retry loading to review saved progress before replacing it.';
       recover(); return;
     }
+    const result = pending, baseline = previous;
+    saving = true; reviewing = false;
+    panel('Saving army', 'Keep this page open while your completed army is saved. You can export this army while saving waits.', null, null, { exportable: true });
     try {
-      const receipt = store.complete(pending, { previous });
-      saved = receipt.snapshot; failure = null; showSaved();
-    } catch (err) { failure = err.message; recover(); }
+      const receipt = await store.complete(result, { previous: baseline });
+      saved = receipt.snapshot; failure = null;
+    } catch (err) { failure = err.message; }
+    finally { saving = false; sync(); }
+    // Inspect/Escape can dismiss the waiting panel without cancelling or rebasing the write.
+    if (dialog.open) { if (failure) recover(); else showSaved(); }
+    else hud.toast(failure ? 'Army not saved. Open After action to retry or export.' : 'Army saved. Open After action to continue.');
   }
   function startLoot(authorized = true) {
+    if (saving || reading || rewardActive || !outcome) return;
+    reviewing = false; rewardActive = true; sync();
     game.paused = true; hud.setPaused(true); baselineKnown = authorized;
     dialog.close(); field.inert = true; failure = null;
     reward = mountReward(document.body, { army: outcome.army, depot: outcome.depot, awardId: outcome.awardId,
       seed: outcome.seed, grade: outcome.grade, captures: outcome.captures, afterAction: outcome.summary,
-      onDone: (result) => { pending = completedSnapshot(result); savePending(); } });
+      onDone: (result) => {
+        if (saving) return;
+        rewardActive = false;
+        try { pending = completedSnapshot(result); savePending(); }
+        catch (err) { failure = err.message; recover(); }
+      } });
   }
-  function openLoot() {
+  async function openLoot() {
+    if (saving || reading || reviewing || rewardActive) return;
     if (!outcome) return;
-    try { previous = store.load(); }
-    catch (err) { baselineKnown = false; failure = err.message; recover(); return; }
+    if (pending) { recover(); return; }
+    failure = null; baselineKnown = false;
+    if (!await readForReview()) return;
     if (previous?.awardId === outcome.awardId) { saved = previous; showSaved(); return; }
     if (previous) {
+      reviewing = true;
       panel('Replace saved army?', 'This practice reward replaces your completed saved army. Export that army before continuing if you want to keep it.',
         'Replace and open loot', () => startLoot(true), { cancel: 'Cancel', exportable: true, focusCancel: true });
     } else startLoot(true);
   }
   function openResult() {
+    if (reviewing || rewardActive) return;
+    if (reading) {
+      panel('Loading saved progress', 'The saved-progress read is still in progress. Inspecting the field cancels this review.', null, null, { exportable: !!pending });
+      return;
+    }
+    if (saving) {
+      panel('Saving army', 'Keep this page open while your completed army is saved. You can export this army while saving waits.', null, null, { exportable: true });
+      return;
+    }
     if (saved) { showSaved(); return; }
-    if (failure) { recover(); return; }
+    if (failure || pending) { recover(); return; }
     const message = outcome
       ? `${game.result.why} ${outcome.summary.surviving.toLocaleString()} surviving men; ${outcome.summary.losses.toLocaleString()} lost. ${outcome.captures.length} held field crates. Open the practice quartermaster issue.`
       : `${game.result.why} ${mode === 'historical' ? 'Historical battles grant no franchise rewards.' : 'Sandbox or altered battles grant no progress rewards.'}`;
@@ -112,5 +169,5 @@ export function attachPracticeFlow({ game, scenario, hud, mode }) {
     openResult();
   }
   return { finishResult, openResult, get outcome() { return outcome; }, get pending() { return pending; },
-    get saved() { return saved; }, get reward() { return reward; } };
+    get saved() { return saved; }, get reward() { return reward; }, get saving() { return saving; }, get reading() { return reading; } };
 }

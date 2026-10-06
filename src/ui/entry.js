@@ -9,6 +9,7 @@ export function mountEntry({ camp = false } = {}) {
   defineRewardSettings();
   const store = createProgressStore();
   let saved = null, failed = false, pendingImport = null, pendingName = null, importing = false;
+  let pendingBaseline, baselineKnown = false, phase = 'idle';
   const root = document.createElement('main'); root.id = 'front'; root.className = 'rw rw-counts';
   root.dataset.uiStyle = STYLE[get('screens.cardStyle')] || 'modern';
   root.innerHTML = `
@@ -33,7 +34,8 @@ export function mountEntry({ camp = false } = {}) {
   document.body.append(root);
   const node = (id) => root.querySelector(`#${id}`), status = node('entry-status');
   const controls = () => {
-    node('entry-continue').disabled = failed;
+    root.setAttribute('aria-busy', String(importing));
+    node('entry-continue').disabled = failed || importing;
     node('entry-export').disabled = !(saved || pendingImport);
     node('entry-retry').hidden = !failed && !pendingImport;
     node('entry-retry').textContent = pendingImport ? 'Retry importing' : 'Retry loading';
@@ -77,56 +79,89 @@ export function mountEntry({ camp = false } = {}) {
       }, 'depot cards');
     }
     controls();
-    window.__entry = { mode: showCamp ? 'camp' : 'title', saved, failed, pending: pendingImport };
+    window.__entry = { mode: showCamp ? 'camp' : 'title', saved, failed, pending: pendingImport, get importing() { return importing; } };
     document.title = `The Civil War — ${showCamp ? 'Your army' : 'Take the field'}`;
   }
-  function load() {
-    try { saved = store.load(); failed = false; status.textContent = saved ? 'Saved army ready.' : 'No completed army saved yet.'; }
+  function focusStatus() { status.tabIndex = -1; status.focus(); status.scrollIntoView({ block: 'nearest' }); }
+  function loading(message = 'Loading saved progress…') { phase = 'reading'; status.textContent = message; focusStatus(); }
+  async function load() {
+    if (importing) return;
+    importing = true; controls(); loading();
+    try { saved = await store.load(); failed = false; status.textContent = saved ? 'Saved army ready.' : 'No completed army saved yet.'; }
     catch (err) { failed = true; status.textContent = err.message; }
-    render(); (failed ? node('entry-retry') : camp && saved ? node('camp-practice') : node('entry-continue')).focus({ preventScroll: true });
+    finally { importing = false; phase = 'idle'; }
+    render(); (failed ? node('entry-retry') : camp && saved ? node('camp-practice') : node('entry-continue')).focus();
   }
   async function confirm(returnTo = node('entry-import')) {
+    phase = 'reviewing';
     const dialog = node('entry-replace'); dialog.returnValue = 'cancel'; dialog.showModal(); node('entry-cancel').focus();
     const accepted = await new Promise((resolve) => dialog.addEventListener('close', () => resolve(dialog.returnValue === 'replace'), { once: true }));
-    returnTo.focus(); return accepted;
+    if (!returnTo.disabled) returnTo.focus(); return accepted;
   }
-  function writeImport() {
-    try { saved = store.import(pendingImport); pendingImport = null; pendingName = null; failed = false; status.textContent = 'Imported and saved army.'; }
+  async function writeImport() {
+    const text = pendingImport, previousRaw = pendingBaseline; phase = 'writing';
+    status.textContent = 'Saving the imported army… You can export the pending import while saving waits.';
+    render(); focusStatus();
+    try {
+      saved = await store.import(text, { previousRaw });
+      pendingImport = null; pendingName = null; pendingBaseline = undefined; baselineKnown = false;
+      failed = false; status.textContent = 'Imported and saved army.';
+    }
     catch (err) { status.textContent = `${err.message} Export the pending import or retry. Current progress is unchanged.`; }
     render(); node('entry-import').focus();
   }
   function importNote(snapshot, name) {
     node('entry-replace-note').textContent = `Import ${name}: ${snapshot.army.length} formations and ${snapshot.depot.length} depot cards. This replaces your completed army and depot. Export first to keep your current army.`;
   }
-  node('entry-continue').addEventListener('click', () => {
+  node('entry-continue').addEventListener('click', async () => {
+    if (importing) return;
+    importing = true; controls();
+    loading();
     // Re-read at navigation: another tab may have saved or invalidated progress.
-    try { saved = store.load(); failed = false; location.assign(saved ? './?camp' : './?intro'); }
-    catch (err) { failed = true; status.textContent = err.message; render(); node('entry-retry').focus(); }
+    try { saved = await store.load(); failed = false; location.assign(saved ? './?camp' : './?intro'); }
+    catch (err) { failed = true; status.textContent = err.message; render(); }
+    finally { importing = false; phase = 'idle'; controls(); if (failed) node('entry-retry').focus(); }
   });
   node('entry-retry').addEventListener('click', async () => {
     if (importing) return;
     if (!pendingImport) { load(); return; }
     importing = true; controls();
     let accepted = false;
-    try { importNote(parseSnapshot(pendingImport), pendingName); accepted = await confirm(node('entry-retry')); if (accepted) writeImport(); }
-    finally { importing = false; controls(); (accepted ? node('entry-import') : node('entry-retry')).focus(); }
+    try {
+      // A failed read grants no write. Only that case may acquire its first baseline on retry.
+      if (!baselineKnown) { loading(); pendingBaseline = await store.readRawBaseline(); baselineKnown = true; }
+      importNote(parseSnapshot(pendingImport), pendingName);
+      accepted = await confirm(node('entry-retry'));
+      if (accepted) await writeImport();
+    } catch (err) { status.textContent = `${err.message} Export the pending import or retry. Current progress is unchanged.`; }
+    finally { importing = false; phase = 'idle'; controls(); (accepted ? node('entry-import') : node('entry-retry')).focus(); }
   });
   node('entry-export').addEventListener('click', () => {
     const text = pendingImport || exportSnapshot(saved), url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
     const a = document.createElement('a'); a.href = url; a.download = 'the-civil-war-army.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-    status.textContent = pendingImport ? 'Exported pending import. Browser saving still needs a retry.' : 'Exported the displayed saved army.';
+    status.textContent = pendingImport ? importing ? phase === 'writing' ? 'Exported pending import. Saving is still waiting.' : 'Exported pending import. Review is still in progress.' : 'Exported pending import. Browser saving still needs a retry.' : 'Exported the displayed saved army.';
   });
-  node('entry-import').addEventListener('click', () => node('entry-file').click());
+  node('entry-import').addEventListener('click', () => { if (!importing) node('entry-file').click(); });
   node('entry-file').addEventListener('change', async (e) => {
     const file = e.target.files[0]; e.target.value = ''; if (!file || importing) return;
-    importing = true; controls();
+    importing = true; controls(); loading('Reading the selected army…');
     try {
       if (file.size > MAX_SAVE_BYTES) throw new Error('Progress: file exceeds the 1 MB limit.');
       const text = await file.text(), snapshot = parseSnapshot(text);
+      let previousRaw;
+      try { previousRaw = await store.readRawBaseline(); }
+      catch (err) {
+        pendingImport = text; pendingName = file.name; pendingBaseline = undefined; baselineKnown = false;
+        status.textContent = `${err.message} Export the pending import, or retry loading before reviewing replacement.`;
+        render(); return;
+      }
       importNote(snapshot, file.name);
-      if (await confirm()) { pendingImport = text; pendingName = file.name; writeImport(); }
+      if (await confirm()) {
+        pendingImport = text; pendingName = file.name; pendingBaseline = previousRaw; baselineKnown = true;
+        await writeImport();
+      }
     } catch (err) { status.textContent = `${err.message} Current progress is unchanged.`; }
-    finally { importing = false; controls(); node('entry-import').focus(); }
+    finally { importing = false; phase = 'idle'; controls(); node('entry-import').focus(); }
   });
   node('entry-cancel').addEventListener('click', () => node('entry-replace').close('cancel'));
   node('entry-confirm').addEventListener('click', () => node('entry-replace').close('replace'));

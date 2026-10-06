@@ -5,7 +5,51 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: frame report accepted; P2i keyboard orders WIP (2026-10-06)
+## Current boundary: P2j1 local candidate green; integration pending (2026-10-06)
+
+P2j1 Web Lock proposal FAILED actual native UI coordination. Retain the lost-update trace
+.out/p2j1-coordination-trace-20261006.json and failed-source hashes; none are acceptance.
+Root replaced the backend inside save.js with IndexedDB under DECISIONS0036, preserving export v1,
+untouched legacy bytes and settings. Only a committed mutation adopts database authority; all callers
+await reads and writes. Helpers read only. P2j2 camp equipment modal has not started.
+
+HEAD/origin main7671f3f987d9f878c940adc280dfbb1bbacef9c1; CI37532456340 and Pages37532456245
+passed. Root owns tracked P2j1 runtime/tests/docs plus new tools/test-save.mjs, test-save-ui.mjs and
+test-progress-browser.mjs. Preserve unrelated workspace and root-owned untracked Shiloh preflight;
+no dawn numeric roster, georeference or runtime scenario is accepted. No competing provider/writer.
+
+Database diagnostics: initial coordination44/44, first serial147/147, then serialr2 failed two real
+320px reward status visibility checks (150/152). Explicit scrolling repaired waiting import but
+rewardr3 still failed clipped Loading feedback (51/52). Move feedback before controls; rewardr4
+52/52 at22:21:39.767Z, zero errors/warnings, Loading y229.867..250.164 in480px. Root viewed both
+exact r4 narrow Loading/Saving PNGs. All receipts are .out/p2j1-database-*20261006.{json,log}; keep
+failed receipts distinct. Retained/new deterministic183+183, unit, owned syntax,CI YAML30steps and
+diff pass. Initial frozen full failed266/268 in444648ms: intro read saved state before its database
+commit and then dereferenced null; later entry/coordination stages were skipped. Await actual save
+settlement and compare database bytes; retain the failure, not acceptance. get+count in the same
+transaction now distinguishes absence from stored undefined/null/nonstring records. Final focused
+coordination51/51 at22:32:28.707Z includes actual asynchronous ConstraintError rollback; source review
+clears both repairs. R2 full native used20 frozen hashes
+.out/p2j1-database-frozen-source-r2-20261006.json; log
+.out/p2j1-database-full-native-r2-20261006.json failed347/348 in521436ms, zero errors/warnings and
+all24 axe scopes empty. Intro actual save/48.1s native first-card, entry and database coordination
+all passed. One practice assertion inspected consent before the database read settled; source review
+confirms the race. Test-only wait for the exact native consent plus Escape return-focus bind repairs
+that assertion; focused practice run is .out/p2j1-database-practice-settlement-r3-20261006.{log,json}.
+Focused practice47/47 in64328ms at22:43:57.358Z confirms settled consent/zero-write diagnostics and
+Escape return focus. Counter checks are now explicit assertions, independently source-cleared;
+the focused receipt predates that strengthening. Runtime/other19 files remain exact. Current full r3
+uses .out/p2j1-database-frozen-source-r3-20261006.json and
+.out/p2j1-database-full-native-r3-20261006.{log,json}:349/349 in468490ms at22:45:33.518Z,
+errors/warnings and all24 axe scopes empty. All20 hashes and byte sizes match; root and independent
+reviewer viewed all seven final narrow read/write/focus PNGs. Independent source/receipt and scoped
+WCAG/rendered reviews clear integration. Final19 syntax checks, unit and diff pass;183+183 retained
+deterministic gates remain green. Actual intro wins45.52sim/47112wallms, first card50381ms, saved
+survivors/captured gear and Continue preserve the real result. No local browser remains.
+Next: explicit staging/commit/push of24 owned files, then read exactSHA CI/Pages before P2j2. Native iPad, approved
+art fielding, saved-gear deployment, campaign phases and all remaining P3-P7 remain open.
+
+## Previous boundary: frame report accepted; P2i candidate
 
 P2h parent a10b128338d14893cdbf8865eb5777b6aab01943 is pushed; Pages37525324397 passed,
 CI37525324425 passed. Preserve workspace/Shiloh notes. P2i's prerequisite is satisfied.

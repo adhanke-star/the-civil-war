@@ -2,25 +2,25 @@ import { AxeBuilder } from '@axe-core/playwright';
 
 export async function spacingControls({ page, check, shot, result }) {
   await page.reload(); await page.waitForFunction(() => window.__ready && window.__game, null, { timeout: 180000 });
-  if (!(await page.evaluate(() => window.__game.game.paused))) await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  if (!(await page.evaluate(async () => window.__game.game.paused))) await page.getByRole('button', { name: 'Pause', exact: true }).click();
   const panel = async (open) => { if ((await page.locator('#sb-toggle').getAttribute('aria-expanded') === 'true') !== open) await page.locator('#sb-toggle').click(); };
   const flag = (name) => page.locator('.marker').filter({ has: page.locator('.nm', { hasText: new RegExp(`^${name}$`) }) });
   await panel(false); await flag('Franklin').dblclick(); await page.waitForTimeout(1200);
-  await page.evaluate(() => { const { rts, camera } = window.__game; for (let i = 0; i < 4; i++) rts.update(1); camera.updateMatrixWorld(); });
+  await page.evaluate(async () => { const { rts, camera } = window.__game; for (let i = 0; i < 4; i++) rts.update(1); camera.updateMatrixWorld(); });
   await page.waitForTimeout(300); await panel(true); await page.getByRole('tab', { name: 'Look', exact: true }).click();
   const slider = page.getByRole('slider', { name: 'Formation spacing', exact: true });
-  const read = () => page.evaluate(() => {
+  const read = () => page.evaluate(async () => {
     const { game: g, post } = window.__game, u = g.units.find((v) => v.id === 'franklin');
-    return { time: g.simTime, paused: g.paused, progress: localStorage.getItem('cw.progress'), writes: window.__sandboxWrites,
+    return { time: g.simTime, paused: g.paused, progress: await window.__progressFixture.raw(), writes: window.__progressPuts + window.__progressLegacyWrites,
       roster: JSON.stringify(g.units.map((v) => [v.id, v.x, v.z, v.men, v.menMax, v.morale, v.fatigue, v.ammo, v.xp, v.weapon, v.order, v.path, v.facing, v.goalFacing])),
       halfFront: u.halfFront, depth: u.depth, textures: post.renderer.info.memory.textures, geometries: post.renderer.info.memory.geometries,
       targets: [post.rtScene, post.rtSmall, post.rtBlur].map((t) => [t.uuid, t.width, t.height]) };
   });
-  await page.evaluate(() => {
+  await page.evaluate(async () => {
     window.__spacingRefs = window.__game.game.units.map((u) => ({ u, figures: [...u.figures], slots: u.figures.map((f) => [f, f.lx, f.lz]),
       fallen: u.figures.filter((f) => !f.alive).map((f) => [f, f.x, f.z, f.yaw]), battery: u.type === 'artillery' ? JSON.stringify([u.halfFront, u.depth, u.gunSlots]) : null }));
   });
-  result.spacingFallenCount = await page.evaluate(() => window.__spacingRefs.reduce((n, r) => n + r.fallen.length, 0));
+  result.spacingFallenCount = await page.evaluate(async () => window.__spacingRefs.reduce((n, r) => n + r.fallen.length, 0));
   const before = await read(), layouts = [];
   for (const scale of [0.75, 1.5, 1]) {
     if (scale === 1) await page.getByRole('button', { name: 'Reset Formation spacing', exact: true }).click();
@@ -46,8 +46,8 @@ export async function spacingControls({ page, check, shot, result }) {
   // Native shift-selection and a real rotated group drag, observed through the actual preview seam.
   await slider.focus(); await page.keyboard.press('End'); await panel(false);
   await flag('Franklin').click(); await page.keyboard.down('Shift'); await flag('Willcox').click(); await page.keyboard.up('Shift');
-  check('spacing-real-group-selection', await page.evaluate(() => window.__game.game.selection.length === 2 && window.__game.game.selection.some((u) => u.id === 'franklin') && window.__game.game.selection.some((u) => u.id === 'willcox')), 'native Shift-click keeps both brigades selected');
-  await page.evaluate(() => {
+  check('spacing-real-group-selection', await page.evaluate(async () => window.__game.game.selection.length === 2 && window.__game.game.selection.some((u) => u.id === 'franklin') && window.__game.game.selection.some((u) => u.id === 'willcox')), 'native Shift-click keeps both brigades selected');
+  await page.evaluate(async () => {
     const { arrows, game } = window.__game, original = arrows.setPreview;
     window.__spacingPreviewOriginal = original;
     window.__spacingGroupBefore = game.selection.map((u) => ({ id: u.id, x: u.x, z: u.z, facing: u.facing }));
@@ -65,7 +65,7 @@ export async function spacingControls({ page, check, shot, result }) {
   const box = await flag('Franklin').locator('svg').boundingBox(), x = box.x + box.width / 2, y = box.y + box.height / 2;
   await page.mouse.move(x, y); await page.mouse.down(); await page.keyboard.down('Shift');
   await page.mouse.move(x + 95, y - 65, { steps: 12 });
-  const preview = await page.evaluate(() => window.__spacingPreview); await page.mouse.up(); await page.keyboard.up('Shift');
+  const preview = await page.evaluate(async () => window.__spacingPreview); await page.mouse.up(); await page.keyboard.up('Shift');
   const group = await page.evaluate((preview) => {
     const { game, arrows } = window.__game; arrows.setPreview = window.__spacingPreviewOriginal;
     const leader = game.units.find((u) => u.id === 'franklin'), other = game.units.find((u) => u.id === 'willcox'), old = window.__spacingGroupBefore.find((u) => u.id === leader.id);
@@ -82,8 +82,8 @@ export async function spacingControls({ page, check, shot, result }) {
   result.spacingGroup = { preview, group }; await shot(page, 'spacing-group-order');
   await panel(true); await page.getByRole('button', { name: 'Reset Formation spacing', exact: true }).click();
   // Ghosts refresh in the render loop; a software-GPU frame can exceed 200 ms.
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-  const resetGhosts = await page.evaluate(() => {
+  await page.evaluate(async () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  const resetGhosts = await page.evaluate(async () => {
     const { game, arrows } = window.__game;
     return ['franklin', 'willcox'].map((id) => { const u = game.units.find((v) => v.id === id), g = arrows.ghosts.get(id)?.g;
       const m = g?.children.find((n) => n.material === arrows.ghostMats.US), p = m?.geometry.attributes.position, c = Math.cos(u.order.endFacing), s = Math.sin(u.order.endFacing);
@@ -94,15 +94,15 @@ export async function spacingControls({ page, check, shot, result }) {
 
   await slider.focus(); for (let i = 0; i < 6; i++) await page.keyboard.press('ArrowRight');
   await page.getByRole('tab', { name: 'Units', exact: true }).click(); await page.getByRole('button', { name: 'Spawn Union brigade at view centre', exact: true }).click();
-  check('spacing-new-placement', await page.evaluate(() => { const u = window.__game.game.selected; return u.id.startsWith('sandbox-') && Math.abs(u.halfFront - Math.max(4, (u.files - 1) / 2 * 2.35 * 1.3)) < 1e-8; }), 'real placement inherits saved1.3spacing');
+  check('spacing-new-placement', await page.evaluate(async () => { const u = window.__game.game.selected; return u.id.startsWith('sandbox-') && Math.abs(u.halfFront - Math.max(4, (u.files - 1) / 2 * 2.35 * 1.3)) < 1e-8; }), 'real placement inherits saved1.3spacing');
   await page.getByRole('button', { name: 'Remove selected', exact: true }).click(); await page.getByRole('tab', { name: 'Look', exact: true }).click();
   await page.getByRole('checkbox', { name: 'Lock this: Formation spacing', exact: true }).check();
   await page.evaluate(async () => { const S = await import('./src/settings.js'); S.set('look.formationSpacing', 0.75); S.reset('look.formationSpacing'); });
   check('spacing-lock', await slider.isDisabled() && await page.evaluate(async () => (await import('./src/settings.js')).get('look.formationSpacing') === 1.3), 'Lock refuses Set/Reset and disables actual slider');
-  await page.getByRole('button', { name: 'Copy settings', exact: true }).click(); const copied = await page.evaluate(() => navigator.clipboard.readText());
+  await page.getByRole('button', { name: 'Copy settings', exact: true }).click(); const copied = await page.evaluate(async () => navigator.clipboard.readText());
   const preReload = await read(); check('spacing-progress-before-reload', preReload.progress === before.progress && preReload.writes === 0, 'slider/group/placement/lock phase preserves exact progress and zero writes before reload resets counters');
   await page.reload(); await page.waitForFunction(() => window.__ready && window.__game, null, { timeout: 180000 });
-  check('spacing-reload', await slider.isDisabled() && await page.evaluate(() => { const u = window.__game.game.units.find((v) => v.id === 'franklin'); return Math.abs(u.halfFront - Math.max(4, (u.files - 1) / 2 * 2.35 * 1.3)) < 1e-8; }), 'new constructor retains1.3spacing/lock; no in-progress battle-save claim');
+  check('spacing-reload', await slider.isDisabled() && await page.evaluate(async () => { const u = window.__game.game.units.find((v) => v.id === 'franklin'); return Math.abs(u.halfFront - Math.max(4, (u.files - 1) / 2 * 2.35 * 1.3)) < 1e-8; }), 'new constructor retains1.3spacing/lock; no in-progress battle-save claim');
   await page.getByRole('checkbox', { name: 'Lock this: Formation spacing', exact: true }).uncheck(); await page.getByRole('button', { name: 'Reset Formation spacing', exact: true }).click();
   await page.getByRole('button', { name: 'Paste settings', exact: true }).click(); await page.locator('#sb-paste-text').fill(copied); await page.getByRole('button', { name: 'Apply', exact: true }).click();
   check('spacing-transfer', await slider.isDisabled() && await page.evaluate(async () => (await import('./src/settings.js')).get('look.formationSpacing') === 1.3), 'real Copy/Paste restores spacing and lock');
