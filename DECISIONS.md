@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0021 — Direct BC7/ASTC improve errors but fail unchanged limits (2026-10-05)
+Candidate 37404193171 at becad67 completes all 18 controls, original raw/source binds and complete-chain
+checks; both sheets inspected. BC7 passes 1/6 page/mips; ASTC software and SwiftShader WebGL pass 3/6
+each. BC7 close mip1 alpha-edge p95=12; ASTC field mip1 RGB mean>2, edges10/10; field mip2 still fails.
+Active failures prohibit fielding despite workflow success. ASTC WebGL support was actually exposed
+and tested on Actions, not forced; native/iPad remain UNRUN. Preserve art/thresholds and HALT before
+full packaging/runtime. Recommend a separately bounded lossless per-battle residency feasibility read.
+
 ## 0020 — Two-page direct-format diagnostic authorized (Aaron, 2026-10-05)
 Aaron selected “authorize all recs” in response to the scope popup: execute the recommended two-page
 Actions-only BC7 + ASTC diagnostic under the existing byte/quality contract. This authorizes tooling

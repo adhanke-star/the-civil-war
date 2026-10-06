@@ -5,22 +5,16 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current authorized boundary (2026-10-05)
+## Current boundary: candidate complete, quality HALT (2026-10-05)
 
-Aaron answered “authorize all recs” to the scope popup in this Codex session: the recommended
-two-page BC7 + ASTC Actions diagnostic is authorized under the complete proposal below. Earlier
-“scope pending” statements are historical. No full packaging/runtime fielding/threshold change is
-authorized. Candidate tooling passed syntax, unit broken-controls and local `npm test` (168540 ms);
-dispatch only `mode=candidate`, once, after exact-SHA
-CI and Pages succeed. Review all metrics and both sheets, document results, then HALT.
-Tooling 15dfacc passed CI 37403337062 and Pages 37403337065, attempt 1. Candidate setup
-run 37403600015 failed at the pinned BC7 build: ert.h lacks <cstdint> under GNU 13.3.0.
-No encoding/readback ran and no review artifact exists. A scoped CMake forced standard-header
-include (`-DCMAKE_CXX_FLAGS=-include cstdint`) repairs compilation without changing pinned source
-or encoder settings. A replacement dispatch is the first actual encoding experiment; do not duplicate
-an active job or describe the setup failure as a quality result.
-The distinct completion predicate keeps `diagnosticOnly:true, fieldable:false, ok:false`; BC7 needs
-real GPU readback and ASTC software evidence has a separate GPU RUN/UNRUN status.
+Aaron authorized the recommended two-page BC7 + ASTC diagnostic (“authorize all recs”). It is now
+COMPLETE: candidate run 37404193171, attempt 1, tool SHA becad673675cc66f4a2dca3574d3b181c259bd42.
+All 18 controls, hash/metadata/complete-chain checks and all 54 unique comparison rows pass evidence
+completion; both candidates fail unchanged quality limits. Both actual sheets and every metric inspected.
+No optimized assets published and no art/runtime/default/threshold changes. Earlier pending-scope
+statements below are historical, not requests to approve the completed experiment again.
+Next scope popup recommends read-only lossless per-battle loading feasibility; decision pending.
+No further encoding, codec sweep, full packaging or runtime fielding is authorized at this HALT.
 
 ## Working with Aaron (his standing preferences)
 - First serious coding project. Explain what he would not know to ask; terse and direct; no emojis.
@@ -185,6 +179,87 @@ real GPU readback and ASTC software evidence has a separate GPU RUN/UNRUN status
   manifest on Actions before local fielding if the full archive is over 100 MB. Never download .blend or
   run Blender on the Mac. A push to bake paths cancels the active bake; do not interrupt it for doc edits.
 - After every push: `gh run list --limit 3`; a red CI is the next task.
+
+## Direct candidate measured readback (2026-10-05)
+
+Tooling 15dfacc: CI 37403337062 and Pages 37403337065 SUCCESS, attempt 1. Setup-only candidate
+37403600015 failed before encoding: pinned ert.h omits <cstdint> under GNU 13.3.0. CMake force-includes
+that standard header, preserving the source archive/commit and encoding settings. Build fix becad67:
+CI 37403837914 and Pages 37403837871 SUCCESS, attempt 1. Replacement candidate **37404193171** at
+becad673675cc66f4a2dca3574d3b181c259bd42 SUCCESS, attempt 1, 1m47s. This was the first actual encoding
+experiment, not an encoder sweep. Ubuntu image ubuntu24 / 20260927.320.1; Node v24.21.0; CMake 3.31.6;
+GNU C++ 13.3.0; bc7enc 1.08; KTX 4.4.2. Both archive checksum checks passed; all 39 recorded commands
+exited zero. BC7 source unchanged, SUPPORT_BC7E=OFF; no ISPC execution, RDO or perceptual metrics.
+
+Only compression-review published: artifact 11386497801, archive 1,672,840 B, archive SHA256
+9f51e8efb7205fbb257ea88bd3e9e1414097a73e737bca316bf0d2761efd8c69. No approved-figures-ktx2 artifact.
+Local small regular files: .out/figure-candidate-37404193171/compression.json (80,363 B), quality.json
+(56,042 B), compression-candidate-close.png (831,345 B), compression-candidate-field.png (860,808 B).
+No encoded/raw atlases downloaded. Both actual comparison sheets inspected, coarse poses/silhouettes
+preserved; small-mip edge/colour differences remain. Six crops/page do not clear all hands/poses or looks.
+The sheets show PNG / raw / direct BC7 WebGL / ASTC SOFTWARE; they do not show ASTC WebGL imagery.
+
+candidateEvidenceOkay(actual quality.json)=true; candidateComplete=true, diagnosticOnly=true,
+ok=false, fieldable=false. Both pages have 27 unique route/mip rows (mips0/1/2, nine routes):
+png->premul, png->raw, raw->raw, raw->bc7-gpu, png->bc7-gpu, raw->astc-software,
+png->astc-software, raw->astc-gpu, png->astc-gpu. All samples nonempty and metrics finite;
+severe body clipping is zero in every row. All 18 Upload/RawBase/Identity/Missing/Colour/WrongAlpha/
+DoublePremul/AutomaticSrgb/Unsupported controls pass. Erroneous alpha, second multiplication and extra
+sRGB decode controls are rendered shader mutations; unsupported capabilities are rejected before upload.
+PNG/typed upload and raw identity are zero-error; raw upload matches original mip bytes exactly.
+PNG/raw mip0 is zero-error; offline mip RGB mean <=.127 and edge RGB/alpha p95 <=1.
+Full approved manifest validated: 45 pages, 5,184 frames, nine looks per tier, all identity/use/frame metadata.
+Original PNG/raw hashes match the historical diagnostic. Historical UASTC 37374456139 is included with
+its original hash-bound report and controls, labeled HISTORICAL; it was not rerun or approved as fallback.
+
+Actual renderer is Actions **SwiftShader**, not native Mac/iPad. Both BPTC and ASTC extensions were
+exposed, linear formats 0x8e8c/0x93b0 advertised, ASTC profiles included ldr, MAX_TEXTURE_SIZE=8192.
+BC7 AND ASTC WebGL readback RUN, independently of ASTC software decode RUN. No unsupported format
+was forced. All 18 GL error checks/page are zero. Formats RGBAFormat / RGBA_BPTC_Format /
+RGBA_ASTC_4x4_Format; vkFormat 37/145/157, linear DFD, primaries none, premultiplied metadata,
+typed premultiplyAlpha=false, flipY=false, NoColorSpace, generateMipmaps=false. Full mip/payload
+hashes and metadata-only edits pass, including tiny tails; 12 levels close and 11 field. Each compressed
+family allocates 4,937,968 + 2,611,264 = 7,549,232 B; raw allocates 30,189,736 B. Container files total
+BC7 7,550,144 B and ASTC 7,550,192 B, no supercompression. Both families are about 14.40 MiB combined.
+
+Unchanged byte limits: RGB mean<=2, alpha mean<=1, edge RGB/alpha p95<=8/8, clipping=0.
+End-to-end actual results (software/WebGL numbers differ slightly; verdicts agree):
+
+| Page | Route | Mip | RGB mean | Alpha mean | Edge RGB/alpha p95 | Pass |
+|---|---|---:|---:|---:|---|---|
+| close | png->bc7-gpu | 0 | 0.985 | 0.224 | 6/8 | yes |
+| close | png->astc-software | 0 | 0.808 | 0.106 | 5/5 | yes |
+| close | png->astc-gpu | 0 | 0.782 | 0.102 | 5/5 | yes |
+| close | png->bc7-gpu | 1 | 1.583 | 0.390 | 8/12 | NO |
+| close | png->astc-software | 1 | 1.230 | 0.193 | 6/7 | yes |
+| close | png->astc-gpu | 1 | 1.243 | 0.189 | 6/7 | yes |
+| close | png->bc7-gpu | 2 | 2.490 | 0.756 | 12/18 | NO |
+| close | png->astc-software | 2 | 1.868 | 0.363 | 9/9 | NO |
+| close | png->astc-gpu | 2 | 1.873 | 0.360 | 9/9 | NO |
+| field | png->bc7-gpu | 0 | 1.987 | 0.647 | 10/14 | NO |
+| field | png->astc-software | 0 | 1.585 | 0.336 | 8/8 | yes |
+| field | png->astc-gpu | 0 | 1.578 | 0.332 | 8/8 | yes |
+| field | png->bc7-gpu | 1 | 2.939 | 1.254 | 13/20 | NO |
+| field | png->astc-software | 1 | 2.176 | 0.629 | 10/10 | NO |
+| field | png->astc-gpu | 1 | 2.190 | 0.628 | 10/10 | NO |
+| field | png->bc7-gpu | 2 | 3.751 | 2.224 | 16/25 | NO |
+| field | png->astc-software | 2 | 2.750 | 1.102 | 12/13 | NO |
+| field | png->astc-gpu | 2 | 2.749 | 1.104 | 12/13 | NO |
+
+Raw->direct rows independently reach the same pass/fail verdicts. BC7 passes only close mip0 (1/6);
+ASTC software and WebGL pass close mips0/1 and field mip0 (3/6 each). Active close mip1 still fails
+BC7; active field mip1 fails both. Bypassing UASTC improves this candidate's errors but is insufficient
+to meet the existing complete acceptance contract. This does not prove every BC7/ASTC configuration
+fails. No route metrics were subtracted to invent additive attribution. No threshold tuning, mip removal,
+alpha dilation, source mutation, new art, full conversion, runtime integration or native/iPad benchmark.
+
+**HALT / recommendation:** define read-only lossless per-battle loading feasibility next, because it
+preserves approved bytes/limits rather than repeating lossy candidates. Assess frame/look subsets,
+loaded+pending residency, total scene/transient memory and downloads from existing data/code; return a
+concrete bounded proposal before implementation. The scope popup is pending; no such implementation
+is authorized. Alternatives: explicitly review limits with actual sheets, or separately approve an
+all-mode BC7E proposal. Do not execute either silently. Full compressed extrapolation still 209,085,952 B
+before terrain/geometry/targets; full raw 797.24 MiB cannot load wholesale. No fallback/new device clearance.
 
 ## Direct-format feasibility proposal (2026-10-05; awaiting scope decision)
 
