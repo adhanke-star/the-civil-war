@@ -354,7 +354,8 @@ not refreshed existing ghosts despite reset unit frontage. Test-only repair wait
 preserving runtime/assertions/tolerances. Software30/30 in130987ms,19:20:42.479Z, retained
 .out/p2g-reset-frame-software-proof-20261006.json: actual216.200013/216.200007 vs216.2,
 unchanged9textures/26geometries, zero progress writes/axe/errors. Independent source/receipt clear;
-native224/224 remains bound to unchanged runtime. Repair exact-SHA CI/Pages required before P2h.
+native224/224 remains bound to unchanged runtime. Repairb8fb1d9 CI37519242159 and
+Pages37519242152 succeeded; P2h prerequisite is satisfied.
 
 Reuse LOOK/settings and Unit's existing layout; no new store or renderer. Root owns src/ui/look.js,
 src/units/unit.js, src/game.js, src/ui/arrows.js, meaningful spacing Node/UI tests, tools/test.mjs, CI, sw.js and docs.
@@ -392,7 +393,28 @@ actual JSON/PNGs, independent source/WCAG/visual review, update docs, explicitly
 read fullSHA CI/Pages and repair red CI before the next slice. Moments/X-Factor, soldier's-eye/full
 keyboard/division selection, deployment/living camp and all P3-P7 scope remain open.
 
-### P2h: isolated loot and X-Factor previews (next bounded slice)
+### P2h: isolated loot and X-Factor previews (green candidate; integration pending)
+
+Candidate Node11+11 passes actual Effects/Unit/HaloPool and intended assertion mutants. Initial
+native36/38 and strengthened diagnostic36/38 retain focus failures at
+.out/p2h-focused-initial-failure-20261006.json and p2h-focused-focus-diagnostic-20261006.json.
+Exact cleanup passed before redundant requests: dead/DOM detached, timers/RAFs/waits0, unsub6/6,
+document keyremove1/native close1. First mount lazily defined reward settings and rebuilt/detached
+the panel trigger; register settings before panel creation. Native Tab from the final control could
+leave the dialog; wrap only live visible-enabled boundaries and own Escape handling. The repaired
+candidate adds actual Sound mute/unmute and lock/Reset/Copy/Paste/reload coverage; UI/readback,
+independent reviews, frozen final native and exact-SHA integration remain pending.
+Final focused native52/52 in67729ms20:04:27.973Z, .out/p2h-focused-final-20261006.json and five
+same-time Moments PNGs pass independent source/WCAG/rendered review. Readable230px preview/12px
+detail minima scroll on short screens; actual boundary/post-turn keyboard focus stays visible.
+Real mute/refusal/fresh sound, media/Off, lock/Reset/reload/Copy/Paste, exact progress/0writes, reused
+9textures/26geometries, both-close exact cleanup and44px/axe/errors pass. All retained deterministic
+positives/intended mutants, unit and syntax/diff/YAML pass.13sourcehashes frozen; full native running.
+Frozen full native260/260 in510344ms20:05:52.125Z, .out/p2h-full-native-final-20261006.json has
+errors/warnings/all scoped axe[].13/13source hashes match; root viewed all five final Moments PNGs.
+First intro card50269wall ms, win45.608sim and idle defeat27.2705sim; actual save/equip/Continue and
+existing ghost Reset216.200000/216.200016 vs216.2 retained. Source/WCAG/rendered review clears
+the final receipt/all five PNGs; integration/exact-SHA CI/Pages pending. No native/iPad FPS claim.
 
 After P2g exact CI/Pages, finish the missing field Moments previews using existing settings, Effects,
 HaloPool/Hud and reward sequence. Root owns those seams, src/main.js/ui/sandbox-tools.js, meaningful
@@ -422,6 +444,44 @@ focused native UI and one frozen full native npm test; read actual JSON/PNGs and
 WCAG/visual review. Update docs/decision, explicitly stage owned files, commit/push and read exact-SHA
 CI/Pages; repair red CI. This does not close earned badges/X-Factors, cinematic charge/melee polish,
 soldier's-eye/fullkeyboard/division selection, campaign/deployment/art/device work or all remaining P2-P7.
+
+### P2i: keyboard march/attack targeting and shared help (next bounded slice)
+
+After P2h exact CI/Pages are green, fill the concrete keyboard-only march/ranged-attack gap through
+existing Input, Game.orderGroup, ArrowLayer/Hud ghost and native menu seams. Root owns
+src/ui/input.js, src/ui/hud.js, src/main.js only if render-time invalidation needs it, index.html,
+focused keyboard Node/UI coverage, tools/test.mjs, CI/sw.js/docs. No new persistent store, new group
+metadata, combat multipliers, camera mode or historical labels. Existing pointer/touch and six orders
+retain behavior. One root writer/browser; independent helpers only read/review.
+
+Fixed keys: B begins march targeting for the selected orderable leader/group at its current location;
+arrows move the world destination in camera-relative25m steps (Shift5m), bounded by the terrain.
+T begins ranged-attack targeting/cycles deterministic alive non-routing hostile units, Shift+T reverses. Preserve
+friendly selection and route attack through actual effective-range halt; never convert it to Charge.
+Q/E adjust preview facing15degrees (Shift5degrees); outside targeting arrows/Q/E remain camera keys.
+Enter commits the actual preview through Game.orderGroup; Escape cancels only the preview and keeps
+selection (outside targeting existing deselect remains). ? opens shared native Controls/menu help,
+clears targeting/camera keys and restores the triggering connected focus on close. Starting/cancelling
+targeting performs no order. Reuse pointer preview world-point calculations instead of a second
+geometry/range/path implementation. Preserve relative rotated group offsets and minimum move distance.
+
+Keep a visible keyboard-targeting status/instructions and actual ghost line/facing/range/march time.
+Revalidate leader/selection/target and refresh moving-target geometry before commit; clear stale preview
+on pointer interaction, selection/leader removal/change, blur, dialog/inert main or no eligible target.
+Do not let held camera arrows drift the view when entering targeting. Editable input/textarea/select/
+contenteditable and native Enter/Space controls retain their behavior; dialogs/sandbox keys stay isolated.
+No-target, routed leader and invalid/stale target produce useful feedback with zero unintended orders.
+
+Prove actual keyboard-only selection -> march -> ranged attack, rotated-camera normal/fine steps,
+manual preview facing, group-relative execution matching displayed ghost, paused ordering, no charge,
+no-target/routing/dead cases, Escape/blur/help/pointer/selection cancellation and form/button isolation.
+Use meaningful actual Input/Game/ArrowLayer fixtures and intended mutants; preserve source bytes.
+Actual native UI must read committed destinations/order kinds and real ghost geometry, menu keyboard
+focus return, progress0writes,320px touch targets/layout and scoped axe/PNG. Run owned syntax/diff,
+retained deterministic positives/mutants/unit, focused native, one frozen full native and independent
+source/WCAG/rendered review; docs/decision explicit commit/push, exact-SHA CI/Pages and red repair.
+This closes one keyboard ordering/help slice, not division selection, soldier's-eye, deployment/living
+camp, all keyboard/UI polish or remaining P2/P3-P7. Do not invent division IDs from Henry parent strings.
 
 ### Required battle-system work (P3/P4; do not hide it inside “build Shiloh”)
 
@@ -514,6 +574,18 @@ and shared-buffer accounting. Actual Henry pool capacities3590/3200 and geometry
 reservations17408000/53477376B at explicit1280x800/DPR1 and1024x768/DPR2 High. These are partial
 source models, not native measurements; totalSceneWithinLimit remains null. Actual runner archive
 binding/report, exact tool-SHA CI/Pages and independent report readback remain UNRUN/pending.
+Runner37520706744 succeeded atf51e2e5478921f56b966a1231767691a5bc6a87c. Actual45 original rows
+bind; full PNG83681229B/GPU835971548B. First-observed manifest hash
+cf546019e34208f886ccdbb0430fb1fe515df8bdb89114cbf4daca2af7bfd112; historical report hash
+cc0cd0549f2f4122ad573de7ba6946360246ac1574f026e8c983be6962ba5f75. Small report retained at
+.out/figure-residency-37520706744/report.json; independent readback recomputes every page/scenario.
+All8 eligible close stand directions need31pages; walk/fire/load32, fallen8. Even incomplete one
+smallest close-page/look coverage needs241074464 texture bytes; buffers/post baseline267145752B
+atDPR1 before terrain/world/effects. Existing raw whole-page loading fails evaluated250MB budget.
+No finer-demand/layout rejection or asset fielding follows. Tool exact CI37520707320 succeeded;
+Pages37520707322 passed. Next art hypothesis is read-only original frame/direction/adjacent-frame
+rectangle demand versus source-page demand and serial decode/release lifecycle, preserving all nine
+named looks/eligibility; no repacking/runtime or codec experiment yet. Quality/native/device remain open.
 
 No hands-on checks from Aaron. Use agent-operated browsers and independent review; establish early
 whether native Mac/iPad automation is already accessible without new spending or user intervention.
@@ -628,6 +700,8 @@ unrelated art experiment. The following detailed notes continue to define their 
 - Candidates into the sandbox Look tab, split-screen against UG: Civil War / Total War references:
   figures, horses, guns, trees, buildings, terrain detail, grade, effects (artillery impact, charge and
   melee, cinematic moments, X-Factor banner), unflinching casualties with the gore toggle.
+  Shared card provenance can still ellipsize long strings (P2h desktop Lorenz render); full source text
+  remains in the DOM, but complete visible card-content/readability polish is still required here.
 - Low/High/Ultra; 1 figure = 5 men must hold 30 fps in a fight on Auto on the UHD 617, else 1:10.
 
 ## S3 · Screens gallery

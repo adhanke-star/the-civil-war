@@ -4,8 +4,56 @@
 // history rule). They are built by Game.spawnUnit, the same construction path as the scenario's units.
 
 import { define, on, get } from '../settings.js';
+import { mountReward, defineRewardSettings } from '../reward/sequence.js';
+
+/** Isolated demonstration: no army callback, replay target or progress-store access. */
+export function previewLoot({ game, hud, trigger = document.activeElement }) {
+  if (document.querySelector('.rw, dialog[open]')) { hud.toast('Close the current dialog before previewing loot.'); return null; }
+  game.paused = true; hud.setPaused(true);
+  const dialog = document.createElement('dialog'); dialog.className = 'field-loot-preview';
+  dialog.setAttribute('aria-labelledby', 'loot-preview-title');
+  const heading = document.createElement('header'); heading.className = 'preview-heading';
+  const title = document.createElement('h2'); title.id = 'loot-preview-title'; title.textContent = 'Loot-card preview';
+  const close = document.createElement('button'); close.type = 'button'; close.textContent = 'Close preview';
+  heading.append(title, close); dialog.append(heading); document.body.append(dialog);
+  let closed = false, reward = null;
+  const clean = () => {
+    if (closed) return; closed = true;
+    close.removeEventListener('click', finish); dialog.removeEventListener('cancel', cancel); dialog.removeEventListener('close', finish);
+    dialog.removeEventListener('keydown', keys);
+    dialog.removeEventListener('focusin', revealFocus);
+    if (dialog.open) dialog.close(); dialog.remove();
+    game.paused = true; hud.setPaused(true);
+    if (trigger?.isConnected) trigger.focus({ preventScroll: true });
+  };
+  const finish = () => { if (closed) return; if (reward) reward.unmount(); else clean(); };
+  const cancel = (e) => { e.preventDefault(); finish(); };
+  const keys = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finish(); return; }
+    if (e.key !== 'Tab' || e.altKey || e.ctrlKey || e.metaKey) return;
+    const targets = [...dialog.querySelectorAll('button, [tabindex="0"]')].filter((n) => !n.disabled && n.getClientRects().length
+      && getComputedStyle(n).visibility !== 'hidden');
+    if (!targets.length) return;
+    const i = targets.indexOf(document.activeElement);
+    if (i >= 0 && (e.shiftKey ? i > 0 : i < targets.length - 1)) return;
+    e.preventDefault(); e.stopPropagation();
+    targets[e.shiftKey ? targets.length - 1 : 0].focus();
+  };
+  const revealFocus = (e) => {
+    if (e.target.closest('.rw-stage')) e.target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  };
+  close.addEventListener('click', finish); dialog.addEventListener('cancel', cancel); dialog.addEventListener('close', finish);
+  dialog.addEventListener('keydown', keys);
+  dialog.showModal();
+  reward = mountReward(dialog, { mode: 'one', rememberReplay: false, onClose: clean });
+  close.focus({ preventScroll: true });
+  dialog.addEventListener('focusin', revealFocus);
+  return { close: finish, dialog, reward };
+}
 
 export function defineSandboxTools({ game, rts, effects, hud }) {
+  // Register before the panel renders: first mount must not rebuild/detach its triggering button.
+  defineRewardSettings();
   const say = (text) => hud.toast(text);
 
   /** View centre, nudged sideways (screen right) until no brigade stands within 60 m. */
@@ -85,6 +133,16 @@ export function defineSandboxTools({ game, rts, effects, hud }) {
     }
     return best;
   };
+  define('moments.xFactor', {
+    tab: 'Moments', type: 'action', label: 'Selected: preview X-Factor',
+    note: 'Shows the selected unit’s presentation cue. It earns no badge and changes no combat values or progress.',
+    run: () => { const u = chosen(); if (u && !effects.xFactor(u, { preview: true })) say('X-Factor effects are Off.'); },
+  });
+  define('moments.lootCard', {
+    tab: 'Moments', type: 'action', label: 'Preview one loot card',
+    note: 'Pauses the field and opens one demonstration card. Close or Escape returns here; no army or progress changes.',
+    run: () => previewLoot({ game, hud }),
+  });
   define('moments.volley', {
     tab: 'Moments', type: 'action', label: 'Selected: fire a volley now',
     note: 'The selected brigade or battery fires at once at its target, or at the nearest enemy within range.',

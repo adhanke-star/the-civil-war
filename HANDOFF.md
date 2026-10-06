@@ -5,7 +5,50 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: report-only residency candidate; P2g repair CI pending (2026-10-06)
+## Current boundary: P2h verified candidate; exact-SHA integration next (2026-10-06)
+
+HEAD/origin main f51e2e5478921f56b966a1231767691a5bc6a87c; CI37520707320,
+Pages37520707322 and residency37520706744 succeeded. P2g test-only repairb8fb1d9 also has
+CI37519242159/Pages37519242152 green. Root owns the dirty P2h runtime/tests/docs; preserve unrelated
+Shiloh candidate notes and workspace file. No COORDINATION.md or competing writer/browser.
+X-Factor previews use existing Effects/Halo/Hud with real-time bounded cues and Full/Subtle/Off;
+loot demonstration owns a native paused modal, opts out of replay memory and cannot write progress.
+Node11+11 passes. Initial native36/38 failed first-open Escape focus and second-open Tab containment.
+Strengthened diagnostic36/38 confirms exact cleanup (dead/queues0/unsubs6/6/keyremove1/nativeclose1)
+before redundant closes; .out/p2h-focused-focus-diagnostic-20261006.json preserves both failures.
+Source review traced first trigger detachment to lazy reward-setting definitions rebuilding the panel.
+Register those before the panel renders; scoped modal keyboard boundaries skip hidden/disabled cards,
+wrap forward/reverse Tab and close Escape. The repaired actual native run also binds Sound mute,
+stale unmute refusal, fresh sound, first trigger identity, 12 Tab steps per opening and settings transfer.
+Focused native52/52 in67729ms,20:04:27.973Z, .out/p2h-focused-final-20261006.json and five same-time
+Moments PNGs are independently source/WCAG/rendered clear. Root viewed all five. Short screens keep
+a230px card with12px minimum detail labels; stage scrolls vertically, fixed Close remains visible.
+Initial header focus, forward/reverse boundary scroll and reward post-turn focus are actually visible.
+All retained positives/intended mutants and unit pass; CI YAML/owned syntax/diff pass. Source is frozen
+to13hashes in .out/p2h-frozen-source-sha256-20261006.json. Frozen full native260/260 in510344ms,
+20:05:52.125Z, .out/p2h-full-native-final-20261006.json passes with errors/warnings/all scoped axe[].
+All13hashes match; root/independent rendered review viewed all five final Moments PNGs;
+source/WCAG/receipt review clears scoped integration.
+Intro first card50269ms, actual win45.608sim/idle defeat27.2705sim; saved army/equipment/Continue,
+old spacing ghost reset216.200000/216.200016 vs216.2 remain green. No local browser remains.
+Acceptance remains pending explicit integration and exact-SHA CI/Pages.
+Long card provenance can still ellipsize; shared full-content polish remains P6. Screenshot FPS meters
+are transient observations, not sustained/native performance acceptance; Mac/iPad gates remain open.
+Keep first failed receipts; do not accept process exit without reading actual checks. One browser only.
+Next bounded product slice after P2h exact CI/Pages: PLAN P2i keyboard march/attack targeting/shared
+help through current Input/Game/ArrowLayer/Hud/menu. No division IDs inferred from parent strings.
+
+## Previous boundary: report-only residency integration (2026-10-06)
+
+Tooling is now pushed atf51e2e5478921f56b966a1231767691a5bc6a87c. Residency37520706744 passed;
+Pages37520707322 and CI37520707320 passed. Actual small report
+.out/figure-residency-37520706744/report.json independently binds/recomputes all45/5184/nine looks.
+Full raw835971548B vs PNG83681229B; all8 eligible close stand directions need31pages. One smallest
+close-page/look plus current buffers/post reaches267145752B before terrain: raw whole-page approach
+fails250MB. fieldable:false/native/quality/iPad UNRUN. Next art hypothesis frame/direction/neighbor
+rectangle demand and source-page decode/release; no repack/codec/runtime experiment authorized here.
+Prior tooling-candidate details below are historical. Root sole writer; preserved Moments drafts and
+Shiloh source notes remain untracked. P2g repair37519242159 passed; the current P2h candidate is above.
 
 Parent main/origin b8fb1d919d78f2a4bd2c4b8e201f458dfcd22f06 is the pushed test-only P2g repair.
 Pages37519242152 passed; CI37519242159 remains in npm test. Read exact conclusion, red takes priority.

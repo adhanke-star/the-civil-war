@@ -44,6 +44,13 @@ export class Effects {
     on('look.smoke', (v) => this.setSmoke(v));
     this.sound = { unlocked: false, enabled: true, zzfx: null, ctx: null, active: 0 };
     this.puffs = 0;
+    this.moments = new Map();
+    this.momentNow = 0;
+    this.activeMoment = null;
+    this.onMoment = null;
+    this.momentAudioEpoch = 0;
+    this.momentVoice = null;
+    on('look.xFactorStyle', () => this.syncMoments());
   }
 
   async init() {
@@ -96,7 +103,7 @@ export class Effects {
   get reducedMotion() { return this._reducedMotion; }
   set reducedMotion(v) {
     if (this._reducedMotion === Boolean(v)) return;
-    this._reducedMotion = Boolean(v); this.smokeEpoch++; this.syncSmoke();
+    this._reducedMotion = Boolean(v); this.smokeEpoch++; this.syncSmoke(); this.syncMoments();
   }
 
   setSmoke(v) {
@@ -163,18 +170,79 @@ export class Effects {
     if (this.ok) this.batch.update(dt);
   }
 
+  /** Shared presentation seam for future earned moments. Sandbox callers explicitly label previews. */
+  xFactor(unit, { preview = false, label = preview ? 'X-Factor preview' : 'X-Factor' } = {}) {
+    if (!unit?.alive || LOOK.xFactorStyle === 'off') return false;
+    this.stopMomentSound();
+    // Bounded cues even when a caller cycles through many units. No scene allocation or combat change.
+    if (!this.moments.has(unit) && this.moments.size >= 8) {
+      const oldest = this.moments.keys().next().value; oldest.momentGlow = false; this.moments.delete(oldest);
+    }
+    const record = { unit, preview: Boolean(preview), label: String(label).slice(0, 100), until: this.momentNow + 4 };
+    this.moments.set(unit, record); this.activeMoment = record; this.presentMoment();
+    const epoch = this.momentAudioEpoch;
+    const play = () => {
+      if (epoch === this.momentAudioEpoch && this.activeMoment === record && this.moments.get(unit) === record) this.playXFactor(unit);
+    };
+    if (this.sound.zzfx) play(); else Promise.resolve(this.unlock()).then(play);
+    return true;
+  }
+
+  momentStyle() { return this.reducedMotion ? 'subtle' : LOOK.xFactorStyle; }
+  presentMoment() {
+    const style = this.momentStyle();
+    for (const record of this.moments.values()) record.unit.momentGlow = style === 'full';
+    this.onMoment?.(this.activeMoment ? { ...this.activeMoment, style } : null);
+  }
+  syncMoments() {
+    this.stopMomentSound();
+    if (LOOK.xFactorStyle === 'off') this.clearMoments(); else this.presentMoment();
+  }
+  clearMoments() {
+    this.stopMomentSound();
+    for (const unit of this.moments.keys()) unit.momentGlow = false;
+    this.moments.clear(); this.activeMoment = null; this.onMoment?.(null);
+  }
+  /** Real presentation seconds, independent of simulation pause/speed. */
+  updateMoments(dt) {
+    if (Number.isFinite(dt) && dt > 0) this.momentNow += dt;
+    let changed = false;
+    for (const [unit, record] of this.moments) if (!unit.alive || record.until <= this.momentNow) {
+      unit.momentGlow = false; this.moments.delete(unit); changed = true;
+      if (record === this.activeMoment) { this.activeMoment = null; this.stopMomentSound(); }
+    }
+    if (changed) {
+      if (!this.activeMoment) this.activeMoment = [...this.moments.values()].at(-1) || null;
+      this.presentMoment();
+    }
+  }
+  stopMomentSound() {
+    this.momentAudioEpoch++;
+    if (this.momentVoice) {
+      try { this.momentVoice.stop(); this.momentVoice.disconnect?.(); } catch { /* an already-ended source is harmless */ }
+      this.momentVoice = null;
+    }
+  }
+  setSound(v) { this.sound.enabled = Boolean(v); if (!v) this.stopMomentSound(); }
+  playXFactor(unit) {
+    if (!unit?.alive || this.activeMoment?.unit !== unit || LOOK.xFactorStyle === 'off'
+      || this.momentStyle() !== 'full' || !this.sound.enabled || !this.sound.zzfx) return;
+    this.momentVoice = this.sound.zzfx(0.4, 0, 420, 0.02, 0.1, 0.5, 1, 1, 160);
+  }
+
   // -------------------------------------------------------------------------------------------------
   // Sound
   unlock() {
-    if (this.sound.unlocked) return;
+    if (this.sound.unlocked) return this.sound.ready;
     this.sound.unlocked = true;
-    import('zzfx')
+    this.sound.ready = import('zzfx')
       .then((m) => {
         this.sound.zzfx = m.zzfx;
         this.sound.ctx = m.ZZFX.audioContext;
         if (this.sound.ctx && this.sound.ctx.state === 'suspended') this.sound.ctx.resume();
       })
       .catch((err) => console.warn('ZzFX unavailable; continuing without sound:', err && err.message ? err.message : err));
+    return this.sound.ready;
   }
 
   _gain(unit) {

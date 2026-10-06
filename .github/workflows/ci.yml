@@ -44,6 +44,8 @@ jobs:
       - run: node tools/test-spacing.mjs --prove-fail
       - run: node tools/test-residency.mjs
       - run: node tools/test-residency.mjs --prove-fail
+      - run: node tools/test-moments.mjs
+      - run: node tools/test-moments.mjs --prove-fail
 
       - run: npm test
 

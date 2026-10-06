@@ -274,8 +274,10 @@ export function mountReward(root, opts = {}) {
   defineRewardSettings();
   sfx.armAudio();
   const host = root || document.body;
-  lastHost = host;
-  if (opts.onDone) lastOnDone = opts.onDone;
+  if (opts.rememberReplay !== false) {
+    lastHost = host;
+    if (opts.onDone) lastOnDone = opts.onDone;
+  }
 
   if (!document.querySelector('link[data-reward-css]')) {
     document.head.append(el('link', { rel: 'stylesheet', href: new URL('./reward.css', import.meta.url).href, 'data-reward-css': true }));
@@ -368,7 +370,8 @@ export function mountReward(root, opts = {}) {
   }
   function announce(text) {
     live.textContent = '';
-    requestAnimationFrame(() => { if (!S.dead) live.textContent = text; });
+    const id = requestAnimationFrame(() => { S.rafs.delete(id); if (!S.dead) live.textContent = text; });
+    S.rafs.add(id);
   }
   function primary(label, onClick, { kbd = 'Enter' } = {}) {
     const b = el('button', { type: 'button', class: 'rw-primary' }, el('span', { class: 'rw-primary-label', text: label }), kbd ? el('kbd', { 'aria-hidden': 'true', text: kbd }) : null);
@@ -1153,6 +1156,7 @@ export function mountReward(root, opts = {}) {
     document.removeEventListener('keydown', onKey);
     rootEl.remove();
     if (active === api) active = null;
+    opts.onClose?.();
   }
 
   const api = { unmount, state: S };

@@ -162,6 +162,9 @@ export class Hud {
     $('result-close').addEventListener('click', () => { $('result').close(); });
     $('army-btn').addEventListener('click', () => this.toggleArmy());
     this.alertAt = null;
+    this.momentBanner = document.createElement('p'); this.momentBanner.id = 'moment-banner';
+    this.momentBanner.className = 'panel'; this.momentBanner.setAttribute('role', 'status');
+    this.momentBanner.hidden = true; document.body.append(this.momentBanner);
     $('banner-fly').addEventListener('click', () => { if (this.alertAt && this.onFly) this.onFly(this.alertAt.x, this.alertAt.z); });
     $('banner-resume').addEventListener('click', () => { if (this.onResume) this.onResume(); });
 
@@ -189,6 +192,12 @@ export class Hud {
     // Stack/hit rectangles must use the new CSS dimensions on the next frame, including while paused.
     for (const m of this.markers.values()) { m.w = 0; m.h = 0; }
     this.sizeTimer = 0;
+  }
+
+  showMoment(moment) {
+    this.momentBanner.hidden = !moment;
+    this.momentBanner.textContent = moment ? `${moment.label} · ${moment.unit.short}` : '';
+    this.momentBanner.dataset.style = moment?.style || 'subtle';
   }
 
   /** A marker for a unit (scenario units at start; sandbox spawns later). */
@@ -335,7 +344,7 @@ export class Hud {
     const w = window.innerWidth, h = window.innerHeight;
     const bounds = { left: 4, right: w - 4, top: $('topbar').getBoundingClientRect().bottom + 4, bottom: h - 4 };
     // Reserve the actual visible panels rather than the entire dock's transparent bounding box.
-    const obstacles = ['unitcard', 'orders', 'minimap-box', 'objective', 'tip', 'intro-hint', 'army', 'field-stores', 'feed'].flatMap((id) => {
+    const obstacles = ['unitcard', 'orders', 'minimap-box', 'objective', 'tip', 'intro-hint', 'army', 'field-stores', 'feed', 'moment-banner'].flatMap((id) => {
       const el = $(id), r = el.getBoundingClientRect();
       return !el.hidden && r.width > 0 && r.height > 0 ? [{ x: r.x + r.width / 2, y: r.bottom, w: r.width, h: r.height }] : [];
     });

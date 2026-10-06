@@ -109,12 +109,13 @@ const hud = new Hud({
   onPause: () => game.togglePause(),
   onSpeed: (s) => game.setSpeed(s),
   onQuality: (q) => setQuality(q),
-  onSound: (on) => { effects.sound.enabled = on; },
+  onSound: (on) => effects.setSound(on),
 });
 hud.onFocus = (u) => rts.flyTo(u.x, u.z);
 hud.onFly = (x, z) => rts.flyTo(x, z);
 hud.onResume = () => { if (game.paused) game.togglePause(); };
 hud.setQuality(post.mode);
+effects.onMoment = (moment) => hud.showMoment(moment);
 
 function setQuality(mode) {
   post.setMode(mode);
@@ -181,6 +182,7 @@ function frame(now) {
   const dt = Math.min(0.1, realDt); // capped, for simulation and camera
   last = now;
   const simDt = game.step(dt);
+  effects.updateMoments(realDt);
   game.setView(camera, window.innerHeight * post.scale);
   game.animate(simDt);
   effects.update(game.paused ? 0 : dt * game.speed);

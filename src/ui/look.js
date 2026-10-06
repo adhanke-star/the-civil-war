@@ -67,6 +67,11 @@ const SPECS = {
     tab: 'Look', type: 'range', default: 0, min: -15, max: 30, step: 1, label: 'Camera elevation',
     note: 'Adds degrees to the zoom-dependent viewing angle; 0 keeps the current view. Positive looks farther down. Keeps view centre, distance and units; pointer projection follows the new angle.',
   }],
+  xFactorStyle: ['look.xFactorStyle', {
+    tab: 'Moments', type: 'choice', default: 'full', label: 'X-Factor effects',
+    options: [{ value: 'full', label: 'Full' }, { value: 'subtle', label: 'Subtle' }, { value: 'off', label: 'Off' }],
+    note: 'Full shows a short banner, warm line glow and sound sting. Subtle keeps a static banner; Off clears all cues. Reduced motion uses Subtle. Previews earn no badge or combat bonus.',
+  }],
 };
 
 export const LOOK = {};

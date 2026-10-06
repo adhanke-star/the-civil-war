@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0033 — Field moment previews cannot earn progression (2026-10-06)
+X-Factor presentation uses the existing Effects/Halo/Hud seam with bounded real-time cues,
+Full/Subtle/Off and authoritative mute/reduced-motion cancellation; sandbox previews earn nothing.
+One-card loot owns a paused native dialog, opts out of replay memory and performs no army callback.
+Reward settings register before panel rendering so first mount preserves its trigger. Preview-owned
+keyboard/focus cleanup keeps controls visible, and short screens scroll a readable card rather than
+shrinking its text. Earned badges/X-Factors and complete card-content polish remain later work.
+
 ## 0032 — Approved-art feasibility reserves pending work before considering admission (2026-10-06)
 The existing pack workflow gains report-only residency mode. It binds every original approved PNG to
 the historical full report and preserves ordered look identity across tiers, without codecs or uploads

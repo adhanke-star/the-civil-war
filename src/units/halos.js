@@ -12,6 +12,7 @@ import { splitHook, CLIP_FRAG } from './soldier-mesh.js';
 const SHADOW = [0.05, 0.04, 0.03, 0.34];
 const SELECTED = [0.45, 1.0, 0.25, 0.8];
 const UNDER_FIRE = [1.0, 0.2, 0.1, 0.75];
+const MOMENT = [1.0, 0.6, 0.12, 0.8];
 
 export class HaloPool {
   constructor(capacity) {
@@ -71,7 +72,7 @@ export class HaloPool {
 
   begin() { this.n = 0; }
 
-  /** kind: 0 shadow, 1 selected, 2 under fire (strength scales the red); clip: compare side (-1/0/+1). */
+  /** kind: 0 shadow, 1 selected, 2 under fire, 3 moment; clip: compare side (-1/0/+1). */
   push(x, y, z, yaw, rx, rz, kind, strength = 1, clip = 0) {
     if (this.n >= this.capacity) return;
     const i = this.n++;
@@ -82,7 +83,7 @@ export class HaloPool {
     te[o + 4] = 0; te[o + 5] = 1; te[o + 6] = 0; te[o + 7] = 0;
     te[o + 8] = s * rz; te[o + 9] = 0; te[o + 10] = c * rz; te[o + 11] = 0;
     te[o + 12] = x; te[o + 13] = y + 0.7; te[o + 14] = z; te[o + 15] = 1;
-    const col = kind === 1 ? SELECTED : kind === 2 ? UNDER_FIRE : SHADOW;
+    const col = kind === 1 ? SELECTED : kind === 2 ? UNDER_FIRE : kind === 3 ? MOMENT : SHADOW;
     const a = this.color.array;
     a[i * 4] = col[0]; a[i * 4 + 1] = col[1]; a[i * 4 + 2] = col[2]; a[i * 4 + 3] = col[3] * (kind === 2 ? strength : 1) + (kind ? 2 : 0);
     this.clip.array[i] = clip;

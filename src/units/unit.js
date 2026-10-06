@@ -576,7 +576,7 @@ export class Unit {
     if (this.formation === 'column') this.layoutColumn();
     const infantry = this.type === 'infantry';
     const halos = this.halos;
-    const haloKind = this.selected ? 1 : this.underFire > 0 ? 2 : 0;
+    const haloKind = this.momentGlow ? 3 : this.selected ? 1 : this.underFire > 0 ? 2 : 0;
     const haloStr = Math.min(1, this.underFire / 0.9);
     // which styles draw this unit's infantrymen (crews, drivers and officers are always rigged)
     const imp = infantry ? this.impostors : null;
