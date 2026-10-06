@@ -84,7 +84,21 @@ export async function entryProgress({ browser, url, check, shot, result, watchEr
     await page.keyboard.press('Shift+Tab'); const wrap = await page.locator('#entry-confirm').evaluate((n) => n === document.activeElement);
     const importAxe = await new AxeBuilder({ page }).include('#entry-replace').analyze(); result.entryImportAxe = importAxe.violations;
     check('entry-import-axe', importAxe.violations.length === 0, JSON.stringify(importAxe.violations.map((v) => v.id))); await shot(page, 'entry-import-320');
+    // Native close is queued. Delay only its notification in this owned context to exercise the
+    // busy interval deterministically; a file selection before cleanup is intentionally ignored.
+    await page.evaluate(() => {
+      const dialog = document.getElementById('entry-replace');
+      const delay = (e) => {
+        dialog.removeEventListener('close', delay, true); e.stopImmediatePropagation();
+        setTimeout(() => dialog.dispatchEvent(new Event('close')), 150);
+      };
+      dialog.addEventListener('close', delay, true);
+    });
     await page.keyboard.press('Escape');
+    result.entryCancelState = await page.evaluate(() => ({ open: document.getElementById('entry-replace').open,
+      busy: document.getElementById('entry-import').disabled, focus: document.activeElement.id, writes: window.__entryWrites }));
+    await page.waitForFunction(() => !document.getElementById('entry-replace').open && !document.getElementById('entry-import').disabled
+      && document.activeElement.id === 'entry-import');
     check('entry-import-cancel-focus', cancel && wrap && await raw() === before && await page.locator('#entry-import').evaluate((n) => n === document.activeElement), 'Cancel focused, Tab trapped, Escape preserves bytes and returns focus');
     await upload(JSON.stringify(replacement)); await page.locator('#entry-confirm').click();
     await page.waitForFunction(() => window.__entry.saved.awardId === 'entry-replacement');

@@ -5,12 +5,22 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2c title and completed-army camp candidate (2026-10-06)
+## Current boundary: P2c queued-close test repair; P2d owned WIP (2026-10-06)
 
 Complete existing v1 remains the active goal; this slice does not close P2 or campaign scope. Root
 is sole product writer; helpers read/review only and browsers are serialized. No COORDINATION.md.
 P2b 4a4a4adb1f6ec695b3329d9298e7a5080b5bca80 has green CI 37496336886 and Pages 37496336828.
-P2c WIP is deliberate, owned and uncommitted. Preserve NEW-civil-war-video-game.code-workspace.
+P2c title/camp shipped at f6edce7469944bf378b24f93e9e132d3d9c2aa46. Pages 37500375379 passed;
+CI 37500375376 failed immediate post-Escape focus and next hidden-file upload (140 checks, 547941 ms).
+Retain .out/p2c-ci-37500375376.zip/result.json and import PNG while the cap permits. Browser queues
+dialog close notification; Import is intentionally disabled until async cleanup. Premature setInputFiles
+bypassed that disabled launcher and was correctly ignored by the busy guard. No product repair found.
+The test-only repair waits for closed dialog/enabled Import/restored focus, retaining byte/focus checks.
+Injected delayed-close notification shows open=false,busy=true,focus=entry-confirm,writes=0 before cleanup;
+software focused 46/46 in 29950 ms, 2026-10-06T17:14:52.370Z, retained
+.out/p2c-close-notification-software-positive-20261006.json. Independent source review clears this repair;
+exact repair CI pending. P2d runtime/tests are separately owned WIP; do not stage them with this repair.
+Preserve NEW-civil-war-video-game.code-workspace.
 
 src/entry.js gates renderer loading: no-query title Continue re-reads cw.progress, successful empty
 read -> ?intro and validated saved army -> ?camp. Blocked/corrupt progress never silently starts fresh.
@@ -40,11 +50,16 @@ desktop depot. Earlier 40-check failure/43- and 44-check pre-final runs remain i
 while the cap permits. Final npm test -- --native passes 157/157 in 250152 ms, timestamp
 2026-10-06T16:52:57.328Z, .out/p2c-full-native-final-20261006.json and final PNGs with 16-52-57-328Z.
 Title measured 200125 B/493 ms; actual intro first card 47606 ms, idle defeat 27.30 sim seconds.
-Exact-SHA CI/Pages remain pending; runtime cw-v9.
+Exact repair CI remains pending; shipped runtime cw-v9, P2d WIP cw-v10.
 
-Next: complete the bounded P2c gates, doc synchronization, explicit owned staging, commit/push and exact
-CI/Pages readback; any red run is the next task. Then inventory remaining P2 sandbox/default/deployment
-requirements before choosing the next short contract. Continue P3/P4 through early sourced Shiloh, all
+Next: commit/push only queued-close test repair/docs and read exact CI/Pages; any red run is the next task.
+Then finish P2d's bounded PLAN contract: placement veterancy and symmetric charge/fatigue-gain knobs.
+Actual prototypes 12+12 and focused native UI 39/39 (52899 ms, 2026-10-06T17:12:40.035Z) pass;
+.out/p2d-focused-final-20261006.json and five sandbox PNGs. Corrected terminal fixture calls actual
+sandbox controller (it exists but never grants loot); composed melee/fatigue preserves unscaled recovery.
+Independent source review clears production, WCAG rendered review/full smoke/exact CI pending.
+Remaining Look/Moments, selection/camera, deployment and living camp scope remain open. Continue P3/P4
+through early sourced Shiloh, all
 combat functions, Stones River and Chattanooga; P5 progression/P6 presentation/P7 release stay binding.
 Old Shiloh data is single-phase compressed Hornets' Nest/landing with division/corps aggregates and
 nonlinear arrivals, not a dawn OOB. Do not transplant it into dawn chronology or invent regiments;

@@ -195,7 +195,11 @@ Title/camp/import axe clear; seven actual screenshots independently reviewed, fu
 depot details verified. Deferred-read overlap and failed-A/cancelled-B/retry-consent controls pass;
 legal 200-formation/2000-item snapshot renders only 12+12 cards. Final native full smoke 157/157 in
 250152 ms, 2026-10-06T16:52:57.328Z; .out/p2c-full-native-final-20261006.json. Title 200125 B/493 ms,
-first real introductory loot card 47606 ms, idle defeat 27.30 sim seconds; exact-SHA CI pending. This
+first real introductory loot card 47606 ms, idle defeat 27.30 sim seconds. f6edce7469944bf378b24f93e9e132d3d9c2aa46
+passed Pages 37500375379, but CI 37500375376 failed the immediate post-Escape focus assertion and
+next hidden-file upload (140 checks, 547941 ms). Queued dialog-close cleanup was still pending;
+the test now waits for closed dialog, enabled Import and restored focus. A delayed-close notification
+fixture passes software focused 46/46 in 29950 ms, 2026-10-06T17:14:52.370Z; exact repair CI pending. This
 static readback does not close living camp/title, editable inventory, deployment or the rest of P2.
 
 Use the existing completed-reward store and card renderers; no second store or campaign schema.
@@ -218,6 +222,32 @@ Check fresh/saved/error/reload/depot/pagination/file transfer through real UI, e
 keyboard/focus/48px targets, 320/1024 screenshots and scoped axe. Keep all P1/P2a/P2b positives/mutants;
 run syntax/diff/unit, one full local smoke, independent source/WCAG/play review, explicit commit/push
 and exact-SHA CI/Pages. Complete sandbox/default/deployment scope remains accounted for before P2 closes.
+
+### P2d: sandbox veterancy and remaining rule multipliers (bounded contract)
+
+Add Next brigade's veterancy (Green/Trained/Veteran/Elite = existing xp 1..4) through the existing
+Units registry and Game.spawnUnit. Omitted xp remains 1; invalid xp rejects before reserve/counter/
+roster mutation. Both sides use the same construction path and generic labels; historical rosters
+and already placed brigades are untouched. This is placement, not earned campaign advancement.
+Charge effect scales existing melee casualty rates on both sides, including defenders; preserve
+ratios, random draws, ordering and caps of available men and 4% of initial strength per sim second.
+Fatigue gain scales positive march/run/rout/charge/melee gains only; rest/firing recovery and 0..100
+bounds stay unchanged. Both multipliers use the existing 0.5..2, step .05, default 1 registry.
+
+Like existing march/fire/morale choices, persisted rule settings apply to subsequent practice too;
+this is explicit player tuning, not a hidden side/difficulty bonus or an anti-cheat boundary. Practice
+award eligibility remains the existing route/roster contract. Sandbox/historical routes still grant
+no progress; original practice roster xp stays unchanged. Do not claim arbitrary rule alterations
+are rejected by practiceOutcome. P1 save schema, art, history, reward balancing and campaign stay out.
+
+Gate actual Game/Combat prototypes with deterministic fixtures and matching assertion-rejecting
+controls: both-side/default/invalid placement, live veterancy effect, charge symmetry/default/caps,
+all fatigue gains, unchanged recovery/bounds and registry clamp/lock/reset/transfer. Actual UI must
+place/control both sides at selected xp, exercise real sliders/Reset/Lock/Copy/Paste and reload,
+preserve progress bytes, show readable notes/keyboard/focus/touch-sized controls, and pass scoped
+axe/screenshots. Keep existing positives/mutants, unit and final native full smoke, independent source/
+WCAG review, docs/commit/push and exact-SHA CI/Pages. This does not close remaining Look/Moments,
+soldier's-eye/division selection, deployment, living camp or full P2.
 
 ### Required battle-system work (P3/P4; do not hide it inside “build Shiloh”)
 
