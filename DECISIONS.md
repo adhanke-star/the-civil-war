@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0029 — Look controls change the existing grade and smoke pool (2026-10-06)
+Saturation and tilt-shift edit existing Post uniforms, preserving .86/.9 defaults and fixed exposure .66;
+no target resize, atlas, lighting or combat change. Smoke off/reduced motion stops and clears pooled
+systems, hides their batch and invalidates delayed emissions; re-enable admits only new puffs. Sound
+remains independent. No disposal or memory-saving claim. The generic FPS note now describes an observed
+drop. Existing preference semantics remain: Set/Reset respect locks; explicit Paste may replace locked
+values and its supplied comma-delimited locked: line restores that lock set. Progress stays separate.
+
 ## 0028 — Sandbox placement and combat tuning reuse existing experience and rules (2026-10-06)
 Next placed brigade selects existing xp 1..4 on either side; invalid xp cannot consume reserve or IDs.
 Charge effect scales melee casualties for both participants within the existing caps. Fatigue gain

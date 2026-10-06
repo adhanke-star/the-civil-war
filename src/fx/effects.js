@@ -6,6 +6,8 @@
 // from the camera target and simultaneous sounds are capped.
 
 import * as THREE from 'three';
+import { LOOK } from '../ui/look.js';
+import { on } from '../settings.js';
 
 const POOL = 200;
 
@@ -36,7 +38,10 @@ export class Effects {
     this.ok = false;
     this.systems = [];
     this.next = 0;
-    this.reducedMotion = false;
+    this._reducedMotion = false;
+    this.smokeEnabled = LOOK.smoke;
+    this.smokeEpoch = 0;
+    on('look.smoke', (v) => this.setSmoke(v));
     this.sound = { unlocked: false, enabled: true, zzfx: null, ctx: null, active: 0 };
     this.puffs = 0;
   }
@@ -82,14 +87,38 @@ export class Effects {
       }
       this.batch = batch;
       this.ok = true;
+      this.syncSmoke();
     } catch (err) {
       console.warn('three.quarks smoke unavailable; continuing without smoke:', err && err.message ? err.message : err);
     }
   }
 
+  get reducedMotion() { return this._reducedMotion; }
+  set reducedMotion(v) {
+    if (this._reducedMotion === Boolean(v)) return;
+    this._reducedMotion = Boolean(v); this.smokeEpoch++; this.syncSmoke();
+  }
+
+  setSmoke(v) {
+    if (this.smokeEnabled === Boolean(v)) return;
+    this.smokeEnabled = Boolean(v); this.smokeEpoch++; this.syncSmoke();
+  }
+
+  syncSmoke() {
+    const visible = this.smokeEnabled && !this.reducedMotion;
+    if (this.batch) this.batch.visible = visible;
+    if (!visible) {
+      // ParticleSystem.stop() clears particles and pauses; the pool and GPU buffers stay allocated.
+      for (const { system } of this.systems) system.stop();
+      if (this.ok) this.batch.update(0);
+    }
+  }
+
   puff(x, z, big = false, delay = 0) {
-    if (!this.ok || this.reducedMotion) return;
+    if (!this.ok || !this.smokeEnabled || this.reducedMotion) return;
+    const epoch = this.smokeEpoch;
     const go = () => {
+      if (!this.ok || !this.smokeEnabled || this.reducedMotion || epoch !== this.smokeEpoch) return;
       let k = 0, s;
       do {
         s = this.systems[this.next];

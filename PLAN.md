@@ -188,7 +188,7 @@ measured elapsed time, separate contested/retake/no-duplicate tests; keyboard/to
 independent source and WCAG/play review; final npm test, docs, commit/push and exact-SHA CI/Pages.
 P2c must still introduce camp/title defaults and resolve complete sandbox/flow scope before full P2 closes.
 
-### P2c: lightweight title and completed-army camp (implementation candidate)
+### P2c: lightweight title and completed-army camp (implemented 2026-10-06)
 
 Focused 46/46, 24310 ms, 2026-10-06T16:50:56.481Z; title 200135 B/211 ms, no field assets or renderer.
 Title/camp/import axe clear; seven actual screenshots independently reviewed, full names and accessible
@@ -199,7 +199,8 @@ first real introductory loot card 47606 ms, idle defeat 27.30 sim seconds. f6edc
 passed Pages 37500375379, but CI 37500375376 failed the immediate post-Escape focus assertion and
 next hidden-file upload (140 checks, 547941 ms). Queued dialog-close cleanup was still pending;
 the test now waits for closed dialog, enabled Import and restored focus. A delayed-close notification
-fixture passes software focused 46/46 in 29950 ms, 2026-10-06T17:14:52.370Z; exact repair CI pending. This
+fixture passes software focused 46/46 in 29950 ms, 2026-10-06T17:14:52.370Z. Repair
+2bf8f8030e856c6e5f097dbd17b1bbf80c06d729 passed CI 37502279679 and Pages 37502279685. This
 static readback does not close living camp/title, editable inventory, deployment or the rest of P2.
 
 Use the existing completed-reward store and card renderers; no second store or campaign schema.
@@ -223,7 +224,7 @@ keyboard/focus/48px targets, 320/1024 screenshots and scoped axe. Keep all P1/P2
 run syntax/diff/unit, one full local smoke, independent source/WCAG/play review, explicit commit/push
 and exact-SHA CI/Pages. Complete sandbox/default/deployment scope remains accounted for before P2 closes.
 
-### P2d: sandbox veterancy and remaining rule multipliers (implementation candidate)
+### P2d: sandbox veterancy and remaining rule multipliers (implemented 2026-10-06)
 
 Actual Game/Combat/settings positives 12/12 and intended rejecting controls 12/12 pass, including
 composed melee-then-fatigue recovery. Native focused UI 39/39 in 52899 ms, 2026-10-06T17:12:40.035Z;
@@ -233,7 +234,8 @@ calls the actual sandbox result controller and proves no award/write. Narrow tar
 axe and console clear. Initial absent-controller assertion was vacuous; controller-state/terminal
 checks replace it. Final native full smoke 169/169 in 274447 ms, 2026-10-06T17:18:14.463Z;
 .out/p2d-full-native-final-20261006.json. First actual intro card 48078 ms; idle defeat 27.33 sim seconds.
-Independent source/WCAG review clears this bounded candidate; exact-SHA CI pending.
+Independent source/WCAG review clears this bounded candidate. 2d761dbd21c4aad797624d37cd63527ca5827581
+passed CI 37503374519 and Pages 37503374677.
 Incidental baseline FPS wording infers causation from uncontrolled samples; correct the wording in
 the next Look slice rather than treating these readings as measured costs of scalar combat rules.
 
@@ -260,6 +262,69 @@ preserve progress bytes, show readable notes/keyboard/focus/touch-sized controls
 axe/screenshots. Keep existing positives/mutants, unit and final native full smoke, independent source/
 WCAG review, docs/commit/push and exact-SHA CI/Pages. This does not close remaining Look/Moments,
 soldier's-eye/division selection, deployment, living camp or full P2.
+
+### P2e: existing post grade, tilt-shift and smoke controls (implementation candidate)
+
+Actual Post/Effects/quarks positives 10/10 and ten intended mutants pass, including in-place target
+resize rejection. Focused native 56/56 in 81327 ms, 2026-10-06T17:35:54.647Z; retained
+.out/p2e-focused-final-20261006.json and six look PNGs. Saturation/tilt change 95.87%/12.14% of 52608
+sampled pixels; Reset restores zero changed pixels, target UUID/dimensions/canvas and nine textures.
+Space switches smoke off; existing particles clear, pre-disable timers remain cancelled after on,
+real reduced-motion changes compose with the preference. Exact saved progress/zero writes, transfer,
+reload, 320px >=44px controls and scoped axe pass. First fixture failure is retained separately;
+it assumed Paste respected locks and compared asymptotically eased camera floats byte-for-byte.
+Product behavior was correct. Explicit Paste may replace locked values; a supplied locked: line
+restores its comma-delimited lock set. Independent focused source/WCAG review clears the candidate.
+Final native full smoke186/186 in300516ms,2026-10-06T17:37:39.593Z, retained
+.out/p2e-full-native-final-20261006.json and six full-run look PNGs. Default-on fight produces real
+casualties and eight puffs; actual intro first card48195ms, win45.50sim/idle defeat27.28sim. Full-run
+Reset again changes zero sampled pixels; all old save/flow checks pass. Independent final source/WCAG
+review read the receipt and all six exact full-run PNGs; no bounded blocker. Exact-SHA CI/Pages pending.
+
+Register colour saturation, tilt-shift amount and smoke visibility in existing LOOK/settings.
+Preserve current saturation .86, tilt .9, center .46, band .24 and fixed exposure .66; no texture,
+terrain, lighting, approved pose/atlas or simulation changes. Saturation/tilt update existing uniforms
+on construction and live changes, with no target resize/rebuild. Numeric split-screen is not promised.
+Smoke defaults on; off/reduced-motion hides and clears existing clouds and suppresses new/scheduled
+emissions. Turning on resumes new emissions without resurrecting pre-disable callbacks/clouds.
+Preserve sound/casualties and particle pool bounds; visibility does not claim disposal or memory savings.
+Use real renderer/particle APIs, verified at runtime. Keep the existing retained smoke-on fight check.
+Correct generic FPS warning wording to describe an observed drop without implying a measured causal
+cost. Preserve settings Reset/Lock/Copy/Paste/reload and all progress/history/art locks.
+
+Gate actual Post/Effects methods with deterministic positive/intended-rejection tests for initial/live
+uniforms/defaults, unchanged target allocation, suppression/clear/delayed callbacks/re-enable/reduced
+motion and unchanged sound calls. Real UI must show actual pixel differences at fixed paused view,
+unchanged dimensions/texture allocations and saved battle state, smoke on/off/readback, controls/
+lock/reset/transfer/reload, keyboard/narrow targets/axe/screenshots and independent visual/source/WCAG
+review. Run retained positives/mutants/unit, final native smoke, docs/commit/push and exact CI/Pages.
+No iPad/performance/fieldable-art or full P2 claim; spacing/marker/camera behavior remain separately bound.
+
+### P2f: marker dimensions and camera elevation (next bounded contract)
+
+Reuse LOOK, Hud and RtsCamera; root sole writer. Own src/ui/look.js, src/ui/hud.js/CSS,
+src/render/rts-camera.js, focused view tests/tools/test.mjs, CI if needed, sw.js and docs.
+Marker size defaults1; scale the existing flag34x30 and bar36x6 through CSS dimensions, keep text
+readable and every button >=44x44. Do not transform the entire button: Hud's projected/stacked transform
+is authoritative. Invalidate cached m.w/m.h/sizeTimer on changes; newly placed markers inherit the
+preference. Preserve ground anchors, stacking/hit rectangles/off-screen behavior, actual click/drag/
+keyboard/touch selection and crate rectangle avoidance. No simulation/formation/art/history change.
+Camera elevation offset defaults0, adds to pitchForDist plus existing manual tilt, retains final
+pitch clamps. Initial constructor and later zoom/rotate/live preference agree; preserve easing9,
+target/distance/yaw, terrain collision protection and near/far limits. Explicit notes explain that a
+changed viewing angle can change pointer projection, not simulation coordinates. No split-screen promise.
+
+Before visual edits refresh/view reference shots. Bind actual camera constructor/live/zoom/manual tilt,
+clamps/Reset to deterministic positives and intended mutants. Actual UI must prove marker flag/bar
+dimensions and cache refresh, selected/new markers, anchor/stack geometry and >=44px hit areas at
+min/default/max; camera pitch changes with unchanged target/distance/yaw/paused unit state, real zoom-
+to-cursor and touch pinch anchors, fly-to/minimap footprint, unchanged progress/art/resources; settings
+locks/explicit Paste/reset/reload, keyboard/320px axe/screens. Preserve all old controls and gates.
+Run syntax for each owned module, git diff --check, all retained reward/outcome/capture/intro/sandbox/
+Look positives+intended mutants, unit, focused native view, frozen final native smoke with receipt/PNG
+readback, independent source/WCAG/visual review, docs sync, explicit commit/push and exact CI/Pages.
+Red CI takes priority. Formation spacing, soldier's-eye, Moments/X-Factor, saved deployment/living camp
+and complete P2/P3-P7 remain separate; no device/performance/approved-art fielding claim.
 
 ### Required battle-system work (P3/P4; do not hide it inside “build Shiloh”)
 

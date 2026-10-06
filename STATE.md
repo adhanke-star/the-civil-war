@@ -3,8 +3,9 @@
 - **Finish:** all three v1 battles and all v1 functions/flow. No deadline, new spending or hands-on checks.
 - **P1/P2a:** a2c29d3/d228fb9 integrated; persistence, actual result bridge and exact-SHA CI green.
 - **P2b:** 4a4a4ad; intro/crates; CI 37496336886 and Pages 37496336828 green; native full 125/125.
-- **P2c:** f6edce7; native full 157/157; CI 37500375376 failed queued-close fixture; repair focused 46/46.
-- **P2d:** placement veterancy/charge/fatigue candidate; 12+12, focused 39/39, native full 169/169; CI pending.
+- **P2c:** repair 2bf8f80; CI 37502279679/Pages 37502279685 green; native 157/157, focused repair 46/46.
+- **P2d:** 2d761db; 12+12, native full 169/169; CI 37503374519/Pages 37503374677 green.
+- **P2e:** Look candidate; Post/Effects 10+10, focused 56/56, native full 186/186; CI pending.
 - **Art next:** Actions manifest/page-demand residency estimator; wholesale lossless tiers exceed budget.
 - **Current play:** title Continue -> intro/saved camp; ?practice Henry rewards; historical/sandbox isolated.
 - **Missing:** saved-gear deployment, living title/camp, campaign saves, phase packs and progression.
@@ -13,7 +14,6 @@
 - **Failed candidates:** UASTC 37360904656 and direct BC7/ASTC 37404193171; limits stay unchanged.
 - **Historical native Mac (2026-10-04):** baked Auto 1:5 40.7/38.7 fps opening/fight; no new measurement.
 - **Unverified:** actual iPad access/performance, full touch/device acceptance, new assets and total memory.
-- **Proof:** reward 21+21, outcome 9+9, capture 6+6, intro 7+7; native full 169/169, first card 48.1s.
-- **Coordination:** no COORDINATION.md; preserve untracked NEW-civil-war-video-game.code-workspace.
-- **Continuation:** HANDOFF + PLAN P2-P7; goal active; no scheduler; retain expansion roadmap/old freeze.
-- **Runtime:** cw-v9 shipped; P2d controls/cw-v10 owned WIP; full performance/iPad gates still open.
+- **Proof:** reward 21+21, outcome 9+9, capture 6+6, intro 7+7; native full 186/186, first card 48.2s.
+- **Coordination:** no ledger; preserve workspace file; HANDOFF/PLAN P2-P7, active goal, no scheduler.
+- **Runtime:** cw-v10 shipped, cw-v11 candidate; next marker/camera then spacing; full device gates open.

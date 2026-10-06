@@ -5,7 +5,56 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2d controls candidate; P2c repair CI pending (2026-10-06)
+## Current boundary: P2e Look acceptance and integration (2026-10-06)
+
+Complete existing v1 remains active under the Codex goal objective and PLAN P1-P7; no partial release
+or complete P2 claim. Root is sole writer, helpers read/review only, one local browser at a time.
+No COORDINATION.md; old Desktop repo frozen/read-only. Preserve untracked workspace file. Current
+Integration parent is 2d761dbd21c4aad797624d37cd63527ca5827581, P2d pushed. Its CI 37503374519 and
+Pages 37503374677 passed. P2c repair 2bf8f8030e856c6e5f097dbd17b1bbf80c06d729
+passed CI 37502279679 and Pages 37502279685. Red exact CI takes priority over the next slice.
+
+P2e owned slice: src/ui/look.js, src/render/post.js, src/fx/effects.js, src/sandbox/panel.js, sw.js,
+tools/test-look.mjs, tools/test-look-ui.mjs, tools/test.mjs, .github/workflows/ci.yml and docs.
+Existing LOOK registry gains saturation0..1.5/default.86, tilt0..1/default.9 and smoke/on. Existing
+Post uniforms update on construction/live changes; exposure.66, center.46/band.24, camera/targets,
+lighting/terrain/art/atlas/combat remain unchanged. ParticleSystem.stop() runtime-clears and pauses;
+off/reduced motion hides+clears actual pool and flushes batch.update(0). Epoch guards prevent delayed
+pre-disable puffs resurrecting after re-enable. New puffs and unchanged sound work independently.
+No resource disposal/memory-saving claim. FPS note reports an observed drop without causal attribution.
+Set/Reset respect locks; explicit Paste may replace locked values and its supplied comma-delimited
+locked: line replaces the lock set. Strict progress storage stays separate.
+
+Actual Node Post/Effects/quarks positive10+intended mutant10 pass; render-target test snapshots UUIDs
+and dimensions, rejecting in-place resize. All retained reward21+21/outcome9+9/capture6+6/intro7+7/
+sandbox12+12/unit gates passed. Native focused56/56 in81327ms,2026-10-06T17:35:54.647Z retained
+.out/p2e-focused-final-20261006.json; six look PNGs carry17-35-54-647Z. Source review clears, root
+viewed all six; independent WCAG rendered review clears focused evidence. Sat/tilt changed95.87%/12.14% of52608 sampled
+pixels; Reset0changed, existing target dimensions/UUID/canvas/nineGPUtextures stable; exact progress,
+paused units/orders/time stable (camera rounded to micrometre precision for asymptotic easing).
+Actual Space/smoke clear/timer cancellation/media change/locks/transfer/reload/320px>=44/axe0 pass.
+Retained .out/p2e-focused-fixture-failure-20261006.json records incorrect paste-lock/float test
+assumptions; no product workaround. Frozen full npm test -- --native passes186/186 in300516ms,
+2026-10-06T17:37:39.593Z; .out/p2e-full-native-final-20261006.json and exact six full PNGs with
+17-37-39-593Z. Fight eight smoke puffs/casualties506US+609CS; firstintrocard48195ms, win45.50sim,
+idledefeat27.28sim; restoredpixels0, alloldflows/progresssafe. Browser closed. Independent full source/
+WCAG review cleared the exact receipt and all six PNGs; exact-SHA CI/Pages pending. Read live git/run status; stage only
+owned files, commit/push, repair red CI. cw-v11 candidate; cw-v10 shipped before integration.
+
+Next recommended P2f: existing marker size plus camera elevation offset, defaults1/0. Markers change
+CSS dimensions (flag34x30/bar36x6) rather than whole-button transform; retain >=44 hit targets and
+invalidate Hud cached m.w/m.h/sizeTimer. Camera uses pitchForDist plus existing manual tilt and new
+offset consistently on construction/live/zoom; retain easing9, final clamps. Verify actual marker
+anchors/stacking/drag/key/touch and camera zoom-to-cursor/pinch/minimap/fly-to, progress/history/art
+invariants, settings/lock/reset/transfer/reload, focused/full gates and independent review. Write a
+bounded PLAN contract before edits. Spacing is separate: actual Unit footprint changes hit-testing,
+combat arcs/melee and order ghosts/group offsets; never claim combat-neutral. Missing Moments/X-Factor,
+soldier's-eye/division selection, deployment, living camp, all combat/phase packs and P3-P7 remain.
+Approved bake/failed codec bounds and Actions-only demand/residency estimator remain as recorded below.
+Actual iPad/sustained native/scene memory/offline/release gates remain unverified; continue independent
+work without Aaron hands-on checks or routine approval. No scheduler or competing store created.
+
+## Previous boundary: P2d candidate and P2c repair submission (2026-10-06)
 
 Complete existing v1 remains the active goal; this slice does not close P2 or campaign scope. Root
 is sole product writer; helpers read/review only and browsers are serialized. No COORDINATION.md.

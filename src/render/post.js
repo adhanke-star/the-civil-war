@@ -15,6 +15,8 @@
 //   lower resolution would only blur the picture (DECISIONS 0012).
 
 import * as THREE from 'three';
+import { LOOK } from '../ui/look.js';
+import { on } from '../settings.js';
 
 export const QUALITY_MODES = ['auto', 'high', 'low'];
 const LOW_SCALE = 0.7;
@@ -122,11 +124,14 @@ export class Post {
       // the sharp band runs from 19% to 69% of the screen height, where the fighting line sits
       uTiltCenter: { value: 0.46 },
       uTiltBand: { value: 0.24 },
-      uTilt: { value: 0.9 },
+      uTilt: { value: LOOK.tiltShift },
       uExposure: { value: 0.66 },
-      uSaturation: { value: 0.86 },
+      uSaturation: { value: LOOK.saturation },
       uVignette: { value: 1.55 },
     });
+
+    on('look.saturation', (v) => { this.finalMat.uniforms.uSaturation.value = v; });
+    on('look.tiltShift', (v) => { this.finalMat.uniforms.uTilt.value = v; });
 
     // governor
     this.samplesLog = []; // [time ms, dt s]

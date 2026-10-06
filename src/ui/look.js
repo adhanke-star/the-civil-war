@@ -43,6 +43,18 @@ const SPECS = {
     tab: 'Look', type: 'range', default: 1, min: 0.6, max: 1.6, step: 0.05, label: 'Figure size',
     note: 'Draws every soldier larger or smaller, in both figure styles (guns, limber teams and slot spacing keep their size). Larger costs a little fill rate.',
   }],
+  saturation: ['look.saturation', {
+    tab: 'Look', type: 'range', default: 0.86, min: 0, max: 1.5, step: 0.01, label: 'Colour saturation',
+    note: 'Changes battlefield colour intensity; 0 is muted, 0.86 keeps the current grade. Leaves HUD colours and lighting unchanged.',
+  }],
+  tiltShift: ['look.tiltShift', {
+    tab: 'Look', type: 'range', default: 0.9, min: 0, max: 1, step: 0.05, label: 'Tilt-shift blur',
+    note: 'Softens the far and near edges of the view; 0 removes this blur, 0.9 keeps the current look. Camera tilt and zoom stay unchanged.',
+  }],
+  smoke: ['look.smoke', {
+    tab: 'Look', type: 'toggle', default: true, label: 'Battle smoke',
+    note: 'Shows musket and cannon smoke; off clears existing clouds and cancels queued puffs. Reduced motion also suppresses smoke; sound and combat stay unchanged.',
+  }],
 };
 
 export const LOOK = {};

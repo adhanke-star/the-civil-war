@@ -296,7 +296,7 @@ export function mountSandbox({ game } = {}) {
       row.classList.toggle('sb-locked', locked);
       const c = costs.get(key);
       cost.hidden = !c;
-      if (c) cost.textContent = `This costs about ${c} fps on this device.`;
+      if (c) cost.textContent = `Frame rate fell by about ${c} fps after this change.`;
     }
     sync();
     return { row, sync };

@@ -57,6 +57,7 @@ import { prune, OUT_DIR } from './prune.mjs';
 import { practiceProgress } from './test-practice-ui.mjs';
 import { introPlay } from './test-intro-ui.mjs';
 import { entryProgress } from './test-entry-ui.mjs';
+import { lookControls } from './test-look-ui.mjs';
 
 const READY_TIMEOUT_MS = 180_000;
 const VIEWPORT = { width: 1280, height: 720 };
@@ -896,6 +897,7 @@ async function sandboxAndDevice(browser, url) {
           `markers ${n0} -> ${spawned.markers} after spawn -> ${n2} after remove; spawned "${spawned.name}" (commander ${JSON.stringify(spawned.commander)}, ${spawned.men} men, ${spawned.figs} figures); after "Selected: rout" its state was ${routed}`);
       }
       await sandboxRuleTools(page);
+      await lookControls({ page, check, shot, result });
       // look.orderLine compares split-screen: both styles are built, each clipped to its side of the divider
       {
         await page.getByRole('tab', { name: 'Look' }).click();
