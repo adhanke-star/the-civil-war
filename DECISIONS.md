@@ -1,5 +1,14 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0027 — Title and camp reuse one completed-army store (2026-10-06)
+Title/camp load without the renderer; Continue re-reads validated progress before choosing intro or camp.
+Blocked/corrupt reads never fall through to a fresh army. Camp reuses actual brigade/item cards, with
+wrapping names, accessible item details and bounded pagination. File imports serialize read/consent/write;
+pending filename and inventory remain bound through quota failure, cancelled previews and re-confirmed
+retry. Clean modern won the independent three-style readability comparison; other sandbox styles remain.
+This is read-only completed-army camp, not live deployment/campaign or the final diorama. No new store,
+schema, art or combat change. Full progression and presentation remain in P3-P7.
+
 ## 0026 — A fictional first command teaches holding and real field capture (2026-10-06)
 P2b reuses Henry Hill terrain for two generic brigades versus one approaching opponent, with unchanged
 combat constants. A 45-sim-second hold requires retaining ground; zero forces or contested/lost ground

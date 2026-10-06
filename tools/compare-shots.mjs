@@ -13,7 +13,7 @@ const url = process.argv[2] || 'http://127.0.0.1:8770/';
 mkdirSync('.out/compare', { recursive: true });
 const browser = await chromium.launch({ channel: 'chrome', headless: false, args: ['--window-size=1600,990'] });
 const page = await (await browser.newContext({ viewport: { width: 1600, height: 900 } })).newPage();
-await page.goto(`${url}?quality=high`);
+await page.goto(`${url}?practice&quality=high`);
 await page.waitForFunction(() => window.__ready === true, null, { timeout: 120000 });
 await page.waitForTimeout(4000);
 

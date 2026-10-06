@@ -49,8 +49,8 @@ export function attachPracticeFlow({ game, scenario, hud, mode }) {
     (focusCancel || !label ? back : action).focus({ preventScroll: true });
   }
   function showSaved() {
-    panel('Army saved', `${saved.army.reduce((n, b) => n + b.men, 0).toLocaleString()} surviving men and ${saved.depot.length} depot cards are saved. Continue opens your saved army. Fresh practice starts with its original troops and gear.`,
-      'Continue', () => location.assign('./reward.html'));
+    panel('Army saved', `${saved.army.reduce((n, b) => n + b.men, 0).toLocaleString()} surviving men and ${saved.depot.length} depot cards are saved. Continue opens your saved army in camp. Fresh practice starts with its original troops and gear.`,
+      'Continue', () => location.assign('./?camp'));
   }
   function recover() {
     panel(pending ? 'Army not saved' : 'Progress unavailable', failure,

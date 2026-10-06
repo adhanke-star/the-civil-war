@@ -1,0 +1,40 @@
+#front { position: fixed; inset: 0; overflow: auto; display: block; padding: 0; }
+#front .entry-wrap { max-width: 1160px; margin: auto; padding: 24px 28px 48px; }
+#front .entry-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-bottom: 28px; border-bottom: 1px solid var(--rw-rule); }
+#front .entry-brand { display: inline-flex; align-items: center; min-height: 48px; font-size: 24px; font-weight: 800; text-decoration: none; color: var(--rw-ink); }
+#front .entry-head p, #front .entry-note { color: var(--rw-dim); }
+#front #entry-title { max-width: 640px; margin: 70px auto; }
+#front h1 { font-size: clamp(32px, 4.8vw, 56px); line-height: 1.12; margin: 0 0 18px; }
+#front #entry-note { font-size: 19px; line-height: 1.6; max-width: 520px; }
+#front button, #front .entry-primary, #front .entry-modes a { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 10px 18px; color: var(--rw-ink); background: var(--rw-faint); border: 1px solid #827c8b; border-radius: 9px; font: inherit; text-decoration: none; cursor: pointer; }
+#front button.entry-primary, #front a.entry-primary { background: var(--rw-btn); color: var(--rw-btn-ink); border-color: transparent; font-size: 18px; font-weight: 800; padding: 14px 30px; }
+#front button:disabled { cursor: default; color: var(--rw-dim); }
+#front .entry-transfer, #front .entry-modes, #front .entry-pages { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+#front .entry-transfer { padding-top: 24px; border-top: 1px solid var(--rw-rule); }
+#front #entry-status { width: 100%; margin: 4px 0 16px; }
+#front .entry-modes { margin-top: 10px; }
+#front .entry-camp-head { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding-top: 32px; }
+#front #entry-camp h1 { font-size: 40px; margin: 0; }
+#front #entry-camp h2 { font-size: 22px; margin-top: 32px; }
+#front .rw-brigs { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+#front .rw-brig { min-width: 0; }
+#front .rw-bname { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+#front .rw-bmeta { flex-wrap: wrap; }
+#front #camp-depot { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+#front #camp-depot .rw-card { width: 100%; height: auto; min-height: 320px; aspect-ratio: auto; }
+#front #camp-depot .rw-front { position: relative; min-height: 320px; }
+#front #camp-depot .rw-name, #front #camp-depot .rw-where, #front #camp-depot .rw-affix-fx { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+#front #camp-depot .rw-where { font-size: 12px; }
+#front .entry-pages { margin-top: 18px; }
+#front dialog { max-width: min(480px, calc(100vw - 40px)); max-height: 85vh; overflow: auto; padding: 24px; color: var(--rw-ink); background: #1f1c24; border: 1px solid #827c8b; border-radius: 12px; }
+#front dialog::backdrop { background: rgba(0,0,0,0.75); }
+#front dialog button { margin: 5px; }
+#front dialog p { overflow-wrap: anywhere; }
+@media (max-width: 850px) { #front .rw-brigs, #front #camp-depot { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) {
+  #front .entry-wrap { padding: 18px 14px 32px; }
+  #front .entry-head, #front .entry-camp-head { align-items: flex-start; flex-direction: column; gap: 8px; }
+  #front #entry-title { margin: 36px 0; }
+  #front #entry-note { font-size: 17px; }
+  #front .rw-brigs, #front #camp-depot { grid-template-columns: minmax(0, 1fr); }
+}

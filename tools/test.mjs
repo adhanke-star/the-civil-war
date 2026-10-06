@@ -1,4 +1,4 @@
-// tools/test.mjs: M1 browser test. Serves the repo on a free port, loads index.html?quality=low in headless
+// tools/test.mjs: M1 browser test. Serves the repo on a free port, loads index.html?practice&quality=low in headless
 // Chromium (SwiftShader WebGL, so CI and the Mac both render), and checks:
 //   1. ready: window.__ready within 180 s (fails fast on the first page/console error during load)
 //   2. no-console-errors: zero pageerror / console error / failed request / HTTP >= 400
@@ -56,6 +56,7 @@ import { startServer, ROOT } from './serve.mjs';
 import { prune, OUT_DIR } from './prune.mjs';
 import { practiceProgress } from './test-practice-ui.mjs';
 import { introPlay } from './test-intro-ui.mjs';
+import { entryProgress } from './test-entry-ui.mjs';
 
 const READY_TIMEOUT_MS = 180_000;
 const VIEWPORT = { width: 1280, height: 720 };
@@ -1172,6 +1173,7 @@ async function main() {
     browser = await chromium.launch(native ? { channel: 'chrome', headless: false }
       : { headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     result.browser = `chromium ${browser.version()}`;
+    if (process.argv.includes('--entry')) { result.mode = 'title and camp only'; await entryProgress({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--intro')) { result.mode = 'unforced introductory play'; await introPlay({ browser, url, check, shot, result, watchErrors, native }); return; }
     if (process.argv.includes('--practice')) { result.mode = 'practice result bridge only'; await practiceProgress({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--reward')) { result.mode = 'reward progress only'; await rewardProgress(browser, url); return; }
@@ -1402,6 +1404,7 @@ async function main() {
     await rewardProgress(browser, url);
     await practiceProgress({ browser, url, check, shot, result, watchErrors });
     await introPlay({ browser, url, check, shot, result, watchErrors, native });
+    await entryProgress({ browser, url, check, shot, result, watchErrors });
   } finally {
     if (browser) await browser.close().catch(() => {});
     await new Promise((resolve) => server.close(resolve));

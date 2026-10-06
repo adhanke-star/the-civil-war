@@ -158,7 +158,8 @@ Capture 6+6, intro 7+7, outcome 9+9 and reward/save 21+21 positives/intended mut
 intro PNGs including 320px briefing and scoped axe are reviewed. A prior full software run failed
 immediate keyboard ordering (123/124, 727018 ms); synchronous select refresh fixes the real disabled-
 button race, with immediate software readback and final full native proof. Minor hint/flag overlap
-remains HUD polish. Exact candidate CI/Pages pending; no Auto/1:5/full-battle or iPad certification.
+remains HUD polish. 4a4a4adb1f6ec695b3329d9298e7a5080b5bca80 passed CI 37496336886 and Pages
+37496336828; no Auto/1:5/full-battle or iPad certification.
 
 Default entry shows a short labelled fictional practice briefing; Continue starts two generic Union
 brigades against one approaching Confederate brigade on reused Henry Hill terrain. Original Henry
@@ -186,6 +187,37 @@ outcome positives/mutants; unit; actual fresh Continue/select/drag/fight/capture
 measured elapsed time, separate contested/retake/no-duplicate tests; keyboard/touch/axe/screenshots;
 independent source and WCAG/play review; final npm test, docs, commit/push and exact-SHA CI/Pages.
 P2c must still introduce camp/title defaults and resolve complete sandbox/flow scope before full P2 closes.
+
+### P2c: lightweight title and completed-army camp (implementation candidate)
+
+Focused 46/46, 24310 ms, 2026-10-06T16:50:56.481Z; title 200135 B/211 ms, no field assets or renderer.
+Title/camp/import axe clear; seven actual screenshots independently reviewed, full names and accessible
+depot details verified. Deferred-read overlap and failed-A/cancelled-B/retry-consent controls pass;
+legal 200-formation/2000-item snapshot renders only 12+12 cards. Final native full smoke 157/157 in
+250152 ms, 2026-10-06T16:52:57.328Z; .out/p2c-full-native-final-20261006.json. Title 200125 B/493 ms,
+first real introductory loot card 47606 ms, idle defeat 27.30 sim seconds; exact-SHA CI pending. This
+static readback does not close living camp/title, editable inventory, deployment or the rest of P2.
+
+Use the existing completed-reward store and card renderers; no second store or campaign schema.
+No-query entry loads a lightweight title, with one Continue: successful empty read -> ?intro;
+validated saved army -> camp. Blocked/corrupt reads show retry/import, never silently start a fresh army.
+Explicit ?intro, ?practice, ?battle=henry-hill and ?sandbox still boot the field; reward.html remains
+the explicit sample reward workbench. After successful practice saving, Continue opens camp.
+Camp reads actual brigade equipment/ratings and full depot names/rarity/condition/provenance, retains
+depleted identities and pages bounded sets so a legal 200-brigade/2000-item export cannot flood the DOM.
+Title/camp entry, reload and export must not roll loot, duplicate an award or write progress/preferences.
+Import uses the existing strict validator and atomic replace, explicit Cancel-focused confirmation,
+failed-import/blocked-read/quota recovery and real file export/import. No editable issue/requisition,
+saved-gear deployment, phase/campaign slots or full living diorama claim in this readback slice.
+
+Clean modern is the reviewed default: three matched existing card-style screenshots were compared
+independently; clearest OVR/identity hierarchy and coherent battle HUD. Keep other sandbox styles and
+stored preferences/locks. Reuse full static item cards, not truncating compact tray names/conditions.
+Title/camp must stay around 5 MB/10 s without terrain, three.js, effects or soldier-atlas requests.
+Check fresh/saved/error/reload/depot/pagination/file transfer through real UI, exact stored bytes,
+keyboard/focus/48px targets, 320/1024 screenshots and scoped axe. Keep all P1/P2a/P2b positives/mutants;
+run syntax/diff/unit, one full local smoke, independent source/WCAG/play review, explicit commit/push
+and exact-SHA CI/Pages. Complete sandbox/default/deployment scope remains accounted for before P2 closes.
 
 ### Required battle-system work (P3/P4; do not hide it inside “build Shiloh”)
 

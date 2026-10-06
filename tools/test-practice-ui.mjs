@@ -137,10 +137,10 @@ export async function practiceProgress({ browser, url, check, shot, result, watc
     check('practice-replay-isolated', await raw() === firstRaw && await page.locator('.rw').count() === 0,
       'sandbox reward action cannot inherit the practice save callback or mount a sample army');
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
-    await page.getByRole('button', { name: 'Resume saved army', exact: true }).click();
-    const resumed = await page.evaluate(() => { const { awardId, cards, army } = window.__reward.state; return { awardId, cards, army }; });
-    check('practice-continue-reload', await raw() === firstRaw && resumed.awardId === first.awardId && resumed.cards.length === 0
-      && resumed.army.length === 5 && resumed.army[1].men === 0, 'Continue navigates to stored army; resume retains depleted identity with no reroll');
+    await page.waitForFunction(() => window.__entry?.mode === 'camp');
+    const resumed = await page.evaluate(() => window.__entry.saved);
+    check('practice-continue-reload', await raw() === firstRaw && resumed.awardId === first.awardId
+      && resumed.army.length === 5 && resumed.army[1].men === 0, 'Continue reaches camp with depleted identity and unchanged progress bytes');
     await shot(page, 'practice-resumed');
 
     await load(); await terminal();

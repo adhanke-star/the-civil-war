@@ -63,7 +63,7 @@ if (FIGURES) {
   const rows = [];
   let gpu = null;
   for (const [style, mpf] of cases) {
-    await page.goto(`${url}?quality=auto&figures=${style}&mpf=${mpf}${EXTRA}`);
+    await page.goto(`${url}?practice&quality=auto&figures=${style}&mpf=${mpf}${EXTRA}`);
     await page.waitForFunction(() => window.__ready === true, null, { timeout: 120000 });
     if (style === 'baked') await page.waitForFunction(() => ['ready', 'failed'].includes(window.__game.game.baked.state), null, { timeout: 60000 });
     if (!gpu) {
@@ -95,7 +95,7 @@ const rows = [];
 let gpu = null;
 let interaction = null;
 for (const q of ['high', 'auto', 'low']) {
-  await page.goto(`${url}?quality=${q}`);
+  await page.goto(`${url}?practice&quality=${q}`);
   await page.waitForFunction(() => window.__ready === true, null, { timeout: 120000 });
   if (!gpu) {
     gpu = await page.evaluate(() => {

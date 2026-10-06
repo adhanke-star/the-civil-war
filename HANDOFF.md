@@ -5,7 +5,55 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2b intro and field stores implemented (2026-10-06)
+## Current boundary: P2c title and completed-army camp candidate (2026-10-06)
+
+Complete existing v1 remains the active goal; this slice does not close P2 or campaign scope. Root
+is sole product writer; helpers read/review only and browsers are serialized. No COORDINATION.md.
+P2b 4a4a4adb1f6ec695b3329d9298e7a5080b5bca80 has green CI 37496336886 and Pages 37496336828.
+P2c WIP is deliberate, owned and uncommitted. Preserve NEW-civil-war-video-game.code-workspace.
+
+src/entry.js gates renderer loading: no-query title Continue re-reads cw.progress, successful empty
+read -> ?intro and validated saved army -> ?camp. Blocked/corrupt progress never silently starts fresh.
+Explicit intro/practice/historical/sandbox/tune routes still boot the field; completed practice Continue
+and menu Saved army now reach camp. Reward workbench remains explicit. Screenshot/GPU tools now bind
+?practice rather than assuming no-query is Henry. No fresh GPU benchmark was run by changing a URL.
+
+src/ui/entry.js/CSS reuse save.js and exported existing brigade/static-item renderers. Read-only camp
+shows real equipment/ratings, depleted identities and full depot condition/provenance. 12-card pages
+bound legal 200-brigade/2000-depot snapshots; stable buttons/counts preserve repeated keyboard paging.
+Names wrap at 320px and item role=group exposes visible details in the accessible tree. Clean modern
+is the independently reviewed default from three matched shots; stored style and locks remain intact.
+This is a static readback, not a living diorama, editable camp, saved-gear deployment or campaign save.
+
+Imports retain the P1 validator and atomic replace, Cancel-focused confirmation, old bytes on failure,
+pending export and explicitly re-confirmed retry. Review found/repaired overlapping file reads sharing
+one consent, and failed A/cancelled B reusing the wrong retry filename. One busy operation now spans
+read/consent/write; pending payload/name stay bound. Deterministic deferred-file and A/B retry tests
+prove single-write/exact-file consent. Invalid import waits for real validation; no source mutation.
+
+Focused final 46/46 in 24310 ms, 2026-10-06T16:50:56.481Z, retained
+.out/p2c-entry-accessible-focused-20261006.json and seven entry PNGs with 16-50-56-481Z. Title measured
+200135 B/211 ms and no terrain/three.js/field effects/atlas requests. Title/camp/import axe are clear.
+Actual file export/import, quota/read/corrupt recovery, preferences/locks, paging and keyboard/focus pass.
+Independent source/WCAG review clears this bounded scope; root inspected final narrow camp/depot and
+desktop depot. Earlier 40-check failure/43- and 44-check pre-final runs remain identifiable in .out
+while the cap permits. Final npm test -- --native passes 157/157 in 250152 ms, timestamp
+2026-10-06T16:52:57.328Z, .out/p2c-full-native-final-20261006.json and final PNGs with 16-52-57-328Z.
+Title measured 200125 B/493 ms; actual intro first card 47606 ms, idle defeat 27.30 sim seconds.
+Exact-SHA CI/Pages remain pending; runtime cw-v9.
+
+Next: complete the bounded P2c gates, doc synchronization, explicit owned staging, commit/push and exact
+CI/Pages readback; any red run is the next task. Then inventory remaining P2 sandbox/default/deployment
+requirements before choosing the next short contract. Continue P3/P4 through early sourced Shiloh, all
+combat functions, Stones River and Chattanooga; P5 progression/P6 presentation/P7 release stay binding.
+Old Shiloh data is single-phase compressed Hornets' Nest/landing with division/corps aggregates and
+nonlinear arrivals, not a dawn OOB. Do not transplant it into dawn chronology or invent regiments;
+reuse citations and fill missing claim-level dual sources, terrain and unit identities. Parameterized
+terrain/scenario/phase-result seams are needed; Henry-specific world alignment/seed/result text persist.
+Art next remains the Actions-only demand/transition residency estimator with all approved byte/look/
+eligibility/anchor/direction locks; failed packs stay unfieldable and iPad/native sustained gates open.
+
+## Previous boundary: P2b intro and field stores implemented (2026-10-06)
 
 Codex goal remains active for the complete existing v1 under DESIGN/DECISIONS 0022 and PLAN P1-P7.
 Root is the sole product writer; bounded helpers review/read only. One browser workload at a time.
@@ -41,7 +89,8 @@ overlap is recorded HUD polish. Final npm test -- --native passes 125/125 in 232
 2026-10-06T16:26:07.649Z, .out/p2b-full-native-final-20261006.json. First revealed card 47337 ms,
 instructed result 45.4701 sim seconds; idle defeat 27.2803. Immediate keyboard/touch and all old battle,
 sandbox, reward, recovery and outcome paths pass; zero errors and zero scoped axe violations. Five
-final intro PNGs carry timestamp 16-26-07-649Z. Exact-SHA CI/Pages remain pending. Runtime cache cw-v8.
+final intro PNGs carry timestamp 16-26-07-649Z. Exact-SHA CI 37496336886 and Pages 37496336828 passed
+for 4a4a4adb1f6ec695b3329d9298e7a5080b5bca80. Runtime cache cw-v8 at this boundary.
 
 Next P2c: lightweight title Continue -> fresh intro / validated saved-army camp; reuse existing card and
 save seams, no sample roll or progress write on entry, recover blocked/corrupt reads explicitly. Preserve

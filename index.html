@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>The Civil War — Henry House Hill</title>
+  <title>The Civil War</title>
   <link rel="icon" href="data:,">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="apple-touch-icon" href="./assets/icons/apple-touch-icon.png">
@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Civil War">
   <meta name="theme-color" content="#17141a">
-  <meta name="description" content="The Civil War: a real-time battle game in the browser. First Bull Run, Henry House Hill, 21 July 1861.">
+  <meta name="description" content="The Civil War: a real-time battle game in the browser. Take the field, capture stores and bring your army back to camp.">
   <script type="importmap">
   {
     "imports": {
@@ -32,9 +32,11 @@
   }
   </script>
   <link rel="stylesheet" href="./src/ui/hud.css">
+  <link rel="stylesheet" href="./src/reward/reward.css" data-reward-css>
+  <link rel="stylesheet" href="./src/ui/entry.css">
 </head>
 <body>
-  <main>
+  <main id="battle" hidden>
     <canvas id="battlefield" tabindex="0" role="application"
             aria-label="Battlefield. Tap or click a blue brigade to select it, then drag from it to draw its march; release on an enemy to attack. Drag the ground or scroll with two fingers to pan, pinch or use the wheel to zoom, Q and E turn, W A S D pan."></canvas>
     <div id="markers" role="group" aria-label="Brigades"></div>
@@ -136,7 +138,7 @@
       <label class="row"><input type="checkbox" id="sound-toggle" checked> Sound</label>
       <p class="row"><a href="?sandbox" style="color: var(--focus)">Sandbox</a>: try and change the look and play, then copy your settings</p>
       <p class="row"><a href="reward.html?sandbox" style="color: var(--focus)">Reward sequence</a>: open the loot, compare and issue it (placeholder data)</p>
-      <p class="row"><a href="?battle=henry-hill" style="color: var(--focus)">Historical battle</a> · <a href="?practice" style="color: var(--focus)">Henry Hill practice</a> · <a href="?intro" style="color: var(--focus)">Introductory fight</a> · <a href="reward.html" style="color: var(--focus)">Saved army</a></p>
+      <p class="row"><a href="?battle=henry-hill" style="color: var(--focus)">Historical battle</a> · <a href="?practice" style="color: var(--focus)">Henry Hill practice</a> · <a href="?intro" style="color: var(--focus)">Introductory fight</a> · <a href="?camp" style="color: var(--focus)">Saved army</a></p>
       <h3>Controls</h3>
       <ul class="keys">
         <li><b>Select</b>: click or tap a brigade or its flag (Tab cycles flags); Shift+drag on the ground, or hold a finger still then drag, to box-select several</li>
@@ -167,6 +169,6 @@
     </dialog>
   </main>
   <noscript><p class="panel">This game needs JavaScript and must be served over HTTP (run play.command).</p></noscript>
-  <script type="module" src="./src/main.js"></script>
+  <script type="module" src="./src/entry.js"></script>
 </body>
 </html>

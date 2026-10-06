@@ -212,13 +212,13 @@ function lootCard(inst, i, n) {
 }
 
 /** A face-up card that does not flip (compare view). */
-function staticCard(inst) {
+export function staticCard(inst) {
   const card = el('div', { class: 'rw-card rw-themed is-static is-up', 'data-rank': String(TIER_BY_ID[tierId(inst)].rank), role: 'img', 'aria-label': itemLabel(inst) }, cardFront(inst));
   return tint(card, tierId(inst));
 }
 
 /** A brigade card (rating-first front). interactive: a role=button target in the issue step. */
-function brigCard(b, i, { interactive = true, show = ratings(b) } = {}) {
+export function brigCard(b, i, { interactive = true, show = ratings(b) } = {}) {
   const def = itemDef(b.weapon.itemId);
   const cond = CONDITION_BY_ID[b.weapon.conditionId];
   const r = ratings(b);

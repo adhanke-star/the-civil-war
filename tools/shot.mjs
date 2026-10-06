@@ -18,7 +18,7 @@ const page = await browser.newPage({ viewport: { width: 1600, height: 900 }, dev
 const errors = [];
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') errors.push(`${m.type()}: ${m.text()}`); });
-await page.goto(url + (process.argv[5] || ''));
+await page.goto(url + (process.argv[5] || '?practice'));
 await page.waitForFunction(() => window.__ready === true, null, { timeout: 180000 });
 if (js) { const r = await page.evaluate(js); if (r !== undefined) console.log(typeof r === "string" ? r : JSON.stringify(r)); }
 await page.waitForTimeout(wait);
