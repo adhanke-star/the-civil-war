@@ -7,7 +7,7 @@
 - **P2d:** 2d761db; 12+12, native full 169/169; CI 37503374519/Pages 37503374677 green.
 - **P2e:** repair48a1f72; CI37508495648/Pages37508497027 green; native186/186, isolated software20/20.
 - **P2f:** 13a9ee9; pure13+13/native209/209; CI37511709837/Pages37511709840 green.
-- **Art next:** Actions manifest/page-demand residency estimator; wholesale lossless tiers exceed budget.
+- **Art next:** report-only residency candidate25+25; runner binding/dispatch UNRUN, no fieldable assets.
 - **Current play:** title Continue -> intro/saved camp; ?practice Henry rewards; historical/sandbox isolated.
 - **Missing:** saved-gear deployment, living title/camp, campaign saves, phase packs and progression.
 - **Figures:** rigged default; second-pass baked Union and tinted Confederate placeholders remain.
@@ -16,4 +16,4 @@
 - **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
 - **Proof:** reward21+21, outcome9+9, capture6+6, intro7+7; native full224/224, first card47.7s.
 - **Coordination:** no ledger; preserve workspace file; HANDOFF/PLAN P2-P7, active goal, no scheduler.
-- **Runtime:** cw-v13/39cc617; native224; CI37515738493 222/223; test-only frame repair software30/30.
+- **Runtime:** cw-v13/repairb8fb1d9; native224/software30; Pages37519242152 green, CI37519242159 pending.

@@ -490,6 +490,31 @@ All heavy encoding/bakes/readbacks run on Actions; local downloads are small rep
 Preserve byte limits RGB mean <=2, alpha mean <=1, edge RGB/alpha p95 <=8/8, clipping=0 and nonempty
 samples. A new solution must meet them and whole-set visual inspection before asset fielding.
 
+Bounded next experiment: add report-only residency mode to existing pack-figures workflow, plus
+tools/bake/estimate-residency.mjs and deterministic positive/intended-mutant tests in CI. Root sole
+writer; helpers read/review. Runner fetches approved37347072866/820846f bake-33 and failed-full
+37360904656/3f439b0d compression-review, verifies run metadata and all45 original PNG names/tier/look/
+dimensions/bytes/SHA256 plus independently recomputed complete mip allocations. Record newly
+observed original manifest hash; no historical manifest-hash claim. Preserve source bytes/metadata.
+Calculate current all-tier loader field, pending-close, both-resident and failed/stuck retry behavior;
+separately label hypothetical eligible-eight page-demand/serial decode/retry/eviction policies.
+Bind clip/frame/direction page needs, loaded+pending GPU reservations, retained decoded-image and
+extra decode/upload-copy assumptions, per-page instance buffers, downloads/retries and superseded
+loads. Use decimal200MB download/250MB scene limits, expose unaccounted terrain/targets/geometry/
+browser memory and never admit assets from a figures-only estimate. fieldable:false; device/quality/
+native-memory UNRUN. No encoder, browser/GPU job, asset publishing, runtime/approved-art change or
+new persistent catalog. All large source files stay on the runner; download only small report.
+Gate syntax/diff, deterministic binding/accounting positives and intended rejecting mutants,
+independent source/report review, exact-SHA CI/Pages and one residency dispatch/report readback.
+Existing green native runtime receipt covers this tooling-only slice; do not repeat a local browser
+suite solely for report arithmetic. A source-bind failure halts the experiment; diagnose before retry.
+Candidate gates RUN25/25 positives+25/25 intended mutants, existing unit, syntax/diff and YAML parse.
+Independent source review clears original bindings/order, caller bytes, quantified failed-sibling bound
+and shared-buffer accounting. Actual Henry pool capacities3590/3200 and geometry3448568B; Post source
+reservations17408000/53477376B at explicit1280x800/DPR1 and1024x768/DPR2 High. These are partial
+source models, not native measurements; totalSceneWithinLimit remains null. Actual runner archive
+binding/report, exact tool-SHA CI/Pages and independent report readback remain UNRUN/pending.
+
 No hands-on checks from Aaron. Use agent-operated browsers and independent review; establish early
 whether native Mac/iPad automation is already accessible without new spending or user intervention.
 Do not close Aaron's browser or change device settings to obtain access. Current access to the actual

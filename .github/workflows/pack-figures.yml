@@ -3,13 +3,14 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Two-page diagnosis, direct candidate experiment, or full legacy packaging
+        description: Report-only residency, two-page diagnosis, direct candidate, or full legacy packaging
         type: choice
         default: diagnostic
         options:
           - diagnostic
           - candidate
           - full
+          - residency
 permissions:
   contents: read
   actions: read
@@ -30,6 +31,7 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts --no-audit --no-fund
       - run: npx playwright install --with-deps chromium
+        if: inputs.mode != 'residency'
       - name: Fetch the approved existing bake on the runner only
         run: |
           set -euo pipefail
@@ -37,6 +39,7 @@ jobs:
           test "$(cat "$RUNNER_TEMP/source.txt")" = '820846fdc2fe11782a36b219220edcb16e222f92 success'
           gh run download 37347072866 --repo adhanke-star/the-civil-war -n bake-33 -D "$RUNNER_TEMP/approved-bake"
       - name: Pinned Khronos encoder (Apache-2.0; build tool only)
+        if: inputs.mode != 'residency'
         run: |
           set -euo pipefail
           curl -fsSL --retry 3 -o "$RUNNER_TEMP/ktx.tar.bz2" https://github.com/KhronosGroup/KTX-Software/releases/download/v4.4.2/KTX-Software-4.4.2-Linux-x86_64.tar.bz2
@@ -60,6 +63,7 @@ jobs:
           gh run download 37374456139 --repo adhanke-star/the-civil-war -n compression-review -D "$RUNNER_TEMP/historical-uastc"
           echo "HISTORICAL_REVIEW=$RUNNER_TEMP/historical-uastc" >> "$GITHUB_ENV"
       - name: Preserve approved identities; encode only the selected mode
+        if: inputs.mode != 'residency'
         env:
           PACK_MODE: ${{ inputs.mode }}
         run: |
@@ -74,7 +78,26 @@ jobs:
             exit 1
           fi
       - name: GPU readback against every approved PNG and meaningful broken controls
+        if: inputs.mode != 'residency'
         run: node tools/bake/review-compression.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack
+      - name: Bind the historical full original-PNG report and assess residency only
+        if: inputs.mode == 'residency'
+        run: |
+          set -euo pipefail
+          gh api repos/adhanke-star/the-civil-war/actions/runs/37360904656 --jq '[.head_sha,.conclusion] | join(" ")' > "$RUNNER_TEMP/historical-source.txt"
+          test "$(cat "$RUNNER_TEMP/historical-source.txt")" = '3f439b0d326d0a27d7a46a599751890a63ed2afc failure'
+          gh run download 37360904656 --repo adhanke-star/the-civil-war -n compression-review -D "$RUNNER_TEMP/full-pack-review"
+          node tools/test-residency.mjs
+          node tools/test-residency.mjs --prove-fail
+          node tools/bake/estimate-residency.mjs "$RUNNER_TEMP/approved-bake/atlas" "$RUNNER_TEMP/full-pack-review/compression.json" .out/figure-residency/report.json
+      - name: Small report only; no source PNG or optimized asset upload
+        if: always() && inputs.mode == 'residency'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: figure-residency
+          path: .out/figure-residency/report.json
+          retention-days: 7
+          if-no-files-found: warn
       - name: Optimized atlases and manifest only
         if: success() && inputs.mode == 'full'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -87,7 +110,7 @@ jobs:
           if-no-files-found: error
           compression-level: 0
       - name: Small quality report and comparison sheets
-        if: always()
+        if: always() && inputs.mode != 'residency'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: compression-review

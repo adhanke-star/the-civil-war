@@ -5,7 +5,26 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2g test-only CI repair (2026-10-06)
+## Current boundary: report-only residency candidate; P2g repair CI pending (2026-10-06)
+
+Parent main/origin b8fb1d919d78f2a4bd2c4b8e201f458dfcd22f06 is the pushed test-only P2g repair.
+Pages37519242152 passed; CI37519242159 remains in npm test. Read exact conclusion, red takes priority.
+Independent art tooling is green locally: estimate-residency.mjs and test-residency.mjs25+25, unit,
+owned syntax/diff and workflow YAML parse pass. Root sole writer; no runtime/art edits or local browser.
+Actual Henry Game pool capacities3590/3200;119 unique geometry upload buffers3448568B. Source review
+clears all45 binding, ordered looks, byte preservation, pending/failed-sibling/retry and dedup models.
+Post source models17408000B at1280x800/DPR1 and53477376B at1024x768/DPR2 High, explicitly not native
+measurement. Existing pack workflow residency mode skips Playwright/encoders/GPU review/asset upload;
+fetches approved37347072866/820846f and full historical37360904656/3f439b0d on runner only.
+Next: commit/push only tooling/workflows/docs, dispatch `gh workflow run pack-figures.yml --ref main
+-f mode=residency`, bind dispatch fullSHA and download only figure-residency report. Read every source
+bind/scenario/limitation and independent review; exact toolSHA CI/Pages also required. No actual approved
+archive assessment yet; source-data binding and runner report remain UNRUN until dispatch/readback.
+totalSceneWithinLimit:null/fieldable:false; quality/native/device gates open. PLAN carries exact scope.
+Preserve untracked Moments Node/UI drafts (syntax only, APIs absent), Shiloh candidate notes and
+workspace file outside this commit. P2h runtime waits P2g repair exact CI/Pages. No concurrent writer.
+
+## Previous boundary: P2g test-only CI repair (2026-10-06)
 
 P2g is pushed at39cc6175469a5d402dc394eee8c0a0cb6f4116fb; Pages37515738423 passed.
 CI37515738493 failed only spacing-existing-ghost-reset:222/223 in925824ms, errors/axe empty.

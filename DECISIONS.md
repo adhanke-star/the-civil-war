@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0032 — Approved-art feasibility reserves pending work before considering admission (2026-10-06)
+The existing pack workflow gains report-only residency mode. It binds every original approved PNG to
+the historical full report and preserves ordered look identity across tiers, without codecs or uploads
+of source/optimized assets. Full-chain loaded/pending and failed-sibling reservations, decoded-image/
+copy assumptions, retry transfer and shared-pool buffers remain distinct from measured residency.
+Actual Game geometry and Post targets provide a partial source baseline; total-scene/native/device
+gates stay open. A first-observed manifest hash is provenance, not a historical approval hash.
+
 ## 0031 — Formation spacing changes actual infantry geometry (2026-10-06)
 Spacing .75..1.5/default1 scales existing line, skirmisher and column slots and footprints; living
 figures refresh in place even paused. Fallen, identities, RNG, men/stats/orders and battery geometry
