@@ -174,7 +174,19 @@ export const SAMPLE_ARMY = [
     base: { fire: 66, melee: 32, morale: 68, drill: 70 } },
 ];
 
-const ARM_BY_ID = Object.fromEntries(ARMS.map((a) => [a.id, a]));
+// Abstract practice equipment, excluded from loot pools. The battlefield's weapon class does not
+// establish an exact historical model, calibre or rarity. Every number here is a game representation.
+export const PRACTICE_ARMS = [
+  ['practice-smooth', 'infantry', 'Practice smoothbore', 'smoothbore musket', 28, 100],
+  ['practice-rifled', 'infantry', 'Practice rifle-musket', 'rifle-musket', 50, 300],
+  ['practice-smbart', 'artillery', 'Practice smoothbore gun', 'smoothbore gun', 30, 1500],
+  ['practice-parrott', 'artillery', 'Practice rifled gun', 'rifled gun', 60, 1900],
+].map(([id, arm, name, kind, power, range]) => ({ id, arm, name, kind, tier: 'common',
+  caliber: 'model unspecified', practice: true, power: ph(power), range: ph(range),
+  rate: ph(arm === 'infantry' ? 3 : 2), accuracy: ph(50), mods: { melee: 0, drill: 0 },
+  effect: { text: 'Practice representation; exact historical model is not established.', src: 'placeholder' } }));
+
+const ARM_BY_ID = Object.fromEntries([...ARMS, ...PRACTICE_ARMS].map((a) => [a.id, a]));
 const UNIQUE_BY_ID = Object.fromEntries(UNIQUES.map((u) => [u.id, u]));
 
 /** The full definition of an item id (an arm, or a unique merged over its base arm). */

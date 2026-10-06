@@ -19,7 +19,7 @@ import { compareState, onCompare } from '../sandbox/compare.js';
 import { TIER_BY_ID, CONDITION_BY_ID, conditionEffect, VETERANCY, GRADES, GRADE_NOTES, SAMPLE_ARMY, itemDef } from './data.js';
 import { rollLoot, ratings, compare, bestFit, equip, armsRating, canCarry, makeRng } from './model.js';
 import * as sfx from './sfx.js';
-import { validateSnapshot } from '../franchise/save.js';
+import { validateSnapshot, completedSnapshot } from '../franchise/save.js';
 
 const STYLE_SLUG = { 'clean modern': 'modern', 'period desk': 'desk', hybrid: 'hybrid' };
 const BARS = [['fire', 'Fire'], ['melee', 'Melee'], ['morale', 'Morale'], ['drill', 'Drill']];
@@ -222,7 +222,7 @@ function brigCard(b, i, { interactive = true, show = ratings(b) } = {}) {
   const def = itemDef(b.weapon.itemId);
   const cond = CONDITION_BY_ID[b.weapon.conditionId];
   const r = ratings(b);
-  const meta = b.kind === 'battery' ? `${b.guns || 6} guns · ${fmtInt(b.men)} men` : `${fmtInt(b.men)} men`;
+  const meta = `${b.men === 0 || (b.kind === 'battery' && b.guns === 0) ? 'Depleted · ' : ''}${b.kind === 'battery' ? `${b.guns ?? 6} guns · ` : ''}${fmtInt(b.men)} men`;
   const bars = el('span', { class: 'rw-bars' });
   for (const [k, name] of BARS) {
     bars.append(el('span', { class: 'rw-bar', 'data-k': k },
@@ -284,8 +284,11 @@ export function mountReward(root, opts = {}) {
   const completed = opts.completed ? validateSnapshot(opts.completed) : null;
   const seed = completed?.seed ?? opts.seed ?? Math.floor(Math.random() * 1e9);
   const grade = completed?.grade ?? (GRADES.includes(opts.grade) ? opts.grade : 'Victory');
+  const awardId = completed?.awardId ?? opts.awardId ?? `demo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  const starting = opts.army ? completedSnapshot({ awardId, army: opts.army, depot: opts.depot ?? [], issued: [], seed, grade }) : null;
   const loot = completed ? { cards: [], captures: [] } : rollLoot({ seed, grade, captures: opts.captures, forceLegendary: !!opts.legendary });
   let cards = loot.cards;
+  if (starting) cards = cards.map((c) => ({ ...c, uid: `${awardId}.${c.uid}` }));
   if (opts.mode === 'one') {
     const rng = makeRng(`${seed}-one`);
     cards = opts.legendary ? [cards[cards.length - 1]] : [cards[Math.floor(rng() * cards.length)]];
@@ -295,11 +298,11 @@ export function mountReward(root, opts = {}) {
   const S = {
     mode: opts.mode === 'one' ? 'one' : 'full',
     seed, grade, captures: loot.captures, cards,
-    awardId: completed?.awardId ?? opts.awardId ?? `demo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
-    onDone: opts.onDone || lastOnDone,
+    awardId,
+    onDone: opts.onDone,
     step: null,
     dealt: 0, up: cards.map(() => false), flipping: new Set(), skipping: false,
-    army: (completed?.army ?? SAMPLE_ARMY).map((b) => ({ ...b, base: { ...b.base }, weapon: { ...b.weapon } })),
+    army: (completed?.army ?? starting?.army ?? SAMPLE_ARMY).map((b) => ({ ...b, base: { ...b.base }, weapon: { ...b.weapon } })),
     armyStart: null,
     tray: [], log: completed?.issued.map((r) => ({ ...r })) ?? [],
     held: null, comparing: null, drag: null,
@@ -309,7 +312,7 @@ export function mountReward(root, opts = {}) {
     ui: {},
   };
   S.armyStart = S.army.map((b) => ({ ...b, base: { ...b.base }, weapon: { ...b.weapon } }));
-  S.tray = (completed?.depot ?? cards).map((c) => ({ ...c }));
+  S.tray = (completed?.depot ?? [...(starting?.depot ?? []), ...cards]).map((c) => ({ ...c }));
 
   // ---- timing ----
   const speed = () => Number(get('screens.revealSpeed')) || 1;
@@ -399,9 +402,10 @@ export function mountReward(root, opts = {}) {
     const nIssue = S.cards.filter((c) => c.source === 'issue').length;
     const btn = primary('Open the loot', () => { sfx.play('whoosh'); go('b'); });
     const sec = el('section', { class: 'rw-step rw-aar', 'aria-labelledby': 'rw-aar-grade' },
-      el('p', { class: 'rw-eyebrow', text: 'After action · placeholder phase' }),
+      el('p', { class: 'rw-eyebrow', text: opts.afterAction ? `Practice · ${opts.afterAction.title}` : 'After action · placeholder phase' }),
       el('h1', { class: 'rw-grade', id: 'rw-aar-grade', 'data-grade': S.grade, text: S.grade }),
-      el('p', { class: 'rw-grade-note', text: GRADE_NOTES[S.grade] }),
+      el('p', { class: 'rw-grade-note', text: opts.afterAction?.why ?? GRADE_NOTES[S.grade] }),
+      opts.afterAction ? el('p', { class: 'rw-hint', text: `${opts.afterAction.surviving.toLocaleString()} surviving men · ${opts.afterAction.losses.toLocaleString()} lost · ${opts.afterAction.guns} crewed guns. Practice rewards and ratings are game values; this does not record the historical outcome.` }) : null,
       el('div', { class: 'rw-aar-stats' },
         el('p', { class: 'rw-aar-stat' }, el('b', { text: String(S.captures.length) }), el('span', { text: 'Captures' })),
         el('p', { class: 'rw-aar-stat' }, el('b', { text: String(nIssue) }), el('span', { text: 'Quartermaster issue' })),
@@ -674,7 +678,7 @@ export function mountReward(root, opts = {}) {
       const c = compare(b, item);
       if (!c.ok) {
         star.hidden = true; prev.textContent = '';
-        blocked.hidden = false; blocked.textContent = b.kind === 'battery' ? 'Guns only' : 'Small arms only';
+        blocked.hidden = false; blocked.textContent = b.men === 0 || (b.kind === 'battery' && b.guns === 0) ? 'Depleted' : b.kind === 'battery' ? 'Guns only' : 'Small arms only';
         node.classList.add('is-blocked'); node.classList.remove('is-best');
         node.setAttribute('aria-label', `${label}. Cannot carry this card: ${c.reason}.`);
         return;
@@ -898,8 +902,7 @@ export function mountReward(root, opts = {}) {
     const grid = el('div', { class: 'rw-brigs is-static', role: 'list', 'aria-label': 'The army after the issue' });
     S.army.forEach((b, i) => {
       const node = brigCard(b, i, { interactive: false, show: changed[i] ? before[i] : after[i] });
-      if (!changed[i]) { if (!completed) node.classList.add('is-unchanged'); }
-      else node.querySelector('.rw-bweap').append(el('span', { class: 'rw-was', text: `was ${itemDef(S.armyStart[i].weapon.itemId).name}` }));
+      if (changed[i]) node.querySelector('.rw-bweap').append(el('span', { class: 'rw-was', text: `was ${itemDef(S.armyStart[i].weapon.itemId).name}` }));
       grid.append(node);
     });
     grid.style.setProperty('--bcols', String(brigCols()));

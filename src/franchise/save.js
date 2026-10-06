@@ -1,10 +1,10 @@
 // One progress-store seam. P1 stores only a completed reward, never a live battle.
-import { ARMS, UNIQUES, VETERANCY, GRADES, CONDITIONS, itemDef } from '../reward/data.js';
+import { ARMS, PRACTICE_ARMS, UNIQUES, VETERANCY, GRADES, CONDITIONS, itemDef } from '../reward/data.js';
 import { ratings, canCarry } from '../reward/model.js';
 
 export const SAVE_KEY = 'cw.progress';
 export const MAX_SAVE_BYTES = 1024 * 1024;
-const knownGear = new Set([...ARMS, ...UNIQUES].map((x) => x.id));
+const knownGear = new Set([...ARMS, ...PRACTICE_ARMS, ...UNIQUES].map((x) => x.id));
 const vets = new Set(VETERANCY.map((x) => x.id));
 const conditions = new Set(CONDITIONS.map((x) => x.id));
 const bad = (message) => { throw new Error(`Progress: ${message}`); };

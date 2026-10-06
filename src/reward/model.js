@@ -188,6 +188,7 @@ export function ovr(brigade) {
 
 /** Equip an item: returns a new brigade and the displaced weapon (which goes to the depot). Pure. */
 export function equip(brigade, item) {
+  if (brigade.men === 0 || (brigade.kind === 'battery' && brigade.guns === 0)) throw new Error('equip: depleted formations keep new arms in the depot');
   if (!canCarry(brigade, item)) throw new Error(`equip: ${brigade.label} cannot carry ${itemDef(item.itemId).name}`);
   const displaced = { ...brigade.weapon, from: `Depot: from ${brigade.label}`, depot: true };
   const weapon = { ...item };
@@ -200,6 +201,10 @@ const STATS = ['ovr', 'arms', 'fire', 'melee', 'morale', 'drill'];
 /** Side-by-side numbers for the compare view. */
 export function compare(brigade, item) {
   const before = ratings(brigade);
+  if (brigade.men === 0 || (brigade.kind === 'battery' && brigade.guns === 0)) {
+    return { ok: false, reason: 'Depleted formation; keep new arms in the depot', before, after: before,
+      delta: Object.fromEntries(STATS.map((k) => [k, 0])) };
+  }
   if (!canCarry(brigade, item)) {
     const reason = brigade.kind === 'battery' ? 'Batteries carry guns only' : 'Infantry carry small arms only';
     return { ok: false, reason, before, after: before, delta: Object.fromEntries(STATS.map((k) => [k, 0])) };

@@ -54,6 +54,7 @@ import { AxeBuilder } from '@axe-core/playwright';
 import { PNG } from 'pngjs';
 import { startServer, ROOT } from './serve.mjs';
 import { prune, OUT_DIR } from './prune.mjs';
+import { practiceProgress } from './test-practice-ui.mjs';
 
 const READY_TIMEOUT_MS = 180_000;
 const VIEWPORT = { width: 1280, height: 720 };
@@ -475,7 +476,7 @@ async function bakedFigures(page) {
     const G = window.__game, g = G.game;
     if (!g.paused) g.togglePause();
     window.__game.hud.toggleArmy(false);
-    document.getElementById('result').hidden = true;
+    document.getElementById('result').close();
     const u = g.units.filter((v) => v.alive && v.type === 'infantry').sort((a, b) => b.figures.length - a.figures.length)[0];
     const r = G.rts;
     r.goal.x = u.x; r.goal.z = u.z; r.goal.dist = 320; r.goal.pitch = r._pitch(320); r.goal.yaw = u.facing + 0.6;
@@ -625,7 +626,7 @@ async function orderObedience(page) {
     const g = window.__game.game;
     if (g.paused) g.togglePause();
     window.__game.hud.toggleArmy(false);
-    document.getElementById('result').hidden = true;
+    document.getElementById('result').close();
   });
 
   // a. move: ends at the ghost, facing as set
@@ -1168,6 +1169,7 @@ async function main() {
   try {
     browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     result.browser = `chromium ${browser.version()}`;
+    if (process.argv.includes('--practice')) { result.mode = 'practice result bridge only'; await practiceProgress({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--reward')) { result.mode = 'reward progress only'; await rewardProgress(browser, url); return; }
     if (process.argv.includes('--s1')) {
       result.mode = 's1 only (battle page skipped)';
@@ -1394,6 +1396,7 @@ async function main() {
     if (process.argv.includes('--field')) { result.mode = 'field only (sandbox and device pages skipped)'; return; }
     await sandboxAndDevice(browser, url);
     await rewardProgress(browser, url);
+    await practiceProgress({ browser, url, check, shot, result, watchErrors });
   } finally {
     if (browser) await browser.close().catch(() => {});
     await new Promise((resolve) => server.close(resolve));

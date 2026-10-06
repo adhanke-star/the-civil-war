@@ -129,7 +129,7 @@ export class Hud {
     });
     for (const r of menu.querySelectorAll('input[name=quality]')) r.addEventListener('change', () => onQuality(r.value));
     $('sound-toggle').addEventListener('change', (e) => onSound(e.target.checked));
-    $('result-close').addEventListener('click', () => { $('result').hidden = true; });
+    $('result-close').addEventListener('click', () => { $('result').close(); });
     $('army-btn').addEventListener('click', () => this.toggleArmy());
     this.alertAt = null;
     $('banner-fly').addEventListener('click', () => { if (this.alertAt && this.onFly) this.onFly(this.alertAt.x, this.alertAt.z); });
@@ -453,6 +453,6 @@ export class Hud {
   result(title, text) {
     $('result-title').textContent = title;
     $('result-text').textContent = text;
-    $('result').hidden = false;
+    $('result').showModal();
   }
 }

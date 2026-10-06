@@ -1,5 +1,14 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0025 — Practice rewards preserve the actual terminal army (2026-10-06)
+P2a pauses/snapshots the real result once, including routed/depleted identities, floored surviving men
+and live crewed guns. Losses conserve the original roster; generic practice arms make no historical
+model claim. Rewards use that army and the P1 atomic store, with namespaced stable item/award IDs.
+Historical/sandbox modes cannot award progress; captures stay empty until real crates exist. Panels
+pause again after fight-on; replay cannot inherit persistence. Failed/blocked saves preserve pending
+exports, require explicit recovered-baseline replacement and retain old bytes on cancel/conflict.
+Actual UI/recovery and rejecting controls pass; intro timing, camp and saved-gear deployment remain open.
+
 ## 0024 — Lossless tier loading still exceeds the scene budget (2026-10-06)
 Read-only approved-report/source assessment: full RGBA+mips 835,971,548 B; eight field looks plus one
 close page each 241,074,464–258,639,136 B before ground/info ~27.96 MB and other scene allocations.

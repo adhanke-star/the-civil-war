@@ -5,7 +5,54 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P1 reward persistence implemented (2026-10-06)
+## Current boundary: P2a actual practice-result bridge implemented (2026-10-06)
+
+Codex goal remains active for complete existing v1, not just these slices. Main is the sole product
+writer; review helpers do not edit or launch competing browsers. No COORDINATION.md exists. Preserve
+NEW-civil-war-video-game.code-workspace and the read-only old Desktop repo. No scheduler was created.
+
+P1 `a2c29d339bd9c73f4f456fcee20cee860cdf91a9` has green exact-SHA CI 37483119128 and Pages 37483119093.
+P2a uses src/franchise/practice.js and practice-ui.js: pause and snapshot once at the actual result
+event, conserve/floor surviving men, retain routed/depleted formations and live crewed guns, then
+mount rewards with those real identities and explicitly generic practice arms. Captures are empty
+until P2b creates real field crates. Sandbox and `?battle=henry-hill` never award franchise loot.
+Same-page result -> loot/equip -> atomic save -> Continue -> stored army works without a reroll.
+The original practice troops still start a new practice; saved equipment is not deployed yet.
+
+Native result/recovery panels re-pause after inspecting/fighting on. Battle keys are suspended behind
+dialogs/inert main. Existing progress replacement focuses Cancel; blocked reads keep an unsaved export
+path and no authority to replace until the recovered baseline is explicitly confirmed. Quota/conflict
+retry keeps the same pending award and old bytes; duplicate callbacks/replay cannot issue a sample army
+or additional writes. Depleted troops/disabled batteries cannot receive loot. Runtime cache is cw-v6.
+Viewport zoom restriction was removed; battle/sandbox axe no longer reports that moderate finding.
+
+Final local candidate: reward/save 21 positive + 21 rejecting mutants; outcome 9 + 9; Node unit/syntax
+and diff gates pass. Full smoke 101/101, 346689 ms, timestamp 2026-10-06T15:34:29.856Z in
+.out/last-result.json. Result/counts/recovery axe report zero violations, as do retained P1 scopes.
+Six practice PNGs with that timestamp show result, 320/1024 loot, counts, resumed army and quota recovery.
+Independent review found/repaired narrow-screen clipping, split statistic words and hidden current
+weapon labels; final real screenshots were inspected. This uses real UI and a clock-accelerated terminal
+event with a deterministic casualty fixture; it is not introductory timing/fun or actual iPad proof.
+Intermediate focus/layout failures and pre-final smoke remain identifiable in .out while the cap permits.
+Before closing integration, read CI and Pages for this commit's exact SHA via PLAN's commands.
+
+Next bounded slice P2b: inspect DESIGN's first minute and crate rules, main scenario/result wiring,
+Game.step/checkObjective, input/HUD, reward/capture model and frozen old capture rules. Write a short
+acceptance contract, then build a clearly fictional two-vs-one intro with contextual hints and real
+capturable/retakable field crates. Keep original Henry Hill practice explicit and historical no-loot
+isolation; preserve all completed-save validation/idempotence/recovery tests. Measure a fresh UI first
+reward about a minute rather than certifying it from a forced clock. P2 as a whole, saved-gear combat,
+camp/title defaults, campaign and the rest of P3-P7 remain unfinished. Continue autonomously after CI.
+
+Native access inventory only (2026-10-06): xcrun exists but devicectl/xctrace are unavailable; idevice
+and iOS WebKit proxy tools are absent; safaridriver and native browsers exist. USB enumeration reported
+no iPad among eight names but also IOCreatePlugInInterfaceForService errors, so absence is qualified.
+No browser setting, pairing/trust, native GPU/FPS or physical iPad check ran. Do not request Aaron's
+intervention, close his browser or claim touch emulation proves A10X performance; continue other work.
+The Actions-only approved-manifest/page-demand estimator remains the next bounded art experiment;
+immutable quality/eligibility/hash/anchor locks and failed-pack fielding prohibition remain unchanged.
+
+## Previous boundary: P1 reward persistence implemented (2026-10-06)
 
 Goal mode is active for complete existing v1 under DESIGN/DECISIONS 0022 and PLAN P1-P7. Codex owns
 the active engineering loop; no other provider writer or COORDINATION.md was observed at startup.

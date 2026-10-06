@@ -66,8 +66,8 @@ validate the complete inventory and reverse-issued history before a single stora
 Compact exports remain importable near the 1 MiB UTF-8 limit. Retry/export preserves unsaved results;
 live-snapshot conflicts cannot be bypassed by opening a one-card preview. Preferences/locks stay separate.
 Reward positives and rejecting mutants are now CI steps; full smoke includes the real reward UI.
-The P1 gate readback and current continuation are at the top of HANDOFF. Check exact-HEAD CI and Pages
-before treating deployment acceptance as closed. The next product slice is P2, not campaign saves.
+P1 was committed at `a2c29d339bd9c73f4f456fcee20cee860cdf91a9`; exact-SHA CI 37483119128 and
+Pages 37483119093 succeeded. The next product phase is P2, not campaign saves.
 
 Purpose: persist the reward prototype's **completed** army/depot state, not an in-progress battle or
 full campaign. Use the already-planned `src/franchise/save.js` as the single progress-store seam;
@@ -118,6 +118,35 @@ Gates, in order (new coverage is implemented before these are acceptance gates):
 
 No texture/codec/art/renderer/simulation changes in P1. The independent art task is a read-only
 residency assessment, not a second writer editing P1 or a license to load failed packs.
+
+### P2a: practice result bridge (implemented 2026-10-06)
+
+The Henry Hill practice now freezes its actual terminal roster, opens rewards on the same page and
+continues to saved progress. Depleted identities and live gun counts survive export/reload; no sample
+army or invented captures replace them. Native result/recovery panels pause the field, trap focus and
+provide explicit replacement, unsaved export and retry. Sandbox/historical sessions cannot award loot.
+Local proof: 9 outcome positives + 9 rejecting mutants; 21 reward/save positives + 21 mutants;
+final smoke 101/101 in 346689 ms, timestamp 2026-10-06T15:34:29.856Z. Result/counts/recovery axe are
+clear; 320/1024 actual screenshots reviewed. This is a clock-accelerated real result/UI test, not a
+one-minute introductory playthrough or native-device proof. Exact commit CI/Pages must still pass.
+
+Connect the unaltered Henry Hill practice result to the same reward/save UI. Pause and snapshot at
+the terminal event once; include routed and depleted formations, floor fractional surviving men,
+derive losses by conservation, and count live battery pieces. Keep scenario identities and use
+explicit generic practice arms; do not assert a historical weapon model from an abstract runtime ID.
+Pass zero captures until P2b implements real field crates. Preserve P1 atomic replacement, confirmation,
+export/retry, idempotence and stale-baseline rejection. Continue reaches saved progress without a roll.
+Historical `?battle=henry-hill` and altered `?sandbox` sessions grant no loot or progress writes.
+Battle input is suspended behind result/reward/recovery UI; reward replay cannot inherit the save callback.
+Gate pure outcome positives plus matching mutants, real result/equip/save/reload/Continue UI, zero-
+survivor and disabled-gun cases, quota/conflict recovery, keyboard/focus/axe, final smoke and exact-SHA
+CI/Pages. Intro timing, actual crates and full P2 remain open for the next green slice.
+
+Next P2b: a clearly fictional two-vs-one introductory fight with contextual first-use hints, actual
+capturable/retakable field crates and a measured first reward about a minute. Preserve the existing
+Henry Hill practice as a distinct route, historical no-loot isolation and all P1/P2a recovery rules.
+Write the bounded intro/crate acceptance contract before changing the scenario/result seams. Saved
+equipment deployment, camp and the full title/campaign path remain open; P2a does not certify them.
 
 ### Required battle-system work (P3/P4; do not hide it inside “build Shiloh”)
 

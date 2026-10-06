@@ -16,6 +16,8 @@ import { Input } from './ui/input.js';
 import { Readout } from './ui/readout.js';
 import { LOOK } from './ui/look.js';
 import { defineSandboxTools } from './ui/sandbox-tools.js';
+import { playMode } from './franchise/practice.js';
+import { attachPracticeFlow } from './franchise/practice-ui.js';
 
 const stats = { fps: 0, scale: 1, quality: 'auto', drawCalls: 0, triangles: 0, figures: 0 };
 window.__stats = stats;
@@ -92,6 +94,8 @@ const game = new Game({ scene, terrain, scenario, world, effects, playerSide: 'U
   }
 }
 const arrows = new ArrowLayer(scene, terrain);
+const mode = playMode(location.search);
+let practiceFlow = null;
 
 const hud = new Hud({
   camera, canvas, terrain, units: game.units, playerSide: 'US', rts, game,
@@ -116,7 +120,10 @@ function setQuality(mode) {
 document.getElementById('history-note').textContent = scenario.historyNote;
 game.on('select', (u) => hud.select(u));
 game.on('log', (text) => hud.toast(text));
-game.on('event', (ev) => { if (LOOK.eventFeed) hud.feed(ev); else hud.toast(ev.text); });
+game.on('event', (ev) => {
+  if (LOOK.eventFeed) hud.feed(ev); else hud.toast(ev.text);
+  if (ev.kind === 'result') practiceFlow?.finishResult();
+});
 game.on('alert', (a) => { hud.setPaused(true); hud.showAlert(a); });
 game.on('spawn', (u) => hud.addUnit(u));
 game.on('remove', (u) => hud.removeUnit(u));
@@ -131,6 +138,9 @@ const input = new Input({
 });
 const readout = new Readout({ scene, terrain, camera, game, layer: document.getElementById('ticks') });
 defineSandboxTools({ game, rts, effects, hud });
+practiceFlow = attachPracticeFlow({ game, scenario, hud, mode });
+document.getElementById('play-mode').textContent = mode === 'practice'
+  ? 'Practice · rewards enabled' : mode === 'historical' ? 'Historical battle · no franchise rewards' : 'Sandbox · no progress rewards';
 // keep the pause/speed buttons in step with keyboard changes
 const togglePause = game.togglePause.bind(game);
 game.togglePause = () => { const p = togglePause(); hud.setPaused(p); return p; };
@@ -209,7 +219,7 @@ function frame(now) {
   }
   if (game.over && !resultShown) {
     resultShown = true;
-    hud.result(game.result.winner === 'US' ? 'Union victory' : 'Confederate victory', game.result.why);
+    practiceFlow.finishResult();
   }
   if (!window.__ready) {
     window.__ready = true;
@@ -219,7 +229,7 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, readout, gpuTier };
+window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, readout, gpuTier, practice: practiceFlow };
 
 // Developer tuning panel (lil-gui), only with ?tune in the URL; players never load it.
 if (new URLSearchParams(location.search).has('tune')) {

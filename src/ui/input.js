@@ -422,6 +422,7 @@ export class Input {
   hideBox() { this.box.hidden = true; }
 
   key(e) {
+    if (document.querySelector('main')?.inert || document.querySelector('dialog[open]')) return;
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.metaKey || e.ctrlKey || e.altKey) return;
     const k = e.key.toLowerCase();
     const onButton = e.target instanceof HTMLButtonElement;

@@ -1,19 +1,19 @@
 # STATE (keep under 20 lines)
 - **Authority (2026-10-06):** DESIGN + DECISIONS 0022; PLAN P1-P7 is the autonomous completion path.
 - **Finish:** all three v1 battles and all v1 functions/flow. No deadline, new spending or hands-on checks.
-- **Decisions:** agent selects/reviews art, UI, tuning and implementation; no routine approval stops.
-- **P1:** completed reward save/resume/export/import implemented; strict cw.progress + stable award IDs.
-- **Next:** read final local/HEAD CI/Pages proof, then P2 actual survivors/captures -> reward -> Continue.
+- **P1:** a2c29d3; completed progress/transfer; CI 37483119128 and Pages 37483119093 green.
+- **P2a:** actual Henry Hill survivors -> rewards -> saved Continue; depleted/guns/recovery retained.
+- **Next:** P2a exact-SHA CI/Pages, then P2b two-vs-one intro, hints and capturable/retakable crates.
 - **Art next:** Actions manifest/page-demand residency estimator; wholesale lossless tiers exceed budget.
-- **Current play:** Henry House Hill plus separate reward prototype; sandbox, controls, comparison, PWA.
-- **Missing foundations:** connected battle/reward/camp loop, campaign saves, phase packs and franchise.
+- **Current play:** connected Henry Hill practice/rewards; historical/sandbox isolated; explicit reward demo.
+- **Missing:** intro/crates, saved-gear deployment/camp, campaign saves, phase packs and progression.
 - **Figures:** rigged default; second-pass baked Union and tinted Confederate placeholders remain.
 - **Approved art:** bake 820846f / 37347072866, sheets 1-12, 5,184 frames, nine looks per tier.
 - **Failed candidates:** UASTC 37360904656 and direct BC7/ASTC 37404193171; limits stay unchanged.
 - **Historical native Mac (2026-10-04):** baked Auto 1:5 40.7/38.7 fps opening/fight; no new measurement.
 - **Unverified:** actual iPad access/performance, full touch/device acceptance, new assets and total memory.
-- **Proof:** 20 positives + 20 mutants; final npm test 76/76 (202044 ms), reward axe clear; SwiftShader.
+- **Proof:** reward 21+21, outcome 9+9; final smoke 101/101 (346689 ms), practice/reward axe clear.
 - **Coordination:** no COORDINATION.md; preserve untracked NEW-civil-war-video-game.code-workspace.
 - **Continuation:** HANDOFF current boundary + PLAN P2-P7; Codex goal active, no scheduler created.
 - **Later:** retain expansion roadmap; reuse frozen old strategy only after fun/flow proof; old repo read-only.
-- **Runtime:** sw.js cw-v5; no renderer/assets/simulation/rebalance changes in P1. See HANDOFF history.
+- **Runtime:** sw.js cw-v6; no new assets/renderer/combat rebalance; native/device gates stay open.

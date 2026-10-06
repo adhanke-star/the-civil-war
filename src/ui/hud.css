@@ -180,9 +180,10 @@ dialog .row { display: block; margin: 10px 0; }
 dialog .keys { margin: 0; padding-left: 18px; }
 dialog .small { font-size: 13px; color: var(--dim); }
 dialog button, #result button { margin-top: 12px; min-height: 44px; padding: 6px 16px; background: #f1ece0; color: #1d1a16; border: 0; border-radius: 4px; cursor: pointer; }
-#result { top: 30%; left: 50%; transform: translateX(-50%); padding: 18px 26px; text-align: center; max-width: 520px; z-index: 20; }
+#result { margin: auto; padding: 18px 26px; text-align: center; width: min(520px, calc(100vw - 68px)); max-height: calc(100dvh - 64px); overflow-y: auto; z-index: 20; }
 #result h2 { margin: 0 0 6px; font: normal 28px Georgia, serif; }
-#result[hidden] { display: none; }
+#result button { min-height: 48px; }
+#result button[hidden] { display: none; }
 
 /* The sandbox panel (src/sandbox/sandbox.css) docks on wide mouse screens: move the strip, dock and feed out
    from under it. (Its own rules for #orders/#balance/#perf predate the dock and no longer move anything.) */

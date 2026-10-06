@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>The Civil War — Henry House Hill</title>
   <link rel="icon" href="data:,">
   <link rel="manifest" href="./manifest.webmanifest">
@@ -43,6 +43,7 @@
 
     <div id="topbar" class="panel">
       <button id="menu-btn" type="button" aria-haspopup="dialog" aria-label="Menu" title="Menu">☰</button>
+      <button id="after-action" type="button" aria-haspopup="dialog" hidden>After action</button>
       <section id="clock" aria-label="Time">
         <button id="pause" type="button" aria-pressed="false" aria-label="Pause" title="Pause or resume (Space)">❚❚</button>
         <div class="clocktext"><span id="clock-date">21st July 1861</span>, <span id="clock-time">14:00</span></div>
@@ -113,6 +114,7 @@
 
     <dialog id="menu" aria-labelledby="menu-title">
       <h2 id="menu-title">Henry House Hill</h2>
+      <p id="play-mode" class="sub"></p>
       <p class="sub">First Bull Run · 21 July 1861 · 2:00 p.m.</p>
       <fieldset>
         <legend>Quality <kbd>G</kbd></legend>
@@ -123,6 +125,7 @@
       <label class="row"><input type="checkbox" id="sound-toggle" checked> Sound</label>
       <p class="row"><a href="?sandbox" style="color: var(--focus)">Sandbox</a>: try and change the look and play, then copy your settings</p>
       <p class="row"><a href="reward.html?sandbox" style="color: var(--focus)">Reward sequence</a>: open the loot, compare and issue it (placeholder data)</p>
+      <p class="row"><a href="?battle=henry-hill" style="color: var(--focus)">Historical battle</a> · <a href="?practice" style="color: var(--focus)">Fresh practice</a> · <a href="reward.html" style="color: var(--focus)">Saved army</a></p>
       <h3>Controls</h3>
       <ul class="keys">
         <li><b>Select</b>: click or tap a brigade or its flag (Tab cycles flags); Shift+drag on the ground, or hold a finger still then drag, to box-select several</li>
@@ -136,11 +139,14 @@
       <p id="history-note" class="small"></p>
       <form method="dialog"><button type="submit">Close</button></form>
     </dialog>
-    <div id="result" class="panel" role="alertdialog" aria-labelledby="result-title" hidden>
+    <dialog id="result" aria-labelledby="result-title" aria-describedby="result-text">
       <h2 id="result-title"></h2>
-      <p id="result-text"></p>
-      <button type="button" id="result-close">Keep watching</button>
-    </div>
+      <p id="result-text" role="status" aria-live="polite"></p>
+      <button type="button" id="result-action" hidden>Open the loot</button>
+      <button type="button" id="result-export" hidden>Export army</button>
+      <button type="button" id="result-unsaved" hidden>Open without saving</button>
+      <button type="button" id="result-close">Inspect the field</button>
+    </dialog>
   </main>
   <noscript><p class="panel">This game needs JavaScript and must be served over HTTP (run play.command).</p></noscript>
   <script type="module" src="./src/main.js"></script>

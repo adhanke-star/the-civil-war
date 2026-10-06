@@ -120,6 +120,16 @@ const CHECKS = [
     return `${n} compares`;
   }],
 
+  ['depleted-no-issue', (m, d) => {
+    for (const b of [{ ...d.SAMPLE_ARMY[0], men: 0 }, { ...d.SAMPLE_ARMY[4], guns: 0 }]) {
+      const it = b.weapon;
+      if (m.compare(b, it).ok || m.bestFit([b], it) !== null) fail('depleted-no-issue: depleted formation accepted a compare/best-fit');
+      let rejected = false; try { m.equip(b, it); } catch (e) { if (/depleted/.test(e.message)) rejected = true; else throw e; }
+      if (!rejected) fail('depleted-no-issue: depleted formation accepted equipment');
+      if (!m.canCarry(b, it)) fail('depleted-no-issue: retained equipment records became invalid');
+    }
+  }],
+
   ['best-fit-max', (m, d) => {
     for (let seed = 1; seed <= 80; seed++) {
       for (const item of m.rollLoot({ seed }).cards) {
@@ -309,6 +319,7 @@ function mutants(m, d) {
     'grade-monotone': [{ ...m, rollLoot: (o) => m.rollLoot({ ...o, grade: { Decisive: 'Defeat', Defeat: 'Decisive', Victory: 'Draw', Draw: 'Victory' }[o.grade] }) }, d],
     'compare-equip-ovr': [{ ...m, compare: (b, it) => { const c = m.compare(b, it); return { ...c, after: { ...c.after, ovr: c.after.ovr + 1 } }; } }, d],
     'best-fit-max': [{ ...m, bestFit: (bs, it) => bs.find((b) => m.compare(b, it).ok) || null }, d],
+    'depleted-no-issue': [{ ...m, compare: (b, it) => m.compare({ ...b, men: 10, guns: 6 }, it) }, d],
     'tier-shapes': [m, brokenData({ TIERS: d.TIERS.map((t) => ({ ...t, shape: 'circle' })) })],
     'uniques-game-items': [m, brokenData({ UNIQUES: d.UNIQUES.map((u, i) => (i === 0 ? { ...u, gameItem: false } : u)) })],
     'no-rank-labels': [m, brokenData({ SAMPLE_ARMY: d.SAMPLE_ARMY.map((b, i) => (i === 0 ? { ...b, label: 'Brig. Gen. Example' } : b)) })],
