@@ -1,5 +1,22 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0024 — Lossless tier loading still exceeds the scene budget (2026-10-06)
+Read-only approved-report/source assessment: full RGBA+mips 835,971,548 B; eight field looks plus one
+close page each 241,074,464–258,639,136 B before ground/info ~27.96 MB and other scene allocations.
+Current tier loader has no pending reservation, eviction or decode/batch accounting. Recommend an
+Actions-only manifest/demand/transition estimator before lossless repacking or integration. Preserve
+approved bytes, all looks/eligibility, anchors and unchanged quality limits; failed codecs stay unfieldable.
+No assets, renderer or native/device evidence changed in this assessment.
+
+## 0023 — Completed reward inventory gets one atomic progress store (2026-10-06)
+P1 uses the planned franchise/save seam and cw.progress, separate from permissive preferences. Strict
+versioned complete-state validation includes unique ownership and reverse-issued history; OVR is derived.
+One setItem replaces progress, stable award IDs refuse reissue, and pending retries retain the acknowledged
+previous snapshot despite previews/external writes. Imports deliberately replace, including older exports;
+no anti-cheat claim. Compact UTF-8-bounded exports remain importable near the limit. Browser failures keep
+old bytes and unsaved export/retry paths. CI includes save/loot positives and per-invariant broken controls;
+actual UI tests cover transfers, reload, failures, focus and accessibility. Campaign/battle saves remain later.
+
 ## 0022 — Autonomous complete v1, with a selective expansion roadmap (Aaron, 2026-10-06)
 Finish all three v1 battles and all v1 systems/flow, without a hard deadline or new spending. Aaron
 withdrew the whole-long-term-vision finish line and the one-hands-on-check option: **no hands-on checks**.

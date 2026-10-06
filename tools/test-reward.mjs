@@ -6,19 +6,23 @@
 //                                           exit 1 if any check passes on its broken stand-in
 //   REWARD_MODEL=<path> node tools/test-reward.mjs   point the checks at another copy of model.js
 //
-// Checks: determinism for a seed; the Rare-or-better guarantee over 500 seeds; Legendary share of cards at
+// Save checks use injected memory storage and per-invariant mutants: strict schema/gear/ownership,
+// issued transfers, atomic imports, duplicate callbacks, conflicts, storage failure and bounded exports.
+// Loot checks: determinism for a seed; the Rare-or-better guarantee over 500 seeds; Legendary share of cards at
 // Victory between 0.5% and 8%; a better grade never lowers expected rarity (mean total rarity per roll AND
 // mean best card per roll, 2,000 seeds each); compare/equip arithmetic agrees with ovr(); bestFit returns
 // the max-gain brigade; every tier has a distinct shape; every unique is gameItem: true; no brigade label
 // matches /Gen\.|Col\.|Brig\./. Writes nothing.
 
 import path from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const modelPath = process.env.REWARD_MODEL ? path.resolve(process.env.REWARD_MODEL) : path.join(ROOT, 'src/reward/model.js');
 const realModel = await import(pathToFileURL(modelPath).href);
 const realData = await import(pathToFileURL(path.join(ROOT, 'src/reward/data.js')).href);
+const realSave = await import(pathToFileURL(path.join(ROOT, 'src/franchise/save.js')).href);
 
 const GRADE_ORDER = ['Defeat', 'Draw', 'Victory', 'Decisive']; // worst to best
 const rankOf = (data, card) => data.TIER_BY_ID[card.tier].rank;
@@ -155,11 +159,135 @@ const CHECKS = [
   }],
 ];
 
+const clone = (v) => JSON.parse(JSON.stringify(v));
+const same = isDeepStrictEqual;
+function memoryStorage() {
+  const data = new Map([['cw.settings', 'preferences'], ['cw.locks', 'locks']]);
+  return { data, writes: 0, getItem(k) { return data.has(k) ? data.get(k) : null; },
+    setItem(k, v) { this.writes++; data.set(k, v); } };
+}
+function sampleResult(m, d, seed = 72) {
+  const army = clone(d.SAMPLE_ARMY), cards = m.rollLoot({ seed }).cards;
+  const it = cards.find((c) => m.canCarry(army[0], c));
+  const { brigade, displaced } = m.equip(army[0], it);
+  army[0] = brigade;
+  return { awardId: `demo-test-${seed}`, army, depot: [...cards.filter((c) => c !== it), displaced],
+    issued: [{ brigade: brigade.id, item: it.uid, displaced: displaced.uid }], seed, grade: 'Victory' };
+}
+function rejected(fn, name, reason) {
+  let error;
+  try { fn(); } catch (err) { error = err; }
+  if (!error || !error.message.startsWith('Progress:') || !error.message.includes(reason)) fail(`${name}: expected rejection for ${reason}, got ${error?.message ?? 'success'}`);
+}
+
+const SAVE_CHECKS = [
+  ['save-export-limit', (m, d, s) => {
+    const input = sampleResult(m, d); input.issued = [];
+    input.depot = Array.from({ length: 2000 }, (_, i) => ({ ...input.army[0].weapon, uid: `cap-${i}-${'a'.repeat(90)}`, from: 'é'.repeat(90) + 'a'.repeat(70), source: 'issue', depot: true }));
+    const snap = realSave.completedSnapshot(input), exported = s.exportSnapshot(snap);
+    if (new TextEncoder().encode(exported).length > s.MAX_SAVE_BYTES) fail('save-export-limit: accepted near-limit multibyte state exported an oversized file');
+    if (!same(s.parseSnapshot(exported), snap)) fail('save-export-limit: near-limit export failed exact round-trip');
+  }],
+  ['save-roundtrip', (m, d, s) => {
+    const mem = memoryStorage(), store = s.createProgressStore(mem), input = sampleResult(m, d);
+    const snap = store.complete(input).snapshot, loaded = store.load();
+    if (!same(snap, loaded) || !same(s.parseSnapshot(s.exportSnapshot(snap)), snap) || !same(snap.issued, input.issued)
+      || !same(snap.depot, input.depot) || snap.awardId !== input.awardId) fail('save-roundtrip: identities, equipment or records changed');
+    const tampered = clone(snap); tampered.army[0].ovr = 1;
+    if (s.parseSnapshot(JSON.stringify(tampered)).army[0].ovr !== m.ratings(input.army[0]).ovr) fail('save-roundtrip: trusted imported derived OVR');
+    if (mem.data.get('cw.settings') !== 'preferences' || mem.data.get('cw.locks') !== 'locks') fail('save-roundtrip: preferences changed');
+  }],
+  ['save-schema', (m, d, s) => {
+    const snap = realSave.completedSnapshot(sampleResult(m, d));
+    for (const text of ['{', 'null', JSON.stringify({ ...snap, version: 2 }), JSON.stringify({ ...snap, army: [] }), JSON.stringify({ ...snap, issued: undefined })]) {
+      rejected(() => s.parseSnapshot(text), 'save-schema', text === '{' ? 'JSON' : text === 'null' ? 'object' : text.includes('"issued":') === false ? 'fields' : text.includes('"version":2') ? 'version' : 'army');
+    }
+    rejected(() => s.parseSnapshot(' '.repeat(s.MAX_SAVE_BYTES + 1)), 'save-schema', 'limit');
+    rejected(() => s.parseSnapshot('é'.repeat(s.MAX_SAVE_BYTES / 2 + 1)), 'save-schema', 'limit');
+    for (const seed of [-1, 0x100000000, null, NaN, Infinity]) {
+      rejected(() => s.validateSnapshot({ ...snap, seed }), 'save-schema', 'seed');
+    }
+    rejected(() => s.validateSnapshot({ ...snap, grade: 'Win' }), 'save-schema', 'grade');
+  }],
+  ['save-gear', (m, d, s) => {
+    for (const patch of [{ itemId: 'missing' }, { itemId: 'constructor' }, { conditionId: 'missing' }, { tier: 'legendary' }]) {
+      const snap = realSave.completedSnapshot(sampleResult(m, d)); Object.assign(snap.army[0].weapon, patch);
+      rejected(() => s.validateSnapshot(snap), 'save-gear', patch.itemId ? 'gear' : 'condition');
+    }
+    const snap = realSave.completedSnapshot(sampleResult(m, d)); snap.army[0].men = Infinity;
+    rejected(() => s.validateSnapshot(snap), 'save-gear', 'men');
+    snap.army[0].men = 10; snap.army[0].base.fire = 100;
+    rejected(() => s.validateSnapshot(snap), 'save-gear', 'rating');
+  }],
+  ['save-ownership', (m, d, s) => {
+    const snap = realSave.completedSnapshot(sampleResult(m, d));
+    snap.depot.push(clone(snap.army[0].weapon));
+    rejected(() => s.validateSnapshot(snap), 'save-ownership', 'duplicate item');
+    snap.depot.pop(); snap.army[1].id = snap.army[0].id;
+    rejected(() => s.validateSnapshot(snap), 'save-ownership', 'duplicate brigade');
+  }],
+  ['save-issued', (m, d, s) => {
+    const input = sampleResult(m, d), oldWeapon = input.depot.find((it) => it.uid === input.issued[0].displaced);
+    const next = m.equip(input.army[1], oldWeapon);
+    input.army[1] = next.brigade;
+    input.depot = [...input.depot.filter((it) => it.uid !== oldWeapon.uid), next.displaced];
+    input.issued.push({ brigade: next.brigade.id, item: oldWeapon.uid, displaced: next.displaced.uid });
+    const transferred = s.validateSnapshot(realSave.completedSnapshot(input));
+    if (!same(transferred.issued, input.issued) || !same(transferred.depot, input.depot)) fail('save-issued: valid multi-brigade transfers did not round-trip');
+    const snap = realSave.completedSnapshot(sampleResult(m, d));
+    snap.issued.push(clone(snap.issued[0]));
+    rejected(() => s.validateSnapshot(snap), 'save-issued', 'inconsistent');
+    snap.issued.pop(); snap.issued[0].item = 'missing';
+    rejected(() => s.validateSnapshot(snap), 'save-issued', 'reference');
+  }],
+  ['save-atomic-import', (m, d, s) => {
+    const mem = memoryStorage(), store = s.createProgressStore(mem);
+    const old = store.complete(sampleResult(m, d)).snapshot, raw = mem.getItem(s.SAVE_KEY), writes = mem.writes;
+    for (const text of ['{', JSON.stringify({ ...old, version: 2 }), JSON.stringify({ ...old, depot: [...old.depot, old.army[0].weapon] })]) {
+      let error; try { store.import(text); } catch (err) { error = err; }
+      if (!error?.message.startsWith('Progress:') || mem.getItem(s.SAVE_KEY) !== raw || mem.writes !== writes || !same(store.load(), old)) fail('save-atomic-import: invalid input changed the previous save or did not reject');
+    }
+    const newer = realSave.completedSnapshot(sampleResult(m, d, 73));
+    store.import(JSON.stringify(newer)); store.import(JSON.stringify(old));
+    if (!same(store.load(), old)) fail('save-atomic-import: older export did not replace exactly');
+  }],
+  ['save-idempotent', (m, d, s) => {
+    const mem = memoryStorage(), store = s.createProgressStore(mem), input = sampleResult(m, d);
+    const first = store.complete(input).snapshot, raw = mem.getItem(s.SAVE_KEY);
+    for (let n = 0; n < 5; n++) {
+      const replay = s.createProgressStore(mem).complete(input);
+      if (!replay.duplicate || !same(replay.snapshot, first) || mem.getItem(s.SAVE_KEY) !== raw || mem.writes !== 1) fail('save-idempotent: repeated callback rewrote or duplicated an award');
+    }
+  }],
+  ['save-storage-failure', (m, d, s) => {
+    const mem = memoryStorage(), store = s.createProgressStore(mem), input = sampleResult(m, d);
+    const first = store.complete(input).snapshot, raw = mem.getItem(s.SAVE_KEY);
+    mem.setItem = () => { throw new Error('quota'); };
+    rejected(() => store.complete(sampleResult(m, d, 73), { previous: first }), 'save-storage-failure', 'could not save');
+    rejected(() => store.import(JSON.stringify(realSave.completedSnapshot(sampleResult(m, d, 73)))), 'save-storage-failure', 'could not save');
+    if (mem.getItem(s.SAVE_KEY) !== raw || !s.exportSnapshot(first)) fail('save-storage-failure: erased progress or export unavailable');
+    mem.getItem = () => { throw new Error('blocked'); };
+    rejected(() => store.load(), 'save-storage-failure', 'read');
+    rejected(() => store.complete(input), 'save-storage-failure', 'read');
+    rejected(() => s.createProgressStore(() => { throw new Error('blocked'); }).load(), 'save-storage-failure', 'unavailable');
+  }],
+  ['save-conflict', (m, d, s) => {
+    const mem = memoryStorage(), store = s.createProgressStore(mem);
+    const first = store.complete(sampleResult(m, d)).snapshot, raw = mem.getItem(s.SAVE_KEY);
+    rejected(() => store.complete(sampleResult(m, d, 73)), 'save-conflict', 'changed');
+    if (mem.getItem(s.SAVE_KEY) !== raw) fail('save-conflict: unacknowledged fresh demo overwrote saved army');
+    const next = store.complete(sampleResult(m, d, 73), { previous: first }).snapshot;
+    rejected(() => store.complete(sampleResult(m, d, 74), { previous: first }), 'save-conflict', 'changed');
+    if (!same(next, store.load())) fail('save-conflict: stale callback overwrote new progress');
+  }],
+];
+CHECKS.push(...SAVE_CHECKS);
+
 function runAll(m, d, quiet) {
   const results = [];
   for (const [name, fn] of CHECKS) {
     try {
-      const note = fn(m, d);
+      const note = fn(m, d, realSave);
       results.push({ name, ok: true, note });
       if (!quiet) console.log(`PASS ${name}${note ? ` (${note})` : ''}`);
     } catch (err) {
@@ -173,7 +301,7 @@ function runAll(m, d, quiet) {
 // ---- negative bind: each check must fail on a broken stand-in, with its own failure text -------------------
 function mutants(m, d) {
   const brokenData = (patch) => ({ ...d, ...patch });
-  return {
+  const modelMutants = {
     'determinism': [{ ...m, rollLoot: (o) => m.rollLoot({ ...o, seed: Math.random() }) }, d],
     'rare-guarantee': [{ ...m, rollLoot: (o) => { const r = m.rollLoot(o); return { ...r, cards: r.cards.map((c) => ({ ...c, tier: 'common' })) }; } }, d],
     'order-rarest-last': [{ ...m, rollLoot: (o) => { const r = m.rollLoot(o); return { ...r, cards: [...r.cards].reverse() }; } }, d],
@@ -185,6 +313,20 @@ function mutants(m, d) {
     'uniques-game-items': [m, brokenData({ UNIQUES: d.UNIQUES.map((u, i) => (i === 0 ? { ...u, gameItem: false } : u)) })],
     'no-rank-labels': [m, brokenData({ SAMPLE_ARMY: d.SAMPLE_ARMY.map((b, i) => (i === 0 ? { ...b, label: 'Brig. Gen. Example' } : b)) })],
   };
+  const permissive = { ...realSave, parseSnapshot: (text) => { try { return JSON.parse(text); } catch { return null; } }, validateSnapshot: (v) => v };
+  const wrapStore = (patch) => ({ ...realSave, createProgressStore: (mem) => {
+    const store = realSave.createProgressStore(mem); return { ...store, ...patch(store, mem) };
+  } });
+  const saveMutants = {
+    'save-export-limit': { ...realSave, exportSnapshot: (v) => JSON.stringify(realSave.validateSnapshot(v), null, 2) },
+    'save-roundtrip': { ...realSave, parseSnapshot: (t) => { const v = realSave.parseSnapshot(t); v.army[0].ovr = 1; return v; } },
+    'save-schema': permissive, 'save-gear': permissive, 'save-ownership': permissive, 'save-issued': permissive,
+    'save-atomic-import': wrapStore((st, mem) => ({ import(t) { mem.setItem(realSave.SAVE_KEY, t); return JSON.parse(t); } })),
+    'save-idempotent': wrapStore((st, mem) => ({ complete(r, o) { const v = st.complete(r, o); mem.setItem(realSave.SAVE_KEY, JSON.stringify(v.snapshot)); return v; } })),
+    'save-storage-failure': wrapStore((st) => ({ complete(r, o) { try { return st.complete(r, o); } catch { return { saved: true }; } } })),
+    'save-conflict': wrapStore((st) => ({ complete(r) { return { snapshot: st.import(JSON.stringify(realSave.completedSnapshot(r))), saved: true }; } })),
+  };
+  return { ...modelMutants, ...Object.fromEntries(Object.entries(saveMutants).map(([name, s]) => [name, [m, d, s]])) };
 }
 
 if (process.argv.includes('--prove-fail')) {
@@ -194,7 +336,7 @@ if (process.argv.includes('--prove-fail')) {
     const pair = muts[name];
     if (!pair) { console.log(`NO-MUTANT ${name}`); bad++; continue; }
     try {
-      fn(pair[0], pair[1]);
+      fn(pair[0], pair[1], pair[2] || realSave);
       console.log(`NOT-CAUGHT ${name}: the check passed on its broken stand-in`);
       bad++;
     } catch (err) {

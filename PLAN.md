@@ -58,7 +58,16 @@ as content grows. No separate engine per battle and no copied old global runtime
 P3/P4 overlap: use the first sourced Shiloh phase to exercise the shared pack and combat work early;
 add capabilities in focused playable slices rather than building every rule in isolation first.
 
-### P1: exact next bounded task
+### P1: completed-state contract
+
+Implementation (2026-10-06): completed rewards now use `cw.progress` through `src/franchise/save.js`.
+Resume bypasses the loot generator; stable award IDs make completion idempotent. Version-1 imports
+validate the complete inventory and reverse-issued history before a single storage replacement.
+Compact exports remain importable near the 1 MiB UTF-8 limit. Retry/export preserves unsaved results;
+live-snapshot conflicts cannot be bypassed by opening a one-card preview. Preferences/locks stay separate.
+Reward positives and rejecting mutants are now CI steps; full smoke includes the real reward UI.
+The P1 gate readback and current continuation are at the top of HANDOFF. Check exact-HEAD CI and Pages
+before treating deployment acceptance as closed. The next product slice is P2, not campaign saves.
 
 Purpose: persist the reward prototype's **completed** army/depot state, not an in-progress battle or
 full campaign. Use the already-planned `src/franchise/save.js` as the single progress-store seam;
@@ -275,6 +284,12 @@ unrelated art experiment. The following detailed notes continue to define their 
 - Review: the agent plays, compares, tests and records defaults. No hands-on check is requested.
 
 ## Art track
+- Read-only residency assessment (2026-10-06): wholesale lossless tier loading does not meet the budget.
+  Approved full RGBA+mips = 835,971,548 B; eight eligible field looks = 83,402,304 B. Adding only one
+  close page for each look already reaches 241,074,464–258,639,136 B before ~27.96 MB ground/info textures,
+  render targets and other scene allocations. Current loader omits pending/decode/batch peaks and eviction.
+  Next justified experiment: approved-manifest page-demand/transition admission estimator on Actions,
+  with source hashes, name/eligibility binds and total-scene reserves. No encoding or runtime change yet.
 - Source survey with pictures and licenses per object (Smithsonian 3D Open Access, MakeHuman/MPFB,
   Quaternius, Poly Haven, Kenney, LoC) -> agent selection and independent visual review.
 - Bake job on GitHub Actions (Blender headless, dev only): model -> sprite atlas with baked light ->

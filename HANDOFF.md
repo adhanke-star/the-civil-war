@@ -5,7 +5,55 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: autonomous v1 plan ready (2026-10-06)
+## Current boundary: P1 reward persistence implemented (2026-10-06)
+
+Goal mode is active for complete existing v1 under DESIGN/DECISIONS 0022 and PLAN P1-P7. Codex owns
+the active engineering loop; no other provider writer or COORDINATION.md was observed at startup.
+No schedule was created. Preserve the untracked workspace file; the old Desktop repo stays read-only.
+Remaining weekly capacity is unknown. Native iPad access and acceptance remain unestablished.
+
+`src/franchise/save.js` is the single progress seam, key `cw.progress`, version-1 completed-reward
+envelope. It preserves army/depot/equipment/issued/seed/grade/award identity; recomputes OVR; validates
+gear, bounds, uniqueness and reverse transfer history; accepts only complete snapshots <=1 MiB UTF-8.
+Imports replace once, never merge. Compact exports round-trip at the bound. Same-award callbacks
+perform no additional write. New demos acknowledge a live previous snapshot; pending retries keep
+that exact baseline even after previews. Blocked reads do not auto-roll; quota failure retains pending
+export/retry and previous stored bytes. Reward demo, preferences and lock behavior remain available.
+
+P1 also adds resume/export/import/retry and replacement confirmation controls to reward.html;
+48px targets, narrow-screen scrolling, focus return/trapping and launcher inertness are exercised.
+Save/source review caught and repaired oversized pretty exports and stale replacement authorization.
+Independent WCAG/screenshot review caught dimmed resumed stats; restored cards now use full contrast.
+Compare ARIA and key-hint contrast were repaired in scope. Runtime cache is `cw-v5`.
+No reward rebalance, texture/codec/art/renderer/simulation change occurred. No campaign or live-battle save.
+
+Local final gates passed: `node tools/test-reward.mjs` 20/20; `--prove-fail` 20/20 intended assertions;
+`node tools/test.mjs --unit`; final `npm test` 76/76 in 202044 ms. Readback timestamp
+2026-10-06T14:50:20.550Z, .out/last-result.json; six reward screenshots include the native import dialog.
+Compare/resume/import/launcher axe each report zero violations. Actual screenshots were inspected.
+Full smoke includes compare/resume/import/launcher axe, keyboard, equip/reload/file transfer, repeated
+callbacks, quota export/retry, external conflict + preview + retry, blocked startup/retry, 1024/320 layout.
+Check exact-HEAD CI and Pages via PLAN's gh commands before proceeding. CI now runs both reward modes.
+Baseline battle/sandbox still has the separate moderate meta-viewport finding; emulation is not iPad proof.
+
+Next product slice: P2 continuous practice loop. Inspect src/main.js result path (~210), Game objective
+completion (~465), Hud.result (~453), index.html result/menu, src/units/unit.js and scenario weapon/source
+data before specifying the bridge. Connect actual surviving brigades/captures to rewards and Continue;
+retain a distinct explicit reward demo. Build the two-vs-one introductory fight with first loot about a
+minute, capturable/retakable crates, saved army return and obvious next action in focused green commits.
+Do not silently change historical unit labels/arms or reset survivors to SAMPLE_ARMY. Standalone historical
+Battles mode must ultimately grant no franchise loot. Full campaign packs/three slots belong to P4.
+
+Read-only art assessment: existing BakedAtlas loads all pages in a tier together and retains them;
+memoryBytes ignores pending, image decode, batch buffers and total scene. Full approved RGBA+mips
+835,971,548 B cannot fit. Eight eligible field looks + one close page each already cost
+241,074,464–258,639,136 B, before ground/info ~27.96 MB and the rest. Preserve all nine looks including
+USCT eligibility, name binding, anchors and directions. Next bounded art hypothesis is an Actions-only
+approved-manifest/demand/transition estimator with pending/decode/disposal/scene reserves; not a codec
+rerun or fielding. Exact clip/page demands and native allocations are still unmeasured. PLAN retains
+the immutable byte gates and failed-pack boundary. Continue P2 independently of those gaps.
+
+## Historical planning boundary: autonomous v1 plan ready (2026-10-06)
 
 Read DECISIONS 0022 and PLAN's complete P1 contract. Aaron's latest choices: finish existing v1
 (Shiloh, Stones River, Chattanooga and all v1 systems), no hard deadline, no new spending, **no

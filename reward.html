@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>The Civil War — reward sequence (prototype)</title>
   <link rel="icon" href="data:,">
   <meta name="theme-color" content="#17141a">
@@ -33,17 +33,26 @@
     html, body { margin: 0; height: 100%; overflow: hidden; background: #17141a; color: var(--text); }
     body { font: 16px/1.45 system-ui, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
     :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
-    #launch { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    #launch { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; box-sizing: border-box; overflow: auto; }
     body.sb-open-right #launch { right: var(--sb-w, 0px); }
     body.sb-open-left #launch { left: var(--sb-w, 0px); }
-    #launch section { max-width: 560px; padding: 28px 30px; border-radius: 16px; background: #1f1c24; border: 1px solid var(--panel-edge); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
+    #launch section { max-width: 560px; min-width: 0; margin: auto; padding: 28px 30px; border-radius: 16px; background: #1f1c24; border: 1px solid var(--panel-edge); box-shadow: 0 20px 50px rgba(0,0,0,0.5); }
     #launch h1 { margin: 0 0 4px; font-size: 26px; font-weight: 800; letter-spacing: -0.01em; }
     #launch p { margin: 0 0 16px; color: var(--dim); }
     #launch .row { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; }
-    #launch button, #launch a.btn { min-height: 48px; padding: 0 18px; border-radius: 10px; border: 1px solid var(--panel-edge); background: rgba(255,255,255,0.06); color: var(--text); font: inherit; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; }
+    #launch button, #launch a.btn { min-height: 48px; padding: 0 18px; border-radius: 10px; border: 1px solid #827c8b; background: rgba(255,255,255,0.06); color: var(--text); font: inherit; font-weight: 700; cursor: pointer; display: inline-flex; align-items: center; text-decoration: none; }
     #launch button.main { background: #f2efe6; color: #13161c; border-color: transparent; }
     #launch button[aria-pressed="true"] { background: rgba(240,199,94,0.22); border-color: #f0c75e; }
     #launch .last { font-size: 14px; }
+    #launch button:disabled { opacity: 0.6; cursor: default; }
+    #launch summary { cursor: pointer; min-height: 48px; display: flex; align-items: center; font-weight: 700; }
+    dialog { max-width: 480px; max-height: 85vh; overflow: auto; border: 1px solid var(--panel-edge); border-radius: 16px; padding: 24px; background: #1f1c24; color: var(--text); }
+    dialog::backdrop { background: rgba(0,0,0,0.7); }
+    dialog button { min-height: 48px; padding: 0 18px; margin: 4px; font: inherit; cursor: pointer; color: #13161c; background: #f2efe6; border: 1px solid #827c8b; border-radius: 10px; }
+    dialog p { color: var(--dim); }
+    @media (max-height: 650px) { #launch { align-items: flex-start; } }
+    @media (max-width: 480px) { #launch { padding: 12px; } #launch section { padding: 18px; } }
   </style>
 </head>
 <body>
@@ -51,6 +60,16 @@
     <section>
       <h1 id="launch-title">Reward sequence</h1>
       <p>Prototype on placeholder data: after action, loot reveal, issue the arms, ratings. Uniques and conditions are game items, not history.</p>
+      <div class="row">
+        <button type="button" class="main" id="resume" disabled>Resume saved army</button>
+        <button type="button" id="export" disabled>Export army</button>
+        <button type="button" id="import">Import army</button>
+        <button type="button" id="retry" hidden>Retry save</button>
+        <input type="file" id="import-file" accept=".json,application/json" hidden>
+      </div>
+      <p class="last" id="last" role="status" aria-live="polite"></p>
+      <details id="demos" open><summary>Start a fresh reward demo</summary>
+      <p>A fresh sample army and new loot. Saved progress is replaced only when you finish.</p>
       <div class="row" role="group" aria-label="Grade">
         <button type="button" data-grade="Decisive" aria-pressed="false">Decisive</button>
         <button type="button" data-grade="Victory" aria-pressed="true">Victory</button>
@@ -58,17 +77,24 @@
         <button type="button" data-grade="Defeat" aria-pressed="false">Defeat</button>
       </div>
       <div class="row">
-        <button type="button" class="main" id="play">Play the reward sequence</button>
+        <button type="button" id="play">Play the reward sequence</button>
         <button type="button" id="play-legendary">With a Legendary</button>
         <button type="button" id="deal-one">Deal one card</button>
       </div>
+      </details>
       <div class="row"><a class="btn" id="sandbox-link" href="?sandbox">Open with the sandbox panel</a></div>
-      <p class="last" id="last" role="status" aria-live="polite"></p>
     </section>
   </main>
+  <dialog id="replace" aria-labelledby="replace-title" aria-describedby="replace-note">
+    <h2 id="replace-title">Replace saved army?</h2>
+    <p id="replace-note"></p>
+    <button type="button" id="replace-cancel">Cancel</button>
+    <button type="button" id="replace-confirm">Replace</button>
+  </dialog>
   <noscript><p>This page needs JavaScript and must be served over HTTP (run play.command).</p></noscript>
   <script type="module">
-    import { mountReward } from './src/reward/sequence.js';
+    import { mountReward, defineRewardSettings, configureRewardReplay } from './src/reward/sequence.js';
+    import { createProgressStore, completedSnapshot, exportSnapshot, parseSnapshot, MAX_SAVE_BYTES } from './src/franchise/save.js';
 
     const q = new URLSearchParams(location.search);
     const GRADES = ['Decisive', 'Victory', 'Draw', 'Defeat'];
@@ -78,27 +104,132 @@
     const legendary = q.get('legendary') === '1';
 
     const last = document.getElementById('last');
+    const launch = document.getElementById('launch');
+    const store = createProgressStore();
+    let saved = null, pending = null, previous = null, pendingPrevious = null, loadFailed = false;
+    const button = (id) => document.getElementById(id);
+    const describe = (s) => `Seed ${s.seed}, ${s.grade}. ${s.issued.length} cards issued; ${s.depot.length} in the depot.`;
+    function sync() {
+      button('resume').disabled = !saved || !!pending;
+      button('export').disabled = !(pending || saved);
+      button('retry').hidden = !pending && !loadFailed;
+      button('retry').textContent = pending ? 'Retry save' : 'Retry loading';
+      window.__rewardResult = pending || saved;
+    }
+    function focusHome() { (pending ? button('retry') : saved ? button('resume') : button('play')).focus(); }
+    function savePending() {
+      try {
+        const { snapshot } = store.complete(pending, { previous: pendingPrevious });
+        saved = snapshot; pending = null; loadFailed = false;
+        last.textContent = `Saved army. ${describe(saved)}`;
+      } catch (err) { last.textContent = err.message; }
+      sync(); focusHome();
+    }
+    function showReward(opts) {
+      // Keep the covered launcher out of the keyboard/screen-reader flow.
+      launch.inert = true;
+      const baseline = previous;
+      window.__reward = mountReward(document.body, { ...opts, onDone: (r) => onDone(r, baseline) });
+      // One-card previews close without a completed army.
+      const root = window.__reward.state.ui.root;
+      const observer = new MutationObserver(() => {
+        if (!root.isConnected) {
+          observer.disconnect();
+          if (!document.querySelector('.rw')) { launch.inert = false; focusHome(); }
+        }
+      });
+      observer.observe(document.body, { childList: true });
+    }
+    async function confirmReplace(message, label, returnTo) {
+      const dlg = button('replace');
+      button('replace-note').textContent = message;
+      button('replace-confirm').textContent = label;
+      dlg.returnValue = 'cancel';
+      dlg.showModal();
+      button('replace-cancel').focus();
+      const accepted = await new Promise((resolve) => dlg.addEventListener('close', () => resolve(dlg.returnValue === 'replace'), { once: true }));
+      returnTo.focus();
+      return accepted;
+    }
+    button('replace-cancel').onclick = () => button('replace').close('cancel');
+    button('replace-confirm').onclick = () => button('replace').close('replace');
+    button('replace').addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      const first = button('replace-cancel'), final = button('replace-confirm');
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); final.focus(); }
+      else if (!e.shiftKey && document.activeElement === final) { e.preventDefault(); first.focus(); }
+    });
     const gradeButtons = [...document.querySelectorAll('[data-grade]')];
     const syncGrade = () => { for (const b of gradeButtons) b.setAttribute('aria-pressed', String(b.dataset.grade === grade)); };
     for (const b of gradeButtons) b.addEventListener('click', () => { grade = b.dataset.grade; syncGrade(); });
     syncGrade();
     if (q.has('sandbox')) document.getElementById('sandbox-link').hidden = true;
 
-    function onDone(result) {
-      const changed = result.issued.length;
-      last.textContent = `Last run: seed ${result.seed}, ${result.grade}. ${changed} card${changed === 1 ? '' : 's'} issued; ${result.depot.length} in the depot.`;
-      document.getElementById('play').focus();
-      window.__rewardResult = result; // for a later test harness
+    function onDone(result, baseline) {
+      launch.inert = false;
+      try { pending = completedSnapshot(result); pendingPrevious = baseline; savePending(); }
+      catch (err) { last.textContent = err.message; focusHome(); }
     }
     const randomSeed = () => Math.floor(Math.random() * 1e9);
-    const start = (extra = {}) => mountReward(document.body, { seed: randomSeed(), grade, onDone, ...extra });
+    const start = async (extra = {}, trigger = button('play')) => {
+      if (extra.mode === 'one') { showReward({ seed: randomSeed(), grade, ...extra }); return; }
+      let baseline = null;
+      try { baseline = store.load(); saved = baseline; sync(); }
+      catch (err) { last.textContent = `${err.message} This demo can still be exported when completed.`; }
+      if ((saved || pending) && extra.mode !== 'one' && !await confirmReplace(
+        'Starting a fresh demo uses a sample army. Finishing replaces your current army. Export first to keep both.', 'Start fresh demo', trigger)) return;
+      previous = baseline; // only the exact snapshot shown/confirmed may be replaced
+      // An unsaved completed result stays recoverable until the next completion.
+      showReward({ seed: randomSeed(), grade, ...extra });
+    };
+    configureRewardReplay((opts) => start(opts, document.activeElement));
+    defineRewardSettings();
 
     document.getElementById('play').addEventListener('click', () => start());
-    document.getElementById('play-legendary').addEventListener('click', () => start({ legendary: true }));
-    document.getElementById('deal-one').addEventListener('click', () => start({ mode: 'one' }));
+    document.getElementById('play-legendary').addEventListener('click', (e) => start({ legendary: true }, e.currentTarget));
+    document.getElementById('deal-one').addEventListener('click', (e) => start({ mode: 'one' }, e.currentTarget));
+    button('resume').addEventListener('click', () => { previous = saved; showReward({ completed: saved }); });
+    button('retry').addEventListener('click', () => {
+      if (pending) { savePending(); return; }
+      try {
+        saved = store.load(); loadFailed = false;
+        last.textContent = saved ? `Saved army ready. ${describe(saved)}` : 'No completed army saved. Start a fresh demo.';
+      } catch (err) { last.textContent = err.message; }
+      sync(); focusHome();
+    });
+    button('export').addEventListener('click', () => {
+      const text = exportSnapshot(pending || saved);
+      const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url; link.download = 'the-civil-war-army.json'; link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      last.textContent = pending ? 'Exported the unsaved army. Keep the file; browser saving still needs a retry.' : 'Exported saved army.';
+    });
+    button('import').addEventListener('click', () => button('import-file').click());
+    button('import-file').addEventListener('change', async (e) => {
+      const file = e.target.files[0]; e.target.value = '';
+      if (!file) { button('import').focus(); return; }
+      try {
+        if (file.size > MAX_SAVE_BYTES) throw new Error('Progress: file exceeds the 1 MB limit.');
+        const text = await file.text();
+        parseSnapshot(text); // reject before asking to replace or writing anything
+        if (!await confirmReplace('Import replaces your army and depot with this completed export. It does not merge loot. Export first to keep your current army.', 'Import and replace', button('import'))) return;
+        saved = store.import(text); pending = null; loadFailed = false;
+        last.textContent = `Imported and saved army. ${describe(saved)}`;
+        sync();
+      } catch (err) { last.textContent = `${err.message} Current progress is unchanged.`; }
+      button('import').focus();
+    });
 
     // mount the sequence at once (the URL can fix the seed, grade and a forced Legendary)
-    window.__reward = mountReward(document.body, { seed: firstSeed ?? randomSeed(), grade, legendary, onDone });
+    try {
+      saved = store.load(); previous = saved;
+      if (saved) {
+        button('demos').open = false;
+        last.textContent = `Saved army ready. ${describe(saved)}`;
+        sync(); focusHome();
+      } else { sync(); showReward({ seed: firstSeed ?? randomSeed(), grade, legendary }); }
+    } catch (err) { loadFailed = true; last.textContent = `${err.message} Import a valid export to recover, or start an explicit demo.`; sync(); }
 
     if (q.has('sandbox')) {
       import('./src/sandbox/panel.js').then(({ mountSandbox }) => mountSandbox()).catch((err) => console.error('sandbox panel failed to load:', err));

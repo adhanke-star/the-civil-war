@@ -40,6 +40,9 @@
 // `node tools/test.mjs --unit` runs only the Node checks (settings, baked-maths; no browser, writes nothing).
 // `node tools/test.mjs --s1` runs the settings, sandbox and device checks only (skips the battle page).
 // `node tools/test.mjs --field` runs the settings and battle-page checks only (skips the sandbox and device pages).
+// `node tools/test.mjs --reward` runs Node foundations and completed reward persistence UI only.
+// Full smoke includes real equip/reload/export/import, duplicate/conflict/quota/read failure recovery,
+// keyboard/focus, scoped compare/resume/import/launcher axe and 1024/320px target/layout checks.
 // SETTINGS_MODULE=<path> points the settings checks at another copy (used to prove the checks fail).
 // Saves screenshots and .out/last-result.json, then prunes .out/. Exit 0 only if every check passes.
 
@@ -958,6 +961,202 @@ async function sandboxAndDevice(browser, url) {
   }
 }
 
+/** P1: actual controls, stable save readbacks, atomic imports and recoverable quota failure. */
+async function rewardProgress(browser, url) {
+  const ctx = await browser.newContext({ viewport: VIEWPORT, reducedMotion: 'reduce', acceptDownloads: true });
+  const page = await ctx.newPage(), errors = [];
+  watchErrors(page, url, errors);
+  const raw = () => page.evaluate(() => localStorage.getItem('cw.progress'));
+  const state = () => page.evaluate(() => window.__rewardResult);
+  async function finish() {
+    await page.getByRole('button', { name: 'Done', exact: true }).click();
+    await page.waitForFunction(() => !window.__reward.state.counting);
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    await page.waitForFunction(() => !document.querySelector('.rw'));
+  }
+  async function reveal() {
+    await page.getByRole('button', { name: /^Open the loot/ }).click();
+    await page.keyboard.press('s');
+    await page.getByRole('button', { name: /^Issue to brigades/ }).click();
+  }
+  async function importFile(text) {
+    await page.locator('#import-file').setInputFiles({ name: 'army.json', mimeType: 'application/json', buffer: Buffer.from(text) });
+  }
+  try {
+    await page.goto(`${url}reward.html?seed=72`, { waitUntil: 'load' });
+    await page.waitForSelector('.rw[data-step="a"]');
+    await page.evaluate(() => {
+      localStorage.setItem('cw.settings', '{"screens.sound":false}'); localStorage.setItem('cw.locks', '["screens.sound"]');
+      window.__p1Set = Storage.prototype.setItem;
+      window.__p1Writes = 0;
+      Storage.prototype.setItem = function(k, v) {
+        if (k === 'cw.progress') { if (window.__p1Quota) throw new DOMException('quota', 'QuotaExceededError'); window.__p1Writes++; }
+        return window.__p1Set.call(this, k, v);
+      };
+    });
+    await reveal();
+    const pair = await page.evaluate(async () => {
+      const { compare } = await import('./src/reward/model.js');
+      const s = window.__reward.state;
+      for (let t = 0; t < s.tray.length; t++) for (let b = 0; b < s.army.length; b++) {
+        const c = compare(s.army[b], s.tray[t]);
+        if (c.ok && c.delta.ovr > 0) return { t, b, label: s.army[b].label, before: c.before.ovr, after: c.after.ovr };
+      }
+      throw new Error('seeded haul has no upgrade');
+    });
+    const tile = () => page.locator(`.rw-tile[data-t="${pair.t}"]`);
+    const brigade = () => page.locator(`.rw-brig[data-b="${pair.b}"]`);
+    await tile().focus(); await page.keyboard.press('Enter');
+    await brigade().focus(); await page.keyboard.press('Enter');
+    const compareDialog = page.getByRole('dialog', { name: `${pair.label}: issue this card?` });
+    const compareAxe = await new AxeBuilder({ page }).include('.rw-cmp').analyze();
+    result.rewardCompareAxe = compareAxe.violations.map((v) => ({ id: v.id, impact: v.impact, targets: v.nodes.map((n) => n.target) }));
+    check('reward-compare-axe', compareAxe.violations.length === 0, JSON.stringify(result.rewardCompareAxe));
+    await shot(page, 'reward-compare');
+    await page.keyboard.press('Tab');
+    const tab1 = await page.evaluate(() => document.activeElement.textContent);
+    await page.keyboard.press('Tab');
+    const tab2 = await page.evaluate(() => document.activeElement.textContent);
+    await page.keyboard.press('Escape');
+    check('reward-keyboard-compare', tab1.includes('Cancel') && tab2.includes('Issue to') && await tile().evaluate((n) => n === document.activeElement), 'keyboard compare wraps within dialog; Escape returns to loot tile');
+    await tile().press('Enter'); await brigade().press('Enter');
+    await compareDialog.getByRole('button', { name: new RegExp(`^Issue to ${pair.label}`) }).click();
+    const equipped = await page.evaluate(() => {
+      const s = window.__reward.state;
+      return { army: s.army, depot: s.tray, issued: s.log, seed: s.seed, grade: s.grade, awardId: s.awardId };
+    });
+    await finish();
+    const original = await state(), originalRaw = await raw();
+    const matches = await page.evaluate(async (before) => {
+      const { completedSnapshot } = await import('./src/franchise/save.js');
+      return JSON.stringify(completedSnapshot(before)) === JSON.stringify(window.__rewardResult);
+    }, equipped);
+    check('reward-equip-save', matches && /Saved army/.test(await page.locator('#last').textContent()) && original.issued.length === 1 && original.army[pair.b].ovr === pair.after,
+      `real keyboard/click equip ${pair.before}->${pair.after}; completed army, identities, depot, issued records, seed, grade and award saved exactly`);
+    // Repeated completion callback with the identical completed result must do no further writes.
+    await page.evaluate((r) => { window.__reward.state.onDone(r); window.__reward.state.onDone(r); }, equipped);
+    check('reward-callback-idempotent', await raw() === originalRaw && await page.evaluate(() => window.__p1Writes === 1), 'repeated callbacks keep the exact save and do not write another award');
+    await page.reload();
+    await page.waitForFunction(() => window.__rewardResult);
+    check('reward-reload', JSON.stringify(await state()) === JSON.stringify(original) && await page.locator('.rw').count() === 0,
+      'reload returns to completed army launcher; no new roll or overlay');
+    await page.getByRole('button', { name: 'Resume saved army', exact: true }).press('Enter');
+    await page.waitForSelector('.rw[data-step="d"]');
+    const resumed = await page.evaluate(() => ({ cards: window.__reward.state.cards.length, issued: window.__reward.state.log.length, title: document.getElementById('rw-counts-title').textContent }));
+    const resumeAxe = await new AxeBuilder({ page }).include('.rw-counts').analyze();
+    result.rewardResumeAxe = resumeAxe.violations.map((v) => ({ id: v.id, impact: v.impact, targets: v.nodes.map((n) => n.target) }));
+    check('reward-resume-axe', resumeAxe.violations.length === 0, JSON.stringify(result.rewardResumeAxe));
+    await shot(page, 'reward-resume');
+    await page.waitForFunction(() => !window.__reward.state.counting);
+    await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    check('reward-resume-no-roll', resumed.cards === 0 && resumed.issued === 1 && resumed.title === 'Saved army' && await raw() === originalRaw,
+      'resume shows existing equipment and depot, zero rolled cards, unchanged award/item counts');
+    const downloadWait = page.waitForEvent('download');
+    await page.getByRole('button', { name: 'Export army', exact: true }).click();
+    const download = await downloadWait, exportPath = path.join(OUT_DIR, `p1-export-${stamp}.json`);
+    await download.saveAs(exportPath);
+    const exported = await fs.readFile(exportPath, 'utf8');
+    check('reward-export', JSON.stringify(JSON.parse(exported)) === JSON.stringify(original), 'actual downloaded file matches completed state');
+    for (const invalid of ['{', JSON.stringify({ ...original, version: 99 }), JSON.stringify({ ...original, depot: [...original.depot, original.army[0].weapon] })]) {
+      await importFile(invalid);
+      await page.waitForFunction(() => document.getElementById('last').textContent.includes('unchanged'));
+      check('reward-invalid-import', await raw() === originalRaw && JSON.stringify(await state()) === JSON.stringify(original), 'rejected UI import preserves exact prior storage and visible state');
+    }
+    await importFile(exported);
+    await page.waitForSelector('#replace[open]');
+    const dialog = page.getByRole('dialog', { name: 'Replace saved army?' });
+    const focusCancel = await page.locator('#replace-cancel').evaluate((n) => n === document.activeElement);
+    const importAxe = await new AxeBuilder({ page }).include('#replace').analyze();
+    result.rewardImportAxe = importAxe.violations.map((v) => ({ id: v.id, impact: v.impact, targets: v.nodes.map((n) => n.target) }));
+    check('reward-import-axe', importAxe.violations.length === 0, JSON.stringify(result.rewardImportAxe));
+    await shot(page, 'reward-import-confirm');
+    await page.keyboard.press('Shift+Tab');
+    const focusWrapped = await page.locator('#replace-confirm').evaluate((n) => n === document.activeElement);
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => !document.getElementById('replace').open);
+    await page.waitForFunction(() => document.activeElement.id === 'import');
+    check('reward-import-cancel-focus', focusCancel && focusWrapped && await page.locator('#import').evaluate((n) => n === document.activeElement) && await raw() === originalRaw,
+      `native confirmation Cancel=${focusCancel}, Tab wrap=${focusWrapped}; Escape preserves save and returns focus`);
+    await page.locator('#demos summary').click();
+    await page.getByRole('button', { name: 'Play the reward sequence', exact: true }).click();
+    await page.getByRole('button', { name: 'Start fresh demo', exact: true }).click();
+    await reveal(); await finish();
+    const newAward = (await state()).awardId;
+    await importFile(exported);
+    await page.getByRole('button', { name: 'Import and replace', exact: true }).click();
+    await page.waitForFunction((award) => window.__rewardResult.awardId === award, original.awardId);
+    check('reward-import-replace', newAward !== original.awardId && await raw() === originalRaw && JSON.stringify(await state()) === JSON.stringify(original),
+      'older exported army atomically replaces a different completed award; no merge or reissue');
+    // Inject a real quota exception into browser storage, while using real completion controls.
+    await page.getByRole('button', { name: 'Play the reward sequence', exact: true }).click();
+    await page.getByRole('button', { name: 'Start fresh demo', exact: true }).click();
+    await reveal();
+    await page.evaluate(() => {
+      window.__p1Set = Storage.prototype.setItem;
+      Storage.prototype.setItem = function(k, v) { if (k === 'cw.progress' && window.__p1Quota) throw new DOMException('quota', 'QuotaExceededError'); return window.__p1Set.call(this, k, v); };
+      window.__p1Quota = true;
+    });
+    await finish();
+    const pending = await state();
+    check('reward-quota-retains', await raw() === originalRaw && /could not save/.test(await page.locator('#last').textContent()) && await page.locator('#retry').isVisible() && await page.locator('#export').isEnabled(),
+      'quota failure retains old stored army and completed result, reports failure, offers retry/export');
+    const recoveryWait = page.waitForEvent('download');
+    await page.locator('#export').click();
+    const recovery = await recoveryWait, recoveryPath = path.join(OUT_DIR, `p1-unsaved-export-${stamp}.json`);
+    await recovery.saveAs(recoveryPath);
+    check('reward-quota-export', JSON.stringify(JSON.parse(await fs.readFile(recoveryPath, 'utf8'))) === JSON.stringify(pending), 'unsaved completed army exports exactly');
+    await page.evaluate(() => { window.__p1Quota = false; });
+    await page.getByRole('button', { name: 'Retry save', exact: true }).click();
+    check('reward-quota-retry', JSON.stringify(await state()) === JSON.stringify(pending) && JSON.stringify(JSON.parse(await raw())) === JSON.stringify(pending) && /Saved army/.test(await page.locator('#last').textContent()),
+      'retry saves the same pending award without reroll');
+    // A new external save must not become authorized merely by opening a preview.
+    await page.locator('#play').click(); await page.getByRole('button', { name: 'Start fresh demo', exact: true }).click();
+    await reveal();
+    await page.evaluate((text) => localStorage.setItem('cw.progress', text), originalRaw);
+    await finish();
+    const conflicted = await state();
+    await page.locator('#deal-one').click();
+    await page.waitForSelector('.rw[data-step="b"]'); await page.keyboard.press('s');
+    await page.getByRole('button', { name: /^Close/ }).click();
+    await page.locator('#retry').click();
+    check('reward-preview-keeps-conflict', await raw() === originalRaw && JSON.stringify(await state()) === JSON.stringify(conflicted) && /changed/.test(await page.locator('#last').textContent()),
+      'conflicting external save survives one-card preview and Retry; pending result keeps its original baseline');
+    await importFile(exported); await page.getByRole('button', { name: 'Import and replace', exact: true }).click();
+    await page.waitForFunction((award) => window.__rewardResult.awardId === award, original.awardId);
+    const prefs = await page.evaluate(() => [localStorage.getItem('cw.settings'), localStorage.getItem('cw.locks')]);
+    check('reward-preferences-preserved', prefs[0] === '{"screens.sound":false}' && prefs[1] === '["screens.sound"]', 'save/import/retry leave preferences and locks byte-for-byte unchanged');
+    const axe = await new AxeBuilder({ page }).analyze();
+    result.rewardAxe = axe.violations.map((v) => ({ id: v.id, impact: v.impact, targets: v.nodes.map((n) => n.target) }));
+    check('reward-launcher-axe', axe.violations.length === 0, JSON.stringify(result.rewardAxe));
+    result.rewardColors = await page.locator('#launch button:visible').evaluateAll((nodes) => nodes.map((n) => { const s = getComputedStyle(n); return { text: n.textContent, color: s.color, background: s.backgroundColor, border: s.borderColor, outline: s.outlineColor }; }));
+    await shot(page, 'reward-saved');
+    for (const viewport of [{ width: 1024, height: 768 }, { width: 320, height: 720 }]) {
+      await page.setViewportSize(viewport);
+      const bounds = await page.locator('#launch button:visible, #launch a.btn:visible, #launch summary').evaluateAll((nodes) => nodes.map((n) => { const r = n.getBoundingClientRect(); return { name: n.textContent, w: r.width, h: r.height }; }));
+      const scroll = await page.locator('#launch').evaluate((n) => ({ scrollWidth: n.scrollWidth, clientWidth: n.clientWidth, top: n.querySelector('section').getBoundingClientRect().top }));
+      check(`reward-targets-${viewport.width}`, bounds.every((b) => b.w >= 44 && b.h >= 44) && scroll.scrollWidth <= scroll.clientWidth && scroll.top >= 0, `${bounds.length} controls >=44px; no horizontal clipping or unreachable top`);
+      await shot(page, `reward-launcher-${viewport.width}`);
+    }
+    const beforeReadFailure = await raw();
+    await ctx.addInitScript(() => {
+      window.__p1RawGet = Storage.prototype.getItem;
+      Storage.prototype.getItem = function(k) {
+        if (k === 'cw.progress' && sessionStorage.getItem('p1.block') === '1') throw new DOMException('blocked', 'SecurityError');
+        return window.__p1RawGet.call(this, k);
+      };
+    });
+    await page.evaluate(() => sessionStorage.setItem('p1.block', '1'));
+    await page.reload();
+    await page.getByRole('button', { name: 'Retry loading', exact: true }).waitFor();
+    check('reward-read-failure-no-roll', await page.locator('.rw').count() === 0 && await page.evaluate((text) => window.__p1RawGet.call(localStorage, 'cw.progress') === text, beforeReadFailure),
+      'blocked startup read retains stored bytes, displays recovery controls, never rolls fresh loot');
+    await page.evaluate(() => sessionStorage.removeItem('p1.block'));
+    await page.getByRole('button', { name: 'Retry loading', exact: true }).click();
+    check('reward-read-retry', await raw() === beforeReadFailure && (await state()).awardId === original.awardId && await page.locator('.rw').count() === 0, 'retry loads the original completed army without rolling');
+    check('reward-no-console-errors', errors.length === 0, errors.join(' | ') || '0 errors');
+  } finally { await ctx.close(); }
+}
+
 async function main() {
   await settingsUnit();
   await bakedUnit();
@@ -969,6 +1168,7 @@ async function main() {
   try {
     browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     result.browser = `chromium ${browser.version()}`;
+    if (process.argv.includes('--reward')) { result.mode = 'reward progress only'; await rewardProgress(browser, url); return; }
     if (process.argv.includes('--s1')) {
       result.mode = 's1 only (battle page skipped)';
       await sandboxAndDevice(browser, url);
@@ -1193,6 +1393,7 @@ async function main() {
     await page.context().close().catch(() => {}); // one game page at a time
     if (process.argv.includes('--field')) { result.mode = 'field only (sandbox and device pages skipped)'; return; }
     await sandboxAndDevice(browser, url);
+    await rewardProgress(browser, url);
   } finally {
     if (browser) await browser.close().catch(() => {});
     await new Promise((resolve) => server.close(resolve));

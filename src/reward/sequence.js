@@ -1,6 +1,7 @@
 // src/reward/sequence.js: the reward sequence prototype (S1), DOM + CSS only, on placeholder data.
 //
-//   mountReward(root = document.body, { seed, grade, captures, legendary, mode, onDone }) -> { unmount, state }
+//   mountReward(root = document.body, { seed, grade, captures, legendary, mode, awardId, completed, onDone })
+//     -> { unmount, state }; completed restores a validated army without rolling loot.
 //     a. After action: grade, captured crates (rarity colour + shape), one button "Open the loot"
 //     b. Loot reveal: cards dealt face down, commons first and rarest last; tap / click / Space turns one;
 //        S or press-and-hold turns all. Fanfare scales with rarity (Legendary: held beat, glow, sting).
@@ -8,7 +9,7 @@
 //        arrow to a brigade + Enter; side-by-side compare; confirm equips, the old weapon goes to the tray.
 //     d. Ratings: changed brigades count up to their new OVR and bars; Continue calls onDone(result).
 //   mode: 'one' deals a single card (the sandbox's "Deal one loot card") and closes after it.
-//   onDone(result): { army, depot, issued, seed, grade }
+//   onDone(result): { awardId, army, depot, issued, seed, grade }
 //
 // State lives in one plain object (S). Settings come from src/settings.js (defineRewardSettings below);
 // the 'screens.cardStyle' choice can be split-screened through src/sandbox/compare.js.
@@ -18,6 +19,7 @@ import { compareState, onCompare } from '../sandbox/compare.js';
 import { TIER_BY_ID, CONDITION_BY_ID, conditionEffect, VETERANCY, GRADES, GRADE_NOTES, SAMPLE_ARMY, itemDef } from './data.js';
 import { rollLoot, ratings, compare, bestFit, equip, armsRating, canCarry, makeRng } from './model.js';
 import * as sfx from './sfx.js';
+import { validateSnapshot } from '../franchise/save.js';
 
 const STYLE_SLUG = { 'clean modern': 'modern', 'period desk': 'desk', hybrid: 'hybrid' };
 const BARS = [['fire', 'Fire'], ['melee', 'Melee'], ['morale', 'Morale'], ['drill', 'Drill']];
@@ -27,6 +29,8 @@ const DRAG_PX = 8; // a pointer that moves this far from a tray card starts a dr
 let active = null; // the mounted sequence
 let lastHost = null;
 let lastOnDone = null;
+let replayHandler = null;
+export function configureRewardReplay(handler) { replayHandler = handler; }
 
 // ---- settings -----------------------------------------------------------------------------------------
 export function defineRewardSettings() {
@@ -75,6 +79,7 @@ export function defineRewardSettings() {
 }
 
 function replay(opts) {
+  if (replayHandler) return replayHandler(opts);
   if (active) active.unmount();
   mountReward(lastHost || document.body, { seed: Math.floor(Math.random() * 1e9), onDone: lastOnDone, ...opts });
 }
@@ -276,9 +281,10 @@ export function mountReward(root, opts = {}) {
     document.head.append(el('link', { rel: 'stylesheet', href: new URL('./reward.css', import.meta.url).href, 'data-reward-css': true }));
   }
 
-  const seed = opts.seed ?? Math.floor(Math.random() * 1e9);
-  const grade = GRADES.includes(opts.grade) ? opts.grade : 'Victory';
-  const loot = rollLoot({ seed, grade, captures: opts.captures, forceLegendary: !!opts.legendary });
+  const completed = opts.completed ? validateSnapshot(opts.completed) : null;
+  const seed = completed?.seed ?? opts.seed ?? Math.floor(Math.random() * 1e9);
+  const grade = completed?.grade ?? (GRADES.includes(opts.grade) ? opts.grade : 'Victory');
+  const loot = completed ? { cards: [], captures: [] } : rollLoot({ seed, grade, captures: opts.captures, forceLegendary: !!opts.legendary });
   let cards = loot.cards;
   if (opts.mode === 'one') {
     const rng = makeRng(`${seed}-one`);
@@ -289,12 +295,13 @@ export function mountReward(root, opts = {}) {
   const S = {
     mode: opts.mode === 'one' ? 'one' : 'full',
     seed, grade, captures: loot.captures, cards,
+    awardId: completed?.awardId ?? opts.awardId ?? `demo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
     onDone: opts.onDone || lastOnDone,
     step: null,
     dealt: 0, up: cards.map(() => false), flipping: new Set(), skipping: false,
-    army: SAMPLE_ARMY.map((b) => ({ ...b, base: { ...b.base }, weapon: { ...b.weapon } })),
+    army: (completed?.army ?? SAMPLE_ARMY).map((b) => ({ ...b, base: { ...b.base }, weapon: { ...b.weapon } })),
     armyStart: null,
-    tray: [], log: [],
+    tray: [], log: completed?.issued.map((r) => ({ ...r })) ?? [],
     held: null, comparing: null, drag: null,
     counting: false, fast: false,
     reduced: false, dead: false,
@@ -302,7 +309,7 @@ export function mountReward(root, opts = {}) {
     ui: {},
   };
   S.armyStart = S.army.map((b) => ({ ...b, base: { ...b.base }, weapon: { ...b.weapon } }));
-  S.tray = cards.map((c) => ({ ...c }));
+  S.tray = (completed?.depot ?? cards).map((c) => ({ ...c }));
 
   // ---- timing ----
   const speed = () => Number(get('screens.revealSpeed')) || 1;
@@ -815,7 +822,7 @@ export function mountReward(root, opts = {}) {
         el('span', { class: `rw-cmp-d ${deltaClass(d)}`, role: 'cell', text: fmtDelta(d) })));
     }
     const dOvr = c.delta.ovr;
-    const ovr = el('div', { class: `rw-cmp-ovr ${deltaClass(dOvr)}`, 'aria-label': `OVR ${c.before.ovr} to ${c.after.ovr}, ${deltaWords(dOvr)}` },
+    const ovr = el('div', { role: 'group', class: `rw-cmp-ovr ${deltaClass(dOvr)}`, 'aria-label': `OVR ${c.before.ovr} to ${c.after.ovr}, ${deltaWords(dOvr)}` },
       el('span', { class: 'rw-cmp-ovr-k', 'aria-hidden': 'true', text: 'OVR' }),
       el('span', { class: 'rw-cmp-ovr-nums', 'aria-hidden': 'true' },
         el('b', { class: 'rw-cmp-old', text: String(c.before.ovr) }),
@@ -827,7 +834,7 @@ export function mountReward(root, opts = {}) {
     const confirm = primary(`Issue to ${br.label}`, () => confirmCompare());
     cancel.addEventListener('click', () => closeCompare(true));
     const dlg = el('div', { class: 'rw-cmp rw-themed', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'rw-cmp-title', style: `--cw:${cw}px` },
-      el('header', { class: 'rw-cmp-head' },
+      el('div', { class: 'rw-cmp-head' },
         el('h2', { id: 'rw-cmp-title', class: 'rw-title', text: `${br.label}: issue this card?` }),
         isBest ? el('span', { class: 'rw-star' }, el('span', { 'aria-hidden': 'true', text: '★ ' }), 'Best fit: gains most') : null),
       el('div', { class: 'rw-cmp-grid' },
@@ -891,7 +898,7 @@ export function mountReward(root, opts = {}) {
     const grid = el('div', { class: 'rw-brigs is-static', role: 'list', 'aria-label': 'The army after the issue' });
     S.army.forEach((b, i) => {
       const node = brigCard(b, i, { interactive: false, show: changed[i] ? before[i] : after[i] });
-      if (!changed[i]) node.classList.add('is-unchanged');
+      if (!changed[i]) { if (!completed) node.classList.add('is-unchanged'); }
       else node.querySelector('.rw-bweap').append(el('span', { class: 'rw-was', text: `was ${itemDef(S.armyStart[i].weapon.itemId).name}` }));
       grid.append(node);
     });
@@ -901,14 +908,14 @@ export function mountReward(root, opts = {}) {
     const sec = el('section', { class: 'rw-step rw-counts', 'aria-labelledby': 'rw-counts-title' },
       el('header', { class: 'rw-head' },
         el('p', { class: 'rw-eyebrow', text: 'Ratings' }),
-        el('h2', { id: 'rw-counts-title', class: 'rw-title', text: nChanged ? 'The army after the issue' : 'No arms issued' }),
+        el('h2', { id: 'rw-counts-title', class: 'rw-title', text: completed ? 'Saved army' : nChanged ? 'The army after the issue' : 'No arms issued' }),
         el('p', { class: 'rw-hint', text: `Depot: ${depot} card${depot === 1 ? '' : 's'} kept in the wagons.` })),
       el('div', { class: 'rw-brigs-wrap' }, grid),
       el('div', { class: 'rw-foot' }, btn));
     stage.append(sec);
     S.ui.grid = grid;
     btn.focus({ preventScroll: true });
-    announce(nChanged
+    announce(completed ? `Saved army. ${S.log.length} cards issued; ${depot} in the depot.` : nChanged
       ? S.army.filter((_, i) => changed[i]).map((b) => { const i = S.army.indexOf(b); return `${b.label}: OVR ${before[i].ovr} to ${after[i].ovr}`; }).join('. ')
       : 'No arms issued. The depot keeps every card.');
     S.counting = true;
@@ -975,12 +982,14 @@ export function mountReward(root, opts = {}) {
   }
 
   function onContinue() {
+    if (S.dead) return;
     if (S.counting) { // first press finishes the count-ups at once
       S.fast = true;
       flushWaits();
       return;
     }
     const result = {
+      awardId: S.awardId,
       army: S.army.map((b) => ({ ...b, base: { ...b.base }, weapon: { ...b.weapon }, ovr: ratings(b).ovr })),
       depot: S.tray.map((it) => ({ ...it })),
       issued: S.log.slice(),
@@ -1146,6 +1155,6 @@ export function mountReward(root, opts = {}) {
   const api = { unmount, state: S };
   active = api;
   applyVars();
-  go(S.mode === 'one' ? 'b' : 'a');
+  go(completed ? 'd' : S.mode === 'one' ? 'b' : 'a');
   return api;
 }
