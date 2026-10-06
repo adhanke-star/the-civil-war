@@ -21,13 +21,13 @@ export function defineSandboxTools({ game, rts, effects, hud }) {
   };
   const spawn = (side) => {
     const [x, z] = spot();
-    const u = game.spawnUnit({ side, men: Number(get('units.spawnStrength')), weapon: get('units.spawnWeapon'), x, z });
+    const u = game.spawnUnit({ side, men: Number(get('units.spawnStrength')), weapon: get('units.spawnWeapon'), xp: get('units.spawnVeterancy'), x, z });
     if (u && game.controls(u)) game.select(u);
   };
 
   define('units.spawnUS', {
     tab: 'Units', type: 'action', label: 'Spawn Union brigade at view centre',
-    note: 'Places a generic Union infantry brigade (strength and muskets below) at the centre of the view, facing the nearest enemy.',
+    note: 'Places a generic Union infantry brigade with the strength, muskets and veterancy below at the centre of the view, facing the nearest enemy.',
     run: () => spawn('US'),
   });
   define('units.spawnCS', {
@@ -44,6 +44,11 @@ export function defineSandboxTools({ game, rts, effects, hud }) {
     tab: 'Units', type: 'choice', default: 'smooth', label: 'Next brigade\'s muskets',
     options: [{ value: 'smooth', label: 'Smoothbore (119 m)' }, { value: 'rifled', label: 'Rifled (293 m)' }],
     note: 'Smoothbore muskets reach about 119 m, rifled muskets about 293 m (and hit harder).',
+  });
+  define('units.spawnVeterancy', {
+    tab: 'Units', type: 'choice', default: 1, label: 'Next brigade\'s veterancy',
+    options: [{ value: 1, label: 'Green' }, { value: 2, label: 'Trained' }, { value: 3, label: 'Veteran' }, { value: 4, label: 'Elite' }],
+    note: 'Experience for the next brigade you place, affecting its fire, melee and morale resilience; leaves existing brigades unchanged.',
   });
   define('units.removeSelected', {
     tab: 'Units', type: 'action', label: 'Remove selected',

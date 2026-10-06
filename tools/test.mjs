@@ -790,6 +790,11 @@ function watchErrors(page, url, into) {
 /** The sandbox panel on ?sandbox&quality=low, then device.html. */
 async function sandboxAndDevice(browser, url) {
   const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1, permissions: ['clipboard-read', 'clipboard-write'] });
+  await ctx.addInitScript(() => {
+    window.__sandboxWrites = 0;
+    const set = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) { if (key === 'cw.progress') window.__sandboxWrites++; return set.call(this, key, value); };
+  });
   try {
     const page = await ctx.newPage();
     const errors = [];
@@ -890,6 +895,7 @@ async function sandboxAndDevice(browser, url) {
         check('sandbox-units-moments', spawned.markers === n0 + 1 && /^Union brigade \d+$/.test(spawned.name || '') && spawned.commander === null && spawned.men === 500 && spawned.figs === 50 && routed === 'routing' && n2 === n0,
           `markers ${n0} -> ${spawned.markers} after spawn -> ${n2} after remove; spawned "${spawned.name}" (commander ${JSON.stringify(spawned.commander)}, ${spawned.men} men, ${spawned.figs} figures); after "Selected: rout" its state was ${routed}`);
       }
+      await sandboxRuleTools(page);
       // look.orderLine compares split-screen: both styles are built, each clipped to its side of the divider
       {
         await page.getByRole('tab', { name: 'Look' }).click();
@@ -962,6 +968,104 @@ async function sandboxAndDevice(browser, url) {
   } finally {
     await ctx.close().catch(() => {});
   }
+}
+
+/** Real controls for placement experience and shared charge/fatigue multipliers, in an owned context. */
+async function sandboxRuleTools(page) {
+  if (!(await page.evaluate(() => window.__game.game.paused))) await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  const before = await page.evaluate(async () => {
+    const { completedSnapshot } = await import('./src/franchise/save.js');
+    const { SAMPLE_ARMY } = await import('./src/reward/data.js');
+    const raw = JSON.stringify(completedSnapshot({ awardId: 'sandbox-preservation', army: structuredClone(SAMPLE_ARMY), depot: [], issued: [], seed: 19, grade: 'Victory' }));
+    localStorage.setItem('cw.progress', raw); window.__sandboxWrites = 0;
+    return { raw, xp: window.__game.game.units.filter((u) => !u.id.startsWith('sandbox-')).map((u) => [u.id, u.xp]) };
+  });
+  await page.getByRole('tab', { name: 'Units', exact: true }).click();
+  const veterancy = page.getByRole('group', { name: "Next brigade's veterancy", exact: true });
+  await veterancy.getByRole('radio', { name: 'Green', exact: true }).focus();
+  for (let i = 0; i < 3; i++) await page.keyboard.press('ArrowRight');
+  await page.getByRole('switch', { name: 'Command both sides', exact: true }).check();
+  const seen = [];
+  for (const side of ['Union', 'Confederate']) {
+    await page.getByRole('button', { name: `Spawn ${side} brigade at view centre`, exact: true }).click();
+    const u = await page.evaluate(() => { const g = window.__game.game, u = g.selected; return { id: u.id, side: u.side, xp: u.xp, defXp: u.def.xp, commander: u.commander, controlled: g.controls(u) }; });
+    await page.getByRole('button', { name: 'Hold', exact: true }).click();
+    u.held = await page.evaluate(() => window.__game.game.selected.order.firm === true);
+    seen.push(u); await page.getByRole('button', { name: 'Remove selected', exact: true }).click();
+  }
+  check('sandbox-veterancy-both-sides', seen.every((u) => u.xp === 4 && u.defXp === 4 && u.commander === null && u.controlled && u.held) && seen.map((u) => u.side).join() === 'US,CS',
+    `real Elite placement and Hold: ${JSON.stringify(seen)}`);
+  await page.getByRole('button', { name: "Reset Next brigade's veterancy", exact: true }).click();
+  await page.getByRole('button', { name: 'Spawn Union brigade at view centre', exact: true }).click();
+  const green = await page.evaluate(() => window.__game.game.selected.xp);
+  await page.getByRole('button', { name: 'Remove selected', exact: true }).click();
+  check('sandbox-veterancy-reset', green === 1 && await veterancy.getByRole('radio', { name: 'Green', exact: true }).isChecked(), 'Reset restores Green for the next placed brigade');
+  await shot(page, 'sandbox-veterancy');
+  await page.getByRole('switch', { name: 'Command both sides', exact: true }).uncheck();
+
+  const live = () => page.evaluate(async () => ({ ...(await import('./src/sim/rules.js')).RULES }));
+  await page.getByRole('tab', { name: 'Rules', exact: true }).click();
+  for (const [name, field, want] of [['Charge effect', 'chargeEffect', 1.5], ['Fatigue gain', 'fatigueGain', 2]]) {
+    const slider = page.getByRole('slider', { name, exact: true }); await slider.focus(); await page.keyboard.press('End');
+    if (want === 1.5) for (let i = 0; i < 10; i++) await page.keyboard.press('ArrowLeft');
+    check(`sandbox-live-${field}`, (await live())[field] === want && await page.evaluate(() => window.__game.game.paused), `keyboard slider sets live ${field}=${want} while battle stays paused`);
+    await page.getByRole('checkbox', { name: `Lock this: ${name}`, exact: true }).check();
+    const kept = await page.evaluate(async ({ field }) => (await import('./src/settings.js')).set(`rules.${field}`, 0.5), { field });
+    check(`sandbox-lock-${field}`, kept === want && await slider.isDisabled() && await page.getByRole('button', { name: `Reset ${name}`, exact: true }).isDisabled(), 'Lock keeps the live rule and disables editing/reset');
+  }
+  await shot(page, 'sandbox-rules');
+  await page.getByRole('button', { name: 'Copy settings', exact: true }).click();
+  const copied = await page.evaluate(async () => {
+    const box = document.getElementById('sb-copybox');
+    return box && !box.hidden ? document.getElementById('sb-copy-text').value : navigator.clipboard.readText();
+  });
+  for (const name of ['Charge effect', 'Fatigue gain']) {
+    await page.getByRole('checkbox', { name: `Lock this: ${name}`, exact: true }).uncheck();
+    await page.getByRole('button', { name: `Reset ${name}`, exact: true }).click();
+  }
+  const reset = await live();
+  await page.getByRole('button', { name: 'Paste settings', exact: true }).click();
+  await page.getByLabel('Paste a settings block, then Apply.').fill(copied);
+  await page.getByRole('button', { name: 'Apply', exact: true }).click();
+  const restored = await live();
+  check('sandbox-rule-transfer-reset', reset.chargeEffect === 1 && reset.fatigueGain === 1 && restored.chargeEffect === 1.5 && restored.fatigueGain === 2
+    && copied.includes('rules.chargeEffect = 1.5') && copied.includes('rules.fatigueGain = 2')
+    && await page.getByRole('checkbox', { name: 'Lock this: Charge effect', exact: true }).isChecked()
+    && await page.getByRole('checkbox', { name: 'Lock this: Fatigue gain', exact: true }).isChecked(), 'real Copy/Paste restores both values and locks after Reset');
+  const preserved = await page.evaluate(() => ({ raw: localStorage.getItem('cw.progress'), writes: window.__sandboxWrites,
+    xp: window.__game.game.units.filter((u) => !u.id.startsWith('sandbox-')).map((u) => [u.id, u.xp]) }));
+  check('sandbox-tuning-preserves-progress-roster', preserved.raw === before.raw && preserved.writes === 0 && JSON.stringify(preserved.xp) === JSON.stringify(before.xp),
+    'controls/placement leave exact completed progress and original roster xp unchanged');
+  const terminal = await page.evaluate(() => {
+    const { game, practice } = window.__game;
+    game.over = true; game.result = { winner: 'US', why: 'Sandbox terminal isolation fixture' }; practice.finishResult();
+    return { empty: practice.outcome === null && practice.pending === null && practice.saved === null && practice.reward === null,
+      text: document.getElementById('result-text').textContent, actionHidden: document.getElementById('result-action').hidden,
+      raw: localStorage.getItem('cw.progress'), writes: window.__sandboxWrites };
+  });
+  check('sandbox-terminal-no-award', terminal.empty && terminal.actionHidden && /no progress rewards/.test(terminal.text) && terminal.raw === before.raw && terminal.writes === 0,
+    'actual terminal controller shows no-loot result and keeps progress unchanged (accelerated terminal fixture)');
+  await page.getByRole('button', { name: 'Inspect the field', exact: true }).click();
+  await page.reload(); await page.waitForFunction(() => window.__ready && document.getElementById('sb-panel'), null, { timeout: READY_TIMEOUT_MS });
+  const loaded = await live();
+  check('sandbox-rule-reload', loaded.chargeEffect === 1.5 && loaded.fatigueGain === 2 && await page.getByRole('slider', { name: 'Charge effect', exact: true }).isDisabled()
+    && await page.evaluate((raw) => localStorage.getItem('cw.progress') === raw && window.__sandboxWrites === 0, before.raw), 'reload retains rule values/locks without a progress write');
+  if (!(await page.evaluate(() => window.__game.game.paused))) await page.getByRole('button', { name: 'Pause', exact: true }).click();
+  for (const name of ['Charge effect', 'Fatigue gain']) {
+    await page.getByRole('checkbox', { name: `Lock this: ${name}`, exact: true }).uncheck(); await page.getByRole('button', { name: `Reset ${name}`, exact: true }).click();
+  }
+  await page.setViewportSize({ width: 320, height: 720 });
+  for (const [tab, key] of [['Units', 'units.spawnVeterancy'], ['Rules', 'rules.fatigueGain']]) {
+    await page.getByRole('tab', { name: tab, exact: true }).click();
+    const row = page.locator(`[data-key="${key}"]`); await row.scrollIntoViewIfNeeded();
+    const targets = await row.locator('.sb-opt, input[type=range], .sb-btn, .sb-lock').evaluateAll((nodes) => nodes.map((n) => { const b = n.getBoundingClientRect(); return { w: b.width, h: b.height }; }));
+    const fits = await page.locator('#sb-panel').evaluate((n) => n.scrollWidth <= n.clientWidth && n.querySelector('.sb-body').scrollWidth <= n.querySelector('.sb-body').clientWidth);
+    const axe = await new AxeBuilder({ page }).include('#sb-panel').analyze();
+    check(`sandbox-new-${tab.toLowerCase()}-narrow`, fits && targets.length > 0 && targets.every((b) => b.w >= 44 && b.h >= 44) && axe.violations.length === 0,
+      `320px: ${targets.length} controls >=44px, no panel clipping, axe ${JSON.stringify(axe.violations.map((v) => v.id))}`);
+    await shot(page, `sandbox-${tab.toLowerCase()}-320`);
+  }
+  await page.setViewportSize(VIEWPORT);
 }
 
 /** P1: actual controls, stable save readbacks, atomic imports and recoverable quota failure. */
@@ -1173,6 +1277,7 @@ async function main() {
     browser = await chromium.launch(native ? { channel: 'chrome', headless: false }
       : { headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     result.browser = `chromium ${browser.version()}`;
+    if (process.argv.includes('--sandbox')) { result.mode = 'sandbox controls only'; await sandboxAndDevice(browser, url); return; }
     if (process.argv.includes('--entry')) { result.mode = 'title and camp only'; await entryProgress({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--intro')) { result.mode = 'unforced introductory play'; await introPlay({ browser, url, check, shot, result, watchErrors, native }); return; }
     if (process.argv.includes('--practice')) { result.mode = 'practice result bridge only'; await practiceProgress({ browser, url, check, shot, result, watchErrors }); return; }

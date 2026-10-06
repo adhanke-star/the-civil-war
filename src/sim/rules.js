@@ -36,6 +36,14 @@ const SPECS = {
     tab: 'Rules', type: 'range', default: 1, min: 0.5, max: 2, step: 0.05, label: 'Morale loss',
     note: 'Multiplies how much morale brigades lose to casualties, fire, flanking and panic; higher breaks lines sooner.',
   }],
+  chargeEffect: ['rules.chargeEffect', {
+    tab: 'Rules', type: 'range', default: 1, min: 0.5, max: 2, step: 0.05, label: 'Charge effect',
+    note: 'Multiplies melee casualties on both sides, including defenders; existing casualty caps still apply. Saved for later practice battles too.',
+  }],
+  fatigueGain: ['rules.fatigueGain', {
+    tab: 'Rules', type: 'range', default: 1, min: 0.5, max: 2, step: 0.05, label: 'Fatigue gain',
+    note: 'Multiplies fatigue gained while marching, running, routing, charging or in melee on both sides; resting and recovery stay the same. Saved for later practice battles too.',
+  }],
   battleSpeed: ['rules.battleSpeed', {
     tab: 'Rules', type: 'range', default: 1, min: 0.5, max: 2, step: 0.05, label: 'Battle speed',
     note: 'Multiplies how fast battle time runs at every game speed (1x/2x/4x).',

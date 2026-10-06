@@ -223,7 +223,19 @@ keyboard/focus/48px targets, 320/1024 screenshots and scoped axe. Keep all P1/P2
 run syntax/diff/unit, one full local smoke, independent source/WCAG/play review, explicit commit/push
 and exact-SHA CI/Pages. Complete sandbox/default/deployment scope remains accounted for before P2 closes.
 
-### P2d: sandbox veterancy and remaining rule multipliers (bounded contract)
+### P2d: sandbox veterancy and remaining rule multipliers (implementation candidate)
+
+Actual Game/Combat/settings positives 12/12 and intended rejecting controls 12/12 pass, including
+composed melee-then-fatigue recovery. Native focused UI 39/39 in 52899 ms, 2026-10-06T17:12:40.035Z;
+.out/p2d-focused-final-20261006.json and five reviewed PNGs. Both-side Elite placement/Hold, reset,
+live rule sliders, lock/transfer/reload and exact progress/roster preservation pass; terminal fixture
+calls the actual sandbox result controller and proves no award/write. Narrow targets >=44px, scoped
+axe and console clear. Initial absent-controller assertion was vacuous; controller-state/terminal
+checks replace it. Final native full smoke 169/169 in 274447 ms, 2026-10-06T17:18:14.463Z;
+.out/p2d-full-native-final-20261006.json. First actual intro card 48078 ms; idle defeat 27.33 sim seconds.
+Independent source/WCAG review clears this bounded candidate; exact-SHA CI pending.
+Incidental baseline FPS wording infers causation from uncontrolled samples; correct the wording in
+the next Look slice rather than treating these readings as measured costs of scalar combat rules.
 
 Add Next brigade's veterancy (Green/Trained/Veteran/Elite = existing xp 1..4) through the existing
 Units registry and Game.spawnUnit. Omitted xp remains 1; invalid xp rejects before reserve/counter/

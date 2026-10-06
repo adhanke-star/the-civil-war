@@ -235,7 +235,7 @@ export class Combat {
         const def = b.men * armB * (0.6 + 0.4 * b.morale / b.moraleMax) * (0.9 + 0.06 * b.xp) * (bCharging ? 1 : b.cover);
         const r = atk / Math.max(1, def);
         // old: 9 x 12 men/s x ratio (108/s) with a 20% per second cap; that bled ~450 men a side in 20 s
-        const base = 9 * dt;
+        const base = 9 * dt * RULES.chargeEffect;
         const aCas = Math.min(a.men, a.menMax * 0.04 * dt, base * (1 / r) * (0.7 + this.rnd() * 0.6));
         const bCas = Math.min(b.men, b.menMax * 0.04 * dt, base * r * (0.7 + this.rnd() * 0.6));
         a.takeLosses(aCas, this.fallen[a.side], time);
@@ -244,8 +244,8 @@ export class Combat {
         b.casTick = (b.casTick || 0) + bCas;
         if (r < 0.85) a.morale -= 18 * dt * RULES.moraleLoss;
         if (r > 1.18) b.morale -= 18 * dt * RULES.moraleLoss;
-        a.fatigue = Math.min(100, a.fatigue + 2.4 * dt);
-        b.fatigue = Math.min(100, b.fatigue + 2.4 * dt);
+        a.fatigue = Math.min(100, a.fatigue + 2.4 * dt * RULES.fatigueGain);
+        b.fatigue = Math.min(100, b.fatigue + 2.4 * dt * RULES.fatigueGain);
       }
     }
     for (const u of this.units) {
@@ -328,7 +328,7 @@ export class Combat {
   fatigueStep(u, dt) {
     const moving = u.follow.active || u.state === 'routing';
     // as in the old model, standing still rests a unit even while it fires
-    if (moving) u.fatigue += (u.state === 'routing' || u.run || u.order.type === 'charge' ? 1.2 : 0.3) * dt;
+    if (moving) u.fatigue += (u.state === 'routing' || u.run || u.order.type === 'charge' ? 1.2 : 0.3) * dt * RULES.fatigueGain;
     else u.fatigue -= (u.firing ? 0.35 : 0.9) * dt;
     u.fatigue = clamp(u.fatigue, 0, 100);
   }

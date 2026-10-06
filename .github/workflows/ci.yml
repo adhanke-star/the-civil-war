@@ -34,6 +34,8 @@ jobs:
       - run: node tools/test-captures.mjs --prove-fail
       - run: node tools/test-intro.mjs
       - run: node tools/test-intro.mjs --prove-fail
+      - run: node tools/test-sandbox-rules.mjs
+      - run: node tools/test-sandbox-rules.mjs --prove-fail
 
       - run: npm test
 

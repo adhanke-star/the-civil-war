@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0028 — Sandbox placement and combat tuning reuse existing experience and rules (2026-10-06)
+Next placed brigade selects existing xp 1..4 on either side; invalid xp cannot consume reserve or IDs.
+Charge effect scales melee casualties for both participants within the existing caps. Fatigue gain
+scales positive movement/melee terms only, keeping recovery, bounds and tick ordering unchanged.
+Defaults 1 preserve the battle model; rule preferences persist into later practice like fire/morale,
+with explicit notes. Original rosters, history and progress remain separate; sandbox results never
+award loot. This adds placement/testing controls, not campaign advancement or new difficulty bonuses.
+
 ## 0027 — Title and camp reuse one completed-army store (2026-10-06)
 Title/camp load without the renderer; Continue re-reads validated progress before choosing intro or camp.
 Blocked/corrupt reads never fall through to a fresh army. Camp reuses actual brigade/item cards, with

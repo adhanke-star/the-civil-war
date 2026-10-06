@@ -5,7 +5,7 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2c queued-close test repair; P2d owned WIP (2026-10-06)
+## Current boundary: P2d controls candidate; P2c repair CI pending (2026-10-06)
 
 Complete existing v1 remains the active goal; this slice does not close P2 or campaign scope. Root
 is sole product writer; helpers read/review only and browsers are serialized. No COORDINATION.md.
@@ -19,7 +19,8 @@ The test-only repair waits for closed dialog/enabled Import/restored focus, reta
 Injected delayed-close notification shows open=false,busy=true,focus=entry-confirm,writes=0 before cleanup;
 software focused 46/46 in 29950 ms, 2026-10-06T17:14:52.370Z, retained
 .out/p2c-close-notification-software-positive-20261006.json. Independent source review clears this repair;
-exact repair CI pending. P2d runtime/tests are separately owned WIP; do not stage them with this repair.
+Repair 2bf8f8030e856c6e5f097dbd17b1bbf80c06d729 is pushed; CI 37502279679 pending and Pages
+37502279685 passed. P2d runtime/tests are separately owned WIP; the repair did not stage them.
 Preserve NEW-civil-war-video-game.code-workspace.
 
 src/entry.js gates renderer loading: no-query title Continue re-reads cw.progress, successful empty
@@ -52,12 +53,29 @@ while the cap permits. Final npm test -- --native passes 157/157 in 250152 ms, t
 Title measured 200125 B/493 ms; actual intro first card 47606 ms, idle defeat 27.30 sim seconds.
 Exact repair CI remains pending; shipped runtime cw-v9, P2d WIP cw-v10.
 
-Next: commit/push only queued-close test repair/docs and read exact CI/Pages; any red run is the next task.
-Then finish P2d's bounded PLAN contract: placement veterancy and symmetric charge/fatigue-gain knobs.
+Next: read repair exact CI; any red run is the next task. Finish P2d's bounded PLAN contract:
+placement veterancy and symmetric charge/fatigue-gain knobs.
 Actual prototypes 12+12 and focused native UI 39/39 (52899 ms, 2026-10-06T17:12:40.035Z) pass;
 .out/p2d-focused-final-20261006.json and five sandbox PNGs. Corrected terminal fixture calls actual
 sandbox controller (it exists but never grants loot); composed melee/fatigue preserves unscaled recovery.
-Independent source review clears production, WCAG rendered review/full smoke/exact CI pending.
+Independent source and WCAG rendered review clear the candidate. Final npm test -- --native passes
+169/169 in 274447 ms, timestamp 2026-10-06T17:18:14.463Z; .out/p2d-full-native-final-20261006.json
+and exact full-run sandbox PNGs with 17-18-14-463Z. First intro card 48078 ms, idle defeat 27.33 sim seconds;
+entry close sample remains busy/zero writes before eventual focus recovery. Browser workload has closed;
+exact-SHA CI remains pending. Do not launch simultaneous browsers or edit from another session.
+P2d owned files: src/game.js, src/sim/combat.js, src/sim/rules.js, src/ui/sandbox-tools.js,
+tools/test-sandbox-rules.mjs, tools/test.mjs, .github/workflows/ci.yml, sw.js and current docs.
+Defaults retain xp1 and both multipliers1. Validate xp1..4 before mutation; preserve melee men/4%-per-
+second caps, ratios and RNG; fatigue scales only positive gains, never recovery. Persisted tuning
+affects later practice explicitly; route/roster eligibility is not a rule-alteration anti-cheat check.
+Keep no-history fabrication, old roster/save bytes, and sandbox/historical no-award invariants.
+Gate syntax/diff, sandbox rules12+12, reward21+21, outcome9+9, capture6+6, intro7+7, unit, final
+native full JSON/screens readback, independent review, docs sync, explicit commit/push and exact CI/Pages.
+Do not stage NEW-civil-war-video-game.code-workspace. After green P2d, next recommended P2e is the
+existing post saturation/tilt-shift uniforms and smoke visibility, preserving .86/.9/on; smoke must
+recheck delayed callbacks and reduced motion. Keep exposure .66/approved atlas bytes and all simulation
+unchanged; no allocation/disposal savings or split-screen promise. Record/correct incidental generic
+FPS causal wording. Formation spacing/marker geometry/camera behavior need separate bounded contracts.
 Remaining Look/Moments, selection/camera, deployment and living camp scope remain open. Continue P3/P4
 through early sourced Shiloh, all
 combat functions, Stones River and Chattanooga; P5 progression/P6 presentation/P7 release stay binding.

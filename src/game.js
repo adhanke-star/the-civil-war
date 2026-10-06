@@ -528,7 +528,11 @@ export class Game {
    * A generic infantry brigade (never a real commander or regiment): "Union brigade 3". Same construction
    * path as the scenario's units. Returns the unit, or null when the side's figure reserve is used up.
    */
-  spawnUnit({ side, men = 1000, weapon = 'smooth', x, z, facing }) {
+  spawnUnit({ side, men = 1000, weapon = 'smooth', xp = 1, x, z, facing }) {
+    if (!Number.isInteger(xp) || xp < 1 || xp > 4) {
+      this.emit('log', 'Choose Green, Trained, Veteran or Elite before placing a brigade.');
+      return null;
+    }
     const nFig = Math.round(men / MIN_MEN_PER_FIGURE) + 6; // counted at 1:5, so look.menPerFigure never overfills the pools
     if (this.reserve[side] < nFig) {
       this.emit('log', `No room for another ${side === 'US' ? 'Union' : 'Confederate'} brigade of ${men} (the figure reserve is used up); remove one first.`);
@@ -540,7 +544,7 @@ export class Game {
     const face = Number.isFinite(facing) ? facing : this.ghostFacing(x, z, side, side === 'US' ? Math.PI / 2 : -Math.PI / 2);
     const def = {
       id: `sandbox-${side.toLowerCase()}-${n}`, side, type: 'infantry', name, short: name, commander: null, parent: 'Sandbox',
-      regiments: [], men, weapon, xp: 1, x, z, facing: face, sources: [], notes: 'Placed in the sandbox; not a historical unit.',
+      regiments: [], men, weapon, xp, x, z, facing: face, sources: [], notes: 'Placed in the sandbox; not a historical unit.',
     };
     const u = this.makeUnit(def, 500 + n * 13 + (side === 'CS' ? 7 : 0));
     u.reserveFigs = nFig;
