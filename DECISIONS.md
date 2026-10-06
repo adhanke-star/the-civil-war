@@ -6,6 +6,9 @@ Actions-only BC7 + ASTC diagnostic under the existing byte/quality contract. Thi
 and one experiment, not full packaging, threshold changes, runtime integration or native/iPad clearance.
 Explicit candidate mode leaves legacy diagnostic/full recipes unchanged; complete raw mip/hash binds,
 separate software/GPU routes and rejecting controls are required. Inspect both sheets and HALT.
+Setup run 37403600015 at 15dfacc failed before encoding: pinned ert.h lacks <cstdint> on GCC 13.
+Force-include that standard header in CMake; preserve source/recipe pins and distinguish setup retry
+from a second quality experiment. No candidate metric exists from the failed setup run.
 
 ## 0019 — Direct-format proposal ready; experiment remains held (2026-10-05)
 Read-only feasibility found pinned OSI direct BC7/ASTC encoders and direct-format paths in three 0.186.1.

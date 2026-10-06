@@ -52,7 +52,9 @@ jobs:
           echo "bbb33d1dbb6178a3a2c044956c3cc0b8ea9fc2f2903824379dd86f87d53b64c6  $RUNNER_TEMP/bc7-source.tar.gz" | sha256sum -c -
           mkdir "$RUNNER_TEMP/bc7-source"
           tar -xf "$RUNNER_TEMP/bc7-source.tar.gz" -C "$RUNNER_TEMP/bc7-source" --strip-components=1
-          cmake -S "$RUNNER_TEMP/bc7-source" -B "$RUNNER_TEMP/bc7-build" -DCMAKE_BUILD_TYPE=Release -DSUPPORT_BC7E=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+          # Pinned ert.h omits <cstdint>; GCC 13 no longer supplies it transitively.
+          # Force-include the standard header without modifying the pinned source or codec settings.
+          cmake -S "$RUNNER_TEMP/bc7-source" -B "$RUNNER_TEMP/bc7-build" -DCMAKE_BUILD_TYPE=Release -DSUPPORT_BC7E=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5 '-DCMAKE_CXX_FLAGS=-include cstdint'
           cmake --build "$RUNNER_TEMP/bc7-build" --parallel 2
           echo "BC7_ENCODER=$RUNNER_TEMP/bc7-build/bc7enc" >> "$GITHUB_ENV"
           gh run download 37374456139 --repo adhanke-star/the-civil-war -n compression-review -D "$RUNNER_TEMP/historical-uastc"

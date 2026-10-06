@@ -13,6 +13,12 @@ two-page BC7 + ASTC Actions diagnostic is authorized under the complete proposal
 authorized. Candidate tooling passed syntax, unit broken-controls and local `npm test` (168540 ms);
 dispatch only `mode=candidate`, once, after exact-SHA
 CI and Pages succeed. Review all metrics and both sheets, document results, then HALT.
+Tooling 15dfacc passed CI 37403337062 and Pages 37403337065, attempt 1. Candidate setup
+run 37403600015 failed at the pinned BC7 build: ert.h lacks <cstdint> under GNU 13.3.0.
+No encoding/readback ran and no review artifact exists. A scoped CMake forced standard-header
+include (`-DCMAKE_CXX_FLAGS=-include cstdint`) repairs compilation without changing pinned source
+or encoder settings. A replacement dispatch is the first actual encoding experiment; do not duplicate
+an active job or describe the setup failure as a quality result.
 The distinct completion predicate keeps `diagnosticOnly:true, fieldable:false, ok:false`; BC7 needs
 real GPU readback and ASTC software evidence has a separate GPU RUN/UNRUN status.
 
