@@ -5,7 +5,46 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2f green candidate, integration pending (2026-10-06)
+## Current boundary: P2g green candidate; integration pending (2026-10-06)
+
+Candidate parent main13a9ee90215985c9ff437c299a89fffcfacd8948. P2f CI37511709837 and Pages37511709840
+both passed. Root sole writer, helper source/WCAG review only; no COORDINATION.md. Preserve workspace
+file. P2g owned WIP src/ui/look.js, src/units/unit.js, src/game.js, src/ui/arrows.js, sw.js(cw-v13),
+tools/test-spacing.mjs, test-spacing-ui.mjs, tools/test.mjs, CI and docs. No concurrent provider/browser.
+LOOK.formationSpacing .75..1.5/default1 scales actual infantry line/screen/column offsets/footprints,
+including column trail resampling; no mesh scaling/stat bonuses. Living figures relayout+snap even
+paused; identities/RNG/fallen/men/stats/centres/orders/path/history/batteries remain unchanged.
+Game callback excludes batteries; Unit spacing defaults1 for other types. Geometry changes picking,
+fire/melee contact and ghosts; relative group centres remain the existing rotated offsets.
+Source review caught existing ghost-cache rounding:150men .8->.85 keeps roundedhalfFront7 but must
+resize13.16->13.9825. Ghost key now includes infantry spacing (batteryfixed1); actual cached positive
+and noopupdate mutant added. Pure13+13 passes actualUnit/Battery/Combat/Game/ArrowLayer/Yuka march
+through column+redeployment, actualcontact geometry and default baseline. Independent source clears.
+First focused native92/92 in130735ms/18:40:44.411Z .out/p2g-focused-initial-20261006.json; five spacing
+PNGs share18-40-44-411Z. Actual Shiftselect Franklin+Willcox then Shift-drag turns.524rad; actualtwo
+previewbars324.300m match scaled front/destinations and confirmed paused group orders. Existing ghost
+Reset returns216.200m; new placement/lock/reload/paste/narrow/axe passed. This first import lacked later
+pre-reload progress-counter guard and geometry-count/fallen-count receipts. Strengthened fixture initially
+read fallen refs before initialization; failure .out/p2g-focused-counter-fixture-failure-20261006.json.
+Ordering-only repair passes31/31 in41940ms/18:48:44.430Z, .out/p2g-focused-strengthened-20261006.json;
+actual five same-timestamp PNGs independently reviewed, source/fixture and scoped UI clear. Progress
+zero writes before reload; fixed-view textures9/geometries26 unchanged. Browser fixture has0 fallen;
+nonempty deterministic death fixture covers fallen preservation. All retained positives+mutants/unit
+and eight owned syntax checks/diff pass. Frozen full npm test -- --native passed224/224 in371000ms;
+.out/p2g-full-native-final-20261006.json is18:51:40.872Z, errors[]/all scoped axe[]. Eight-file
+.out/p2g-frozen-source-sha256-20261006.json matches actual source. Same five final spacing PNGs plus
+enlarged-marker intro use18-51-40-872Z. First card47710ms/win45.44sim and idledefeat27.26sim. Browser
+closed; do not alter the frozen runtime/test source before integration without renewed relevant gates.
+Dedicated flag seeds one acknowledged valid completed snapshot, then invokes same actual spacing UI.
+Record rendered fallen count honestly (nonempty pure death fixture proves position preservation).
+Independent final source/receipt and all five spacing plus intro crate PNGs clear. Next: explicitly
+stage owned files including DEC0031,
+commit/push and read exactfullSHA CI/Pages; repair red CI. No fullP2/device/art claim. PLAN P2h carries
+isolated loot/X-Factor preview contract; no runtime edits for it until P2g exact CI/Pages green.
+Next afterspacing: remaining Moments/X-Factor and soldier's-eye/fullkeyboard/division selection;
+saved deployment/living camp, allcombat/phasepacks/progression/P3-P7 remain. Approved art locks below.
+
+## Previous boundary: P2f green candidate, integration pending (2026-10-06)
 
 P2e test-only repair48a1f7273003c9d35f406338753f55c44afab63c is HEAD/origin main; exact CI37508495648
 and Pages37508497027 passed. No ledger/provider change; root sole writer, helpers read/review only.

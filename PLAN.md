@@ -307,7 +307,7 @@ lock/reset/transfer/reload, keyboard/narrow targets/axe/screenshots and independ
 review. Run retained positives/mutants/unit, final native smoke, docs/commit/push and exact CI/Pages.
 No iPad/performance/fieldable-art or full P2 claim; spacing/marker/camera behavior remain separately bound.
 
-### P2f: marker dimensions and camera elevation (implemented; exact CI pending)
+### P2f: marker dimensions and camera elevation (implemented 2026-10-06)
 
 Reuse LOOK, Hud and RtsCamera; root sole writer. Own src/ui/look.js, src/ui/hud.js/CSS,
 src/render/rts-camera.js, focused view tests/tools/test.mjs, CI if needed, sw.js and docs.
@@ -331,7 +331,8 @@ is369695ms/18:21:08.175Z with zero errors/axe; runtime/test source hashes unchan
 view images plus enlarged-marker intro independently reviewed, clearing top-strip/high-angle Orders
 occlusion. Eleven actual tethers have two bound paths; post-dock three flags59.5px avoid both crates.
 Real firstcard48045ms/win45.51sim, idledefeat27.22sim; paused progress and settled render resources
-unchanged. Bounded source/visual clearance; exact-SHA CI/Pages still required. No device/performance claim.
+unchanged. Integrated13a9ee90215985c9ff437c299a89fffcfacd8948; exact CI37511709837 and Pages37511709840
+pass. Bounded source/visual clearance; no device/performance claim.
 
 Before visual edits refresh/view reference shots. Bind actual camera constructor/live/zoom/manual tilt,
 clamps/Reset to deterministic positives and intended mutants. Actual UI must prove marker flag/bar
@@ -345,10 +346,10 @@ readback, independent source/WCAG/visual review, docs sync, explicit commit/push
 Red CI takes priority. Formation spacing, soldier's-eye, Moments/X-Factor, saved deployment/living camp
 and complete P2/P3-P7 remain separate; no device/performance/approved-art fielding claim.
 
-### P2g: shared infantry formation spacing (next after P2f integration)
+### P2g: shared infantry formation spacing (implemented 2026-10-06; integration pending)
 
 Reuse LOOK/settings and Unit's existing layout; no new store or renderer. Root owns src/ui/look.js,
-src/units/unit.js, src/game.js, meaningful spacing Node/UI tests, tools/test.mjs, CI, sw.js and docs.
+src/units/unit.js, src/game.js, src/ui/arrows.js, meaningful spacing Node/UI tests, tools/test.mjs, CI, sw.js and docs.
 Default1 must preserve existing geometry exactly; range.75..1.5/step.05 scales infantry file/rank,
 skirmisher lateral/forward/stagger and column lateral/trail-resampling offsets. Keep random jitter,
 minimum footprint/picking/column safety padding and independent officer clearance unchanged except
@@ -359,6 +360,15 @@ RNG state, men, weapon/xp/ammo/morale/fatigue and casualty/speed coefficients re
 Live changes re-layout existing infantry and snap living figures into the changed slots even paused;
 fallen remain at exact positions. Never rebuild/reroll figures. Orders/path/facing/anchors remain exact.
 New placements and reload use saved spacing. Existing 1:5 vs1:10 frontage behavior is unchanged.
+Existing destination ghost cache includes infantry spacing: a150-man .80->.85 change shares rounded
+halfFront7 but must update actual ghost13.16->13.9825. Bind cached updates, not only fresh geometry.
+Pure13+13, strengthened focused native31/31 and frozen full native224/224 pass; final receipt
+.out/p2g-full-native-final-20261006.json is371000ms/18:51:40.872Z with errors[]/all scoped axe[].
+Eight frozen source hashes match. Fixed-view9textures/26geometries unchanged; actual rotated group
+preview324.3m/destinations and Reset216.2m match orders. Browser has0fallen; nonempty pure death
+fixture proves exact fallen preservation. Pre-reload progress unchanged/zero writes. First card47710ms,
+instructed win45.44sim/idledefeat27.26sim. Independent final source/receipt and all five spacing plus
+intro crate images clear. Exact committed-SHA CI/Pages still required.
 
 Bind actual line/skirmisher/column slots and footprints at min/default/max, live same-formation refresh,
 true picking boundary, lineHalfFront in column and matching actual ghost geometry, unchanged batteries,
@@ -373,6 +383,37 @@ Look/view positives+mutants, unit, focused native spacing and frozen full native
 actual JSON/PNGs, independent source/WCAG/visual review, update docs, explicitly stage/commit/push,
 read fullSHA CI/Pages and repair red CI before the next slice. Moments/X-Factor, soldier's-eye/full
 keyboard/division selection, deployment/living camp and all P3-P7 scope remain open.
+
+### P2h: isolated loot and X-Factor previews (next bounded slice)
+
+After P2g exact CI/Pages, finish the missing field Moments previews using existing settings, Effects,
+HaloPool/Hud and reward sequence. Root owns those seams, src/main.js/ui/sandbox-tools.js, meaningful
+Node/UI tests, CI, sw.js and docs; no new progress store, art pipeline or combat multiplier.
+Add a clearly labelled selected-unit X-Factor preview with a short banner, sound sting and warm line
+glow, plus a Full/Subtle/Off setting. This is a presentation preview, not an earned Gold badge or
+combat bonus; earned conditions/progression remain P5. Reduced motion uses a static toned-down cue;
+Off clears active cues and queued sound. Existing sound mute remains authoritative. Repeated triggers
+replace/refresh bounded effects without growing geometry/textures, stealing focus or blocking orders.
+Presentation time advances while paused; unit identities, centres/orders/stats/RNG/progress stay exact.
+The future earned-X-Factor path must reuse the same effects seam without making sandbox previews count.
+
+Expose one loot-card preview from the field using mountReward(mode one) and an explicit close lifecycle.
+Pause the field, use native modal focus/inert behavior, Close/Escape return to the triggering control,
+dispose listeners/timers exactly once, and keep the field paused. The preview rolls demonstration loot
+only; it cannot complete/replace/import an army, issue a card, award a badge or write cw.progress.
+Refuse while an existing reward/result modal is active; opt out of global replay-host/callback memory
+so a removed preview dialog cannot become a replay target or inherit a completed-army callback.
+Keep current practice-result/replay handling and the separate reward workbench intact. Preserve exact
+prior completed progress and settings/locks across repeated open/close, mid-animation Escape and reload.
+
+Before visual edits refresh/view references. Bind the actual effects/halo attributes and the isolated
+reward lifecycle, repeat/expiry/off/reduced-motion/mute, real keyboard/pointer preview controls,
+320px targets/axe, modal focus containment/restoration and zero progress writes before any reload.
+Run all changed syntax/diff checks, focused positives+intended mutants, retained deterministic gates,
+focused native UI and one frozen full native npm test; read actual JSON/PNGs and independent source/
+WCAG/visual review. Update docs/decision, explicitly stage owned files, commit/push and read exact-SHA
+CI/Pages; repair red CI. This does not close earned badges/X-Factors, cinematic charge/melee polish,
+soldier's-eye/fullkeyboard/division selection, campaign/deployment/art/device work or all remaining P2-P7.
 
 ### Required battle-system work (P3/P4; do not hide it inside “build Shiloh”)
 
@@ -422,6 +463,8 @@ clear side/selection/state cues, artillery/charge/melee/cinematic/X-Factor effec
 Auto/Low/High/Ultra, recorded spatial battle audio and period music off the battlefield, living camp
 reflecting army/depot, polished cards and UI; choose one coherent gallery style after comparing the
 three candidates. Keep the working title unless a better checked name is useful; naming is delegated.
+National/regimental flags need source and rendered verification too: current Hud usFlag creates
+4x5 stars while its own comment says34. Record this existing mismatch; P2g does not repair flag art.
 
 ## Art feasibility and device proof
 

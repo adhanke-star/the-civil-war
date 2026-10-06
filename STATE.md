@@ -6,7 +6,7 @@
 - **P2c:** repair 2bf8f80; CI 37502279679/Pages 37502279685 green; native 157/157, focused repair 46/46.
 - **P2d:** 2d761db; 12+12, native full 169/169; CI 37503374519/Pages 37503374677 green.
 - **P2e:** repair48a1f72; CI37508495648/Pages37508497027 green; native186/186, isolated software20/20.
-- **P2f:** marker/camera candidate; pure13+13, focused78/78, native full209/209; exact CI pending.
+- **P2f:** 13a9ee9; pure13+13/native209/209; CI37511709837/Pages37511709840 green.
 - **Art next:** Actions manifest/page-demand residency estimator; wholesale lossless tiers exceed budget.
 - **Current play:** title Continue -> intro/saved camp; ?practice Henry rewards; historical/sandbox isolated.
 - **Missing:** saved-gear deployment, living title/camp, campaign saves, phase packs and progression.
@@ -14,6 +14,6 @@
 - **Approved art:** bake 820846f / 37347072866, sheets 1-12, 5,184 frames, nine looks per tier.
 - **Failed candidates:** UASTC 37360904656 and direct BC7/ASTC 37404193171; limits stay unchanged.
 - **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
-- **Proof:** reward21+21, outcome9+9, capture6+6, intro7+7; native full209/209, first card48.0s.
+- **Proof:** reward21+21, outcome9+9, capture6+6, intro7+7; native full224/224, first card47.7s.
 - **Coordination:** no ledger; preserve workspace file; HANDOFF/PLAN P2-P7, active goal, no scheduler.
-- **Runtime:** cw-v12 P2f candidate; PLAN P2g shared-infantry spacing contract next.
+- **Runtime:** cw-v13 P2g green candidate: pure13+13/focused31/full224; integration/exact CI pending.

@@ -59,6 +59,10 @@ const SPECS = {
     tab: 'Look', type: 'range', default: 1, min: 0.75, max: 1.75, step: 0.05, label: 'Marker size',
     note: 'Sizes brigade flags and morale bars; 1 keeps the current size. Text and tap targets keep their minimum size; soldiers and formations stay unchanged.',
   }],
+  formationSpacing: ['look.formationSpacing', {
+    tab: 'Look', type: 'range', default: 1, min: 0.75, max: 1.5, step: 0.05, label: 'Formation spacing',
+    note: 'Spreads infantry files, ranks and skirmishers; 1 keeps the current layout. Picking, combat contact and order ghosts use the changed footprint. Men, figure count and brigade centres stay unchanged; batteries keep their spacing. Applies in practice too.',
+  }],
   cameraElevation: ['look.cameraElevation', {
     tab: 'Look', type: 'range', default: 0, min: -15, max: 30, step: 1, label: 'Camera elevation',
     note: 'Adds degrees to the zoom-dependent viewing angle; 0 keeps the current view. Positive looks farther down. Keeps view centre, distance and units; pointer projection follows the new angle.',

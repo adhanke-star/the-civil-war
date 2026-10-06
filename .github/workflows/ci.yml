@@ -40,6 +40,8 @@ jobs:
       - run: node tools/test-look.mjs --prove-fail
       - run: node tools/test-view.mjs
       - run: node tools/test-view.mjs --prove-fail
+      - run: node tools/test-spacing.mjs
+      - run: node tools/test-spacing.mjs --prove-fail
 
       - run: npm test
 

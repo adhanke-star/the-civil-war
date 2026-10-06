@@ -424,7 +424,7 @@ export class ArrowLayer {
     const end = u.path[u.path.length - 1];
     const facing = u.order.keepFacing ? u.facing : u.order.endFacing ?? u.facing;
     const hf = u.lineHalfFront();
-    const key = `${Math.round(end[0])},${Math.round(end[1])},${facing.toFixed(2)},${Math.round(hf)},${arc ? Math.round(arc.range) : 0}`;
+    const key = `${Math.round(end[0])},${Math.round(end[1])},${facing.toFixed(2)},${Math.round(hf)},${arc ? Math.round(arc.range) : 0},${u.type === 'infantry' ? LOOK.formationSpacing : 1}`;
     if (old && old.key === key) return;
     if (old) this.dropGhost(old.g);
     this.ghosts.set(u.id, { key, g: this.ghost(end[0], end[1], facing, hf, u.side, arc) });

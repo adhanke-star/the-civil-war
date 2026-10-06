@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0031 — Formation spacing changes actual infantry geometry (2026-10-06)
+Spacing .75..1.5/default1 scales existing line, skirmisher and column slots and footprints; living
+figures refresh in place even paused. Fallen, identities, RNG, men/stats/orders and battery geometry
+remain exact. Picking, fire/melee contact and destination ghosts consume the changed footprint; this
+is game calibration, not sourced historical spacing or a combat-neutral mesh scale. Group centres
+retain their rotated offsets, so wide neighboring formations can intersect. Ghost caches bind spacing
+explicitly because rounded frontage alone misses small live changes. Progress remains separate.
+
 ## 0030 — Marker scaling keeps visible controls tied to their ground anchors (2026-10-06)
 Flag/bar dimensions scale while text and hit minima remain; fractional caches refresh immediately.
 Rendered review caught top-strip and high-angle dock occlusion, so placement reserves actual visible

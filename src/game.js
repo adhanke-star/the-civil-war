@@ -114,6 +114,7 @@ export class Game {
     this.logSeen = 0;
     this.slowT = 0;
     onSetting('look.menPerFigure', (v) => this.applyMenPerFigure(v));
+    onSetting('look.formationSpacing', () => this.applyFormationSpacing());
     this.updateFigureView();
     this.flushAll();
   }
@@ -123,6 +124,18 @@ export class Game {
     setMenPerFigure(n);
     let changed = 0;
     for (const u of this.units) if (u.rebuildFigures()) changed++;
+    return changed;
+  }
+
+  /** Re-layout existing infantry without rerolling figures, including while paused. */
+  applyFormationSpacing() {
+    let changed = 0;
+    for (const u of this.units) {
+      if (u.type !== 'infantry') continue;
+      if (u.formation === 'column') u.layoutColumn(); else u.layout();
+      u.snapFigures(); // living figures only; the fallen keep their exact positions
+      changed++;
+    }
     return changed;
   }
 

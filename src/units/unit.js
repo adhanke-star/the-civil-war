@@ -27,6 +27,7 @@ import { framePos } from './figure.js';
 import { BAKE_CLIP } from './impostor.js';
 import { mulberry32 } from '../world/landscape.js';
 import { RULES } from '../sim/rules.js';
+import { LOOK } from '../ui/look.js';
 
 export let MEN_PER_FIGURE = 10; // live binding: look.menPerFigure (the game calls setMenPerFigure)
 export const MEN_PER_FIGURE_OPTIONS = [10, 5];
@@ -219,9 +220,11 @@ export class Unit {
   get z() { return this.vehicle.position.z; }
   get alive() { return this.men >= 1; }
   get aliveFigures() { return this.figures.filter((f) => f.alive); }
+  get spacing() { return this.type === 'infantry' ? LOOK.formationSpacing : 1; }
 
   /** Assign line slots (two dense ranks plus the skirmish screen) to living figures, keeping neighbours. */
   layout() {
+    const spacing = this.spacing;
     const live = this.figures.filter((f) => f.alive);
     const screen = this.formation === 'line' ? live.filter((f) => f.skirmisher) : [];
     const body = screen.length ? live.filter((f) => !f.skirmisher) : live;
@@ -232,30 +235,31 @@ export class Unit {
       const file = Math.floor(k / ranks);
       const rank = k % ranks;
       const f = body[k];
-      f.lx = (file - (files - 1) / 2) * FILE_SPACING;
-      f.lz = ((ranks - 1) / 2 - rank) * RANK_SPACING;
+      f.lx = (file - (files - 1) / 2) * FILE_SPACING * spacing;
+      f.lz = ((ranks - 1) / 2 - rank) * RANK_SPACING * spacing;
       f.rank = rank;
     }
     screen.sort((a, b) => a.lx - b.lx);
     for (let k = 0; k < screen.length; k++) {
       const f = screen[k];
-      f.lx = (k - (screen.length - 1) / 2) * SKIRMISH_SPACING;
-      f.lz = SKIRMISH_AHEAD + (k % 2) * 4;
+      f.lx = (k - (screen.length - 1) / 2) * SKIRMISH_SPACING * spacing;
+      f.lz = (SKIRMISH_AHEAD + (k % 2) * 4) * spacing;
       f.rank = -1;
     }
-    this.halfFront = Math.max(4, ((files - 1) / 2) * FILE_SPACING);
-    this.depth = ranks * RANK_SPACING + (screen.length ? SKIRMISH_AHEAD * 0.5 : 0);
+    this.halfFront = Math.max(4, ((files - 1) / 2) * FILE_SPACING * spacing);
+    this.depth = (ranks * RANK_SPACING + (screen.length ? SKIRMISH_AHEAD * 0.5 : 0)) * spacing;
     this.files = files;
   }
 
   /** Half the width of the brigade's front once it stands in line (also while it marches in column). */
   lineHalfFront() {
     if (this.formation !== 'column' || !this.files) return this.halfFront;
-    return Math.max(4, ((this.files - 1) / 2) * FILE_SPACING);
+    return Math.max(4, ((this.files - 1) / 2) * FILE_SPACING * this.spacing);
   }
 
   /** Column of fours along the trail: slot k = rank k/4 at COLUMN_RANK_SPACING back along the trail. */
   layoutColumn() {
+    const rankSpacing = COLUMN_RANK_SPACING * this.spacing;
     const live = this.figures.filter((f) => f.alive).sort((a, b) => a.order - b.order);
     const ranks = Math.ceil(live.length / COLUMN_FILES);
     // resample the trail from the head backwards at COLUMN_RANK_SPACING
@@ -264,7 +268,7 @@ export class Unit {
     const T = this.trail;
     let hx = this.x, hz = this.z;
     let k = T.length - 1;
-    let need = COLUMN_RANK_SPACING * 0.5;
+    let need = rankSpacing * 0.5;
     let px = hx, pz = hz;
     let tx = 0, tz = 1;
     while (slots.length < ranks && k >= 0) {
@@ -276,7 +280,7 @@ export class Unit {
         const t = need / seg;
         px += dx * t; pz += dz * t;
         slots.push([px, pz, Math.atan2(tx, tz)]);
-        need = COLUMN_RANK_SPACING;
+        need = rankSpacing;
       } else {
         need -= seg;
         px = cx; pz = cz;
@@ -285,7 +289,7 @@ export class Unit {
     }
     while (slots.length < ranks) {
       const last = slots[slots.length - 1] || [hx, hz, this.facing];
-      slots.push([last[0] - Math.sin(last[2]) * COLUMN_RANK_SPACING, last[1] - Math.cos(last[2]) * COLUMN_RANK_SPACING, last[2]]);
+      slots.push([last[0] - Math.sin(last[2]) * rankSpacing, last[1] - Math.cos(last[2]) * rankSpacing, last[2]]);
     }
     for (let i = 0; i < live.length; i++) {
       const f = live[i];
@@ -293,15 +297,15 @@ export class Unit {
       f.cfile = (i % COLUMN_FILES) - (COLUMN_FILES - 1) / 2;
       f.rank = f.crank === 0 ? 0 : 1;
     }
-    this.halfFront = COLUMN_FILES * COLUMN_FILE_SPACING * 0.5 + 6;
-    this.depth = Math.max(10, ranks * COLUMN_RANK_SPACING);
+    this.halfFront = COLUMN_FILES * COLUMN_FILE_SPACING * this.spacing * 0.5 + 6;
+    this.depth = Math.max(10, ranks * rankSpacing);
   }
 
   slotWorld(f) {
     if (this.formation === 'column' && f.crank !== undefined && this.columnSlots[f.crank]) {
       const [sx, sz, yaw] = this.columnSlots[f.crank];
       const c = Math.cos(yaw), s = Math.sin(yaw);
-      const lx = f.cfile * COLUMN_FILE_SPACING + f.jx * 0.6;
+      const lx = f.cfile * COLUMN_FILE_SPACING * this.spacing + f.jx * 0.6;
       return [sx + c * lx, sz - s * lx, yaw];
     }
     const s = Math.sin(this.facing), c = Math.cos(this.facing);
@@ -682,7 +686,7 @@ export class Unit {
     if (this.formation === 'column' && this.columnSlots.length) {
       tx = this.x + fs * 9 + fc * 5; tz = this.z + fc * 9 - fs * 5; tyaw = this.facing;
     } else {
-      const back = this.state === 'routing' ? 4 : RANK_SPACING + 7;
+      const back = this.state === 'routing' ? 4 : RANK_SPACING * this.spacing + 7;
       tx = this.x - fs * back + fc * 3; tz = this.z - fc * back - fs * 3; tyaw = this.facing;
     }
     const dx = tx - o.x, dz = tz - o.z;
