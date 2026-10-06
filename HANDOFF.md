@@ -1,11 +1,41 @@
-# HANDOFF — Claude Code / Codex transfer (2026-10-05)
+# HANDOFF — Claude Code / Codex transfer (current plan: 2026-10-06)
 
 Read in this order: `AGENTS.md`, this file, `docs/drill-reference.md`, `DESIGN.md` (the design of
 record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS.md`. Read `COORDINATION.md`
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: candidate complete, quality HALT (2026-10-05)
+## Current boundary: autonomous v1 plan ready (2026-10-06)
+
+Read DECISIONS 0022 and PLAN's complete P1 contract. Aaron's latest choices: finish existing v1
+(Shiloh, Stones River, Chattanooga and all v1 systems), no hard deadline, no new spending, **no
+hands-on checks**. He undid the brief whole-vision answer and the one-device-check answer. Mac/iPad
+remain targets. Keep an expansion roadmap; reuse old strategy only when playable review shows fun
+and clear flow. Routine design, art, implementation and acceptance choices belong to the agent.
+
+This supersedes the approval/popup/device-playtest waits below. Preserve their historical evidence
+and quality restrictions: failed texture candidates remain unfieldable, but bounded feasibility and
+repairs can proceed autonomously. First implementation: completed reward-state persistence/export/
+import and reward CI coverage (PLAN P1); start read-only art residency feasibility independently.
+One progress-store seam is planned at src/franchise/save.js; do not build campaign/battle saves yet.
+No product code or assets changed in this planning session; no goal/schedule was activated.
+
+Startup assessed main/origin/main at bde3939463e11783b47b5f2ea87ff1e42671ae77, CI 37404610471 and
+Pages 37404610443 success. Preserve untracked NEW-civil-war-video-game.code-workspace. No COORDINATION
+file or other active build/provider writer was observed; recheck on resume. PLAN/STATE hold the newest
+state; never use an older SHA here to overwrite newer work. Old Desktop repo stays frozen/read-only.
+Actual iPad automation access remains unestablished: emulation/WebKit cannot certify A10X GPU/memory.
+Continue independent work; do not ask Aaron for hands-on evidence or mark device acceptance complete.
+
+Planning verification: independent source/design coverage review found no material omissions.
+Local `node tools/test.mjs --unit`, reward positives (10/10) and `--prove-fail` (10/10 caught) passed.
+`npm test` passed in 177073 ms after a sandbox loopback-bind EPERM; the initial harness failure is
+retained in `.out/planning-20261006-sandbox-failure.json`, passing readback in `.out/last-result.json`.
+Existing axe checks still report a minor/moderate meta-viewport finding outside their serious/critical
+filter. This is baseline smoke proof, not complete accessibility, native-device or gameplay clearance.
+Existing prune finished at 299.7 MiB. No new native GPU run, iPad run or renderer experiment occurred.
+
+## Historical renderer boundary: candidate complete, quality HALT (2026-10-05)
 
 Aaron authorized the recommended two-page BC7 + ASTC diagnostic (“authorize all recs”). It is now
 COMPLETE: candidate run 37404193171, attempt 1, tool SHA becad673675cc66f4a2dca3574d3b181c259bd42.

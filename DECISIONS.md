@@ -1,5 +1,17 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0022 — Autonomous complete v1, with a selective expansion roadmap (Aaron, 2026-10-06)
+Finish all three v1 battles and all v1 systems/flow, without a hard deadline or new spending. Aaron
+withdrew the whole-long-term-vision finish line and the one-hands-on-check option: **no hands-on checks**.
+Mac/iPad stay targets; no native-device evidence may be invented. Delegate reasonable product/art/
+engineering choices and acceptance; replace recurring popups and Aaron-only locks with independent
+agent review and measured gates. Preserve approved art, history and quality limits; resolve blockers
+autonomously and continue independent work. PLAN now contracts P1 reward persistence, the full P1-P7
+path and post-v1 strategy reuse only when playable review shows improved fun/flow. One progress store
+uses the planned franchise/save seam: unlike permissive preferences, inventory needs atomic strict
+validation and stable ownership. No second tracker/store/scheduler is added. This commit plans work;
+it does not implement saves, activate a goal, certify devices or field the failed texture candidates.
+
 ## 0021 — Direct BC7/ASTC improve errors but fail unchanged limits (2026-10-05)
 Candidate 37404193171 at becad67 completes all 18 controls, original raw/source binds and complete-chain
 checks; both sheets inspected. BC7 passes 1/6 page/mips; ASTC software and SwiftShader WebGL pass 3/6

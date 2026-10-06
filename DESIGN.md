@@ -1,7 +1,18 @@
 # DESIGN: "One Army, One War" (decided by Aaron in popups, 2026-10-02/03)
 
 The design of record. PLAN.md holds the build order; DECISIONS.md 0013 records the change of direction.
-Rows are Aaron's choices unless marked "(mine)". Change a row only by asking him in a popup.
+Rows are Aaron's choices unless marked "(mine)". The delegation below supersedes the older popup rules.
+
+**Completion delegation (Aaron, 2026-10-06; DECISIONS 0022):** finish the complete existing v1,
+including all three battles and all v1 functions/flow. No hard deadline, no new spending, and no
+hands-on checks from Aaron. Mac and iPad remain targets. The agent makes reasonable design/art/
+engineering/tuning choices and performs acceptance through tests and independent visual/play review;
+per-object approval, Aaron-only sandbox locks and requests for device playtesting are superseded.
+Approved art, the look/play bar, source integrity and quality limits remain binding. Unavailable
+native-device evidence stays explicitly unverified. PLAN.md contains the execution and release gates.
+Keep a post-v1 expansion plan, selectively reusing old-game strategy if an agent-played prototype
+demonstrates fun and clear flow; it does not expand the v1 finish line. His brief whole-vision scope
+answer and later one-device-check answer were both explicitly withdrawn.
 
 ## 1 · Game shape
 | Topic | Decision |
@@ -166,4 +177,3 @@ sandbox first, spectacle as top pillar).
 - `DESIGN.md` (this design), `PLAN.md` (milestones), a free GitHub Projects board (To do / Building /
   For your review / Done), a Release per milestone. Review = Pages link + 3-5 things to try, then a popup.
 - Mac stays clean: baking, heavy tests and screenshot baselines on GitHub Actions; local output in `.out/`.
-

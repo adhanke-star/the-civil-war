@@ -1,19 +1,19 @@
 # STATE (keep under 20 lines)
-- **Handoff (2026-10-05):** read HANDOFF.md for where work stopped and what is next.
-- **Direction:** DESIGN.md is the design of record, PLAN.md the order, DECISIONS 0013-0014 the summary.
-- **S1 sandbox on main:** `?sandbox` panel (5 tabs, Lock this, Copy/Paste settings, fps meter, compare);
-  mouse/trackpad/touch controls (ghost orders, pencil lines, six order buttons, dock + minimap, pause with
-  orders, feed, army list, spawn and moment tools); `reward.html`; installable web app; `device.html`.
-- **Figures:** Look tab: rigged 3D (default) / baked sprites, 1 figure per 10 or 5 men. Baked = second-pass
-  Union infantryman; Confederates are the Union sprite tinted (placeholder).
-- **Real GPU, UHD 617, Auto, opening/fight (2026-10-04):** baked 1:10 42.6/40.7, baked 1:5 40.7/38.7 fps;
-  rigged 1:5 40.6/36.8. 1:5 holds 30 fps.
-- **Art (`bake` 820846f):** simple authored hands; Full Bake 37347072866 + CI passed, 5,184 frames.
-  Aaron saw and approved all 12 sheets. Package 37360904656: 47.40 MiB disk, 199.40 MiB BC7/mips.
-  HALT: direct candidate 37404193171 controls pass; BC7 and ASTC quality fail; next scope pending.
-- **Known in play:** front-on firing poses hard to tell apart; halos louder than the baked shadow; walk bob;
-  uniform details are placeholders. **Unverified:** iPad; pinch, twist-to-face, box select, minimap input.
-- **Awaiting Aaron:** sandbox and reward page Copy-settings from Mac and iPad; device.html results;
-  `gh auth refresh -s project,read:project` for the Project board.
-- **Watch:** `node tools/test.mjs --unit|--field|--s1`; `node tools/test-reward.mjs`; `node tools/gpu-fps.mjs
-  --figures` (Chrome closed); bump VERSION in sw.js when src ships (now cw-v4).
+- **Authority (2026-10-06):** DESIGN + DECISIONS 0022; PLAN P1-P7 is the autonomous completion path.
+- **Finish:** all three v1 battles and all v1 functions/flow. No deadline, new spending or hands-on checks.
+- **Decisions:** agent selects/reviews art, UI, tuning and implementation; no routine approval stops.
+- **Next:** PLAN P1: persist/export/import completed reward army/depot, prevent duplicate/rerolled awards,
+  add reward/save CI coverage. No campaign/battle-state saves in P1. No implementation started yet.
+- **Parallel read-only:** lossless approved-art residency feasibility; failed codecs remain unfieldable.
+- **Current play:** Henry House Hill plus separate reward prototype; sandbox, controls, comparison, PWA.
+- **Missing foundations:** connected battle/reward/camp loop, progress saves, phase packs and franchise.
+- **Figures:** rigged default; second-pass baked Union and tinted Confederate placeholders remain.
+- **Approved art:** bake 820846f / 37347072866, sheets 1-12, 5,184 frames, nine looks per tier.
+- **Failed candidates:** UASTC 37360904656 and direct BC7/ASTC 37404193171; limits stay unchanged.
+- **Historical native Mac (2026-10-04):** baked Auto 1:5 40.7/38.7 fps opening/fight; no new measurement.
+- **Unverified:** actual iPad access/performance, full touch/device acceptance, new assets and total memory.
+- **Proof:** current npm test uses SwiftShader; reward tests separate. Neither proves native speed or fun.
+- **Coordination:** no COORDINATION.md; preserve untracked NEW-civil-war-video-game.code-workspace.
+- **Continuation:** HANDOFF current boundary + full PLAN P1 contract; no goal/scheduler activated.
+- **Later:** retain expansion roadmap; reuse frozen old strategy only after fun/flow proof; old repo read-only.
+- **Runtime:** sw.js cw-v4 unchanged; bump when product code/assets ship. Historical detail in HANDOFF.
