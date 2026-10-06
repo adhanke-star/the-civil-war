@@ -16,4 +16,4 @@
 - **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
 - **Proof:** retained/new pure127+127; P2h focused52/52, frozen native260/260; first card50.3s.
 - **Coordination:** no ledger; preserve workspace file; HANDOFF/PLAN P2-P7, active goal, no scheduler.
-- **Runtime/WIP:** cw-v14 P2h green candidate; integration/exact CI pending; next P2i keyboard targeting.
+- **Runtime/WIP:** cw-v14 P2h a10b128 CI37525324425/Pages37525324397 green; next P2i keyboard targeting.

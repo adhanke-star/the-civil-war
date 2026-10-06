@@ -5,7 +5,21 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2h verified candidate; exact-SHA integration next (2026-10-06)
+## Current boundary: P2h exact CI green; independent frame-demand candidate (2026-10-06)
+
+P2h main/origin a10b128338d14893cdbf8865eb5777b6aab01943 is pushed; Pages37525324397 passed,
+CI37525324425 passed. Preserve workspace/Shiloh notes. P2i's prerequisite is satisfied.
+Independent root-owned report-only frame-cohort/serial-decode extension is scoped in
+PLAN; touches estimate-residency/test-residency/docs only. No browser or asset/runtime mutation.
+P2h native260/260/source13/13 and source/WCAG/rendered review remain below; repair any red CI first.
+Independent report reviewers required evicted-page refetch accounting and exact CPU/GPU formulas;
+root repaired both, labels requested versus resolved phases, and declares release of ALL field/close
+decoded sources hypothetical. Fresh compact JSON is capped at5000000B.41/41 positives and41/41
+intended assertion mutants, unit/syntax/diff pass; both independent source reviewers clear repairs.
+Local final logs are .out/frame-demand-{positive,mutants,unit}-final-20261006.log. Runner readback pending;
+no actual new source assessment until existing Actions residency mode runs at the committed fullSHA.
+
+## Previous boundary: P2h local candidate (subsequently integrated above)
 
 HEAD/origin main f51e2e5478921f56b966a1231767691a5bc6a87c; CI37520707320,
 Pages37520707322 and residency37520706744 succeeded. P2g test-only repairb8fb1d9 also has
@@ -31,7 +45,7 @@ All13hashes match; root/independent rendered review viewed all five final Moment
 source/WCAG/receipt review clears scoped integration.
 Intro first card50269ms, actual win45.608sim/idle defeat27.2705sim; saved army/equipment/Continue,
 old spacing ghost reset216.200000/216.200016 vs216.2 remain green. No local browser remains.
-Acceptance remains pending explicit integration and exact-SHA CI/Pages.
+P2h was subsequently integrated with exact-SHA CI/Pages green at the current boundary above.
 Long card provenance can still ellipsize; shared full-content polish remains P6. Screenshot FPS meters
 are transient observations, not sustained/native performance acceptance; Mac/iPad gates remain open.
 Keep first failed receipts; do not accept process exit without reading actual checks. One browser only.

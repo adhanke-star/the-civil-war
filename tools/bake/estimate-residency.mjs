@@ -5,6 +5,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 import * as THREE from 'three';
 import { Post } from '../../src/render/post.js';
+import { AtlasLayout, BAKE_CLIP } from '../../src/units/impostor.js';
 import { SOURCE, groupsOf, validateApproved, mipBytes, sha256 } from './compress.mjs';
 
 export const HISTORICAL = { run: 37360904656, sha: '3f439b0d326d0a27d7a46a599751890a63ed2afc', artifact: 'compression-review' };
@@ -65,6 +66,164 @@ export function pageDemand(manifest, tier, looks, clips = Object.keys(manifest.c
     }
   }
   return { tier, looks, clips, frames, files: [...files].sort() };
+}
+
+/** Exact original frame locality through the runtime resolver. No cropping, packing or allocation. */
+export function frameDemand(manifest, tier, looks, requests, { neighbors = false, layout = new AtlasLayout(manifest) } = {}) {
+  const groups = groupsOf(manifest.tiers[tier] || {}), T = layout.tiers[tier], records = new Map();
+  if (!T || !looks.length || new Set(looks).size !== looks.length || looks.some((l) => !groups[l]) || !requests.length) fail('invalid frame demand');
+  for (const r of requests) {
+    if (!Object.values(BAKE_CLIP).includes(r.pose) || !Number.isFinite(r.phase) || !Number.isFinite(r.heading)) fail('invalid frame request');
+    const slot = layout.slotFor(r.pose, r.phase), clip = layout.clipNames[layout.slotClip[slot]], C = layout.clips[clip];
+    const k = slot - C.start, d = layout.direction(tier, slot, r.heading, 0, 0, 0, 1), available = T.avail[clip];
+    const di = available.indexOf(d); if (di < 0) fail('runtime picked unavailable direction');
+    const frames = [k], directions = [d];
+    if (neighbors) {
+      const next = clip === 'walk' ? (k + 1) % C.count : Math.min(k + 1, C.count - 1);
+      if (!frames.includes(next)) frames.push(next);
+      for (const offset of [-1, 1]) { const dd = available[(di + offset + available.length) % available.length]; if (!directions.includes(dd)) directions.push(dd); }
+    }
+    for (const look of looks) for (const frame of frames) for (const direction of directions) {
+      const key = `${clip}_${frame}_d${String(direction).padStart(2, '0')}`, id = `${look}/${key}`;
+      if (records.has(id)) continue;
+      const original = groups[look].frames[key], page = groups[look].pages[original?.page];
+      if (!page) fail('missing original demanded frame');
+      const li = T.looks.indexOf(look), o = layout.entry(C.start + frame, direction, li), R = T.rects;
+      if (li < 0 || T.pages[R[o]]?.file !== page.file || R[o + 1] !== Math.fround(original.x) || R[o + 2] !== Math.fround(original.y)
+        || R[o + 3] !== Math.fround(original.w) || R[o + 4] !== Math.fround(original.h)
+        || R[o + 5] !== Math.fround(original.ox - original.ax) || R[o + 6] !== Math.fround(original.oy - original.ay)
+        || R[o + 7] !== Math.fround(original.ppm)) fail('runtime/original rectangle anchor scale disagree');
+      records.set(id, { id, look, key, file: page.file, original: { ...original } });
+    }
+  }
+  const frames = [...records.values()].sort((a, b) => a.id.localeCompare(b.id));
+  return { tier, looks: [...looks], neighbors, frames, files: [...new Set(frames.map((f) => f.file))].sort() };
+}
+
+/** Full source pages are real reservations; rectangle arithmetic is explicitly only a locality metric. */
+export function summarizeFrames(pages, demand) {
+  const byFile = new Map(pages.map((p) => [p.file, p]));
+  const selected = demand.files.map((f) => { const p = byFile.get(f); if (!p) fail('unbound frame page'); return p; });
+  return { frames: demand.frames.length, sourcePages: selected.length,
+    sourcePageGpuMipBytes: sum(selected, 'gpuRgbaMipBytes'), originalPngDownloadBytes: sum(selected, 'pngBytes'),
+    summedDistinctFrameAreaPixels: demand.frames.reduce((n, f) => n + f.original.w * f.original.h, 0),
+    isolatedRectangleMipByteMetric: demand.frames.reduce((n, f) => n + mipBytes(f.original.w, f.original.h).rgba8, 0),
+    files: demand.files, frameKeysSha256: sha256(Buffer.from(JSON.stringify(demand.frames.map((f) => f.id)))),
+    originalFrameMetadataSha256: sha256(Buffer.from(JSON.stringify(demand.frames))),
+    allocationMeaning: 'Original source-page mip reservations. Rectangle area/mips omit packing, gutters and mip isolation; they are not an implemented atlas allocation.',
+    fieldable: false, totalSceneWithinLimit: null };
+}
+
+/** Hypothetical serial decode envelope; old reservations and lifetime downloads survive transitions. */
+export function serialAccount(pages, { retained = [], previous = [], next = [], downloaded = [], refetchFiles = [], failedFile = null, retryFailed = false,
+  extraCopies = 2, poolCapacities = [] } = {}) {
+  const byFile = new Map(pages.map((p) => [p.file, p]));
+  for (const list of [retained, previous, next, downloaded]) if (new Set(list).size !== list.length || list.some((f) => !byFile.has(f))) fail('invalid serial page set');
+  // Attempts deliberately preserve duplicates: evicted A can be requested twice again.
+  if (!Array.isArray(refetchFiles) || refetchFiles.some((f) => !byFile.has(f) || !downloaded.includes(f))) fail('refetch requires prior download evidence');
+  if (!Number.isInteger(extraCopies) || extraCopies < 0 || poolCapacities.some((c) => !Number.isSafeInteger(c) || c < 0)
+    || typeof retryFailed !== 'boolean' || (retryFailed && !failedFile)) fail('invalid serial assumption');
+  const loaded = [...new Set([...retained, ...previous])], pending = next.filter((f) => !loaded.includes(f));
+  if (failedFile && !pending.includes(failedFile)) fail('failed page must be outstanding');
+  const reserved = [...loaded, ...pending], fetched = [...new Set([...downloaded, ...reserved])];
+  const active = pending.map((f) => byFile.get(f)), all = reserved.map((f) => byFile.get(f));
+  const basePeak = Math.max(0, ...active.map((p) => p.baseRgbaBytes)), encodedPeak = Math.max(0, ...active.map((p) => p.pngBytes));
+  const instanceBytes = reserved.length * poolCapacities.reduce((s, c) => s + c, 0) * 12 * 4;
+  const gpu = sum(all, 'gpuRgbaMipBytes'), retainedDecoded = sum(all, 'baseRgbaBytes');
+  const refetchPngBytes = sum(refetchFiles.map((f) => byFile.get(f)), 'pngBytes');
+  const transfer = sum(fetched.map((f) => byFile.get(f)), 'pngBytes') + refetchPngBytes + (retryFailed ? byFile.get(failedFile).pngBytes : 0);
+  const cpuRetained = retainedDecoded + basePeak * extraCopies + encodedPeak + instanceBytes;
+  const cpuReleased = basePeak * (1 + extraCopies) + encodedPeak + instanceBytes;
+  return { policy: 'HYPOTHETICAL serial source decode/release; current loader unchanged', loadedFiles: loaded, pendingFiles: pending,
+    lifetimeDownloadedFiles: fetched, refetchFiles: [...refetchFiles], refetchPngBytes,
+    loadedPages: loaded.length, pendingPages: pending.length, sourcePageGpuReservationBytes: gpu,
+    instanceGpuBytes: instanceBytes, instanceCpuBytes: instanceBytes, extraCopies, decodeConcurrency: 1,
+    activeDecodedSourcePeakBytes: basePeak, activeEncodedPngPeakBytes: encodedPeak, extraDecodeUploadCopiesPeakBytes: basePeak * extraCopies,
+    retainedDecodedSourcesAssumptionBytes: retainedDecoded, retainedPolicyCpuEnvelopeBytes: cpuRetained,
+    releasedPolicyCpuEnvelopeBytes: cpuReleased, figuresGpuAndBufferMinimumBytes: gpu + instanceBytes,
+    gpuCpuRetainedEnvelopeBytes: gpu + instanceBytes + cpuRetained, gpuCpuReleasedEnvelopeBytes: gpu + instanceBytes + cpuReleased,
+    uniqueLifetimePngDownloadBytes: sum(fetched.map((f) => byFile.get(f)), 'pngBytes'), transmittedPngBytesWithRetries: transfer,
+    pngDownloadWithinLimit: transfer <= LIMITS.downloadBytes, failedFile, automaticRetryRequests: 0, proposedRetryRequests: retryFailed ? 1 : 0,
+    failedGpuReservationBytes: failedFile ? byFile.get(failedFile).gpuRgbaMipBytes : 0,
+    failurePolicy: 'Failed/partially uploaded page and successful siblings retain conservative reservations until explicit retirement; not measured allocation.',
+    transferMeaning: 'Unique lifetime PNG payload is a lower bound. Zero refetch attempts assumes perfect lifetime encoded/browser-cache reuse, which is unverified; explicit refetch attempts and one proposed failed-page retry add payload. Headers and other assets are excluded.',
+    releaseMeaning: 'Released CPU envelope hypothetically releases ALL decoded sources, including retained field-page images; the current field loader retains its images and is unchanged.',
+    peakMeaning: 'Independent largest-page decode and PNG peaks give a conservative envelope, not an observed simultaneous peak.',
+    fieldable: false, totalSceneWithinLimit: null, disposalRetryPolicy: 'UNIMPLEMENTED' };
+}
+
+/** Synthetic cohorts only; ranges enumerate the stated bases, not every possible battlefield distribution. */
+export function cohortStudy(bound, poolCapacities = [], { headingCounts = [1, 2, 4, 16], phaseCounts = [1, 2, 4, 'all'],
+  clipSets = [...Object.keys(bound.manifest.clips), 'mixed'] } = {}) {
+  const { manifest, pages } = bound, before = JSON.stringify(manifest), layout = new AtlasLayout(manifest), groups = groupsOf(manifest.tiers.close);
+  if (layout.missing.length || layout.problems().length || !headingCounts.length || !phaseCounts.length || !clipSets.length
+    || [headingCounts, phaseCounts, clipSets].some((v) => new Set(v).size !== v.length) || headingCounts.some((n) => ![1, 2, 4, 16].includes(n))
+    || phaseCounts.some((n) => ![1, 2, 4, 'all'].includes(n)) || clipSets.some((c) => c !== 'mixed' && !manifest.clips[c])) fail('invalid cohort study');
+  const all = Object.keys(groups), eligible = all.filter((l) => (l === 'base' ? manifest.tiers.close.baseComposition : groups[l].composition).use !== 'usct');
+  if (all.length !== 9 || eligible.length !== 8 || !equal(layout.tiers.close.looks, layout.tiers.field.looks)) fail('cohort look identity');
+  const pose = { stand: BAKE_CLIP.STAND, walk: BAKE_CLIP.WALK, fallen: BAKE_CLIP.FALLEN, load: BAKE_CLIP.LOAD };
+  const makeRequest = (clip, phase, heading) => ({ pose: clip === 'fire' ? [BAKE_CLIP.AIM, BAKE_CLIP.FIRE, BAKE_CLIP.RECOVER][Math.min(2, Math.max(0, Math.floor(phase * 3)))] : pose[clip], phase, heading });
+  const rows = [], transitions = [], assignments = Object.fromEntries(all.map((l) => [l, 0]));
+  for (let man = 0; man < 512; man++) assignments[layout.tiers.close.looks[layout.lookFor('close', man)]]++;
+  for (const [lookSet, looks] of [['all-nine', all], ['eligible-eight', eligible]]) for (const clipSet of clipSets)
+    for (const headings of headingCounts) for (const phases of phaseCounts) {
+      const clips = clipSet === 'mixed' ? Object.keys(manifest.clips) : [clipSet];
+      const bases = phases === 'all' ? [0] : [...new Set([0, 1, ...clips.flatMap((c) => manifest.clips[c].frames.map((_, i, a) => (i + 0.5) / a.length))])];
+      const ranges = { current: {}, prefetched: {}, activeResolution: {} }; let samples = 0, lowest = null, highest = null;
+      for (let baseHeading = 0; baseHeading < (headings === 16 ? 1 : 16); baseHeading++) for (const basePhase of bases) {
+        const requests = [], activeRequests = [];
+        for (let h = 0; h < headings; h++) {
+          const heading = Math.PI * 2 * (baseHeading / 16 + h / headings);
+          for (const clip of clips) {
+            const count = manifest.clips[clip].frames.length, n = phases === 'all' ? count : Math.min(phases, count);
+            for (let p = 0; p < n; p++) activeRequests.push(makeRequest(clip, phases === 'all' ? (p + 0.5) / count : basePhase + p / n, heading));
+          }
+          // Persistent fallen coexist with the active clip; no corpse retirement is assumed.
+          requests.push(makeRequest('fallen', 0, heading));
+        }
+        requests.push(...activeRequests);
+        const activeFrames = frameDemand(manifest, 'close', [looks[0]], activeRequests, { layout }).frames;
+        const activeResolution = { frameSlots: new Set(activeFrames.map((f) => f.key.replace(/_d\d+$/, ''))).size,
+          frameDirectionPairs: activeFrames.length };
+        const demand = (neighbors) => summarizeFrames(pages, frameDemand(manifest, 'close', looks, requests, { neighbors, layout }));
+        const current = demand(false), prefetched = demand(true), sample = { baseHeading, basePhase, requests, activeResolution, current, prefetched };
+        for (const [kind, metrics] of [['current', current], ['prefetched', prefetched], ['activeResolution', activeResolution]]) for (const [key, v] of Object.entries(metrics)) if (typeof v === 'number') {
+          const r = ranges[kind][key] ||= { min: v, max: v }; r.min = Math.min(r.min, v); r.max = Math.max(r.max, v);
+        }
+        if (!lowest || prefetched.sourcePageGpuMipBytes < lowest.prefetched.sourcePageGpuMipBytes) lowest = sample;
+        if (!highest || prefetched.sourcePageGpuMipBytes > highest.prefetched.sourcePageGpuMipBytes) highest = sample;
+        samples++;
+      }
+      rows.push({ lookSet, looks, clipSet, headingCohorts: headings, phaseCohorts: phases,
+        cohortMeaning: 'Heading/phase counts are requested coupled cohorts; activeResolution reports distinct runtime-resolved active slots/direction pairs, excluding the separately retained fallen unless fallen is an active clip. Nonwrapping phases can collapse.', samples, ranges,
+        lowestSourcePageSample: lowest, highestSourcePageSample: highest });
+      if (clipSet === 'walk' && headings === 1 && phases === 1) {
+        const field = pageDemand(manifest, 'field', looks).files, previous = lowest.current.files, next = highest.prefetched.files;
+        const failedFile = next.find((f) => !previous.includes(f));
+        transitions.push({ lookSet, phase: 'old close demand retained while next demand decodes', ...serialAccount(pages, { retained: field, previous, next, poolCapacities }) },
+          { lookSet, phase: 'hypothetical retirement; lifetime downloads remain', ...serialAccount(pages, { retained: field, next, downloaded: previous, poolCapacities }) },
+          { lookSet, phase: 'revisit retired original demand without encoded-cache reuse', ...serialAccount(pages,
+            { retained: field, next: previous, downloaded: [...new Set([...previous, ...next])], refetchFiles: previous, poolCapacities }) });
+        if (failedFile) for (const retryFailed of [false, true]) transitions.push({ lookSet, phase: 'failed page and sibling reservations',
+          ...serialAccount(pages, { retained: field, previous, next, failedFile, retryFailed, poolCapacities }) });
+      }
+    }
+  const catalogRequests = [];
+  for (const [clip, spec] of Object.entries(manifest.clips)) for (let k = 0; k < spec.frames.length; k++) for (let d = 0; d < 16; d++)
+    catalogRequests.push(makeRequest(clip, (k + 0.5) / spec.frames.length, d * Math.PI * 2 / 16));
+  const catalog = frameDemand(manifest, 'close', all, catalogRequests, { layout });
+  if (catalog.frames.length !== 2592 || JSON.stringify(manifest) !== before) fail('cohort metadata changed or incomplete');
+  return { schema: 1, synthetic: true, fieldable: false, totalSceneWithinLimit: null, stableRuntimeLookAssignments512: assignments, rows, transitions,
+    originalCloseFrameCatalog: catalog.frames,
+    manifestCohortBasis: { camera: { ...manifest.camera }, clips: structuredClone(manifest.clips),
+      directionsByClip: structuredClone(manifest.tiers.close.directionsByClip),
+      looks: all.map((name) => ({ name, composition: { ...(name === 'base' ? manifest.tiers.close.baseComposition : groups[name].composition) } })) },
+    limits: LIMITS, gates: { quality: 'UNRUN', nativeMemory: 'UNRUN', iPad: 'UNRUN', disposalRetryPolicy: 'UNIMPLEMENTED' },
+    basis: 'Runtime-resolved relative headings at 16 direction bases; coupled phase bases at declared frame centres and endpoints. All-phase/all-heading cases have invariant coverage and one base. Every case retains fallen at its declared heading cohorts.',
+    limitations: ['Synthetic coupled cohorts are not exhaustive arbitrary phase/heading combinations or actual camera populations.',
+      'Summed distinct-frame rectangle areas can overlap; no pixel extraction, new gutters, packing, sampling or quality assessment occurs.',
+      'Serial CPU release of ALL sources, including field images, is hypothetical; source-page GPU residency is unchanged. Unique PNG payload is a lower bound; explicit retired-page refetch attempts and proposed retries add transfers.',
+      'Instance capacity comes from current Henry pools, not a validated historical battle roster; terrain/world/effects and browser/driver residency remain unmeasured.'] };
 }
 
 /** Reservations include outstanding allocations, including work that may complete after a view change. */
@@ -217,6 +376,7 @@ async function main() {
   const terrain = { half: 3000, heightAt: () => 0, slopeAt: () => 0, inBounds: () => true };
   const game = new Game({ scene: new THREE.Scene(), terrain, scenario, world: {}, effects: {} });
   const report = estimate(bound, [game.impostors.US.capacity, game.impostors.CS.capacity]);
+  report.frameLocality = cohortStudy(bound, [game.impostors.US.capacity, game.impostors.CS.capacity]);
   const geometry = geometryInventory(game.scene), views = [];
   const previousWindow = globalThis.window;
   try {
@@ -238,12 +398,20 @@ async function main() {
     sourceGpuCpuModelBytes: s.modelledGpuAndCpuBytes + geometry.gpuReservationBytes + geometry.cpuBytes + v.gpuReservationBytes,
     remainderToSceneLimitBytes: LIMITS.sceneBytes - (s.modelledGpuAndCpuBytes + geometry.gpuReservationBytes + geometry.cpuBytes + v.gpuReservationBytes),
     totalSceneWithinLimit: null }));
+  for (const s of report.frameLocality.transitions) s.sceneBaselineViews = views.map((v) => ({ label: v.label,
+    sourceGpuReservationBytes: s.figuresGpuAndBufferMinimumBytes + geometry.gpuReservationBytes + v.gpuReservationBytes,
+    retainedSourceGpuCpuEnvelopeBytes: s.gpuCpuRetainedEnvelopeBytes + geometry.gpuReservationBytes + geometry.cpuBytes + v.gpuReservationBytes,
+    releasedSourceGpuCpuEnvelopeBytes: s.gpuCpuReleasedEnvelopeBytes + geometry.gpuReservationBytes + geometry.cpuBytes + v.gpuReservationBytes,
+    totalSceneWithinLimit: null }));
   report.toolSha = process.env.GITHUB_SHA;
   report.poolBasis = 'Actual current Henry scenario Game constructor at toolSha; future historical packs must supply their own full roster capacity.';
   report.runtimeSourceSha256 = Object.fromEntries(['src/units/impostor.js', 'src/game.js', 'src/render/post.js', 'assets/scenarios/henry-hill.json'].map((f) => [f, sha256(regular(path.join(ROOT, f)))]));
   if (sha256(regular(path.join(source, 'soldier.json'))) !== bound.manifestHash) fail('approved manifest changed during study');
-  fs.writeFileSync(reportFile, JSON.stringify(report, null, 2), { flag: 'wx' });
+  const json = JSON.stringify(report), reportBytes = Buffer.byteLength(json, 'utf8');
+  if (reportBytes > 5000000) fail('report exceeds 5 MB small-report ceiling');
+  fs.writeFileSync(reportFile, json, { flag: 'wx' });
   console.log(JSON.stringify({ report: path.relative(ROOT, reportFile), counts: report.counts, fieldable: false,
+    reportBytes, cohortRows: report.frameLocality.rows.length, closeCatalogFrames: report.frameLocality.originalCloseFrameCatalog.length,
     fullGpuBytes: sum(bound.pages, 'gpuRgbaMipBytes'), fullPngBytes: sum(bound.pages, 'pngBytes'), scenarios: report.scenarios.map((s) => ({ label: s.label, gpu: s.totalGpuReservationBytes, modelledGpuCpu: s.modelledGpuAndCpuBytes })) }));
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) main().catch((e) => { console.error(e.message); process.exitCode = 1; });

@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0034 — Frame locality is distinct from source-page residency (2026-10-06)
+Report-only art analysis resolves original frames through the actual runtime layout, preserving named
+looks and rectangle/anchor/scale metadata. Synthetic requested cohorts carry resolved frame ranges;
+rectangle arithmetic cannot certify packing. Serial envelopes retain old/pending/failure reservations;
+unique PNG payload is a lower bound, with explicit repeated refetch attempts for retired-page revisits.
+Release of all decoded sources, including field images, is hypothetical. A bounded compact report
+changes no runtime, asset bytes, quality limit or fieldability/native/device verdict.
+
 ## 0033 — Field moment previews cannot earn progression (2026-10-06)
 X-Factor presentation uses the existing Effects/Halo/Hud seam with bounded real-time cues,
 Full/Subtle/Off and authoritative mute/reduced-motion cancellation; sandbox previews earn nothing.

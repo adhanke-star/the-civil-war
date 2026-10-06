@@ -393,28 +393,28 @@ actual JSON/PNGs, independent source/WCAG/visual review, update docs, explicitly
 read fullSHA CI/Pages and repair red CI before the next slice. Moments/X-Factor, soldier's-eye/full
 keyboard/division selection, deployment/living camp and all P3-P7 scope remain open.
 
-### P2h: isolated loot and X-Factor previews (green candidate; integration pending)
+### P2h: isolated loot and X-Factor previews (integrated)
 
-Candidate Node11+11 passes actual Effects/Unit/HaloPool and intended assertion mutants. Initial
+Node11+11 passes actual Effects/Unit/HaloPool and intended assertion mutants. Initial
 native36/38 and strengthened diagnostic36/38 retain focus failures at
 .out/p2h-focused-initial-failure-20261006.json and p2h-focused-focus-diagnostic-20261006.json.
 Exact cleanup passed before redundant requests: dead/DOM detached, timers/RAFs/waits0, unsub6/6,
 document keyremove1/native close1. First mount lazily defined reward settings and rebuilt/detached
 the panel trigger; register settings before panel creation. Native Tab from the final control could
 leave the dialog; wrap only live visible-enabled boundaries and own Escape handling. The repaired
-candidate adds actual Sound mute/unmute and lock/Reset/Copy/Paste/reload coverage; UI/readback,
-independent reviews, frozen final native and exact-SHA integration remain pending.
+candidate adds actual Sound mute/unmute and lock/Reset/Copy/Paste/reload coverage.
 Final focused native52/52 in67729ms20:04:27.973Z, .out/p2h-focused-final-20261006.json and five
 same-time Moments PNGs pass independent source/WCAG/rendered review. Readable230px preview/12px
 detail minima scroll on short screens; actual boundary/post-turn keyboard focus stays visible.
 Real mute/refusal/fresh sound, media/Off, lock/Reset/reload/Copy/Paste, exact progress/0writes, reused
 9textures/26geometries, both-close exact cleanup and44px/axe/errors pass. All retained deterministic
-positives/intended mutants, unit and syntax/diff/YAML pass.13sourcehashes frozen; full native running.
+positives/intended mutants, unit and syntax/diff/YAML pass.13sourcehashes frozen.
 Frozen full native260/260 in510344ms20:05:52.125Z, .out/p2h-full-native-final-20261006.json has
 errors/warnings/all scoped axe[].13/13source hashes match; root viewed all five final Moments PNGs.
 First intro card50269wall ms, win45.608sim and idle defeat27.2705sim; actual save/equip/Continue and
 existing ghost Reset216.200000/216.200016 vs216.2 retained. Source/WCAG/rendered review clears
-the final receipt/all five PNGs; integration/exact-SHA CI/Pages pending. No native/iPad FPS claim.
+the final receipt/all five PNGs. Integrated a10b128338d14893cdbf8865eb5777b6aab01943;
+CI37525324425 and Pages37525324397 succeeded. No native/iPad FPS claim.
 
 After P2g exact CI/Pages, finish the missing field Moments previews using existing settings, Effects,
 HaloPool/Hud and reward sequence. Root owns those seams, src/main.js/ui/sandbox-tools.js, meaningful
@@ -586,6 +586,40 @@ No finer-demand/layout rejection or asset fielding follows. Tool exact CI3752070
 Pages37520707322 passed. Next art hypothesis is read-only original frame/direction/adjacent-frame
 rectangle demand versus source-page demand and serial decode/release lifecycle, preserving all nine
 named looks/eligibility; no repacking/runtime or codec experiment yet. Quality/native/device remain open.
+
+Next bounded report-only extension (independent of P2h CI): root owns only existing
+tools/bake/estimate-residency.mjs, tools/test-residency.mjs and docs. Existing workflow already runs
+both test modes and uploads only the small report; no new artifact/store or runtime/atlas edit.
+Reuse actual AtlasLayout slot/direction/look resolution. Quantify synthetic clip/mixed cohorts with
+1/2/4/all animation phases and1/2/4/16 relative headings, enumerate declared base headings/phases,
+report ranges rather than a favorable pose. Keep all-nine and eligibility-filtered-eight named sets
+separate; no renumbered-look runtime claim. Include current, next-frame/adjacent-available-direction
+prefetch and persistent fallen demand; walk wraps, load clamps, fire maps aim/fire/recover.
+Label requested phase cohorts and distinct resolved active frame/direction ranges separately;
+nonwrapping load/fire requests can collapse at saturation.
+Distinct original keys/rect/anchor/scale metadata and page unions bind locality metrics. Rectangle
+area/isolated-rectangle mip arithmetic is not an implemented packing or actual source-page GPU budget.
+Report full original source-page mip reservations and PNG transfers alongside it. Synthetic ranges
+are not arbitrary real battle/camera distributions or a measured scene/device admission.
+
+Model one active source-page decode plus explicit copies/one active encoded PNG independently of
+total queued transfers. Contrast retained decoded images and hypothetical release after extraction;
+serial decoding cannot shrink final page GPU residency. Reserve old+new demand during transitions,
+accumulate downloaded pages after hypothetical retirement, and bind failed-page/sibling completion/
+current0retry versus a clearly hypothetical retry.
+Unique lifetime PNG payload is a lower bound; zero refetch assumes unverified lifetime encoded/cache
+reuse. Explicit refetch attempts preserve duplicates and charge evict/revisit downloads separately.
+Hypothetical CPU release includes ALL decoded field/close images; current field images remain retained.
+Fresh compact report JSON must remain <=5000000B; original assets stay runner-only.
+Final local41/41 positives+41/41 intended assertion mutants and unit/syntax/diff pass; two independent
+source reviews clear runtime binding, transfer/copy arithmetic and protected report-only scope.
+All release/cancel/frame-loader policy remains UNIMPLEMENTED,
+fieldable:false/scene:null/quality/native/iPad UNRUN; existing250MB/200MB limits,
+source45/5184/nine hashes/eligibility/directions/anchors and original bytes remain unchanged.
+Run syntax/diff, extended positives/intended assertion mutants, existing unit, independent source
+review, exact-SHA CI/Pages and one existing residency Actions dispatch. Read actual small report,
+recompute bounds/transition/serial rows and hashes; original PNGs remain runner-only. Do not encode,
+repack, upload fieldable assets, change runtime or close quality/native/device gates from this study.
 
 No hands-on checks from Aaron. Use agent-operated browsers and independent review; establish early
 whether native Mac/iPad automation is already accessible without new spending or user intervention.

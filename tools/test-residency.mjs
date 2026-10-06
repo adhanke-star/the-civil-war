@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { PNG } from 'pngjs';
 import * as THREE from 'three';
 import { Post } from '../src/render/post.js';
-import { bindApproved, pageDemand, account, estimate, geometryInventory, postInventory, HISTORICAL, LIMITS } from './bake/estimate-residency.mjs';
+import { bindApproved, pageDemand, frameDemand, summarizeFrames, serialAccount, cohortStudy, account, estimate, geometryInventory, postInventory, HISTORICAL, LIMITS } from './bake/estimate-residency.mjs';
+import { BAKE_CLIP } from '../src/units/impostor.js';
 import { SOURCE, groupsOf, mipBytes, sha256 } from './bake/compress.mjs';
 
 function fixture() {
@@ -37,12 +38,17 @@ function fixture() {
   return { m, h, bytes, bind: (fn = bindApproved) => fn(Buffer.from(JSON.stringify(m)), Buffer.from(JSON.stringify(h)), (f) => bytes.get(f)) };
 }
 const f = fixture(), bound = f.bind();
-const api = { bind: bindApproved, demand: pageDemand, account, estimate, geometry: geometryInventory, post: postInventory };
+const smallStudy = cohortStudy(bound, [100, 200], { headingCounts: [1, 16], phaseCounts: [1, 'all'], clipSets: ['walk', 'mixed'] });
+const clampStudy = cohortStudy(bound, [], { headingCounts: [1], phaseCounts: [4], clipSets: ['load', 'fire'] });
+const api = { bind: bindApproved, demand: pageDemand, account, estimate, geometry: geometryInventory, post: postInventory,
+  frames: frameDemand, summary: summarizeFrames, serial: serialAccount, study: () => structuredClone(smallStudy), clampStudy: () => structuredClone(clampStudy) };
 const bypass = { ...api, bind: () => bound };
 const reject = (a, mutate, pattern) => {
   const x = fixture(); mutate(x); assert.throws(() => x.bind(a.bind), pattern);
 };
 const alterAccount = (change) => ({ ...api, account: (...args) => { const r = account(...args); change(r); return r; } });
+const alterSerial = (change) => ({ ...api, serial: (...args) => { const r = serialAccount(...args); change(r); return r; } });
+const alterStudy = (change) => ({ ...api, study: () => { const r = structuredClone(smallStudy); change(r); return r; } });
 const tests = [
   ['all-originals-mips-metadata-unchanged', (a) => {
     const x = fixture(), before = JSON.stringify([x.m, x.h]), mb = Buffer.from(JSON.stringify(x.m)), hb = Buffer.from(JSON.stringify(x.h));
@@ -140,6 +146,122 @@ const tests = [
       assert.equal(r.defaultFramebufferColorAssumptionBytes, 2048 * 1536 * 4);
     } finally { if (prior === undefined) delete globalThis.window; else globalThis.window = prior; }
   }, { ...api, post: (...args) => { const r = postInventory(...args); r.depthAssumptionBytes = 0; return r; } }],
+  ['runtime-frame-metadata-and-input-preservation', (a) => {
+    const before = JSON.stringify(bound.manifest), request = [{ pose: BAKE_CLIP.WALK, phase: 0.3, heading: 0 }];
+    const r = a.frames(bound.manifest, 'close', ['base', 'h7_cap_roll'], request);
+    assert.equal(r.frames.length, 2); assert.equal(r.frames[0].key, 'walk_2_d00');
+    for (const frame of r.frames) assert.deepEqual(frame.original, groupsOf(bound.manifest.tiers.close)[frame.look].frames[frame.key]);
+    assert.equal(JSON.stringify(bound.manifest), before); assert.deepEqual(request, [{ pose: BAKE_CLIP.WALK, phase: 0.3, heading: 0 }]);
+  }, { ...api, frames: (...args) => { const r = frameDemand(...args); r.frames[0].original.ppm++; return r; } }],
+  ['next-walk-wrap-load-clamp-and-fire-pose', (a) => {
+    const req = (pose, phase) => [{ pose, phase, heading: 0 }];
+    const walk = a.frames(bound.manifest, 'close', ['base'], req(BAKE_CLIP.WALK, 0.999), { neighbors: true });
+    assert.equal(walk.frames.length, 6); assert.ok(walk.frames.some((f) => f.key === 'walk_0_d15')); assert.ok(walk.frames.some((f) => f.key === 'walk_7_d01'));
+    const load = a.frames(bound.manifest, 'close', ['base'], req(BAKE_CLIP.LOAD, 1.2), { neighbors: true });
+    assert.equal(load.frames.length, 3); assert.ok(load.frames.every((f) => f.key.startsWith('load_4_')));
+    assert.equal(a.frames(bound.manifest, 'close', ['base'], req(BAKE_CLIP.FIRE, 0))["frames"][0].key, 'fire_1_d00');
+  }, { ...api, frames: (m, t, l, r, opts) => frameDemand(m, t, l, r, { ...opts, neighbors: false }) }],
+  ['nearest-available-clip-direction', (a) => {
+    const m = structuredClone(bound.manifest); m.tiers.close.directionsByClip.walk = [0, 2, 4, 6, 8, 10, 12, 14];
+    const r = a.frames(m, 'close', ['base'], [{ pose: BAKE_CLIP.WALK, phase: 0, heading: 3.2 * Math.PI * 2 / 16 }]);
+    assert.equal(r.frames[0].key, 'walk_0_d04');
+  }, { ...api, frames: (m, ...args) => { const copy = structuredClone(m); copy.tiers.close.directionsByClip.walk = [...Array(16).keys()]; return frameDemand(copy, ...args); } }],
+  ['persistent-fallen-demand', (a) => {
+    const r = a.frames(bound.manifest, 'close', ['base'], [{ pose: BAKE_CLIP.STAND, phase: 0, heading: 0 }, { pose: BAKE_CLIP.FALLEN, phase: 0, heading: 0 }]);
+    assert.equal(r.frames.length, 2); assert.equal(r.files.length, 2); assert.ok(r.frames.some((f) => f.key === 'fallen_0_d00'));
+  }, { ...api, frames: (m, t, l, r) => frameDemand(m, t, l, r.filter((q) => q.pose !== BAKE_CLIP.FALLEN)) }],
+  ['source-page-dedup-not-rectangle-allocation', (a) => {
+    const r = frameDemand(bound.manifest, 'close', ['base'], [0, 1].map((d) => ({ pose: BAKE_CLIP.STAND, phase: 0, heading: d * Math.PI * 2 / 16 })));
+    const s = a.summary(bound.pages, r); assert.equal(s.frames, 2); assert.equal(s.sourcePages, 1); assert.equal(s.sourcePageGpuMipBytes, 340);
+    assert.equal(s.summedDistinctFrameAreaPixels, 2); assert.equal(s.isolatedRectangleMipByteMetric, 8); assert.equal(s.totalSceneWithinLimit, null);
+    assert.ok(s.allocationMeaning.includes('not an implemented')); assert.equal(s.fieldable, false);
+  }, { ...api, summary: (...args) => { const r = summarizeFrames(...args); r.sourcePageGpuMipBytes = r.isolatedRectangleMipByteMetric; return r; } }],
+  ['serial-one-active-page-not-all-queued', (a) => {
+    const next = bound.pages.filter((p) => p.tier === 'close').map((p) => p.file), r = a.serial(bound.pages, { next });
+    assert.equal(r.activeDecodedSourcePeakBytes, 384); assert.equal(r.extraDecodeUploadCopiesPeakBytes, 768);
+    assert.equal(r.activeEncodedPngPeakBytes, Math.max(...bound.pages.filter((p) => p.tier === 'close').map((p) => p.pngBytes)));
+    assert.equal(r.uniqueLifetimePngDownloadBytes, bound.pages.filter((p) => p.tier === 'close').reduce((n, p) => n + p.pngBytes, 0));
+    assert.ok(r.uniqueLifetimePngDownloadBytes > r.activeEncodedPngPeakBytes);
+  }, alterSerial((r) => { r.activeEncodedPngPeakBytes = r.uniqueLifetimePngDownloadBytes; })],
+  ['serial-old-plus-next-and-retained-versus-release', (a) => {
+    const retained = [bound.pages[36].file], previous = [bound.pages[0].file], next = [bound.pages[0].file, bound.pages[3].file];
+    const r = a.serial(bound.pages, { retained, previous, next, poolCapacities: [100, 200] });
+    assert.equal(r.loadedPages, 2); assert.equal(r.pendingPages, 1); assert.equal(r.sourcePageGpuReservationBytes, 340 * 2 + 508);
+    assert.equal(r.instanceGpuBytes, 3 * 300 * 48); assert.equal(r.retainedDecodedSourcesAssumptionBytes, 256 * 2 + 384);
+    const instances = 3 * 300 * 48, encoded = bound.pages[3].pngBytes;
+    assert.equal(r.retainedPolicyCpuEnvelopeBytes, 896 + 768 + encoded + instances);
+    assert.equal(r.releasedPolicyCpuEnvelopeBytes, 1152 + encoded + instances);
+    assert.equal(r.gpuCpuRetainedEnvelopeBytes, 1188 + instances + 896 + 768 + encoded + instances);
+    assert.equal(r.gpuCpuReleasedEnvelopeBytes, 1188 + instances + 1152 + encoded + instances);
+    assert.ok(r.releaseMeaning.includes('ALL')); assert.ok(r.releaseMeaning.includes('field'));
+    assert.equal(r.disposalRetryPolicy, 'UNIMPLEMENTED');
+  }, alterSerial((r) => { r.sourcePageGpuReservationBytes -= 340; })],
+  ['serial-exact-cpu-copies-and-combined-envelope', (a) => {
+    const r = a.serial(bound.pages, { retained: [bound.pages[0].file], next: [bound.pages[3].file], extraCopies: 3, poolCapacities: [10, 20] });
+    const instances = 2 * 30 * 48, encoded = bound.pages[3].pngBytes;
+    assert.equal(r.retainedPolicyCpuEnvelopeBytes, 640 + 1152 + encoded + instances);
+    assert.equal(r.releasedPolicyCpuEnvelopeBytes, 1536 + encoded + instances);
+    assert.equal(r.gpuCpuRetainedEnvelopeBytes, 848 + instances + 640 + 1152 + encoded + instances);
+    assert.equal(r.gpuCpuReleasedEnvelopeBytes, 848 + instances + 1536 + encoded + instances);
+  }, alterSerial((r) => { r.releasedPolicyCpuEnvelopeBytes -= r.instanceCpuBytes; })],
+  ['lifetime-downloads-survive-hypothetical-retirement', (a) => {
+    const old = bound.pages[0], current = bound.pages[3], r = a.serial(bound.pages, { next: [current.file], downloaded: [old.file] });
+    assert.equal(r.sourcePageGpuReservationBytes, current.gpuRgbaMipBytes); assert.equal(r.uniqueLifetimePngDownloadBytes, old.pngBytes + current.pngBytes);
+    assert.ok(r.lifetimeDownloadedFiles.includes(old.file)); assert.equal(r.totalSceneWithinLimit, null);
+  }, alterSerial((r) => { r.uniqueLifetimePngDownloadBytes = r.activeEncodedPngPeakBytes; })],
+  ['revisit-transfers-count-each-refetch-attempt', (a) => {
+    const old = bound.pages[0], other = bound.pages[3], refetchFiles = [old.file, old.file];
+    const r = a.serial(bound.pages, { next: [old.file], downloaded: [old.file, other.file], refetchFiles });
+    assert.equal(r.uniqueLifetimePngDownloadBytes, old.pngBytes + other.pngBytes);
+    assert.equal(r.refetchPngBytes, old.pngBytes * 2); assert.deepEqual(r.refetchFiles, refetchFiles);
+    assert.equal(r.transmittedPngBytesWithRetries, old.pngBytes * 3 + other.pngBytes);
+    assert.equal(r.sourcePageGpuReservationBytes, old.gpuRgbaMipBytes);
+    assert.ok(r.transferMeaning.includes('lower bound')); assert.ok(r.transferMeaning.includes('unverified'));
+  }, alterSerial((r) => { r.transmittedPngBytesWithRetries = r.uniqueLifetimePngDownloadBytes; })],
+  ['failed-siblings-reserved-no-current-retry', (a) => {
+    const next = [bound.pages[0].file, bound.pages[3].file], failedFile = next[1], r = a.serial(bound.pages, { next, failedFile });
+    assert.equal(r.sourcePageGpuReservationBytes, 848); assert.equal(r.failedGpuReservationBytes, 508); assert.equal(r.automaticRetryRequests, 0);
+    const retry = a.serial(bound.pages, { next, failedFile, retryFailed: true });
+    assert.equal(retry.proposedRetryRequests, 1); assert.equal(retry.transmittedPngBytesWithRetries, r.transmittedPngBytesWithRetries + bound.pages[3].pngBytes);
+    assert.equal(retry.automaticRetryRequests, 0); assert.equal(retry.disposalRetryPolicy, 'UNIMPLEMENTED');
+  }, alterSerial((r) => { r.automaticRetryRequests = 1; })],
+  ['cohort-nine-names-eligibility-and-original-catalog', (a) => {
+    const r = a.study(), names = Object.keys(groupsOf(bound.manifest.tiers.close));
+    assert.deepEqual(Object.keys(r.stableRuntimeLookAssignments512), names); assert.equal(Object.values(r.stableRuntimeLookAssignments512).reduce((n, v) => n + v, 0), 512);
+    assert.ok(Object.values(r.stableRuntimeLookAssignments512).every((v) => v > 0)); assert.equal(r.originalCloseFrameCatalog.length, 2592);
+    assert.ok(r.originalCloseFrameCatalog.some((f) => f.look === 'h7_cap_roll')); assert.equal(new Set(r.originalCloseFrameCatalog.map((f) => f.id)).size, 2592);
+    for (const row of r.rows) assert.deepEqual(row.looks, row.lookSet === 'all-nine' ? names : names.slice(0, 8));
+  }, alterStudy((r) => { delete r.stableRuntimeLookAssignments512.h7_cap_roll; })],
+  ['cohort-all-phases-and-declared-ranges', (a) => {
+    const r = a.study(), row = r.rows.find((v) => v.lookSet === 'all-nine' && v.clipSet === 'walk' && v.headingCohorts === 16 && v.phaseCohorts === 'all');
+    assert.equal(row.samples, 1); assert.equal(row.ranges.current.frames.min, 9 * 16 * 9); assert.equal(row.ranges.current.sourcePages.max, 36);
+    assert.equal(row.ranges.current.sourcePageGpuMipBytes.max, bound.pages.filter((p) => p.tier === 'close').reduce((n, p) => n + p.gpuRgbaMipBytes, 0));
+    assert.deepEqual(row.ranges.activeResolution.frameSlots, { min: 8, max: 8 });
+    assert.deepEqual(row.ranges.activeResolution.frameDirectionPairs, { min: 128, max: 128 });
+    assert.ok(r.rows.every((v) => v.ranges.prefetched.sourcePageGpuMipBytes.min >= v.ranges.current.sourcePageGpuMipBytes.min));
+    assert.ok(r.basis.includes('coupled')); assert.ok(r.limitations.some((l) => l.includes('not exhaustive')));
+  }, alterStudy((r) => { r.rows.find((v) => v.lookSet === 'all-nine' && v.clipSet === 'walk' && v.headingCohorts === 16 && v.phaseCohorts === 'all').ranges.current.frames.min--; })],
+  ['requested-phase-cohorts-report-resolved-clamp-collapse', (a) => {
+    for (const row of a.clampStudy().rows) {
+      assert.equal(row.phaseCohorts, 4); assert.equal(row.ranges.activeResolution.frameSlots.min, 1);
+      assert.equal(row.ranges.activeResolution.frameSlots.max, row.clipSet === 'load' ? 4 : 3);
+      assert.ok(row.cohortMeaning.includes('requested')); assert.ok(row.cohortMeaning.includes('collapse'));
+    }
+  }, { ...api, clampStudy: () => { const r = structuredClone(clampStudy); r.rows[0].ranges.activeResolution.frameSlots.min = 4; return r; } }],
+  ['cohort-does-not-admit-scene-or-policy', (a) => {
+    const r = a.study(); assert.equal(r.fieldable, false); assert.equal(r.totalSceneWithinLimit, null); assert.equal(r.gates.iPad, 'UNRUN');
+    assert.equal(r.gates.quality, 'UNRUN'); assert.equal(r.gates.disposalRetryPolicy, 'UNIMPLEMENTED'); assert.equal(r.transitions.length, 10);
+    const revisits = r.transitions.filter((s) => s.phase.startsWith('revisit'));
+    assert.equal(revisits.length, 2); assert.ok(revisits.every((s) => s.refetchPngBytes > 0 && s.transmittedPngBytesWithRetries > s.uniqueLifetimePngDownloadBytes));
+    assert.ok(r.transitions.every((s) => !s.fieldable && s.totalSceneWithinLimit === null && s.disposalRetryPolicy === 'UNIMPLEMENTED'));
+  }, alterStudy((r) => { r.fieldable = true; })],
+  ['serial-invalid-and-duplicate-assumptions-refused', (a) => {
+    assert.throws(() => a.serial(bound.pages, { next: [bound.pages[0].file, bound.pages[0].file] }), /invalid serial page/);
+    assert.throws(() => a.serial(bound.pages, { next: ['unknown'] }), /invalid serial page/);
+    assert.throws(() => a.serial(bound.pages, { retryFailed: true }), /invalid serial assumption/);
+    assert.throws(() => a.serial(bound.pages, { refetchFiles: [bound.pages[0].file] }), /prior download evidence/);
+    assert.throws(() => a.serial(bound.pages, { retained: [bound.pages[0].file], next: [bound.pages[0].file], failedFile: bound.pages[0].file }), /outstanding/);
+  }, { ...api, serial: () => ({}) }],
 ];
 let failed = 0;
 for (const [name, check, mutant] of tests) {
