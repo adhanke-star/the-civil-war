@@ -445,11 +445,26 @@ WCAG/visual review. Update docs/decision, explicitly stage owned files, commit/p
 CI/Pages; repair red CI. This does not close earned badges/X-Factors, cinematic charge/melee polish,
 soldier's-eye/fullkeyboard/division selection, campaign/deployment/art/device work or all remaining P2-P7.
 
-### P2i: keyboard march/attack targeting and shared help (next bounded slice)
+### P2i: keyboard march/attack targeting and shared help (locally green; integration pending)
+
+Root-owned candidate:22actual Input/Game/Unit/ArrowLayer positives+22intended assertion mutants,
+retained deterministic gates and unit pass. Initial native39/40 exposed a stale-target fixture race;
+corrected automatic cancellation bind passes repaired41/41 in37145ms20:52:31.468Z.
+Source review repaired finite no-enemy facing, short-label clearing, stale Escape consumption,
+unchanged geometry reuse and scale/march-speed invalidation; zero-length lines avoid NaN generation.
+Accessible status updates on explicit adjustment, with distance/compass/exact facing degrees;
+per-frame validation does not announce repeatedly. Shared native Menu labels are44px, tab boundaries
+contain focus and Close scrolls into view. Finalfocused45/45 in35585ms20:54:58.280Z, finalfrozenfull
+289/289 in452304ms21:04:08.721Z, errors/warnings/all scoped axe[]; ten r2 source hashes exact.
+Initialfull175/176 failed only a hidden Look-tab timeout after keyboardControls closed the sandbox.
+Test-only restoration through actual sb-toggle repairs the harness; all other nine hashes remain exact.
+Keep the initial failed receipt. Final six keyboard PNGs root/independently viewed; independent source,
+receipt and WCAG/rendered review clear. Integration/exactSHA CI/Pages pending. Retained/new
+deterministic165+165 and unit/syntax/diff pass.
 
 After P2h exact CI/Pages are green, fill the concrete keyboard-only march/ranged-attack gap through
 existing Input, Game.orderGroup, ArrowLayer/Hud ghost and native menu seams. Root owns
-src/ui/input.js, src/ui/hud.js, src/main.js only if render-time invalidation needs it, index.html,
+src/ui/input.js, src/ui/hud.js, src/ui/hud.css, src/main.js for render-time invalidation, index.html,
 focused keyboard Node/UI coverage, tools/test.mjs, CI/sw.js/docs. No new persistent store, new group
 metadata, combat multipliers, camera mode or historical labels. Existing pointer/touch and six orders
 retain behavior. One root writer/browser; independent helpers only read/review.
@@ -458,7 +473,8 @@ Fixed keys: B begins march targeting for the selected orderable leader/group at 
 arrows move the world destination in camera-relative25m steps (Shift5m), bounded by the terrain.
 T begins ranged-attack targeting/cycles deterministic alive non-routing hostile units, Shift+T reverses. Preserve
 friendly selection and route attack through actual effective-range halt; never convert it to Charge.
-Q/E adjust preview facing15degrees (Shift5degrees); outside targeting arrows/Q/E remain camera keys.
+Q/E adjust march preview facing15degrees (Shift5degrees); attack ghosts face their chosen target,
+matching Game.attackStep's enforced bearing. Outside targeting arrows/Q/E remain camera keys.
 Enter commits the actual preview through Game.orderGroup; Escape cancels only the preview and keeps
 selection (outside targeting existing deselect remains). ? opens shared native Controls/menu help,
 clears targeting/camera keys and restores the triggering connected focus on close. Starting/cancelling
@@ -482,6 +498,80 @@ retained deterministic positives/mutants/unit, focused native, one frozen full n
 source/WCAG/rendered review; docs/decision explicit commit/push, exact-SHA CI/Pages and red repair.
 This closes one keyboard ordering/help slice, not division selection, soldier's-eye, deployment/living
 camp, all keyboard/UI polish or remaining P2/P3-P7. Do not invent division IDs from Henry parent strings.
+
+### P2j: compare and issue saved depot equipment in camp (next dependency-ready slice)
+
+After P2i exact CI/Pages pass, make saved depot gear useful without another reward roll. Root owns
+the existing src/franchise/save.js transaction seam, src/reward/model.js for bounded displaced provenance,
+src/ui/entry.js and entry.css, reward.html/src/franchise/practice-ui.js for awaited writer adaptation,
+focused reward/save and camp Node/UI coverage, tools/test.mjs, CI/sw.js/docs. No new store/key/schema, roster/stat editor,
+in-progress save, deployment, shop, campaign phase or art work in this slice. One writer/browser;
+independent source and WCAG reviewers only read. P2i source stays frozen until its full/native integration.
+
+Two green commit boundaries keep this change reviewable: P2j1 adds the pure exchange, coordinated
+asynchronous store and awaited existing reward/practice/import callers, with deterministic and real
+two-tab writer proofs plus retained native flow. P2j2 connects the bounded camp comparison/issue modal
+and pending-exchange recovery. P2j is complete only after both boundaries and their exact-SHA CI/Pages;
+the transaction foundation alone is not camp-equipment acceptance. P2j1 owns no new comparison UI.
+
+Expose one pure validated depot-exchange operation and one authoritative store operation taking
+brigade identity+depot item identity and the exact displayed baseline. Reuse actual model.equip,
+compare/canCarry/ratings; load validated current storage, reject missing/stale/corrupt baseline before
+mutation, and replace once only after full next-snapshot validation. Every complete/import/issue writer
+must participate in one origin-wide Web Lock named for the existing progress key; adapt all callers to
+await asynchronous writes while load remains synchronous. Read/check/write alone is not cross-tab
+compare-and-swap. Check the baseline inside the shared exclusive lock; no unsafe fallback writes when
+the browser lacks coordination. Capture the immutable draft/baseline before queueing; hold the lock only
+for synchronous storage read/validate/check/write, never file reads, confirmation, rendering or animation.
+Every resolution/rejection releases it. Coordination covers updated participating clients; an already-open
+older page or direct localStorage writer does not acquire this lock. Pure preparation validates without writing.
+Inject a stateful serial lock
+in Node controls, and prove real two-tab queued writes in one renderer-free native browser workload.
+Preserve format/version,
+completed award/seed/grade, brigade IDs/kind/men/guns/veterancy/base, all item identities/types/rarity/
+condition/source and inventory cardinality. Recompute OVR; one depot item becomes equipped, displaced
+gear returns to the depot with bounded existing equip provenance semantics (legal160-character
+brigade names retain full UI text; displaced.from remains <=160). Append exactly one consistent issued
+record so reverse audit remains valid. Never use complete(sameAward) to persist camp edits; its
+idempotence must continue returning current saved state, including legitimate camp changes.
+Import uses readRawBaseline() and required import(text,{previousRaw}); read exact string/null bytes
+after file validation and before consent, then check strict equality inside the lock. Missing/undefined
+is not an observed empty store. Do not parse the old bytes, so unchanged corrupt JSON remains repairable;
+changed corrupt or whitespace-only bytes reject. Retain the original baseline on quota retry; conflicts
+require a fresh explicit import/consent, never a silent retry rebase. A failed baseline read keeps the
+validated file exportable but grants no write; successful baseline read plus consent is still required.
+Reject depleted/incompatible/missing gear, duplicates, oversized issued history and invalid commands
+before write. Concurrent/stale changes cannot merge or overwrite. Explicit older export import remains
+intentional replacement; no anti-cheat claim.
+
+Keep existing12+12 camp pagination and legal200formations/2000depot bounds. Each displayed depot
+item offers a keyboard/touch Compare and issue action. A native owned modal selects a compatible
+nondepleted saved brigade (best-fit default is an explicit recommendation), displays full item/brigade
+names and before/after ratings, and confirms or cancels. Confirm saves one exchange, then renders the
+real updated camp and returns connected focus; Cancel/Escape/open/reload/export grant nothing and
+do not write. No unbounded reward-grid mount. Preserve preferences/locks and title-only loading without
+field assets or renderer. Prevent import/compare/retry overlap and stale modal callbacks.
+
+One operation owner spans file reads, native modal/queued-close, asynchronous write and finally in camp,
+reward.html and practice-ui. Gate start/import/retry/replay until settlement so a late completion cannot
+clear a newer pending result; pending import/exchange are mutually exclusive. Use identities rather than page indexes; after an
+issued depot item disappears, preserve/clamp pagination and focus a connected next item/pager/heading.
+Storage failure must leave stored and displayed saved state exact, retain an immutable validated draft
+with its original baseline+brigade/item identities,
+with useful retry/export, and never claim saved. Retry rechecks the original baseline; a concurrent
+change remains rejected. Retry never rebases or appends twice. Export clearly distinguishes pending
+draft from displayed saved state. Bind A→B→A/cross-brigade audit cycles, same-award replay0writes,
+maximum-length labels and near-1MiB/issued-limit record-growth refusal before mutation.
+Actual native UI: saved depot -> compare -> cancel unchanged -> confirm -> one exchange -> reload ->
+export exact -> import roundtrip; repeated activation/reload no extra item/award/record; depleted or
+wrong-kind refusal; concurrent tab change and blocked/quota failures preserve old saved state and
+pending draft. Keyboard focus containment/scroll/return,320px full text/44px targets, scoped axe/PNG,
+largest legal inventory pagination and no renderer/title asset regression are acceptance gates.
+Run owned syntax/diff, meaningful actual save/equip positives+intended assertion mutants, retained
+deterministic/unit gates with awaited rejection checks (no unhandled Promise or harness-error acceptance),
+focused native, one frozen full native, independent source/WCAG/rendered
+review, docs/decision, explicit commit/push and exact-SHA CI/Pages; repair red CI. Saved-gear deployment,
+living camp/title, named/campaign saves and all P3-P7 remain open.
 
 ### Required battle-system work (P3/P4; do not hide it inside “build Shiloh”)
 
@@ -616,7 +706,15 @@ source reviews clear runtime binding, transfer/copy arithmetic and protected rep
 All release/cancel/frame-loader policy remains UNIMPLEMENTED,
 fieldable:false/scene:null/quality/native/iPad UNRUN; existing250MB/200MB limits,
 source45/5184/nine hashes/eligibility/directions/anchors and original bytes remain unchanged.
-Run syntax/diff, extended positives/intended assertion mutants, existing unit, independent source
+Completed source dispatch37527814035 at0836d2acc30d15c24c777fd5582f7cf9dab612a1;
+CI37527810306/Pages37527810298 green. Actual2599531B/192rows/2592catalog/10transitions report
+passes independent full reconstruction and603serial arithmetic checks; all45source page rows and
+original hashes match prior report. Smallest evaluated eligible-eight close168378016B plus field
+83402304B exceeds250MB textures alone; every serial partial scene exceeds limit. One walk cohort
+rectangle metric2722484B shows locality, not packing admission. All clips/phases/headings eligible
+rectangle mip metric600072844B also excludes packing costs. Future lossless streaming/layout must
+bound actual population and transition/cache demand; wholesale repacking alone cannot fit full demand.
+Required gates were syntax/diff, extended positives/intended assertion mutants, existing unit, independent source
 review, exact-SHA CI/Pages and one existing residency Actions dispatch. Read actual small report,
 recompute bounds/transition/serial rows and hashes; original PNGs remain runner-only. Do not encode,
 repack, upload fieldable assets, change runtime or close quality/native/device gates from this study.

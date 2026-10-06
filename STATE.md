@@ -7,13 +7,13 @@
 - **P2d:** 2d761db; 12+12, native full 169/169; CI 37503374519/Pages 37503374677 green.
 - **P2e:** repair48a1f72; CI37508495648/Pages37508497027 green; native186/186, isolated software20/20.
 - **P2f:** 13a9ee9; pure13+13/native209/209; CI37511709837/Pages37511709840 green.
-- **Art next:** residency37520706744 binds45pages; raw close-page loading fails budget; frame-demand study next.
+- **Art next:** residency37527814035 binds192frame cohorts; source-page limits fail; lossless frame layout next.
 - **Current play:** title Continue -> intro/saved camp; ?practice Henry rewards; historical/sandbox isolated.
 - **Missing:** saved-gear deployment, living title/camp, campaign saves, phase packs and progression.
 - **Figures:** rigged default; second-pass baked Union and tinted Confederate placeholders remain.
 - **Approved art:** bake 820846f / 37347072866, sheets 1-12, 5,184 frames, nine looks per tier.
 - **Failed candidates:** UASTC 37360904656 and direct BC7/ASTC 37404193171; limits stay unchanged.
 - **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
-- **Proof:** retained/new pure127+127; P2h focused52/52, frozen native260/260; first card50.3s.
+- **Proof:** retained/new165+165; P2i focused45/45, frozen native289/289; intro first card47.8s.
 - **Coordination:** no ledger; preserve workspace file; HANDOFF/PLAN P2-P7, active goal, no scheduler.
-- **Runtime/WIP:** cw-v14 P2h a10b128 CI37525324425/Pages37525324397 green; next P2i keyboard targeting.
+- **Runtime/WIP:** P2i cw-v15 local green, final review/integration pending; next P2j1 coordinated saves.

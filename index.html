@@ -38,11 +38,12 @@
 <body>
   <main id="battle" hidden>
     <canvas id="battlefield" tabindex="0" role="application"
-            aria-label="Battlefield. Tap or click a blue brigade to select it, then drag from it to draw its march; release on an enemy to attack. Drag the ground or scroll with two fingers to pan, pinch or use the wheel to zoom, Q and E turn, W A S D pan."></canvas>
+            aria-label="Battlefield. Select a blue brigade with its flag or Army list. B starts keyboard march: arrows move its destination, Q/E set facing, Shift uses fine steps. T chooses a ranged enemy target. Enter orders, Escape cancels, question mark opens help. You can also drag from a brigade to march or onto an enemy to attack. Drag ground or W A S D pan; wheel zooms."></canvas>
     <div id="markers" role="group" aria-label="Brigades"></div>
     <div id="field-crates" role="group" aria-label="Field stores"></div>
     <div id="ticks" aria-hidden="true"></div>
     <p id="ghost-label" aria-hidden="true" hidden></p>
+    <p id="keyboard-targeting" class="panel" role="status" hidden></p>
 
     <div id="topbar" class="panel">
       <button id="menu-btn" type="button" aria-haspopup="dialog" aria-label="Menu" title="Menu">☰</button>
@@ -141,9 +142,11 @@
       <p class="row"><a href="?battle=henry-hill" style="color: var(--focus)">Historical battle</a> · <a href="?practice" style="color: var(--focus)">Henry Hill practice</a> · <a href="?intro" style="color: var(--focus)">Introductory fight</a> · <a href="?camp" style="color: var(--focus)">Saved army</a></p>
       <h3>Controls</h3>
       <ul class="keys">
-        <li><b>Select</b>: click or tap a brigade or its flag (Tab cycles flags); Shift+drag on the ground, or hold a finger still then drag, to box-select several</li>
+        <li><b>Select</b>: click or tap a brigade or its flag (Tab cycles flags; Shift+Enter adds or removes a friendly flag); Shift+drag on the ground, or hold a finger still then drag, to box-select several</li>
         <li><b>March</b>: drag from your brigade and release; it halts to fight any enemy that comes in range on the way, then marches on. Hold Shift (or twist a second finger) to set the facing. Right-click ground for a straight march</li>
         <li><b>Attack</b>: release the drag on an enemy: the brigade closes to effective range, halts and fires, and follows if the enemy moves. Only Charge goes in with the bayonet</li>
+        <li><b>Keyboard march</b>: select with a flag or Army list, press B, then arrows to move the destination 25 m (Shift: 5 m). Q/E turn its facing 15° (Shift: 5°). Enter orders; Escape cancels the ghost and keeps your selection</li>
+        <li><b>Keyboard attack</b>: T chooses or cycles enemy targets; Shift+T cycles backwards. Enter orders ranged fire facing that target. B switches to march; ? opens this help. Starting or cancelling a ghost issues no order</li>
         <li><b>Camera</b>: drag the ground or two-finger scroll to pan; pinch or wheel to zoom toward the pointer (the view tilts as you zoom); right-drag or Option + scroll to turn; WASD / arrows, Q/E, +/-; double-click or double-tap a flag to fly to it; click the map</li>
         <li><b>Reading the field</b>: under each flag is what the brigade is doing; the bar under the flag is its strength, striped when shaken, broken when wavering, hollow when routing</li>
         <li><b>Orders</b>: H hold · C charge · R run · F fall back · X halt · V hold fire · Space pause · 1/2/3 speed · M map · L army list</li>

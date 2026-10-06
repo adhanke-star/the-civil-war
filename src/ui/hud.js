@@ -148,14 +148,24 @@ export class Hud {
     document.querySelector('#balance .flag.cs').style.backgroundImage = flagDataUrl('CS');
 
     for (const btn of document.querySelectorAll('#orders button')) {
-      btn.addEventListener('click', () => { onOrder(btn.dataset.order); this.updateOrders(); });
+      btn.addEventListener('click', () => { this.onDirectOrder?.(); onOrder(btn.dataset.order); this.updateOrders(); });
     }
     $('pause').addEventListener('click', onPause);
     for (const b of document.querySelectorAll('.speeds button')) b.addEventListener('click', () => onSpeed(Number(b.dataset.speed)));
     const menu = $('menu');
-    $('menu-btn').addEventListener('click', () => {
-      for (const r of menu.querySelectorAll('input[name=quality]')) r.checked = r.value === this.quality;
-      menu.showModal();
+    $('menu-btn').addEventListener('click', (e) => this.openMenu(e.currentTarget));
+    menu.addEventListener('close', () => {
+      const trigger = this.menuTrigger; this.menuTrigger = null;
+      if (trigger?.isConnected && !trigger.closest('[inert]')) trigger.focus({ preventScroll: true });
+    });
+    menu.addEventListener('keydown', (e) => {
+      if (e.key !== 'Tab') return;
+      const live = [...menu.querySelectorAll('button, input, a[href], select, textarea, [tabindex]')]
+        .filter((el) => !el.disabled && el.tabIndex >= 0 && el.getClientRects().length && (el.type !== 'radio' || el.checked));
+      const first = live[0], last = live.at(-1), current = document.activeElement;
+      if (first && ((e.shiftKey && current === first) || (!e.shiftKey && current === last))) {
+        e.preventDefault(); (e.shiftKey ? last : first).focus();
+      }
     });
     for (const r of menu.querySelectorAll('input[name=quality]')) r.addEventListener('change', () => onQuality(r.value));
     $('sound-toggle').addEventListener('change', (e) => onSound(e.target.checked));
@@ -211,7 +221,7 @@ export class Hud {
     b.querySelector('.cmd').textContent = commanderLine(u);
     // pointer presses go through ui/input.js (select, drag an order, double-tap); a click without a pointer
     // (Enter or Space on a focused flag: detail 0) selects it from the keyboard
-    b.addEventListener('click', (e) => { e.stopPropagation(); if (e.detail === 0) this.onSelect(u, { fromMarker: true }); });
+    b.addEventListener('click', (e) => { e.stopPropagation(); if (e.detail === 0) this.onSelect(u, { add: e.shiftKey, fromMarker: true }); });
     b.addEventListener('dblclick', (e) => { e.stopPropagation(); if (this.onFocus) this.onFocus(u); });
     b.addEventListener('pointerdown', (e) => this.onMarkerDown && this.onMarkerDown(u, e));
     const link = document.createElementNS('http://www.w3.org/2000/svg', 'g');
@@ -311,6 +321,22 @@ export class Hud {
     this.showLabel(info || this.marchLabel());
   }
 
+  /** One native help/menu path, shared by the menu button and keyboard. */
+  openMenu(trigger) {
+    const menu = $('menu');
+    if (menu.open) return;
+    this.onOpenMenu?.(); this.menuTrigger = trigger;
+    for (const r of menu.querySelectorAll('input[name=quality]')) r.checked = r.value === this.quality;
+    menu.showModal();
+  }
+
+  setTargeting(text) {
+    const el = $('keyboard-targeting');
+    if (el.textContent !== (text || '')) el.textContent = text || '';
+    el.hidden = !text;
+    document.body.classList.toggle('keyboard-targeting', !!text);
+  }
+
   showLabel(info) {
     this.ghostAt = info;
     if (!info) { this.ghostLabel.hidden = true; return; }
@@ -344,7 +370,7 @@ export class Hud {
     const w = window.innerWidth, h = window.innerHeight;
     const bounds = { left: 4, right: w - 4, top: $('topbar').getBoundingClientRect().bottom + 4, bottom: h - 4 };
     // Reserve the actual visible panels rather than the entire dock's transparent bounding box.
-    const obstacles = ['unitcard', 'orders', 'minimap-box', 'objective', 'tip', 'intro-hint', 'army', 'field-stores', 'feed', 'moment-banner'].flatMap((id) => {
+    const obstacles = ['unitcard', 'orders', 'minimap-box', 'objective', 'tip', 'intro-hint', 'army', 'field-stores', 'feed', 'moment-banner', 'keyboard-targeting'].flatMap((id) => {
       const el = $(id), r = el.getBoundingClientRect();
       return !el.hidden && r.width > 0 && r.height > 0 ? [{ x: r.x + r.width / 2, y: r.bottom, w: r.width, h: r.height }] : [];
     });

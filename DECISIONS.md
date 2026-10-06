@@ -1,5 +1,14 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0035 — Keyboard destinations use the same preview and order path as pointer orders (2026-10-06)
+B/T targeting reuses world-point preview and Game.orderGroup; march ghosts carry one finite facing
+and rotated group centres, ranged attacks retain the engine's target-facing behavior. Starting or
+cancelling targeting issues nothing. Selection/target/dialog/pointer/blur invalidation preserves
+ordinary Escape semantics. Geometry refreshes only when its inputs change, including zoom scale.
+Explicit adjustments announce distance/bearing/exact degrees without per-frame status churn. Native
+Menu/help shares connected-trigger focus return, visible44px labels and scoped keyboard boundaries.
+Leader attack ghosts remain nominal range marks; group/line-of-sight attack footprints are not certified.
+
 ## 0034 — Frame locality is distinct from source-page residency (2026-10-06)
 Report-only art analysis resolves original frames through the actual runtime layout, preserving named
 looks and rectangle/anchor/scale metadata. Synthetic requested cohorts carry resolved frame ranges;

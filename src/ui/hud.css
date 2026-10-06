@@ -89,6 +89,11 @@ body dialog.field-loot-preview .rw { left: 0; right: 0; top: 60px; bottom: 0; }
 #field-stores button:disabled { color: var(--dim); cursor: default; }
 #intro-hint { bottom: calc(var(--edge) + var(--dock-h) + 14px + env(safe-area-inset-bottom)); left: calc(var(--edge) + env(safe-area-inset-left));
   max-width: min(430px, 47vw); margin: 0; padding: 9px 12px; border-color: var(--focus); pointer-events: none; }
+#keyboard-targeting { bottom: calc(var(--edge) + var(--dock-h) + 14px + env(safe-area-inset-bottom));
+  left: calc(var(--edge) + env(safe-area-inset-left)); right: calc(var(--edge) + env(safe-area-inset-right));
+  box-sizing: border-box; margin: 0; padding: 9px 12px; color: #fff0c5; background: #302719;
+  border-color: #b18c43; pointer-events: none; z-index: 12; }
+#keyboard-targeting[hidden], .keyboard-targeting #tip, .keyboard-targeting #intro-hint { display: none; }
 #intro { margin: auto; width: min(460px, calc(100vw - 64px)); max-height: calc(100vh - 64px); overflow: auto; }
 #intro button { min-height: 48px; min-width: 48px; padding: 10px 24px; background: #f1ece0; color: #17141a; cursor: pointer; border-radius: 6px; border: 1px solid #b4aa98; }
 #banner { top: calc(var(--edge) + var(--top-h) + 6px + env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px;
@@ -223,6 +228,9 @@ dialog h2 { margin: 0; font: normal 24px Georgia, serif; }
 dialog h3 { margin: 14px 0 4px; font: normal 17px Georgia, serif; }
 dialog .sub { margin: 2px 0 12px; color: var(--dim); }
 dialog fieldset { border: 1px solid var(--panel-edge); border-radius: 6px; display: flex; gap: 16px; padding: 6px 12px 10px; }
+#menu fieldset { flex-wrap: wrap; gap: 4px 16px; }
+#menu fieldset label { display: inline-flex; align-items: center; min-height: 44px; }
+#menu label.row { display: flex; align-items: center; min-height: 44px; }
 dialog .row { display: block; margin: 10px 0; }
 dialog .keys { margin: 0; padding-left: 18px; }
 dialog .small { font-size: 13px; color: var(--dim); }

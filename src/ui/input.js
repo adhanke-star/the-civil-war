@@ -16,10 +16,11 @@
 //   box-select; two fingers pinch to zoom and drag to pan; double-tap a brigade to fly to it. The browser's
 //   own pinch and its compatibility mouse events after a touch are suppressed.
 // Keys: H hold, C charge, R run, F fall back, X halt, V hold fire, Space pause, 1/2/3 speed, M map, L army
-//   list, Esc deselect, G quality; camera keys are handled by RtsCamera. Orders go to every selected brigade.
+//   list, B march targeting, T ranged target, Enter commit, Esc cancel/deselect, ? help, G quality.
+//   During march targeting arrows move the destination and Q/E face the ghost; Shift uses finer steps.
 
 import { RULES } from '../sim/rules.js';
-import { coverWord, minutesText } from './hud.js';
+import { coverWord, minutesText, compass } from './hud.js';
 
 const DRAG_PX = { mouse: 7, pen: 7, touch: 11 };
 const MIN_ORDER_M = 22;
@@ -31,6 +32,7 @@ export class Input {
   constructor({ canvas, rts, game, arrows, hud, playerSide, onQualityKey }) {
     Object.assign(this, { canvas, rts, game, arrows, hud, playerSide, onQualityKey });
     this.drag = null;
+    this.targeting = null;
     this.pointers = new Map(); // pointerId -> { x, y, type }
     this.lastTouch = -1e9;
     this.lastTap = null; // { t, unit } for double-tap
@@ -52,12 +54,14 @@ export class Input {
     window.addEventListener('pointermove', (e) => this.move(e));
     window.addEventListener('pointerup', (e) => this.up(e));
     window.addEventListener('pointercancel', (e) => this.cancel(e));
+    window.addEventListener('pointerdown', () => this.cancelTargeting());
     // Safari: no page pinch-zoom or rubber-band scroll over the field (touch-action: none covers the rest)
     for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
     for (const el of [canvas, document.getElementById('markers')]) el.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
     this.wheelGesture = null;
     const onWheel = (e) => {
+      this.cancelTargeting();
       e.preventDefault();
       this.rts.inertia = null;
       const kind = this.wheelKind(e);
@@ -77,6 +81,10 @@ export class Input {
     window.addEventListener('keydown', (e) => this.key(e));
     window.addEventListener('keyup', (e) => rts.onKey(e, false));
     window.addEventListener('blur', () => { rts.keys.clear(); this.cancel(); });
+    game.on('select', () => this.cancelTargeting());
+    game.on('remove', () => this.refreshTargeting());
+    hud.onOpenMenu = () => { rts.keys.clear(); this.cancel(); };
+    hud.onDirectOrder = () => this.cancelTargeting();
   }
 
   /**
@@ -121,6 +129,7 @@ export class Input {
   // ---------------------------------------------------------------------------------------------------
   down(e, markerUnit) {
     if (this.isCompatMouse(e)) return;
+    this.cancelTargeting();
     this.game.effects.unlock();
     const touch = e.pointerType === 'touch';
     if (touch) {
@@ -255,32 +264,39 @@ export class Input {
 
   /** The order being drawn: preview line, ghost, arc and label (move, or attack when over an enemy). */
   orderPreview(d, cx, cy, shift) {
+    const p = this.rts.pick(cx, cy, this.canvas);
+    if (p) this.orderPreviewAt(d, p, shift);
+  }
+
+  /** Shared world-point preview: keyboard march forces ground, keyboard attack supplies its target. */
+  orderPreviewAt(d, p, shift = false, target = undefined) {
     const g = this.game;
     const u = d.unit;
-    const p = this.rts.pick(cx, cy, this.canvas);
-    if (!p) return;
     const last = d.points[d.points.length - 1];
     if (Math.hypot(p.x - last[0], p.z - last[1]) > 9) d.points.push([p.x, p.z]);
     const over = this.unitAt(p);
-    const enemy = over && over.side !== u.side && over.state !== 'routing' ? over : null;
+    const enemy = target === undefined ? (over && over.side !== u.side && over.state !== 'routing' ? over : null) : target;
     const arc = this.arcOf(u);
     const width = Math.min(26, Math.max(12, u.halfFront * 0.22));
     d.enemy = enemy;
     if (enemy) {
       const halt = g.attackHalt(u, enemy);
-      d.preview = this.arrows.setPreview([[u.x, u.z], [halt.x, halt.z]], u.side, width, u.lineHalfFront(), { facing: halt.facing, arc });
-      if (!d.preview) d.preview = [[u.x, u.z], [halt.x, halt.z]];
       const len = Math.hypot(halt.x - u.x, halt.z - u.z);
+      if (len >= 6) d.preview = this.arrows.setPreview([[u.x, u.z], [halt.x, halt.z]], u.side, width, u.lineHalfFront(), { facing: halt.facing, arc });
+      else { this.arrows.clearPreview(); d.preview = null; }
+      if (!d.preview) d.preview = [[u.x, u.z], [halt.x, halt.z]];
       const mins = g.marchMinutes(len);
       this.hud.setGhostLabel({ text: `Attack ${enemy.short}: halts at ${Math.round(g.effRange(u))} m and fires${len > 10 ? ` · ${minutesText(mins)}` : ''}`, x: halt.x, z: halt.z });
       d.end = p;
       return;
     }
     const pts = d.points.concat([[p.x, p.z]]);
-    let face = g.ghostFacing(p.x, p.z, u.side, undefined);
+    let face = g.ghostFacing(p.x, p.z, u.side, u.facing);
     if (shift) face = this.dragDirection(pts) ?? face;
     if (d.faceSet) face = d.face;
     else d.face = face;
+    const length = pts.slice(1).reduce((n, p, i) => n + Math.hypot(p[0] - pts[i][0], p[1] - pts[i][1]), 0);
+    if (length < 6) { d.preview = null; d.end = p; this.arrows.clearPreview(); this.hud.setGhostLabel(null); return; }
     let extras = null;
     if (g.selection.length > 1 && g.selection.includes(u)) {
       const f = Number.isFinite(face) ? face : u.facing;
@@ -296,7 +312,7 @@ export class Input {
       const c = g.coverAt(end.x, end.z);
       const cover = c.value > 1 ? ` · ${c.kind}: ${coverWord(c.value)} cover` : '';
       this.hud.setGhostLabel({ text: `${minutesText(g.marchMinutes(end.length))} march${cover}`, x: end.x, z: end.z });
-    }
+    } else this.hud.setGhostLabel(null);
   }
 
   /** Facing along the last ~25 m of the drag (Shift while dragging). */
@@ -402,6 +418,7 @@ export class Input {
   }
 
   cancel(e) {
+    this.cancelTargeting();
     if (e && e.pointerId !== undefined) this.pointers.delete(e.pointerId);
     else this.pointers.clear();
     clearTimeout(this.longPress);
@@ -421,11 +438,106 @@ export class Input {
 
   hideBox() { this.box.hidden = true; }
 
+  cancelTargeting(message = null) {
+    if (this.targeting) { this.targeting = null; this.arrows.clearPreview(); this.hud.setGhostLabel(null); }
+    this.hud.setTargeting(message);
+  }
+
+  eligibleTargets(leader) {
+    return this.game.units.filter((u) => u.side !== leader.side && u.alive && u.state !== 'routing')
+      .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  }
+
+  beginTargeting(mode, reverse = false) {
+    const unit = this.game.selected;
+    if (!unit || !this.game.units.includes(unit) || !this.mine(unit)) {
+      this.cancelTargeting(); this.hud.toast('Select a brigade that can take orders.'); return;
+    }
+    const old = this.targeting, targets = mode === 'attack' ? this.eligibleTargets(unit) : [];
+    if (mode === 'attack' && !targets.length) { this.cancelTargeting(); this.hud.toast('No enemy is available for ranged attack.'); return; }
+    this.cancel(); this.rts.keys.clear(); this.rts.inertia = null;
+    const direction = reverse ? -1 : 1, i = old?.mode === 'attack' ? targets.indexOf(old.enemy) : -1;
+    const enemy = mode === 'attack' ? targets[(i < 0 ? (reverse ? targets.length - 1 : 0) : (i + direction + targets.length) % targets.length)] : null;
+    this.targeting = { mode, unit, selection: [...this.game.selection], point: { x: unit.x, z: unit.z },
+      points: [[unit.x, unit.z]], enemy, face: unit.facing, faceSet: false };
+    // Native Enter/Space controls must keep their meaning; targeting owns keys on the field.
+    this.canvas.focus({ preventScroll: true });
+    this.refreshTargeting(true);
+  }
+
+  refreshTargeting(announce = false) {
+    const d = this.targeting;
+    if (!d) return false;
+    const g = this.game;
+    if (document.querySelector('main')?.inert || document.querySelector('dialog[open]') || g.selected !== d.unit
+      || !g.units.includes(d.unit) || !this.mine(d.unit) || g.selection.length !== d.selection.length
+      || g.selection.some((u, i) => u !== d.selection[i])) { this.cancelTargeting(); return false; }
+    if (d.mode === 'attack' && !this.eligibleTargets(d.unit).includes(d.enemy)) {
+      this.cancelTargeting(); this.hud.toast('That enemy is no longer available. Choose another target with T.'); return false;
+    }
+    d.points = [[d.unit.x, d.unit.z]];
+    const p = d.mode === 'attack' ? { x: d.enemy.x, z: d.enemy.z } : d.point;
+    const automaticFace = d.mode === 'attack' ? this.game.attackHalt(d.unit, d.enemy).facing : this.game.ghostFacing(p.x, p.z, d.unit.side, d.unit.facing);
+    const previewKey = JSON.stringify([d.mode, p.x, p.z, d.faceSet ? d.face : automaticFace, this.game.range(d.unit), this.game.effRange(d.unit),
+      this.arrows.mpp, this.game.marchMinutes(1),
+      g.orderable().map((u) => [u.id, u.x, u.z, u.facing, u.halfFront, u.lineHalfFront()]), this.arrows.styles()]);
+    if (previewKey !== d.previewKey) {
+      this.orderPreviewAt(d, p, false, d.mode === 'attack' ? d.enemy : null);
+      d.previewKey = previewKey;
+    }
+    if (announce || !d.statusText) {
+      const distance = Math.round(Math.hypot(p.x - d.unit.x, p.z - d.unit.z));
+      const bearing = distance ? compass(Math.atan2(p.x - d.unit.x, p.z - d.unit.z)) : 'here';
+      const face = d.face ?? d.unit.facing, degrees = ((Math.round(180 - face * 180 / Math.PI) % 360) + 360) % 360;
+      d.statusText = d.mode === 'attack'
+        ? `Attack ${d.enemy.short} · halt at ${Math.round(g.effRange(d.unit))} m · T next / Shift+T previous · Enter orders ranged fire · Esc cancels · ? help`
+        : `March ${distance} m ${bearing}, facing ${compass(face)} ${degrees}° · arrows 25 m / Shift 5 m · Q/E facing 15° / Shift 5° · Enter orders · Esc cancels · ? help`;
+    }
+    this.hud.setTargeting(d.statusText);
+    return true;
+  }
+
+  targetingKey(e, k) {
+    if (!this.refreshTargeting()) return false;
+    const d = this.targeting;
+    if (k === 'escape') { this.cancelTargeting(); return true; }
+    if (k === 'enter') {
+      if (e.repeat) return true;
+      let length = 0;
+      for (let i = 1; i < (d.preview?.length || 0); i++) length += Math.hypot(d.preview[i][0] - d.preview[i - 1][0], d.preview[i][1] - d.preview[i - 1][1]);
+      if (d.mode === 'march' && length < MIN_ORDER_M) { this.hud.toast('Move the destination at least 22 metres before ordering.'); return true; }
+      const ok = d.mode === 'attack' ? this.game.orderGroup(d.unit, { type: 'attack', target: d.enemy })
+        : this.game.orderGroup(d.unit, { type: 'move', points: d.preview, endFacing: d.face });
+      this.cancelTargeting(); this.hud.toast(ok ? `${d.mode === 'attack' ? `Ranged attack on ${d.enemy.short}` : 'March'} ordered.` : 'That brigade could not take the order.'); return true;
+    }
+    if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'q', 'e'].includes(k)) {
+      if (d.mode === 'attack') { this.hud.toast('Ranged attacks face their target. Use T to choose another enemy, or B to march.'); return true; }
+      const step = e.shiftKey ? 5 : 25, angle = (e.shiftKey ? 5 : 15) * Math.PI / 180;
+      if (k === 'q' || k === 'e') { d.face = (Number.isFinite(d.face) ? d.face : d.unit.facing) + (k === 'q' ? -angle : angle); d.faceSet = true; }
+      else {
+        const right = k === 'arrowright' ? step : k === 'arrowleft' ? -step : 0;
+        const forward = k === 'arrowup' ? step : k === 'arrowdown' ? -step : 0;
+        const s = Math.sin(this.rts.yaw), c = Math.cos(this.rts.yaw), half = this.game.terrain.half;
+        d.point.x = Math.max(-half, Math.min(half, d.point.x + right * c - forward * s));
+        d.point.z = Math.max(-half, Math.min(half, d.point.z - right * s - forward * c));
+      }
+      this.refreshTargeting(true); return true;
+    }
+    return false;
+  }
+
   key(e) {
-    if (document.querySelector('main')?.inert || document.querySelector('dialog[open]')) return;
-    if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (document.querySelector('main')?.inert || document.querySelector('dialog[open]')) { this.rts.keys.clear(); this.cancelTargeting(); return; }
+    if (e.target?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), #sb-panel') || e.metaKey || e.ctrlKey || e.altKey) return;
     const k = e.key.toLowerCase();
-    const onButton = e.target instanceof HTMLButtonElement;
+    const onButton = !!e.target?.closest?.('button, a[href], [role="button"]');
+    if (onButton && (k === 'enter' || k === ' ')) return;
+    if (k === '?') { e.preventDefault(); this.hud.openMenu(e.target); return; }
+    if (k === 'b' || k === 't') { e.preventDefault(); if (!e.repeat) this.beginTargeting(k === 'b' ? 'march' : 'attack', e.shiftKey); return; }
+    if (this.targeting) {
+      const consumed = this.targetingKey(e, k);
+      if (consumed || (!this.targeting && ['escape', 'enter', 'arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'q', 'e'].includes(k))) { e.preventDefault(); return; }
+    }
     if (k === ' ' && !onButton) { e.preventDefault(); this.game.togglePause(); return; }
     if (k === 'escape') { this.cancel(); this.game.select(null); return; }
     if (k === 'g') { this.onQualityKey(); return; }
@@ -433,7 +545,7 @@ export class Input {
     if (k === 'l') { this.hud.toggleArmy(); return; }
     if (k === '1' || k === '2' || k === '3') { this.game.setSpeed({ 1: 1, 2: 2, 3: 4 }[k]); return; }
     const orderKeys = { h: 'hold', c: 'charge', r: 'run', f: 'fallback', x: 'halt', v: 'holdfire' };
-    if (orderKeys[k]) { this.game.orderSelected(orderKeys[k]); return; }
+    if (orderKeys[k]) { this.cancelTargeting(); this.game.orderSelected(orderKeys[k]); return; }
     if (!onButton && this.rts.onKey(e, true)) e.preventDefault();
   }
 }

@@ -104,7 +104,7 @@ let practiceFlow = null;
 
 const hud = new Hud({
   camera, canvas, terrain, units: game.units, playerSide: 'US', rts, game,
-  onSelect: (u) => game.select(u),
+  onSelect: (u, options) => game.select(u, options),
   onOrder: (kind) => game.orderSelected(kind),
   onPause: () => game.togglePause(),
   onSpeed: (s) => game.setSpeed(s),
@@ -188,6 +188,7 @@ function frame(now) {
   effects.update(game.paused ? 0 : dt * game.speed);
   const mpp = metresPerPixel();
   arrows.setScale(mpp);
+  input.refreshTargeting();
   arrows.update(game.units, commands, arcOf);
   rts.update(dt);
   world.trees.userData.updateLod(camera, rts.dist + 200);

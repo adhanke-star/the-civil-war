@@ -61,6 +61,7 @@ import { lookControls } from './test-look-ui.mjs';
 import { viewControls } from './test-view-ui.mjs';
 import { spacingControls } from './test-spacing-ui.mjs';
 import { momentControls } from './test-moments-ui.mjs';
+import { keyboardControls } from './test-keyboard-ui.mjs';
 
 const READY_TIMEOUT_MS = 180_000;
 const VIEWPORT = { width: 1280, height: 720 };
@@ -792,7 +793,7 @@ function watchErrors(page, url, into) {
 }
 
 /** The sandbox panel on ?sandbox&quality=low, then device.html. */
-async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly = false } = {}) {
+async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly = false, keyboardOnly = false } = {}) {
   const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1, permissions: ['clipboard-read', 'clipboard-write'] });
   await ctx.addInitScript(() => {
     window.__sandboxWrites = 0;
@@ -812,7 +813,7 @@ async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly
       check('sandbox-panel', false, `the sandbox panel did not mount: ${err.message.split('\n')[0]}`);
     }
     if (mounted) {
-      if (spacingOnly || momentsOnly) {
+      if (spacingOnly || momentsOnly || keyboardOnly) {
         await page.evaluate(async () => {
           const { completedSnapshot } = await import('./src/franchise/save.js'), { SAMPLE_ARMY } = await import('./src/reward/data.js');
           localStorage.setItem('cw.progress', JSON.stringify(completedSnapshot({ awardId: 'spacing-preservation', army: structuredClone(SAMPLE_ARMY), depot: [], issued: [], seed: 19, grade: 'Victory' })));
@@ -822,8 +823,9 @@ async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly
           const renderer = await page.evaluate(() => { const gl = document.getElementById('battlefield').getContext('webgl2'), e = gl.getExtension('WEBGL_debug_renderer_info'); return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); });
           check('spacing-native-renderer', !/swiftshader|llvmpipe|software/i.test(renderer), renderer);
         }
-        if (momentsOnly) await momentControls({ page, check, shot, result }); else await spacingControls({ page, check, shot, result });
-        check(`${momentsOnly ? 'moments' : 'spacing'}-no-console-errors`, errors.length === 0, JSON.stringify(errors)); await page.close(); return;
+        if (keyboardOnly) await keyboardControls({ page, check, shot, result });
+        else if (momentsOnly) await momentControls({ page, check, shot, result }); else await spacingControls({ page, check, shot, result });
+        check(`${keyboardOnly ? 'keyboard' : momentsOnly ? 'moments' : 'spacing'}-no-console-errors`, errors.length === 0, JSON.stringify(errors)); await page.close(); return;
       }
       const tabs = await page.locator('#sb-panel [role=tab]').allTextContents();
       const want = ['Units', 'Rules', 'Look', 'Moments', 'Screens'];
@@ -917,6 +919,9 @@ async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly
       await viewControls({ page, check, shot, result });
       await spacingControls({ page, check, shot, result });
       await momentControls({ page, check, shot, result });
+      await keyboardControls({ page, check, shot, result });
+      // Keyboard ordering deliberately closes the panel. The retained comparison resumes inside it.
+      if (await page.locator('#sb-toggle').getAttribute('aria-expanded') !== 'true') await page.locator('#sb-toggle').click();
       // look.orderLine compares split-screen: both styles are built, each clipped to its side of the divider
       {
         await page.getByRole('tab', { name: 'Look' }).click();
@@ -1298,6 +1303,7 @@ async function main() {
     browser = await chromium.launch(native ? { channel: 'chrome', headless: false }
       : { headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     result.browser = `chromium ${browser.version()}`;
+    if (process.argv.includes('--keyboard')) { result.mode = 'keyboard orders only'; await sandboxAndDevice(browser, url, { keyboardOnly: true }); return; }
     if (process.argv.includes('--spacing')) { result.mode = 'formation spacing only'; await sandboxAndDevice(browser, url, { spacingOnly: true }); return; }
     if (process.argv.includes('--moments')) { result.mode = 'field moments only'; await sandboxAndDevice(browser, url, { momentsOnly: true }); return; }
     if (process.argv.includes('--sandbox')) { result.mode = 'sandbox controls only'; await sandboxAndDevice(browser, url); return; }

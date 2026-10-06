@@ -5,9 +5,9 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2h exact CI green; independent frame-demand candidate (2026-10-06)
+## Current boundary: frame report accepted; P2i keyboard orders WIP (2026-10-06)
 
-P2h main/origin a10b128338d14893cdbf8865eb5777b6aab01943 is pushed; Pages37525324397 passed,
+P2h parent a10b128338d14893cdbf8865eb5777b6aab01943 is pushed; Pages37525324397 passed,
 CI37525324425 passed. Preserve workspace/Shiloh notes. P2i's prerequisite is satisfied.
 Independent root-owned report-only frame-cohort/serial-decode extension is scoped in
 PLAN; touches estimate-residency/test-residency/docs only. No browser or asset/runtime mutation.
@@ -16,8 +16,41 @@ Independent report reviewers required evicted-page refetch accounting and exact 
 root repaired both, labels requested versus resolved phases, and declares release of ALL field/close
 decoded sources hypothetical. Fresh compact JSON is capped at5000000B.41/41 positives and41/41
 intended assertion mutants, unit/syntax/diff pass; both independent source reviewers clear repairs.
-Local final logs are .out/frame-demand-{positive,mutants,unit}-final-20261006.log. Runner readback pending;
-no actual new source assessment until existing Actions residency mode runs at the committed fullSHA.
+Local final logs are .out/frame-demand-{positive,mutants,unit}-final-20261006.log.
+HEAD/origin main0836d2acc30d15c24c777fd5582f7cf9dab612a1;
+residency37527814035/Pages37527810298/CI37527810306 passed. Actual2599531B report
+.out/figure-residency-37527814035/report.json: independent192row/2592catalog/10transition
+reconstruction and603serial arithmetic checks pass; original45page rows/hashes match prior report.
+Every serial transition exceeds250MB before omitted scene costs. Smallest evaluated eligible-eight
+current close168378016B plus field83402304B =251780320B textures alone. One walk cohort rectangle
+mip metric2722484B vs168378016B source pages; supports lossless frame-local layout research only.
+Quality/native/iPad/packing remain UNRUN, no runtime or source assets changed by the report.
+Root now owns P2i runtime/tests/docs WIP, no competing writer/browser. Shared pointer/world-point
+preview drives B march/T ranged targets; attack bearing remains enforced by existing attackStep.
+Actual Input/Game/Unit/ArrowLayer22+22 pass. Native initial39/40 failed only a stale-target test race;
+render auto-cancel preceded Escape, which then correctly deselected outside targeting. Bind automatic
+cancellation independently; pure immediate stale Escape remains. Repaired native41/41 in37145ms,
+20:52:31.468Z (.out/p2i-focused-native-r2-20261006.json). No errors/warnings/scoped axe violations.
+Independent review additionally required exact facing-degree feedback and44px Menu labels/scrollable
+keyboard Close. Those are repaired with one owned native menu Tab loop. Finalfocused45/45 in35585ms,
+20:54:58.280Z (.out/p2i-focused-native-final-20261006.json), six exact PNGs independently/root viewed,
+all errors/warnings/scoped axe[]. Source and WCAG/rendered review clear.22+22 keyboard gates pass;
+retained/new165+165 all green. Initialfull175/176 failed only a hidden Look-tab locator timeout after
+keyboardControls left the sandbox closed; test-only actual sb-toggle restoration repairs the harness.
+Nine other source hashes remain exact. Repaired frozenfull289/289 in452304ms21:04:08.721Z,
+.out/p2i-full-native-r2-20261006.json, all errors/warnings/scoped axe[], ten r2 hashes exact in
+.out/p2i-frozen-source-r2-sha256-20261006.json. Root and independent WCAG reviewer viewed all six
+final keyboard PNGs and cleared scoped render/receipt checks. Independent source/frozen-receipt review
+also clears289/289 and10/10 hashes; integration and exactSHA CI/Pages pending, no local browser runs.
+Transient rapid-test toast stacks can cover nameplates;
+full shared message polish remains P6, not an excuse to claim full AT/device/performance acceptance.
+Keep initial focused/full failed receipts; no prior failed receipt is acceptance. Root sole writer.
+Next PLAN P2j has two green boundaries: P2j1 pure exchange/common Web Lock/awaited existing writers,
+then P2j2 bounded camp modal/issue recovery; only both complete camp acceptance. One cw.progress store
+and unchanged schema; clone baselines before queueing, locks only across synchronous read/check/write.
+Import requires exact raw baseline bytes (including unchanged corrupt repair), never retry rebase.
+Updated participating clients coordinate; older open tabs/direct writers are outside that guarantee.
+Preparation/docs only until P2i exactSHA gates pass; preserve workspace and Shiloh candidate notes.
 
 ## Previous boundary: P2h local candidate (subsequently integrated above)
 

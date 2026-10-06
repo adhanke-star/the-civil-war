@@ -46,6 +46,8 @@ jobs:
       - run: node tools/test-residency.mjs --prove-fail
       - run: node tools/test-moments.mjs
       - run: node tools/test-moments.mjs --prove-fail
+      - run: node tools/test-keyboard.mjs
+      - run: node tools/test-keyboard.mjs --prove-fail
 
       - run: npm test
 
