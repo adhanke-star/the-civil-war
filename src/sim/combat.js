@@ -79,6 +79,7 @@ export class Combat {
   }
 
   range(u) {
+    if (u.equipmentProfile) return u.equipmentProfile.rangeMetres;
     return u.type === 'artillery' ? RANGE.artillery : RANGE[u.weapon] || RANGE.smooth;
   }
 
@@ -163,7 +164,7 @@ export class Combat {
     }
     const canFire = t && !u.holdFire && !u.melee && u.state !== 'routing' && u.order.type !== 'charge' && !(moving && (u.run || isArt)) && (!isArt || u.unlimbered);
     u.firing = !!canFire && !moving;
-    const period = (isArt ? RELOAD.gun : RELOAD.musket) * (1 + 0.5 * (u.fatigue / 100)) * (moving ? 1.5 : 1);
+    const period = (u.equipmentProfile ? u.equipmentProfile.reloadSeconds : (isArt ? RELOAD.gun : RELOAD.musket)) * (1 + 0.5 * (u.fatigue / 100)) * (moving ? 1.5 : 1);
     if (u.reload < 1) u.reload = Math.min(1, u.reload + dt / period);
     if (!canFire || u.reload < 1) return;
     this.volleyAt(u, t, time, moving, period);
@@ -172,6 +173,10 @@ export class Combat {
   /** One volley (or round from every gun) from u at t, now. Also used by the sandbox's "fire a volley now". */
   volleyAt(u, t, time, moving = false, period) {
     const isArt = u.type === 'artillery';
+    // Named damage is per round at the nominal musket/gun calibration, independent of faster
+    // reload or an explicit direct-volley period. Preserve legacy fatigue/moving semantics:
+    // default direct calls have fatigue only; fireStep supplies the moving-period factor.
+    if (u.equipmentProfile) period = (isArt ? RELOAD.gun : RELOAD.musket) * (1 + 0.5 * (u.fatigue / 100)) * (moving && period !== undefined ? 1.5 : 1);
     if (period === undefined) period = (isArt ? RELOAD.gun : RELOAD.musket) * (1 + 0.5 * (u.fatigue / 100));
     u.reload = this.rnd() * 0.15;
     const d = Math.hypot(t.x - u.x, t.z - u.z);
@@ -184,6 +189,7 @@ export class Combat {
     const arc = this.arcMult(u, t);
     let fireMen = u.men;
     let pow = POW[u.weapon] || 1;
+    if (u.equipmentProfile) pow = u.equipmentProfile.powerMultiplier;
     let art = 1;
     if (isArt) {
       fireMen = u.guns * 27 * clamp(u.men / u.menMax, 0, 1); // old GUN_FIRE_WEIGHT (T5:54)

@@ -28,6 +28,7 @@ import { BAKE_CLIP } from './impostor.js';
 import { mulberry32 } from '../world/landscape.js';
 import { RULES } from '../sim/rules.js';
 import { LOOK } from '../ui/look.js';
+import { equipmentProfile } from '../sim/equipment.js';
 
 export let MEN_PER_FIGURE = 10; // live binding: look.menPerFigure (the game calls setMenPerFigure)
 export const MEN_PER_FIGURE_OPTIONS = [10, 5];
@@ -86,6 +87,18 @@ function bakedPhase(f, s, walkM) {
 
 export class Unit {
   constructor(def, pool, terrain, seed) {
+    // Refuse explicit/inherited invalid gear before assigning fields, Vehicle or figure allocation.
+    if ('equipment' in def) {
+      if (!Object.prototype.hasOwnProperty.call(def, 'equipment')) throw new Error('Equipment: inherited equipment is unsupported.');
+      if ('type' in def && (!Object.prototype.hasOwnProperty.call(def, 'type') || !['infantry', 'artillery'].includes(def.type))) {
+        throw new Error('Equipment: unsupported supplied unit type.');
+      }
+      const profile = equipmentProfile(def.equipment, Object.prototype.hasOwnProperty.call(def, 'type') ? def.type : 'infantry');
+      Object.defineProperties(this, {
+        equipment: { value: profile.item, enumerable: true },
+        equipmentProfile: { value: profile, enumerable: true },
+      });
+    }
     Object.assign(this, {
       id: def.id,
       side: def.side,

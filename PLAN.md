@@ -562,7 +562,23 @@ Independent annotation/log/config review clears; literal workflow replacement pr
 unchanged, all11source hash/byte binds match. CI plus four accepted runtime/test files are frozen in
 .out/p2j2-ci-budget-frozen-source-r1-20261006.json; diff/STATE19 pass. Explicit commit/push and
 complete new exact-SHA CI/Pages remain required; the timed-out partial run is not acceptance.
+Budget repair committed/pushedce6c1d3f5be9dd50cb5820fe6d694a93dddda609 with five owned files
+and five verified frozen index bindings. Exact Pages37555708522 passed; complete CI37555708630
+is running. Root receipt-doc WIP records this new boundary; P2k1 remains unstarted until green.
 No equipment implementation has started.
+Resume readback: exact ce6 CI37555708630 completed SUCCESS;183+183 standalone controls and
+actual browser393/393 in738309ms (2026-10-07T01:10:26.642Z), errors/warnings and29 exercised
+axe scopes empty. Both repaired assertions pass; native timing explicitly UNRUN on SwiftShader.
+Root independently fetched actual final JSON/narrow PNG via168974B ZIP ranges; receipt is
+.out/p2j2-ce6-ci-root-read-r1-20261006.json (218739B SHA34975c80b7219f4f5212e5236b191055966342d78490dd3700408d364b969cd6).
+Pages remains green. Root and independent reviewer read the actual receipt/log and viewed the exact
+narrow Legendary PNG; scoped source/receipt/rendered review clears. Browser warnings are empty;
+workflow cleanup has a nonblocking action deprecation warning, not a zero-annotation claim.
+P2j2 integration clears. Untracked tools/test-equipment.mjs and its small .out oracle log appeared
+from an unknown writer during root/helper reads. Preserve without execution/adoption/staging/editing;
+the126 expected cases/helper match retained r3, but ownership is not acceptance. Root's async writer
+clarification is pending. All code edits stay paused until reconciliation; owned receipt docs continue.
+P2k1 runtime remains unstarted. HANDOFF records exact metadata and the refined engine contract.
 
 P2j1 repair replaces the failed Web Lock proposal (DECISIONS0036): actualnative
 trace .out/p2j1-coordination-trace-20261006.json proves correct lock order but stale localStorage
@@ -669,6 +685,26 @@ review, docs/decision, explicit commit/push and exact-SHA CI/Pages; repair red C
 living camp/title, named/campaign saves and all P3-P7 remain open.
 
 ### P2k: deploy saved equipment into actual practice combat (next after P2j)
+
+Restart ownership reconciled by Aaron's authored packet and fresh process/git/hash audit:
+root adopts receipt-doc WIP and34691B durable generic gate; historical unknown-writer hold remains
+in HANDOFF. Exact ce6 CI37555708630/Pages37555708522 re-read green; pre-edit126/126 replay
+passes all original counts. P2k1 optional equipment foundation is now root-owned; no named gate
+or saved deployment acceptance yet. Preserve unrelated workspace/Shiloh preflight unstaged.
+
+P2k1 candidate now passes23named positives+23intended AssertionError controls,115actual catalogue/
+condition Unit/profile/volley samples, exact historical generic A126/B/A2 126 and retained183+183/unit.
+Independent engine/source challenge clears the implementation; symbol/accessor refusal samples added.
+DECISIONS0039 records shared game calibration and cadence/direct-period semantics. Seven changed
+runtime/test/CI files frozen; one final serial native suite is running. Local logs/binds are
+.out/p2k1-deterministic-r2-20261006.log and .out/p2k1-deterministic-source-r2-20261006.json;
+native freeze .out/p2k1-frozen-source-r1-20261006.json. Final frozen native394/394 in468803ms at
+2026-10-07T01:40:07.664Z; .out/p2k1-full-native-r1-20261006.{log,json}, actual JSON218363B/
+SHA295cead4a81b488e6719a1f1280f90fd3e7c324051f276a83e1989191a19ab13 equals last-result bytes.
+Errors/warnings/all29exercised axe scopes empty;7source hashes/bytes unchanged. Root/independent
+reviewer viewed actual field/order/keyboard/intro/camp/Moments PNGs; final source/receipt/rendered
+review clears. Actual Intel Metal UHD617; no sustained intro30fps/new-art/iPad proof. Commit/push/
+exact integration remain pending; P2k2 deployment stays UNRUN with a separate contract before routes.
 
 Recommendation: establish named equipment profiles before camp deployment, because current Combat
 accepts only generic smooth/rifled/smbart/parrott categories; putting a named saved card on a unit

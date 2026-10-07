@@ -5,7 +5,92 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2j2 CI-only budget repair WIP (2026-10-06)
+## Current boundary: P2k1 sole-writer continuation (2026-10-06)
+
+Aaron's restart packet identifies tools/test-equipment.mjs and its prechange log as the original
+session's owned work, resolving the historical authorship uncertainty below. Fresh Codex startup
+fetched origin: HEAD/origin maince6c1d3f5be9dd50cb5820fe6d694a93dddda609; no separate writer,
+browser, server or watcher process. No COORDINATION.md. Root alone adopts the three receipt-doc
+WIP files and durable equipment oracle; preserve unrelated workspace/Shiloh files unstaged.
+Exact CI37555708630/Pages37555708522 independently re-read SUCCESS for that full SHA.
+Authored test34691B/SHA256 cc3192f632deeb054cc3b0c6fde1db128e424d793a2bc671c95180d8e5e74685
+and117B log/SHA256 add5abb204471e494ade2f5ba50542ec47d7436ea334dac7a899373102c145d3
+match the packet. Pre-edit durable oracle executed126/126:18halts/resumes,18arrivals,18direct,
+54gun samples,3606Combat/136580Unit draws. This proves generic baseline only. No named acceptance.
+No existing goal is available in this fresh thread; do not create a duplicate goal or scheduler.
+Root proceeds only with PLAN P2k1 owned optional equipment foundation; saved deployment stays P2k2.
+The prior writer HOLD is preserved below as historical evidence, superseded by this explicit relay.
+
+P2k1 candidate implemented in equipment.js/Unit/Combat/reward TUNING, durable equipment gate,
+CI two explicit equipment steps and sw19. DECISIONS0039 records calibration/direct-period semantics.
+No route/store/schema/inventory/scenario/art change. Independent read-only engine/source review clears
+the optional branch, identities, restrictions, actual geometry/arithmetic and intended controls; its
+symbol/accessor item-refusal recommendation was added. Final deterministicr2 passes23named+23
+intended AssertionError controls,115actual Unit/profile/volley cases and exact generic A126/B/A2 126
+with all original draws/counts; retained183+183 and UNIT OK. Actual log/source bindings:
+.out/p2k1-deterministic-r2-20261006.log and .out/p2k1-deterministic-source-r2-20261006.json.
+R1 also passed before the two extra invalid samples; keep its distinct receipt. Frozen7 changed
+runtime/test/CI files in .out/p2k1-frozen-source-r1-20261006.json. Final serial native passes394/394
+in468803ms at2026-10-07T01:40:07.664Z; actual .out/p2k1-full-native-r1-20261006.{log,json},
+with218363B JSON/SHA256 295cead4a81b488e6719a1f1280f90fd3e7c324051f276a83e1989191a19ab13,
+equals last-result.json byte-for-byte. Readback .out/p2k1-full-native-readback-r1-20261006.json;
+failures/errors/warnings and29exercised axe scopes empty. All7hashes/bytes match after run.
+Actual Intel Metal UHD617; unforced intro win45.43sim/first card46504wallms, idle defeat27.28sim.
+Root and independent reviewer viewed actual ordered/rigged/keyboard/intro/camp/Moments screenshots;
+independent final source/receipt/rendered review clears stage/commit. A transient intro-capture4fps
+meter alongside broad55.7/sandbox55 is not a sustained native30fps floor or a causal regression.
+These UI checks cover existing generic routes; actual named deployment remains P2k2 UNRUN.
+Commit/push/exact P2k1 CI/Pages remain pending. The full v1 goal is not complete.
+
+## Historical boundary: P2j2 integrated; P2k1 writer ownership hold (2026-10-06)
+
+Resume audit at 2026-10-07 01:20 UTC: exact CI37555708630 is still live (job112581329957,
+npm test running); root's watch session64793 is live. Do not restart the run. Pages remains green.
+That observation is historical: CI completed SUCCESS at01:22:49Z and watch64793 finished.
+Root read its complete log and independently fetched actual final JSON/repaired narrow PNG from
+artifact11454837603 with168974B bounded ZIP reads of32531983B/84entries; no archive downloaded.
+.out/p2j2-ce6-ci-root-read-r1-20261006.json is218739B/SHA256
+34975c80b7219f4f5212e5236b191055966342d78490dd3700408d364b969cd6:
+393/393 in738309ms at2026-10-07T01:10:26.642Z, no console errors/warnings and29 exercised axe
+scopes empty including three camp themes. Completed log proves183+183 intended standalone controls.
+Both formerly failed assertions pass: Legendary content320/320px, card245.27px/font>=12px and
+vertical536px>420px; cancelled read closed/After-action focus, rw0/all write counters0 and exact
+pending SHAae902ea3c04af2e2337a275f4b70c5de2dd33fb1873edab363e30aed07ed1814
+across before/held/settled. Actual intro win46.00sim/first card72713wallms; software-native timing
+explicitly UNRUN. Root viewed .out/p2j2-ce6-ci-root-moments-320-r1-20261006.png. Local native
+394/394 and its unchanged four source binds remain separate evidence. Exact Pages remains green.
+The initial identical-named CI JSON appeared from an unknown writer at01:23:33Z; root collector
+refused EEXIST without overwrite, then re-fetched the actual member under the distinct root path
+above. Both local JSON bytes equal the independently fetched member. This does not resolve writer
+ownership. Root collector summary-parser mistakes were repaired against actual terminal labels;
+they are not product failures or accepted test runs. No new runtime/test/browser execution.
+During read-only preflight, untracked tools/test-equipment.mjs appeared at01:18:44.113Z,
+34691B/SHA256 cc3192f632deeb054cc3b0c6fde1db128e424d793a2bc671c95180d8e5e74685.
+Its .out/p2k1-durable-prechange-oracle-20261006.log appeared at01:18:46.202Z,
+117B/SHA256 add5abb204471e494ade2f5ba50542ec47d7436ea334dac7a899373102c145d3.
+Neither root nor camp_review created these during this turn. Preserve both as unknown WIP;
+do not run, adopt, stage or edit them until writer ownership is reconciled. An async Aaron question
+is pending under AGENTS' no-simultaneous-edits requirement. No response is approval. Read-only
+comparison proves the test embeds all126 exact retained r3 expectations and the exact replay helper;
+all seven original runtime bindings still match. This does not establish ownership or acceptance.
+Root's three status docs remain owned; workspace/Shiloh files stay unrelated. No runtime edit started.
+Independent engine preflight clears the optional seam with refinements: strict saved item shape,
+equipped depot flag refusal, unsupported supplied type refusal, catalogue arm values infantry/artillery,
+deep immutability/provenance and validation before Unit/Battery allocations. Named casualty mass
+uses nominal5/7.5s with legacy fatigue/moving modifiers; direct default retains fatigue-only period.
+The explicit direct period argument must not restore shorter-cadence damage cancellation. Test
+restrictions through fireStep; direct sandbox volley intentionally bypasses them. Named power replaces
+generic POW, raw accuracy/condition apply once; specials stay P5 debt. No new acceptance claims.
+
+HEAD/origin maince6c1d3f5be9dd50cb5820fe6d694a93dddda609. Five budget-repair files committed/
+pushed after independent review and index verification. Exact Pages37555708522 passed;
+CI37555708630 passed the complete30-minute-budget job. Only root-owned receipt-doc WIP in
+HANDOFF/PLAN/STATE plus preserved workspace/Shiloh files and unknown equipment test.
+No local browser or watcher remains. Code edits stay paused until writer ownership is reconciled.
+Independent final ce6 receipt/log/image review clears393/393, both repairs, all29 scoped axe results
+and the actual narrow PNG. Native count differs only by intro-native-renderer; native timing stays
+UNRUN on SwiftShader. Browser warnings are empty; workflow cleanup has a nonblocking action
+deprecation warning. Do not claim zero workflow annotations or adopt the unknown writer's files.
 
 Repair parent a408c3fc704752fda2bf2f598dfd2886e8c73b0f. Pages37549462780 passed;
 exact CI37549462745 FAILED389/391 in1122955ms (not a workflow timeout). Camp checks passed.
@@ -45,7 +130,7 @@ verified source/index binds and viewed Moments, five practice/entry and all eigh
 source/receipt/scoped WCAG/rendered review clears. No physical device or repaired exact-CI claim.
 No browser remains; failed camp and exact-CI receipts plus P2k1 pre-edit oracle/helper remain present.
 Seven owned repair files committed/pushed as25b27a44d17dfd30ebd865e854ae830865678ee7;
-HEAD/origin main match. Four tested source hash/byte bindings matched the index. Only unrelated
+HEAD/origin main matched at that push. Four tested source hash/byte bindings matched the index. Only unrelated
 workspace/Shiloh files remained after push; this receipt-doc update is root-owned pending WIP.
 Exact Pages37553559360 passed; five deployed repair/camp files match accepted bytes in
 .out/p2j2-ci-repair-live-pages-source-20261006.json. Exact CI37553559450 initially ran with all
@@ -58,16 +143,18 @@ did not finish. Artifact11454194412 has62entries/no final JSON; bounded director
 29565040B archive stored only .out/p2j2-ci-repair-cancelled-artifact-11454194412-20261006.json.
 No partial acceptance. Watch session finished. Prior completed software suite needed118s after
 intro Continue. DECISIONS0038 permits only CI job20->30minutes plus docs; no shorter tests,
-operation timeouts, runtime changes or quality/timing relaxations. Root owns CI YAML/decision and
+operation timeouts, runtime changes or quality/timing relaxations. The budget patch owns CI YAML/decision and
 three receipt docs. Four frozen native runtime/test binds and seven generic oracle binds remain exact.
 Independent actual annotation/log/config review clears the budget repair. Literal workflow equality
 after only20->30 replacement proves all30steps and assertions unchanged; all11source bindings match.
 CI plus four unchanged runtime/test hashes/bytes frozen in .out/p2j2-ci-budget-frozen-source-r1-20261006.json.
 Actual annotation retained in .out/p2j2-ci-repair-timeout-annotation-20261006.txt. Diff/STATE19 pass.
-Next: explicitly stage five owned files,
-commit/push and read complete new exact-SHA CI/Pages. No local browser rerun for CI-only budget;
+All five budget files committed/pushed asce6c1d3; five frozen hash/byte bindings matched the index.
+Complete exact CI37555708630 and actual final log/small JSON now pass, recorded above.
+No local browser rerun for CI-only budget;
 native394/394 remains proof on identical runtime/test bytes. Repair red CI before P2k1.
-P2k1 remains unstarted until this integration is green. Seven generic-oracle source binds stay exact.
+P2k1 runtime remains unstarted; integration is green, but its unknown test writer must be reconciled.
+Seven generic-oracle source binds stay exact.
 
 ## Previous boundary: P2j2 pushed; initial exact CI pending (2026-10-06)
 

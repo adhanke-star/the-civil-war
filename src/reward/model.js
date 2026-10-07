@@ -15,6 +15,11 @@
 import { TIERS, TIER_BY_ID, ARMS, UNIQUES, CONDITIONS, CONDITION_BY_ID, GRADES, CAPTURE_PLACES, ISSUE_PLACE, itemDef } from './data.js';
 
 export const TUNING = {
+  // Named per-round combat calibration (game choice). Practice smooth/gun anchor to generic
+  // smooth/smbart power at equal geometry; catalogue range/rate and raw accuracy stay authoritative.
+  // Reload cadence is separate; condition multiplies this firepower once, not range/reload.
+  namedFire: { powerReference: { infantry: 28, artillery: 30 }, accuracyReference: 50,
+    basePower: { infantry: 1, artillery: 1.6 } },
   // OVR = floor + scale * (weighted sum). Arms enter directly (0.5) and again through Fire.
   ovr: { floor: 40, scale: 0.6, weights: { arms: 0.5, fire: 0.2, melee: 0.1, morale: 0.1, drill: 0.1 } },
   // Fire bar = troops' own skill blended with their arms rating (gear-led).

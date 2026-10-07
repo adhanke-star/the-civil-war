@@ -23,6 +23,9 @@ jobs:
 
       - run: npx playwright install --with-deps chromium
 
+      - run: node tools/test-equipment.mjs
+      - run: node tools/test-equipment.mjs --prove-fail
+
       - run: node tools/test-reward.mjs
 
       - run: node tools/test-reward.mjs --prove-fail

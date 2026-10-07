@@ -1,5 +1,20 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0039 — Named equipment uses the shared field combat model (2026-10-06)
+An optional equipped item is validated and cloned before Unit assignment/Vehicle/figure allocation;
+generic units retain their exact prior behavior. Catalogue-derived ID Sets guard ordinary-object
+lookups, with strict identity/source/rarity/condition/type and depot refusal. Field artillery maps to
+the catalogue's artillery arm (reward batteries), with immutable complete definition/provenance.
+Range is yards*0.9144; reload is60/(RPM*4)sim seconds. Shared TUNING anchors practice smooth/gun
+per-round power to generic smooth1/smbart1.6 using power references28/30 and accuracy reference50.
+These are game calibration, not new historical ratings. Power, raw accuracy and condition multiply
+firepower once. Named damage uses nominal5/7.5sim-second mass plus legacy fatigue/moving terms;
+actual reload cadence is separate so repeaters gain fire rate. Explicit direct-volley periods cannot
+cancel that gain; default direct moving volleys retain fatigue-only period and the existing half-effect.
+Game/Input/Arrow already share Combat range; no geometry/route/schema/inventory change is needed.
+Unique metadata stays labelled game items; special mechanics remain P5. This foundation does not
+deploy the saved camp army: P2k2 requires separate conserved deployment/result/recovery proof.
+
 ## 0038 — Give the complete software-rendered CI suite a bounded 30-minute job (2026-10-06)
 Repair CI37553559450 exceeded the actual20-minute job limit after270 passing browser checks;
 both repaired assertions passed, but later entry/camp/save stages never completed. The prior full
