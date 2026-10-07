@@ -204,14 +204,33 @@ export async function practiceProgress({ browser, url, check, shot, result, watc
     check('practice-blocked-read-export', await raw() === secondRaw && unsaved.awardId === await page.evaluate(() => window.__game.practice.pending.awardId),
       'blocked reads still allow loot completion/export and never grant replacement authority');
     await page.evaluate(() => { window.__practiceBlocked = false; });
+    const cancelledRaw = await raw();
+    const cancelState = () => page.evaluate(async () => {
+      const { exportSnapshot } = await import('./src/franchise/save.js');
+      return { open: document.getElementById('result').open, activeId: document.activeElement.id,
+        reading: window.__game.practice.reading, rwCount: document.querySelectorAll('.rw').length,
+        pending: exportSnapshot(window.__game.practice.pending), puts: window.__progressPuts,
+        commits: window.__practiceWrites, legacy: window.__progressLegacyWrites };
+    });
+    const cancelBefore = await cancelState();
     await holdProgressTransaction(page);
     await page.getByRole('button', { name: 'Retry loading', exact: true }).click();
     await page.waitForFunction(() => window.__game.practice.reading);
     await page.keyboard.press('Escape');
-    await releaseProgressTransaction(page); await page.waitForFunction(() => !window.__game.practice.reading);
-    check('practice-cancelled-read-no-mount', await page.evaluate(() => !document.getElementById('result').open
-      && document.activeElement.id === 'after-action') && await page.locator('.rw').count() === 0,
-      'cancelled pending-save read settles without mounting loot or forcing the modal back open');
+    await page.waitForFunction(() => !document.getElementById('result').open && document.activeElement.id === 'after-action');
+    const cancelledHeld = await cancelState();
+    check('practice-cancelled-read-held', !cancelledHeld.open && cancelledHeld.reading && cancelledHeld.rwCount === 0
+      && cancelledHeld.pending === cancelBefore.pending && cancelledHeld.puts === cancelBefore.puts
+      && cancelledHeld.commits === cancelBefore.commits && cancelledHeld.legacy === cancelBefore.legacy,
+      `native Escape closes/restores focus while read remains held; exact pending/zero new writes: ${JSON.stringify(cancelledHeld)}`);
+    await releaseProgressTransaction(page);
+    await page.waitForFunction(() => !window.__game.practice.reading && !document.getElementById('result').open
+      && document.activeElement.id === 'after-action');
+    const cancelledSettled = await cancelState(); result.practiceCancelledRead = { before: cancelBefore, held: cancelledHeld, settled: cancelledSettled };
+    check('practice-cancelled-read-no-mount', !cancelledSettled.open && !cancelledSettled.reading && cancelledSettled.rwCount === 0
+      && cancelledSettled.pending === cancelBefore.pending && cancelledSettled.puts === cancelBefore.puts
+      && cancelledSettled.commits === cancelBefore.commits && cancelledSettled.legacy === cancelBefore.legacy && await raw() === cancelledRaw,
+      `both read and native close/focus settle; exact saved/pending and zero new writes: ${JSON.stringify(cancelledSettled)}`);
     await page.getByRole('button', { name: 'After action', exact: true }).click();
     check('practice-cancelled-read-retains-pending', JSON.stringify(await exported()) === JSON.stringify(unsaved)
       && await page.getByRole('button', { name: 'Retry loading', exact: true }).isVisible()

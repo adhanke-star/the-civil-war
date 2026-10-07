@@ -523,6 +523,28 @@ in28966ms at23:45:47.561Z. Runtime and other five frozen files remain unchanged.
 hashes/bytes match; named full JSON equals last-result.json; errors/warnings and all axe scopes empty.
 Independent reviewer viewed eight exact full-run camp PNGs and cleared scoped source/receipt/WCAG.
 Retain failed r3 as nonacceptance. Intro first card47497ms; saved-gear deployment remains UNRUN.
+P2j2 committed/pushed a408c3fc704752fda2bf2f598dfd2886e8c73b0f with ten owned files/six index
+source bindings. Pages37549462780 passed; four actual deployed runtime files match accepted bytes.
+Exact CI37549462745 FAILED389/391 in1122955ms; deterministic183+183/camp checks passed.
+Actual JSON/log and narrow PNG retained. Legendary552px rays enlarged stage scrollWidth to457px;
+renderer-free A436 -> withoutRays320 -> A2436 -> scopedclip320 isolates decoration, preserving
+230px card and527px vertical content. Preview-only overflow-x:clip plus actual seeded130 Henry
+Legendary coverage repairs this without changing width/font/touch/axe guards. Practice cancellation
+checked focus before queued native close could settle; new held/settled phases await actual close/focus,
+bind exact saved/pending and zero new puts/commits/legacy writes, and retain diagnostics. Source shows
+that race; original failing conjunct was not recorded. Independent source/rendered review clears
+four owned repair files (hud.css/two UI tests/sw v18). Actual focused native Moments53/53 in61302ms
+and practice48/48 in54709ms have empty errors/warnings/axe scopes; held/settled cancellation
+diagnostics bind the unchanged pending hash and zero writes. Root viewed exact narrow Legendary
+PNG; retained183+183/unit/syntax/diff pass. Four hashes/bytes are frozen in
+.out/p2j2-ci-repair-frozen-source-r1-20261006.json. Final full native repair r1 passes394/394
+in458360ms at2026-10-07T00:34:10.658Z; actual JSON equals last-result.json, errors/warnings/all axe
+scopes empty, four frozen hashes/bytes and seven generic oracle binds match. Root viewed exact
+Moments/practice/camp narrow PNGs. Intro real win45.40sim, first card47282wallms. Independent final
+review verified actual receipt/source binds and viewed Moments, five practice/entry and all eight camp
+exact PNGs; source/receipt/scoped WCAG/rendered review clears. Commit/push and repaired exact-SHA
+CI/Pages remain required before P2k1.
+No equipment implementation has started.
 
 P2j1 repair replaces the failed Web Lock proposal (DECISIONS0036): actualnative
 trace .out/p2j1-coordination-trace-20261006.json proves correct lock order but stale localStorage
@@ -651,7 +673,11 @@ construction; do not replace a saved identity or write derived profile values in
 every ARMS/PRACTICE_ARMS/UNIQUES definition through itemDef, preserving its provenance. Known
 conditions are explicitly game modifiers. Reject unknown/incompatible/nonfinite profiles with useful
 errors before constructing a partial unit, allocating figures or mutating input. No permissive fallback
-for an explicitly supplied invalid item. Units without equipment must retain all existing behavior:
+for explicitly supplied invalid gear, including null/undefined or inherited lookup IDs
+(constructor/toString/__proto__); validate
+membership in catalogue-derived Sets before itemDef/condition object lookup. Unit type artillery
+maps deliberately to gun compatibility; do not pass it as reward's brigade kind battery.
+Units without equipment must retain all existing behavior:
 generic range/effective range, reload/cadence, casualty/cover/ammo/morale/fatigue, moving/limber/fire
 restrictions, random draw order, target choice, march/attack arrival and sandbox rule multipliers.
 Do not change existing generic constants, scenario definitions or historical presence/labels.
@@ -672,6 +698,17 @@ effect; cover/fatigue/moving/hold-fire/limber/sandbox interactions; exact seeded
 equivalence including random draws and terminal state. Each intended mutant must hit its named
 assertion; import/syntax/harness errors never count as a rejecting control. Do not mutate shipped
 source for controls. If isolation needs a copy, bind originals and require byte-for-byte restoration.
+
+Pre-edit generic oracle is .out/p2k1-prechange-generic-oracle-r3-20261006.json plus helper
+.out/p2k1-prechange-generic-replay-r3-20261006.txt, independently source-cleared against seven
+unchanged source hashes/bytes:126cases/126hashes,18actual halts/resumes,18quiet arrivals,
+18direct default-period volleys,54gun-firing samples,3606Combat and136580post-construction Unit
+draws. Initial full figures and nested order/path history are immutable snapshots. Embed these
+expected hashes/fixture in the durable test before runtime edits; CI cannot depend on local .out.
+Do not regenerate expectations from edited code. A and A2 must equal this pre-change oracle;
+actual named-equipment B between them also binds global settings/tuning leakage. Catalogue coverage
+is23definitions*5conditions=115 nonempty cases. m1842/practice-smooth share range/rate/power
+but differ accuracy25/50; bind that actual volley difference separately from cadence and condition.
 
 Gates after implementation, in order:
 1. node --check each touched JS/MJS (equipment.js, unit.js, combat.js, model.js if changed,

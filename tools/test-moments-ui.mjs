@@ -152,7 +152,18 @@ export async function momentControls({ page, check, shot, result }) {
   check('moments-targets-narrow', targets.length === 3 && targets.every((r) => r.fits && r.controls.length && r.controls.every(([w, h]) => w >= 44 && h >= 44)), `320px targets ${JSON.stringify(targets)}`);
   const axe = await new AxeBuilder({ page }).include('[data-key="moments.xFactor"]').include('[data-key="moments.lootCard"]').include('[data-key="look.xFactorStyle"]').analyze();
   result.momentsAxe = axe.violations; check('moments-axe', axe.violations.length === 0, JSON.stringify(axe.violations.map((v) => v.id))); await shot(page, 'moments-320');
+  // Exercise actual Legendary rays every run; random common cards hid the scroll-overflow defect.
+  await page.evaluate(async () => {
+    const { all } = await import('./src/settings.js'), spec = all().find((s) => s.key === 'moments.lootCard').spec, run = spec.run;
+    spec.run = () => {
+      const random = Math.random; Math.random = () => 130 / 1e9;
+      try { const handle = run(); window.__narrowLootCard = handle.reward.state.cards[0]; return handle; }
+      finally { Math.random = random; spec.run = run; }
+    };
+  });
   await loot.click(); await dialog.waitFor();
+  check('moments-loot-narrow-legendary-bind', await page.evaluate(() => window.__narrowLootCard.itemId === 'henry'
+    && window.__narrowLootCard.tier === 'legendary'), 'actual one-card preview uses seeded Legendary Henry, including its ray decoration');
   check('moments-loot-narrow-first-focus', await dialog.getByRole('button', { name: 'Close preview', exact: true }).evaluate((n) => n === document.activeElement), 'short-screen preview starts on its visible Close control');
   const visibleFocus = () => dialog.evaluate((n) => {
     const b = document.activeElement, r = b.getBoundingClientRect(), s = b.closest('.rw-stage'), bounds = (s || n).getBoundingClientRect();

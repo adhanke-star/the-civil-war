@@ -5,7 +5,50 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2j2 camp locally verified; integration next (2026-10-06)
+## Current boundary: P2j2 CI repair, final native green (2026-10-06)
+
+HEAD/origin main a408c3fc704752fda2bf2f598dfd2886e8c73b0f. Pages37549462780 passed;
+exact CI37549462745 FAILED389/391 in1122955ms (not a workflow timeout). Camp checks passed.
+Actual failed log/JSON: .out/p2j2-exact-ci-37549462745-failed-20261006.{log,json}.
+Root viewed actual CI PNG .out/p2j2-ci-failed-moments-narrow-20261006.png, fetched with bounded
+ZIP ranges; no archive stored. Scoped axe/console checks passed; red is not integration acceptance.
+Two repairs owned by root: src/ui/hud.css preview-only horizontal clip, tools/test-moments-ui.mjs
+real seeded Legendary coverage, tools/test-practice-ui.mjs native cancelled-read settlement/zero-write
+proof and sw.js v18; plus these three status docs. No equipment/engine/route/save-runtime edits.
+Actual renderer-free preview A436px -> withoutRays320 -> A2436 -> scopedclip320 with230px card
+and527px vertical content proves Legendary552px rays enlarge scrollable width. Diagnosis is
+.out/p2j2-ci-preview-layout-diagnosis-20261006.json; failed and candidate PNGs root/independently
+viewed. Clip preserves card/font/vertical scroll/focus. Narrow test invokes the actual preview with
+seed130 under synchronous one-shot Math.random override restored in finally, asserting Henry/Legendary.
+Original width/font/touch/axe acceptance stays unchanged. Practice's old check waited only read
+settlement, but native close restores focus separately. New proof binds native closed/After-action
+focus while read remains held, exact pending/zero writes, then settled read+close/focus plus exact
+saved/pending/zero writes. Actual failure conjunct was not logged; source establishes a settlement
+race hypothesis, not retrospective proof of that conjunct. New diagnostics retain both phases.
+Independent source/rendered/scoped WCAG review clears these repairs. Focused native Moments r1
+passes53/53 in61302ms at00:26:25.247Z; practice r1 passes48/48 in54709ms at00:28:30.832Z.
+Receipts .out/p2j2-ci-repair-{moments,practice}-native-r1-20261006.{json,log} have empty console/
+axe scopes. Actual Henry Legendary card242.44px fits320px without horizontal overflow; vertical
+content537px remains scrollable. Root viewed the exact focused PNG. Practice diagnostics bind
+closed/After-action focus during held and settled reads, unchanged pending hash and zero writes.
+Retained183+183/unit pass in .out/p2j2-ci-repair-deterministic-r3-20261006.log; earlier collector
+errors are not acceptance. Four source hashes/bytes frozen in
+.out/p2j2-ci-repair-frozen-source-r1-20261006.json. Final full native
+.out/p2j2-ci-repair-full-native-r1-20261006.{json,log} passes394/394 in458360ms at
+2026-10-07T00:34:10.658Z; errors/warnings and every exercised axe scope empty. Four frozen
+hashes/bytes match; actual named full JSON equals last-result.json byte-for-byte. Seven unchanged
+generic-oracle source binds still match. Full cancellation pending SHA93ccd1b2... is exact across
+held/settled phases, closed/After-action focus and zero writes. Actual Legendary narrow content320px
+and card240.05px retain538px vertical content. Intro actual win45.40sim, first card47282wallms.
+Root viewed exact narrow Moments/practice/camp PNGs. Independent final review read the actual receipt,
+verified source/index binds and viewed Moments, five practice/entry and all eight camp exact PNGs;
+source/receipt/scoped WCAG/rendered review clears. No physical device or repaired exact-CI claim.
+No browser remains; failed camp and exact-CI receipts plus P2k1 pre-edit oracle/helper remain present.
+Next: explicitly stage
+only these seven repair files, commit/push and read repaired exact-SHA CI/Pages; red CI is next task.
+P2k1 remains unstarted until this integration is green. Seven generic-oracle source binds stay exact.
+
+## Previous boundary: P2j2 pushed; initial exact CI pending (2026-10-06)
 
 Autonomous v1 goal is active under DESIGN/DECISIONS0022/PLAN P1-P7. Root resumed interrupted
 camp WIP after live fetch/status/process reconciliation: HEAD/origin main6a83af01d206c69dc3df45edf93a6af94e641805,
@@ -40,11 +83,32 @@ All six hashes/bytes in .out/p2j2-frozen-source-r4-20261006.json match live sour
 matches last-result.json byte-for-byte. Independent review viewed all eight exact full-run camp PNGs
 and cleared source/receipt/scoped WCAG/rendered review. Intro first card47497ms, actual win45.46sim.
 Keep failed r2/r3 receipts distinct. No browser remains. Final syntax/unit/diff pass.
-Next: explicitly stage ten owned runtime/test/docs files, commit/push main and read exact-SHA
-CI/Pages, repairing red CI. P2j2 is not integrated yet. After green, take PLAN P2k1's optional named
+Ten owned files committed/pushed as a408c3fc704752fda2bf2f598dfd2886e8c73b0f; six source
+hashes/bytes matched the index. HEAD/origin main match; only unrelated workspace/Shiloh files remain.
+Exact Pages37549462780 passed; four deployed runtime files match accepted hashes/bytes in
+.out/p2j2-live-pages-source-20261006.json. Exact CI37549462745 is running; its183+183 deterministic
+steps passed, browser suite pending. Next: read that exact run, repair red CI, sync final receipt docs.
+P2j2 integration acceptance awaits CI. After green, take PLAN P2k1's optional named
 equipment/actual Combat foundation; do not start camp deployment before its separate P2k2 contract.
 Saved-gear deployment,
 living camp/title, campaigns, approved art fielding, native iPad and all P3-P7 remain open.
+
+Read-only P2k1 preflight: existing Game/Input/Arrow methods already delegate to Combat range;
+no edit there justified. Named reload cadence must be separate from nominal per-round casualty
+calibration, because the existing rate*period arithmetic otherwise cancels faster cadence.
+Explicit null/undefined gear and inherited lookup IDs must refuse before figure allocation.
+Catalogue is23definitions*5conditions=115cases; m1842/practice-smooth isolates accuracy.
+Pre-change generic oracle .out/p2k1-prechange-generic-oracle-r3-20261006.json and helper
+.out/p2k1-prechange-generic-replay-r3-20261006.txt bind seven unchanged source hashes/bytes,
+126seeded cases/126trace hashes/54actual gun-firing samples/3606Combat draws/136580Unit draws.
+History includes actual Unit/Combat/Game movement, targets/orders/path/halt/men/ammo/morale/
+fatigue/reload/shots/kills/figures/effects and terminal state. R1 omitted gun deployment state;
+r2 sets actual unlimbered except marching. Independent review found mutable path history and
+missing fight-march/direct/constructor binds; r3 deep-copies initial figures/order/path and adds
+18actual halts+resumes,18quiet arrivals and18direct default-period volleys. Seven source hashes
+match; independent reviewer clears this pre-edit oracle. No artifact implements named equipment.
+Preserve oracle/helper unchanged and embed durable expected hashes in the eventual gate before
+runtime edits; never regenerate expected hashes from edited code or make CI depend on local .out.
 
 ## Previous boundary: P2j1 integrated; P2j2 camp equipment next (2026-10-06)
 

@@ -65,9 +65,9 @@ kbd { font-size: 11px; border: 1px solid #8a8580; border-radius: 3px; padding: 0
 .field-loot-preview .preview-heading h2 { font: 600 16px/1.2 system-ui, sans-serif; margin: 0; }
 .field-loot-preview .preview-heading button { min-width: 64px; min-height: 44px; }
 body dialog.field-loot-preview .rw { left: 0; right: 0; top: 60px; bottom: 0; }
-/* A single demonstration card stays readable; short screens scroll instead of shrinking its type. */
+/* Short screens scroll instead of shrinking type; decorative rays cannot widen the card column. */
 .field-loot-preview .rw-stage { overflow-y: auto; }
-.field-loot-preview .rw-reveal { flex: none; min-height: 100%; }
+.field-loot-preview .rw-reveal { flex: none; min-height: 100%; overflow-x: clip; }
 .field-loot-preview .rw-deal { --cw: 230px !important; flex: none; height: 350px; }
 .field-loot-preview .rw-arms small, .field-loot-preview .rw-stat small { font-size: 12px; }
 @media (max-width: 600px) {

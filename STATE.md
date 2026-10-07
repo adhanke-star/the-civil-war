@@ -14,6 +14,6 @@
 - **Approved art:** bake 820846f / 37347072866, sheets 1-12, 5,184 frames, nine looks per tier.
 - **Failed candidates:** UASTC 37360904656 and direct BC7/ASTC 37404193171; limits stay unchanged.
 - **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
-- **Proof:** retained183+183; P2j2 focused57/57/full392/392,6hashes; intro first card47.5s; review clear.
+- **Proof:** retained183+183/unit; repair native53/53+48/48/full394/394,4hashes; review clear; CI next.
 - **Coordination:** no ledger; preserve workspace file; HANDOFF/PLAN P2-P7, active goal, no scheduler.
-- **Runtime/WIP:** P2j2 locally green; commit/push/exact-SHA CI/Pages next, then PLAN P2k1; retain failed runs.
+- **Runtime/WIP:** a408c3f Pages green/CI37549462745 RED389/391; scoped clip/native-close test repair WIP.
