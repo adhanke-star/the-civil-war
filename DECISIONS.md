@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0053 · A phase snapshot has no save or launch authority (2026-10-07)
+
+Validate the complete ordered pack before selecting a phase, then return detached deeply frozen
+scenario data and stable neighbor IDs. Retain every citation and metadata value without upgrading
+historical status. Unit IDs remain stable across phases. This simulation seam has no renderer,
+store, reward or route ownership; existing practice manifests continue to bind those identities.
+The pure foundation does not certify timed arrivals, carry-over, history or GPU admission.
+
 ## 0051 · A cached targeting preview retains its complete path (2026-10-07)
 
 Exact CI37645892377 archives the remaining ghost mismatch: both native I event tasks preserve

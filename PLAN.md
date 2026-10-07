@@ -1,5 +1,19 @@
 # PLAN — autonomous completion of v1 (Aaron, 2026-10-06; DECISIONS 0022)
 
+
+## P2o blocked; P3a independent phase foundation (2026-10-07)
+
+P2o r10 source / r11 native remains BLOCKED: actual27 checks,26PASS,134814B receipt SHA6c2c16a026162bbb0ceb97bd75c85a6476adcd321e7c01eb301e178c04ec0e81; ALL19 PNG independently reviewed. Retention/native inputs/actions/axe clear; trusted live GPU loss and black terrain forbid acceptance. Seven-cycle accepted/current control also stays rendered; count-alone hypothesis rejected. Preserve owned14/source49 WIP and unrelated workspace/Shiloh files. No full518/CI517/Pages6 claim.
+
+P3a root sole writer in isolated temporary checkout /private/tmp/the-civil-war-p3a-phase-contract-20261007, branch p3a-phase-contract from accepted1c11763. No simultaneous browser or edits; original checkout remains preserved. Architecture overlap: practice.js binds persisted army identity/reward conservation; intro.js is a fictional scenario template; new src/sim/phase.js is detached immutable, storage-free pack/phase structure for existing campaign requirements. No competing progress store or battles directory.
+
+BEFORE EDIT: pure version1 pack {version,id,title,phases:[{id,scenario}]} with explicit order and existing scenario data, stable unique phase/unit identities, valid same-day date/clocks, finite positions/strength/objective, supported current unit types and existing equipment validation. All metadata/citations copied exactly; no historical Verified upgrade, invented OOB or Shiloh content. Reject unsafe non-JSON/accessor/inherited/cyclic/sparse data, duplicate/missing IDs, invalid clocks/coordinates and dangling opening references before returning any phase. Bound structural input to1MiB UTF8/depth32, operational limits only; this is NOT GPU/headroom admission or timed-arrival/carry-over implementation. preparePhase validates the whole pack then returns a detached deeply frozen phase with packId/phaseId/index/previousId/nextId/scenario. It writes no store/preferences/RNG/DOM and allocates no renderer. No runtime route yet.
+
+Own src/sim/phase.js, tools/test-phase.mjs, tools/test.mjs ONLY new pure foundation check/import, .github/workflows/ci.yml ONLY two explicit phase commands, PLAN/HANDOFF/STATE/DECISIONS (8paths). Leave Game/Unit/Combat/equipment/terrain/history/Hud/Input/renderer/assets/vendor/sw unchanged. Keep historical generic126 and all original equipment/deployment assertions exact. Add meaningful pure positives plus intended rejecting controls (named exact counts recorded after independent challenge). FullCI506 (=505+one phase-model foundation),41recursive axe paths,32 explicit completed standalone commands. No visual acceptance claim from this pure foundation. Run syntax/diffcheck; every existing30 pure command unchanged; new phase positive/control; unit smoke. Freeze accepted48 plus new phase/source test =50; retain unchanged browser sources. Independent source/control/actual CI challenge; bounded exact completed artifact and32logs; stage only8owned paths, commit/push, then exact-SHA CI and Pages. Root may integrate tested staged delta without overwriting preserved P2o working files; verify exact index tree, ownership and retained WIP before main commit. Continue next slice after green.
+
+Clarification before edit: unit IDs are unique WITHIN a phase; stable IDs may repeat across phases. Validate each scenario date/window independently, never force one campaign date. Expected future native507/CI506,41axe; only a new pure foundation runs on Mac here because existing browser/runtime sources remain byte-identical. No midnight window in the current Game; reject same-date end<=start rather than silently wrapping. New phase scheduler/cross-midnight/carry-over require their next explicit integration slice.
+
+
 ## Finish line and authority
 
 Finish **the complete existing v1**, with Shiloh, Stones River and Chattanooga, all v1 battle and
@@ -2465,3 +2479,9 @@ text scale, key rebinding.
 
 Rejected or deferred (unchanged): agargaro/instanced-mesh, proj4js, pmndrs/postprocessing, three-mesh-bvh,
 troika-three-text, three-geo, playwright-mcp (reasons in DECISIONS 0006 and git history).
+
+P3a frozen-r1:50bindings=4changed46accepted locks;20positive categories/20intended mutants. Current supported explicit generic weapon labels validated; absent equipment/type retained without fabrication. Serial37 and exactCI506/41axe/32standalone logs remain UNRUN. Future fullnative507 is expected, not claimed; original runtime/browser bytes remain accepted1c. Worktree node_modules is an identified read-only dependency symlink, never stage it.
+
+P3a serial-r1 actual37 FAILED only unit settings isolation; all32standalone commands and50source bindings exact. New top-level phase probe imports existing equipment->Combat->RULES, registering rules before settingsUnit expects its isolated registry. Before repair defer ONLY new probe dynamic import until after settingsUnit; retain old settings predicates and original runtime/Combat/RULES/equipment sources. No gate/count/threshold change. Preserve failed serial receipt/log.
+
+P3a r2 serial37PASS/current50 exact;20positive+20intended controls; independent source/control reviewCLEAR. Dynamic probe import preserves original settings isolation. Ready owned8 integration; exactCI506/41emptyaxes/32completed actual standalone logs and public phase.js readback remain UNRUN. Expected name multiset and41axes derive from actual acceptedCI37656475987 artifact, byte/SHA bound; no old acceptance rewritten. Current browser/runtime sources remain1c byte-identical; no new native507 claim.

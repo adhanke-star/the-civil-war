@@ -1362,10 +1362,16 @@ async function rewardProgress(browser, url) {
   } finally { await ctx.close(); }
 }
 
+async function phaseModelUnit() {
+  try { const { phaseUnit } = await import('./test-phase.mjs'); const count = phaseUnit(); check('phase-model', count === 20, `${count} immutable phase categories; no launch/store/history authority`); }
+  catch (error) { check('phase-model', false, error.message); }
+}
+
 async function main() {
   await settingsUnit();
   await bakedUnit();
   await approvedPackUnit();
+  await phaseModelUnit();
   await fs.mkdir(OUT_DIR, { recursive: true });
   const { server, url } = await startServer({ port: 0 });
   result.url = url;
@@ -1642,6 +1648,7 @@ if (process.argv.includes('--unit')) {
   } catch (err) {
     check('settings', false, `the settings module failed to load or threw: ${err.message}`);
   }
+  await phaseModelUnit();
   try {
     await bakedUnit();
     await approvedPackUnit();

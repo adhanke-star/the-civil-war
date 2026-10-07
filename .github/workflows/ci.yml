@@ -26,6 +26,9 @@ jobs:
       - run: node tools/test-deployment.mjs
       - run: node tools/test-deployment.mjs --prove-fail
 
+      - run: node tools/test-phase.mjs
+      - run: node tools/test-phase.mjs --prove-fail
+
       - run: node tools/test-equipment.mjs
       - run: node tools/test-equipment.mjs --prove-fail
 
