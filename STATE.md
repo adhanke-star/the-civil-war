@@ -9,11 +9,11 @@
 - **P2f:** 13a9ee9; pure13+13/native209/209; CI37511709837/Pages37511709840 green.
 - **Art next:** residency37527814035 binds192frame cohorts; source-page limits fail; lossless frame layout next.
 - **Current play:** title Continue -> intro/saved camp; ?practice Henry rewards; historical/sandbox isolated.
-- **Missing:** narrow HUD/soldier-eye, living title/camp, campaign saves, phase packs and progression.
+- **Missing:** soldier-eye/combat feedback, living title/camp, campaign saves, phase packs and progression.
 - **Figures:** rigged default; second-pass baked Union and tinted Confederate placeholders remain.
 - **Approved art:** bake 820846f / 37347072866, sheets 1-12, 5,184 frames, nine looks per tier.
 - **Failed candidates:** UASTC 37360904656 and direct BC7/ASTC 37404193171; limits stay unchanged.
 - **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
-- **Proof:** P2k2a19+19, named23+23/115/A126-B-A2, retained183+183/unit; frozen native394/394/29axe;4+17hashes.
+- **Proof:** deployment21+21, named23+23/115/A126-B-A2, retained183+183/unit; native486/40axe/ALL138review; exactCI485/40axe/28logs/public4/source40.
 - **Coordination:** no ledger/competing writer; root sole writer; preserve workspace/Shiloh; no duplicate goal/scheduler.
-- **Runtime/WIP:** HEAD/origin67a3a79; indexempty/untrackedpreserved. CI37606487882CANCELLED30min/476PASS0FAIL/9deployment+JSONUNRUN; PagesSUCCESS/4bytesUNRUN; original37593724002FAILED. RootCI+4docs processrepaircontract30->40 written; runtime/test39unchanged/native486/40axes/ALL138review retained. Nextnewfreeze40/index5/commitpush/exact485CI28logs/Pages4, then P2n full reviewedDRAFT; no localbrowser repeat.
+- **Runtime/WIP:** HEAD/origin131df8b/indexempty/unrelated2preserved. P2m ACCEPTED exactCI37610361430/Pages37610361438 actual485/40axes/28logs/source40/public4; native486 retained. Prior failures distinct. P2n ACTIVE16owned/45bindings/41gates/20+20pure/20UI=>506native505CI/41axes/30steps; final41r4/native35r11/ALL10review GREEN, freeze45 EXECUTED. Fullnative r1 EXIT0/506exact/41emptyaxes/45unchanged/148PNG/JSON23136961B SHA39c90a414db683cb3be9ff75e396e34c3c9879a5b46ce5f1e4da5b77ef051aa2; independentfullreceipt/source/ALL148review CLEAR; next owned16integration/exact505CI/30logs/Pages8. Rootsolewriter/no simultaneous tests/browser/runtime edits.

@@ -5,21 +5,70 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Active iteration: P2m readable header and native panels (2026-10-07)
+## Active iteration: P2n held soldier-eye and scene-depth blur (2026-10-07)
 
-CURRENT: P2m aggregate-CI repair at67a3a79174b0858882e7d28ce15192b2c0450153; HEAD=origin/main.
+LIVE13:27UTC: fullnative r1 COMPLETED EXIT0; freeze45 EXECUTED EXIT0.
+Actual506/504unique exactnames,935520ms,t13:09:57.477Z;41empty/exactaxes/zeroallerrorswarnings/
+3headerStagestrue/source45 unchanged/last-result byteequal. Actual148uniquePNG allfound;
+Independent fullreceipt/source/ALL148review CLEAR; root5current held/map/baked/split/crate PNG viewed.
+JSON23136961B SHA39c90a414db683cb3be9ff75e396e34c3c9879a5b46ce5f1e4da5b77ef051aa2;
+log175330B SHA16657b717bc0a43342e93a28636256afadb18c45b493cf72b5bffb8df647d3d7.
+Future bounded CIreader decoded cap48MiB from actual23.1MB native/rawpacked596588B; unchanged
+packed1MiB/range2MiB/total3MiB and <100MBparse. Collector binds actualhash/run/SHA/exactaxePaths.
+Finalserial41r4 GREEN/source45r11 unchanged, log35118B SHA69cfc996a31764316de8b6ee1b773b8bcddf3a3def0d2571c10deb31f295bff2.
+Corrected focusednative35r11 EXIT0/35PASS/10PNG,159280ms,t13:02:03.541Z; JSON15644766B SHA5a7d9222454f90ba7ba9718cb564832e59bda3623c4b8993c0988110e670ebdc;
+log27279B SHA4c66279715fb92d1fc723a93dfab68b75cee3e7d1af292814eaaed8c6fc3925d.
+Canonical1newaxe array/count-only category; source45 unchanged, zeroerrors/warnings/axe. Native lost
+39renderattempts/0targetcalls; active diagnostic generic tick conserved; GPU A/B/A2+resources+crates GREEN.
+Independent current receipt/source/ALL10 actualPNG challenge CLEAR; r10 originalALL10 review CLEAR,
+its duplicate42scope serialization corrected beforefreeze. Runtime unchanged from r10.
+Freeze .out/p2n-freeze-r1-20261007.mjs EXECUTED =>45=12changed33locks/506native505CI/
+41actualrecursivepaths; ONE .out/p2n-full-native-r1-20261007.mjs EXIT0; then allactualPNG review;
+owned16index45/commitpush/exact505CI/all30logs/Pages8. Rootsolewriter/unrelated2preserved.
+P2n full review CLEAR; owned16 integration/exactCI acceptance next. No simultaneous tests/browser/runtime edits.
+
+P2m ACCEPTED131df8b: exactCI37610361430/Pages37610361438 SUCCESS, actual485/40emptyaxes/
+28standalone logs/source40/public4; root and independent review CLEAR. Native486/ALL138review
+retained at identical39runtime/testbytes. Failed37593724002/cancelled37606487882 remain historical.
+P2n full written PLAN contract activated BEFORE product changes:16owned/45bindings=12changed33locks/
+41serialcommands;20+20pure/20newUI=>506native505CI/41axes/30explicitsteps/current40minCI envelope.
+Root sole writer; ONE existing bounded read-only reviewer; no simultaneous browser/test/writer.
+Target index/main/Input/hudCSS/Post/newSoldierView and narrow Readout.projectTicks extraction,
+newpure/UI probes/test harness/sw+4docs. RTS/Game/Unit/Combat/RNG/oracles/Arrow/Hud/settings/save/
+history/terrain/art/assets/vendor and old28gates locked. Readout ownership amended explicitly.
+Implement actual object/yaw/head-scaled follow, pre/postLOD, capture release-before-native-dispatch,
+current resize/Auto, forced-exit latch/focus ownership, synchronous overlay/minimap/geometry return
+without casualty timer/tickAcc mutation. One owned depth attachment/eye material, original map shader
+hash f477d9947ccc261cdd568fbacdd4cb66a8c6121ab1ea8320807b9649fa3ec8c4 unchanged.
+Controlled axial8/16/32GPU A/B/A2 and actual field images/counts now RUN in focusedr11/fullr1.
+Resume independent fullsource/ALL148PNG/actualreceipt review, then owned16index45/commitpush/exact505CI/
+all30logs/artifact/source45/public8bytes. Continue immediately after green; no milestone final.
+
+## Accepted P2m readable header and native panels (2026-10-07)
+
+CURRENT: P2m aggregate-CI repair committed/pushed131df8b865f48d45eafcce197a818af108f73f5d; HEAD=origin/main.
+ExactCI37610361430 andPages37610361438 SUCCESS. Only3postpushreceiptdocs WIP/indexempty;
+unrelatedworkspace/Shiloh untrackedpreserved. CI-onlydelta/index5/freeze40 CLEAR, native r2 retained.
+Actual collector EXIT0:485/485 exact names,40emptyaxes,all28 completed standalone logs/counts,
+source40 committed/live and public4 exact. JSON8253748B SHA547254d06b44d63dd4585155bdfa817d4c1bbc239d4f190a39db720faaa6deb3;
+log309460B SHA796193985277ae365879adc1acc4621242ba6678950351dcf9380e7942e73b49.
+Full1872804ms,t10:54:07.278Z; artifact11479376843 via243524B of45999220B/141entries.
+Fourcameraepochs511/308/379/174 exact/restored/zero failures,14B+alias/A/A2,13close-focusreturns7–270ms.
+Independent finalactualreceipt challenge CLEAR; P2n reviewed16owned/45bindings/41gates now ACTIVE.
+Its new narrow Readout projection extraction preserves all casualty timers/accumulators.
+Collector whenbothactualSUCCESS: node .out/p2m-collect-completed-r3-20261007.mjs 37610361430 131df8b865f48d45eafcce197a818af108f73f5d 37610361438
 CI37606487882 CANCELLED30min: actual476PASS/0FAIL/all21header/all28standalone;9deploymentchecks
 andfinalJSONUNRUN. Artifact11476911382 has136entries/no last-result.json (65536B boundedread).
 BeforeeditPLAN/DEC0046 authorize ONLY CIjob timeout30->40+4docs; no test/runtime/budget change.
 Preserve actualcancelledlog311802B SHA92fc246b5156006facd557e14da70714549fbf9ef1aa7a0782b78dda94f6b4e3.
 Next workflowdelta/live39locks/newfreeze40/index5/commitpush/replacementexact485/40axes/all28logs/
 Pages4; native r2 retained at identicalruntime39/oldCIconfig. No repeatedlocalbrowser justified.
-RootWIP now CIworkflow +4repairdocs; indexempty; two unrelated untracked preserved.
+HistoricalprecommitWIP was CIworkflow +4repairdocs; owned5committed, indexempty, unrelated2preserved.
 Serial35gatesr14/AFmini r2GREEN2/finalnativefocusedr9GREEN36; independentALL24+4review CLEAR.
 Freeze r2 EXECUTED40bindings/486native485CI/40axes; onlyheaderprobe differsfromoriginalfreeze.
 ONEfullnative r2 completedEXIT0/486namesExact/40emptyaxes; ALL138 independentPNG review CLEAR.
 Prior headerrepair INDEX5owned/40frozen/livebytes CLEAR/pushEXIT0. CI37606487882 CANCELLED; Pages37606488025 SUCCESS at67a3a79.
-Actualreplacement485CI/40scopes/finalJSON/Pages4bytes stillUNRUN. No browser/test; no duplicate run.
+Actualreplacement485CI/40scopes/finalJSON/Pages4bytes now RUN at131df8b; historical failed/cancelled runs remain distinct.
 Logs .out/p2m-full-native-r2-20261007{-outer.log,.log,.json,-readback.json}.
 Preserve unrelated paths.
 Resume reconciliation 10:28UTC: fetch confirms HEAD=origin/main67a3a79, indexempty, only known3docs
@@ -115,9 +164,11 @@ Collector: node .out/p2m-collect-completed-r2-20261007.mjs 37606487882 67a3a7917
 ONLY afterbothcompletedSUCCESS. No overlappingwriters.
 Independentfullreadback also binds realintroUS45.5354sim/firstcard47236wallms/idlegenuineCS27.2761,
 savedUS45.5329/15losses andCS19.2168/2losses, reveal9true/recovery2puts0writesafterabort.
-ExistingP2/P6 camp-origin truncation confirmed in m1-camp-issued-focus-320/m1-camp-desk-button-320
-at09:47:34.945Z; src/ui/entry.js/reward/sequence.js/reward.css byte-locked unchanged. Keep separate
-from readableheader acceptance, alongside Screens/Moments andAFfeedback debt. No broaderHUD claim.
+CORRECTION10:56UTC: camp-origin truncation report was mistaken. tools/test-camp-ui.mjs fixture
+padEnd160 itself ends 'Long source Lo'; all26actualfullr2 origins equal its complete storedvalue.
+Root and independent reviewer re-viewed m1-camp-issued-focus-320/m1-camp-desk-button-320 at09:47:
+allfourwrappedlines fit. sequence preserves inst.from and entryCSS disablesellipsis. No product
+repair justified; existing Screens/Moments/AFfeedback debt remains separate. No broaderHUD claim.
 P2n remains draftonly until repaired exactCI/all485/40axes/Pages4bytes accepted. Success-onlycollector:
 node .out/p2m-collect-completed-r2-20261007.mjs <replacementCIid> <replacementFullSHA> <replacementPagesid>
 onlyafter actualCI andPagescompletedSUCCESS. No acceptance fromjobmetadata alone. No runtime/test edits afterfreeze. ImmediatelyP2n atgreen.

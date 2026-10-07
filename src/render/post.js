@@ -19,6 +19,9 @@ import { LOOK } from '../ui/look.js';
 import { on } from '../settings.js';
 
 export const QUALITY_MODES = ['auto', 'high', 'low'];
+// The same arithmetic is exercised against independent projected depths by the pure lens gate.
+export const DEPTH_DISTANCE = '(nearPlane * farPlane) / (farPlane - depth * (farPlane - nearPlane))';
+export const DEPTH_BLEND = 'smoothstep(0.08, 0.40, abs(zDistance - focusDistance) / max(zDistance, nearPlane))';
 const LOW_SCALE = 0.7;
 const AUTO_LEVELS = [2, 1.6, 1.3, 1, 0.85, 0.7, 0.6];
 
@@ -44,6 +47,7 @@ export class Post {
     this.width = 1;
     this.height = 1;
     this.enabled = true;
+    this.soldierView = null;
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2));
     this.quad.frustumCulled = false;
     this.qScene = new THREE.Scene();
@@ -139,6 +143,12 @@ export class Post {
     this.probe = null; // { level, fps } after a step down: undone if the frame rate did not rise
     this.holdUntil = 0; // time ms before which Auto will not step below holdLevel
     this.holdLevel = 0;
+    // Lost-context target callbacks must retire before THREE installs its new GL properties.
+    // Keep CPU targets and shared materials; the restored renderer allocates them lazily.
+    renderer.domElement?.addEventListener('webglcontextlost', () => {
+      try { this.endSoldierView(); }
+      finally { for (const target of [this.rtScene, this.rtSmall, this.rtBlur]) target.dispose(); }
+    });
     this.setMode(mode);
   }
 
@@ -214,8 +224,57 @@ export class Post {
     this.renderer.render(this.qScene, this.qCam);
   }
 
+  /** One transient native depth attachment; ordinary map materials and samplers stay intact. */
+  beginSoldierView(camera, focus) {
+    if (this.soldierView) { this.updateSoldierView(camera, focus); return; }
+    if (this.rtScene.depthTexture) throw new Error('The scene already has a depth owner.');
+    const depth = new THREE.DepthTexture(this.rtScene.width, this.rtScene.height, THREE.UnsignedIntType);
+    depth.format = THREE.DepthFormat;
+    depth.minFilter = depth.magFilter = THREE.NearestFilter;
+    depth.wrapS = depth.wrapT = THREE.ClampToEdgeWrapping;
+    depth.generateMipmaps = false;
+    const original = this.finalMat.fragmentShader;
+    const start = original.indexOf('        // tilt-shift:');
+    const end = original.indexOf('        vec3 col =', start);
+    const fragment = (original.slice(0, start) + `
+        float nearPlane = uNear, farPlane = uFar, focusDistance = uFocus;
+        float depth = texture2D(tDepth, vUv).x;
+        float zDistance = ${DEPTH_DISTANCE};
+        float t = ${DEPTH_BLEND};
+` + original.slice(end)).replace('varying vec2 vUv;',
+      'uniform sampler2D tDepth; uniform float uNear; uniform float uFar; uniform float uFocus; varying vec2 vUv;');
+    const material = fsMaterial(fragment, { ...this.finalMat.uniforms, tDepth: { value: depth },
+      uNear: { value: camera.near }, uFar: { value: camera.far }, uFocus: { value: focus } });
+    this.soldierView = { depth, material };
+    this.rtScene.depthTexture = depth;
+    try { this.updateSoldierView(camera, focus); }
+    catch (error) { this.endSoldierView(); throw error; }
+  }
+
+  updateSoldierView(camera, focus) {
+    if (!this.soldierView) return;
+    if (![camera.near, camera.far, focus].every(Number.isFinite)
+      || camera.near <= 0 || camera.far <= camera.near || focus <= camera.near || focus >= camera.far) {
+      throw new Error('The inspection lens needs finite current depth planes and focus.');
+    }
+    const u = this.soldierView.material.uniforms;
+    u.uNear.value = camera.near; u.uFar.value = camera.far; u.uFocus.value = focus;
+  }
+
+  endSoldierView() {
+    const owned = this.soldierView;
+    if (!owned) return;
+    this.soldierView = null;
+    this.quad.material = this.finalMat;
+    owned.material.uniforms.tDepth.value = null;
+    if (this.rtScene.depthTexture === owned.depth) this.rtScene.depthTexture = null;
+    try { owned.material.dispose(); } finally { owned.depth.dispose(); }
+  }
+
   render(scene, camera) {
     const r = this.renderer;
+    // Target setup also allocates outside THREE.render's own lost-context guard.
+    if (r.getContext?.().isContextLost()) return;
     r.setRenderTarget(this.rtScene);
     r.clear();
     r.render(scene, camera);
@@ -238,7 +297,7 @@ export class Post {
     this._pass(this.blurMat, this.rtSmall);
     this.finalMat.uniforms.tSharp.value = this.rtScene.texture;
     this.finalMat.uniforms.tBlur.value = this.rtSmall.texture;
-    this._pass(this.finalMat, null);
+    this._pass(this.soldierView?.material || this.finalMat, null);
   }
 
   /** Call once per frame (Auto mode only adjusts). */

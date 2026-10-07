@@ -43,6 +43,22 @@ export class Input {
     this.box.hidden = true;
     document.body.appendChild(this.box);
 
+    // A transient lens releases at window capture, before a reader or ordinary field picking owns
+    // the event. Stop propagation, not immediate propagation: later capture observers see the return.
+    const consumed = (e, handled) => { if (handled) { e.preventDefault(); e.stopPropagation(); } };
+    window.addEventListener('keydown', (e) => consumed(e, this.soldierView?.keyDown(e)), true);
+    window.addEventListener('keyup', (e) => consumed(e, this.soldierView?.keyUp(e)), true);
+    for (const type of ['pointerdown', 'dblclick', 'wheel']) {
+      window.addEventListener(type, () => this.soldierView?.end(type === 'wheel' ? 'wheel' : 'pointer'), true);
+    }
+    window.addEventListener('focusin', (e) => {
+      if (this.soldierView?.active && !this.soldierView.isFieldFocus(e)) this.soldierView.end('focus');
+    }, true);
+    window.addEventListener('blur', (e) => { if (e.target === window) this.soldierView?.blur(); }, true);
+    window.addEventListener('pagehide', () => this.soldierView?.blur('pagehide'), true);
+    document.addEventListener('visibilitychange', () => { if (document.hidden) this.soldierView?.blur('hidden'); });
+    canvas.addEventListener('webglcontextlost', () => this.soldierView?.blur('context'));
+
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.addEventListener('pointerdown', (e) => this.down(e, null));
     canvas.addEventListener('dblclick', (e) => {

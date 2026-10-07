@@ -68,6 +68,7 @@ import { keyboardControls } from './test-keyboard-ui.mjs';
 import { dockControls } from './test-dock-ui.mjs';
 import { headerControls, headerAfterAction, headerStores, headerIntro, finishHeader } from './test-header-ui.mjs';
 import { deploymentProgress } from './test-deployment-ui.mjs';
+import { soldierViewControls } from './test-soldier-view-ui.mjs';
 
 const READY_TIMEOUT_MS = 180_000;
 const VIEWPORT = { width: 1280, height: 720 };
@@ -1374,6 +1375,7 @@ async function main() {
     browser = await chromium.launch(native ? { channel: 'chrome', headless: false }
       : { headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     result.browser = `chromium ${browser.version()}`;
+    if (process.argv.includes('--soldier-view')) { result.mode = 'held soldier-eye view'; await soldierViewControls({ browser, url, check, shot, result, watchErrors, native, focused: true }); return; }
     if (process.argv.includes('--save-coordination')) { result.mode = 'two-tab save coordination only';
       await saveCoordination({ browser, url, check, shot, result, watchErrors, trace: process.argv.includes('--save-trace') }); return;
     }
@@ -1627,6 +1629,7 @@ async function main() {
     await campEquipment({ browser, url, check, shot, result, watchErrors });
     await saveCoordination({ browser, url, check, shot, result, watchErrors });
     await deploymentProgress({ browser, url, check, shot, result, watchErrors, native });
+    await soldierViewControls({ browser, url, check, shot, result, watchErrors, native });
   } finally {
     if (browser) await browser.close().catch(() => {});
     await new Promise((resolve) => server.close(resolve));

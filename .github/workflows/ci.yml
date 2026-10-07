@@ -57,6 +57,9 @@ jobs:
       - run: node tools/test-keyboard.mjs
       - run: node tools/test-keyboard.mjs --prove-fail
 
+      - run: node tools/test-soldier-view.mjs
+      - run: node tools/test-soldier-view.mjs --prove-fail
+
       - run: npm test
 
       - name: Upload test output

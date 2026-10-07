@@ -1,5 +1,21 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0047 · Held inspection owns a transient lens and synchronous map return (2026-10-07)
+
+Hold I on selected friendly infantry to follow an actual living main-body figure at model head
+height along its current flank. Suspend only ordinary map-camera easing; simulation and figure
+animation keep their original sequence. Capture release and steering intent before ordinary picking,
+restore coherent map matrices/current aspect and projected overlays in the same event task, then
+restore only owned field focus. Repeated keys cannot resnapshot or reopen after forced exit.
+Scene depth comes from one lazy attachment on the existing scene target with original materials;
+an eye-only compositor shares grading and quarter blur. Keep the normal map shader byte-identical.
+Separate tick projection from casualty spawning/aging so return never consumes pending losses.
+Independent axial-depth A/B/A2, real rigged/baked/clipped views and repeated allocation checks are
+required before acceptance; this adds neither a persistent camera mode nor art/device certification.
+Actual native context restoration exposed stale GPU target disposal callbacks in pinned THREE.
+Release Post-owned GPU allocations while lost, retaining the same CPU targets and normal materials;
+require subsequent native resize/quality/resource checks and zero warnings.
+
 ## 0046 · Allow the full serial software suite to finish within 40 minutes (2026-10-07)
 
 Exact CI37606487882 reached476 passing browser checks, all21header checks and all28standalone

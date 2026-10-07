@@ -38,7 +38,7 @@
 <body>
   <main id="battle" hidden>
     <canvas id="battlefield" tabindex="0" role="application"
-            aria-label="Battlefield. Select a blue brigade with its flag or Army list. B starts keyboard march: arrows move its destination, Q/E set facing, Shift uses fine steps. T chooses a ranged enemy target. Enter orders, Escape cancels, question mark opens help. You can also drag from a brigade to march or onto an enemy to attack. Drag ground or W A S D pan; wheel zooms."></canvas>
+            aria-label="Battlefield. Select a blue brigade with its flag or Army list. Hold I to inspect selected infantry at soldier-eye height; release I to return to the map. B starts keyboard march: arrows move its destination, Q/E set facing, Shift uses fine steps. T chooses a ranged enemy target. Enter orders, Escape cancels, question mark opens help. You can also drag from a brigade to march or onto an enemy to attack. Drag ground or W A S D pan; wheel zooms."></canvas>
     <div id="markers" role="group" aria-label="Brigades"></div>
     <div id="field-crates" role="group" aria-label="Field stores"></div>
     <div id="ticks" aria-hidden="true"></div>
@@ -126,6 +126,7 @@
 
     <p id="tip" class="panel" role="note" tabindex="0">Tap or click a <b>blue flag</b>, then <b>drag from it</b> to draw its march; release on an enemy to attack it. Drag the ground to pan, pinch or wheel to zoom. With the field focused, Space pauses.</p>
     <p id="intro-hint" class="panel" role="status" tabindex="0" hidden></p>
+    <p id="soldier-view-hint" class="panel" role="note" hidden>Soldier-eye inspection · Release <kbd>I</kbd> for the map.</p>
     <span id="intro-timer" class="visually-hidden" hidden></span>
     <div id="toasts" role="status" aria-live="polite"></div>
     <p id="status" class="visually-hidden" role="status">Loading the battlefield…</p>
@@ -152,6 +153,7 @@
         <li><b>Keyboard march</b>: select with a flag or Army list, press B, then arrows to move the destination 25 m (Shift: 5 m). Q/E turn its facing 15° (Shift: 5°). Enter orders; Escape cancels the ghost and keeps your selection</li>
         <li><b>Keyboard attack</b>: T chooses or cycles enemy targets; Shift+T cycles backwards. Enter orders ranged fire facing that target. B switches to march; ? opens this help. Starting or cancelling a ghost issues no order</li>
         <li><b>Camera</b>: drag the ground or two-finger scroll to pan; pinch or wheel to zoom toward the pointer (the view tilts as you zoom); right-drag or Option + scroll to turn; WASD / arrows, Q/E, +/-; double-click or double-tap a flag to fly to it; click the map</li>
+        <li><b>Soldier-eye inspection</b>: select friendly infantry, focus its flag or the battlefield, then hold I to look along its line. Release I or press Escape for the map. The fight keeps running; Space pauses and 1/2/3 change speed</li>
         <li><b>Reading the field</b>: under each flag is what the brigade is doing; the bar under the flag is its strength, striped when shaken, broken when wavering, hollow when routing</li>
         <li><b>Orders</b>: H hold · C charge · R run · F fall back · X halt · V hold fire · Space pause · 1/2/3 speed · M map · L army list</li>
       </ul>

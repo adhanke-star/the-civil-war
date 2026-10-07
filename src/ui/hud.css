@@ -351,6 +351,26 @@ body .sb-toggle.sb-closed:not(.sb-left) {
   max-height: min(180px, calc(100dvh - var(--top-h) - var(--dock-h) - var(--objective-h) - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
   bottom: calc(var(--edge) + var(--dock-h) + 2px + env(safe-area-inset-bottom)); padding: 4px 6px; font-size: 14px; background: #18161d; }
 #objective:focus-visible, #tip:focus-visible, #intro-hint:focus-visible, #keyboard-targeting:focus-visible { outline-offset: -4px; }
+
+/* The held lens hides projected map furniture, retaining its native layout and focus semantics. */
+body.soldier-view #markers, body.soldier-view #field-crates, body.soldier-view #ticks,
+body.soldier-view #ghost-label { visibility: hidden; }
+body.soldier-view #tip, body.soldier-view #intro-hint { display: none; }
+#soldier-view-hint { position: fixed; left: calc(var(--edge) + env(safe-area-inset-left));
+  right: calc(var(--edge) + env(safe-area-inset-right)); bottom: calc(var(--edge) + var(--dock-h) + 2px + env(safe-area-inset-bottom));
+  width: max-content; max-width: calc(100vw - 2 * var(--edge) - env(safe-area-inset-left) - env(safe-area-inset-right));
+  max-height: calc(100dvh - var(--top-h) - var(--dock-h) - var(--objective-h) - 24px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  min-height: 44px; box-sizing: border-box; margin: 0; padding: 8px 10px; font-size: 14px; line-height: 1.4;
+  color: #f5f0e8; background: #18161d; overflow-wrap: anywhere; overflow-y: auto; pointer-events: none; z-index: 10; }
+#soldier-view-hint[hidden] { display: none; }
+@media (min-width: 900px) {
+  body.sb-open-left #soldier-view-hint { left: calc(var(--sb-w, 360px) + var(--edge) + env(safe-area-inset-left)); }
+  body.sb-open-left #soldier-view-hint, body.sb-open-right #soldier-view-hint {
+    max-width: calc(100vw - var(--sb-w, 360px) - 2 * var(--edge) - env(safe-area-inset-left) - env(safe-area-inset-right));
+  }
+}
+body:has(.sb-toggle.sb-left.sb-closed) #soldier-view-hint { left: calc(var(--edge) + 60px + env(safe-area-inset-left)); max-width: calc(100vw - 84px); }
+body:has(.sb-toggle.sb-closed:not(.sb-left)) #soldier-view-hint { right: calc(var(--edge) + 60px + env(safe-area-inset-right)); max-width: calc(100vw - 84px); }
 @media (max-width: 760px) {
   #objective { left: calc(var(--edge) + env(safe-area-inset-left)); right: calc(var(--edge) + env(safe-area-inset-right)); max-width: none; }
   body:has(.sb-toggle.sb-left.sb-closed) #objective { left: calc(var(--edge) + 60px + env(safe-area-inset-left)); }

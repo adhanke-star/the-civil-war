@@ -99,11 +99,19 @@ export class Readout {
         if (lost >= 1 || !on) u.tickAcc = 0;
       }
     }
-    const w = window.innerWidth, h = window.innerHeight;
     for (const t of this.ticks) {
       if (t.age >= TICK_S) continue;
       t.age += dt;
       if (t.age >= TICK_S || !on) { t.el.hidden = true; t.age = TICK_S; continue; }
+    }
+    this.projectTicks();
+  }
+
+  /** Reproject current feedback after a lens change; never consume pending losses or age a tick. */
+  projectTicks() {
+    const w = window.innerWidth, h = window.innerHeight;
+    for (const t of this.ticks) {
+      if (t.age >= TICK_S) continue;
       _v.set(t.x, t.y, t.z).project(this.camera);
       if (_v.z > 1) { t.el.style.opacity = '0'; continue; }
       const x = (_v.x * 0.5 + 0.5) * w + t.dx, y = (-_v.y * 0.5 + 0.5) * h - 10 - t.age * 26;

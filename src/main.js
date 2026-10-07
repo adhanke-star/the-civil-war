@@ -8,6 +8,7 @@ import { loadTerrainData } from './world/terrain.js';
 import { buildWorld } from './world/world.js';
 import { Post, QUALITY_MODES } from './render/post.js';
 import { RtsCamera } from './render/rts-camera.js';
+import { SoldierView } from './render/soldier-view.js';
 import { Game } from './game.js';
 import { Effects } from './fx/effects.js';
 import { ArrowLayer } from './ui/arrows.js';
@@ -198,6 +199,60 @@ const metresPerPixel = () => (2 * rts.dist * Math.tan((camera.fov * Math.PI) / 3
 const arcOf = (u) => (u.selected ? input.arcOf(u) : null);
 const commands = (u) => game.controls(u);
 
+const fieldFocus = (event) => {
+  const owner = event?.target || document.activeElement;
+  if (!owner?.isConnected || owner.closest?.('[hidden], [inert]') || !owner.getClientRects().length
+    || getComputedStyle(owner).visibility === 'hidden') return false;
+  if (owner === canvas) return true;
+  const flag = owner.closest?.('.marker'), u = game.selected;
+  return !!u && u.side === game.playerSide && game.controls(u) && hud.markers.get(u.id)?.el === flag;
+};
+const lensAvailable = () => !document.querySelector('main')?.inert && !document.querySelector('dialog[open]')
+  && !input.drag && !input.targeting && !input.pointers.size && !arrows.preview && !arrows.previewEnd;
+let eyeUI = null;
+const soldierView = new SoldierView({ camera, rts, game, terrain, post,
+  isFieldFocus: fieldFocus,
+  canBegin: event => lensAvailable() && fieldFocus(event),
+  canContinue: () => lensAvailable() && fieldFocus(),
+  onEnter: () => {
+    const hint = document.getElementById('soldier-view-hint');
+    eyeUI = { focus: document.activeElement, text: statusEl.textContent, arrows: arrows.group.visible,
+      hintHidden: hint.hidden, classHeld: document.body.classList.contains('soldier-view') };
+    canvas.focus({ preventScroll: true });
+    document.body.classList.add('soldier-view');
+    hint.hidden = false;
+    statusEl.textContent = 'Soldier-eye inspection. Release I to return to the map.';
+    arrows.group.visible = false;
+    readout.mesh.visible = false;
+  },
+  onExit: reason => {
+    const ui = eyeUI;
+    eyeUI = null;
+    if (!ui) return;
+    // Camera is already coherent and inspection inactive. Restore layout before measuring it.
+    document.body.classList.toggle('soldier-view', ui.classHeld);
+    document.getElementById('soldier-view-hint').hidden = ui.hintHidden;
+    statusEl.textContent = ui.text;
+    hud.applyMarkerScale(LOOK.markerScale);
+    hud.update(0);
+    hud.minimap?.draw();
+    practiceField.update();
+    const mpp = metresPerPixel();
+    arrows.setScale(mpp);
+    arrows.update(game.units, commands, arcOf);
+    readout.lines(mpp);
+    readout.projectTicks();
+    arrows.group.visible = ui.arrows;
+    if (['release', 'escape'].includes(reason) && document.activeElement === canvas && ui.focus?.isConnected
+      && !ui.focus.closest('[hidden], [inert]') && ui.focus.getClientRects().length) ui.focus.focus({ preventScroll: true });
+  },
+});
+input.soldierView = soldierView;
+window.addEventListener('resize', () => soldierView.onResize());
+for (const event of ['select', 'remove']) game.on(event, () => {
+  if (soldierView.active && !soldierView.valid()) soldierView.end('selection');
+});
+
 // ---------------------------------------------------------------------------------------------------
 // Loop
 let last = performance.now();
@@ -210,17 +265,20 @@ function frame(now) {
   last = now;
   const simDt = game.step(dt);
   effects.updateMoments(realDt);
+  soldierView.updatePose();
   game.setView(camera, window.innerHeight * post.scale);
   game.animate(simDt);
+  soldierView.updatePose();
   effects.update(game.paused ? 0 : dt * game.speed);
   const mpp = metresPerPixel();
-  arrows.setScale(mpp);
+  if (!soldierView.active) arrows.setScale(mpp);
   input.refreshTargeting();
   arrows.update(game.units, commands, arcOf);
-  rts.update(dt);
+  soldierView.updateMap(dt);
   world.trees.userData.updateLod(camera, rts.dist + 200);
   hud.update(dt);
   readout.update(game.paused ? 0 : dt, mpp);
+  if (soldierView.active) readout.mesh.visible = false;
   if (game.orders && !tip.hidden) tip.hidden = true;
   practiceField.update();
 
@@ -270,7 +328,7 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, readout, gpuTier, practice: practiceFlow, practiceField, manifest };
+window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, readout, soldierView, gpuTier, practice: practiceFlow, practiceField, manifest };
 
 // Developer tuning panel (lil-gui), only with ?tune in the URL; players never load it.
 if (new URLSearchParams(location.search).has('tune')) {

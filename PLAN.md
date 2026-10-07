@@ -1157,6 +1157,16 @@ actualJSON40axes andPages/public4bytes. Updatecollector/readerr3 tobind newfreez
 native r2 multiset. P2n staysDRAFT until repairedexactacceptance; no other runtime edits duringCI.
 Receipt .out/p2m-cancelled-ci-37606487882-causal-readback-r1-20261007.json; retain actualcancelledlog/
 metadata/artifactinventory. Original37593724002 remainsFAILED separately; no blindrerun.
+Processrepair frozenr3/index5/source40 CLEAR; committed/pushed131df8b865f48d45eafcce197a818af108f73f5d.
+ExactCI37610361430/Pages37610361438 SUCCESS; actual collector EXIT0485/40scopes/28logs/Pages4.
+ActualJSON8253748B SHA547254d06b44d63dd4585155bdfa817d4c1bbc239d4f190a39db720faaa6deb3,
+log309460B SHA796193985277ae365879adc1acc4621242ba6678950351dcf9380e7942e73b49;
+1872804ms,t10:54:07.278Z/artifact11479376843/243524B bounded transfer. Source40 committed/live exact;
+fourcameraepochs511/308/379/174 exact/restored/zero failures,14B+alias/A/A2/13close-focus7–270ms.
+Independent actualreceipt review CLEAR; next P2n finalcontract16owned/45bindings/41commands ACTIVE
+below. Retain native486/40axes/ALL138review at identical39runtime/testbindings.
+Successcollector: node .out/p2m-collect-completed-r3-20261007.mjs 37610361430 131df8b865f48d45eafcce197a818af108f73f5d 37610361438
+Do not duplicate existingruns/localbrowser. P2n independently reviewedfulldraft remainsNOTACTIVE.
 
 CURRENT EXACTCI FAILURE (2026-10-07): committed2ec61c04ca6525902aedef534a556124e905fec8/run37593724002
 failed195checks (194pass+harness timeout),520600ms. All28standalone steps passed. FirstheaderControls
@@ -1250,9 +1260,12 @@ exist/signaturesverified, root10keyPNGviewed, independentALL138reviewCLEAR. Next
 stage/index40 CLEAR; committed/pushed67a3a79174b0858882e7d28ce15192b2c0450153 main EXIT0 at10:18UTC.
 ExactCI37606487882/Pages37606488025 ACTIVE. Requireactual485/40axes/all28steps/artifact/Pages4bytes;
 no newproductacceptance yet. No runtime/test edits/localbrowser whileCI; P2n staysdraftonly.
-ExistingP2/P6 debt confirmed in actualfullr2 camp-issued-focus-320/camp-desk-button-320: longpractice
-origin texttruncates; entry/sequence/rewardCSS remainlockedunchanged. Screens/Moments andAFfeedback
-overlaps remainopen; no wholeHUD/nativeiPad/performance/art/v1claim fromthisrepair.
+CORRECTION10:56UTC: the previously reported camp-origin truncation is not a product defect. The
+fixture tools/test-camp-ui.mjs uses padEnd160 and its full value ends 'Long source Lo'; actualfullr2
+contains26exact matching origins. Root and independent reviewer re-viewed both cited320PNG: all
+four wrapped lines fit. sequence preserves inst.from and entryCSS overrides ellipsis. No camp-origin
+repair justified. Screens/Moments andAFfeedback overlaps remainopen; no wholeHUD/nativeiPad/
+performance/art/v1claim fromthisrepair.
 
 P2l exactCI37578420410 failed278checks at dock-resize-restore and introdrag line50. Repair first:
 root extends current P2l11path ownership to tools/test-intro-ui.mjs for proven native input
@@ -1481,6 +1494,350 @@ Pages, subject to actual BASE/candidate rendered geometry and all gates. Observe
 needs diagnosis/justifiedfix, no preemptive weaker budgets. Preserve every
 failed receipt/unknownfile. If one seam truly blocked, mark affectedwork only and select independent
 v1work. Immediately next loop at green boundary, no final/milestone stop or userdevice requests.
+
+### P2n acceptance contract — held soldier-eye view and scene-depth blur
+
+ACTIVE 2026-10-07 after exact P2m CI37610361430/Pages37610361438 at131df8b:
+actual485/40axes/28logs/source40/public4, root and independent receipt review CLEAR. Root sole writer; one bounded read-only reviewer, no simultaneous writer/browser/test.
+Native diagnostic r1/r2 FAILED at actual trusted flag I admission (16 checks, no field images).
+r2 actual15273B SHA32c23cb7e19765b52b6d75d6edfda6586f4bac3a0ab2179e7daf33988cb08894:
+canBegin/eligible/fieldFocus true, then activefalse/heldfalse/latchedtrue before any held frame.
+Source confirms window capture blur received the flag's element blur during canvas focus transfer.
+Bounded owned Input repair guards e.target===window; element focus exit remains focusin-owned.
+Retain failed receipts; native admission/release/remaining20 categories stay UNRUN until repaired proof.
+Implementation/pure20+20 now RUN; serial41r1 GREEN (pre-blur-repair source45). Native r3 repaired flag
+admission/release and6othercategories RUN; inert-focus baseline FAIL plus stalled unbounded pointer
+phase/owned abort gives actual25checks/2FAIL/2PNGs, no acceptance. Review-driven probe repairs bind
+full RTS/roster/event overlays, actual preLOD/push buckets, initial resource baseline, true baked/split,
+15s observation and cleanup. Native focusedr4 RUN at sourceadmission45r4; final repaired41gates,
+freeze/fullnative506/exact505CI/Pages8 remain UNRUN. No source edits while its browser is active.
+Native r4 actual25checks/1FAIL was stopped prematurely: retained currentOperation records rotate/
+select after five preceding loop iterations; the pointer assertion group itself was UNRUN. Absence
+of group logging was not evidence of a hang; no partial pointer group acceptance is claimed.
+Retain JSON416359B SHA0e56b2bd00caccf600def8eab8a9f97496291ad7f4dc063f5393006749452286.
+Probe repair adds per-case progress and transfers only current rows/calls, preserving full finaltrace.
+Independent follow-up requires admission/continuous moving-interval LOD crossings, independently
+projected visibility and source-locked original markerPosition geometry/DOM transform controls.
+Crate proof uses the SAME context/page after sandbox wrappers are restored: navigate existing intro
+route but never Continue, keep paused/simTime0/startedfalse, diagnostic close briefing only, native
+select/I-up and actual visible existing crate connectors. No additional played or rewarded encounter,
+no roster/time/casualty rewind; fold proof into existing map-restore category, preserve20/35/506 counts.
+LIVE12:38UTC: P2n native r5 completed FAILED30checks/3FAIL/4actualPNG, duration127731ms.
+Camera/fullRTS return and casualty conservation were exact for all six native pointer cases; failures
+were marker placement oracle subpixel DOM dimensions plus wrong combobox lookup (actual choices
+are native buttons). ActualJSON11693227B SHAc5fd4e99ec8ec922b4960fa4540abba65e2d7abdb70c6f8227b9627925c58382;
+log20915B SHA8128b064d4d1d4ecca59c3e4c6dede632cce04fe8d344a33b964794c540a4728.
+Actual GPU loss/restoration passed; moving >3m plus same-admission advancing-time LOD crossing was
+observed before later control lookup failed. Moving category/GPUdepth/resources/finalcrate remain
+UNRUN for acceptance. Probe uses cache dimensions only after independent DOM size validation,
+actual named choice buttons, both native lifecycle trusted flags and additional coarse-left geometry.
+Native focusedr6 RUN/session34304, sourceadmission45r6. No simultaneous browser/tests or runtime edits.
+Next actual r6 receipt, causal repairs, finalserial41/freeze45/full506/integration/exact505CI/Pages8.
+
+LIVE12:42UTC: nativefocusedr6 FAILED30/3FAIL/4PNG, exactJSON11686490B SHAe9edff5e30ebfb690518f153116a921bdbc6014a9c42151fea2e5cb391fd96a2; log20926B SHA67ad2201c0cc091d004a4878a73b4126d3d616a652b1e598d71dc0226e6d0b84.
+Cache dimensions alone did not resolve marker oracle; no definitive rounding cause claimed.
+Actual controls are RADIO inputs (panel.js213-227), corrected from both invalid combobox/button lookups.
+Probe now retains cached/DOM dimensions and independent expected transforms plus immediate
+before/after original Hud.update layout to identify the exact synchronous discrepancy. Original
+method called once and own/inherited descriptor restored. r7 RUN/session69201/sourceadmission45r7.
+No runtime/test edits or simultaneous browser/tests during this run. Final41/freeze/full/CI UNRUN.
+
+
+Measured r7 native repair (2026-10-07): actual35/4FAIL/10PNG; moving/depth/resources/axe GREEN.
+JSON15797489B SHA516a3c604adeef2858b5ed2da54004ba72ecbbb11a3d0d2d99a2bbb4446a69c4;
+log33156B SHA9e6edecc43d550c073c2ced650a9459d0e3a12f082472a87c912789ab260fa4e.
+Release/pointer/crate A/A2 oracle failures are proven CSSOM integer serialization (.0 removed), not
+runtime geometry: preserve raw plus detached-style canonical expected strings/exact comparison;
+canonicalize tick transform/opacity likewise. Keep independent visibility/anchors/DOM/cache guards.
+Seven actual invalid GPU deletes follow context restoration: pinned THREE reinitializes properties
+while old WebGLTextures target disposal callbacks retain lost handles. Bounded owned Post repair:
+on actual canvas context-loss delivery, end only owned eye resources, dispose existing rtScene/Small/
+Blur GPU allocations while lost, BEFORE restore. Preserve CPU target objects/dimensions/materials/
+normal shader/pass graph; no target recreation or extra normal entry/exit disposal. Native loss/
+restore then resize/quality/resources/strict-zero warnings and pure current20 category bind repair.
+Fixture control constructs ShaderMaterial from original vertex/source/direct shared uniforms, rather
+than clone() which warns on render-target sampler cloning. GPU predicates/counts/limits unchanged.
+
+Independent r8 follow-up: lost-context Post.render must return BEFORE setRenderTarget to prevent
+THREE target setup from reattaching old-context callbacks; eye cleanup uses finally for all3targets.
+Preserve headless existing Post pure adapters with optional domElement hook. Extend existing native
+release category with explicitly labelled Readout.spawn feedback on a disposable generic brigade;
+this tests live tick DOM reprojection/conservation, not a claim of actual combat casualties. Native
+I entry/up, real wall-frame aging/expiry; never rewind ticks/time or alter historical men. No new
+category/context/rewarded encounter; actual synthetic fixture attribution remains explicit.
+
+LIVE12:53UTC: P2n16owned WIP, HEAD/origin131df8b, indexempty/unrelated2preserved.
+Native r8 actual35/34PASS/1FAIL/10PNG, duration162616ms, JSON14947704B SHAbcfb3a83881439105ec32b9bcbcbb7ece4f52dffa6f74160f9743af1f67597d1; log27243B SHAdc48c9af789f9f543cefed182b139208991f495b3a11cfaeda0031e73e56051e.
+Release/pointer/crate/depth/moving/resources/axe now pass. Only7stale GPU target delete warnings
+remain: old callbacks were reinstalled during lost RAFs. Current Post guard prevents any lost-context
+target setup; callback disposes existing3targets in finally, CPU objects/materials stay intact.
+Preserve locked headless adapters with optional domElement. New native generic Readout.spawn display
+fixture binds active tick projection/age/loss conservation; explicitly no actual combat-loss claim.
+Serialr2 FAILED39commands only new test expected4targetcalls; actual original source scene+4post=5.
+Source-correct expected5; retain failed log SHA18f50c9fbc49fe2c392c27d21a5ee904212bd5973fc835d1b36a59a9e66e176c.
+Final41serialr3 GREEN/source45r10 unchanged, log35118B SHA69cfc996a31764316de8b6ee1b773b8bcddf3a3def0d2571c10deb31f295bff2. Focusednative35r10 RUN/session66234. No simultaneous browser/test/runtime edits. r9native UNRUN.
+Native resource identity now actual admission CPUtarget refs+texture UUIDs (RenderTarget has no uuid).
+After41GREEN/source45, focusednative35r10, independent full source/actual10PNG/receipt review,
+freeze45/ONEfullnative506/41axes/ALLPNG review/owned16stage/index45/commitpush/exact505CI30logs/
+artifact/source45/Pages8. Immediately continue next v1 slice after green; no milestone final.
+
+LIVE13:01UTC: finalserial41r3 and focusednative35r10 GREEN, source45 unchanged; ALL10 actualPNG
+independently viewed and source/behavior/depth/ticks/resources CLEAR. Focus JSON15727031B SHAf4a9d25d40d91eb372b6cc96b5a153671ca6740f64bf978c6b2ccb983d80ebd1; log27270B SHA066d3a974a3d3e62a367315d261baa2f966b1ae130bb481996f8c833967560f4; native lost45attempts/0targetcalls.
+Accounting BLOCK before freeze: r10 duplicates canonical soldierViewAxe under soldierView.axe,
+so recursive collectors would see42fullscopes. Category now serializes count-only, retains20names/
+canonical1newarray. Freeze independently walks actual focused axes; full verifies actual all41paths.
+Runtime unchanged from r10. Final41serialr4 GREEN/source45r11 unchanged (same35118B/logSHA69cfc996a31764316de8b6ee1b773b8bcddf3a3def0d2571c10deb31f295bff2); focusednative35r11 RUN/session93669. Independent
+independent serialization/receipt/all10image review then freeze45/full506/CI505/30logs/Pages8.
+No P2n freeze/full/integration/CI acceptance yet; no simultaneous tests/browser/runtime edits.
+
+LIVE13:27UTC: ONE fullnative r1 COMPLETED EXIT0; freeze45 EXECUTED EXIT0.
+Actual506/504unique exactnames,935520ms,t13:09:57.477Z;41empty/exactaxes/zeroallerrorswarnings/
+3headerStagestrue/source45 unchanged/last-result byteequal. Actual148uniquePNG allfound;
+Independent fullreceipt/source/ALL148review CLEAR; root5current held/map/baked/split/crate PNG viewed.
+JSON23136961B SHA39c90a414db683cb3be9ff75e396e34c3c9879a5b46ce5f1e4da5b77ef051aa2;
+log175330B SHA16657b717bc0a43342e93a28636256afadb18c45b493cf72b5bffb8df647d3d7.
+Future bounded CIreader decoded cap48MiB from actual23.1MB native/rawpacked596588B; unchanged
+packed1MiB/range2MiB/total3MiB and <100MBparse. Collector binds actualhash/run/SHA/exactaxePaths.
+Finalserial41r4 GREEN/source45r11 unchanged, log35118B SHA69cfc996a31764316de8b6ee1b773b8bcddf3a3def0d2571c10deb31f295bff2.
+Corrected focusednative35r11 EXIT0/35PASS/10PNG,159280ms,t13:02:03.541Z; JSON15644766B SHA5a7d9222454f90ba7ba9718cb564832e59bda3623c4b8993c0988110e670ebdc;
+log27279B SHA4c66279715fb92d1fc723a93dfab68b75cee3e7d1af292814eaaed8c6fc3925d.
+Canonical1newaxe array/count-only category; source45 unchanged, zeroerrors/warnings/axe. Native lost
+39renderattempts/0targetcalls; active diagnostic generic tick conserved; GPU A/B/A2+resources+crates GREEN.
+Independent current receipt/source/ALL10 actualPNG challenge CLEAR; r10 originalALL10 review CLEAR,
+its duplicate42scope serialization corrected beforefreeze. Runtime unchanged from r10.
+Freeze .out/p2n-freeze-r1-20261007.mjs EXECUTED =>45=12changed33locks/506native505CI/
+41actualrecursivepaths; ONE .out/p2n-full-native-r1-20261007.mjs EXIT0; then allactualPNG review;
+owned16index45/commitpush/exact505CI/all30logs/Pages8. Rootsolewriter/unrelated2preserved.
+P2n full review CLEAR; owned16 integration/exactCI acceptance next. No simultaneous tests/browser/runtime edits.
+
+Objective: holding I on the battlefield follows a selected living friendly infantry figure at low
+model head height with actual scene-depth blur; release restores the map synchronously. This is
+DESIGN's inspection camera, not a combat/save mode. Existing v1 scope and all old gates remain binding.
+
+Own exactly16: index.html; src/main.js; src/ui/input.js; src/ui/hud.css; src/ui/readout.js; src/render/post.js;
+new src/render/soldier-view.js; new tools/test-soldier-view.mjs; new tools/test-soldier-view-ui.mjs;
+tools/test.mjs; .github/workflows/ci.yml; sw.js; PLAN.md; HANDOFF.md; STATE.md; DECISIONS.md.
+Runtime/test/CI freeze45=12changed+33locks: previous40 plus Readout, Post and three new source/test files.
+Readout ownership is ONLY the projection-only extraction below; amend its prior lock explicitly.
+Do not touch RTS/Game/Unit/Battery/Combat/equipment/rules/RNG/oracles, Arrow/Hud controllers,
+settings/LOOK defaults, old dock/header probes/counts, saves/routes/history/terrain/art/assets/vendor,
+quality limits. No new dependency, render target, scene pass, setting, persistent mode or directory.
+
+Admission and event ownership:
+- I down must be fresh/nonrepeat/unmodified with actual field canvas or connected controlled friendly
+  flag focus, current selected object in game.units, alive orderable infantry, and at least one living
+  non-gone main-body figure. Refuse modal/inert/forms/readers/native UI/sandbox ownership, pointers,
+  drag, keyboard ghost or existing preview. Refusal does not change selection/focus/ghost/orders/save.
+- Choose actual front main-body figure deterministically by front rank, current local lateral slot
+  (column cfile vs line lx), stable i; keep its object identity. Repeated down never re-snapshots,
+  reallocates or changes followed object. Successful flag admission focuses canvas before hiding flags.
+- Input optional controller receives capture keydown/keyup, pointerdown/dblclick/wheel/focusin exits.
+  Admitted I and active Escape consume before normal handlers; Escape keeps selection. I-up releases
+  even if a reading owner stops bubbling. Forced exit latches until I-up; repeats never reopen even
+  after blur clears physical-held state. Repeated Escape from the same handled press cannot deselect.
+- Restore map before canvas/marker down, double-click and all wheel zoom/pinch/pan/rotate methods;
+  forward native handling exactly once. Non-pause/speed steering/order/help/UI key intent exits first.
+  Space and1/2/3 field keys can retain held inspection while normal simulation pause/speed changes.
+- Blur/hidden/pagehide/context loss clean up. UI focus exit retains its newly focused owner. Explicit
+  I-up/Escape restores prior connected field focus only while inspection still owns focus; forced
+  pointer/wheel/focus/blur/navigation never steals focus. Selection-array membership/order change, unit
+  removal/rout/death, figure death/gone/replacement and external map goal intent end inspection.
+  Unit combat-order changes/completion do not themselves exit; genuine moving follow must continue.
+
+Camera and loop:
+- Model s=FIGURE_SCALE4.4*LOOK.figureScale, head center1.64*s from existing geometry; no animated
+  eye-bone or anatomical/historical-height claim. Use actual f.x/z/yaw every pose update. Camera
+  offset=-right*1.8*s+forward*0.7*s, target=figure+right*6*s; right=(cosYaw,-sinYaw),
+  forward=(sinYaw,cosYaw). Each point's Y=local terrain+head height; minimum camera clearance0.4*s.
+  FOV55, near0.3, far6000, current aspect. Focus=-targetCameraSpace.z after coherent matrix update.
+  Flat distance=sqrt(7.8^2+0.7^2)*s. This is outside the selected figure's local flank only; actual
+  moving/turning/column sight and neighbour occlusion must be reviewed, no whole-formation guarantee.
+  Constants are initial game tuning, documented candidate-view correction allowed BEFORE freeze;
+  do not silently adjust acceptance/art/quality thresholds to fit a result.
+- Controller suspends ordinary RTS.update only while active; target/goal/filter/yaw/pitch/dist/tilt
+  remain intact, owned keys/inertia cancelled on entry/end. Snapshot camera position/quaternion/up/
+  scale/FOV/near/far/zoom/aspect and local/world/worldInverse/projection/projectionInverse matrices.
+  Clean release restores exact snapshot and coherent matrices synchronously before picking.
+  Resize returns current aspect/projection with saved map pose/planes; Auto remains current.
+  External changed goal is retained, never overwritten. Ordinary resumed easing is separately bound
+  to detached original RTS at actual dt; paused Game does not imply stationary camera.
+- Keep original one game.step(dt), dt cap0.1 and one game.animate(simDt), in their original sequence.
+  Eye update before Game.setView supplies pre-animation LOD; update after ordinary animate supplies
+  rendered actual figure pose. Bind both including first frame and near-threshold crossing. Pools
+  intentionally use that frame's pre-animation pose. Original tree threshold rts.dist+200 remains.
+- Snapshot arrow group.visible and restore exactly; class hides map markers/crates/ticks/ghost only
+  held without destroying children or attributes. Keep top/dock/pause controls. Existing hidden status
+  announces inspection and restores prior text; new nonfocusable visible soldier-view-hint says
+  release I for map, >=14px/44px with native wrapping below objective and above dock. Suppress tip/
+  intro hints only with the owned held class. Explain I in canvas label and existing Controls help.
+- Restore projected overlays synchronously in the release event task before paint or original native
+  handling. Mark inspection inactive before HUD refresh/focus (synchronous focusin must not re-enter
+  partial cleanup). Restore camera/matrices, remove held layout suppression so normal hints/obstacles and DOM
+  dimensions exist; invalidate marker size caches using existing hud.applyMarkerScale(current LOOK
+  markerScale), then hud.update(0), hud.minimap?.draw(), practiceField.update(), map-scale arrows
+  setScale/update with existing commands/arcOf, readout.lines(mapmpp), and readout.projectTicks().
+  Restore prior arrow-group visibility after rebuilding. No stale eye-camera positions, minimap eye
+  footprint or eye-scale geometry may become observable before the next RAF. Hide engagement mesh
+  after every ordinary held readout.update, since lines() itself makes it visible.
+- Extract only existing tick projection/transform/opacity into Readout.projectTicks(). Normal
+  casualties(dt) retains exactly its spawning/tickT/tickAcc/aging/expiry order then calls that method.
+  Projection-only release must preserve every tick object/age/next/tickT and unit.tickAcc; never call
+  casualties(0) or readout.update(0) for restoration. Pure return and native release/pointer categories
+  bind those invariants plus actual projected positions/DOM dimensions/minimap before native handling.
+  Explicit field-focus restoration comes last, after layout/projection restoration is complete.
+
+Post resources and actual depth:
+- Lazy one native DepthTexture attached to existing rtScene only while held; unsigned integer,
+  nearest, clamp/no mip. Render normal materials' color and depth in the original scene pass.
+  No Bokeh override or second scene pass. Normal finalMat source/uniforms/samplers remain unchanged.
+- Lazy separate eye-only ShaderMaterial shares original grading/sharpen uniform objects and existing
+  quarter blur. Depth view distance=-perspectiveDepthToViewZ(d,near,far), perspective formula from
+  pinned THREE. Blur weight=smoothstep(0.08,0.40,abs(z-focus)/max(z,near)), independent of UV.y.
+  Actual current camera planes/focus update every frame. Disabled post remains original graded sharp.
+- Dispose/detach eye material/depth, null sampler and restore map quad on exit; idempotent and failed
+  entry safe. Target resizing disposes GPU attachment then reuses owned CPU DepthTexture; final exit
+  does not dispose shared map color/blur targets beyond needed framebuffer reallocation. Preserve
+  target UUIDs/dimensions and original measured map allocation counts at same viewport/quality.
+  Retain legitimate resized/Auto state. No null depth sampler in ordinary map material.
+- Actual custom rigged deformation, opaque baked alpha discard and split clipping use original
+  materials. Smoke/soft edges depthWrite:false use underlying opaque depth: explicit limitation.
+  Actual rigged/baked/alpha/clipped field images are required; opaque fixture does not certify those.
+
+Independent controlled GPU fixture (not genuine-field proof):
+- One temporary unlit opaque scene/camera, reuse actual Post synchronously. Perspective60 near1
+  far128/focus16. Three96x96 render-pixel sinusoidal panels at axial8/16/32, NDCx=-.5/0/.5,
+  NDC Y=0 (vertical center). CSS1280x800/low0.7 must draw896x560. World square=2*depth*tan30*96/560,
+  X=NDCx*depth*tan30*aspect. Shared96px nearest/no-mip DataTexture, linear gray
+  .45+.30*cos(2*pi*x/8), constant rows, ordinary MeshBasicMaterial depthWrite/test true.
+- Central64x64 ROI,16px edge guard/eight periods; decode sRGB, Rec709 linear luminance, subtract each
+  row mean, average complex sine/cos Fourier magnitude. Normalize each location to its own sharp B.
+  Fix BEFORE measurement: B amplitude>0.03; A/A2 focus>=0.8 B; near/far<=0.5 B. Lens law yields
+  weights1/0/1 at8/16/32. B ONLY changes blend weight to original screen-height map expression,
+  same depth/material uniforms/planes/grade/scene/passgraph. B must fail SAME depth discriminator;
+  A2 pixel bytes EXACT A. No changed production expectations generated from observed output.
+- Read RGBA and capture fixture PNG synchronously immediately after render, before yielding/main RAF.
+  Later field screenshot cannot stand in for fixture evidence. Finally restore renderer target/
+  viewport/scissor/test/clear, quad material, all changed sampler/uniform refs+values/material source;
+  release owned eye resources normally, dispose ONLY fixture geometry/material/DataTexture/control.
+  Re-render current ordinary field before same-viewport/quality resource comparison. No game rewind.
+
+Exact20 pure positive+intended-control categories, actual controller/THREE/Post with bounded adapters:
+1 begin-current-front-figure: actual membership/main-body/rank/lateral selection; B picks skirmisher.
+2 scaled-model-head: independent geometry-derived scale cases; B ignores actual scale.
+3 yaw-flank-four-headings: independent slot convention/projection; B uses unit yaw instead of figure.
+4 local-terrain-clearance: camera/target local heights; B samples brigade center only.
+5 actual-figure-follow: move same figure and retain identity; B freezes entry coordinates.
+6 ordinary-map-suspension: held update never advances ordinary RTS; B executes ordinary update.
+7 exact-camera-return: coherent full matrix/pose/map state event boundary; B retains eye projection.
+8 resized-current-aspect: resize aspect survives return with saved map pose; B restores old aspect.
+9 repeat-no-allocation: same snapshot/figure/depth across repeated begin; B allocates/snapshots again.
+10 no-selection-refusal: no state/order/resource mutation; B invents a selected unit.
+11 unsupported-control-refusal: gun/enemy/uncontrolled reject; B accepts unsupported unit.
+12 rout-depleted-refusal: routed/dead/zero-strength reject; B ignores admission status.
+13 dead-gone-refusal: no live main-body candidate rejects; B follows dead/gone figure.
+14 object-membership-rebuild: replacement with same i exits; B accepts reused i as identity.
+15 selection-changed-exit: group/primary change ends; B ignores change.
+16 external-goal-retained: real external intent exits/preserves goal; B overwrites new goal.
+17 idempotent-failed-cleanup: failed begin/end/page exit leaves original resources; B leaks owner.
+18 perspective-depth-linearization: known project/deproject values/planes; B uses raw depth.
+19 near-focus-far-coc: independent8/16/32 + offscreen-Y anchors; B uses screenY.
+20 post-lazy-map-integrity: actual Post lifecycle/resize/shared grade/original shader hash; B binds
+   depth sampler into normal map material. Every B must fail its own named AssertionError and A2
+   restore; incidental exception, weakened count or assertion mirroring is not acceptance.
+
+Exact20 added UI categories, one aggregate new axe array makes41 full scopes:
+Use one fresh sequential test context/page for the new20 cases after prior context closes, rather
+than installing a supposed pre-admission observer after Input already owns capture handlers. Register
+trusted I-down window capture via addInitScript BEFORE production; install I-up observer on SAME
+window capture phase AFTER production release listeners. Production keyup releases at capture but
+does not stopImmediatePropagation, so that later same-window capture observer sees synchronous
+restoration even if readers suppress bubbling or production stops propagation to other targets.
+Match actual event identities/trust. Test wrappers retain own/inherited descriptor distinctions,
+forward original receiver/arguments exactly once and restore in finally; listeners also removed.
+Full calls this20-case helper once;
+focused calls the same helper plus14foundations/onefocused native guard only. No extra genuine
+reward encounter, no camera/time/roster/progress rewind. Moving-follow uses an actual ordinary order
+and normal live frames; if a quiet generic sandbox formation is needed, create it through the actual
+existing sandbox button, keep its fictional generic label, remove it normally in finally. Selection
+and orders are native; no forced victory/time/casualties or invented historic unit.
+soldier-view-native-held (trusted canvas+friendly-flag I, actual current figure/lens/preLOD/postpose);
+soldier-view-native-release (actual I-down capture/I-up after-production event identity, exact restore);
+soldier-view-refusal (none/gun/enemy/routed/depleted, no mutation); soldier-view-ghost-preserved
+(real B ghost/drag/pointer ownership refuses); soldier-view-ui-isolation (forms/buttons/readers/sandbox);
+soldier-view-modal-isolation (inert/intro/menu/result); soldier-view-repeat-guard (no snapshots/depth,
+forced-exit latch); soldier-view-escape (selection retained, repeat safe); soldier-view-focus-exit
+(new UI focus kept); soldier-view-pointer-exit (trusted down/dblclick/wheel zoom/trackpad/pinch,
+test-only first-dispatch wrappers show restored camera BEFORE original handling exactly once);
+soldier-view-blur-exit (blur/hidden/pagehide/context loss cleanup); soldier-view-selection-exit
+(native selection plus direct external goal intent); soldier-view-figure-exit (death/gone/same-i
+rebuild/unit removal/rout); soldier-view-resize (current aspect/Auto, narrow hint geometry);
+soldier-view-moving-follow (genuine ordinary order/time advance, actual same figure/prepostLOD,
+paused and Play/speed intervals separately conserved, rigged/baked/alpha/split field images);
+soldier-view-depth (controlled GPU A/B/A2 separate actual PNG/metrics); soldier-view-resources
+(repeated cycles/resize/quality SAME viewport-quality restored measured memory/targets/programs);
+soldier-view-map-restore (exact event restoration then detached actual-dt resumed easing, latched
+failures, original method descriptors restored finally); soldier-view-axe (all exercised held/return
+scopes zero violations); soldier-view-no-console-errors (errors/warnings zero, original canonical
+driver filter only, raw startup driver warnings retained). No shipped test-only logging.
+
+Gates EXACT41, serial, unique actual source/log/JSON/PNG receipts:
+node --check src/main.js
+node --check src/ui/input.js
+node --check src/ui/readout.js
+node --check src/render/post.js
+node --check src/render/soldier-view.js
+node --check tools/test-soldier-view.mjs
+node --check tools/test-soldier-view-ui.mjs
+node --check tools/test.mjs
+node --check sw.js
+git diff --check
+node tools/test-deployment.mjs
+node tools/test-deployment.mjs --prove-fail
+node tools/test-equipment.mjs
+node tools/test-equipment.mjs --prove-fail
+node tools/test-reward.mjs
+node tools/test-reward.mjs --prove-fail
+node tools/test-save.mjs
+node tools/test-save.mjs --prove-fail
+node tools/test-practice.mjs
+node tools/test-practice.mjs --prove-fail
+node tools/test-captures.mjs
+node tools/test-captures.mjs --prove-fail
+node tools/test-intro.mjs
+node tools/test-intro.mjs --prove-fail
+node tools/test-sandbox-rules.mjs
+node tools/test-sandbox-rules.mjs --prove-fail
+node tools/test-look.mjs
+node tools/test-look.mjs --prove-fail
+node tools/test-view.mjs
+node tools/test-view.mjs --prove-fail
+node tools/test-spacing.mjs
+node tools/test-spacing.mjs --prove-fail
+node tools/test-residency.mjs
+node tools/test-residency.mjs --prove-fail
+node tools/test-moments.mjs
+node tools/test-moments.mjs --prove-fail
+node tools/test-keyboard.mjs
+node tools/test-keyboard.mjs --prove-fail
+node tools/test-soldier-view.mjs
+node tools/test-soldier-view.mjs --prove-fail
+node tools/test.mjs --unit
+
+Retain deployment21+21, equipment23+23/115/A126-B-A2/3606Combat136580Unit draws, other183each,
+unit foundations and all original486native485CI name multisets/40axes. Add20UI=>506native505CI;
+focused --soldier-view native35/software34=14foundations+20UI+onefocused native-renderer only.
+CI adds exactlytwo explicit pure commands, total30standalone; accepted timeout40 unchanged unless measured
+failure justifies separate written bounded process repair. No unchanged35software cases on Mac.
+Before freeze run focused serial native with actual trusted inputs/GPU/control/field PNG/source
+readback; independent bounded source/rendered/receipt challenge and causal repair. Freeze45 and
+exact old+20 names/41scope paths. ONE final npm test -- --native; actual506/all41emptyaxes/
+errorswarnings, last-result bytes/source45 unchanged and ALL actual PNG independent review.
+Syncdocs STATE<20lines, explicit owned16stage/index45 bindings, commit/pushmain, existing exact
+505CI/all30actual completed logs/artifact/name multiset/source45 and Pages every changed runtime
+file (index/main/input/hudCSS/Readout/Post/controller/sw) exact public bytes. No acceptance from metadata.
+Preserve prior failed receipts/unrelated untracked paths. If blocked, mark only affected lane and
+select independent v1 work. Immediately next dependency-ready P2 feedback/title/camp/P3P4 slice;
+no milestone final/whole-v1/native-iPad/art-fieldability/performance claim or recurring user checks.
 
 ### Required battle-system work (P3/P4; do not hide it inside “build Shiloh”)
 
