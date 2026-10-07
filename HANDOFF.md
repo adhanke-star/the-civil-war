@@ -5,6 +5,39 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
+## Active iteration: P2k2a pure deployment (2026-10-06)
+Live fetch HEAD/origin de159d36de67e0dc5127fe150a356a708519067a. Identified three doc WIP adopted;
+workspace/Shiloh preserved. Process audit: shared Codex app-server/REPLs, no field/test/server/watcher;
+no independent writer identified. Exact P2k1 CI37559053382/Pages37559053342 re-read SUCCESS.
+P2k2a contract in PLAN chooses immutable whole-army manifest/outcome, <=5active/7240men/12guns/
+1490dense pool, infantry<=3000/battery<=120crew/6guns, separated rows and7loot/UTF8 reserve.
+Pure foundation owns practice.js/test-deployment/CI/sw/docs; routes and saved native deployment UNRUN.
+Root source/implementation/integration; one independent read-only gpt-6.1-sol/high reviewer.
+Continue P2k2b only after pure foundation exact-SHA green; no duplicate goal/scheduler.
+
+P2k2a pure candidate:19positive+19intended named AssertionError controls, retained183+183,
+equipment23+23/115actual Unit/profile/volley/A126-B-A2 originaldraws and UNIT OK. Total225+225
+categories; grouped controls prove one intended rejection per category, not every subordinatecase.
+New actual Unit/Battery/Combat/Game-method/Arrow geometry proof uses terrain/GPU/store adapters;
+Game constructor/browser saved deployment remains P2k2b UNRUN. Source confirms no seeded preview;
+Math.random instrumentation separately proves0globaldraws. Independent source/gate challenge clear.
+Original fixture17/19 failed read-only equipment assignment/nonexistent preview method, not product;
+repaired positive r1 passes19/19. Controls r1 FAILED10/19 on assertion-name harness check; preserved
+.out/p2k2a-deployment-controls-r1-20261006.log. r2 passes19/19 with explicit named refusal helper.
+Final .out/p2k2a-deterministic-r1-20261006.log binds current source and all prescribed exits0.
+Four changed runtime/test/CI files frozen in .out/p2k2a-frozen-source-r1-20261006.json, plus17untouched
+engine/route/scenario locks. ONE frozen serial native passes394/394 in459777ms at
+2026-10-07T02:30:06.551Z; .out/p2k2a-full-native-r1-20261006.{log,json}, -readback.json.
+Actual JSON220494B/SHA256320c1af0a4f5997f103ed7d19655bffa71a5373e56ae3f23479839b6e00d9bab
+equals last-result.json bytes; failures/errors/warnings[]; all29exercisedaxe scopes empty.
+Fourchanged+17untouched bindings unchanged afterrun. Actual Intel ANGLE Metal UHD617;
+unforced intro wins45.46sim/firstcard47326wallms; idle loses27.29sim. Root inspected exact field,
+intro, narrow camp comparison and narrow Legendary PNGs. Single intro capture FPS26 versus broad60
+is not a sustained30fps certification or a causal regression; P7/nativeiPad/art/memory gates stayopen.
+Automatic prune removed185oldest generated files31.5MiB; .out299.9MiB, current receipts remain.
+Independent final source/actual receipt/6PNG review clears integration: all28explicit deterministic CI commands retained with new deployment pair;394/394/29axe/21bindings confirmed. Index/commit/push/exact-SHA CI/Pages pending; P2k2b route not yet edited or accepted.
+
+
 ## Current boundary: P2k1 sole-writer continuation (2026-10-06)
 
 Aaron's restart packet identifies tools/test-equipment.mjs and its prechange log as the original
@@ -40,7 +73,64 @@ Root and independent reviewer viewed actual ordered/rigged/keyboard/intro/camp/M
 independent final source/receipt/rendered review clears stage/commit. A transient intro-capture4fps
 meter alongside broad55.7/sandbox55 is not a sustained native30fps floor or a causal regression.
 These UI checks cover existing generic routes; actual named deployment remains P2k2 UNRUN.
-Commit/push/exact P2k1 CI/Pages remain pending. The full v1 goal is not complete.
+Eleven explicitly staged owned files committed/pushed asde159d36de67e0dc5127fe150a356a708519067a;
+all7frozen hash/byte bindings match the index. HEAD/origin main match, with only unrelated workspace/
+Shiloh files after push. Exact Pages37559053342 and CI37559053382 SUCCESS. Actual completed log
+proves both explicit equipment steps23named/115/A126-B-A2,23intended controls and all24retained
+deterministic steps; full browser393/393 in1128044ms, test start2026-10-07T01:51:00.769Z and
+terminal TEST OK02:09:48.820Z/job complete02:09:52Z. Only local-vs-CI
+check difference is intro-native-renderer, absent in CI. Collector72245 finished; completed actual
+.out/p2k1-exact-ci-37559053382-20261006.log is211883B/SHA256
+24c4ef41b77247da18a81d8193d58e356f9651a3e515e15e7273de1f6d7bf003; metadata/readback beside it.
+Root independently fetched actual final JSON from artifact11456119590 using95625B ZIP ranges of
+32553322B/84entries; no archive stored. .out/p2k1-exact-ci-37559053382-actual-artifact-20261006.json
+is221211B/SHA256 81f820751945eca24ff101009d37e77f6fa8495473ce5fc2ea28e1bc1786187d;
+all393checks, errors/warnings[] and29exercised axe scopes empty (26top-level+3camp themes).
+Actual SwiftShader/Chromium153.0.8010.12; intro45.68sim/first card113655wallms, idle27.28sim;
+software timing is not native/device proof. Pages five runtime files match accepted bytes in
+.out/p2k1-live-pages-source-r1-20261006.json. This post-push receipt/preflight note is owned WIP for
+the next owned commit. Independent completed log/artifact/count/source review clears integration.
+Browser warnings are empty; workflow upload/cleanup has nonblocking action/Node deprecation warnings.
+No P2k2 runtime edits. P2k1 integrated; full v1 remains incomplete.
+
+## Historical P2k2 read-only preflight — superseded by active P2k2a contract
+
+At that preflight boundary, no P2k2 runtime edits or acceptance existed. Root and one independent reviewer inspected
+entry/main, practice/outcome, reward sequence, save limits and Unit/Battery allocation. A saved route
+must validate/admit before main import: main creates WebGL before reading any saved army. Existing
+practiceOutcome creates fresh practice UIDs and empty depot/issued; it cannot conserve a saved army.
+Reward sequence also drops the starting issued prefix unless its state initialization changes.
+Use an immutable launch manifest/baseline; update only actual survivor men/live guns and fresh result
+metadata, preserving every brigade/base/veterancy/weapon UID/provenance, dormant record, depot and
+issued prefix. Old-baseline complete/conflict/export/retry must never rebase or reroll.
+
+Legal saves can have200brigades/100000men each/200guns each/2000depot/5000issued/near1MiB;
+schema validity alone does not admit field or reward UI allocation. Men0 Units allocate figures;
+gunless batteries may remain alive. Keep nonbattle-capable records off field, visibly disclosed and
+unchanged; require living infantry for this held-ground practice rule rather than changing generic
+Game.resultStep. Include every battle-capable brigade or refuse the whole launch without writes,
+hidden troop cuts, recruitment or gun manufacture. Existing Henry US field has5units/7240men/
+12guns/1490worst-density figures; CS5/5300/8/1100. Those are input comparisons, not measured native
+performance/admission limits. Source-challenge an explicit whole-army/formation/spacing/allocation
+bound before adopting it; no saved-army layout or accepted numeric admission contract exists yet.
+
+Recommendation: saved-fight new-loot reveal -> conserved save -> existing paginated camp issue,
+because reward sequence eagerly renders all inherited army/depot cards while camp already has12+12
+paging. Keep fresh practice's existing issue flow. Resolve this route's exact interaction contract
+before edits; do not silently drop equipment choices. Pre-field reserve worst-case actual loot slots
+and UTF8 save growth from roll rules. Full inventories/issued/near-byte limits need renderer-free
+Camp/Export/Retry refusal, not a late invalid pending result. UID collisions must refuse before
+mutation, never regenerate an award. Copy fictional encounter definitions/nested data without
+mutating Henry/scenario history; namespace enemy runtime IDs against legal saved IDs.
+
+Proposed next ownership is entry/main/ui entry, existing franchise practice/practice-ui and reward
+sequence, focused deterministic/browser gates, CI/sw/docs. No save schema/backend, named engine
+calibration, Unit/Battery allocation rules, art, OOB/history, shops/training/badges changes. First
+contract and prove pure manifest/outcome/conservation/admission/headroom/issued ledger with intended
+controls; then connect pre-render loading/camp/battle/result/loot/save and test actual equip -> profile
+combat -> losses -> loot -> save/reload/camp. Freeze and run one final serial native suite, independent
+source/rendered/scoped WCAG review, explicit CI steps, exact-SHA CI/Pages. This preflight is a design
+recommendation, not implementation or a measured hardware guarantee.
 
 ## Historical boundary: P2j2 integrated; P2k1 writer ownership hold (2026-10-06)
 

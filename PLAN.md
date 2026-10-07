@@ -689,22 +689,31 @@ living camp/title, named/campaign saves and all P3-P7 remain open.
 Restart ownership reconciled by Aaron's authored packet and fresh process/git/hash audit:
 root adopts receipt-doc WIP and34691B durable generic gate; historical unknown-writer hold remains
 in HANDOFF. Exact ce6 CI37555708630/Pages37555708522 re-read green; pre-edit126/126 replay
-passes all original counts. P2k1 optional equipment foundation is now root-owned; no named gate
-or saved deployment acceptance yet. Preserve unrelated workspace/Shiloh preflight unstaged.
+passes all original counts. P2k1 optional equipment foundation is now root-owned; this pre-edit
+observation did not yet accept named equipment. Current accepted local evidence follows; saved
+deployment stays UNRUN. Preserve unrelated workspace/Shiloh preflight unstaged.
 
 P2k1 candidate now passes23named positives+23intended AssertionError controls,115actual catalogue/
 condition Unit/profile/volley samples, exact historical generic A126/B/A2 126 and retained183+183/unit.
 Independent engine/source challenge clears the implementation; symbol/accessor refusal samples added.
 DECISIONS0039 records shared game calibration and cadence/direct-period semantics. Seven changed
-runtime/test/CI files frozen; one final serial native suite is running. Local logs/binds are
+runtime/test/CI files frozen; the final serial native suite completed. Local logs/binds are
 .out/p2k1-deterministic-r2-20261006.log and .out/p2k1-deterministic-source-r2-20261006.json;
 native freeze .out/p2k1-frozen-source-r1-20261006.json. Final frozen native394/394 in468803ms at
 2026-10-07T01:40:07.664Z; .out/p2k1-full-native-r1-20261006.{log,json}, actual JSON218363B/
 SHA295cead4a81b488e6719a1f1280f90fd3e7c324051f276a83e1989191a19ab13 equals last-result bytes.
 Errors/warnings/all29exercised axe scopes empty;7source hashes/bytes unchanged. Root/independent
 reviewer viewed actual field/order/keyboard/intro/camp/Moments PNGs; final source/receipt/rendered
-review clears. Actual Intel Metal UHD617; no sustained intro30fps/new-art/iPad proof. Commit/push/
-exact integration remain pending; P2k2 deployment stays UNRUN with a separate contract before routes.
+review clears. Actual Intel Metal UHD617; no sustained intro30fps/new-art/iPad proof. P2k2 deployment
+stays UNRUN with a separate contract before routes. Pushed exact integration status follows.
+Implementation committed/pushedde159d36de67e0dc5127fe150a356a708519067a with11owned files and
+7verified frozen index bindings. Exact Pages37559053342/CI37559053382 SUCCESS; both explicit
+equipment steps23named/115/A126-B-A2 and23intended controls, all24retained deterministic steps,
+actual full browser393/393 in1128044ms. Only native difference intro-native-renderer; actual final
+JSON221211B/SHA81f820751945eca24ff101009d37e77f6fa8495473ce5fc2ea28e1bc1786187d independently
+fetched from artifact11456119590 via95625B ranges, no archive. Errors/warnings/29axe scopes empty;
+five deployed runtime files match frozen bytes. P2k1 integrated. Only root-owned receipt/preflight
+docs WIP plus preserved workspace/Shiloh files; P2k2 needs a separate contract before route edits.
 
 Recommendation: establish named equipment profiles before camp deployment, because current Combat
 accepts only generic smooth/rifled/smbart/parrott categories; putting a named saved card on a unit
@@ -790,6 +799,85 @@ inventories without partial writes or silent troop cuts; practice explicitly fic
 and historical/sandbox no-loot routes preserved; fresh result award exactly once and old-baseline
 conflicts/pending export/retry retained. Prove actual equip -> changed combat -> losses -> loot ->
 save/reload/camp through the native UI. Until those gates, saved deployment is UNRUN.
+Read-only P2k2 preflight is in HANDOFF: early pre-WebGL admission, immutable baseline/manifest,
+conserved dormant/depot/issued records, whole-army allocation/layout limits and pre-field loot/byte
+headroom need a source-challenged contract. Recommendation is new loot -> conserved save -> existing
+paginated camp issue for saved fights, preserving fresh practice's issue flow; this avoids rendering
+up to2000inherited depot cards. No numeric admission or route contract is accepted yet; no runtime edit.
+
+
+### P2k2a: immutable saved deployment foundation (candidate verified, integration pending)
+
+P2k2a pure candidate:19positive+19intended named AssertionError controls, retained183+183,
+equipment23+23/115actual Unit/profile/volley/A126-B-A2 originaldraws and UNIT OK. Total225+225
+categories; grouped controls prove one intended rejection per category, not every subordinatecase.
+New actual Unit/Battery/Combat/Game-method/Arrow geometry proof uses terrain/GPU/store adapters;
+Game constructor/browser saved deployment remains P2k2b UNRUN. Source confirms no seeded preview;
+Math.random instrumentation separately proves0globaldraws. Independent source/gate challenge clear.
+Original fixture17/19 failed read-only equipment assignment/nonexistent preview method, not product;
+repaired positive r1 passes19/19. Controls r1 FAILED10/19 on assertion-name harness check; preserved
+.out/p2k2a-deployment-controls-r1-20261006.log. r2 passes19/19 with explicit named refusal helper.
+Final .out/p2k2a-deterministic-r1-20261006.log binds current source and all prescribed exits0.
+Four changed runtime/test/CI files frozen in .out/p2k2a-frozen-source-r1-20261006.json, plus17untouched
+engine/route/scenario locks. ONE frozen serial native passes394/394 in459777ms at
+2026-10-07T02:30:06.551Z; .out/p2k2a-full-native-r1-20261006.{log,json}, -readback.json.
+Actual JSON220494B/SHA256320c1af0a4f5997f103ed7d19655bffa71a5373e56ae3f23479839b6e00d9bab
+equals last-result.json bytes; failures/errors/warnings[]; all29exercisedaxe scopes empty.
+Fourchanged+17untouched bindings unchanged afterrun. Actual Intel ANGLE Metal UHD617;
+unforced intro wins45.46sim/firstcard47326wallms; idle loses27.29sim. Root inspected exact field,
+intro, narrow camp comparison and narrow Legendary PNGs. Single intro capture FPS26 versus broad60
+is not a sustained30fps certification or a causal regression; P7/nativeiPad/art/memory gates stayopen.
+Automatic prune removed185oldest generated files31.5MiB; .out299.9MiB, current receipts remain.
+Independent final source/actual receipt/6PNG review clears integration: all28explicit deterministic CI commands retained with new deployment pair;394/394/29axe/21bindings confirmed. Index/commit/push/exact-SHA CI/Pages pending; P2k2b route not yet edited or accepted.
+
+
+Root sole writer owns src/franchise/practice.js, tools/test-deployment.mjs, CI/sw and existing
+PLAN/HANDOFF/STATE/DECISIONS. Adopt identified receipt-doc WIP; preserve workspace/Shiloh unstaged.
+No route/UI, save schema/backend, Unit/Battery/Combat/equipment/rules, scenario/history/art edits.
+Independent read-only source challenge uses gpt-6.1-sol/high; no helper product edits/browser.
+Terminal: meaningful pure/actual engine positives and intended AssertionError controls, retained
+183+183/equipment23+23/115/A126-B-A2/unit, frozen native regression, exact-SHA CI/Pages acceptance.
+Then immediately continue P2k2b; pure foundation never claims saved UI deployment or all P2/v1.
+
+Manifest canonical-validates the exact saved baseline and binds fresh award/seed once. Deep frozen,
+authentic in-memory manifest; no new persistence. Whole-army admission includes every living infantry
+and every crewed battery with guns; zero-men/zero-gun records are dormant and conserved unchanged.
+At least one living infantry is required by unchanged held-ground doctrine. Bound active count5,
+individual infantry3000, battery120men/6guns, aggregate7240men/12guns and densest pool1490
+(sum max(1,round(men/5 infantry or/4 crew))+6 per active). These are conservative game input limits,
+not hardware/fps guarantees. Limits equal or fall below existing HenryUS allocation.
+Infantry-first stable deployment ensures first living infantry holds reused practice objective:
+x=-480-180*row,z=-610,facing pi/2. All five rows fit the1300m half-map with20m margin;
+conservative footprint uses full two-rank n (one rank<=14), file2.35*maxspacing1.5, jitter+pick10,
+forward/rear75m bound (screen60m/crew/limber teams). Rows leave30m separation. Geometry admission
+checks bounds and separation before field allocations, and actual Unit/Battery tests verify them.
+Copy fictional intro ground/definitions recursively; namespace generic enemy IDs against ALL saved
+brigade IDs, with no invented commander/history. Original scenario bytes must stay exact.
+
+Pre-field headroom reserves actual maximum issue5 + two explicit capture slots =7 depot additions,
+from live grade rules; guarantee promotes an existing issue. Zero new issued rows: saved fight
+reveal -> save -> paginated camp issue. Existing issued5000 may deploy, with camp append cap retained.
+Compute conservative UTF8 JSON growth by enumerating actual loot catalogue/conditions/origins and
+fixed award-prefixed seed UIDs, plus new metadata; never call RNG/roll to preview. Reserve every
+possible UID index before launch; any collision refuses without reroll. No silent record drop.
+Outcome authenticates roster/equipment against manifest, freezes first actual terminal snapshot,
+updates ONLY floored surviving men/live guns (zero crew=>zero active guns), keeps army order/base/
+veterancy/gear/provenance/dormants/depot/issued, rolls once and appends new loot. Same award/seed/
+result remains byte-stable on repeats, quota retry and export. store.complete previous=manifest.baseline
+is mandatory; stale baseline cannot rebase. Victory/defeat both conserve; altered/invalid live state refuses.
+
+Gates in order: node --check each touched JS/MJS; git diff --check; inspect CI/sw; explicit
+node tools/test-deployment.mjs and --prove-fail, requiring nonempty named cases and intended
+AssertionErrors only; node tools/test-equipment.mjs then --prove-fail retaining all counts/draw binds;
+for test-reward/save/practice/captures/intro/sandbox-rules/look/view/spacing/residency/moments/keyboard
+run positive then --prove-fail in that order; node tools/test.mjs --unit. Independent source review;
+freeze changed runtime/test/CI SHA256+bytes and untouched engine/scenario locks; ONE serial
+npm test -- --native on frozen tree. Preserve unique actual log/JSON, bind last-result equality,
+read all failures/errors/warnings/axe scopes, inspect actual relevant PNGs, independent final review;
+verify hashes afterrun. Sync existing docs (STATE<20lines), explicit owned stage/index hashes,
+commit/push main and actual exact-SHA CI/Pages log/JSON counts/deployed bytes. Red repair precedes
+next integration; no silent gate weakening. Heavy work Actions; no simultaneous edits/browsers.
+P2k2b route/focus/async recovery contract and focused native controls required before UI edits.
 
 ### Required battle-system work (P3/P4; do not hide it inside “build Shiloh”)
 

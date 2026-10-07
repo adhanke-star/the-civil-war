@@ -1,5 +1,14 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0040 — Saved practice admits the whole army before field allocation (2026-10-06)
+Use an immutable canonical baseline/fictional manifest in existing practice seam, and preserve
+all brigade/gear/depot/issued identities. Conservative input bounds match HenryUS pool ceiling;
+separated infantry-first rows fit maximum density/spacing. Dormant records stay off field unchanged.
+Require living infantry under unchanged held-ground doctrine. Reserve7new loot slots and actual
+serialized UTF8 growth before rendering without rolling. Saved results roll once, conserve actual
+losses, reveal only new loot and save before camp issue. This avoids eager inherited inventory cards
+and late unexportable results; it is no hardware/fps or native UI acceptance. No schema/store change.
+
 ## 0039 — Named equipment uses the shared field combat model (2026-10-06)
 An optional equipped item is validated and cloned before Unit assignment/Vehicle/figure allocation;
 generic units retain their exact prior behavior. Catalogue-derived ID Sets guard ordinary-object
