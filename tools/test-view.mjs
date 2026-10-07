@@ -16,6 +16,25 @@ function settle(r) { for (let i = 0; i < 70; i++) { r.update(0.1); r.camera.upda
 const dom = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 1280, height: 720 }) };
 const api = { camera, marker: Hud.prototype.applyMarkerScale, position: markerPosition };
 const tests = [
+  ['update-publishes-coherent-world-and-inverse', (a) => {
+    const r = a.camera(); r.update(0.1); S.set('look.cameraElevation', 30);
+    r.rotateBy(0.2, 0); r.update(0.1);
+    const expected = new THREE.Matrix4().compose(r.camera.position, r.camera.quaternion, r.camera.scale);
+    const inverse = expected.clone().invert();
+    for (let i = 0; i < 16; i++) {
+      near(r.camera.matrixWorld.elements[i], expected.elements[i]);
+      near(r.camera.matrixWorldInverse.elements[i], inverse.elements[i]);
+    }
+  }, { ...api, camera: (o) => {
+    const r = camera(o), update = r.update;
+    r.update = function (dt) {
+      const oldQuaternion = this.camera.quaternion.clone(); update.call(this, dt);
+      // Exact former lookAt phase: new position, previous orientation, current projection.
+      this.camera.matrixWorld.compose(this.camera.position, oldQuaternion, this.camera.scale);
+      this.camera.matrixWorldInverse.copy(this.camera.matrixWorld).invert();
+    };
+    return r;
+  } }],
   ['default-angle-and-pose', (a) => {
     for (const dist of [150, 1150, 2000]) {
       const r = a.camera({ dist }); near(r.pitch, pitchForDist(dist)); near(r.goal.pitch, pitchForDist(dist));

@@ -33,6 +33,32 @@ function beforeInput() {
   };
   const mapState = () => { const r = window.__game?.rts; return r && { goal: { ...r.goal }, target: r.target.toArray(), yaw: r.yaw, pitch: r.pitch,
     dist: r.dist, groundY: r.groundY, tilt: r.tilt, keys: [...r.keys], inertia: r.inertia && { ...r.inertia } }; };
+  // Bind ghost-owned data independently of the mutable Unit/pool/render graph.
+  const ghostValue = value => {
+    if (value === null) return { type: 'null' };
+    if (typeof value !== 'object') return { type: typeof value, value: typeof value === 'number' && !Number.isFinite(value) ? String(value) : value };
+    if (Reflect.ownKeys(value).some(k => typeof k !== 'string')) throw Error('Unexpected symbol in ghost intent');
+    return { type: Array.isArray(value) ? 'array' : 'object', values: Object.getOwnPropertyNames(value).map(k => [k, ghostValue(value[k])]) };
+  };
+  const ghostSnapshot = () => {
+    const game = window.__game?.game, target = window.__game?.input.targeting;
+    if (!target) return { target: null, unit: null, enemy: null, selection: [], data: null };
+    const keys = Reflect.ownKeys(target);
+    if (keys.some(k => typeof k !== 'string')) throw Error('Unexpected symbol in targeting');
+    const selection = [...target.selection];
+    return { target, unit: target.unit, enemy: target.enemy, selection, gameSelected: game.selected, gameSelection: [...game.selection],
+      data: { keys, values: keys.filter(k => !['unit', 'enemy', 'selection'].includes(k)).map(k => [k, ghostValue(target[k])]),
+        unit: target.unit?.id ?? null, enemy: target.enemy?.id ?? null, selection: selection.map(u => u.id),
+        connected: game.selected === target.unit && game.units.includes(target.unit)
+          && (!target.enemy || game.units.includes(target.enemy)) && selection.every(u => game.units.includes(u))
+          && game.selection.length === selection.length && game.selection.every((u, i) => u === selection[i]) } };
+  };
+  const ghostEqual = (a, b) => a.target === b.target && a.unit === b.unit && a.enemy === b.enemy
+    && a.selection.length === b.selection.length && a.selection.every((u, i) => u === b.selection[i])
+    && (!a.target || (a.data.connected && b.data?.connected && a.gameSelected === b.gameSelected
+      && a.gameSelection.length === b.gameSelection.length && a.gameSelection.every((u, i) => u === b.gameSelection[i])))
+    && JSON.stringify(a.data) === JSON.stringify(b.data);
+  const ghostEvents = new WeakMap();
   const events = new WeakMap(), rows = [], listeners = [];
   const early = e => {
     if (!window.__game) return;
@@ -48,10 +74,11 @@ function beforeInput() {
         mapFlag: (() => { const x = window.__game, e = x.hud.markers.get(x.game.selected?.id)?.el; if (!e) return null;
           const r = e.getBoundingClientRect(); return [r.x + r.width / 2, r.y + Math.min(r.height / 2, 25)]; })() };
       events.set(e, row); rows.push(row);
+      if (isI) { const ghost = ghostSnapshot(); ghostEvents.set(e, ghost); row.beforeGhost = ghost.data; }
     }
   };
   for (const t of ['keydown', 'keyup', 'pointerdown', 'dblclick', 'wheel']) { addEventListener(t, early, true); listeners.push([t, early]); }
-  window.__soldierWitness = { camera, feedback, mapState, rows, events, listeners, entry: null };
+  window.__soldierWitness = { camera, feedback, mapState, ghostSnapshot, ghostEqual, ghostEvents, rows, events, listeners, entry: null };
 }
 
 async function observers(page) {
@@ -124,6 +151,10 @@ async function observers(page) {
       const row = w.events.get(e); if (!row) return;
       row.afterCamera = w.camera(); row.afterFeedback = w.feedback(); row.afterMap = w.mapState(); row.active = x.soldierView.active;
       row.focus = document.activeElement.id || document.activeElement.className;
+      if (w.ghostEvents.has(e)) {
+        const before = w.ghostEvents.get(e), after = w.ghostSnapshot();
+        row.afterGhost = after.data; row.ghostSameEvent = true; row.ghostExact = w.ghostEqual(before, after);
+      }
       if (e.type === 'keydown' && e.key.toLowerCase() === 'i' && !row.wasActive && row.active) {
         w.entry = row; w.liveSnapshot = x.soldierView.snapshot; w.liveDepth = x.post.rtScene.depthTexture;
         w.lod.epoch++;
@@ -448,8 +479,25 @@ export async function soldierViewControls({ browser, url, check, shot, result, w
     record('refusal', refused.length >= 4 && refused.every(r => r.pass) && unsupported.length >= 2, refused);
 
     await select(); await field.focus(); await page.keyboard.press('b'); await page.keyboard.press('ArrowUp');
-    const ghostBefore = await page.evaluate(() => JSON.stringify(window.__game.input.targeting)), ghost = await refuse();
-    const ghostAfter = await page.evaluate(() => JSON.stringify(window.__game.input.targeting)); await page.keyboard.press('Escape');
+    await page.evaluate(() => { const w = window.__soldierWitness; w.ghostBefore = w.ghostSnapshot(); w.ghostRowsStart = w.rows.length; });
+    const ghost = await refuse();
+    const ghostIntent = await page.evaluate(() => {
+      const w = window.__soldierWitness, before = w.ghostBefore, after = w.ghostSnapshot();
+      if (!before.target || !before.unit || !before.data.keys.includes('point')) throw Error('Missing actual ghost fixture');
+      const badPoint = { ...before, data: structuredClone(before.data) };
+      badPoint.data.values.find(([k]) => k === 'point')[1].values.find(([k]) => k === 'x')[1].value += 1;
+      const badUnit = { ...before, unit: { ...before.unit, id: before.unit.id } };
+      const rows = w.rows.slice(w.ghostRowsStart).filter(r => r.key?.toLowerCase() === 'i');
+      const controls = { badPointRejected: !w.ghostEqual(before, badPoint), sameIdUnitRejected: !w.ghostEqual(before, badUnit),
+        restoredExact: w.ghostEqual(before, after) };
+      const evidence = { before: before.data, after: after.data, intervalExact: w.ghostEqual(before, after), controls, rows,
+        eventsExact: rows.length === 2 && rows.every(r => r.trusted && r.ghostSameEvent && r.ghostExact
+          && !r.wasActive && !r.active && JSON.stringify(r.beforeCamera) === JSON.stringify(r.afterCamera)
+          && JSON.stringify(r.beforeMap) === JSON.stringify(r.afterMap) && JSON.stringify(r.beforeFeedback) === JSON.stringify(r.afterFeedback)),
+        adapterLabel: 'detached bad destination and same-id substituted Unit; no live mutation' };
+      delete w.ghostBefore; delete w.ghostRowsStart; return evidence;
+    });
+    await page.keyboard.press('Escape');
     const pointerOwnership = await page.evaluate(() => {
       const { input, soldierView } = window.__game, canvas = document.getElementById('battlefield'), answer = [];
       for (const owner of ['drag', 'pointers']) {
@@ -459,7 +507,9 @@ export async function soldierViewControls({ browser, url, check, shot, result, w
       }
       return answer;
     });
-    record('ghost-preserved', ghost.pass && ghostBefore === ghostAfter && pointerOwnership.every(Boolean), { ghost, ghostExact: ghostBefore === ghostAfter, pointerOwnership, adapterLabel: 'bounded nonnative drag/pointer ownership admission' });
+    record('ghost-preserved', ghost.pass && ghostIntent.intervalExact && ghostIntent.eventsExact
+      && Object.values(ghostIntent.controls).every(Boolean) && pointerOwnership.every(Boolean),
+      { ghost, ghostIntent, ghostExact: ghostIntent.intervalExact, pointerOwnership, adapterLabel: 'bounded nonnative drag/pointer ownership admission' });
 
     await openWorkbench(); await page.getByRole('tab', { name: 'Look', exact: true }).click();
     const uiRefusals = [];

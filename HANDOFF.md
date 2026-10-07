@@ -7,6 +7,174 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
 
 ## Active iteration: P2n held soldier-eye and scene-depth blur (2026-10-07)
 
+Integration review15:39UTC CLEAR: ALL15 current focused PNGs individually reviewed by root and
+independent reviewer; actual67unique/allPASS/nineemptyaxes/hashes/47bindings/stages/controls/restore
+independently confirmed. GenuineUSwin45.5797sim/15loss andCSdefeat19.2296sim/2loss; reveal9guards,
+abortputs2/commits0. Native explicit composite506=67correctedfocus+439retainedfull independently
+recomputed; originalfull remainsFAILED and causeunknown. All148 fullimages independentlyclear.
+Own9/source47=5changed42locks; exact staged-index/commit/push and exactCI505/41axes/30logs/Pages9
+are next, not yet acceptance. No runtime/test edits or browser/test during Actions.
+
+Launch-read native boundary15:33UTC: inherited actual67/67 PASS,9 exactemptyaxes/errors[]/warnings[],
+47 frozenbindings exact,227358ms,t2026-10-07T15:28:34.821Z. Actual7074020B
+SHAf0eac3fa9a75f8f76c229807e927e295a31ec9f74f9788aa5bd3b5ad07207630;
+log13352B SHAf5f24126f713cf75056745523e81c621bc6b814ff29727921bf3d57236727103.
+Actual readonly get created1791386926297.3, trusted Escape6323.6, retained cancelled pending owner
+before release6341.2, complete6370.5, campfocus6437.6, unchangedwrites/puts/GPU0; allreadinesscontrolsPASS.
+Root individuallyviewed ALL15 new PNGs; independent actualreceipt/ALL15 renderedreview RUN.
+Temporary source bridge/index/collector independentlyCLEAR; bridge actualreadbackPASS: labelled
+composite506, singleGreenFullRun:false, retained fullFAILED505/506+focused67, ONLY deploymentUI delta.
+Receipt .out/p2n-native-source-bridge-readback-r1-20261007.json. Sourcefreeze-r2=47/5changed42locks;
+37serialPASS. Index/commit/push/exact505CI/41axes/30completed actuallogs/Pages9 stillUNRUN.
+No browser/test running; no P2o productedits. Immediately next boundedfeedback at repairedacceptance.
+
+Launch-read repair boundary15:31UTC: independent source CLEAR; serial37 allEXIT0/source47exact,
+log35085B SHA72feca6ff8080b3414dc6ab0444dbd66154e6e271994b3185447d082adc9273d.
+Freeze .out/p2n-launch-repair-frozen-source-r2-20261007.json: owned9,5changed42locks;
+ONLY deploymentUI differs from full repairnative47. Inherited focused --native --deployment67 RUN,
+runner .out/p2n-launch-repair-deployment-native-r1-20261007.mjs; queued-read/nativeEscapePASS in actual
+in-progress log, remaining real encounters/save/stale/mixed routes pending. All148 failedfull actual
+PNGs independently individuallyreviewed/no additional scoped blocker; root high/victory/defeat/held320/
+depthA-B-A2 actualimages viewed. Full remains FAILED505/506, no new single greenfullclaim.
+Temporary bridge/index/collector source review RUN; future CI/Pages acceptanceUNRUN.
+
+Queued launch-read repair contract (2026-10-07 15:24UTC; BEFORE probe edits):
+Diagnostic actual15/15 PASS, 21915ms,54504B SHA68e3f5021be7113b4c5c8cfa923d8a621806891018614265a33ba5781abb0973;
+47 source bytes exact, no GPU/errors/warnings. Its seven readonly reads are initial/review reads;
+NO launch recheck transaction occurs before Escape. Owner settles before fixture release while the
+original transient owner sample passes. This directly proves the old predicate can pass without
+its advertised queued-read stage; original failed full-run subpredicate/cause remains UNKNOWN.
+Root additionally owns ONLY tools/test-deployment-ui.mjs, taking owned8 to9 and source47 to5changed42locks.
+All runtime, shared progress helper, harness/workflow, other probes and original47 baseline stay frozen.
+Install a temporary passive local readonly/get observer immediately around launch-escape. Bind actual
+cw.progress/progress/cw.progress pending request to the current exact deployment task/award, held
+fixture, importing/busy, open uncancelled/unadmitted review and zero GPU; await that real stage before
+native Escape. Preserve native methods receiver/args/return/request and exact descriptor restore in
+finally; fixture raw primitives bypass observation. No arbitrary delay, retry, threshold/category or
+runtime/save/RNG/gear/history changes. Archive before/after native Escape, readonly lifecycle, actual
+owner retention before fixture release, final camp focus/GPU/write conservation, cleanup descriptors.
+Use the SAME readiness predicate for deterministic pre-stage and detached wrong-task/key/store/mode/
+completed/released/GPU controls; all must refuse while actual stage passes, A2 unchanged.
+Gate sequence: syntax5 owned source files, git diff --check, existing30 standalone positive/control
+commands, node tools/test.mjs --unit =37 serial steps; freeze47 new bindings. Run ONE actual inherited
+npm test -- --native --deployment (14 foundations+53 existing deployment categories=67) covering both
+real encounters, write failures, stale-tab and mixed-route isolation, exact names/scoped axes and
+actual PNG/source readback. Review ALL new focused PNGs plus ALL148 prior full-run PNGs independently.
+Native acceptance is an EXPLICIT two-run source bridge, never a claimed new green full run: retain
+fullr1 FAILED505/506 with its sole launch-escape failure,41 empty axes,47 old bindings; focused67 must
+ALLpass on new47, with ONLY deploymentUI different between bindings. Replace matching67 categories
+in a labelled composite506; all other full categories remain exact runtime evidence. No relaxation
+of existing assertions/counts/quality. Collector and staged-index checks must bind both actual receipt
+bytes, reject ANY additional full failure/source delta, and require new readiness/control evidence.
+No second full-native repeat unless new product/runtime changes or unresolved concerns justify it.
+Then owned9 exact index/commit/push, exactCI505+41axes/actual30 standalone logs, Pages9 runtime bytes;
+collector must require native bridge explicitly and source47 frozen, not retroactively green fullr1.
+Full r1 review/diagnostic/focused acceptance remain pending; P2o stays inactive until repaired acceptance.
+
+
+Launch-cancellation diagnostic contract15:14UTC (BEFORE diagnostic edits; no product/test source edits):
+Full repairnative r1 COMPLETED FAILED506checks/505PASS/504unique; soledeployment-launch-escape.
+Actual23616403B SHA67e0f62ca50b6b3b99177fc27a923fa98d45871958005063af4097b9de702b33,955602ms,t14:55:39.072Z;
+log174954B SHAeec5b796aed54166ce874669a01e13df8f44f12813433d13d0f0cccec24703d9.
+41exactemptyaxes/console[]/all3headerStages/source47exact/last-resultbyteequal/148actualPNGs.
+Fullsource/renderedreview RUN; fullreceipt FAILED, no acceptance. Failed subpredicate/cause UNKNOWN.
+Source independently proves busy precedes import and canonical readonlyload; readwrite counter cannot
+bind launch load. Root earlier misread locked() versus reading(); corrected directly against load231–232.
+Root owns ONLY a new temporary .out diagnostic driver plus existing4docs. Existing47 runtime/test/workflow
+bindings remain exact; current8ownedrepairWIP preserved. No production/probe predicate, wait, input,
+hold/release, deadline, save/gear/RNG/history/resource/quality changes. No P2o activation/integration.
+Driver invokes ACTUAL tools/test-deployment-ui.mjs deploymentProgress unchanged through its first15
+existing checks, ending after launch-escape via a labelled diagnostic-only sentinel after original
+verdict; existing context finallycleanup executes. No later53/full acceptance or new played encounter.
+Browser adapter inserts passive witness AFTER original probeProgress init (fixture retains raw/bypass
+IDB primitives), then restores addInitScript method descriptor. Observe actual readonly transaction/get/
+complete/abort phase/times, native Escape/cancel/close events, owner/dialog/focus/GPU/held state; preserve
+original method receiver/args/return/promise with native callback observation, no extra pre-Escape await.
+Read final witness before context close only. Capture separate retainedOwner/cancelled outcome where
+observably available without replacing original predicate. Original source assertions/counts unchanged.
+Pre/postsource47, driver syntax/diff/source/witness read-only review; ONE native bounded prefix diagnostic,
+unique actual15check JSON/log/readback, no blind rerun. Read native event/transaction stages before a
+new evidence-qualified repair contract. If race absent, keep uncertainty explicit; no inferred original
+state. Field source/rewards/whole53 route untouched. Full506/505CI acceptance remains pending.
+
+FROZEN14:55UTC: repaired47bindings (4changed43locks),506native/505CI exactnames+41paths, focused55+35/ALL25actualPNGs root+independentCLEAR. Fullnative repairr1 RUN onthisfrozen candidate; source edits forbidden untilactualreceipt. Resume runner .out/p2n-repair-full-native-r1-20261007.mjs; then readactualJSON/last-result/source47/name/axe/console/ALL148PNG before owned8stage/index/commit/push/exactCI30steps/505+Pages9. No P2n acceptance yet.
+
+Repair focused boundary14:53UTC: camera/Look native55/55 (82518ms,t14:46:32.986Z), actual352353B SHAf26eacdfd022a6a56ab930b1f1c5a24705eb819288622c1315fcd59ea3b5ae57,2emptyaxes/console[]/47bindingsexact/ALL15PNG independentCLEAR. Retained64of80camera updates compose currentworld exactly/inversewithin1.14e-12; highFranklin nativehit/clearPASS. Soldiernative35/35 (180820ms,t14:48:14.328Z), actual15273335B SHAb266b17ce24eaa6ac971d46cbde18f2770e07f318bc893542c414fd1a655cdf6,emptyaxe/console[]/source47exact. Ghost12ownkeys including previewKey unchanged/connectedrefs/two trusted sameevent snapshots/wholeinterval/detachedpoint+sameidref controls PASS. SoldierALL10PNG independentreview pending, full506/CI505 stillUNRUN. Legacyfeedbacktoastoverlap and narrowScreens clipping remain open; no wholeHUD/art/deviceclaim. Unique receipts .out/p2n-repair-{view-native-r4,soldier-native-r2}-20261007.{json,log,-readback.json}.
+
+Repair execution14:48UTC: source47/43locks independentCLEAR. Serialr2 all36EXIT0, log35038B SHAad692f1101d57d4d1e3c3b0aff2119d1237706a9d96b9fd029d5aeb481190a10; pureView14+14, retainedother184each, deployment/equipment/RNG unchanged. Serialr1 green originalprobe is historical; source corrections followed. Focusedviewr2 failed6checks beforebrowser (temporary Node bake import); r3 failed15 beforebrowser (sandbox loopbackEPERM); both retained. Driver-r4 changes ONLY Node bake relative paths, independentCLEAR; escalated focusedviewr4RUN. Actualdiagnostic30completedstandalone logs nowverified; high850892B/held32096745B actualPNGs viewed, no missingmarker after5diagnosticframes. Repairedfocused/native/CI acceptance pending.
+
+P2n bounded evidenced repair contract (2026-10-07 14:35UTC; BEFORE runtime/probe edits):
+Diagnostic a11e04aa8a24612bc10daf0443c4c127e4e9dd11/CI37632882573 COMPLETED FAILED: actual
+505checks/504PASS,41emptyaxes/zeroerrorswarnings/all3headerStages/148PNG; all30standalone metadata
+PASS, completedlog readback pending. Actual17741933B SHA210c0113d69d7eea26b57227f7f9152cb32aeb19dc83b38598cff9bbb7995c2d, artifact11490250995/151entries/605541B boundedread. Pages37632882456
+SUCCESS/public8exact. Existing45source bytes remainidentical toc3c. No P2n acceptance.
+Actualframe math+independentreview confirms a normal-map matrix defect: first2real updates project
+Franklin through staleinverse toY-2.005323/-1.251510 (hidden), coherent pose to-.747429/-.773342
+(visible). Inverse reconstruction binds actualunitX/Z<1e-7. THREE.lookAt updates matrices BEFORE
+assigning quaternion; Rts.update must publish coherent world/inverse AFTER newpose/projection.
+Originalc3c failedcamera cause remains INFERRED because that receipt lacksactualpose. Preserve it.
+Sole currentFAILghost-preserved: refusedI/passivefeedback PASS, pointerownership2PASS; full
+JSON.stringify(input.targeting) intervalcomparison false. Changedfield UNKNOWN/rawnotarchived;
+do not claim a definite renderingdelta. Fullowner graph includes liveUnit/pool state beyond ghost.
+Root owns EXACT8: src/render/rts-camera.js;tools/test-view.mjs;tools/test-soldier-view-ui.mjs;
+sw.js;PLAN.md;HANDOFF.md;STATE.md;DECISIONS.md. tools/test-view-ui.mjs instrumentation staysEXACTa11.
+Freeze47=4changed43locked: prior46 (original45+oldviewUI) unlockONLY RTS/soldierUI/sw; newlybind
+oldpureview as47th. ALLother currentruntime/test/workflow/grade/shader/saves/equipment/RNG/history/
+art/terrain/vendor sources locked. No main/Hud/Input/Combat/effects/goals/easing/dt changes.
+RTS repair ONLY camera.updateMatrixWorld(true) after existing updateProjectionMatrix; preserve
+terrainclearance/position/quaternion/frustum/footprint/easing/goals/key behavior and900ms. Bump swv25.
+PureView retains13existing checks+one coherent-update check=14positive/14intendedcontrols. Negative
+reconstructs EXACTprior-phase matrix using oldquaternion/newposition/currentprojection; it MUST
+fail coherence while positives bind every world/inverse entry to independent composed pose.
+Ghost proof snapshots alltargeting OWNkeys/values (including point/points/end/face/faceSet/preview/
+previewKey/statusText), skips ONLY liveUnit/enemy/orderedselection graph recursion and binds
+those exactactualobject identities/membership separately. Bind targetingobject identity too; points
+array values ratherthan its recreatedreference. Archive before/after across whole refusalinterval
+AND same trustedIkeydown/up early/late event; unchangedcamera/map/pausedroster/orders/feedback/
+progress predicates retained. No broad derived-field ignoring: previewKey remains exact; if it
+drifts, capture and diagnose ordinary refreshinputs before a further amendment. Detachedbadpoint
+and same-id badUnit-reference controls MUST fail SAME complete intent/identity predicate, A2
+unchanged; unexpectedexceptions notcontrols. No live mutation/freeze/rewind/retry/additionalorder.
+All20soldierUI categories/35focused count retained; alloldUI names506native/505CI and41recursive
+axes EXACT. Standalone count30/current40minCI unchanged; pureview14 raises other183->184each;
+deployment21/equipment23/115catalogue/genericA126-B-A2/3606Combat136580Unitdraws remainexact.
+Gates EXACT36 SERIAL: node --check src/render/rts-camera.js; node --check tools/test-view.mjs;
+node --check tools/test-soldier-view-ui.mjs; node --check sw.js; git diff --check; then
+node tools/test-deployment.mjs; node tools/test-deployment.mjs --prove-fail;
+node tools/test-equipment.mjs; node tools/test-equipment.mjs --prove-fail;
+node tools/test-reward.mjs; node tools/test-reward.mjs --prove-fail;
+node tools/test-save.mjs; node tools/test-save.mjs --prove-fail;
+node tools/test-practice.mjs; node tools/test-practice.mjs --prove-fail;
+node tools/test-captures.mjs; node tools/test-captures.mjs --prove-fail;
+node tools/test-intro.mjs; node tools/test-intro.mjs --prove-fail;
+node tools/test-sandbox-rules.mjs; node tools/test-sandbox-rules.mjs --prove-fail;
+node tools/test-look.mjs; node tools/test-look.mjs --prove-fail;
+node tools/test-view.mjs; node tools/test-view.mjs --prove-fail;
+node tools/test-spacing.mjs; node tools/test-spacing.mjs --prove-fail;
+node tools/test-residency.mjs; node tools/test-residency.mjs --prove-fail;
+node tools/test-moments.mjs; node tools/test-moments.mjs --prove-fail;
+node tools/test-keyboard.mjs; node tools/test-keyboard.mjs --prove-fail;
+node tools/test-soldier-view.mjs; node tools/test-soldier-view.mjs --prove-fail; node tools/test.mjs --unit.
+Independent source/control review; native55 Look/View scopedfixture from reviewedr3 .outdriver
+(14foundations+17Look+22View+nativeguard+errors;2axes/15PNG), native35soldier sequential.
+Current47bindings/readbacks/actualPNG review; freeze47 expected506/505names+41paths; ONE justified
+final fullnative506 at changedruntime/probe, actualbytes/hash/name/axe/console/source/lastresult and
+ALLactualPNG review. StageONLY8/index47, commitpushmain, exact505CI/all30completed logcounts/
+artifact/source47/Pages everychangedruntimeRTS/sw plusoriginal8 exactbytes. No blindrerun.
+Runtime/test edits stopduringfrozenfull/CI; rootsolewriter/ONEread-onlyhelper/unrelated2preserved.
+All current repairgates/native/CI acceptance UNRUN. Atgreen continueP2feedback with baseline47
+(newfreeze48), no milestone final/device request. Keep cancelled/failed native/CI evidence distinct.
+
+
+LIVE14:01UTC: diagnostic-only5files committed/pushed a11e04aa8a24612bc10daf0443c4c127e4e9dd11;
+HEAD=origin/main/indexempty/unrelated2preserved. CI37632882573 RUN/Pages37632882456SUCCESS.
+Independent currentinstrumentation/source45 CLEAR; syntax/diff/unit14/index5/source46 CLEAR.
+Original900ms/predicates remain; atomic passive64frame camera/marker/projection trace beforeclick,
+detachedclampedgoal pose and exact finallydescriptorrestore. NO repairedacceptance yet.
+Read completed actual artifact: node .out/p2n-read-diagnostic-ci-r1-20261007.mjs 37632882573 a11e04aa8a24612bc10daf0443c4c127e4e9dd11
+Existinggreen collector mustnotaccept diagnostic-only candidate. Sourcebinding .out/p2n-view-diagnostic-source-r3-20261007.json.
+
+
 P2n exact-CI diagnosis contract (2026-10-07 13:56UTC; before probe edits):
 CI37629607925 FAILED atc3c97768d3f1fe2d5dcb521df141af7328c9cb0a; actual83checks/82PASS+
 harness TypeError tools/test-view-ui.mjs:107 (missingFranklin after900ms). ActualfailedJSON51254B

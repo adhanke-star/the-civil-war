@@ -1,5 +1,23 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0050 · Cancel launch after its real queued canonical read (2026-10-07)
+
+The native diagnostic passed Escape without ever queuing the launch recheck: busy begins before
+module import. Bind the actual pending readonly request and exact task before cancellation, then
+retain the existing owner, no-GPU, settlement and camp-focus assertions. Preserve the earlier
+failed full receipt; a test-only correction uses explicit unchanged-source full/focused evidence
+rather than claiming a new green full run. The earlier failed subpredicate remains unobserved.
+
+## 0049 · Camera matrices follow the current pose; ghost checks own intent (2026-10-07)
+
+Actual CI trace confirms HUD projection used the previous camera quaternion while rendering used
+the current one. Publish coherent world/inverse matrices at the end of Rts.update, retaining all
+easing, input and visibility thresholds; prove the prior phase fails a pure negative control.
+The same CI's ghost test compared a whole mutable Unit/render graph without archiving its diff.
+Bind every ghost-owned value and exact live-object identity at trusted event boundaries and across
+the refusal interval; preserve passive conservation and rejecting detached controls. The missing
+original failure state and unobserved full-graph difference remain explicitly unproven.
+
 ## 0048 · Preserve missing-marker CI evidence before choosing a repair (2026-10-07)
 
 P2n exactCI37629607925 failed in the unchanged high-camera marker probe: Franklin absent after

@@ -235,6 +235,8 @@ export class RtsCamera {
     this.camera.far = this.dist * 4 + 2000;
     this.camera.near = Math.max(2, this.dist * 0.02);
     this.camera.updateProjectionMatrix();
+    // HUD projection runs before rendering; publish the pose lookAt just assigned.
+    this.camera.updateMatrixWorld(true);
   }
 
   /** World point on the terrain under a client (CSS px) position, or null. Ray-marched heightfield. */

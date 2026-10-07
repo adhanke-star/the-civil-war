@@ -165,10 +165,111 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
       && (await counters()).gpu === 0, 'repeat event cannot acquire another field or allocation');
     await page.locator('#deploy-cancel').click(); releaseModule(); await handled; await page.unroute('**/src/main.js');
     verdict('launch-cancel', await cancelled(), 'cancelled import does not call launcher or start its canonical read');
-    await review(); await holdProgressTransaction(page); await page.locator('#deploy-launch').click();
-    await page.waitForFunction(() => window.__entry.deployment.busy);
-    await page.keyboard.press('Escape'); const heldOwner = (await counters()).busy; await releaseProgressTransaction(page);
-    verdict('launch-escape', heldOwner && await cancelled(), 'Escape cancels a queued launch recheck before WebGL and releases on settlement');
+    await review();
+    // busy begins before module import. Observe the real canonical request, not that earlier phase.
+    await page.evaluate(() => {
+      if (window.__launchReadProbe) throw new Error('Launch-read observer already owned');
+      const task = window.__entry.deployment, rows = [], events = [], byTransaction = new WeakMap();
+      const transactionDescriptor = Object.getOwnPropertyDescriptor(IDBDatabase.prototype, 'transaction');
+      const getDescriptor = Object.getOwnPropertyDescriptor(IDBObjectStore.prototype, 'get');
+      const transact = IDBDatabase.prototype.transaction, get = IDBObjectStore.prototype.get;
+      const state = () => ({ time: performance.timeOrigin + performance.now(), awardId: window.__entry?.deployment?.awardId,
+        importing: !!window.__entry?.importing, busy: !!window.__entry?.deployment?.busy,
+        cancelled: !!window.__entry?.deployment?.cancelled, admitted: !!window.__entry?.deployment?.admitted,
+        open: document.getElementById('deploy-review').open, focus: document.activeElement?.id,
+        held: !!window.__saveHolding, released: !!window.__saveReleaseRequested,
+        gpu: window.__deployGpu, writes: window.__deployWrites, puts: window.__progressPuts });
+      const ready = (row, owner = window.__entry?.deployment, s = state()) => !!row
+        && owner === task && row.task === task && row.awardId === task.awardId
+        && row.database === 'cw.progress' && row.mode === 'readonly' && row.store === 'progress'
+        && row.key === 'cw.progress' && row.pending && !row.finished
+        && s.importing && s.busy && !s.cancelled && !s.admitted && s.open && s.held && !s.released && s.gpu === 0;
+      const clean = ({ task: ignored, ...row }) => row;
+      const event = e => {
+        if ((e.type === 'keydown' || e.type === 'keyup') && e.key !== 'Escape') return;
+        events.push({ type: e.type, trusted: e.isTrusted, state: state() });
+      };
+      const dialog = document.getElementById('deploy-review');
+      for (const type of ['keydown', 'keyup']) window.addEventListener(type, event, true);
+      for (const type of ['cancel', 'close']) dialog.addEventListener(type, event, true);
+      IDBDatabase.prototype.transaction = function (...args) {
+        const tx = transact.apply(this, args);
+        if (this.name === 'cw.progress' && tx.mode === 'readonly' && tx.objectStoreNames.contains('progress')) {
+          const row = { task: window.__entry?.deployment, awardId: window.__entry?.deployment?.awardId,
+            database: this.name, mode: tx.mode, pending: false, queued: state() };
+          rows.push(row); byTransaction.set(tx, row);
+          for (const type of ['complete', 'abort']) tx.addEventListener(type, () => {
+            row.finished = type; row.settled = state();
+          });
+        }
+        return tx;
+      };
+      IDBObjectStore.prototype.get = function (...args) {
+        const request = get.apply(this, args), row = byTransaction.get(this.transaction);
+        if (row) {
+          row.store = this.name; row.key = args[0]; row.pending = true; row.created = state();
+          for (const type of ['success', 'error']) request.addEventListener(type, () => {
+            row.pending = false; row.requestOutcome = type; row.requestSettled = state();
+          });
+        }
+        return request;
+      };
+      const descriptorSame = (a, b) => !!a === !!b && (!a
+        || ['value', 'get', 'set', 'writable', 'enumerable', 'configurable'].every(k => a[k] === b[k]));
+      window.__launchReadProbe = {
+        ready: () => rows.some(row => ready(row)),
+        capture: () => ({ state: state(), rows: rows.map(clean), events: events.map(e => ({ ...e })) }),
+        controls: () => {
+          const row = rows.find(row => ready(row)); if (!row) return { actual: false };
+          const a = JSON.stringify(clean(row));
+          const cases = [{ task: { ...task } }, { awardId: task.awardId + '-wrong' }, { database: 'other' },
+            { mode: 'readwrite' }, { store: 'other' }, { key: 'other' }, { pending: false }, { finished: 'complete' }];
+          const s = state();
+          return { actual: ready(row), detached: cases.every(patch => !ready({ ...row, ...patch })),
+            wrongOwner: !ready(row, { ...task }), released: !ready(row, task, { ...s, released: true }),
+            allocated: !ready(row, task, { ...s, gpu: 1 }), a2: a === JSON.stringify(clean(row)) && ready(row) };
+        },
+        restore: () => {
+          Object.defineProperty(IDBDatabase.prototype, 'transaction', transactionDescriptor);
+          Object.defineProperty(IDBObjectStore.prototype, 'get', getDescriptor);
+          for (const type of ['keydown', 'keyup']) window.removeEventListener(type, event, true);
+          for (const type of ['cancel', 'close']) dialog.removeEventListener(type, event, true);
+          const exact = descriptorSame(transactionDescriptor, Object.getOwnPropertyDescriptor(IDBDatabase.prototype, 'transaction'))
+            && descriptorSame(getDescriptor, Object.getOwnPropertyDescriptor(IDBObjectStore.prototype, 'get'));
+          delete window.__launchReadProbe; return exact;
+        }
+      };
+    });
+    let heldOwner, cancelledLaunch, restored = false, releasedHold = false;
+    const launchRead = result.deploymentLaunchRead = {};
+    try {
+      launchRead.preStageRefused = !await page.evaluate(() => window.__launchReadProbe.ready());
+      await holdProgressTransaction(page); await page.locator('#deploy-launch').click();
+      await page.waitForFunction(() => window.__launchReadProbe.ready());
+      launchRead.beforeEscape = await page.evaluate(() => window.__launchReadProbe.capture());
+      launchRead.controls = await page.evaluate(() => window.__launchReadProbe.controls());
+      await page.keyboard.press('Escape'); heldOwner = (await counters()).busy;
+      launchRead.beforeRelease = await page.evaluate(() => window.__launchReadProbe.capture());
+      await releaseProgressTransaction(page); releasedHold = true; cancelledLaunch = await cancelled();
+      launchRead.afterSettlement = await page.evaluate(() => window.__launchReadProbe.capture());
+    } catch (error) {
+      launchRead.error = error.message;
+      try { launchRead.failureSnapshot = await page.evaluate(() => window.__launchReadProbe.capture()); }
+      catch (captureError) { launchRead.captureError = captureError.message; }
+      throw error;
+    } finally {
+      try { if (!releasedHold) await releaseProgressTransaction(page); }
+      finally { launchRead.restored = restored = await page.evaluate(() => window.__launchReadProbe.restore()); }
+    }
+    launchRead.restored = restored;
+    const before = launchRead.beforeEscape.state, retained = launchRead.beforeRelease.state, after = launchRead.afterSettlement.state;
+    const nativeEscape = launchRead.beforeRelease.events.filter(e => e.type === 'keydown' || e.type === 'keyup');
+    verdict('launch-escape', launchRead.preStageRefused && Object.values(launchRead.controls).every(Boolean)
+      && restored && heldOwner && retained.importing && retained.busy && retained.cancelled && !retained.open
+      && retained.held && !retained.released && retained.gpu === 0 && nativeEscape.length === 2
+      && nativeEscape.every(e => e.trusted) && cancelledLaunch && after.gpu === 0
+      && after.writes === before.writes && after.puts === before.puts,
+    'actual pending canonical readonly request precedes native Escape; rejecting controls, retained owner, no GPU/write, settlement/focus and exact observer restore');
 
     const bads = [['missing', null, 'no completed army'], ['corrupt', '{broken', 'not valid json'],
       ['unsupported', JSON.stringify({ ...equipped, version: 2 }), 'unsupported'],
