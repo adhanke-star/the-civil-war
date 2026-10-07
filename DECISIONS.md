@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0048 · Preserve missing-marker CI evidence before choosing a repair (2026-10-07)
+
+P2n exactCI37629607925 failed in the unchanged high-camera marker probe: Franklin absent after
+900ms wall time, before its named assertion. Goal pitch passing does not identify the cause. Own
+only that probe plus four docs; bind all45 existing frozen sources, preserve every old predicate,
+record passive actual frame/camera/projection state beforeclick and restore instrumentation exactly.
+Use existing Actions for the bounded diagnostic. No runtime or tolerance change without actual cause.
+
 ## 0047 · Held inspection owns a transient lens and synchronous map return (2026-10-07)
 
 Hold I on selected friendly infantry to follow an actual living main-body figure at model head

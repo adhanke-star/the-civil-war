@@ -1497,6 +1497,38 @@ v1work. Immediately next loop at green boundary, no final/milestone stop or user
 
 ### P2n acceptance contract — held soldier-eye view and scene-depth blur
 
+P2n exact-CI diagnosis contract (2026-10-07 13:56UTC; before probe edits):
+CI37629607925 FAILED atc3c97768d3f1fe2d5dcb521df141af7328c9cb0a; actual83checks/82PASS+
+harness TypeError tools/test-view-ui.mjs:107 (missingFranklin after900ms). ActualfailedJSON51254B
+SHA8ce24c5f6924862f73942f7b8785c35456d677897a0c6655e99105132a1b4536; artifact11486151853
+21entries/74964B transfer. Zeroerrors/warnings/twoemptyaxes are partial, not505/41 acceptance.
+Root+ONEread-only helper agree causeUNPROVEN: actualcamera/Hud state absent; goalpitch pass only.
+Root owns ONLY tools/test-view-ui.mjs plus PLAN/HANDOFF/STATE/DECISIONS. Existing45frozen
+runtime/test/workflow/source bytes stay EXACTc3c9776; old probe newly bound as46thsource.
+First instrumentation-only commit keeps900ms/alloldnamedpredicates and captures current actual/goal
+camera matrices/pitch/ground/keys/inertia/allunitprojection/hiddenstate, passive realupdate framecount
+and actualdt; atomic finalmarker/camera/projection sample, phase-labelled fullcamera pose/projection;
+original method receiver/args/return preserved with exactdescriptor finallyrestore.
+Capture before native Franklin click; if absent, archive actual PNG/evidence and fail existing named
+view-high-markers-clear-dock (no undefined dereference); bounded explicit diagnostic abort preserves
+partial result. No camera/Game/Hud stepping or goal changes, tolerance/readiness alteration or acceptance.
+Run syntax/diff/source46/index5; push diagnostic main commit to existing CI (30standalone unchanged).
+Read actual failed/success log/JSON/PNG exactSHA before choosing any causal repair. Native506 atc3c
+remains historical runtime proof; no blind fullnative/software rerun. Afterevidenced repair write
+new exact native/CI/name/axe contract before edits; independent source/receipt review required.
+P2o remainsNOTACTIVE. CIred does not end autonomous loop; retain allfailed evidence/unrelated2.
+
+
+PUSHED13:35UTC c3c97768d3f1fe2d5dcb521df141af7328c9cb0a; owned16/index45 CLEAR, HEAD=origin/main.
+ExactCI37629607925 RUN; Pages37629607851 workflow SUCCESS, publicbytespending;30standalone
+steps metadata success, actuallogcountspending. Actual505/41axes/30completedstandalone logs/artifact/
+source45/public8 acceptance pending. Collector: node .out/p2n-collect-completed-r1-20261007.mjs
+37629607925 c3c97768d3f1fe2d5dcb521df141af7328c9cb0a 37629607851
+Postpush3receipt docs fold into next owned implementation; no docs-onlycommit/native repeat.
+Next draftP2feedback must share existing reading-space with active instructions: actual320/568
+geometry disproves separate44px feedback band. No P2o product edit before revised independent
+contract/BASE geometry and P2n exactCI acceptance. Continue loop during CI read-only source work.
+
 ACTIVE 2026-10-07 after exact P2m CI37610361430/Pages37610361438 at131df8b:
 actual485/40axes/28logs/source40/public4, root and independent receipt review CLEAR. Root sole writer; one bounded read-only reviewer, no simultaneous writer/browser/test.
 Native diagnostic r1/r2 FAILED at actual trusted flag I admission (16 checks, no field images).
@@ -1608,7 +1640,7 @@ its duplicate42scope serialization corrected beforefreeze. Runtime unchanged fro
 Freeze .out/p2n-freeze-r1-20261007.mjs EXECUTED =>45=12changed33locks/506native505CI/
 41actualrecursivepaths; ONE .out/p2n-full-native-r1-20261007.mjs EXIT0; then allactualPNG review;
 owned16index45/commitpush/exact505CI/all30logs/Pages8. Rootsolewriter/unrelated2preserved.
-P2n full review CLEAR; owned16 integration/exactCI acceptance next. No simultaneous tests/browser/runtime edits.
+P2n full review/integration CLEAR; exactCI acceptance RUN. No simultaneous tests/browser/runtime edits.
 
 Objective: holding I on the battlefield follows a selected living friendly infantry figure at low
 model head height with actual scene-depth blur; release restores the map synchronously. This is

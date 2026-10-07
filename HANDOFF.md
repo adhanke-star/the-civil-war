@@ -7,6 +7,41 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
 
 ## Active iteration: P2n held soldier-eye and scene-depth blur (2026-10-07)
 
+P2n exact-CI diagnosis contract (2026-10-07 13:56UTC; before probe edits):
+CI37629607925 FAILED atc3c97768d3f1fe2d5dcb521df141af7328c9cb0a; actual83checks/82PASS+
+harness TypeError tools/test-view-ui.mjs:107 (missingFranklin after900ms). ActualfailedJSON51254B
+SHA8ce24c5f6924862f73942f7b8785c35456d677897a0c6655e99105132a1b4536; artifact11486151853
+21entries/74964B transfer. Zeroerrors/warnings/twoemptyaxes are partial, not505/41 acceptance.
+Root+ONEread-only helper agree causeUNPROVEN: actualcamera/Hud state absent; goalpitch pass only.
+Root owns ONLY tools/test-view-ui.mjs plus PLAN/HANDOFF/STATE/DECISIONS. Existing45frozen
+runtime/test/workflow/source bytes stay EXACTc3c9776; old probe newly bound as46thsource.
+First instrumentation-only commit keeps900ms/alloldnamedpredicates and captures current actual/goal
+camera matrices/pitch/ground/keys/inertia/allunitprojection/hiddenstate, passive realupdate framecount
+and actualdt; atomic finalmarker/camera/projection sample, phase-labelled fullcamera pose/projection;
+original method receiver/args/return preserved with exactdescriptor finallyrestore.
+Capture before native Franklin click; if absent, archive actual PNG/evidence and fail existing named
+view-high-markers-clear-dock (no undefined dereference); bounded explicit diagnostic abort preserves
+partial result. No camera/Game/Hud stepping or goal changes, tolerance/readiness alteration or acceptance.
+Run syntax/diff/source46/index5; push diagnostic main commit to existing CI (30standalone unchanged).
+Read actual failed/success log/JSON/PNG exactSHA before choosing any causal repair. Native506 atc3c
+remains historical runtime proof; no blind fullnative/software rerun. Afterevidenced repair write
+new exact native/CI/name/axe contract before edits; independent source/receipt review required.
+P2o remainsNOTACTIVE. CIred does not end autonomous loop; retain allfailed evidence/unrelated2.
+
+
+PUSHED13:35UTC: c3c97768d3f1fe2d5dcb521df141af7328c9cb0a, HEAD=origin/main/indexempty.
+Owned16/index45bindings CLEAR; only3postpush receipt docs dirty, unrelatedworkspace/Shiloh preserved.
+CORRECTION13:58UTC: ExactCI37629607925 FAILED83(82PASS+harness); actualfailedJSON/readback
+retained above. All30standalone actualcompletedlog summaries verified; log160697B
+SHA34045d4763068731159385f92cadcce87a38c9aa1221159c129e7d0fe3856fe2.
+Pages37629607851SUCCESS/public8UNRUN. Diagnostic-only probe+4docs currentWIP; original45locked.
+Collector: node .out/p2n-collect-completed-r1-20261007.mjs 37629607925 c3c97768d3f1fe2d5dcb521df141af7328c9cb0a 37629607851
+After exact acceptance immediately next P2 feedback; revised shared-instruction draft remains
+NOTACTIVE .out/p2o-feedback-contract-draft-r1-20261007.txt (13owned/46bindings/39gates/12UI).
+Its initial separate44px band is disproven by actual320/568 geometry; require shared reading-space
+policy, actual minimum viewport, synchronous Hud layout/main entry, old independent probe list and
+pointerdown targeting preservation before product changes. No milestone final/device requests.
+
 LIVE13:27UTC: fullnative r1 COMPLETED EXIT0; freeze45 EXECUTED EXIT0.
 Actual506/504unique exactnames,935520ms,t13:09:57.477Z;41empty/exactaxes/zeroallerrorswarnings/
 3headerStagestrue/source45 unchanged/last-result byteequal. Actual148uniquePNG allfound;
@@ -25,7 +60,7 @@ its duplicate42scope serialization corrected beforefreeze. Runtime unchanged fro
 Freeze .out/p2n-freeze-r1-20261007.mjs EXECUTED =>45=12changed33locks/506native505CI/
 41actualrecursivepaths; ONE .out/p2n-full-native-r1-20261007.mjs EXIT0; then allactualPNG review;
 owned16index45/commitpush/exact505CI/all30logs/Pages8. Rootsolewriter/unrelated2preserved.
-P2n full review CLEAR; owned16 integration/exactCI acceptance next. No simultaneous tests/browser/runtime edits.
+P2n full review/integration CLEAR; exactCI acceptance RUN. No simultaneous tests/browser/runtime edits.
 
 P2m ACCEPTED131df8b: exactCI37610361430/Pages37610361438 SUCCESS, actual485/40emptyaxes/
 28standalone logs/source40/public4; root and independent review CLEAR. Native486/ALL138review

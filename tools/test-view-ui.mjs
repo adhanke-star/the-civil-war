@@ -91,24 +91,69 @@ export async function viewControls({ page, check, shot, result }) {
 
   const cameraBefore = await state();
   const angle = page.getByRole('slider', { name: 'Camera elevation', exact: true });
-  await angle.focus(); await page.keyboard.press('End'); const high = await state();
-  check('view-camera-live', Math.abs(high.pitch - Math.min(1.35, before.pitch + Math.PI / 6)) < 1e-8 && JSON.stringify(high.goal) === JSON.stringify(before.goal)
-    && high.units === cameraBefore.units && high.time === cameraBefore.time && high.paused, 'keyboard elevation changes goal pitch by30degrees while centre/distance/yaw/paused units/time stay exact');
-  await page.locator('#sb-toggle').click(); await page.waitForTimeout(900); const highSettled = await state();
-  const highMarkers = await page.evaluate(async () => {
-    const panels = ['unitcard', 'orders', 'minimap-box', 'objective', 'tip', 'intro-hint', 'army', 'field-stores', 'feed'].map((id) => document.getElementById(id))
-      .filter((n) => !n.hidden).map((n) => n.getBoundingClientRect()).filter((r) => r.width && r.height);
-    return [...window.__game.hud.markers.entries()].filter(([, m]) => !m.el.classList.contains('hidden')).map(([id, m]) => {
-      const b = m.el.getBoundingClientRect(), f = m.el.querySelector('svg').getBoundingClientRect(), x = f.x + f.width / 2, y = f.y + f.height / 2;
-      return { id, x, y, hit: m.el.contains(document.elementFromPoint(x, y)), clear: panels.every((p) => b.right <= p.left || b.left >= p.right || b.bottom <= p.top || b.top >= p.bottom) };
-    });
+  // Passive diagnostic: retain real camera updates; never step or settle the live camera here.
+  await page.evaluate(() => {
+    if (Object.hasOwn(window, '__viewHighTrace')) throw Error('Unexpected existing view trace owner');
+    const { rts, camera } = window.__game, descriptor = Object.getOwnPropertyDescriptor(rts, 'update'), original = rts.update;
+    const rows = [], read = () => ({ pitch: rts.pitch, groundY: rts.groundY, target: rts.target.toArray(),
+      dist: rts.dist, yaw: rts.yaw, goal: { ...rts.goal }, keys: [...rts.keys], inertia: rts.inertia && { ...rts.inertia },
+      phase: 'before-or-immediately-after-rts-update-before-hud-render', position: camera.position.toArray(), quaternion: camera.quaternion.toArray(),
+      near: camera.near, far: camera.far, projection: camera.projectionMatrix.toArray(), matrix: camera.matrixWorld.toArray(), inverse: camera.matrixWorldInverse.toArray() });
+    const trace = { before: read(), rows, frames: 0, dtSum: 0, restore() {
+      if (descriptor) Object.defineProperty(rts, 'update', descriptor); else delete rts.update;
+      if (rts.update !== original) throw Error('View diagnostic update restore failed');
+    } };
+    rts.update = function (...args) {
+      const before = read(), returned = original.apply(this, args); trace.frames++; trace.dtSum += args[0];
+      if (rows.length < 64) rows.push({ frame: trace.frames, dt: args[0], before, after: read() });
+      return returned;
+    };
+    window.__viewHighTrace = trace;
   });
-  const franklinHigh = highMarkers.find((m) => m.id === 'franklin');
-  await page.mouse.click(franklinHigh.x, franklinHigh.y);
-  check('view-high-markers-clear-dock', highMarkers.length > 0 && highMarkers.every((m) => m.hit && m.clear) && await page.evaluate(async () => window.__game.game.selected?.id === 'franklin'),
-    `high-angle marker bodies avoid visible HUD panels and Franklin accepts actual pointer: ${JSON.stringify(highMarkers)}`);
-  result.viewHighMarkers = highMarkers;
-  await shot(page, 'view-camera-high'); await page.locator('#sb-toggle').click();
+  let highSettled;
+  try {
+    await angle.focus(); await page.keyboard.press('End'); const high = await state();
+    check('view-camera-live', Math.abs(high.pitch - Math.min(1.35, before.pitch + Math.PI / 6)) < 1e-8 && JSON.stringify(high.goal) === JSON.stringify(before.goal)
+      && high.units === cameraBefore.units && high.time === cameraBefore.time && high.paused, 'keyboard elevation changes goal pitch by30degrees while centre/distance/yaw/paused units/time stay exact');
+    await page.locator('#sb-toggle').click(); await page.waitForTimeout(900); highSettled = await state();
+    const diagnostic = await page.evaluate(() => {
+      const panels = ['unitcard', 'orders', 'minimap-box', 'objective', 'tip', 'intro-hint', 'army', 'field-stores', 'feed'].map((id) => document.getElementById(id))
+        .filter((n) => !n.hidden).map((n) => n.getBoundingClientRect()).filter((r) => r.width && r.height);
+      const highMarkers = [...window.__game.hud.markers.entries()].filter(([, m]) => !m.el.classList.contains('hidden')).map(([id, m]) => {
+        const b = m.el.getBoundingClientRect(), f = m.el.querySelector('svg').getBoundingClientRect(), x = f.x + f.width / 2, y = f.y + f.height / 2;
+        return { id, x, y, hit: m.el.contains(document.elementFromPoint(x, y)), clear: panels.every((p) => b.right <= p.left || b.left >= p.right || b.bottom <= p.top || b.top >= p.bottom) };
+      });
+      const { rts, camera, game, terrain, hud } = window.__game, g = rts.goal;
+      // Independent detached goal projection, copied from the source-bound camera construction formula.
+      const detached = camera.clone(), ty = terrain.heightAt(g.x, g.z), h = Math.cos(g.pitch) * g.dist;
+      detached.near = Math.max(2, g.dist * .02); detached.far = g.dist * 4 + 2000; detached.updateProjectionMatrix();
+      detached.position.set(g.x + Math.sin(g.yaw) * h, ty + Math.sin(g.pitch) * g.dist, g.z + Math.cos(g.yaw) * h);
+      detached.position.y = Math.max(detached.position.y, terrain.heightAt(detached.position.x, detached.position.z) + 25);
+      detached.lookAt(g.x, ty, g.z); detached.updateMatrixWorld(true);
+      const projections = game.units.map(u => { const point = camera.position.clone().set(u.x, terrain.heightAt(u.x, u.z) + 16, u.z);
+        return { id: u.id, alive: u.alive, actual: point.clone().project(camera).toArray(), goal: point.project(detached).toArray(),
+          hidden: hud.markers.get(u.id)?.el.classList.contains('hidden') }; });
+      const t = window.__viewHighTrace;
+      return { highMarkers, detached: { position: detached.position.toArray(), quaternion: detached.quaternion.toArray(),
+          near: detached.near, far: detached.far, matrix: detached.matrixWorld.toArray(), inverse: detached.matrixWorldInverse.toArray(), projection: detached.projectionMatrix.toArray() }, before: t.before, frames: t.frames, dtSum: t.dtSum, rows: t.rows, projections,
+        actual: { pitch: rts.pitch, groundY: rts.groundY, target: rts.target.toArray(), dist: rts.dist, yaw: rts.yaw,
+          goal: { ...rts.goal }, keys: [...rts.keys], inertia: rts.inertia && { ...rts.inertia },
+          phase: 'atomic-marker-camera-projection-sample', position: camera.position.toArray(), quaternion: camera.quaternion.toArray(),
+          near: camera.near, far: camera.far, projection: camera.projectionMatrix.toArray(), matrix: camera.matrixWorld.toArray(), inverse: camera.matrixWorldInverse.toArray() } };
+    });
+    const { highMarkers } = diagnostic;
+    result.viewHighDiagnostic = { highSettledBeforeAtomicSample: highSettled, ...diagnostic };
+    const franklinHigh = highMarkers.find((m) => m.id === 'franklin');
+    if (franklinHigh) await page.mouse.click(franklinHigh.x, franklinHigh.y);
+    check('view-high-markers-clear-dock', !!franklinHigh && highMarkers.length > 0 && highMarkers.every((m) => m.hit && m.clear) && await page.evaluate(async () => window.__game.game.selected?.id === 'franklin'),
+      `high-angle marker bodies avoid visible HUD panels and Franklin accepts actual pointer: ${JSON.stringify(highMarkers)}`);
+    result.viewHighMarkers = highMarkers;
+    await shot(page, 'view-camera-high');
+    if (!franklinHigh) throw Error('View high marker absent; retained passive camera/projection diagnostic');
+  } finally {
+    await page.evaluate(() => { const t = window.__viewHighTrace; if (t) { t.restore(); delete window.__viewHighTrace; } });
+  }
+  await page.locator('#sb-toggle').click();
   await angle.focus(); await page.keyboard.press('Home'); const low = await state();
   check('view-camera-low', Math.abs(low.pitch - Math.max(0.3, before.pitch - Math.PI / 12)) < 1e-8 && low.units === cameraBefore.units && low.time === cameraBefore.time, 'minimum elevation is clamped and leaves paused brigade state unchanged');
   await page.locator('#sb-toggle').click(); await page.waitForTimeout(900); await shot(page, 'view-camera-low'); await page.locator('#sb-toggle').click();
