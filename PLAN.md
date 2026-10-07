@@ -992,8 +992,128 @@ ONE full native447/447 in660726ms,t04:01:11.298Z, actual JSON7279305B SHA256
 91fd72b9300f8dab80ece586bc0a633ea45aca03503be9b633b95720b81f9476,38emptyaxe/errors/warnings[].
 All14candidate+20locked source bindings unchanged; old394name multiset plus53newunique retained.
 447checks/445unique reflects three inherited invalid-import labels. Independent full receipt/source/
-rendered review CLEAR. Commit/exact446CI/Pages still pending. Separate inherited P2 responsive-dock
+rendered review CLEAR. Pushed6f862baa3c23e69e3b28f5a941bc5eefcb25c4d0; exact446CI37570770532
+SUCCESS446/446 in1456824ms,38emptyaxe/errorswarnings; Pages37570770654/all10deployed runtime hashes
+match. Actual CIJSON7281544B SHAc926f87bcccd17bec2a19ed390b98876cf7af0163ef89d209fda07d9bf086c59;
+log235338B SHA75439cc2c78c66453ee8d41057e8a5c45c69fe1d11266b6746f859e2f86adde5; independent
+actualsource/receipt acceptance CLEAR. All28steps and native-versus-CI multiset bound. P2k2b accepted.
+Separate inherited P2 responsive-dock
 follow-up: actual320keyboard PNG crops order columns; outer dock fit alone is insufficient evidence.
+
+### P2l active acceptance contract — responsive dock only (2026-10-07)
+
+Root sole writer. Recommendation: fix the inherited clipped dock first; actual320 PNG shows
+five order buttons partly/fully beyond the viewport. Keep P2m top-strip/Army/speeds clipping
+explicitly open, and P2n held soldier-eye + true depth-based DOF open. No whole320HUD/WCAG/iPad claim.
+
+Own index.html (identity-first card markup and native scroll semantics), src/ui/hud.css and hud.js (dock layout,
+available width/height observation, native card scroll-key ownership, and closed-left sandbox-toggle
+placement above the measured dock while preserving its48px target, plus narrow first-use/intro/
+keyboard hint placement beside either closed target), new tools/test-dock-ui.mjs,
+tools/test.mjs focused/full wiring, sw.js and PLAN/HANDOFF/STATE/DECISIONS. Ten paths. No header DOM/
+top-strip CSS, main/entry/reward/save/schema/equipment/Unit/Battery/Game/Combat/Input/Arrow/camera/
+Post/art/terrain/scenario/history/data/quality/lock preferences edits. No persistent setting/subsystem.
+Current28standalone CI commands stay intact; no new pure gate mirroring CSS implementation.
+
+Measure dock's actual available width including sandbox-left/right offsets, without per-frame layout
+polling. Existing Hud can own ResizeObserver; autonomous dock/card heights must not depend circularly
+on measured --dock-h. Use original wide dimensions when they fit, compact one-row at shortlandscape,
+card+map first row and all6orders in3x2 second row when narrow. Every button full label/key >=48px,
+native visible focus, no overlap/clipping. Compact tiles2x2, readable labels/values and identity first.
+Map>=80px where narrow, both its normal and M-expanded views
+remain usable. Keep selected card stats readable; full names/state vertically scroll if necessary,
+native focus and Arrows/PageUp/Down/Home/End/Space must scroll without steering or issuing a command.
+Leave global keyup clearing intact. Retained --dock-h consumers must follow actual dock height so
+keyboard hint/feed/intro hint/compare toolbar stay above it; top strip remains a separately open debt.
+Header bottom +64px must be <= dock top in568x320, and targeting/intro hint remain above dock and
+below header; fail if impossible rather than hide buttons.
+No unwanted writes/orders/RNG/simulation changes from geometry, resize or read/scroll controls.
+
+Exactly18new browser categories:
+dock-layout-320; dock-layout-375; dock-layout-landscape; dock-layout-760; dock-layout-1024;
+dock-layout-1440; dock-sandbox-left; dock-sandbox-right; dock-long-card-scroll;
+dock-keyboard-six-orders; dock-touch-six-orders; dock-map-pointer; dock-map-expand;
+dock-overlays-measured; dock-resize-restore; dock-preserved-progress; dock-axe; dock-no-console-errors.
+Measure EVERY dock child/button rect + real elementFromPoint at centre and inset corners, visible
+identity text hit points, closed-toggle/dock/hint nonoverlap and hint field containment,
+full labels/text ranges, min target/font,
+pairwise nonoverlap and normal/large minimap state, not outer dock alone. 320x568,375x667,568x320,
+760x568,1024x768,1440x788; closed left/right toggle at320/375/568landscape and open left/right
+fine-pointer sandbox1024 and1440;760/761899/900 boundaries
+within existing resize categories. Empty/selected/group/labelled long-card states within categories.
+Real native Enter/Space actions must reach all6buttons once with expected Game outcome; Chromium CDP
+trusted touch events preserve fine-pointer media (existing context lacks hasTouch), not iPad certification.
+Real minimap pointer jumps and M restores current dock geometry. Enlarged map is an intentional overlay;
+bind viewport containment/working close/exact normal-layout restoration, not pairwise separation then.
+Long-card visual fixture explicitly labelled; readback/writes exact. Bound observable scroll/resize
+settlement and actual text access; bounded timeout failure stays false, no fixed-sleep proof.
+Strengthened geometry oracle A/B/A2: accepted layout -> controlled original-overflow style -> exact
+inline-style restoration in finally, assert B fails named predicate and A2 equals A. Preserve separate
+actual pre-edit BASE diagnostic320fail/1024pass without claiming it is new acceptance.
+
+Focused node tools/test.mjs --dock --native =14foundation+18new+1focused native-renderer=33;
+new helper emits dock-no-console-errors ONCE; focused wrapper does not add duplicate error category.
+full465native/464CI = old447/446+18, only old intro-native-renderer full difference. No extra axe arrays
+from duplicating scopes; ONE new result.dockAxe array ->39fullscopes, tag any multi-viewport violations.
+New cases require
+explicit contract accounting, never weaker assertions. Focused should reuse the existing sandbox
+context/current progress fixture serially and full invokes it after retained keyboard cases.
+
+P2k2b exact CI37570770532/Pages37570770654 accepted at6f862ba. Reconcile git/process/owner/docs before new seam.
+Run BASE diagnostic, implement, syntax touched modules/diffcheck, four syntax checks (hud.js,test-dock-ui.mjs,test.mjs,sw.js), git diff --check, then all28ordered deterministic commands and node tools/test.mjs --unit:34total
+commands (21+21deployment,23+23/115/A126-B-A2/original3606Combat/136580Unit,183+183/unit), focused
+dock/native actual unique log/JSON/PNG; independent read-only source/rendered/receipt review and repair.
+Freeze owned+locked source hashes/bytes; ONE final serial npm test -- --native, exact names/axe/errors/
+warnings/PNG/last-result/source readback, independently review. Sync docs<20STATE, stage only owned10,
+index bindings, commit/pushmain, exactCI all28steps/464actualJSON + Pages/deployedtouched runtimebytes.
+Preserve workspace/Shiloh/failures; no broad browser rerun for receipt-doc edits. Immediately next loop
+P2m header or true soldier-eye once its control entry can fit. No milestone final answer.
+
+Exact deterministic order after syntax/diff: node tools/test-deployment.mjs, same --prove-fail;
+node tools/test-equipment.mjs, same --prove-fail; then tools/test-reward.mjs, test-save.mjs,
+test-practice.mjs, test-captures.mjs, test-intro.mjs, test-sandbox-rules.mjs, test-look.mjs,
+test-view.mjs, test-spacing.mjs, test-residency.mjs, test-moments.mjs, test-keyboard.mjs EACH
+positive then --prove-fail in that order; finally node tools/test.mjs --unit.
+Freeze before ONE final native465; preserve old447 name multiset plus18new unique,39empty axe scopes,
+errors/warnings empty, actual log/JSON/PNGs and last-result byte equality, original source locks.
+ExactCI464 differs only by retained intro-native-renderer; verify all28standalone step names/counts,
+actual final artifact via bounded reads, Pages and deployed index/hud.css/hud.js/sw bytes.
+No simulation/import/store/schema/history/art/quality changes or inherited oracle regeneration.
+Restore fixture DOM/inline style/settings/panel side and selection before retained full suite resumes.
+If geometry/control fails, retain failure and repair inside ownership; impossible measured geometry
+blocks this slice, not the whole loop. Top-strip P2m then soldier-eye remain dependency-ready priorities.
+
+P2l focused boundary (2026-10-07): final deterministicr4 all34EXIT0; nativefocusedr2 actual33/33
+unique in51810ms,t05:05:36.411Z, JSON160757B SHAb9197623ac3727a62de4b23c553b818f487612cd20cc9d86d27e6878dadba7d4.
+All6sourcebindingsunchanged, ONEdockAxe/errors/warnings empty; independentALL12PNG/source/receipt
+review CLEAR. Exactprogress/prefs/locks/panel restoration; actual6nativekeyboard+6trustedtouch
+Gameeffects, A/B/A2 geometry+inline, map400/Mrestore, fieldgap/hints pass. Frozen38bindings+exact
+465native/464CI name multisets/39axes. Fullr1 completed465/465,692717ms,t05:08:26.605Z;
+actualJSON7432083B SHA8b34e50b2de13e1eb63cee690fb60b80d439adc1fd7553debe62b99c79c51dfd,
+39emptyaxes/errors/warnings and38bindings exact. Rendered acceptance REJECTED: closed-left toggle
+obscures card identity at320. Preserve passing numeric receipt with rejected visual attribution;
+repair owned toggle placement and hit predicates, then deterministicr5/focusedr3/newfreeze/fullr2.
+Focusedrepairr3 passes33/33 but rendered acceptance also REJECTED: clamp relocates occlusion onto
+initial instructions at320. Reserve its horizontal48px target in narrow hints; bind their containment/
+nonoverlap and add unclamped-toggle A/B/A2 within existing resize category. Next deterministicr6/
+focusedr4 before freeze/fullr2. Focusedr4 actual31/33 failed the strengthened right-toggle/hint
+exclusion at568landscape; left/card/native/negative controls pass. Reserve right48target as well;
+Deterministicr7 all34EXIT0; focusedr5 actual33/33unique,54782ms,t05:33:58.039Z,JSON178642B SHA
+b6c3b323d0dae67b525210c838a85faff9cfd73e822af7db93f06ab8798ad853. All6sourcebindingsunchanged,
+emptyaxe/errors/warnings, bothclosedside narrowhint/card hits and native6+6orders pass. Original
+overflowB namedfail; unclampedtoggleB failscardidentity+toggleoverlap, bothA2exact. RootkeyPNG CLEAR;
+independentALL18PNG/source/receipt review CLEAR. Repairedfreeze r2 retainsoriginal38bindings/
+465native/464CI/39axes andupdated6ownedbinds. ONE serialfinalfullr2 active79961; no runtime/test edits
+afterfreeze. Fullr2 completedEXIT0,465/465 in591237ms,t05:36:19.615Z. ActualJSON7450872B SHA
+03337c4a627d4d87b0e662a5b5beaadcc99c99b0dab4e9233d4ef019935c71b4; log82728B SHA
+f26b6819722b2cecabc9da8b51a996e1d27d76a2b46ecf4d03150a49410fc1ee. Original465multiset/
+463unique/39emptyaxes/errors/warnings/dockWarnings/last-result exact,38bindingsunchanged.
+RootkeyPNG CLEAR; independentALL43PNG/source/receipt review CLEAR. Native genuineintro
+45.5843sim/firstcard46755wallms, savedUS45.5314sim/15integerloss andCS19.1679sim/2integerloss.
+No forcedplayable terminal. Local repairedcandidate accepted; commit/exact464CI/Pages remainUNRUN.
+Focusedr1 failed23/24 at Space scrollwait, retainedactualJSON/log; nativeSpace diagnostics succeed
+with existing handler, no confirmed product/body-default attribution. Actualscrollend sequencing
+plus bounded contrast/restoration fixes passr2; no font/target/quality/timeout/assertion relaxation.
 
 ### Required battle-system work (P3/P4; do not hide it inside “build Shiloh”)
 

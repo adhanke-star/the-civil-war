@@ -9,11 +9,11 @@
 - **P2f:** 13a9ee9; pure13+13/native209/209; CI37511709837/Pages37511709840 green.
 - **Art next:** residency37527814035 binds192frame cohorts; source-page limits fail; lossless frame layout next.
 - **Current play:** title Continue -> intro/saved camp; ?practice Henry rewards; historical/sandbox isolated.
-- **Missing:** saved-gear deployment, living title/camp, campaign saves, phase packs and progression.
+- **Missing:** narrow HUD/soldier-eye, living title/camp, campaign saves, phase packs and progression.
 - **Figures:** rigged default; second-pass baked Union and tinted Confederate placeholders remain.
 - **Approved art:** bake 820846f / 37347072866, sheets 1-12, 5,184 frames, nine looks per tier.
 - **Failed candidates:** UASTC 37360904656 and direct BC7/ASTC 37404193171; limits stay unchanged.
 - **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
 - **Proof:** P2k2a19+19, named23+23/115/A126-B-A2, retained183+183/unit; frozen native394/394/29axe;4+17hashes.
 - **Coordination:** no ledger/competing writer; root sole writer; preserve workspace/Shiloh; no duplicate goal/scheduler.
-- **Runtime/WIP:** HEAD/origin deacdf3; P2k2b rootWIP,21+21/retained green; focusedr8 67/67; frozen447/447,38axe/34hashes/full independent review CLEAR; commit/exact446CI/Pages pending; inherited320dock open.
+- **Runtime/WIP:** HEAD/origin6f862ba; P2k2b accepted447native/446CI37570770532/Pages37570770654; P2l10pathWIP repaired34deterministic/33focused/full465/39axe/38bindings/43PNGclear; stage/commit/exact464CI/PagesUNRUN; header/eye/feedback open.

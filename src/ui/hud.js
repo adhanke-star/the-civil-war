@@ -138,6 +138,28 @@ export class Hud {
   constructor({ camera, canvas, terrain, units, playerSide, rts, game, onSelect, onOrder, onPause, onSpeed, onQuality, onSound }) {
     Object.assign(this, { camera, canvas, terrain, units, playerSide, rts, game, onSelect, onOrder });
     this.selected = null;
+    // Layout changes only after a resize; measured height is an overlay output, never a sizing input.
+    const dock = $('dock');
+    let layoutFrame = 0;
+    this.dockObserver = new ResizeObserver(() => {
+      if (layoutFrame) return;
+      layoutFrame = requestAnimationFrame(() => {
+        layoutFrame = 0;
+        const width = dock.getBoundingClientRect().width, css = getComputedStyle(document.documentElement);
+        const wide = parseFloat(css.getPropertyValue('--dock-card-w')) + 3 * parseFloat(css.getPropertyValue('--dock-order-w'))
+          + parseFloat(css.getPropertyValue('--mm')) + 36 + 16;
+        const layout = width >= wide ? 'wide' : width >= 520 ? 'compact' : 'stacked';
+        if (dock.dataset.layout !== layout) dock.dataset.layout = layout;
+        const height = dock.getBoundingClientRect().height;
+        document.documentElement.style.setProperty('--dock-h', height + 'px');
+      });
+    });
+    this.dockObserver.observe(dock);
+    // Native scroll defaults stay intact. Keyup still bubbles to clear previously held camera keys.
+    $('unitcard').addEventListener('keydown', (e) => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) e.stopPropagation();
+    });
+    $('unitcard').addEventListener('focus', () => { this.rts?.keys.clear(); if (this.rts) this.rts.inertia = null; });
     this.markers = new Map();
     this.markerLinks = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     this.markerLinks.setAttribute('class', 'marker-link'); this.markerLinks.setAttribute('aria-hidden', 'true'); this.markerLinks.setAttribute('focusable', 'false');
@@ -267,6 +289,7 @@ export class Hud {
   select(u) {
     for (const [id, m] of this.markers) m.el.classList.toggle('selected', !!this.game && this.game.selection.some((v) => v.id === id));
     if (!this.game && this.selected) this.markers.get(this.selected.id)?.el.classList.remove('selected');
+    if (this.selected !== u) $('unitcard').scrollTop = 0;
     this.selected = u;
     if (!this.game && u) this.markers.get(u.id)?.el.classList.add('selected');
     $('uc-empty').hidden = !!u;

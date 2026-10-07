@@ -89,9 +89,10 @@
     <span id="capture-status" class="visually-hidden" role="status"></span>
 
     <div id="dock">
-      <section id="unitcard" class="panel" aria-label="Selected brigade">
+      <section id="unitcard" class="panel" aria-label="Selected brigade" tabindex="0">
         <p id="uc-empty" class="ucempty">Tap or click a blue flag to select a brigade.</p>
         <div id="uc-body" hidden>
+          <p class="ucname"><span id="uc-name">--</span> <span class="cas" title="Casualties"><span aria-hidden="true">☠</span> <span id="uc-cas">0</span></span></p>
           <div class="uchead">
             <div class="portrait" id="uc-portrait" aria-hidden="true"></div>
             <div class="tiles">
@@ -101,7 +102,6 @@
               <div class="tile reload"><span class="lbl">Reload</span><span class="val" id="uc-reload">--</span><i id="uc-reload-bar"></i></div>
             </div>
           </div>
-          <p class="ucname"><span id="uc-name">--</span> <span class="cas" title="Casualties"><span aria-hidden="true">☠</span> <span id="uc-cas">0</span></span></p>
           <p class="ucstate" id="uc-state"></p>
         </div>
       </section>

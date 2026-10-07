@@ -1,5 +1,18 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0042 · Dock responds to its available space; the card owns native reading keys (2026-10-07)
+
+Measure the dock after safe-area and sandbox offsets, using its existing Hud lifetime. Publish actual
+height for existing overlays, independently of card sizing, and keep six full order targets visible.
+Compact cards put identity first and scroll vertically with native keys isolated from field commands;
+keyup still clears camera keys. This repairs actual narrow clipping without changing simulation or
+extending the separate top-strip/soldier-eye scope. Acceptance binds real hit geometry, native orders,
+trusted Chromium touch, conserved progress, and an original-overflow A/B/A2 control.
+Fullr1 rendered review also exposed closed-left toggle occlusion. Clamp its48px target above the
+measured dock; reserve either closed target beside narrow hints, and bind card/map inset hits,
+visible identity and unobscured instructions under both closed sides. A restored unclamped toggle
+must fail identity-hit and dock-overlap predicates before exact restoration.
+
 ## 0041 · Authenticated saved field handoff and new-loot-only completion (2026-10-06)
 
 Saved camp uses a native cancellable review, pure admission before field requests, then explicit

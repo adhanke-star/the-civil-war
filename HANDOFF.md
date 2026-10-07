@@ -1,12 +1,99 @@
-# HANDOFF — Claude Code / Codex transfer (current plan: 2026-10-06)
+# HANDOFF — Claude Code / Codex transfer (current plan: 2026-10-07)
 
 Read in this order: `AGENTS.md`, this file, `docs/drill-reference.md`, `DESIGN.md` (the design of
 record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS.md`. Read `COORDINATION.md`
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Active iteration: P2k2b frozen full proof (2026-10-07)
-HEAD/origin remain deacdf34aca8c791564c97233a072adf57ceaee9, index empty; root sole writer.
+## Active iteration: P2l responsive dock only (2026-10-07)
+
+Current authoritative boundary: root sole writer, HEAD/origin6f862baa3c23e69e3b28f5a941bc5eefcb25c4d0;
+index empty, owned10pathWIP, workspace/Shiloh unrelated and preserved. No COORDINATION; if created
+readfull relevant lane. Deterministicr7 all34EXIT0; focusedr5 actual33/33unique/18PNG root+independent
+CLEAR. Repairedfreeze .out/p2l-frozen-source-r2-20261007.json binds6owned+32locks=38, original465/
+464names and39axes. Local nativefullr2 session79961 completedEXIT0,465/465 in591237ms,
+t05:36:19.615Z; no runtime/test edits afterfreeze and no localbrowser/test. ActualJSON7450872B SHA
+03337c4a627d4d87b0e662a5b5beaadcc99c99b0dab4e9233d4ef019935c71b4; log82728B SHA
+f26b6819722b2cecabc9da8b51a996e1d27d76a2b46ecf4d03150a49410fc1ee. Originalnames465/463unique,
+39emptyaxes/errors/warnings/dockWarnings/last-result exact,38sourcebindingsunchanged. RootkeyPNG CLEAR,
+independentALL43PNG (18dock+15deployment+10retained)/source/receipt review CLEAR. NEXT
+syncdocs/stageonly10/index38bindings/commit/push/
+exact464CI(all28steps)+Pages4deployedbytes. Collectors bindacceptedrepair r2, not rejectedvisualr1.
+Nativeintro45.5843sim/firstcard46755wallms, savedUS45.5314sim/15integerloss,CS19.1679sim/2loss.
+No milestone stop; next P2m header then heldsoldier-eye depthDOF. No wholeHUD/device/art/v1claim.
+
+### Retained P2l repair notes (superseded by the active boundary above)
+
+Root sole writer; HEAD/origin6f862baa3c23e69e3b28f5a941bc5eefcb25c4d0. Index empty; root-owned
+10path responsive-dock runtime/test/sw/docs WIP; unrelated workspace/Shiloh preserved. No COORDINATION;
+if created read full relevant lane before work. No local browser/test/server; session70162 completed.
+One bounded read-only helper only. Fullr1 numeric465/465/39emptyaxes/38bindings exact, but root and
+independent rendered acceptance REJECTED: closed-left48px toggle covers320card identity/read text.
+Repair within amended ownedhud.css toggle placement above measured dock and strengthened existing
+18categories (card/map inset hits, visible identity, both closed sides320/375/landscape); preserve
+numericr1 receipt/freeze/PNGs with rejected visual attribution. Next deterministicr5/focusedr3/review,
+newfreeze r2/ONE justified finalfullr2; then docs/index38bindings/commit/push/exact464CI+Pages4bytes.
+Correction: deterministicr5 all34EXIT0/focusedr3 numeric33/33,54455ms,JSON166289B SHA
+87cc601256991422a81a5b11ffbe60bb5f8406497fc543ceaf10d68119831ba8; source6unchanged. RootPNG
+REJECTED initialhint occlusion. Owned narrowhint placement reservesleft48target, explicit hint
+nonoverlap/fieldcontainment and unclamped-toggle negative A/B/A2 addedwithin18categories.
+Deterministicr6 all34EXIT0; focusedr4 FAILED31/33 on rightclosedtoggle/hint overlap568landscape.
+ActualJSON178924B SHAcaec937bb25ee2f6bfba07032be908ffff4f66d22d22ab3d5e6e7a637a051bdf;
+6bindingsunchanged, nativeorders/left/card/negative/restoration/axe guards pass. Reserve hints beside
+eitherclosedtarget. Deterministicr7 all34EXIT0; focusedr5 PASSES33/33unique in54782ms,t05:33:58.039Z,
+actualJSON178642B SHAb6c3b323d0dae67b525210c838a85faff9cfd73e822af7db93f06ab8798ad853;
+6bindingsunchanged, axe/errors/warnings empty. Bothclosedside320/375/landscape clear; native6+6
+orders exact; oldoverflowB namedfailure and newunclampedtoggleB card-hit/card-identity-hit/
+closed-toggle-dock-overlap reject, bothA2geometry/inline/readstate exact. RootkeyPNG CLEAR,
+independentALL18PNG/source/receipt review CLEAR. Frozen .out/p2l-frozen-source-r2-20261007.json
+retains original38bindings/465native/464CI/39axes, updated6ownedbinds afterrepair. ONE final serial
+nativefullr2 .out/p2l-full-native-r2-20261007.mjs active session79961; no runtime/test edits afterfreeze.
+NEXT poll79961/readactualfinal465log/JSON/last-result/PNG/source, independentfullreview, then
+owned10stage/index38bindings/commit/push/exact464CI+Pages4bytes. No other localbrowser/test.
+Own10paths index.html,src/ui/hud.css,hud.js,tools/test-dock-ui.mjs,tools/test.mjs,sw.js,4existingdocs.
+Active contract PLAN P2l; no simulation/save/gear/camera/art/scenario/history edits. Top strip P2m and
+held soldier-eye+depthDOF remain open, no whole narrowHUD/iPad/WCAG/art/fps claim.
+Final deterministicr4 all34commandsEXIT0 (21+21deployment,23+23/115/A126-B-A2/original3606Combat/
+136580Unit draws,retained183each/unit), actual .out/p2l-deterministic-r4-20261007.log.
+Focusedr2 PASSES33/33unique (14foundation+18new+1focused native-renderer),51810ms,t05:05:36.411Z.
+Actual .out/p2l-focused-native-r2-20261007.{log,json}/-readback.json160757B SHA
+b9197623ac3727a62de4b23c553b818f487612cd20cc9d86d27e6878dadba7d4;6sourcebindingsunchanged.
+ONEdockAxe empty across6viewport+4pressed scopes; errors/warnings/dockWarnings empty. RootkeyPNGs
+and independentALL12rendered/source/receipt review CLEAR. Native6keyboard+6trustedChromiumtouch
+actualeffects/eventidentity/ordercount exact, final14commands; no iPadclaim. NativeSpace/PageUp/Down/
+Home/End/Arrows/ShiftSpace waitactualscrollend, fullidentity/intention reachable/visiblefocus, no field
+steering/commands/writes. Mapbacking400 andactualpointergoal520; Mgeometryrestore exact.
+A/B/A2 originaloverflow control fails named containment; A2geometry and allinlineattributes exact,
+no progress/settings/state changes. Actual899/900 both-side allocation;
+568x320 docktop192, headerbottom60+64<=192. InitialBASE320fail/1024pass preservedr1/r2/r3.
+Frozen .out/p2l-frozen-source-r1-20261007.json contains6owned+32untouched=38bindings againstHEAD
+and acceptedP2k2b,465native/464CI exactname multisets and39axe paths. NO runtime/test edits after
+freeze until fullr1 completed. ActualJSON7432083B SHA8b34e50b2de13e1eb63cee690fb60b80d439adc1fd7553debe62b99c79c51dfd,
+692717ms,t05:08:26.605Z; log81997B SHA7eaae81c7bca8c9a06362ac5f551354bf20112c4d8e24ece125b142c76d220a6.
+465checks/463unique, retained447+18exact; no r1visual acceptance. Commit/CI UNRUN. Sync STATE<20;
+stageonlyowned10; collectors must bind acceptedrepair r2 rather than historicalr1.
+Immediately continue overnightloop at next accepted boundary, no milestone final.
+
+### Historical P2l focusedr1 failure and repair diagnosis
+
+P2l WIP (2026-10-07T05:04Z): active10pathcontract adopted before edits; original accepted HEAD
+BASEr1 and strengthened routed-HEADr2 show1024pass/320orders+map overflow; actualPNG root viewed.
+Current root responsiveHUD/test WIP, no committed runtime yet. Deterministicr1 all34EXIT0; focused
+r1 failed23/24 at native Space-scroll wait after first8layoutcategories. Source unchanged; actual
+.out/p2l-focused-native-r1-20261007.{log,json}/-readback.json, JSON8228B SHA
+1ac7ad20a70881d0609afbb49eff8bc575ca25db5d2ed1452d7931bdb7dbb9f7. No candidate acceptance.
+Bounded space diagnosticsr1/r2 show native Space DOESscroll with current stopPropagation, pausedtrue
+and defaultPreventedfalse; no body-default causal claim. Harness now waits actual scrollend plus
+expected position before next native key, same15sec failtimeout; no runtimeSpace interception.
+Read-only source review found pressed-key3.50contrast/hoverborder2.96 and exact prefs/panel/inline
+restoration gaps; owned CSS/harness repaired, pressedaxe/events/cardcleanup included. BASEr3 final
+strengthened geometry against routed originalHEAD3files also1024pass/320fail; EXIT0. NativeSpace
+r1failure causal verdict remains unclassified; strengthened observable settlement passesr2 above.
+
+## Accepted P2k2b exact full boundary (2026-10-07)
+HEAD/origin6f862baa3c23e69e3b28f5a941bc5eefcb25c4d0; tracked clean/index empty; root sole writer.
+P2k2b accepted, exactCI37570770532 SUCCESS; Pages37570770654 SUCCESS and all10deployedruntime
+hashes/bytes match frozen candidate (.out/p2k2b-live-pages-source-r1-20261006.json).
 Final ordered deterministic r5 all41commands EXIT0:21+21deployment,23+23/115/A126-B-A2 with
 original3606Combat/136580Unit draws, retained183+183 and unit. Actual log
 .out/p2k2b-deterministic-r5-20261006.log. Native focused r8 PASSES67/67,206419ms,
@@ -28,11 +115,33 @@ unchanged afterrun, locked files match deacdf3. Frozen source receipt and name-r
 label repeats three times. GenuineUS45.4699sim/15loss andCS19.2518/2loss; no injected playable proof.
 Independent full source/receipt/all15deployment+15retained PNG review CLEAR; root key PNGs clear.
 Inherited320px dock crops orders; separate responsive-dock P2 follow-up, no whole-game WCAG claim.
-No browser/test remains; no runtime/test/CI edits after freeze. Commit/push/446CI/Pages pending.
-Current owned17pathWIP; workspace/Shiloh stay unstaged. Explicitly stage owned paths/indexhash,
-commit/push, read exact446CI/Pages/all28standalone steps/deployed10runtimebindings; collector ready
+No browser/test remains; no runtime/test/CI edits after freeze. All17ownedpaths committed/index34
+bindings verified; workspace/Shiloh stay unstaged. Exact446CI/all28standalone steps accepted.
+Actual completed log235338B SHA75439cc2c78c66453ee8d41057e8a5c45c69fe1d11266b6746f859e2f86adde5;
+.out/p2k2b-exact-ci-37570770532-r1-20261006.log and -metadata/-readback.json.
+Actual CIJSON7281544B SHAc926f87bcccd17bec2a19ed390b98876cf7af0163ef89d209fda07d9bf086c59,
+446/446 in1456824ms,t2026-10-07T04:18:34.011Z;38emptyaxe/errorswarnings[].446checks/444unique,
+only oldintro-native-renderer absent vsnative; all53new unique. Artifact11461781538/99entries,
+35786347B archive read190852B via bounded ranges; no whole archive. Actual-artifact/readback siblings.
+All28explicitsteps:21+21deployment,23+23/115/A126-B-A2/original3606Combat/136580Unit draws,
+retained183each/unit; all34live+committed bindings,2x20logged binds and10Pages runtime binds exact.
+Independent completed CI/log/JSON/source acceptance CLEAR. SwiftShader/Chromium153 is not native
+device evidence. GenuineCI US45.4503sim/15integerloss,CS19.183/2; introfirstcard114105wallms.
+Collectors below are completed receipts, do not rerun. Next runtime slice is P2l above.
+
+Historical collection-ready checkpoint:
 .out/p2k2b-read-ci-json-r1-20261006.mjs. Continue loop immediately after accepted boundary;
-next read-only preflight is missing P2soldier-eye/sandbox scope, no active new seam until green.
+Completed-green collection runner .out/p2k2b-collect-completed-r1-20261007.mjs is syntax checked;
+its actual-log parser is checked against prior393receipt. Run ONLY after exact37570770532 succeeds:
+node .out/p2k2b-collect-completed-r1-20261007.mjs; then existing node tools/prune.mjs.
+It retains completed log/metadata and bounded actual446JSON, all28summaries/183each/originaldraws,
+native-vs-CI exact name multiset,34live+committed source hashes and10Pagesbindings. Independent
+review of actual completed receipts required before P2l mutation. Owned ghwatch session4289 running;
+no local browser/test. Do not rerun CI; preserve failed collector receipt if one occurs.
+Next read-only preflight recommends P2l responsive dock only, P2m top strip then held soldier-eye
+with actual depth DOF. .out/p2l-dock-proposed-contract-r1-20261007.md is a proposal, not active:
+root must finalize counts/scope and write PLAN acceptance contract before edits after green.
+No active new seam until exactCI/receipt independent acceptance. No whole narrowHUD claim.
 
 ### Historical P2k2b focused attempts, superseded by r8/frozen boundary above
 
