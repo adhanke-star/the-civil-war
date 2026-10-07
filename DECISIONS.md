@@ -1,5 +1,22 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0044 · Header wraps naturally; native panes own reading keys and connected focus (2026-10-07)
+
+Native BASE proved narrow speed clipping, hidden Army and focus falling to BODY after a real
+Army-row refresh. Keep every control visible through natural wrapping; one existing Hud observer
+publishes header, dock and objective heights for other consumers. Short screens retain full text
+through native scrolling, full targets and measured field space. Army Close/Escape returns its
+connected trigger; rebuilds restore only focus formerly inside the replaced list. Existing stores
+and result controllers remain intact. Valid native targeting proved Enter could issue a march from
+a focused hint: isolate reading/command keys without preventing native scrolling or button clicks.
+Passive camera proof binds exact rendered pose and control state; internal terrain-height easing
+is recorded separately, following its measured 2.8e-14 residue. Percent proof compares exact Game
+values numerically after CSSOM normalization. Later nativeproof exposed premature pose settlement
+and Army toggle occlusion: reserve the closed target beside each reading pane. Camera readiness
+requires observed equal frames and a detached unchanged-update fixed point at the existing maximum
+dt, with real accessibility work during easing; all subsequent pose comparisons remain exact within
+the same 15-second budget. No simulation, camera, save, quality or budget change.
+
 ## 0043 · Native play probes wait for layout and verify the actual drag owner (2026-10-07)
 
 CI37578420410 exposed two separate probe races: wide dock geometry stayed stable before its

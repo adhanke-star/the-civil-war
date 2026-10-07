@@ -3,7 +3,7 @@
 import { AxeBuilder } from '@axe-core/playwright';
 import { probeProgress, progressRaw } from './test-progress-browser.mjs';
 
-export async function introPlay({ browser, url, check, shot, result, watchErrors, native = false }) {
+export async function introPlay({ browser, url, check, shot, result, watchErrors, native = false, afterIdle = null, afterStores = null }) {
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, reducedMotion: 'reduce', hasTouch: true });
   await probeProgress(ctx, { prefix: '__intro', readFlag: '__introReadBlocked', quotaFlag: '__introQuota' });
   const page = await ctx.newPage(), errors = []; watchErrors(page, url, errors);
@@ -150,6 +150,7 @@ export async function introPlay({ browser, url, check, shot, result, watchErrors
     check('intro-idle-defeat', idle.result.winner === 'CS' && idle.time < 45 && idle.outcome.grade === 'Defeat',
       `unopposed approach breaches held ground at ${idle.time.toFixed(2)} sim s; no scripted win`);
     await shot(page, 'intro-idle-defeat');
+    if (afterIdle) await afterIdle({ page, check, shot, result, errors });
 
     // Keyboard and emulated touch destinations use the normal group-order seam, while truly paused.
     await load(); await page.keyboard.press('Escape');
@@ -179,6 +180,7 @@ export async function introPlay({ browser, url, check, shot, result, watchErrors
     await page.keyboard.press('Escape');
     check('intro-stores-close-focus', await page.locator('#capture-count').evaluate((n) => n === document.activeElement)
       && await page.locator('#field-stores').evaluate((n) => n.hidden), 'Escape closes stores and returns focus to Crates');
+    if (afterStores) await afterStores({ page, check, shot, result, errors });
 
     // Controlled capture fixtures: do not confuse these with the unforced timing runs above.
     const fixtures = await page.evaluate(async () => {

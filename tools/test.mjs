@@ -66,6 +66,7 @@ import { spacingControls } from './test-spacing-ui.mjs';
 import { momentControls } from './test-moments-ui.mjs';
 import { keyboardControls } from './test-keyboard-ui.mjs';
 import { dockControls } from './test-dock-ui.mjs';
+import { headerControls, headerAfterAction, headerStores, headerIntro, finishHeader } from './test-header-ui.mjs';
 import { deploymentProgress } from './test-deployment-ui.mjs';
 
 const READY_TIMEOUT_MS = 180_000;
@@ -798,7 +799,7 @@ function watchErrors(page, url, into) {
 }
 
 /** The sandbox panel on ?sandbox&quality=low, then device.html. */
-async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly = false, keyboardOnly = false, dockOnly = false } = {}) {
+async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly = false, keyboardOnly = false, dockOnly = false, headerOnly = false } = {}) {
   const ctx = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1, permissions: ['clipboard-read', 'clipboard-write'] });
   await probeProgress(ctx, { prefix: '__sandbox', readFlag: '__sandboxReadBlocked', quotaFlag: '__sandboxQuota' });
   try {
@@ -814,7 +815,7 @@ async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly
       check('sandbox-panel', false, `the sandbox panel did not mount: ${err.message.split('\n')[0]}`);
     }
     if (mounted) {
-      if (spacingOnly || momentsOnly || keyboardOnly || dockOnly) {
+      if (spacingOnly || momentsOnly || keyboardOnly || dockOnly || headerOnly) {
         await page.evaluate(async () => {
           const { completedSnapshot } = await import('./src/franchise/save.js'), { SAMPLE_ARMY } = await import('./src/reward/data.js');
           await window.__progressFixture.seed(JSON.stringify(completedSnapshot({ awardId: 'spacing-preservation', army: structuredClone(SAMPLE_ARMY), depot: [], issued: [], seed: 19, grade: 'Victory' })));
@@ -822,9 +823,10 @@ async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly
         });
         if (process.argv.includes('--native')) {
           const renderer = await page.evaluate(async () => { const gl = document.getElementById('battlefield').getContext('webgl2'), e = gl.getExtension('WEBGL_debug_renderer_info'); return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); });
-          check(dockOnly ? 'dock-native-renderer' : 'spacing-native-renderer', !/swiftshader|llvmpipe|software/i.test(renderer), renderer);
+          check(headerOnly ? 'header-native-renderer' : dockOnly ? 'dock-native-renderer' : 'spacing-native-renderer', !/swiftshader|llvmpipe|software/i.test(renderer), renderer);
         }
         if (dockOnly) { await dockControls({ page, check, shot, result, errors }); await page.close(); return; }
+        if (headerOnly) { await headerControls({ page, check, shot, result, errors }); await page.close(); return; }
         if (keyboardOnly) await keyboardControls({ page, check, shot, result });
         else if (momentsOnly) await momentControls({ page, check, shot, result }); else await spacingControls({ page, check, shot, result });
         check(`${keyboardOnly ? 'keyboard' : momentsOnly ? 'moments' : 'spacing'}-no-console-errors`, errors.length === 0, JSON.stringify(errors)); await page.close(); return;
@@ -923,6 +925,7 @@ async function sandboxAndDevice(browser, url, { spacingOnly = false, momentsOnly
       await momentControls({ page, check, shot, result });
       await keyboardControls({ page, check, shot, result });
       await dockControls({ page, check, shot, result, errors });
+      await headerControls({ page, check, shot, result, errors });
       // Keyboard ordering deliberately closes the panel. The retained comparison resumes inside it.
       if (await page.locator('#sb-toggle').getAttribute('aria-expanded') !== 'true') await page.locator('#sb-toggle').click();
       // look.orderLine compares split-screen: both styles are built, each clipped to its side of the divider
@@ -1375,6 +1378,7 @@ async function main() {
       await saveCoordination({ browser, url, check, shot, result, watchErrors, trace: process.argv.includes('--save-trace') }); return;
     }
     if (process.argv.includes('--dock')) { result.mode = 'responsive dock only'; await sandboxAndDevice(browser, url, { dockOnly: true }); return; }
+    if (process.argv.includes('--header')) { result.mode = 'readable header and native panels'; await sandboxAndDevice(browser, url, { headerOnly: true }); await headerIntro({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--keyboard')) { result.mode = 'keyboard orders only'; await sandboxAndDevice(browser, url, { keyboardOnly: true }); return; }
     if (process.argv.includes('--spacing')) { result.mode = 'formation spacing only'; await sandboxAndDevice(browser, url, { spacingOnly: true }); return; }
     if (process.argv.includes('--moments')) { result.mode = 'field moments only'; await sandboxAndDevice(browser, url, { momentsOnly: true }); return; }
@@ -1617,7 +1621,8 @@ async function main() {
     await sandboxAndDevice(browser, url);
     await rewardProgress(browser, url);
     await practiceProgress({ browser, url, check, shot, result, watchErrors });
-    await introPlay({ browser, url, check, shot, result, watchErrors, native });
+    await introPlay({ browser, url, check, shot, result, watchErrors, native, afterIdle: headerAfterAction, afterStores: headerStores });
+    finishHeader({ check, result });
     await entryProgress({ browser, url, check, shot, result, watchErrors });
     await campEquipment({ browser, url, check, shot, result, watchErrors });
     await saveCoordination({ browser, url, check, shot, result, watchErrors });

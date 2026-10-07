@@ -1125,8 +1125,19 @@ namesexact/last-resultbyteequal/sourceunchanged. JSON7454224B SHA
 independentALL43fullPNG/source/receipt review CLEAR beforecommit. OldCI failure preserved;
 repairedexact464CI/Pages4bytes stillUNRUN. Nativeintrofirstcard46665ms/genuine45.4671sim;
 savedUS45.4813/15integerloss andCS19.1844/2loss conserved. No shippedruntime/sim/timing changes.
+Repair6ownedpaths committed/pushed3c017365336aa5e80d686610b546f4a1bca88ab5; exactCI37581828690/
+Pages37581828569 active. Require actual464/39axes/all28steps/counts/39sources/Pages4bytes before
+activatingP2m. No localbrowser/runtimeedits duringwait; no blindrerun or milestone stop.
 
-### P2m queued contract — readable header and its native panels (not active)
+P2l repaired exact acceptance COMPLETE: CI37581828690 SUCCESS actual464/464/39emptyaxes,
+1262356ms,t06:30:47.892Z; actual7453000B SHAe10c6e757c6183d83c5785dc88d0c5303c485af09479ff8b6dd49bb08de8332e.
+All28explicitsteps/counts/39live+committedbinds/Pages37581828569sameSHA4actualbytes verified;
+root+independent actualCI/source/readback CLEAR. Original failedCI37578420410 preserved.
+P2m activated immediately on2026-10-07; nativeBASE r1 EXIT0:320 namedfull-speed/Armyfailures,
+1024pass; realArmyrow focusbutton disconnectedafterordinaryrefresh/focusBODY,39sourcesunchanged/
+errors empty. ActualthreePNGs rootviewed; .out/p2m-base-native-r1-20261007.json. Implementation next.
+
+### P2m active contract — readable header and its native panels
 
 P2l exactCI37578420410 failed278checks at dock-resize-restore and introdrag line50. Repair first:
 root extends current P2l11path ownership to tools/test-intro-ui.mjs for proven native input
@@ -1136,7 +1147,8 @@ native; newfreeze7owned+32locks=39; ONE justified finalnative465; repairedexactC
 No causal link between the freshintrocontext and dockfailure is established. Preserve actualfailure.
 
 Activate only after repaired exact P2l CI/Pages/deployed4bytes are accepted at the replacement
-fullSHA/runIDs recorded in HANDOFF. Original37578420410 at3ceb46c is FAILED, never acceptance.
+fullSHA3c017365336aa5e80d686610b546f4a1bca88ab5/run37581828690/Pages37581828569 recorded in HANDOFF.
+Original37578420410 at3ceb46c is FAILED, never acceptance.
 Until then only the bounded P2l repair may edit/run localbrowser. Root
 sole writer; ONE bounded read-only helper gpt-6.1-sol/high. No COORDINATION; read full lane if created.
 Recommendation: close real top-strip clipping next, then held soldier-eye/true depthDOF. Actual320
@@ -1186,8 +1198,12 @@ field focus. Preserve closedtoggle48targets and hint exclusion on bothsides; no 
 Army and stores are explicit temporary list overlays below measuredheader and withinviewport;
 they may cover dock whileopen, like expandedmap. Native vertical scrolling keeps all rows/actions
 reachable and fully readable. Army adds native>=44px Close/Escape with focus returned to connected
-openingtrigger; realrow activation selects/flys sameunit through existing controller. Stores retains
-actualCrates/March/Close/Escape semantics andfocus, >=48px actions, ordinary expectedorder once.
+openingtrigger; realrow activation selects/flys sameunit through existing controller.
+Native Army row refresh must retain a connected focused row (or Close if that unit disappears):
+current Hud.select marks armyDirty and refreshArmy replaces the list, so reader keys must never
+fall through to the battlefield after a real selection/refresh. Bind this within header-native-army;
+preserve actual selection/fly behavior and existing list lifecycle, no separate subsystem.
+Stores retains actualCrates/March/Close/Escape semantics andfocus, >=48px actions, ordinary expectedorder once.
 No new modal trap or field steering/orders while merely reading. Hud-owned isolation on Army,
 stores and hints must also cover letters/digits (Input.key protects nativebutton Enter/Space only),
 stopPropagation without preventDefault, keep keyup bubbling and existing stores Escape listener
@@ -1210,6 +1226,93 @@ menu/Pause/1x2x4x/Army, trustedChromiumtouch identity/events/effect exactlyonce 
 Clocktext/strength/progress must match actual Game, not hardcoded UI-only values. Passivegeometry/
 reading/resize preserve exact progress,writes,pausedtime,roster/orders/ghost/camera; explicitactions
 bind legitimatechanges and then restore. Rawprefs/locks/hidden/panel side/selection restored exactly.
+Native Pause/Play may genuinely advance time/roster before Pause returns; bind that legitimate
+interval, restore paused/speed via real controls, and start a fresh passive baseline. Never rewind
+Game time, casualties, commands or units to counterfeit restoration. Passive reading/geometry must
+remain exact against its own baseline; connectedfocus/nativeeffects/progress invariants still bind.
+
+Actual P2m r1 native diagnosis clarifies "camera": exact goal/currenttargetx,z/yaw/pitch/dist,
+renderedcamera.position/quaternion/near/far, emptykeys and inactiveinertia. Use this same definition
+for camera settlement and passive equality; record target.y/groundY separately as terrainEase.
+Onlythose internal terrain-filter values changed+2.8e-14 while allactualcamera pose/controlbytes
+and otherpassive fields stayedexact. No tolerance/rewind/runtimecamera change. ActualCSSOM0% is
+equivalent to expectedrounded0.0%: compare finite numericpercent EXACT withpercentunit, notstring.
+ValidnativeEntertrace confirmed focusedtargetinghint leakedorders0→1/hold→move atunchangedpaused
+time; Hud isolation includesEnter withoutpreventDefault, and readerprobe must usevalidnativeghost.
+ShortArmyprobe binds bothclosed sides320x480/568x320, nativeEnd/lastrow/Closehits/fulltext/scroll.
+Theseclarifications retain11ownedpaths/21names/40bindings/35gates/alloriginaloracles and budgets.
+
+Native focusedr2 FAILED36checks/8namedfailures in149422ms,t07:23:42.807Z. Actual604790B SHA
+cca4751983ef4d67b61876c656d322e22999e04f90b8064388e176d5cc5253ad;40bindings unchanged,
+allthreehooks/zeroaxes/errors/warnings. Header geometry and genuineAF/nativeactions/validhintEnter
+pass; sixlayoutcamera baselines prematurelysettled (actualrenderY+1.4e-12), Armyfirstrowleft and
+Closeright occluded by closedtoggle; firstArmy/stores passivecamera also premature. NativeEnd
+wronglyrequiredpositive scroll when320x480 allfive rowsfit321/321, landscapegenuinelyscrolls122px.
+Root+independentactualJSON/left-rightPNGsource confirms causes. Ownedpane repairs reserve60px lane;
+reachedrow/Close nowfivehits and End requiresbottom/positiveonlyoverflow. Provisional detached
+maxdt=.1 fixed-point camera readiness retains exactactualpose and internalfilter; scopeddiagnosis
+r1 failed15s, retained. Next diagnose true readiness before newfocused/full; no acceptance yet.
+
+Readiness diagnosisr2 EXIT0 .out/p2m-settlement-native-r2-20261007.{json,mjs,png}:
+literalmaxdt=.1 detachedupdate reached exact controls+groundfilter+renderpose fixedpoint12601ms;
+allrealwholepageaxe reports empty; subsequent actualpausedresize/select/reading passivefields
+byteexact. R1fixedpoint waitwithoutrealwork failed15s (preserved). Productionreadiness nowperforms
+ordinaryactualaxe while the live renderer eases, twoobservedequalRAFposes and literalclonedmaxdt
+fixedpoint inside SAME15000ms total. No camera/Game mutation, tolerance, forceddt or count/quality
+change; readinessobservations preserved infocused/fullJSON. Addexactpane/toggleexclusion and
+postscrollfivehits; deterministicr3/r4 passed35, finalr5/newfocusedr3 next.
+Each readiness await is bounded byremaining15000ms; wholepageaxe reads are recorded diagnostic
+work only, acceptance stays ONEaggregatedscopedheaderAxe + alloriginalscopeaudits.
+
+Focusednativer3 FAILED36/1 in160030ms,t07:37:45.856Z: allcamera/passive/header/readers/
+genuineAF/stores gates passed; landscapeArmy lastrow+Close rightinset5 intercepted after nativeEnd.
+Actual646693B SHA6ad94f89a2408c5e5e57ee886ff3bcc570b8452003f9438b96058b4eb2b104e0;
+40sourcesunchanged. Actualscroll trace r1 stopped on ambiguousdiagnosticselector (preserved);
+correctedr2 EXIT0: leftlandscape fivehits identify ASIDE#army atbothrightpoints, candidate24px
+rightpadding allfiveBUTTON hits, byte-exactrestoredrects regain originalfailure; rightcandidate
+passes though originalbar faded. Actualpausedprogress/writes/roster/time/orders exact. Rootactual
+PNGview confirmscontrol/readability; independentactualreview queued. Use24px rightpadding for
+bothnativepanes; Armyheadingkbd now14px andheadingrange/fontguard included. Renamecamera
+diagnostic sample.axe to pageAudit so exactly40finalacceptanceaxe arrays remain. Scope/counts/
+originaloracles unchanged; deterministicr6 thennewfocusedr4/freeze40/full486 remainpending.
+
+Focusednativer4 FAILED36/1 in162758ms,t07:46:03.132Z,actual654530B SHA
+2abf147430d3edb130a4014703cdf42c9b7c6f81747131172a2085acba8bfeda/40sourcesunchanged.
+Allnativebar/Armyrow/Close/Storesfivehits and camera/readers/genuinehooks pass; ONLYArmyheading
+fullrange containment false. Scoped .out/p2m-army-heading-native-r1-20261007.{json,mjs} proves
+14pxkbd border extends1px beyondnormal18px h2, candidate16px/1.35 headingcontainsallranges,
+A2exactoriginalrects/failure; pausedprogress/time/roster/orders/writes exact. Runtimeownedh2
+lineheight repaired to1.35, allminfonts/targets/predicates intact. Correctedr4runner preflight
+priorfreeze-r4 pointer failedBEFOREbrowser, preservedscript; canonicalP2l-r3 restored.
+Independentsource/actualtrace review then deterministicr8/newfocusedr5/freeze40/full486 next.
+
+CURRENT P2m FULL NATIVE GREEN, independent full review CLEAR. Frozen r1 unchanged; one serial
+run EXIT0, actual486 checks (484unique; retained invalid-import repeats), exact original+21 multiset,
+721738ms,t07:57:42.295Z. Actual8130152B SHA405df65dd36427c3f044156f28c61271547067db619b6669587fc8fadd5f6eee;
+log135074B SHAdcc4cdd1e8036f2501a93f7b3085c5541fa7317da71d195be11de2529ebe91c2.
+All40 required axes andconsole/dock/header warnings/errors empty; all3headerStages true;
+last-result byteequal/all40sources unchanged. ActualFULL screenshots138 (required subset67 is not
+full screenshot count). Root10currentkeyPNG +2priorcomparisonPNG viewed; independentALL138source/receipt/PNG review CLEAR.
+.out/p2m-full-native-r1-20261007.{json,log,-readback.json}; no localbrowser/test remains.
+Incidental debt confirmed by actual priorP2l/native114-image receipt and corresponding current images:
+320px sandbox Screens tab clipped; Moments caption may sit behind sticky tabs. Both pre-existP2m
+and their CSS/controller sources are unchanged. Keep openP2 workbench/P6 presentation, no wholeHUD claim.
+NEXT stageONLY11owned/index40; commitpushmain; exactCI485/
+all28explicitsteps andPages4runtimebytes. No runtime/test edits afterfreeze. ImmediatelyP2n atgreen.
+
+Earlier focused boundary (completed before full native): deterministicr8 all35EXIT0; focusednativer5 EXIT0 actual36/36
+unique in165304ms,t07:51:22.494Z,654954B SHA7217c541d5c17b1bedde782d79ad7ca60eabc2735d7703bb4d2ac00742ca61c5.
+40before/after/livebindings andlast-resultbyteequal; scopedheaderAxe/errors/warnings/headerErrors/
+headerWarnings empty, all3stages genuine. Readiness11971/27/14868ms remaininsideoriginal15s.
+Root4keyactualPNG andindependentALL24PNG/source/actualJSON/log review CLEAR. Rootsolewriter;
+indexempty/11ownedWIP/unrelatedworkspace+Shiloh preserved; no localbrowser/test now.
+NEXT node .out/p2m-freeze-r1-20261007.mjs ->40bindings/486native/485CI/40axes, thenONE
+node .out/p2m-full-native-r1-20261007.mjs; preserveactualfailedr1-r4 receipts. Require486names/
+40emptyaxes/last-result/source/ALL67actualPNG independentreview beforeowned11stage/index40/
+commitpushmain/exact485CI28steps/Pages4bytes. Collector .out/p2m-collect-completed-r1-20261007.mjs
+<CIid> <fullSHA> <Pagesid>; correctedoutscriptpreflight paths bindcanonicalP2l-r3 unchangedlocks.
+No milestone stop; immediatelynextP2n heldlowview/true depthDOF. Combatfeedback overlays remain
+separateopenP2/P6 debt, no wholeHUD/art/nativeiPad/performance/v1 claim.
 
 Shared header probes reuse original unforced intro idle defeat AFTER its existingassertion/shot and
 AFTER positive first-card<=90s/save/camp checks: actualInspect→Afteraction focus→native reopen→Escape
@@ -1227,8 +1330,11 @@ non-native focused35. Full486native/485CI = retained465/464+21, only oldintro-na
 
 Beforeedit actual BASE acceptedHEAD320 fails named full-speed/Army predicate,1024passes; route
 original committed index/hud.css/hud.js into one serial diagnostic if needed. Preserve actualPNG/
-JSON/failure attribution. Final header A/B/A2 original fixed-height/no-wrap/hiddenArmy control must
-fail named geometry/visibility predicate; restore stylesheet, all inlineattributes and --top-h exactly
+JSON/failure attribution. BASE also opens actual Army, focuses/activates a real row and waits for the ordinary dirty-list
+refresh; record connected focus before/after. Verify the source-cited rebuild behavior against
+actual runtime before changing it. This diagnostic is not a playable-history/timing claim.
+Final header A/B/A2 original fixed-height/no-wrap/hiddenArmy control must fail named geometry/
+visibility predicate; restore stylesheet, all inlineattributes and --top-h exactly
 in finally; A2geometry/state byteequal. No inherited oracle/category/count/quality/RNG weakening.
 
 Gate sequence35commands: node --check src/ui/hud.js;node --check tools/test-header-ui.mjs;

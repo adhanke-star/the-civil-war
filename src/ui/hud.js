@@ -138,7 +138,7 @@ export class Hud {
   constructor({ camera, canvas, terrain, units, playerSide, rts, game, onSelect, onOrder, onPause, onSpeed, onQuality, onSound }) {
     Object.assign(this, { camera, canvas, terrain, units, playerSide, rts, game, onSelect, onOrder });
     this.selected = null;
-    // Layout changes only after a resize; measured height is an overlay output, never a sizing input.
+    // One bounded observer publishes overlay heights; none sizes its own observed element.
     const dock = $('dock');
     let layoutFrame = 0;
     this.dockObserver = new ResizeObserver(() => {
@@ -150,16 +150,34 @@ export class Hud {
           + parseFloat(css.getPropertyValue('--mm')) + 36 + 16;
         const layout = width >= wide ? 'wide' : width >= 520 ? 'compact' : 'stacked';
         if (dock.dataset.layout !== layout) dock.dataset.layout = layout;
+        document.documentElement.style.setProperty('--top-h', $('topbar').getBoundingClientRect().height + 'px');
         const height = dock.getBoundingClientRect().height;
         document.documentElement.style.setProperty('--dock-h', height + 'px');
+        document.documentElement.style.setProperty('--objective-h', $('objective').getBoundingClientRect().height + 'px');
       });
     });
     this.dockObserver.observe(dock);
+    this.dockObserver.observe($('topbar'));
+    this.dockObserver.observe($('objective'));
     // Native scroll defaults stay intact. Keyup still bubbles to clear previously held camera keys.
     $('unitcard').addEventListener('keydown', (e) => {
       if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) e.stopPropagation();
     });
     $('unitcard').addEventListener('focus', () => { this.rts?.keys.clear(); if (this.rts) this.rts.inertia = null; });
+    // Reading and native buttons own their keys. Defaults still scroll/click; keyup clears RTS keys.
+    for (const id of ['topbar', 'army', 'field-stores', 'objective', 'tip', 'intro-hint', 'keyboard-targeting']) {
+      const region = $(id);
+      region.addEventListener('focusin', () => { this.rts?.keys.clear(); if (this.rts) this.rts.inertia = null; });
+      region.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          if (id === 'army') { e.stopPropagation(); this.toggleArmy(false); }
+          else if (id === 'field-stores') e.stopPropagation(); // Keep the existing same-element Close listener.
+          else if (['objective', 'tip', 'intro-hint', 'keyboard-targeting'].includes(id)) this.canvas.focus({ preventScroll: true });
+          return;
+        }
+        if (/^[a-z0-9?+\-=]$/i.test(e.key) || ['Enter', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) e.stopPropagation();
+      });
+    }
     this.markers = new Map();
     this.markerLinks = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     this.markerLinks.setAttribute('class', 'marker-link'); this.markerLinks.setAttribute('aria-hidden', 'true'); this.markerLinks.setAttribute('focusable', 'false');
@@ -192,7 +210,8 @@ export class Hud {
     for (const r of menu.querySelectorAll('input[name=quality]')) r.addEventListener('change', () => onQuality(r.value));
     $('sound-toggle').addEventListener('change', (e) => onSound(e.target.checked));
     $('result-close').addEventListener('click', () => { $('result').close(); });
-    $('army-btn').addEventListener('click', () => this.toggleArmy());
+    $('army-btn').addEventListener('click', (e) => this.toggleArmy(undefined, e.currentTarget));
+    $('army-close').addEventListener('click', () => this.toggleArmy(false));
     this.alertAt = null;
     this.momentBanner = document.createElement('p'); this.momentBanner.id = 'moment-banner';
     this.momentBanner.className = 'panel'; this.momentBanner.setAttribute('role', 'status');
@@ -481,18 +500,28 @@ export class Hud {
   }
 
   // ---- army list (key L) ---------------------------------------------------------------------------------
-  toggleArmy(open) {
+  toggleArmy(open, trigger = document.activeElement) {
     const el = $('army');
+    const wasHidden = el.hidden;
     const show = open ?? el.hidden;
     el.hidden = !show;
     $('army-btn').setAttribute('aria-expanded', String(show));
-    if (show) { this.armyDirty = true; this.refreshArmy(); }
+    if (show) {
+      if (wasHidden) this.armyTrigger = trigger;
+      this.armyDirty = true; this.refreshArmy();
+      if (wasHidden) (this.armyRows.values().next().value?.b || $('army-close')).focus({ preventScroll: true });
+    } else if (!wasHidden) {
+      const target = this.armyTrigger; this.armyTrigger = null;
+      (target?.isConnected && !target.closest('[inert]') && !target.disabled && target.getClientRects().length ? target : $('army-btn')).focus({ preventScroll: true });
+    }
   }
 
   refreshArmy() {
     const list = $('army-list');
     const mine = this.units.filter((u) => u.alive && (this.game ? this.game.controls(u) : u.side === this.playerSide));
     if (this.armyDirty || mine.length !== this.armyRows.size || mine.some((u) => !this.armyRows.has(u.id))) {
+      const focused = list.contains(document.activeElement), focusedId = focused ? [...this.armyRows].find(([, r]) => r.b === document.activeElement)?.[0] : null;
+      const scroll = $('army').scrollTop;
       this.armyDirty = false;
       list.replaceChildren();
       this.armyRows.clear();
@@ -500,12 +529,17 @@ export class Hud {
         const li = document.createElement('li');
         const b = document.createElement('button');
         b.type = 'button';
+        b.dataset.armyUnit = u.id;
         b.innerHTML = '<span class="al-name"></span><span class="al-men"></span><span class="al-state"></span>';
         b.querySelector('.al-name').textContent = u.short;
         b.addEventListener('click', () => { this.onSelect(u); if (this.onFocus) this.onFocus(u); });
         li.appendChild(b);
         list.appendChild(li);
         this.armyRows.set(u.id, { b, men: b.querySelector('.al-men'), st: b.querySelector('.al-state'), last: '' });
+      }
+      if (focused && !$('army').hidden) {
+        (this.armyRows.get(focusedId)?.b || $('army-close')).focus({ preventScroll: true });
+        $('army').scrollTop = scroll;
       }
     }
     for (const u of mine) {
