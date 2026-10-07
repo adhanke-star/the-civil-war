@@ -1,5 +1,14 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0038 — Give the complete software-rendered CI suite a bounded 30-minute job (2026-10-06)
+Repair CI37553559450 exceeded the actual20-minute job limit after270 passing browser checks;
+both repaired assertions passed, but later entry/camp/save stages never completed. The prior full
+software run still needed118s after intro Continue; this runner reached that point near cancellation.
+Raise only the workflow job budget to30minutes. Keep every test, per-operation timeout, assertion,
+native timing/quality limit and runtime byte unchanged. No local browser rerun for a CI-only number:
+existing frozen native394/394 remains evidence for identical runtime/test files. The new exact-SHA
+complete CI receipt is required; a cancelled partial run has no final JSON and is not acceptance.
+
 ## 0037 — Camp equipment exchanges retain the exact reviewed army (2026-10-06)
 Each saved depot card opens one native comparison with eligible best-fit recommendation, full
 names and before/after game ratings. Confirm uses the existing validated IndexedDB issue seam;

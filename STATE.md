@@ -16,4 +16,4 @@
 - **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
 - **Proof:** retained183+183/unit; repair native53/53+48/48/full394/394,4hashes; review clear; CI next.
 - **Coordination:** no ledger; preserve workspace file; HANDOFF/PLAN P2-P7, active goal, no scheduler.
-- **Runtime/WIP:** a408c3f Pages green/CI37549462745 RED389/391; scoped clip/native-close test repair WIP.
+- **Runtime/WIP:** 25b27a4 Pages green; CI37553559450 timed out after270 passes; CI30min/docs repair WIP.

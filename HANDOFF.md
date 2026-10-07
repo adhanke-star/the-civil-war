@@ -5,9 +5,9 @@ record, ~180 rows chosen by Aaron), `STATE.md`, `PLAN.md`, the top of `DECISIONS
 immediately after AGENTS if one is created (none exists at this transfer). This file adds what
 those do not say: how to work with Aaron, where the work stopped, and what to do next.
 
-## Current boundary: P2j2 CI repair, final native green (2026-10-06)
+## Current boundary: P2j2 CI-only budget repair WIP (2026-10-06)
 
-HEAD/origin main a408c3fc704752fda2bf2f598dfd2886e8c73b0f. Pages37549462780 passed;
+Repair parent a408c3fc704752fda2bf2f598dfd2886e8c73b0f. Pages37549462780 passed;
 exact CI37549462745 FAILED389/391 in1122955ms (not a workflow timeout). Camp checks passed.
 Actual failed log/JSON: .out/p2j2-exact-ci-37549462745-failed-20261006.{log,json}.
 Root viewed actual CI PNG .out/p2j2-ci-failed-moments-narrow-20261006.png, fetched with bounded
@@ -44,8 +44,29 @@ Root viewed exact narrow Moments/practice/camp PNGs. Independent final review re
 verified source/index binds and viewed Moments, five practice/entry and all eight camp exact PNGs;
 source/receipt/scoped WCAG/rendered review clears. No physical device or repaired exact-CI claim.
 No browser remains; failed camp and exact-CI receipts plus P2k1 pre-edit oracle/helper remain present.
-Next: explicitly stage
-only these seven repair files, commit/push and read repaired exact-SHA CI/Pages; red CI is next task.
+Seven owned repair files committed/pushed as25b27a44d17dfd30ebd865e854ae830865678ee7;
+HEAD/origin main match. Four tested source hash/byte bindings matched the index. Only unrelated
+workspace/Shiloh files remained after push; this receipt-doc update is root-owned pending WIP.
+Exact Pages37553559360 passed; five deployed repair/camp files match accepted bytes in
+.out/p2j2-ci-repair-live-pages-source-20261006.json. Exact CI37553559450 initially ran with all
+retained deterministic steps passing. Small completed watch log is
+.out/p2j2-ci-repair-exact-ci-37553559450-watch-20261006.log; unified session48247 has finished.
+Final CI37553559450 is CANCELLED: GitHub annotation proves maximum20m exceeded. Actual log
+.out/p2j2-ci-repair-exact-ci-37553559450-cancelled-20261006.log contains270 passing browser
+checks/no FAIL; both repaired assertions passed, intro actual play/save/Continue passed, later stages
+did not finish. Artifact11454194412 has62entries/no final JSON; bounded directory read65558B of
+29565040B archive stored only .out/p2j2-ci-repair-cancelled-artifact-11454194412-20261006.json.
+No partial acceptance. Watch session finished. Prior completed software suite needed118s after
+intro Continue. DECISIONS0038 permits only CI job20->30minutes plus docs; no shorter tests,
+operation timeouts, runtime changes or quality/timing relaxations. Root owns CI YAML/decision and
+three receipt docs. Four frozen native runtime/test binds and seven generic oracle binds remain exact.
+Independent actual annotation/log/config review clears the budget repair. Literal workflow equality
+after only20->30 replacement proves all30steps and assertions unchanged; all11source bindings match.
+CI plus four unchanged runtime/test hashes/bytes frozen in .out/p2j2-ci-budget-frozen-source-r1-20261006.json.
+Actual annotation retained in .out/p2j2-ci-repair-timeout-annotation-20261006.txt. Diff/STATE19 pass.
+Next: explicitly stage five owned files,
+commit/push and read complete new exact-SHA CI/Pages. No local browser rerun for CI-only budget;
+native394/394 remains proof on identical runtime/test bytes. Repair red CI before P2k1.
 P2k1 remains unstarted until this integration is green. Seven generic-oracle source binds stay exact.
 
 ## Previous boundary: P2j2 pushed; initial exact CI pending (2026-10-06)

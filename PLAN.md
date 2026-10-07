@@ -543,7 +543,25 @@ scopes empty, four frozen hashes/bytes and seven generic oracle binds match. Roo
 Moments/practice/camp narrow PNGs. Intro real win45.40sim, first card47282wallms. Independent final
 review verified actual receipt/source binds and viewed Moments, five practice/entry and all eight camp
 exact PNGs; source/receipt/scoped WCAG/rendered review clears. Commit/push and repaired exact-SHA
-CI/Pages remain required before P2k1.
+CI remains required before P2k1. Repair committed/pushed25b27a44d17dfd30ebd865e854ae830865678ee7;
+exact Pages37553559360 passed and five deployed runtime files match accepted bytes. Exact
+CI37553559450 initially passed retained deterministic steps; its final result follows.
+Final CI37553559450 was CANCELLED by its annotated20-minute job limit:270 browser checks passed,
+including both repaired assertions; no FAIL line, no final JSON, later stages incomplete. Actual
+cancelled log is .out/p2j2-ci-repair-exact-ci-37553559450-cancelled-20261006.log. Bounded artifact
+directory receipt confirms62entries/no last-result.json from only65558range bytes; no archive stored.
+Prior full software run needed118s after intro Continue. Root-owned budget repair (DECISIONS0038)
+changes only .github/workflows/ci.yml job20->30minutes plus status docs/decision. Runtime/tests and
+all assertion/time/quality limits remain exact. Gates: inspect single-line YAML/topology and all
+retained steps; verify four frozen runtime/test binds and seven generic oracle binds; independent
+actual log/config review; freeze CI plus unchanged runtime/test bytes; diff/STATE<20; explicitly
+stage these five owned files, commit/push and read complete new exact-SHA CI/Pages. Native394/394
+on identical runtime/test bytes remains valid; no repeated local browser suite for the CI-only number.
+No P2k1 runtime work before the new complete CI gate passes.
+Independent annotation/log/config review clears; literal workflow replacement proves all30steps
+unchanged, all11source hash/byte binds match. CI plus four accepted runtime/test files are frozen in
+.out/p2j2-ci-budget-frozen-source-r1-20261006.json; diff/STATE19 pass. Explicit commit/push and
+complete new exact-SHA CI/Pages remain required; the timed-out partial run is not acceptance.
 No equipment implementation has started.
 
 P2j1 repair replaces the failed Web Lock proposal (DECISIONS0036): actualnative
@@ -657,6 +675,9 @@ accepts only generic smooth/rifled/smbart/parrott categories; putting a named sa
 without changing range/fire/reload would misrepresent its effect. Two green boundaries: P2k1 adds
 and proves the optional equipment/Combat seam while existing battles stay unchanged; P2k2 connects
 camp -> saved army fight -> conserved result/loot -> camp. Neither foundation alone closes P2 or P5.
+Wire both node tools/test-equipment.mjs and its --prove-fail as explicit CI workflow steps;
+the existing smoke harness does not discover standalone gates. Verify both completed steps and
+actual nonempty case counts for the P2k1 SHA, rather than accepting a CI run that omits this seam.
 P2k1 begins only after P2j2 implementation exact-SHA CI/Pages are green. Shiloh research remains
 independent; the untracked preflight does not admit any dawn roster, numeric split or georeference.
 
