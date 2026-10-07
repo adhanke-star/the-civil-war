@@ -7,13 +7,28 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
 
 ## Active iteration: P2m readable header and native panels (2026-10-07)
 
-CURRENT: P2m CI repair owns tools/test-header-ui.mjs +4docs at HEAD/origin2ec61c0; indexempty.
+CURRENT: P2m aggregate-CI repair at67a3a79174b0858882e7d28ce15192b2c0450153; HEAD=origin/main.
+CI37606487882 CANCELLED30min: actual476PASS/0FAIL/all21header/all28standalone;9deploymentchecks
+andfinalJSONUNRUN. Artifact11476911382 has136entries/no last-result.json (65536B boundedread).
+BeforeeditPLAN/DEC0046 authorize ONLY CIjob timeout30->40+4docs; no test/runtime/budget change.
+Preserve actualcancelledlog311802B SHA92fc246b5156006facd557e14da70714549fbf9ef1aa7a0782b78dda94f6b4e3.
+Next workflowdelta/live39locks/newfreeze40/index5/commitpush/replacementexact485/40axes/all28logs/
+Pages4; native r2 retained at identicalruntime39/oldCIconfig. No repeatedlocalbrowser justified.
+RootWIP now CIworkflow +4repairdocs; indexempty; two unrelated untracked preserved.
 Serial35gatesr14/AFmini r2GREEN2/finalnativefocusedr9GREEN36; independentALL24+4review CLEAR.
 Freeze r2 EXECUTED40bindings/486native485CI/40axes; onlyheaderprobe differsfromoriginalfreeze.
 ONEfullnative r2 completedEXIT0/486namesExact/40emptyaxes; ALL138 independentPNG review CLEAR.
-Replacementintegration/exact485CI/Pages4bytes stillUNRUN. No browser/test remains; no duplicate run.
+Prior headerrepair INDEX5owned/40frozen/livebytes CLEAR/pushEXIT0. CI37606487882 CANCELLED; Pages37606488025 SUCCESS at67a3a79.
+Actualreplacement485CI/40scopes/finalJSON/Pages4bytes stillUNRUN. No browser/test; no duplicate run.
 Logs .out/p2m-full-native-r2-20261007{-outer.log,.log,.json,-readback.json}.
 Preserve unrelated paths.
+Resume reconciliation 10:28UTC: fetch confirms HEAD=origin/main67a3a79, indexempty, only known3docs
+dirty plus unchanged unrelated2untracked; no active Claude/projecttest/browser process, no newer commit.
+P2n finaldraft .out/p2n-plan-contract-r1-20261007.txt independently source/accounting CLEAR, NOTACTIVE.
+It carries event-boundary matrix restore, restored-before-native dispatch, current UI focus ownership,
+actual-dt resumed camera, corrected axial lens and equal-projected-size depth A/B/A2. Clarified NDCY0
+and selection-array order (ordinary combat-order completion retains follow). Activate only after P2m
+actual485/40axes/all28logs/source40/public4 accepted; product/GPU/native P2n remains UNRUN.
 Original P2m FULL NATIVE r1 GREEN, independent full review CLEAR. Frozen r1 unchanged; one serial
 run EXIT0, actual486 checks (484unique; retained invalid-import repeats), exact original+21 multiset,
 721738ms,t07:57:42.295Z. Actual8130152B SHA405df65dd36427c3f044156f28c61271547067db619b6669587fc8fadd5f6eee;
@@ -93,8 +108,11 @@ dock/headerwarnings empty/all3stages true; lastresultbyteequal/source40unchanged
 1329/690/910/441exact/restored/0failure,13closeevents/returns11–64ms/counts1..13. Actual138unique
 existingPNG signatures checked; root10keyPNG viewed; independentALL138review CLEAR. Headerprobe
 56214B SHA5efd44f111b9d52296d8119ebe06727a043c24263d5abecb227091e2b323883e;39locks unchanged.
-Fetch10:02UTC completed; reconcile HEAD/origin beforestage. No repairedintegration yet; indexempty.
-Afterclear explicitowned5stage/index40/commitpushmain/exact485CI28steps/Pages4. No overlappingwriters.
+Fetch10:02UTC completed; owned5stage/index40 CLEAR, commitpush67a3a79 main EXIT0 at10:18UTC.
+ExactCI37606487882/Pages37606488025 ACTIVE atfullSHAabove. Requireactual485CI28steps/Pages4 beforeP2n.
+No runtime/test edits/localbrowser duringCI; postpush3docs mayfold into nextownedimplementation.
+Collector: node .out/p2m-collect-completed-r2-20261007.mjs 37606487882 67a3a79174b0858882e7d28ce15192b2c0450153 37606488025
+ONLY afterbothcompletedSUCCESS. No overlappingwriters.
 Independentfullreadback also binds realintroUS45.5354sim/firstcard47236wallms/idlegenuineCS27.2761,
 savedUS45.5329/15losses andCS19.2168/2losses, reveal9true/recovery2puts0writesafterabort.
 ExistingP2/P6 camp-origin truncation confirmed in m1-camp-issued-focus-320/m1-camp-desk-button-320

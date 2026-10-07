@@ -1,5 +1,16 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0046 · Allow the full serial software suite to finish within 40 minutes (2026-10-07)
+
+Exact CI37606487882 reached476 passing browser checks, all21header checks and all28standalone
+steps before its30-minute job cancellation. Nine deployment checks and the final JSON remained
+unrun; the artifact contains136entries and no last-result.json. This is incomplete evidence.
+Raise only the aggregate CI job envelope to40minutes, leaving every operation timeout, assertion,
+count, runtime and quality limit unchanged. Preserve the cancelled run and require a new exact-SHA
+485-check/40-scope artifact plus all28step logs and deployed-file bytes before accepting P2m.
+The existing native486-check receipt remains bound to identical runtime/test bytes; a CI-only
+envelope change does not justify repeating that local browser suite.
+
 ## 0045 · Header probes conserve the camera's ordinary easing trajectory (2026-10-07)
 
 Exact CI failed while a paused game's camera still eased; the smaller tested viewport also missed

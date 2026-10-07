@@ -1139,6 +1139,25 @@ errors empty. ActualthreePNGs rootviewed; .out/p2m-base-native-r1-20261007.json.
 
 ### P2m active contract — readable header and its native panels
 
+CURRENT AGGREGATE-CI REPAIR CONTRACT (2026-10-07, before workflow edit): exact67a3a79/run37606487882
+was CANCELLED at30min. Actual completedlog311802B SHA92fc246b5156006facd557e14da70714549fbf9ef1aa7a0782b78dda94f6b4e3
+contains476PASS/0FAIL, all21headercategories and all28completedstandalone steps. Lastcheck
+deployment-camp-reload-bound10:48:18UTC; cancellation10:48:29. Artifact11476911382 ZIP45227071B,
+bounded65536B directory read/136entries proves NOlast-result.json. Nine missingdeploymentchecks
+(unforced-defeat/defeat-one-save/other-tab-terminal-stale/stale-retry-no-rebase/saving-escape-no-navigation/
+mixed-route-isolation/themes-axe/all-scoped-axe/no-console-errors) stayUNRUN, no40axe/full485claim.
+All40frozenr2 livebindings verifiedunchanged. Root owns ONLY .github/workflows/ci.yml plus4docs
+for this processrepair: timeout-minutes30->40, justified10min tail envelope without any per-operation
+timeout/assertion/count/runtime/oracle/quality change. Existing fullnative486/40axes/ALL138review
+remains at identical39runtime/test bindings plus old30minCIconfig; do NOT repeatlocalfullnative.
+Freeze r3 TOTAL40=8changed32locks (CIfile movesfromlocked33 tochanged8); retain r2/native receipts.
+Require YAMLsingle-line delta/explicit28unchangedcommands, gitdiffcheck/live39unchanged + independent
+actualsource/log/causalreview, explicitowned5stage/index40/commitpushmain, newexact485CI/all28logs/
+actualJSON40axes andPages/public4bytes. Updatecollector/readerr3 tobind newfreeze40 but retained
+native r2 multiset. P2n staysDRAFT until repairedexactacceptance; no other runtime edits duringCI.
+Receipt .out/p2m-cancelled-ci-37606487882-causal-readback-r1-20261007.json; retain actualcancelledlog/
+metadata/artifactinventory. Original37593724002 remainsFAILED separately; no blindrerun.
+
 CURRENT EXACTCI FAILURE (2026-10-07): committed2ec61c04ca6525902aedef534a556124e905fec8/run37593724002
 failed195checks (194pass+harness timeout),520600ms. All28standalone steps passed. FirstheaderControls
 readiness timed out ORIGINAL15000ms while software-rendered ground/camera still eased, before
@@ -1228,7 +1247,9 @@ a35a538c52ad5934bd4865de2f2757cd772b0f39ab29c0552b3c53a2426f2ff9; log152320B SHA
 dock/headerwarnings empty/all3stages true; last-result byteequal/source40unchanged. Fourcameraepochs
 1329/690/910/441exact/restored/0failure;13actualcloseevents/returns11–64ms. Actual138uniquePNG
 exist/signaturesverified, root10keyPNGviewed, independentALL138reviewCLEAR. Nextowned5
-stage/index40/commitpushmain/replacementexact485CI/all28steps/Pages4bytes. No newproductacceptance yet.
+stage/index40 CLEAR; committed/pushed67a3a79174b0858882e7d28ce15192b2c0450153 main EXIT0 at10:18UTC.
+ExactCI37606487882/Pages37606488025 ACTIVE. Requireactual485/40axes/all28steps/artifact/Pages4bytes;
+no newproductacceptance yet. No runtime/test edits/localbrowser whileCI; P2n staysdraftonly.
 ExistingP2/P6 debt confirmed in actualfullr2 camp-issued-focus-320/camp-desk-button-320: longpractice
 origin texttruncates; entry/sequence/rewardCSS remainlockedunchanged. Screens/Moments andAFfeedback
 overlaps remainopen; no wholeHUD/nativeiPad/performance/art/v1claim fromthisrepair.
