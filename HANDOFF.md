@@ -7,8 +7,56 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
 
 ## Active iteration: P2l responsive dock only (2026-10-07)
 
-Current authoritative boundary: root sole writer, HEAD/origin6f862baa3c23e69e3b28f5a941bc5eefcb25c4d0;
-index empty, owned10pathWIP, workspace/Shiloh unrelated and preserved. No COORDINATION; if created
+Current authoritative boundary: HEAD/origin3ceb46ca9363d1c91f29bc3619a79858db1b7300 afterfetch;
+rootsolewriter,6dirtyowned(twoUItests+4docs),indexempty; workspace/Shilohpreserved, no COORDINATION.
+Repair deterministicr8 all35EXIT0; nativefocusedr6 33/nativeintro r1 39/softwaremini r2 and actual
+rendered/source reviews CLEAR. Frozenr3 binds7owned+32locks=39; finalnative r3 completedEXIT0,
+465/465 in606560ms,t06:15:58.122Z,originalnames465/463unique/39emptyaxes/errors/warnings/
+dockWarnings/last-resultbyteequal/39sourcebinds unchanged. ActualJSON7454224B SHA
+720935ac4a7f4ff1820f8d25b837a9f47d080fa9ec492c939f78a298a921582e; log83560B SHA
+aab1239a4488061f8d63e7ae74afee32634003275d5f41d04372a6ad4d2aaba1.
+Nativeintro45.4671sim/firstcard46665ms; savedUS45.4813sim/15integerloss,CS19.1844sim/2loss.
+RootkeyPNG and independentALL43actualPNG/source/receipt review CLEAR. No localbrowser/test.
+NEXT owned6stage/index39verify, commit/push, repairedexact464CI/all28steps/
+Pages4bytes via .out/p2l-collect-completed-r2-20261007.mjs <CIid> <fullSHA> <Pagesid>.
+Then activate P2m21category/11path/40binding contract. No milestone stop or wholeHUD/device/art/v1claim.
+
+### Retained exact CI failure and repair sequence (superseded by current boundary)
+
+ExactCI37578420410 FAILED after278checks,666760ms: dock-resize-restore900left/right
+observed stale wide142px at524px available width; introPlay drag conjunction timed out at line50.
+Actual artifact11464315814 JSON319237B SHAef91273de2b6020611791986b8a1ab669734034dc25dde960185f3f0a2ed5f6b;
+20exercisedaxes/errors/warnings/dockWarnings empty, laterfull UNRUN. Preserved failedlog and
+.out/p2l-exact-ci-37578420410-failed-actual-artifact-r1-20261007.{json,-readback.json}.
+Root-owned repair extends P2l to tools/test-intro-ui.mjs ONLY for real input sequencing/diagnostics,
+never simulation/timing changes. Diagnose both separately, retain original categories/counts and
+quality/time limits. Dock settlement must bind current computed threshold/mode plus stable geometry;
+intro needs trusted actualpointer trace before any repair. P2m stays queued until repairedexactCI.
+Repair gates: five syntax checks(hud.js,test-dock-ui.mjs,test.mjs,test-intro-ui.mjs,sw.js),diffcheck,
+28ordered standalone and unit=35; nativefocused33 plus justifiedintro39; freeze7owned+32locks=39,
+ONE justified finalnative465/39axes, stageonly11owned, exact464CI/all28steps/Pages4bytes.
+No blindCI rerun. Watch2108/diagnosis48040/nativefocused93126/nativeintro42541 completed.
+Actualsoftwarediagnosisr1 reproduced wide524/142 for3samples then compact160; trustedintrodown
+hitbattlefield/pan/orders0 aftercachedflag moved. Rootandindependent source repair CLEAR.
+Deterministicr8 all35EXIT0, latercommentonlyintro syntax/diffcheck pass. Nativefocusedr6 actual33/33,
+54939ms,t06:10:50.990Z,178673B SHA047549202c85c1b82143c0846aa1b6729010798e12358b2721492ddcdfde9d35;
+18actualPNGs rootkey/independentALL CLEAR. Nativeintro r1 actual39/39,106601ms,t06:12:13.534Z,
+16634B SHA5bd3a4bf91336cf721dde98d49457cfd3bc9dfdbe890edfdc8835dd72a4ec241;7sourcebindsunchanged.
+Realdownorderpractice-first/35pointpreview, firstcard47119wallms/45.4459sim, idledefeat27.32;
+save/camp/stores/twoaxes/errors/warnings pass; independentALL6PNG/source/receipt CLEAR.
+Softwaremini repair r2 completedEXIT0: all6samplescompact524/160/published160; trusteddown order
+practice-first/active drag/exactly1committedorder/hint3 at1.9333sim. RootPNG/independenttrace/source
+CLEAR; this is scopedsoftwarediagnosis, not fullsoftware acceptance. No sim/time/capture/winner edits.
+Frozen .out/p2l-frozen-source-r3-20261007.json binds7owned+32locks=39, same465native/464CI/39axes.
+ONE justified final .out/p2l-full-native-r3-20261007.mjs active31374; no edits afterfreeze and
+no otherbrowser/test. NEXT existing31374/actual465names/39axes/source/last-result/PNGreview, then
+owned6stage/index39exact/commit/push/repairedexact464CI+Pages4. P2m staysqueued until acceptance.
+Repaired finalcollector .out/p2l-collect-completed-r2-20261007.mjs bindsfreeze/fullr3/39sources.
+Rootowns6dirtypaths(twohelpers+4docs), indexempty, no runtimechanges. Below boundary is historical.
+
+Retained pre-failure boundary: root sole writer, HEAD/origin3ceb46ca9363d1c91f29bc3619a79858db1b7300;
+P2l10paths committed/pushed; index empty, only root-owned receipt docs become WIP afterpush;
+workspace/Shiloh unrelated and preserved. No COORDINATION; if created
 readfull relevant lane. Deterministicr7 all34EXIT0; focusedr5 actual33/33unique/18PNG root+independent
 CLEAR. Repairedfreeze .out/p2l-frozen-source-r2-20261007.json binds6owned+32locks=38, original465/
 464names and39axes. Local nativefullr2 session79961 completedEXIT0,465/465 in591237ms,
@@ -16,10 +64,16 @@ t05:36:19.615Z; no runtime/test edits afterfreeze and no localbrowser/test. Actu
 03337c4a627d4d87b0e662a5b5beaadcc99c99b0dab4e9233d4ef019935c71b4; log82728B SHA
 f26b6819722b2cecabc9da8b51a996e1d27d76a2b46ecf4d03150a49410fc1ee. Originalnames465/463unique,
 39emptyaxes/errors/warnings/dockWarnings/last-result exact,38sourcebindingsunchanged. RootkeyPNG CLEAR,
-independentALL43PNG (18dock+15deployment+10retained)/source/receipt review CLEAR. NEXT
-syncdocs/stageonly10/index38bindings/commit/push/
-exact464CI(all28steps)+Pages4deployedbytes. Collectors bindacceptedrepair r2, not rejectedvisualr1.
+independentALL43PNG (18dock+15deployment+10retained)/source/receipt review CLEAR. INDEX10owned/
+38sourcebindings exact beforecommit. ExactCI37578420410 active, watchsession2108; all28explicit
+stepspassed, remote npmtest active. Pages37578420389 SUCCESS atsameSHA, deployed4bytesUNRUN.
+NEXT waitexistingwatch2108, actual464CIJSON/all28counts/source binding + Pages4bytes collection:
+node .out/p2l-collect-completed-r1-20261007.mjs 37578420410 3ceb46ca9363d1c91f29bc3619a79858db1b7300 37578420389
+Collectors bindacceptedrepair r2, not rejectedvisualr1. No localbrowser/runtimeedits duringCI.
 Nativeintro45.5843sim/firstcard46755wallms, savedUS45.5314sim/15integerloss,CS19.1679sim/2loss.
+Pages preflight actual4runtimebytes match frozen source (.out/p2l-pages-preflight-r1-20261007.json);
+collector still requires finalexactCI+Pages readback. P2m queued PLAN11path/21category/35gate contract
+independent source/accounting CLEAR; NOTACTIVE until P2l exactCI accepted, no runtime edits yet.
 No milestone stop; next P2m header then heldsoldier-eye depthDOF. No wholeHUD/device/art/v1claim.
 
 ### Retained P2l repair notes (superseded by the active boundary above)

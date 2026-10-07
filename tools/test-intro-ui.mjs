@@ -39,14 +39,41 @@ export async function introPlay({ browser, url, check, shot, result, watchErrors
       && !await page.locator('#intro').evaluate((n) => n.open), 'Continue starts battle and returns keyboard focus to the field');
     await page.getByRole('button', { name: /^1st Practice Brigade/ }).focus(); await page.keyboard.press('Enter');
     await page.waitForFunction(() => document.getElementById('intro-hint').textContent.startsWith('2'));
-    const flag = page.getByRole('button', { name: /^1st Practice Brigade/ }), box = await flag.boundingBox();
+    const flag = page.getByRole('button', { name: /^1st Practice Brigade/ });
+    // Marker placement can change after selection, viewport or hint updates. Do not drag
+    // from a cached rectangle: on SwiftShader that point can already be open ground.
+    await flag.evaluate((n) => { delete n.dataset.introSettled; });
+    await page.waitForFunction(() => {
+      const n = window.__game.hud.markers.get('practice-first')?.el;
+      if (!n) return false;
+      const r = n.getBoundingClientRect(), key = [r.x, r.y, r.width, r.height].join(':');
+      const same = n.dataset.introSettled === key; n.dataset.introSettled = key;
+      const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return same && (hit === n || n.contains(hit));
+    }, null, { polling: 'raf', timeout: 30000 });
     const dest = await page.evaluate(() => {
       const { camera, terrain } = window.__game, v = camera.position.clone().set(-350, terrain.heightAt(-350, -665), -665).project(camera);
       return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight };
     });
+    const box = await flag.boundingBox();
     if (!box) throw new Error('intro flag not visible');
     await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
-    await page.mouse.move(dest.x, dest.y, { steps: 12 }); await page.mouse.up();
+    result.introDrag = { down: await page.evaluate(() => {
+      const d = window.__game.input.drag;
+      return { mode: d?.mode, unit: d?.unit?.id, active: d?.active, orders: window.__game.game.orders };
+    }) };
+    if (result.introDrag.down.mode !== 'order' || result.introDrag.down.unit !== 'practice-first') {
+      await page.mouse.up(); throw new Error('intro trusted drag did not begin on the intended brigade');
+    }
+    await page.mouse.move(dest.x, dest.y, { steps: 12 });
+    result.introDrag.move = await page.evaluate(() => {
+      const d = window.__game.input.drag;
+      return { mode: d?.mode, unit: d?.unit?.id, active: d?.active, points: d?.preview?.length || 0 };
+    });
+    await page.mouse.up();
+    if (result.introDrag.move.mode !== 'order' || result.introDrag.move.unit !== 'practice-first'
+      || !result.introDrag.move.active || result.introDrag.move.points < 2) throw new Error('intro genuine drag did not create a march preview');
+    await flag.evaluate((n) => { delete n.dataset.introSettled; });
     await page.waitForFunction(() => window.__game.game.orders > 0 && document.getElementById('intro-hint').textContent.startsWith('3'));
     check('intro-drag-command', await page.evaluate(() => window.__game.game.orders > 0 && document.getElementById('intro-hint').textContent.startsWith('3')),
       'actual drag issues a march and progresses contextual hints');

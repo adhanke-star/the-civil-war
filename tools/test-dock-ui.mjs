@@ -73,10 +73,13 @@ export async function settleDock(page) {
   await page.evaluate(() => { delete window.__dockSettledKey; });
   await page.waitForFunction(() => {
     const e = document.getElementById('dock'), r = e.getBoundingClientRect();
-    const h = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--dock-h'));
+    const css = getComputedStyle(document.documentElement), h = parseFloat(css.getPropertyValue('--dock-h'));
+    const wide = parseFloat(css.getPropertyValue('--dock-card-w')) + 3 * parseFloat(css.getPropertyValue('--dock-order-w'))
+      + parseFloat(css.getPropertyValue('--mm')) + 36 + 16;
+    const expected = r.width >= wide ? 'wide' : r.width >= 520 ? 'compact' : 'stacked';
     const key = [r.x, r.y, r.width, r.height, e.dataset.layout, h, ...[...e.querySelectorAll(':scope > *, button')].flatMap((c) => { const b = c.getBoundingClientRect(); return [b.x, b.y, b.width, b.height]; })].join(':');
     const same = window.__dockSettledKey === key; window.__dockSettledKey = key;
-    return same && Math.abs(h - r.height) < 0.5;
+    return same && e.dataset.layout === expected && Math.abs(h - r.height) < 0.5;
   }, null, { polling: 'raf', timeout: 15000 });
 }
 

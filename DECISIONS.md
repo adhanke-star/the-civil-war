@@ -1,5 +1,14 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0043 · Native play probes wait for layout and verify the actual drag owner (2026-10-07)
+
+CI37578420410 exposed two separate probe races: wide dock geometry stayed stable before its
+queued resize callback; the intro mouse pressed open ground after the sampled flag moved.
+Actual software-renderer trace reproduced both. Require dock mode to match current available
+width and verify settled flag hit geometry, intended Input drag owner and genuine march preview.
+Keep one trusted drag, original categories, all capture/result/timing checks and per-operation
+budgets. Simulation and shipped runtime are unchanged; a missed native action remains a failure.
+
 ## 0042 · Dock responds to its available space; the card owns native reading keys (2026-10-07)
 
 Measure the dock after safe-area and sandbox offsets, using its existing Hud lifetime. Publish actual

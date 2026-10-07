@@ -1110,10 +1110,144 @@ f26b6819722b2cecabc9da8b51a996e1d27d76a2b46ecf4d03150a49410fc1ee. Original465mul
 463unique/39emptyaxes/errors/warnings/dockWarnings/last-result exact,38bindingsunchanged.
 RootkeyPNG CLEAR; independentALL43PNG/source/receipt review CLEAR. Native genuineintro
 45.5843sim/firstcard46755wallms, savedUS45.5314sim/15integerloss andCS19.1679sim/2integerloss.
-No forcedplayable terminal. Local repairedcandidate accepted; commit/exact464CI/Pages remainUNRUN.
+No forcedplayable terminal. Local repairedcandidate accepted;10paths committed/pushed3ceb46ca9363d1c91f29bc3619a79858db1b7300,
+index38bindings exact. ExactCI37578420410 activewatch2108/all28explicitstepspassed; Pages37578420389
+SUCCESS. Actual464CIartifact/counts/source/deployed4runtimebytes remainUNRUN until collector/readback.
 Focusedr1 failed23/24 at Space scrollwait, retainedactualJSON/log; nativeSpace diagnostics succeed
 with existing handler, no confirmed product/body-default attribution. Actualscrollend sequencing
 plus bounded contrast/restoration fixes passr2; no font/target/quality/timeout/assertion relaxation.
+
+P2l exactCI repair local boundary: deterministicr8 all35EXIT0; nativefocusedr6 33/33,
+nativeintro r1 39/39 and scopedsoftwaremini r2/source/rendered reviews CLEAR. Freeze r3 39bindings;
+finalnative r3 actual465/465 in606560ms,t06:15:58.122Z,39emptyaxes/errors/warnings/dockWarnings,
+namesexact/last-resultbyteequal/sourceunchanged. JSON7454224B SHA
+720935ac4a7f4ff1820f8d25b837a9f47d080fa9ec492c939f78a298a921582e; rootkeyPNGclear,
+independentALL43fullPNG/source/receipt review CLEAR beforecommit. OldCI failure preserved;
+repairedexact464CI/Pages4bytes stillUNRUN. Nativeintrofirstcard46665ms/genuine45.4671sim;
+savedUS45.4813/15integerloss andCS19.1844/2loss conserved. No shippedruntime/sim/timing changes.
+
+### P2m queued contract — readable header and its native panels (not active)
+
+P2l exactCI37578420410 failed278checks at dock-resize-restore and introdrag line50. Repair first:
+root extends current P2l11path ownership to tools/test-intro-ui.mjs for proven native input
+sequencing only. Retain465native/464CI names/39axes, simulation/first-card/per-operation budgets,
+alloriginal oracles and controls. Five syntax+diff+28standalone+unit=35; focused33native + intro39
+native; newfreeze7owned+32locks=39; ONE justified finalnative465; repairedexactCI/Pages4bytes.
+No causal link between the freshintrocontext and dockfailure is established. Preserve actualfailure.
+
+Activate only after repaired exact P2l CI/Pages/deployed4bytes are accepted at the replacement
+fullSHA/runIDs recorded in HANDOFF. Original37578420410 at3ceb46c is FAILED, never acceptance.
+Until then only the bounded P2l repair may edit/run localbrowser. Root
+sole writer; ONE bounded read-only helper gpt-6.1-sol/high. No COORDINATION; read full lane if created.
+Recommendation: close real top-strip clipping next, then held soldier-eye/true depthDOF. Actual320
+P2l screenshots show only1x and hideArmy; all v1 controls/clock/balance must remain available.
+
+Own11paths: index.html,src/ui/hud.css,src/ui/hud.js,newtools/test-header-ui.mjs,tools/test.mjs,
+tools/test-intro-ui.mjs (optional probes only),sw.js,PLAN/HANDOFF/STATE/DECISIONS. Beforeedit verify
+live git/process/source and repaired P2l source39binds. No entry/main/reward/save/schema/gear/Unit/
+Battery/Game/Combat/Input/Arrow/camera/Post/art/scenario/history/data/quality/preferences changes.
+Keep tools/test-dock-ui.mjs and its18categories/negativecontrols unchanged; preserve accepted native
+card reading, map geometry and six dock commands. No new persistent subsystem/setting/container.
+Keep original flags/star-count issue and transient combat-toast/feedback overlap as explicit P6/P2
+feedback debt; do not claim wholeHUD/WCAG/nativeiPad/performance/art/v1 acceptance.
+
+Source-only shortportrait feasibility preflight: primary clock grid can keep Pause+all3speeds
+on its44px control row, complete14px date/time on a secondnative text row, and existing progress;
+secondary controls use44px row then realstrengthbar. A130–136px fullyconditional header is plausible,
+UNRUN until actualBASE/candidate. The64px minimum field alone cannot fit objective+readinghint.
+At320x480 spend shortcard height toward110 as needed; objective uses remaining field width and
+same closedtoggle exclusion, and hints need >=44px native scroll/read target in actual remaining
+field. Extend the existing bounded ResizeObserver to objective if its measured height is needed;
+publish --objective-h only as output for OTHER consumers, never its own sizing. If objective itself
+needs bounded native scrolling, include tabindex/focus/pointer/reading-key isolation and fulltext
+access in existing header-height-consumers/axe categories. No silent objective/hint/toggle overlap,
+lineclamp, minimum-size reduction or new per-frame polling. Keep scope11/count21/40bindings unchanged.
+
+Use logical primary(Menu+Time) and secondary(Army, realconditionalCrates/Afteraction, strength) DOM
+wrappers, keep every existingID/role/controller, preserve nativebutton semantics/logicaltab order.
+Natural width/height wrapping: no display:contents or scaling/ellipsis, no hiding Army/speeds/clock/
+conditional controls. All header targets>=44px, font>=14px, full date/time/speed/counter/Afteraction
+text and actual strength bar/readable accessible totals. Existing perf hide<=760 may stay. Measure
+actualtopbar with ResizeObserver in Hud; publish --top-h as OUTPUT only, independent of sizing.
+No per-frame new layout polling. Actualconditional hidden/text changes and sandbox offsets must
+settle naturally. In568x320 headerbottom+64<=docktop, including realCrates+Afteraction state.
+
+320x568,375x667,568x320,760x568,1024x768,1440x788; add320x480 inside existing320category.
+At shortportrait, allow stackedcard height110..160 based only on viewport and measuredheader,
+preserving fonts/fullnativevertical reading. Currentstacked orders+gap=128px; twoedgegaps16+field64
+give208px outsidecard/header, plus actualsafearea insets. Never depend on measured --dock-h for
+its own/card sizing. Fail impossible geometry instead of hiding targets. At320x480 still preserve
+64px field between header and dock. Native hints may scroll within that field, allfulltext reachable,
+no horizontal clipping/lineclamps/shrunken type, visible nativefocus. Focused hints own readingkeys/
+letters so they do not steer, change speeds/pause or issue orders; keyup clears camera keys; Tab leaves
+normally, Escape returns field and retains ordinary cancellation. Keep Space wording honest about
+field focus. Preserve closedtoggle48targets and hint exclusion on bothsides; no sandboxCSS/settings edits.
+
+Army and stores are explicit temporary list overlays below measuredheader and withinviewport;
+they may cover dock whileopen, like expandedmap. Native vertical scrolling keeps all rows/actions
+reachable and fully readable. Army adds native>=44px Close/Escape with focus returned to connected
+openingtrigger; realrow activation selects/flys sameunit through existing controller. Stores retains
+actualCrates/March/Close/Escape semantics andfocus, >=48px actions, ordinary expectedorder once.
+No new modal trap or field steering/orders while merely reading. Hud-owned isolation on Army,
+stores and hints must also cover letters/digits (Input.key protects nativebutton Enter/Space only),
+stopPropagation without preventDefault, keep keyup bubbling and existing stores Escape listener
+reachable (no stopImmediatePropagation). Scrollable hints require pointer access inside their own
+region; current pointer-events:none cannot serve native touch reading. Include visible panes/hints
+in the ONE aggregated headerAxe, finalized after both probes. Objective/intro/targeting offsets
+follow actualheader/dock; full combatfeedback redesign remains separate. Conditional controls need
+real scenario/terminal states; do not unhide fabricated playable results as acceptance.
+
+Exactly21new categories: header-layout-320,header-layout-375,header-layout-landscape,header-layout-760,
+header-layout-1024,header-layout-1440,header-sandbox-left,header-sandbox-right,
+header-conditional-controls,header-clock-strength,header-native-menu,header-native-pause-speeds,
+header-trusted-touch,header-native-army,header-native-stores,header-after-action-native,
+header-height-consumers,header-resize-restore,header-preserved-progress,header-axe,header-no-console-errors.
+Bind EVERY visibleheader child/button rect/5inset actualhits/text ranges/minfont/minsize/pairwise
+nonoverlap, publishedheight, fieldbounds and nativefocus. Actualleft/right900/1024/1440allocation;
+760/761/899/900 boundaries within existingcategories; sandbox below900 remains intentionaloverlay.
+Empty/selected/group and realconditional states, opaque readablepanel targets, allnativeEnter/Space
+menu/Pause/1x2x4x/Army, trustedChromiumtouch identity/events/effect exactlyonce (no iPadclaim).
+Clocktext/strength/progress must match actual Game, not hardcoded UI-only values. Passivegeometry/
+reading/resize preserve exact progress,writes,pausedtime,roster/orders/ghost/camera; explicitactions
+bind legitimatechanges and then restore. Rawprefs/locks/hidden/panel side/selection restored exactly.
+
+Shared header probes reuse original unforced intro idle defeat AFTER its existingassertion/shot and
+AFTER positive first-card<=90s/save/camp checks: actualInspect→Afteraction focus→native reopen→Escape
+→focusreturn→reopen; bind immutableoutcome/progress/writes/units/time/orders/rewardabsence/URL,
+restore viewport and leave resultOPEN. Emit Afteraction+conditional categories once. Native stores
+probe runs AFTER existing intro-stores-close-focus, BEFORE controlledcapturefixtures, while actual
+field is paused and selected; preserve every originalintro assertion/name/timing/encounter.
+Optional two testhooks only; no extra genuine encounter in FULL. Focused --header runs16sandbox
+categories plus the same2Afteraction/conditional probes on ONE genuine defaultidle encounter and
+same1storesprobe after a freshpaused UI load (no secondencounter), then2finalscopedaxe/error guards.
+No forcedtime/men/winner/capture or replacingauthenticresults. Finalize headeraxe/errors AFTER both
+hooks contribute; never append violations after an earlier PASS. ONE result.headerAxe ->40fullaxes,
+record scoped headerWarnings; all empty. Focused36native=14foundations+21new+1header-native-renderer;
+non-native focused35. Full486native/485CI = retained465/464+21, only oldintro-native-renderer difference.
+
+Beforeedit actual BASE acceptedHEAD320 fails named full-speed/Army predicate,1024passes; route
+original committed index/hud.css/hud.js into one serial diagnostic if needed. Preserve actualPNG/
+JSON/failure attribution. Final header A/B/A2 original fixed-height/no-wrap/hiddenArmy control must
+fail named geometry/visibility predicate; restore stylesheet, all inlineattributes and --top-h exactly
+in finally; A2geometry/state byteequal. No inherited oracle/category/count/quality/RNG weakening.
+
+Gate sequence35commands: node --check src/ui/hud.js;node --check tools/test-header-ui.mjs;
+node --check tools/test.mjs;node --check tools/test-intro-ui.mjs;node --check sw.js;git diff --check;
+then all28ordered standalonecommands: tools/test-deployment.mjs then --prove-fail, equipment same;
+reward,save,practice,captures,intro,sandbox-rules,look,view,spacing,residency,moments,keyboard EACH
+positive then --prove-fail in that order; finally node tools/test.mjs --unit. Retain21+21deployment,
+23+23/115/A126-B-A2/original3606Combat136580Unit draws,183each/unit. Run node tools/test.mjs --header
+--native serially with unique actuallog/JSON/PNGs/sourcebindings; independentreadonlysource/rendered/
+receipt review and repair. Freeze7ownedruntime/test/sw+33priorlocks=40bindings, original465multiset+
+21newnames and40axe paths; ONE final npm test -- --native. Require actual486/485multisets, emptyaxes/
+errors/warnings/headerWarnings, last-result byteequal, fullPNG/source independentreview. Syncdocs
+STATE<20lines, stageonlyowned11/index40bindings, commit/pushmain, exactCI all28explicitsteps/485actual
+artifact + Pages/deployedindex/hud.css/hud.js/sw bytes; no docs-onlycommit or broadrerun for docedits.
+Independent read-only source/count/ownership/hook review CLEAR for activation after P2l exactCI/
+Pages, subject to actual BASE/candidate rendered geometry and all gates. ObservedCI failure/timeout
+needs diagnosis/justifiedfix, no preemptive weaker budgets. Preserve every
+failed receipt/unknownfile. If one seam truly blocked, mark affectedwork only and select independent
+v1work. Immediately next loop at green boundary, no final/milestone stop or userdevice requests.
 
 ### Required battle-system work (P3/P4; do not hide it inside “build Shiloh”)
 
