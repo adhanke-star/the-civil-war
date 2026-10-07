@@ -119,9 +119,25 @@ const tests = [
   }, mutant((f) => { f.input.refreshTargeting = () => true; })],
   ['paused-stable-preview-reuses-geometry', (a) => {
     const f = a.make(); press(f, 'b'); press(f, 'ArrowUp'); const ghost = f.arrows.previewGhost, bar = ghost.children[1];
-    for (let i = 0; i < 20; i++) f.input.refreshTargeting(); assert.equal(f.arrows.previewGhost, ghost); assert.equal(f.arrows.previewGhost.children[1], bar);
+    const intent = f.input.targeting, keys = Reflect.ownKeys(intent);
+    assert.ok(keys.every(k => typeof k === 'string'));
+    const owned = () => structuredClone(Object.fromEntries(keys.filter(k => !['unit', 'enemy', 'selection'].includes(k)).map(k => [k, intent[k]])));
+    const values = owned(), refs = Object.fromEntries(keys.map(k => [k, intent[k]])), selection = [...intent.selection];
+    assert.equal(intent.points.length, 2, 'actual march fixture begins with origin and destination');
+    for (let i = 0; i < 20; i++) {
+      f.input.refreshTargeting();
+      assert.equal(f.input.targeting, intent); assert.deepEqual(Reflect.ownKeys(intent), keys);
+      assert.deepEqual(owned(), values, 'cached refresh preserves every ghost-owned value');
+      for (const k of keys) assert.equal(intent[k], refs[k], 'cached refresh preserves reference/value: ' + k);
+      assert.equal(intent.selection.length, selection.length);
+      assert.ok(intent.selection.every((u, j) => u === selection[j]));
+      assert.equal(f.arrows.previewGhost, ghost); assert.equal(f.arrows.previewGhost.children[1], bar);
+    }
     f.leader.vehicle.position.x += 2; f.input.refreshTargeting(); assert.notEqual(f.arrows.previewGhost, ghost);
-  }, mutant((f) => { const refresh = f.input.refreshTargeting; f.input.refreshTargeting = function () { if (this.targeting) this.targeting.previewKey = null; return refresh.call(this); }; })],
+  }, [
+    mutant((f) => { const refresh = f.input.refreshTargeting; f.input.refreshTargeting = function () { if (this.targeting) this.targeting.previewKey = null; return refresh.call(this); }; }),
+    mutant((f) => { const refresh = f.input.refreshTargeting; f.input.refreshTargeting = function (...args) { if (this.targeting) this.targeting.points = [[this.targeting.unit.x, this.targeting.unit.z]]; return refresh.apply(this, args); }; }),
+  ]],
   ['zoom-scale-invalidates-cached-pencil-geometry', (a) => {
     const f = a.make(); press(f, 'b'); press(f, 'ArrowUp'); const old = f.arrows.preview;
     f.arrows.setScale(2); f.input.refreshTargeting(); assert.notEqual(f.arrows.preview, old); assert.equal(f.game.orders, 0);
@@ -147,13 +163,19 @@ const tests = [
   }, mutant((f) => { const key = f.input.key; f.input.key = function (e) { e.repeat = false; key.call(this, e); }; })],
 ];
 let failed = 0;
+const controls = [];
 for (const [name, check, broken] of tests) {
   try {
     if (process.argv.includes('--prove-fail')) {
-      let caught = false; try { check(broken); } catch (e) { if (e instanceof assert.AssertionError) caught = true; else throw e; }
-      assert.equal(caught, true, 'mutant escaped intended assertion'); console.log(`CAUGHT ${name}`);
+      for (const adapter of Array.isArray(broken) ? broken : [broken]) {
+        let caught = false, assertion; try { check(adapter); } catch (e) { if (e instanceof assert.AssertionError) { caught = true; assertion = { code: e.code, operator: e.operator, message: e.generatedMessage ? null : e.message.split('\n')[0] }; } else throw e; }
+        assert.equal(caught, true, 'mutant escaped intended assertion');
+        controls.push({ category: name, assertion });
+      }
+      console.log(`CAUGHT ${name}${Array.isArray(broken) ? ' (' + broken.length + ' intended controls)' : ''}`);
     } else { check(api); console.log(`PASS ${name}`); }
   } catch (e) { failed++; console.error(`FAIL ${name}: ${e.stack}`); }
 }
 delete globalThis.document;
-console.log(`KEYBOARD ${failed ? 'FAILED' : 'OK'} (${tests.length - failed}/${tests.length})`); process.exitCode = failed ? 1 : 0;
+if (process.argv.includes('--prove-fail')) console.log('KEYBOARD CONTROLS ' + JSON.stringify(controls));
+console.log(`KEYBOARD ${failed ? 'FAILED' : 'OK'} (${tests.length - failed}/${tests.length})${process.argv.includes('--prove-fail') ? '; ' + tests.reduce((n, [, , b]) => n + (Array.isArray(b) ? b.length : 1), 0) + ' intended mutants' : ''}`); process.exitCode = failed ? 1 : 0;

@@ -7,6 +7,108 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
 
 ## Active iteration: P2n held soldier-eye and scene-depth blur (2026-10-07)
 
+Cached-path integration review17:02UTC: independent ALL148/148 actual PNGs individually CLEAR,
+exact stored path set matches freshfull JSON; root ten named actual images individually viewed.
+Rendered receipt .out/p2n-cached-path-full-rendered-review-r1-20261007.json binds each PNG's bytes/SHA
+and review attribution. Held320 release text visible; existing card/toast overlap and workbench/
+origin-reading debt remain P2o/P2p/P6. Freshfull singleGREEN506/41emptyaxes/current48; source/camera/
+ghost/realqueued-read checks clear. Stage exactly7 owned after final independent receipt readback;
+index48, commit/pushmain, then exact505CI/41axes/30actualcompletedlogs/Pages10 remain required.
+
+Known failed CI37645892377 raw artifact retired16:55UTC for local cap: original17952090B
+SHAfcf69e711549a1c12c998b9de0c7c4beee047fe15f0f84bdf154deed363a4d26 is preserved
+byte-exact in same .out filename+.gz (563949B), independently decompressed/hash-read back before raw
+removal; preservation receipt p2n-cached-path-preserve-retired-readback-r3-20261007.json. Causal
+report, actual30standalone log/readback and metadata remain live; no product/acceptance change.
+
+Cached-path full native boundary16:48UTC: fresh frozen-r2 run completedGREEN506/506,
+968301ms,t2026-10-07T16:32:38.313Z; JSON23743453B
+SHA33ff45822448d276e7e97f17af21307742e91ba971e520a249a03142e3a4116d;
+log175485B SHAe67e7fb4ff8930a291af8e2a57a92fa4a5cf08d395632673bf407500499022b1.
+Exact old name multiset/41 empty recursive axes/source48/last-result bytes confirmed; all console,
+dock/header warnings/errors empty; all three header stages true. Actual ghost interval/native events/
+controls and queued canonical launch-read cancellation PASS. This is a new single green full native
+run, unlike the historical source bridge. ALL148 actual PNGs under independent individual review;
+root actual high/low/header320/landscape/victory/defeat/held320/depthA-B-A2 viewed with no new scoped
+blocker. Source/index/collector review CLEAR; integration remains pending rendered review, owned7
+index/commit/push/exactCI505+41axes+30actuallogs/Pages10. No browser/test/server remains active.
+
+Cached-path native boundary16:38UTC: focused r1 actual35unique/35PASS,169368ms,15825934B
+SHA7eb1ba0b076e5a251a16f7fac5f42b54b4e6be9d75739db242b897a0c08d4292; ALL10 actualPNG
+root+independent individuallyCLEAR,ghost12keys/interval/nativeevents/controls exact; narrowfeedback debt
+remainsP2o. Pure-selection length correction followed focusedcompletion: currentfreeze-r2 differs
+ONLYpureKeyboard, all47runtime/UI bytes same; no r2focusedrerun. Serial35r2PASS/source48exact/log38358B
+SHA7136f4d5481140afc2a0ef49a0a7f4677d50444a4cd1275255ad08878c468b27. Freshfullnative506
+RUN frozenr2 via.out/p2n-cached-path-full-native-r1-20261007-r2.mjs (exec73767); no sourceedits/browser.
+Index/collector-r2 independentlysourceCLEAR; latestcollector-r3 adds honest184categoryrows/185negative
+mutants/Keyboard23 accounting only. ALL30 prior failedCI37645892377 completedactuallogs verified,
+not acceptance. Retired r10/r11 rawnativeJSON also exactgzip/readback-r2 (31371797B->871646B).
+Future r10feedback/BASEdriver are SOURCE drafts, not active/RUN. Resume fullactual receipt/ALLimages
+then owned7index/commit/push/exactCI505+41axes+30logs/Pages10; keep source48/runtime freeze.
+
+Cached-path gate boundary16:29UTC: old-Input pureBASE21/22 failed ONLY cached owned-value predicate,
+new Input22categories/23intended mutants PASS, all35serialEXIT0 with48exactsources; log38358B
+SHA7136f4d5481140afc2a0ef49a0a7f4677d50444a4cd1275255ad08878c468b27. Frozen48=3changed45locks,
+focusnative35 RUN. Five historical rawJSON receipts now exact gzip copies under same.out filename+.gz
+(86842652B->2328612B), hashes/readback p2n-cached-path-preserve-retired-readback-r1-20261007.json;
+raw originals removed ONLY after exact readback, so old bridge needs explicit decompression to rerun
+and is historical. Current failedCI actualJSON remains live; no fieldability/acceptance claim.
+Futurefeedbackdraft-r10 carries immediate CSS :has content eligibility and narroweditor hiding/close
+restore; no JS parenthidden/circular visibility, widecoarseheldhint preserved; future49sourcebindings.
+
+Active16:22UTC: CI37645892377 completedFAILED505/504PASS; soleghost-preserved,41emptyaxes/
+zeroerrorswarnings. Actual ghost native-I events allEXACT; interval ONLY points2->1. Source
+refreshTargeting resets points before cache guard. DEC0051/PLAN contract owns ONLY Input/Keyboard/
+sw+4docs (7), freeze48=3changed45locks relative7ca (prior47 plus pureKeyboard). Strengthen existing pure stable-preview first,
+require old-Input path BASE failure; move reset into changed-key branch;22categories/23mutants,
+serial35/focusnative35/newfullnative506 required due runtime change. Prior native bridge historical.
+Then owned7index/commit/push/exactCI505+41axes+30actuallogs/Pages10bytes; no acceptance yet.
+HEAD/origin7ca/indexempty; unrelated workspace/Shiloh preserved; no browser/competing writer.
+
+Read-only later-save inventory (16:00UTC; no design/activation/runtime edits): one IndexedDB
+cw.progress version1/storeprogress/keycw.progress JSON record,1MiB cap. Legacy localStorage supplies
+bootstrap only when DB key absent; no legacy overwrite/delete. Strict canonical completed-reward
+schema has no slot/phase/livebattle fields;1–200formations/0–2000depot/0–5000issued, unique ownership,
+reverse transfer audit/compatiblegear/recomputedOVR. Equality includes existing canonical JSON ordering.
+load/raw are readonly; complete/import/issue resolve only on transaction complete, abort rejects.
+Complete duplicateaward no-write and canonical observedbaseline comparison, Import exact observedraw
+comparison, and Issue canonicalcompare are distinct existing contracts. practice freezes launch
+baseline/manifest identity and caches first frozen terminal outcome; retries keep samebaseline,
+pendingresult andlaunchbaseline exports distinct. Main rechecks before admission/GPU and cancellation
+followsawait. Three slots/phaseautosave/RNG/livebattle continuation remainUNIMPLEMENTED; current
+validator refuses unsupportedfields. Preserve these seams in laterP3/P4, no new storage design here.
+
+P2n Pages boundary15:50UTC: Pages37645892433 completedSUCCESS at exact7caac6e;
+actualnine public runtime files byte-match frozen47, including RTS andsw. Actualreceipt
+.out/p2n-pages-37645892433-live-source-r1-20261007.json. CI37645892377 stillRUNNING browser;
+metadata all30standalonegreen, completedactual log/artifact/505 acceptance stillpending.
+PostpushtrackedWIP exactlyHANDOFF/PLAN/STATE (3docs); source47 unchanged, indexempty/unrelated2preserved.
+Latestfuturefeedbackdraft-r9 independentlysourceCLEAR; BASE/implementation/gatesUNRUN.
+Read-only futureworkbenchpreflight: tablist horizontal overflow+nonshrinking tabs and no selected-tab
+reveal plausibly cause narrowScreens debt; body child replacement without scroll reset plausibly
+hides firstMoments caption. These are SOURCE hypotheses, not newly measured rendered causes.
+Prefer narrowtab wrapping ONLYifactualBASE leavesusablebody with44px tabs/footer/uiScale; alternative
+native horizontal scrolling+selected-tab reveal. Resetbody scroll ONLYontab-name change ifBASEconfirms,
+preserve same-tab render reading/native focus/settings/listeners. New scoped reachability/caption
+proof needed; old harness probes do not cover those boundaries. Separatefuturetask, no runtimeedits.
+
+P2n integration boundary15:46UTC: exact owned9/index47 gatePASS; committed+pushed
+7caac6e27b8b964b75601eba39c9615c486c4366, HEAD=origin/main, only unrelated2 untracked before postpushdocs.
+ExactCI37645892377 andPages37645892433 RUNNING; job112876409533 started15:40:57UTC.
+No runtime/test edits or local browser during Actions. Resume existingruns, no duplicate dispatch;
+collector .out/p2n-launch-repair-collect-completed-r1-20261007.mjs 37645892377
+7caac6e27b8b964b75601eba39c9615c486c4366 37645892433 ONLY after completedgreen CI+Pages.
+Require actual505checks/41emptyrecursiveaxes/30completed actuallogs(View14/other184)/source47/Pages9,
+plus explicit source bridge fullFAILED505/506+focused67 and onlydeploymentUI delta. No acceptance yet.
+Read-only P2o r8 review carried three source constraints into latest draft-r9: synchronous CSS
+instruction priority for unchanged dock probe's same-evaluation intro rectangle; originalevent.target
+keyboard-targeting Escape exception in Input and parent; remove parent aria-live explicitly. Full held
+hint initial line-box fit/compactchildpadding must be measured, not inferred from parent44px.
+No actual repairedBASE/newphase browser or P2o productedit; activate onlyafter exactP2n acceptance.
+Normal .out cap pruning preserved exact older r5-r8 receipts/source/PNG bytes via uniquely labelled
+compressed forensic backups .out/p2n-cap-preservation-r{1,2}-20261007.json.gz plus SHA readbacks.
+No external offload/catalog/policy/asset changes; allcurrentacceptance source/receipts remain live.
+
 Integration review15:39UTC CLEAR: ALL15 current focused PNGs individually reviewed by root and
 independent reviewer; actual67unique/allPASS/nineemptyaxes/hashes/47bindings/stages/controls/restore
 independently confirmed. GenuineUSwin45.5797sim/15loss andCSdefeat19.2296sim/2loss; reveal9guards,

@@ -1,5 +1,14 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0051 · A cached targeting preview retains its complete path (2026-10-07)
+
+Exact CI37645892377 archives the remaining ghost mismatch: both native I event tasks preserve
+every ghost value, but an intervening refresh truncates points from two to one. refreshTargeting
+resets that path even when its preview key is unchanged. Move only the reset into the existing
+changed-key branch; retain all cache invalidations and native orders. Strengthen the existing pure
+stable-preview category with exact owned-data/reference conservation and an additional old-reset
+mutant. Runtime changes require a fresh full native receipt, not the prior two-run source bridge.
+
 ## 0050 · Cancel launch after its real queued canonical read (2026-10-07)
 
 The native diagnostic passed Escape without ever queuing the launch recheck: busy begins before

@@ -491,13 +491,13 @@ export class Input {
     if (d.mode === 'attack' && !this.eligibleTargets(d.unit).includes(d.enemy)) {
       this.cancelTargeting(); this.hud.toast('That enemy is no longer available. Choose another target with T.'); return false;
     }
-    d.points = [[d.unit.x, d.unit.z]];
     const p = d.mode === 'attack' ? { x: d.enemy.x, z: d.enemy.z } : d.point;
     const automaticFace = d.mode === 'attack' ? this.game.attackHalt(d.unit, d.enemy).facing : this.game.ghostFacing(p.x, p.z, d.unit.side, d.unit.facing);
     const previewKey = JSON.stringify([d.mode, p.x, p.z, d.faceSet ? d.face : automaticFace, this.game.range(d.unit), this.game.effRange(d.unit),
       this.arrows.mpp, this.game.marchMinutes(1),
       g.orderable().map((u) => [u.id, u.x, u.z, u.facing, u.halfFront, u.lineHalfFront()]), this.arrows.styles()]);
     if (previewKey !== d.previewKey) {
+      d.points = [[d.unit.x, d.unit.z]];
       this.orderPreviewAt(d, p, false, d.mode === 'attack' ? d.enemy : null);
       d.previewKey = previewKey;
     }
