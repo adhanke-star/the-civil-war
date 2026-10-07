@@ -16,4 +16,4 @@
 - **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
 - **Proof:** P2k2a19+19, named23+23/115/A126-B-A2, retained183+183/unit; frozen native394/394/29axe;4+17hashes.
 - **Coordination:** no ledger/competing writer; root sole writer; preserve workspace/Shiloh; no duplicate goal/scheduler.
-- **Runtime/WIP:** HEAD/origin3c01736; acceptedP2l465native/CI37581828690actual464/39axes/Pages37581828569; P2m ACTIVE11owned/indexempty; gatesr8 all35/focusedr5 actual36+ALL24PNG independent CLEAR; frozen40/full486nativeGREEN/40axes/actual138PNGreviewCLEAR; nextcommit/exactCI485/Pages4; eye/feedback open.
+- **Runtime/WIP:** HEAD/origin2ec61c0; originalCI37593724002FAILED195readiness; Pages37593724069SUCCESS/4bytesUNRUN. Root5ownedWIP/indexempty; serial35gatesr14/AFminir2GREEN2/native9GREEN36/all28focusimagesreviewed. Freeze r2EXECUTED40bindings/486-485/40axes; fullr2GREEN486/40axes/ALL138reviewCLEAR. Nextowned5/index40/commitpush/repaired485CI/Pages4 then eye/feedback.

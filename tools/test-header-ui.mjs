@@ -94,28 +94,31 @@ export async function headerGeometry(page) {
 }
 
 async function read(page) {
-  return page.evaluate(async () => {
+  let timer;
+  try { return await Promise.race([page.evaluate(async () => {
+    if (window.__headerCameraWitness) await new Promise(resolve => requestAnimationFrame(resolve));
     const { game: g, input, rts, arrows, camera } = window.__game;
     return { progress: await window.__progressFixture.raw(), writes: window.__progressPuts + window.__progressLegacyWrites,
       time: g.simTime, paused: g.paused, speed: g.speed, orders: g.orders || 0,
       roster: JSON.stringify(g.units.map(u => [u.id, u.x, u.z, u.men, u.morale, u.fatigue, u.ammo, u.shots, u.casualties, u.gear, u.order.type, u.order.firm, u.order.dest, u.order.target?.id, u.order.points, u.run, u.holdFire])),
       camera: JSON.stringify([rts.goal, [rts.target.x, rts.target.z], rts.yaw, rts.pitch, rts.dist, camera.position.toArray(), camera.quaternion.toArray(), camera.near, camera.far]),
+      cameraEvidence: window.__headerCameraWitness?.evidence() || null,
       terrainEase: { targetY: rts.target.y, groundY: rts.groundY },
       keys: [...rts.keys], inertia: rts.inertia, targeting: !!input.targeting,
       targetingState: input.targeting ? JSON.stringify([input.targeting.mode, input.targeting.unit.id, input.targeting.selection.map(u => u.id), input.targeting.point, input.targeting.enemy?.id, input.targeting.face, input.targeting.faceSet, input.targeting.preview, input.targeting.statusText]) : null,
       ghost: JSON.stringify({ end: arrows.previewEnd || null, keyboard: input.targeting?.preview || null }),
       selection: g.selection.map(u => u.id), prefs: localStorage.getItem('cw.settings'), locks: localStorage.getItem('cw.locks'), hidden: localStorage.getItem('cw.sandbox.hidden') };
-  });
+  }), new Promise((_, reject) => { timer = setTimeout(() => reject(Error('header passive read exceeded15000ms')), 15000); })]);
+  } finally { clearTimeout(timer); }
 }
 
-const passiveSame = (a, b, withCamera = true) => ['progress', 'writes', 'time', 'paused', 'speed', 'orders', 'roster', 'targeting', 'targetingState', 'ghost', ...(withCamera ? ['camera'] : [])].every(k => a[k] === b[k]) && a.keys.length === 0 && b.keys.length === 0 && a.inertia === null && b.inertia === null;
+const cameraSame = (a, b) => a.cameraEvidence?.exact && b.cameraEvidence?.exact && a.cameraEvidence.epoch === b.cameraEvidence.epoch && b.cameraEvidence.frames > a.cameraEvidence.frames;
+const passiveSame = (a, b) => ['progress', 'writes', 'time', 'paused', 'speed', 'orders', 'roster', 'targeting', 'targetingState', 'ghost'].every(k => a[k] === b[k]) && cameraSame(a, b) && a.keys.length === 0 && b.keys.length === 0 && a.inertia === null && b.inertia === null;
 
 export async function settleCamera(page) {
-  // Native short frames can round an easing step to zero before a slower frame advances it.
-  // Require a literal fixed point at main.frame's capped .1 dt, plus two observed equal poses.
-  // Only detached state/camera clones are updated; ordinary real accessibility work lets the
-  // live renderer settle. The original 15-second readiness budget and exact passive pose remain.
-  const started = Date.now(), observations = []; let previous;
+  // Paused simulation still eases its camera. Conserve its exact ordinary trajectory instead of
+  // requiring a static pose. This wrapper never changes the live timestep, pose or input state.
+  const started = Date.now(), observations = [];
   const bounded = async work => {
     const remaining = 15000 - (Date.now() - started); let timer;
     if (remaining <= 0) throw Error('camera readiness exceeded original15000ms: ' + JSON.stringify(observations));
@@ -125,30 +128,82 @@ export async function settleCamera(page) {
       })]);
     } finally { clearTimeout(timer); }
   };
-  while (Date.now() - started < 15000) {
-    const sample = await bounded(() => page.evaluate(async () => {
-      await new Promise(resolve => requestAnimationFrame(resolve));
-      const { rts: r, camera: c } = window.__game;
-      const pose = (r, c) => JSON.stringify([r.goal, [r.target.x, r.target.z], r.yaw, r.pitch, r.dist, c.position.toArray(), c.quaternion.toArray(), c.near, c.far]);
-      const key = pose(r, c);
-      if (r.keys.size || r.inertia) return { key, fixed: false, keys: [...r.keys], inertia: r.inertia };
-      const future = Object.assign(Object.create(Object.getPrototypeOf(r)), r,
-        { goal: { ...r.goal }, target: r.target.clone(), camera: c.clone(), keys: new Set() });
-      future.update(0.1);
-      return { key, fixed: future.groundY === r.groundY && future.target.y === r.target.y && pose(future, future.camera) === key,
-        groundY: r.groundY, groundNext: future.groundY, poseNext: pose(future, future.camera) };
-    }));
-    sample.wall = Date.now() - started; observations.push(sample);
-    if (sample.fixed && sample.key === previous && sample.wall < 15000) return observations;
-    previous = sample.key;
-    if (!sample.fixed) {
-      const report = await bounded(() => new AxeBuilder({ page }).analyze());
-      sample.pageAudit = report.violations.map(v => v.id);
-      // These whole-page reads are diagnostic settling evidence. Acceptance remains the one
-      // aggregated scoped headerAxe, plus every unchanged prior audit; no whole-HUD claim.
+  await bounded(() => page.evaluate(() => {
+    if (window.__headerCameraWitness) {
+      if (!window.__headerCameraWitness.evidence().exact) throw Error('Existing camera epoch failed');
+      return; // Camera-neutral checkpoints retain their predictor and all prior errors.
     }
+    const { rts: r, camera: c } = window.__game;
+    if (r.keys.size || r.inertia) throw Error('camera baseline has active steering');
+    const own = Object.getOwnPropertyDescriptor(r, 'update'), original = r.update;
+    const clone = x => {
+      const q = Object.assign(Object.create(Object.getPrototypeOf(x)), x, { goal: { ...x.goal }, target: x.target.clone(), camera: x.camera.clone(), keys: new Set(x.keys), inertia: x.inertia && { ...x.inertia } });
+      delete q.update; return q;
+    };
+    const data = x => [x.goal, x.target.toArray(), x.yaw, x.pitch, x.dist, x.groundY, x.tilt, x.camera.position.toArray(), x.camera.quaternion.toArray(), x.camera.up.toArray(), x.camera.fov, x.camera.zoom, x.camera.near, x.camera.far, x.camera.aspect, x.camera.projectionMatrix.toArray(), x.camera.projectionMatrixInverse.toArray(), [...x.keys], x.inertia];
+    const pose = x => JSON.stringify(data(x));
+    const finite = x => typeof x === 'number' ? Number.isFinite(x) : x && typeof x === 'object' ? Object.values(x).every(finite) : true;
+    const matches = (a, b) => finite(data(a)) && finite(data(b)) && pose(a) === pose(b) && a.keys.size === 0 && b.keys.size === 0 && a.inertia === null && b.inertia === null;
+    const monitor = (actual, predicted, frame = () => 0) => {
+      if (actual === predicted || actual.goal === predicted.goal || actual.target === predicted.target || actual.camera === predicted.camera || actual.keys === predicted.keys) throw Error('camera predictor is aliased');
+      let failures = 0; const errors = [];
+      const fail = (label, extra = {}) => { failures++; if (errors.length < 16) errors.push({ label, frame: frame(), ...extra }); };
+      const inspect = label => { if (!matches(actual, predicted)) fail(label, { actual: pose(actual), predicted: pose(predicted) }); return pose(actual); };
+      const status = () => ({ exact: failures === 0, failures, errors: [...errors] });
+      return { inspect, status, fail };
+    };
+    const expected = clone(r), initial = pose(r), epoch = (window.__headerCameraEpoch || 0) + 1;
+    window.__headerCameraEpoch = epoch;
+    let frames = 0, minDt = Infinity, maxDt = 0;
+    const guard = monitor(r, expected, () => frames), inspect = guard.inspect;
+    const resize = () => { expected.camera.aspect = innerWidth / innerHeight; expected.camera.updateProjectionMatrix(); };
+    const evidence = () => { const actual = inspect('read'); return { epoch, frames, ...guard.status(), initial, actual, expected: pose(expected), minDt: frames ? minDt : null, maxDt }; };
+    const finish = () => {
+      const report = evidence(); removeEventListener('resize', resize);
+      if (own) Object.defineProperty(r, 'update', own); else delete r.update;
+      const restored = Object.getOwnPropertyDescriptor(r, 'update');
+      report.restored = r.update === original && !!restored === !!own && (!own || ['value', 'get', 'set', 'writable', 'enumerable', 'configurable'].every(k => restored[k] === own[k]));
+      (window.__headerCameraArchive ||= []).push(report); delete window.__headerCameraWitness;
+      if (!report.exact || !report.restored || frames < 2) throw Error('camera epoch failed: ' + JSON.stringify(report));
+      return report;
+    };
+    r.update = function (dt) {
+      inspect('before');
+      if (!Number.isFinite(dt) || dt < 0.0001 || dt > 0.1) guard.fail('invalid actual dt', { dt });
+      original.call(expected, dt); const value = original.call(this, dt);
+      frames++; minDt = Math.min(minDt, dt); maxDt = Math.max(maxDt, dt); inspect('after'); return value;
+    };
+    addEventListener('resize', resize); window.__headerCameraWitness = { evidence, finish, clone, pose, original, matches, monitor };
+  }));
+  for (let i = 0; i < 2; i++) {
+    const sample = await bounded(() => page.evaluate(async () => { await new Promise(resolve => requestAnimationFrame(resolve)); return window.__headerCameraWitness.evidence(); }));
+    sample.wall = Date.now() - started; observations.push(sample);
+    if (!sample.exact) throw Error('camera trajectory mismatch: ' + JSON.stringify(sample));
   }
-  throw Error('camera fixed-point readiness exceeded original15000ms: ' + JSON.stringify(observations));
+  if (observations[1].frames < 2 || observations[1].frames <= observations[0].frames || Date.now() - started >= 15000) throw Error('camera trajectory readiness failed original15000ms: ' + JSON.stringify(observations));
+  return observations;
+}
+
+async function releaseCamera(page, result) {
+  const { epochs, error } = await page.evaluate(() => {
+    let error;
+    try { window.__headerCameraWitness?.finish(); } catch (e) { error = e.message; }
+    const epochs = window.__headerCameraArchive || []; window.__headerCameraArchive = []; return { epochs, error };
+  });
+  (result.headerCameraEpochs ||= []).push(...epochs);
+  if (error) throw Error(error);
+}
+
+async function cameraControls(page) {
+  return page.evaluate(() => {
+    const { clone, pose, original, matches, monitor } = window.__headerCameraWitness, base = clone(window.__game.rts);
+    const pair = () => [clone(base), clone(base)];
+    const run = () => { const [a, b] = pair(), guard = monitor(a, b); for (const dt of [0.0001, 0.016, 0.1, 0.03]) { guard.inspect('before'); original.call(a, dt); original.call(b, dt); guard.inspect('after'); } return guard.status().exact; };
+    const mutations = [x => x.goal.x++, x => x.keys.add('w'), x => x.inertia = { vx: 5, vz: 1 }, x => x.groundY++, x => x.camera.position.y++, x => x.camera.quaternion.x += 0.01, x => x.camera.near++, x => { x.camera.aspect++; x.camera.updateProjectionMatrix(); }, x => x.goal.x = NaN, x => x.camera.projectionMatrixInverse.elements[0]++, x => x.camera.fov++, x => x.camera.up.x++, x => x.camera.zoom++, x => x.tilt++];
+    const a = run(), b = mutations.map(mutate => { const [actual, expected] = pair(), guard = monitor(actual, expected); mutate(actual); guard.inspect('before'); const beforeFailed = !guard.status().exact; original.call(actual, 0.1); original.call(expected, 0.1); guard.inspect('after'); return { beforeFailed, latchedFailed: !guard.status().exact, afterMatches: matches(actual, expected), failures: guard.status().failures }; });
+    let aliasRefused = false; try { monitor(base, base); } catch (e) { aliasRefused = e.message === 'camera predictor is aliased'; }
+    const a2 = run(); return { a, b, a2, aliasRefused, baseUnchanged: pose(base) === pose(window.__game.rts), detached: base !== window.__game.rts && base.goal !== window.__game.rts.goal && base.target !== window.__game.rts.target && base.camera !== window.__game.camera && base.keys !== window.__game.rts.keys };
+  });
 }
 
 async function touchButton(page, selector) {
@@ -260,6 +315,7 @@ export async function headerControls({ page, check, shot, result, errors }) {
     result.headerCameraReadiness.push(await settleCamera(page)); afterActions = await read(page); // Real Play intervals are never rewound.
     await page.locator('#army-btn').focus(); await page.keyboard.press('Enter');
     const row = page.locator('#army-list button').first(); await row.focus(); const rowId = await row.getAttribute('data-army-unit');
+    await releaseCamera(page, result); // These two real row activations deliberately fly the map.
     await page.keyboard.press('Enter');
     await page.waitForFunction(id => document.activeElement?.dataset.armyUnit === id && document.activeElement.isConnected && !window.__game.hud.armyDirty, rowId, { polling: 'raf', timeout: 15000 });
     const selectedFly = await page.evaluate(id => { const { game: g, rts } = window.__game, u = g.units.find(u => u.id === id); return g.selected === u && rts.goal.x === u.x && rts.goal.z === u.z && rts.goal.dist <= 650; }, rowId);
@@ -330,16 +386,19 @@ export async function headerControls({ page, check, shot, result, errors }) {
     }
     const inlineAfter = await inline(), controlAfter = await read(page);
     check('header-resize-restore', boundaries.every(s => s.ok) && !a.failures.length && b.failures.includes('visible:army-btn') && b.failures.some(f => f.startsWith('child-containment:')) && same(a, a2) && same(inlineBefore, inlineAfter) && passiveSame(controlBefore, controlAfter), JSON.stringify({ a: a.failures, b: b.failures, a2: a2.failures, exactGeometry: same(a, a2), exactInline: same(inlineBefore, inlineAfter), boundaries }));
+    result.headerCameraControls = await cameraControls(page);
     result.header = { before, afterActions, layouts, boundaries, values, pauseSamples, speedSamples, touch, touchInterval: { before: touchBefore, after: touchAfter }, army: { rowId, selectedFly, armyBefore, armyAfter, armyRead, escapeFocus, closeFocus, armySamples }, consumers, control: { a, b, a2 } };
   } finally {
+    try {
     await panel(panelOpen); await setSide(side); await page.setViewportSize(viewport); await settleHeader(page);
     await clear();
     await page.evaluate(o => { for (const [k, v] of [['cw.settings', o.prefs], ['cw.locks', o.locks], ['cw.sandbox.hidden', o.hidden]]) { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); } delete window.__headerSettled; delete window.__headerCamera; }, original);
-    unwatch(); result.headerErrors.push(...errors);
+    } finally { unwatch(); result.headerErrors.push(...errors); await releaseCamera(page, result); }
   }
   const after = await read(page); result.header.after = after;
   const restore = after.progress === before.progress && after.writes === before.writes && after.prefs === original.prefs && after.locks === original.locks && after.hidden === original.hidden && after.paused === original.paused && after.speed === original.speed && same(after.selection, original.selection) && after.time >= before.time;
-  check('header-preserved-progress', restore, 'exact progress/write/preference/lock/hidden/selection restoration; only separately bound genuine Play intervals advance time, never rewound');
+  const control = result.headerCameraControls;
+  check('header-preserved-progress', restore && control.a && control.a2 && control.baseUnchanged && control.detached && control.aliasRefused && control.b.length === 14 && control.b.every(b => b.beforeFailed && b.latchedFailed) && control.b[4].afterMatches && control.b[5].afterMatches, JSON.stringify({ restore, cameraControls: control, epochs: result.headerCameraEpochs.map(e => ({ epoch: e.epoch, frames: e.frames, exact: e.exact, restored: e.restored })) }));
   result.headerStages.sandbox = true;
 }
 
@@ -352,13 +411,42 @@ async function terminal(page) {
   }) };
 }
 
+async function afterActionReturned(page, traces) {
+  // PracticeUI restores focus in the dialog's close event. Observe it; never manufacture focus.
+  const started = Date.now(), trace = {}; traces.push(trace); const expectedEvents = traces.length; let timer;
+  try { return await Promise.race([(async () => {
+  const state = () => page.evaluate(() => ({ active: document.activeElement?.id, open: document.getElementById('result').open, closeEvents: window.__headerAFcloseEvents || [] }));
+  const before = await state(); trace.before = before;
+  await page.waitForFunction(expected => {
+    const button = document.getElementById('after-action');
+    const events = window.__headerAFcloseEvents || [];
+    return events.length === expected && events.every(e => !e.open && e.active === 'after-action') && !document.getElementById('result').open && button.isConnected && !button.hidden && !button.disabled && button.getClientRects().length > 0 && document.activeElement === button;
+  }, expectedEvents, { polling: 'raf', timeout: Math.max(1, 15000 - (Date.now() - started)) });
+  const after = await state(), elapsedMs = Date.now() - started;
+  Object.assign(trace, { after, elapsedMs });
+  if (elapsedMs >= 15000) throw Error('Afteraction return exceeded original15000ms');
+  return trace;
+  })(), new Promise((_, reject) => { timer = setTimeout(() => reject(Error('Afteraction return exceeded original15000ms')), 15000); })]);
+  } catch (error) { trace.elapsedMs = Date.now() - started; trace.error = error.message; throw error; }
+  finally { clearTimeout(timer); }
+}
+
 /** Reuse the original genuine idle defeat, after its assertion and photograph. Leave its result open. */
 export async function headerAfterAction({ page, check, shot, result, errors }) {
   scopes(result); const unwatch = warnings(page, result), viewport = page.viewportSize();
-  const cameraReadiness = await settleCamera(page); const before = await terminal(page), samples = [];
+  let cameraReadiness, before; const samples = [], focusReturns = [];
+  result.headerAfterAction = { samples, focusReturns };
   try {
+    cameraReadiness = await settleCamera(page); before = await terminal(page);
+    Object.assign(result.headerAfterAction, { cameraReadiness, before });
+    await page.evaluate(() => {
+      window.__headerAFcloseEvents = [];
+      window.__headerAFcloseListener = () => window.__headerAFcloseEvents.push({ time: performance.now(), active: document.activeElement?.id, open: document.getElementById('result').open });
+      document.getElementById('result').addEventListener('close', window.__headerAFcloseListener);
+    });
     const genuine = before.over && before.winner === 'CS' && before.grade === 'Defeat' && before.time < 45 && before.paused && before.rewardAbsent;
     await page.locator('#result-close').focus(); await page.keyboard.press('Enter');
+    await afterActionReturned(page, focusReturns);
     const inspectFocus = await page.locator('#after-action').evaluate(e => e === document.activeElement);
     for (const [width, height] of [[320, 568], [320, 480], [375, 667], [568, 320]]) {
       await page.setViewportSize({ width, height }); await settleHeader(page); const geometry = await headerGeometry(page);
@@ -368,23 +456,29 @@ export async function headerAfterAction({ page, check, shot, result, errors }) {
         await page.locator('#after-action').focus(); await page.keyboard.press(key);
         const open = await page.locator('#result').evaluate(e => e.open && e.contains(document.activeElement));
         await axe(page, result, 'after-action-' + width + '-' + key, ['#result']);
-        await page.keyboard.press('Escape'); const returned = await page.locator('#after-action').evaluate(e => e === document.activeElement && !document.getElementById('result').open);
+        await page.keyboard.press('Escape'); await afterActionReturned(page, focusReturns); const returned = await page.locator('#after-action').evaluate(e => e === document.activeElement && !document.getElementById('result').open);
         actions.push({ key, open, returned });
       }
       const touch = await touchButton(page, '#after-action'); const touchOpen = await page.locator('#result').evaluate(e => e.open);
-      await page.keyboard.press('Escape'); const touchReturn = await page.locator('#after-action').evaluate(e => e === document.activeElement);
+      await page.keyboard.press('Escape'); await afterActionReturned(page, focusReturns); const touchReturn = await page.locator('#after-action').evaluate(e => e === document.activeElement);
       await axe(page, result, 'conditional-' + width + '-' + height); await shot(page, 'header-after-action-' + width + '-' + height);
-      const after = await terminal(page), { terrainEase: beforeEase, ...beforeConserved } = before, { terrainEase: afterEase, ...afterConserved } = after;
-      samples.push({ width, height, geometry, controls, actions, touch, touchOpen, touchReturn, beforeEase, afterEase, after, conserved: same(beforeConserved, afterConserved) });
+      const after = await terminal(page), { terrainEase: beforeEase, camera: beforePose, cameraEvidence: beforeEvidence, ...beforeConserved } = before, { terrainEase: afterEase, camera: afterPose, cameraEvidence: afterEvidence, ...afterConserved } = after;
+      samples.push({ width, height, geometry, controls, actions, touch, touchOpen, touchReturn, beforeEase, afterEase, beforePose, afterPose, after, conserved: same(beforeConserved, afterConserved) && cameraSame(before, after) });
     }
-    check('header-after-action-native', genuine && inspectFocus && samples.every(s => s.conserved && s.actions.every(a => a.open && a.returned) && s.touch.exact && s.touchOpen && s.touchReturn), JSON.stringify({ genuine, inspectFocus, samples: samples.map(s => ({ width: s.width, height: s.height, actions: s.actions, touch: s.touch, conserved: s.conserved })) }));
+    const closeEventsExact = focusReturns.length === 13 && focusReturns.every((r, i) => !r.error && r.elapsedMs < 15000 && r.after.active === 'after-action' && !r.after.open && r.after.closeEvents.length === i + 1 && r.after.closeEvents.every(e => e.active === 'after-action' && !e.open));
+    check('header-after-action-native', genuine && inspectFocus && closeEventsExact && samples.every(s => s.conserved && s.actions.every(a => a.open && a.returned) && s.touch.exact && s.touchOpen && s.touchReturn), JSON.stringify({ genuine, inspectFocus, closeEventsExact, samples: samples.map(s => ({ width: s.width, height: s.height, actions: s.actions, touch: s.touch, conserved: s.conserved })) }));
     check('header-conditional-controls', samples.every(s => !s.geometry.failures.length && s.controls.crates && s.controls.after && s.controls.cratesTotal === 2 && /^Crates: \d\/2$/.test(s.controls.count)), JSON.stringify(samples.map(s => ({ width: s.width, height: s.height, failures: s.geometry.failures, header: s.geometry.header, dock: s.geometry.dock, controls: s.controls }))));
-    result.headerAfterAction = { cameraReadiness, before, samples };
+    result.headerAfterAction = { cameraReadiness, before, samples, focusReturns };
     result.headerStages.afterAction = true;
   } finally {
+    try {
     await page.setViewportSize(viewport); await settleHeader(page);
     if (!await page.locator('#result').evaluate(e => e.open)) { await page.locator('#after-action').focus(); await page.keyboard.press('Enter'); }
-    unwatch(); result.headerErrors.push(...errors);
+    } finally {
+      unwatch(); result.headerErrors.push(...errors);
+      try { await page.evaluate(() => { document.getElementById('result').removeEventListener('close', window.__headerAFcloseListener); delete window.__headerAFcloseListener; delete window.__headerAFcloseEvents; }); }
+      finally { await releaseCamera(page, result); }
+    }
   }
 }
 
@@ -411,8 +505,9 @@ async function panelGeometry(page, id) {
 /** Reuse the original paused selected field after its native stores-close-focus assertion. */
 export async function headerStores({ page, check, shot, result, errors }) {
   scopes(result); const unwatch = warnings(page, result), viewport = page.viewportSize(), samples = [];
-  const cameraReadiness = await settleCamera(page); const before = await read(page); let march;
+  let cameraReadiness, before, march;
   try {
+    cameraReadiness = await settleCamera(page); before = await read(page);
     for (const [width, height] of [[320, 480], [320, 568], [375, 667], [568, 320]]) {
       await page.setViewportSize({ width, height }); await settleHeader(page);
       const g = await headerGeometry(page), baseline = await read(page);
@@ -453,7 +548,7 @@ export async function headerStores({ page, check, shot, result, errors }) {
       && march.touch.exact && march.effect && march.afterOrders === march.beforeOrders + 1 && march.timeSame && march.progressSame && march.onlySelectedOrder,
     JSON.stringify({ samples: samples.map(s => ({ width: s.width, height: s.height, headerFailures: s.g.failures, geometry: s.geometry, initialFocus: s.initialFocus, readSame: s.readSame, reached: s.reached, closeVisible: s.closeVisible, closeFocus: s.closeFocus, escapeFocus: s.escapeFocus })), march }));
     result.headerStores = { cameraReadiness, before, samples, march }; result.headerStages.stores = true;
-  } finally { await page.setViewportSize(viewport); await settleHeader(page); unwatch(); result.headerErrors.push(...errors); }
+  } finally { try { await page.setViewportSize(viewport); await settleHeader(page); } finally { unwatch(); result.headerErrors.push(...errors); await releaseCamera(page, result); } }
 }
 
 export function finishHeader({ check, result }) {

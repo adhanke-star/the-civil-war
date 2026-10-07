@@ -7,7 +7,14 @@ those do not say: how to work with Aaron, where the work stopped, and what to do
 
 ## Active iteration: P2m readable header and native panels (2026-10-07)
 
-CURRENT P2m FULL NATIVE GREEN, independent full review CLEAR. Frozen r1 unchanged; one serial
+CURRENT: P2m CI repair owns tools/test-header-ui.mjs +4docs at HEAD/origin2ec61c0; indexempty.
+Serial35gatesr14/AFmini r2GREEN2/finalnativefocusedr9GREEN36; independentALL24+4review CLEAR.
+Freeze r2 EXECUTED40bindings/486native485CI/40axes; onlyheaderprobe differsfromoriginalfreeze.
+ONEfullnative r2 completedEXIT0/486namesExact/40emptyaxes; ALL138 independentPNG review CLEAR.
+Replacementintegration/exact485CI/Pages4bytes stillUNRUN. No browser/test remains; no duplicate run.
+Logs .out/p2m-full-native-r2-20261007{-outer.log,.log,.json,-readback.json}.
+Preserve unrelated paths.
+Original P2m FULL NATIVE r1 GREEN, independent full review CLEAR. Frozen r1 unchanged; one serial
 run EXIT0, actual486 checks (484unique; retained invalid-import repeats), exact original+21 multiset,
 721738ms,t07:57:42.295Z. Actual8130152B SHA405df65dd36427c3f044156f28c61271547067db619b6669587fc8fadd5f6eee;
 log135074B SHAdcc4cdd1e8036f2501a93f7b3085c5541fa7317da71d195be11de2529ebe91c2.
@@ -18,8 +25,95 @@ full screenshot count). Root10currentkeyPNG +2priorcomparisonPNG viewed; indepen
 Incidental debt confirmed by actual priorP2l/native114-image receipt and corresponding current images:
 320px sandbox Screens tab clipped; Moments caption may sit behind sticky tabs. Both pre-existP2m
 and their CSS/controller sources are unchanged. Keep openP2 workbench/P6 presentation, no wholeHUD claim.
-NEXT stageONLY11owned/index40; commitpushmain; exactCI485/
-all28explicitsteps andPages4runtimebytes. No runtime/test edits afterfreeze. ImmediatelyP2n atgreen.
+INDEX11owned/40frozen bindings CLEAR; committed/pushed main 2ec61c04ca6525902aedef534a556124e905fec8, HEAD=origin/main.
+CORRECTION: CI37593724002 FAILED at exact2ec61c04ca6525902aedef534a556124e905fec8;
+Pages37593724069 completedSUCCESS but public4bytes are UNRUN and this is not acceptance.
+Actualfailed artifact11469652391:195checks/194passed+harnessfailure,520600ms,t08:26:43.802Z,
+289011B SHAd59a0dccba8436968c3e3b432148dc9de94ecda4f4696f72ebc46c173ecd8f77.
+All28 explicitstandalone steps passed; headerControls first readiness timed out original15000ms
+before anyheader assertions. Actualsoftwareground47.435756685928965→62.4870069790148, next62.52666571648039
+at11154ms: renderedcameraY still easing. No console/dock/header warnings/errors; header stages false;
+11actual emptyaxe arrays are incomplete, not40scope acceptance. Preserve actualfailed log/JSON:
+.out/p2m-failed-ci-37593724002-r1-20261007.log and
+.out/p2m-exact-ci-37593724002-failed-artifact-r1-20261007{.json,-readback.json}.
+Root and ONE existingread-only helper challenge boundedrepair. Viewportdiagnosisr1 failedpreflight
+(open narrow sandbox occludedPause); correctedr2 FAILED15s at320x480 with40sources unchanged.
+Reject viewportrehearsal; retain both .out/p2m-ci-viewport-diagnosis-r{1,2}-20261007 receipts.
+Written trajectory repaircontract in PLAN/DEC0045 replaces false pausedcamera stationarity with
+exact per-frame detachedcounterfactual noninterference. ONLY tools/test-header-ui.mjs +4docs owned;
+39other frozen files remainbyteunchanged. Firstimplementation under review; softwarefocusedr1 is
+diagnosticONLY. Six independent sourcefindings queued: share comparison+latch with controls;
+harvest failedarchives beforethrow; unconditionalfinallycleanup; boundedactualframeadvance;
+retain epochs across neutralactions; inverseprojection+finiteguard. No sourceedits duringprobe.
+Deterministicr9 all35EXIT0 but browserlaunch overlappedfinalcommands: EXCLUDED fromacceptance,
+repeatserially on repairedfinalcandidate. OriginalnativeGREEN remains distinct from repairedwitness.
+Softwarefocusedr1 was deliberatelyclosed after sourcefindings, NOTproductfailure/acceptance:
+22checks/21pass+browserclosedharness, actual13314B SHA60df04ded24516ba7bbee139eb85f6c27df03ea5d158f4ed3a659a093cfebad7.
+Allsixsourcefindings corrected; independentSOURCECLEAR,39/40originalbindings unchanged.
+Serial deterministicr10 all35EXIT0. Final nativefocusedr6 EXIT0 actual36/36unique,148353ms,
+t09:02:02.699Z,752133B SHAcd2e35939471df343104a6c3fa48ee0ff60f117ada9b73f32f9936386cdbf02c.
+All40sourcebeforeafter/lastresultbyteequal; headerAxe/errors/warnings empty/all3hooks true.
+Four phase-attributedepochs1248/633/870/481actualframes exact/restored/0failures;14B+alias/A/A2;
+overwrittenposition/quaternion compareequal afterwards butmonitor remainsfailed. Root5actualkeyPNG
+viewed; independentALL24image/receipt review underway. .out/p2m-focused-native-r6-20261007 receipts.
+Softwarefocusedr2 FAILEDONE of35 in544298ms, actual748547B SHA
+d23abaa8f14e9dc6611bbd4a550ea496813c7eca87115acc6456a91b1704b841: firstInspect focus sampled
+before nativeclose handler. Other34checks/4cameraepochs/14B+alias/zeroaxeserrors pass atTHATsource.
+Probe now observes actualclosed result/connectedvisibleenabledfocusedAfteraction within the SAME
+total15s, records passive closeevents and all13returns, retains partial traces ontimeout and asserts
+counts1..13. No syntheticfocus/retry/extraaction/runtimechange. Independent finalSOURCECLEAR.
+Nativefocusedr7 GREEN36/150715ms/780555B SHAf0ce4cb68b1c3c82b7558440be29c90bf84b3941ad03628f790d84aed8b3efcb
+predates final partialtrace/cardinality hardening; historicalonly. Serial deterministicr13 all35EXIT0
+on finalcandidate; nativefocusedr8 GREEN36/36unique/152411ms,t09:30:56.276Z,780743B SHA
+029102957a61e51a12131eb955f1a689f8f4d69b08a60732d92e666beac5329e; source40/last-result equal,
+zeroaxes/errors/warnings/allstages true. Fourphaseepochs1374/702/968/456exact/restored/zeroerrors;
+14B+alias/A/A2; all13nativecloseevents/focusreturns82msmax. Root4actualPNGviewed; independent
+ALL24native review CLEAR atitsownsource. SoftwareAFmini r1 FAILED1/2 in185950ms,138082B SHA
+fede4c3c1754aed57190b10fc592ca6b390736847e7cdde4b804a77f8da44e67; genuineCS27.0833sim/fourconserved
+snapshots/107exactcameraframes/all13focusreturns pass, but queuedcloseevents lag: return4has3,
+return13has12; delayed5th event sees nextopen/result-action. Independentactualsource/ALL4PNG CLEAR
+forcause; UA-specific mechanism is inference. BeforeeditPLAN fixes waiter torequire exactexpected
+cumulativeclosecount and closed/focused events PLUSactualclosed/focus, SAME15s/noextraactions.
+Applied; serialdeterministicr14 ALL35EXIT0. RevisedsoftwareAFmini r2 GREEN2/2/158305ms,
+t09:39:19.509Z,138625B SHA9571cdf41620acb9421aa86323f92fabcea2ff948d662d249b544c9571fa1196, ONLY
+twoexistingcategories/fourviewports/13nativeevents/onecameraepoch/40bindings. Startupdriverwarnings
+preservedraw/useexistingmainfilter; scopedheaderwarnings strictzero, request/HTTPerrors instrumented.
+Source40unchanged/118exactrestoredframes/zeroerrors, actual13events+returns8–593ms; root2PNGviewed,
+independentALL4review CLEAR. Native r8 nowhistorical duewaiterchange; native r9 GREEN36/36unique,
+137781ms,t09:42:42.475Z,780483B SHAc5507103b13a4f400b6201cad267776b81ce26e2d4cbe2c8349aa2b7e1a365c9.
+All40bindings/last-result unchanged, emptyaxes/errors/warnings/allstages true; fourepochs
+1183/605/951/509exact/restored/0failure,14B+alias/A/A2,13returns12–83ms/counts1..13. Root4PNG
+viewed; independentALL24review CLEAR. Native r9 andsoftwaremini2 source40 are identical.
+Independentcurrent receipts/24native+
+4softwarePNGreview CLEAR; freeze r2EXECUTED40bindings/486native485CI/40axes. Fullr2completedEXIT0:
+486/486namesexact(484unique),761085ms,t09:47:34.945Z,8259417B SHA
+a35a538c52ad5934bd4865de2f2757cd772b0f39ab29c0552b3c53a2426f2ff9; log152320B SHA
+19f91c7fe17555a40877dbd6146431c9e024dc4133598cd0076f0b67205f0db9. All40axes/errors/warnings/
+dock/headerwarnings empty/all3stages true; lastresultbyteequal/source40unchanged; cameraepochs
+1329/690/910/441exact/restored/0failure,13closeevents/returns11–64ms/counts1..13. Actual138unique
+existingPNG signatures checked; root10keyPNG viewed; independentALL138review CLEAR. Headerprobe
+56214B SHA5efd44f111b9d52296d8119ebe06727a043c24263d5abecb227091e2b323883e;39locks unchanged.
+Fetch10:02UTC completed; reconcile HEAD/origin beforestage. No repairedintegration yet; indexempty.
+Afterclear explicitowned5stage/index40/commitpushmain/exact485CI28steps/Pages4. No overlappingwriters.
+Independentfullreadback also binds realintroUS45.5354sim/firstcard47236wallms/idlegenuineCS27.2761,
+savedUS45.5329/15losses andCS19.2168/2losses, reveal9true/recovery2puts0writesafterabort.
+ExistingP2/P6 camp-origin truncation confirmed in m1-camp-issued-focus-320/m1-camp-desk-button-320
+at09:47:34.945Z; src/ui/entry.js/reward/sequence.js/reward.css byte-locked unchanged. Keep separate
+from readableheader acceptance, alongside Screens/Moments andAFfeedback debt. No broaderHUD claim.
+P2n remains draftonly until repaired exactCI/all485/40axes/Pages4bytes accepted. Success-onlycollector:
+node .out/p2m-collect-completed-r2-20261007.mjs <replacementCIid> <replacementFullSHA> <replacementPagesid>
+onlyafter actualCI andPagescompletedSUCCESS. No acceptance fromjobmetadata alone. No runtime/test edits afterfreeze. ImmediatelyP2n atgreen.
+
+Read-only next-slice preflight while P2m CI runs (2026-10-07): P2n draft at
+.out/p2n-contract-draft-r1-20261007.txt is NOT ACTIVE/product implementation. Root + independent
+source challenge retain transient camera/native scene-depth seam; clarify restore-before-pick,
+held-key exit latch, actual figure-object membership/f.yaw, deliberate pre/post-animation LOD,
+current resize/Auto intent and idempotent depth/material disposal. Proposed15owned/20newUI/
+20+20pure/40gatecommands/44sourcebindings/506native505CI/41axes/30explicitsteps remain subject to
+exact final PLAN contract AFTER P2m exactCI/Pages acceptance. No runtime edits/localbrowser duringCI.
+Future historical source read confirmed live NPS Fraley page's250 remainsone source, no new Verified
+strength/timing/geometry admission. LOC page+JSON inaccessible via web tool; existing old references
+preserved, no inferred coordinates/units/asset copied. Unrelated Shiloh preflight remains unstaged.
 
 Earlier focused boundary (completed before full native): deterministicr8 all35EXIT0; focusednativer5 EXIT0 actual36/36
 unique in165304ms,t07:51:22.494Z,654954B SHA7217c541d5c17b1bedde782d79ad7ca60eabc2735d7703bb4d2ac00742ca61c5.

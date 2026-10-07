@@ -1,5 +1,19 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0045 · Header probes conserve the camera's ordinary easing trajectory (2026-10-07)
+
+Exact CI failed while a paused game's camera still eased; the smaller tested viewport also missed
+the unchanged 15-second fixed-point gate. That static oracle cannot describe paused camera behavior.
+Keep runtime and budgets unchanged. Predict each actual camera timestep on a detached original-state
+clone, compare exact pose and controls before and after the live update, and retain every mismatch.
+Only genuine explicit camera actions open a documented new epoch; errors cannot disappear through
+rebasing. Native resizing supplies expected projection from viewport dimensions. Detached A/B/A2
+controls challenge the same comparator, and cleanup restores the original method and listener shape.
+This proves header noninterference during normal easing; it does not claim stationary rendering.
+Software evidence also separated native focus return from the queued dialog close event. Observe
+both before the next ordinary reopen, with the original total 15-second limit. The probe records
+all 13 close events and focus returns, retains failure traces, and never manufactures focus.
+
 ## 0044 · Header wraps naturally; native panes own reading keys and connected focus (2026-10-07)
 
 Native BASE proved narrow speed clipping, hidden Army and focus falling to BODY after a real
