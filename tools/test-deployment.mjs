@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { savedDeployment, savedOutcome, DEPLOYMENT_LIMITS } from '../src/franchise/practice.js';
+import { savedDeployment, savedOutcome, assertSavedLaunch, assertSavedReward, DEPLOYMENT_LIMITS } from '../src/franchise/practice.js';
 import { completedSnapshot, validateSnapshot, exportSnapshot, createProgressStore, exchangeDepot, MAX_SAVE_BYTES } from '../src/franchise/save.js';
 import { SAMPLE_ARMY, itemDef } from '../src/reward/data.js';
 import { rollLoot, seedOf } from '../src/reward/model.js';
@@ -19,7 +19,8 @@ const copy = (v) => structuredClone(v), ground = JSON.parse(readFileSync(new URL
 const hash = (b) => createHash('sha256').update(b).digest('hex');
 const bindings = ['src/franchise/practice.js', 'tools/test-deployment.mjs', 'src/franchise/save.js', 'src/reward/model.js',
   'src/reward/data.js', 'src/units/unit.js', 'src/units/battery.js', 'src/sim/combat.js', 'src/game.js',
-  'src/ui/arrows.js', 'src/ui/input.js', 'src/sim/rules.js', 'src/franchise/intro.js', 'assets/scenarios/henry-hill.json'];
+  'src/ui/arrows.js', 'src/ui/input.js', 'src/sim/rules.js', 'src/franchise/intro.js', 'assets/scenarios/henry-hill.json',
+  'src/entry.js', 'src/main.js', 'src/ui/entry.js', 'src/franchise/practice-ui.js', 'src/ui/practice-field.js', 'src/reward/sequence.js'];
 const source = bindings.map((path) => { const b = readFileSync(new URL('../' + path, import.meta.url)); return { path, bytes: b.length, sha256: hash(b) }; });
 console.log('DEPLOYMENT SOURCE ' + JSON.stringify(source));
 const terrain = { half: 1300, heightAt: () => 0, slopeAt: () => 0, inBounds: (x, z) => Math.abs(x) <= 1300 && Math.abs(z) <= 1300 };
@@ -56,6 +57,7 @@ function fixture(a = api, change = () => {}) {
   return { input, manifest, game };
 }
 const api = { launch: savedDeployment, outcome: savedOutcome, actual, reserve: (m) => m.reserve,
+  launchGuard: assertSavedLaunch, rewardGuard: assertSavedReward,
   complete: (s, result, previous) => s.complete(result, { previous }) };
 const broken = (v) => ({ ...api, ...v });
 const changedLaunch = (fn) => broken({ launch: (input) => fn(copy(savedDeployment(input)), input) });
@@ -72,6 +74,23 @@ function assertions(name) {
       if (error && (!(error instanceof Error) || !pattern.test(error.message))) throw error;
       assert.ok(error instanceof Error, `${name}: ${why}`); } };
 }
+
+test('authentic-launch-recheck', (a, t) => {
+  const manifest = a.launch(args());
+  t.eq(a.launchGuard(manifest), manifest, 'authentic definitions accepted without allocations');
+  t.eq(a.launchGuard(manifest, copy(manifest.baseline)), manifest, 'exact canonical re-read accepted');
+  t.refuses(() => a.launchGuard(copy(manifest)), 'copied manifest refused');
+  t.refuses(() => a.launchGuard(manifest, null), 'missing baseline refused');
+  t.refuses(() => a.launchGuard(manifest, { ...copy(manifest.baseline), awardId: 'other-tab' }), 'stale read cannot admit');
+}, broken({ launchGuard: (m) => m }));
+
+test('authentic-prepared-reveal', (a, t) => {
+  const f = fixture(a), result = a.outcome(f);
+  t.eq(a.rewardGuard(result), result, 'real terminal roll consumed without reconstruction');
+  t.refuses(() => a.rewardGuard(copy(result)), 'copied outcome cannot become another roll');
+  t.refuses(() => a.rewardGuard(null), 'missing prepared reward refuses');
+  t.eq(a.outcome(f), result, 'same authentic cached outcome');
+}, broken({ rewardGuard: (r) => r }));
 
 test('whole-army-and-dormant', (a, t) => {
   const f = fixture(a); t.eq(f.manifest.scenario.units.filter((u) => u.side === 'US').map((u) => u.id), ['b1', 'b2', 'bA'], 'every capable formation, infantry first');

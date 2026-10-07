@@ -6,7 +6,8 @@
 #front #entry-title { max-width: 640px; margin: 70px auto; }
 #front h1 { font-size: clamp(32px, 4.8vw, 56px); line-height: 1.12; margin: 0 0 18px; }
 #front #entry-note { font-size: 19px; line-height: 1.6; max-width: 520px; }
-#front button, #front .entry-primary, #front .entry-modes a { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 10px 18px; color: var(--rw-ink); background: var(--rw-faint); border: 1px solid #827c8b; border-radius: 9px; font: inherit; text-decoration: none; cursor: pointer; }
+/* wcag-auditor: contrast fix from #827c8b to #9b93a5 for AA compliance */
+#front button, #front .entry-primary, #front .entry-secondary, #front .entry-modes a { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 10px 18px; color: var(--rw-ink); background: var(--rw-faint); border: 1px solid #9b93a5; border-radius: 9px; font: inherit; text-decoration: none; cursor: pointer; }
 #front button.entry-primary, #front a.entry-primary { background: var(--rw-btn); color: var(--rw-btn-ink); border-color: transparent; font-size: 18px; font-weight: 800; padding: 14px 30px; }
 #front button:disabled { cursor: default; color: var(--rw-dim); }
 #front .entry-transfer, #front .entry-modes, #front .entry-pages { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
@@ -43,6 +44,12 @@
 #front #camp-compare th:first-child { text-align: left; }
 #front .camp-compare-actions { display: flex; flex-wrap: wrap; gap: 10px; }
 #front .camp-compare-actions button { margin: 0; flex: 1 1 auto; }
+#front .entry-field-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+#front #deploy-review { box-sizing: border-box; width: min(620px, calc(100vw - 32px)); max-width: none; padding: 20px; }
+#front #deploy-review h2, #front #deploy-review li { overflow-wrap: anywhere; }
+#front #deploy-review li { margin: 12px 0; line-height: 1.5; }
+#front #deploy-review button { max-width: 100%; white-space: normal; }
+#front #deploy-dormant summary { min-height: 48px; cursor: pointer; padding: 12px 0; box-sizing: border-box; }
 @media (max-width: 850px) { #front .rw-brigs, #front #camp-depot { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) {
   #front .entry-wrap { padding: 18px 14px 32px; }

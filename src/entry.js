@@ -2,10 +2,15 @@
 const q = new URLSearchParams(location.search);
 if (['intro', 'practice', 'battle', 'sandbox', 'tune'].some((key) => q.has(key))) {
   document.getElementById('battle').hidden = false;
-  await import('./main.js');
+  await (await import('./main.js')).startField();
 } else {
   const { mountEntry } = await import('./ui/entry.js');
-  mountEntry({ camp: q.has('camp') });
+  mountEntry({ camp: q.has('camp') || q.has('saved'), deploy: q.has('saved'),
+    onDeploy: async (options) => {
+      const field = await import('./main.js');
+      if (!options.isCurrent()) throw new Error('Practice: deployment review was cancelled.');
+      return field.startField(options);
+    } });
 }
 // Entry pages also participate in the installed app's existing cache.
 if (location.protocol === 'https:' && 'serviceWorker' in navigator && !q.has('nosw')) {

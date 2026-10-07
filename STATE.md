@@ -16,4 +16,4 @@
 - **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
 - **Proof:** P2k2a19+19, named23+23/115/A126-B-A2, retained183+183/unit; frozen native394/394/29axe;4+17hashes.
 - **Coordination:** no ledger/competing writer; root sole writer; preserve workspace/Shiloh; no duplicate goal/scheduler.
-- **Runtime/WIP:** de159d3 P2k1 green; root P2k2a pure candidate verified, owned practice/test/CI/sw/docs; commit/exactCI pending; nextP2k2b.
+- **Runtime/WIP:** HEAD/origin deacdf3; P2k2b rootWIP,21+21/retained green; focusedr8 67/67; frozen447/447,38axe/34hashes/full independent review CLEAR; commit/exact446CI/Pages pending; inherited320dock open.

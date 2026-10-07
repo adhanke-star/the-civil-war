@@ -1,5 +1,16 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0041 · Authenticated saved field handoff and new-loot-only completion (2026-10-06)
+
+Saved camp uses a native cancellable review, pure admission before field requests, then explicit
+startField with an exact canonical launch re-read before WebGL. No auto-boot on module import or
+persistent launch slot. A prepared authentic frozen terminal result reveals only new loot and saves
+against the immutable launch baseline; camp retains all issuing and pagination. This conserves
+identities/5000issued prefix, avoids thousands of inherited cards, and makes stale or failed saves
+exportable without replacement consent/rebase. Legacy field/reward routes retain their behavior.
+Root alone implements; scoped native flow/keyboard/axe/source/receipt review is required before
+route acceptance. Full v1, campaign/art/native-device evidence stays open.
+
 ## 0040 — Saved practice admits the whole army before field allocation (2026-10-06)
 Use an immutable canonical baseline/fictional manifest in existing practice seam, and preserve
 all brigade/gear/depot/issued identities. Conservative input bounds match HenryUS pool ceiling;

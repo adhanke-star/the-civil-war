@@ -16,10 +16,34 @@ import { Input } from './ui/input.js';
 import { Readout } from './ui/readout.js';
 import { LOOK } from './ui/look.js';
 import { defineSandboxTools } from './ui/sandbox-tools.js';
-import { playMode } from './franchise/practice.js';
+import { playMode, assertSavedLaunch } from './franchise/practice.js';
+import { createProgressStore } from './franchise/save.js';
 import { attachPracticeFlow } from './franchise/practice-ui.js';
 import { introScenario } from './franchise/intro.js';
 import { attachPracticeField } from './ui/practice-field.js';
+
+let fieldClaimed = false;
+// Importing this module has no field side effects. The owner commits navigation only after recheck.
+export async function startField({ manifest = null, isCurrent = () => true, onAdmitted = () => {} } = {}) {
+  if (!isCurrent()) throw new Error('Practice: deployment review was cancelled.');
+  if (fieldClaimed) throw new Error('Practice: this page already owns a field. Return to camp before another deployment.');
+  if (manifest) {
+    assertSavedLaunch(manifest);
+    if (manifest.scenario.id !== 'saved-practice' || !Array.isArray(manifest.scenario.sites)
+      || !Array.isArray(manifest.scenario.woods)) throw new Error('Practice: the deployment needs its complete practice ground.');
+    if (['intro', 'practice', 'battle', 'sandbox', 'tune'].some((key) => new URLSearchParams(location.search).has(key))) {
+      throw new Error('Practice: saved deployment cannot override another field mode.');
+    }
+  }
+  fieldClaimed = true;
+  let allocated = false;
+  try {
+    if (manifest) {
+      const current = await createProgressStore().load();
+      assertSavedLaunch(manifest, current);
+      if (!isCurrent()) throw new Error('Practice: deployment review was cancelled.');
+      onAdmitted();
+    }
 
 const stats = { fps: 0, scale: 1, quality: 'auto', drawCalls: 0, triangles: 0, figures: 0 };
 window.__stats = stats;
@@ -46,6 +70,7 @@ function savePref(key, value) {
   }
 }
 
+allocated = true;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
 renderer.autoClear = false;
 renderer.info.autoReset = false;
@@ -65,8 +90,8 @@ const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerH
 statusEl.textContent = 'Loading the ground…';
 const terrain = await loadTerrainData('./assets/terrain');
 const mode = playMode(location.search);
-const ground = await (await fetch('./assets/scenarios/henry-hill.json')).json();
-const scenario = mode === 'practice' && !new URLSearchParams(location.search).has('practice') ? introScenario(ground) : ground;
+const ground = manifest ? null : await (await fetch('./assets/scenarios/henry-hill.json')).json();
+const scenario = manifest?.scenario ?? (mode === 'practice' && !new URLSearchParams(location.search).has('practice') ? introScenario(ground) : ground);
 const world = buildWorld(scene, terrain, scenario);
 Object.assign(stats, world.stats);
 
@@ -130,7 +155,9 @@ document.title = `The Civil War — ${scenario.title}`;
 game.on('select', (u) => hud.select(u));
 game.on('log', (text) => hud.toast(text));
 game.on('event', (ev) => {
-  if (LOOK.eventFeed) hud.feed(ev); else hud.toast(ev.text);
+  const shown = manifest && ev.kind === 'result' ? { ...ev,
+    text: 'Practice encounter completed. Actual survivors and new loot return to camp.' } : ev;
+  if (LOOK.eventFeed) hud.feed(shown); else hud.toast(shown.text);
   if (ev.kind === 'result') practiceFlow?.finishResult();
 });
 game.on('alert', (a) => { hud.setPaused(true); hud.showAlert(a); });
@@ -147,8 +174,8 @@ const input = new Input({
 });
 const readout = new Readout({ scene, terrain, camera, game, layer: document.getElementById('ticks') });
 defineSandboxTools({ game, rts, effects, hud });
-practiceFlow = attachPracticeFlow({ game, scenario, hud, mode });
-const practiceField = attachPracticeField({ game, scenario, hud, camera, terrain, rts, effects });
+practiceFlow = attachPracticeFlow({ game, scenario, hud, mode, manifest });
+const practiceField = attachPracticeField({ game, scenario, hud, camera, terrain, rts, effects, manifest });
 document.getElementById('play-mode').textContent = mode === 'practice'
   ? 'Practice · rewards enabled' : mode === 'historical' ? 'Historical battle · no franchise rewards' : 'Sandbox · no progress rewards';
 // keep the pause/speed buttons in step with keyboard changes
@@ -236,14 +263,14 @@ function frame(now) {
   }
   if (!window.__ready) {
     window.__ready = true;
-    statusEl.textContent = scenario.practiceIntro ? 'Your first command is ready. Continue begins the fictional practice fight.'
+    statusEl.textContent = manifest ? 'Your saved army is ready. Continue begins the fictional exercise; losses return to camp.' : scenario.practiceIntro ? 'Your first command is ready. Continue begins the fictional practice fight.'
       : 'Henry House Hill, 21 July 1861. Union brigades are below the hill; Jackson holds the crest.';
   }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
-window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, readout, gpuTier, practice: practiceFlow, practiceField };
+window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, readout, gpuTier, practice: practiceFlow, practiceField, manifest };
 
 // Developer tuning panel (lil-gui), only with ?tune in the URL; players never load it.
 if (new URLSearchParams(location.search).has('tune')) {
@@ -258,4 +285,9 @@ if (new URLSearchParams(location.search).has('sandbox')) {
 // Installable app: the service worker only on the live https site (local http dev and tests never get one); ?nosw skips it.
 if (location.protocol === 'https:' && 'serviceWorker' in navigator && !new URLSearchParams(location.search).has('nosw')) {
   navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('service worker not registered:', err && err.message ? err.message : err));
+}
+  } finally {
+    // Once allocated, a retry needs a new page; never stack GPU state, listeners or RAF loops.
+    if (!allocated) fieldClaimed = false;
+  }
 }

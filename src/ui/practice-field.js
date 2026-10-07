@@ -3,13 +3,17 @@ import * as THREE from 'three';
 import { TIER_BY_ID } from '../reward/data.js';
 
 const GLYPHS = { circle: '●', square: '■', diamond: '◆', hexagon: '⬢', star: '★' };
-export function attachPracticeField({ game, scenario, hud, camera, terrain, rts, effects }) {
+export function attachPracticeField({ game, scenario, hud, camera, terrain, rts, effects, manifest = null }) {
   if (!game.fieldCaptures.crates.length) return { update() {}, started: true };
   const intro = document.getElementById('intro'), start = document.getElementById('intro-start');
   const hint = document.getElementById('intro-hint'), tip = document.getElementById('tip');
   const counter = document.getElementById('capture-count'), layer = document.getElementById('field-crates');
   const stores = document.getElementById('field-stores'), actions = document.getElementById('stores-actions');
   const selection = document.getElementById('stores-selection'), timer = document.getElementById('intro-timer');
+  if (manifest) {
+    document.getElementById('intro-title').textContent = 'Your army on practice ground';
+    document.getElementById('intro-text').textContent = `${manifest.allocation.formations} active formations · ${manifest.allocation.men.toLocaleString()} men · ${manifest.allocation.guns} guns. Hold the ground for 45 seconds and march onto stores. ${manifest.dormant.length} dormant formations stay unchanged in camp. Your actual losses and new loot return to camp; equipment and strengths are game values.`;
+  }
   const v = new THREE.Vector3();
   const markers = game.fieldCaptures.crates.map((c) => {
     const t = TIER_BY_ID[c.tier], n = document.createElement('p'); n.className = 'field-crate';
@@ -97,12 +101,12 @@ export function attachPracticeField({ game, scenario, hud, camera, terrain, rts,
     }
     if (!scenario.practiceIntro || !started) return;
     hint.hidden = game.over || document.querySelector('main').inert;
-    const message = !selected ? '1 · Select a blue brigade flag. Your two brigades can hold off this approach.'
+    const message = !selected ? (manifest ? '1 · Select a blue brigade flag. Hold the ground with your saved formations.' : '1 · Select a blue brigade flag. Your two brigades can hold off this approach.')
       : !game.orders ? '2 · Drag from your brigade toward the Rare crate to march. It halts to fight on the way; Charge is a separate order.'
         : '3 · Hold stores for two seconds to capture them. Stop the enemy before it reaches your ground. Retaken crates lose their loot.';
     if (hint.textContent !== message) hint.textContent = message;
     timer.hidden = game.over;
-    const timeText = `${Math.max(0, Math.ceil(45 - game.simTime))} seconds until the issue.`;
+    const timeText = `${Math.max(0, Math.ceil(45 - game.simTime))} seconds until ${manifest ? 'the result' : 'the issue'}.`;
     if (timer.textContent !== timeText) timer.textContent = timeText;
   }
   return { update, get started() { return started; } };

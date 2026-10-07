@@ -10,7 +10,7 @@ const WEAPONS = { infantry: new Set(['smooth', 'rifled']), artillery: new Set(['
 // Input limits, not a measured hardware promise. No field imports or allocations in this seam.
 export const DEPLOYMENT_LIMITS = Object.freeze({ formations: 5, men: 7240, guns: 12, figures: 1490,
   infantryMen: 3000, batteryMen: 120, batteryGuns: 6, halfMap: 1300, margin: 20 });
-const manifests = new WeakSet(), outcomes = new WeakMap();
+const manifests = new WeakSet(), outcomes = new WeakMap(), prepared = new WeakSet();
 const bytes = (v) => new TextEncoder().encode(JSON.stringify(v)).length;
 function frozen(v) {
   if (v === null || typeof v !== 'object') return v;
@@ -19,6 +19,21 @@ function frozen(v) {
 const capable = (b) => b.men > 0 && (b.kind === 'infantry' || b.guns > 0);
 const lootUid = (awardId, seed, i) => `${awardId}.L${seedOf(seed).toString(36)}-${i}`;
 const captureOrigin = (c) => `Captured: ${c.name} (fictional practice stores)`;
+
+/** Definitions may be imported without field allocation; only an admitted manifest can boot. */
+export function assertSavedLaunch(manifest, current) {
+  if (!manifest || !manifests.has(manifest)) fail('deployment manifest is not the admitted launch baseline.');
+  if (arguments.length > 1 && (current === null || JSON.stringify(validateSnapshot(current)) !== JSON.stringify(manifest.baseline))) {
+    fail('saved progress changed after deployment was reviewed. Return to camp for a fresh review.');
+  }
+  return manifest;
+}
+
+/** The reward UI consumes the real terminal roll; forged/copied previews cannot replace it. */
+export function assertSavedReward(outcome) {
+  if (!outcome || !prepared.has(outcome)) fail('loot must use the frozen completed saved encounter.');
+  return outcome;
+}
 
 function lootReserve(baseline, scenario, awardId, seed) {
   // Explicit captures bypass the model's random capture count. Guarantee promotes an issue card.
@@ -146,6 +161,7 @@ export function savedOutcome({ manifest, game }) {
   const outcome = frozen({ snapshot, cards, captures, summary: { starting, surviving, losses: starting - surviving,
     guns: snapshot.army.reduce((n, b) => n + (b.guns || 0), 0), title: scenario.title, why: game.result.why } });
   outcomes.set(manifest, outcome);
+  prepared.add(outcome);
   return outcome;
 }
 

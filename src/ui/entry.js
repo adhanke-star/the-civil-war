@@ -3,15 +3,17 @@ import { createProgressStore, parseSnapshot, exportSnapshot, exchangeDepot, MAX_
 import { get } from '../settings.js';
 import { brigCard, staticCard, itemLabel, defineRewardSettings } from '../reward/sequence.js';
 import { compare, bestFit } from '../reward/model.js';
+import { savedDeployment } from '../franchise/practice.js';
 
 const PAGE_SIZE = 12;
 const STYLE = { 'clean modern': 'modern', 'period desk': 'desk', hybrid: 'hybrid' };
-export function mountEntry({ camp = false } = {}) {
+export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
   defineRewardSettings();
   const store = createProgressStore();
   let saved = null, failed = false, pendingImport = null, pendingName = null, importing = false;
   let pendingBaseline, baselineKnown = false, phase = 'idle';
   let pendingExchange = null, activeReview = null;
+  let activeDeployment = null, disposed = false;
   const pages = { army: 0, depot: 0 };
   const root = document.createElement('main'); root.id = 'front'; root.className = 'rw rw-counts';
   root.dataset.uiStyle = STYLE[get('screens.cardStyle')] || 'modern';
@@ -24,8 +26,8 @@ export function mountEntry({ camp = false } = {}) {
       </section>
       <section id="entry-camp" aria-labelledby="entry-camp-heading" hidden>
         <header class="entry-camp-head"><div><p class="rw-eyebrow">Between battles</p><h1 id="entry-camp-heading">Your army</h1><p id="entry-summary"></p></div>
-          <a id="camp-practice" class="entry-primary" href="./?intro">Practice again</a></header>
-        <p class="entry-note">Practice again starts the original teaching formations. Your saved army stays here until you explicitly replace it after another result.</p>
+          <div class="entry-field-actions"><button id="camp-deploy" class="entry-primary" type="button">Deploy saved army</button><a id="camp-practice" class="entry-secondary" href="./?intro">Practice again</a></div></header>
+        <p class="entry-note">Deploy fights with your saved formations and equipment; actual losses return here. Practice again starts the original teaching formations and asks before replacing your army.</p>
         <section aria-labelledby="camp-army-heading"><h2 id="camp-army-heading">Brigades</h2><div id="camp-army" class="rw-brigs is-static" role="list" aria-label="Saved brigades"></div><div id="army-pages" class="entry-pages"></div></section>
         <section aria-labelledby="camp-depot-heading"><h2 id="camp-depot-heading" tabindex="-1">Depot</h2><p id="depot-note"></p><div id="camp-depot" role="list" aria-label="Saved depot"></div><div id="depot-pages" class="entry-pages"></div></section>
       </section>
@@ -39,6 +41,12 @@ export function mountEntry({ camp = false } = {}) {
       <label for="camp-recipient">Issue to</label><select id="camp-recipient"></select><p id="camp-recipient-name"></p>
       <div id="camp-ratings"></div><p id="camp-exchange-note" role="status"></p>
       <div class="camp-compare-actions"><button id="camp-compare-cancel" type="button">Cancel</button><button id="camp-issue" type="button">Issue and save</button></div>
+    </dialog>
+    <dialog id="deploy-review" aria-labelledby="deploy-heading" aria-describedby="deploy-note">
+      <h2 id="deploy-heading" tabindex="-1">Deploy your saved army</h2><p id="deploy-note" role="status"></p>
+      <ul id="deploy-formations" aria-label="Formations taking the field"></ul>
+      <details id="deploy-dormant"><summary id="deploy-dormant-count"></summary><ul id="deploy-dormant-names" aria-label="Formations staying in camp"></ul></details><p class="entry-note">Fictional exercise on Henry Hill terrain. Strengths, equipment and rewards are game values. Survivors and new loot return to camp; no recruitment or historical outcome is implied.</p>
+      <div class="camp-compare-actions"><button id="deploy-cancel" type="button">Return to camp</button><button id="deploy-export" type="button" disabled>Export army at review</button><button id="deploy-again" type="button" hidden>Review again</button><button id="deploy-launch" class="entry-primary" type="button" disabled>Take the field</button></div>
     </dialog>`;
   document.body.append(root);
   const node = (id) => root.querySelector(`#${id}`), status = node('entry-status');
@@ -51,6 +59,7 @@ export function mountEntry({ camp = false } = {}) {
     node('entry-retry').hidden = !failed && !pendingImport && !pendingExchange;
     node('entry-retry').textContent = pendingExchange ? 'Retry reviewed exchange' : pendingImport ? 'Retry importing' : 'Retry loading';
     node('entry-import').disabled = importing || !!pendingExchange;
+    node('camp-deploy').disabled = importing || !!pendingImport || !!pendingExchange || !saved || failed;
     node('entry-retry').disabled = importing;
     node('entry-discard-exchange').hidden = !pendingExchange;
     node('entry-discard-exchange').disabled = importing;
@@ -100,7 +109,7 @@ export function mountEntry({ camp = false } = {}) {
     }
     controls();
     window.__entry = { mode: showCamp ? 'camp' : 'title', saved, failed, pending: pendingImport,
-      get exchange() { return pendingExchange; }, get importing() { return importing; } };
+      get exchange() { return pendingExchange; }, get importing() { return importing; }, get deployment() { return activeDeployment; } };
     document.title = `The Civil War — ${showCamp ? 'Your army' : 'Take the field'}`;
   }
   function focusStatus() { status.tabIndex = -1; status.focus(); status.scrollIntoView({ block: 'nearest' }); }
@@ -305,5 +314,134 @@ export function mountEntry({ camp = false } = {}) {
     if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   });
-  load();
+
+  const reviewDialog = node('deploy-review');
+  const currentDeployment = (task) => !disposed && activeDeployment === task && !task.cancelled && reviewDialog.open;
+  function deploymentBusy(task, message) {
+    task.busy = true; node('deploy-launch').disabled = true; node('deploy-again').disabled = true;
+    reviewDialog.setAttribute('aria-busy', 'true'); node('deploy-note').textContent = message;
+    node('deploy-heading').focus(); node('deploy-heading').scrollIntoView({ block: 'nearest' });
+  }
+  function finishDeployment(task) {
+    if (disposed || activeDeployment !== task || task.busy || task.admitted) return;
+    activeDeployment = null; importing = false; phase = 'idle'; render();
+    const target = task.trigger?.isConnected && !task.trigger.disabled && task.trigger.getClientRects().length
+      ? task.trigger : saved && !failed ? node('camp-deploy') : node('entry-retry').hidden ? node('entry-continue') : node('entry-retry');
+    target.focus(); target.scrollIntoView({ block: 'nearest' });
+  }
+  function cancelDeployment() {
+    const task = activeDeployment; if (!task || task.admitted) return;
+    task.cancelled = true; if (reviewDialog.open) reviewDialog.close('cancel');
+    finishDeployment(task); // an outstanding operation retains its owner until settlement
+  }
+  function deploymentFailure(task, error) {
+    node('deploy-note').textContent = `${error.message} No saved progress was changed. Export this file or return to camp; Review again reads a fresh army explicitly.`;
+    node('deploy-launch').disabled = true; node('deploy-again').hidden = false;
+    node('deploy-export').disabled = !task.raw;
+    node('deploy-export').textContent = task.baseline ? 'Export army at review' : 'Export stored file';
+  }
+  async function openDeployment(trigger = node('camp-deploy')) {
+    if (disposed || importing || pendingExchange || pendingImport) return;
+    importing = true; phase = 'reading'; controls();
+    const awardId = `saved-${globalThis.crypto.randomUUID()}`;
+    const task = { awardId, seed: awardId, trigger, cancelled: false, admitted: false, busy: true,
+      manifest: null, baseline: null, raw: null };
+    activeDeployment = task; reviewDialog.returnValue = 'cancel';
+    node('deploy-formations').replaceChildren(); node('deploy-dormant-names').replaceChildren();
+    node('deploy-dormant-count').textContent = ''; node('deploy-dormant').hidden = true; node('deploy-dormant').open = false;
+    node('deploy-export').disabled = true; node('deploy-again').hidden = true;
+    reviewDialog.showModal(); deploymentBusy(task, 'Loading your saved army before the field is loaded…');
+    try {
+      let baseline;
+      try { baseline = await store.load(); }
+      catch (error) { if (!disposed) { saved = null; failed = true; } throw error; }
+      if (!disposed) { saved = baseline; failed = false; }
+      if (!currentDeployment(task)) return;
+      if (!baseline) throw new Error('Practice: no completed army is saved yet. Choose introductory practice from camp.');
+      task.baseline = baseline; task.raw = exportSnapshot(baseline);
+      saved = baseline; failed = false;
+      // Admission precedes even small scenario metadata; no terrain/GPU/unit import is needed.
+      savedDeployment({ baseline, ground: {}, awardId, seed: task.seed });
+      const response = await fetch('./assets/scenarios/henry-hill.json');
+      if (!currentDeployment(task)) return;
+      if (!response.ok) throw new Error('Practice: the practice ground description could not be loaded.');
+      const ground = await response.json();
+      if (!currentDeployment(task)) return;
+      if (ground.id !== 'henry-hill' || !Array.isArray(ground.sites) || !Array.isArray(ground.woods)) throw new Error('Practice: the practice ground description is invalid.');
+      task.manifest = savedDeployment({ baseline, ground, awardId, seed: task.seed });
+      saved = baseline; failed = false; render();
+      const manifest = task.manifest;
+      for (const def of manifest.scenario.units.filter((d) => d.side === 'US')) {
+        const b = manifest.baseline.army.find((b) => b.id === def.id), row = document.createElement('li');
+        row.textContent = `${b.label} · ${b.men.toLocaleString()} men${b.kind === 'battery' ? ` · ${b.guns} guns` : ''} · ${itemLabel(b.weapon)} · ${b.weapon.from}${b.weapon.source ? ` · ${b.weapon.source}` : ''}`;
+        node('deploy-formations').append(row);
+      }
+      node('deploy-note').textContent = `${manifest.allocation.formations} active formations, ${manifest.allocation.men.toLocaleString()} men and ${manifest.allocation.guns} guns. Your whole active army fits this exercise. Hold the ground for 45 seconds. Take the field rechecks this exact reviewed army before loading the battlefield.`;
+      node('deploy-dormant-count').textContent = `${manifest.dormant.length} dormant formations stay unchanged in camp. Show names.`;
+      node('deploy-dormant').hidden = manifest.dormant.length === 0;
+      for (const id of manifest.dormant) {
+        const row = document.createElement('li'); row.textContent = manifest.baseline.army.find((b) => b.id === id).label;
+        node('deploy-dormant-names').append(row);
+      }
+      node('deploy-export').disabled = false; node('deploy-export').textContent = 'Export army at review';
+      node('deploy-launch').disabled = false; phase = 'reviewing';
+    } catch (error) {
+      if (!currentDeployment(task)) return;
+      if (!task.raw) {
+        try { task.raw = await store.readRawBaseline(); } catch { /* the failed read grants no export or write */ }
+        if (!currentDeployment(task)) return;
+      }
+      deploymentFailure(task, error);
+    } finally {
+      task.busy = false;
+      if (currentDeployment(task)) {
+        reviewDialog.setAttribute('aria-busy', 'false'); node('deploy-again').disabled = false;
+        node('deploy-heading').focus(); node('deploy-heading').scrollIntoView({ block: 'nearest' });
+      } else finishDeployment(task);
+    }
+  }
+  node('camp-deploy').addEventListener('click', () => openDeployment());
+  node('deploy-cancel').addEventListener('click', cancelDeployment);
+  reviewDialog.addEventListener('cancel', (e) => { e.preventDefault(); cancelDeployment(); });
+  reviewDialog.addEventListener('close', () => { if (!reviewDialog.open) cancelDeployment(); });
+  node('deploy-export').addEventListener('click', () => { const task = activeDeployment; if (task?.raw) download(task.raw); });
+  node('deploy-again').addEventListener('click', () => {
+    const task = activeDeployment; if (!task || task.busy) return;
+    const trigger = task.trigger; cancelDeployment(); openDeployment(trigger);
+  });
+  node('deploy-launch').addEventListener('click', async () => {
+    const task = activeDeployment;
+    if (!task?.manifest || task.busy || !currentDeployment(task) || node('deploy-launch').disabled) return;
+    phase = 'launching'; deploymentBusy(task, 'Rechecking the reviewed army before loading the field… Return to camp cancels this handoff.');
+    try {
+      if (typeof onDeploy !== 'function') throw new Error('Practice: the field launcher is unavailable.');
+      await onDeploy({ manifest: task.manifest, isCurrent: () => currentDeployment(task), onAdmitted: () => {
+        if (!currentDeployment(task)) throw new Error('Practice: deployment review was cancelled.');
+        task.admitted = true; disposed = true; reviewDialog.close('launch'); root.remove();
+        delete window.__entry;
+        const q = new URLSearchParams(location.search); q.delete('camp'); q.set('saved', '');
+        history.replaceState(null, '', location.pathname + '?' + q.toString());
+        document.getElementById('battle').hidden = false;
+      } });
+    } catch (error) {
+      if (currentDeployment(task)) deploymentFailure(task, error);
+      else if (task.admitted) {
+        const link = document.createElement('a'); link.href = './?camp'; link.textContent = 'Return to camp';
+        link.style.color = 'var(--focus)';
+        document.getElementById('status').replaceChildren(document.createTextNode(`${error.message} `), link);
+      }
+    } finally {
+      task.busy = false;
+      if (currentDeployment(task)) { reviewDialog.setAttribute('aria-busy', 'false'); node('deploy-again').disabled = false; }
+      else finishDeployment(task);
+    }
+  });
+  reviewDialog.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const stops = [...reviewDialog.querySelectorAll('button,summary')].filter((b) => !b.disabled && b.getClientRects().length);
+    const first = stops[0], last = stops[stops.length - 1];
+    if (e.shiftKey && [first, node('deploy-heading')].includes(document.activeElement)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  if (deploy) { render(); openDeployment(); } else load();
 }

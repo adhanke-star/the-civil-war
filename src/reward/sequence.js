@@ -20,6 +20,7 @@ import { TIER_BY_ID, CONDITION_BY_ID, conditionEffect, VETERANCY, GRADES, GRADE_
 import { rollLoot, ratings, compare, bestFit, equip, armsRating, canCarry, makeRng } from './model.js';
 import * as sfx from './sfx.js';
 import { validateSnapshot, completedSnapshot } from '../franchise/save.js';
+import { assertSavedReward } from '../franchise/practice.js';
 
 const STYLE_SLUG = { 'clean modern': 'modern', 'period desk': 'desk', hybrid: 'hybrid' };
 const BARS = [['fire', 'Fire'], ['melee', 'Melee'], ['morale', 'Morale'], ['drill', 'Drill']];
@@ -270,6 +271,10 @@ function trayTile(inst, t) {
 
 // ---- the sequence -----------------------------------------------------------------------------------------
 export function mountReward(root, opts = {}) {
+  const prepared = Object.hasOwn(opts, 'preparedOutcome') ? assertSavedReward(opts.preparedOutcome) : null;
+  if (prepared && (opts.completed || opts.army || opts.depot || opts.mode === 'one' || opts.legendary)) {
+    throw new Error('Practice: completed saved loot cannot be mixed with another reward mode.');
+  }
   if (active) active.unmount();
   defineRewardSettings();
   sfx.armAudio();
@@ -284,11 +289,12 @@ export function mountReward(root, opts = {}) {
   }
 
   const completed = opts.completed ? validateSnapshot(opts.completed) : null;
-  const seed = completed?.seed ?? opts.seed ?? Math.floor(Math.random() * 1e9);
-  const grade = completed?.grade ?? (GRADES.includes(opts.grade) ? opts.grade : 'Victory');
-  const awardId = completed?.awardId ?? opts.awardId ?? `demo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  const seed = prepared?.snapshot.seed ?? completed?.seed ?? opts.seed ?? Math.floor(Math.random() * 1e9);
+  const grade = prepared?.snapshot.grade ?? completed?.grade ?? (GRADES.includes(opts.grade) ? opts.grade : 'Victory');
+  const awardId = prepared?.snapshot.awardId ?? completed?.awardId ?? opts.awardId ?? `demo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   const starting = opts.army ? completedSnapshot({ awardId, army: opts.army, depot: opts.depot ?? [], issued: [], seed, grade }) : null;
-  const loot = completed ? { cards: [], captures: [] } : rollLoot({ seed, grade, captures: opts.captures, forceLegendary: !!opts.legendary });
+  const loot = prepared ? { cards: prepared.cards, captures: prepared.captures.map((c) => c.tier) }
+    : completed ? { cards: [], captures: [] } : rollLoot({ seed, grade, captures: opts.captures, forceLegendary: !!opts.legendary });
   let cards = loot.cards;
   if (starting) cards = cards.map((c) => ({ ...c, uid: `${awardId}.${c.uid}` }));
   if (opts.mode === 'one') {
@@ -304,7 +310,7 @@ export function mountReward(root, opts = {}) {
     onDone: opts.onDone,
     step: null,
     dealt: 0, up: cards.map(() => false), flipping: new Set(), skipping: false,
-    army: (completed?.army ?? starting?.army ?? SAMPLE_ARMY).map((b) => ({ ...b, base: { ...b.base }, weapon: { ...b.weapon } })),
+    army: (prepared ? [] : completed?.army ?? starting?.army ?? SAMPLE_ARMY).map((b) => ({ ...b, base: { ...b.base }, weapon: { ...b.weapon } })),
     armyStart: null,
     tray: [], log: completed?.issued.map((r) => ({ ...r })) ?? [],
     held: null, comparing: null, drag: null,
@@ -314,7 +320,7 @@ export function mountReward(root, opts = {}) {
     ui: {},
   };
   S.armyStart = S.army.map((b) => ({ ...b, base: { ...b.base }, weapon: { ...b.weapon } }));
-  S.tray = (completed?.depot ?? [...(starting?.depot ?? []), ...cards]).map((c) => ({ ...c }));
+  S.tray = (prepared ? cards : completed?.depot ?? [...(starting?.depot ?? []), ...cards]).map((c) => ({ ...c }));
 
   // ---- timing ----
   const speed = () => Number(get('screens.revealSpeed')) || 1;
@@ -328,6 +334,7 @@ export function mountReward(root, opts = {}) {
   const motionQuery = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
   S.reduced = !!(motionQuery && motionQuery.matches);
   const rootEl = el('div', { class: 'rw', role: 'region', 'aria-label': 'After action and loot', 'data-step': 'a' });
+  if (prepared) rootEl.dataset.savedDeployment = 'true';
   const bgB = el('div', { class: 'rw-bg-b', hidden: true, 'aria-hidden': 'true' });
   const flash = el('div', { class: 'rw-flash', 'aria-hidden': 'true' });
   const stage = el('div', { class: 'rw-stage' });
@@ -424,6 +431,7 @@ export function mountReward(root, opts = {}) {
   function renderReveal() {
     const n = S.cards.length;
     const deal = el('div', { class: 'rw-deal', role: 'group', 'aria-label': `Loot: ${n} card${n === 1 ? '' : 's'}` });
+    if (prepared) deal.tabIndex = 0;
     const nodes = S.cards.map((c, i) => lootCard(c, i, n));
     deal.append(...nodes);
     const btn = primary('Turn next card', onRevealPrimary, { kbd: 'Space' });
@@ -502,6 +510,11 @@ export function mountReward(root, opts = {}) {
     const n = S.cards.length;
     const W = deal.clientWidth;
     const H = deal.clientHeight;
+    if (prepared && matchMedia('(max-width: 700px)').matches) {
+      deal.style.setProperty('--cw', `${Math.max(1, Math.floor(Math.min(320, W - 16)))}px`);
+      deal.style.setProperty('--cols', '1'); deal.style.setProperty('--gap', '20px');
+      return;
+    }
     const gap = W < 700 ? 12 : 18;
     let best = { cw: 0, cols: n };
     for (let rows = 1; rows <= 3; rows++) {
@@ -522,6 +535,7 @@ export function mountReward(root, opts = {}) {
     if (S.up.every(Boolean)) {
       if (S.mode === 'one') { unmount(); return; }
       sfx.play('whoosh');
+      if (prepared) { onContinue(); return; }
       go('c');
       return;
     }
@@ -532,7 +546,7 @@ export function mountReward(root, opts = {}) {
     const btn = S.ui.revealBtn;
     if (!btn) return;
     const all = S.up.every(Boolean);
-    if (all) setPrimary(btn, S.mode === 'one' ? 'Close' : 'Issue to brigades', 'Enter');
+    if (all) setPrimary(btn, prepared ? 'Save and return to camp' : S.mode === 'one' ? 'Close' : 'Issue to brigades', 'Enter');
     else setPrimary(btn, 'Turn next card', 'Space');
     btn.classList.toggle('is-ready', all);
     if (S.ui.hint) S.ui.hint.hidden = all;
@@ -989,6 +1003,11 @@ export function mountReward(root, opts = {}) {
 
   function onContinue() {
     if (S.dead) return;
+    if (prepared) {
+      const cb = S.onDone; unmount();
+      if (typeof cb === 'function') cb(prepared.snapshot);
+      return;
+    }
     if (S.counting) { // first press finishes the count-ups at once
       S.fast = true;
       flushWaits();

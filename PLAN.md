@@ -806,7 +806,7 @@ paginated camp issue for saved fights, preserving fresh practice's issue flow; t
 up to2000inherited depot cards. No numeric admission or route contract is accepted yet; no runtime edit.
 
 
-### P2k2a: immutable saved deployment foundation (candidate verified, integration pending)
+### P2k2a: immutable saved deployment foundation (integrated deacdf3)
 
 P2k2a pure candidate:19positive+19intended named AssertionError controls, retained183+183,
 equipment23+23/115actual Unit/profile/volley/A126-B-A2 originaldraws and UNIT OK. Total225+225
@@ -878,6 +878,122 @@ verify hashes afterrun. Sync existing docs (STATE<20lines), explicit owned stage
 commit/push main and actual exact-SHA CI/Pages log/JSON counts/deployed bytes. Red repair precedes
 next integration; no silent gate weakening. Heavy work Actions; no simultaneous edits/browsers.
 P2k2b route/focus/async recovery contract and focused native controls required before UI edits.
+
+P2k2a integrated deacdf34aca8c791564c97233a072adf57ceaee9. Exact CI37563045868 and
+Pages37563045769 SUCCESS; independent source/receipt review CLEAR. Completed log220936B SHA256
+f35dcf081637ce94da8ded616738640899c7afb3b4019241b1ee9c60acdd4d76 preserves all28standalone
+steps: deployment19+19, named23+23/115/A126-B-A2 originaldraws, retained183+183.
+Actual CI393/393 in1122239ms, timestamp2026-10-07T02:40:49.401Z, Chromium153.0.8010.12/SwiftShader;
+errors/warnings[] and29empty axe scopes. Only intro-native-renderer absent versus local394.
+.out/p2k2a-exact-ci-37563045868-r1-20261006.log and -log-readback-r1-20261006.json;
+-actual-artifact-r1-20261006.json is219865B SHA256
+225606d2ee2e32a97f71fbe5e0e0a74a8da02e4fa8510c6669c9b27e29145588, with -readback.json.
+Artifact11458037056/84entries read95578B via numeric ranges of32549115B; no whole archive retained.
+Original suffix-range collector failed because server200 ignored it: .out/p2k2a-ci-collector-failed-r1-20261006.json.
+Repaired collector r2 used HEAD length plus numeric ranges, CRC/size/budget checks; collection failure
+is distinct from passing product CI. All21source bindings and both deployed runtime files match.
+CI unforcedintro45.55sim/firstcard113927wallms, idledefeat27.32sim; software timing is not native proof.
+Saved UI remains UNRUN until P2k2b gates. Continue the autonomous loop; no milestone final answer.
+
+
+### P2k2b: saved camp -> real battle -> conserved loot/save -> camp (active contract)
+
+Root sole writer owns src/entry.js, src/main.js, src/ui/entry.js and entry.css,
+src/franchise/practice.js and practice-ui.js, src/ui/practice-field.js, src/reward/sequence.js and
+src/reward/reward.css (saved-reveal readability only; added after actual focused image review),
+tools/test-deployment.mjs, new tools/test-deployment-ui.mjs, tools/test.mjs, existing CI/sw and
+PLAN/HANDOFF/STATE/DECISIONS. One explicitly routed read-only independent reviewer; no helper edits
+or browser. No save schema/backend, Unit/Battery/Combat/equipment/model/data calibration, generic
+rules/intro/Henry/history/OOB, art/terrain/battle-pack/shop/training/badges/audio edits. No new store
+or persistent launch container. Working tree starts deacdf3==origin, root-owned receipt-doc WIP only;
+preserve workspace/Shiloh unstaged. Re-read coordination if created; currently absent.
+
+Explicit async startField wraps existing main boot; importing its definitions never boots a field.
+Legacy entry field routes call it with original query precedence. Camp Deploy and direct ?saved
+open the same native renderer-free review. Initial canonical store read and pure ground{} admission
+occur before even small ground metadata fetch or main import; full frozen metadata manifest is
+then rebuilt with identical award/seed. Never field a metadata-free ground. Every living infantry
+and crewed battery deploys or whole launch refuses; dormant names/counts are disclosed and unchanged.
+Existing limits/layout/reserve remain. Review displays complete active labels, gear/condition/origin,
+men/guns, fictional nature and loss conservation; Cancel/Escape0writes/0WebGL/no hidden field.
+Owner spans held reads, metadata fetch, module import and final read, blocks overlaps/navigation and
+checks cancellation after every await. Last canonical read must equal the exact reviewed baseline
+before WebGL. A stale/corrupt/missing/unsupported/unfit/blocked/headroom refusal keeps Camp/Export/
+explicit fresh review available. Retry never silently rebases or rerolls.
+Cancellation after a failed canonical read retains Retry/import with Continue disabled; a successful
+null read clears any previously displayed army before cancellation, returning the empty title.
+Boot ownership releases on pre-allocation cancellation/refusal; repeated allocated boot refuses,
+with only one renderer/RAF.
+
+Authentic frozen manifest and terminal outcome are guarded inside existing practice.js using weak
+in-memory membership only. Actual Game gets exact manifest.scenario and actual named equipment.
+Manifest-specific practice briefing/hints replace two-brigade/first-issue wording for this route.
+Saved terminal freezes actual survivors/liveguns and rolls once using P2k2a; both genuine victory and
+defeat must save/reload/return camp. Prepared reward path consumes the authenticated frozen outcome,
+never rolls again, renders only <=7NEW cards, no inherited200army/2000depot DOM or Issue/counts step.
+Reveal Space/S/touch remains; final action Save and return to camp. Callback always uses exact frozen
+snapshot, preserves issued prefix and calls store.complete(previous=manifest.baseline); no Replace
+consent or rebase. Pending result and Army at launch exports are distinct and exact. Quota/abort/
+request/stale failure retains byte-stable result/seed/award; Inspect/Escape during writes must not
+navigate after settlement. Success Continue opens existing12+12paginated camp. Replay/duplicate
+callbacks cannot award again. Original practice/intro/standalonehistorical/sandbox/workbench stay intact.
+
+Focused command contracted BEFORE runtime edits: node tools/test.mjs --deployment --native.
+Focused r5 actual image review found320px saved loot cards too small despite passing fit/axe.
+Scope extension before repair: saved reveal only, at viewport<=700px, one full-width card column in a native
+keyboard/touch-scrollable area; keep the final48px save action visible. Preserve3Dflip and <=7newDOM;
+full names/type/effect/condition/origin wrap, >=12px detail/caption text at320, no inherited issuing.
+Existing reveal-narrow-keyboard category must verify readable fonts/full content and actual keyboard
+scroll/last-card access. Preserve original demo/practice reveal layout; no new count/category.
+Add same focused module to full smoke. Expected53NEW named UI assertions plus14retained Node
+foundations =67focused; final full447native/446CI (old394/393 +53), only old native-renderer difference.
+The53 categories: camp-read-only; real-camp-issue; review-all-active-dormant; review-zero-field-write;
+review-narrow; review-keyboard-loop; review-cancel; review-escape; read-held; read-cancel; read-escape;
+launch-held; launch-repeat-guard; launch-cancel; launch-escape; refusal-missing; refusal-corrupt;
+refusal-unsupported; refusal-no-infantry; refusal-oversize; refusal-full-depot; refusal-headroom;
+refusal-blocked-read; other-tab-launch-stale; direct-review-cancel; real-roster-budget; dormant-off-field;
+issued-profile; real-range-ghost; orders-capture; unforced-victory; terminal-freeze; fixed-new-loot;
+new-loot-dom-bound; reveal-narrow-keyboard; quota; request-failure; abort; distinct-exports;
+queued-save-owner; inspect-settlement; exact-one-save; repeat-no-award; camp-reload-bound;
+unforced-defeat; defeat-one-save; other-tab-terminal-stale; stale-retry-no-rebase;
+saving-escape-no-navigation; themes-axe; all-scoped-axe; mixed-route-isolation; no-console-errors.
+Use a validated200formation legal large fixture (197dormant/2infantry/onebattery),1970depot,
+4999valid reverse-ownership records; real camp issue reaches5000 before battle. Keep active on first
+page and short repeated origins; separately test legal near1MiB refusal. Real victory uses UI stores
+march/normal frames/fire/loss/capture; victory at45sim or earlier only when every enemy infantry
+is eliminated/routing (existing Game rule, not a timer/strength edit). Real defeat ordinary withdrawal out of the objective, with
+normal alerts resumed via UI. No forced winner/clock/rout/casualty as playable proof. A clearly
+labelled separate controlled third terminal may exercise stale-write/held-write fault recovery only.
+Actual second UI tab imports a distinct canonical save for stale launch/completion. Snapshot/export/
+commit/put/legacy counters distinguish attempts from commits; aborted puts are not zero attempts.
+Inspect320/1024 screenshots, full keyboard focus/visible scroll, themes and all exercised axe scopes;
+independent scoped WCAG source/rendered review; native iPad/fullnewart/fps/memory stay UNVERIFIED.
+
+Gate order: syntax each touched JS/MJS; git diff --check; CI/sw inspection; extended deployment
+positive then --prove-fail (expected21+21: old19 plus authentic launch recheck and prepared reveal,
+intended named AssertionErrors only, no source mutations); equipment positive/control23+23/115/
+A126-B-A2/draw locks; reward/save/practice/captures/intro/sandbox-rules/look/view/spacing/residency/
+moments/keyboard positive then --prove-fail each IN THAT ORDER (183each); node tools/test.mjs --unit.
+Focused node tools/test.mjs --deployment --native, actual uniquely named log/JSON/PNG; root and
+independent review; fix bounded findings before freeze. New cases require explicit contract accounting,
+never weaker assertions. Freeze touched runtime/test/CI SHA256+bytes plus untouched save/model/data/
+Unit/Battery/Combat/Game/Arrow/Input/RULES/intro/Henry/terrain locks. ONE final serial npm test -- --native;
+read actual JSON/log, last-result byte equality, all failures/errors/warnings/axe, relevant PNGs and
+independent review; reverify bindings afterrun. Do not repeat broad smoke for receipt-doc changes.
+Sync existing docs/STATE<20lines and material decision; explicitly stage ONLY owned paths and check
+index hashes, commit/push main. Watch exact CI/Pages to completion; inspect all28explicit steps/counts,
+446browser JSON/errors/warnings/axe and deployed touched bytes, bounded artifact ranges only.
+No blind reruns/quality relaxation. Repair red next; preserve failure versus accepted attribution.
+After green update live docs and IMMEDIATELY select next P2 obligation/P3-P4 first sourced Shiloh
+slice in this same autonomous loop. All P1-P7/design rows remain; no v1 completion/release claim here.
+
+Local frozen acceptance (2026-10-07): deterministic r5 all41commands EXIT0; focused r8 67/67;
+ONE full native447/447 in660726ms,t04:01:11.298Z, actual JSON7279305B SHA256
+91fd72b9300f8dab80ece586bc0a633ea45aca03503be9b633b95720b81f9476,38emptyaxe/errors/warnings[].
+All14candidate+20locked source bindings unchanged; old394name multiset plus53newunique retained.
+447checks/445unique reflects three inherited invalid-import labels. Independent full receipt/source/
+rendered review CLEAR. Commit/exact446CI/Pages still pending. Separate inherited P2 responsive-dock
+follow-up: actual320keyboard PNG crops order columns; outer dock fit alone is insufficient evidence.
 
 ### Required battle-system work (P3/P4; do not hide it inside “build Shiloh”)
 

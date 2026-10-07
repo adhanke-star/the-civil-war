@@ -1,9 +1,10 @@
 // Same-page result -> reward -> single completed-progress store. The battlefield is inert during loot.
 import { createProgressStore, completedSnapshot, exportSnapshot } from './save.js';
-import { practiceOutcome } from './practice.js';
+import { practiceOutcome, savedOutcome, assertSavedLaunch } from './practice.js';
 import { mountReward, configureRewardReplay } from '../reward/sequence.js';
 
-export function attachPracticeFlow({ game, scenario, hud, mode }) {
+export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null }) {
+  if (manifest) assertSavedLaunch(manifest);
   const store = createProgressStore();
   const field = document.querySelector('main');
   const dialog = document.getElementById('result');
@@ -12,11 +13,14 @@ export function attachPracticeFlow({ game, scenario, hud, mode }) {
   const action = document.getElementById('result-action');
   const back = document.getElementById('result-close');
   const exportButton = document.getElementById('result-export');
+  const launchExport = document.createElement('button'); launchExport.type = 'button'; launchExport.id = 'result-export-launch';
+  launchExport.textContent = 'Export army at launch'; launchExport.hidden = true; exportButton.after(launchExport);
   const unsavedButton = document.getElementById('result-unsaved');
   const after = document.getElementById('after-action');
   let captured = false, outcome = null, pending = null, saved = null, previous = null, failure = null, reward = null, baselineKnown = false;
   let saving = false, reviewing = false, rewardActive = false;
   let reading = false, readCancelled = false;
+  if (manifest) { previous = manifest.baseline; baselineKnown = true; }
 
   configureRewardReplay(() => hud.toast('Open the separate reward demo from the menu. Practice rewards use the completed battlefield.'));
   dialog.addEventListener('close', () => {
@@ -35,7 +39,8 @@ export function attachPracticeFlow({ game, scenario, hud, mode }) {
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
   });
   after.addEventListener('click', openResult);
-  exportButton.addEventListener('click', () => download(pending || previous));
+  exportButton.addEventListener('click', () => download(pending || outcome?.snapshot || previous));
+  launchExport.addEventListener('click', () => download(manifest?.baseline));
   unsavedButton.addEventListener('click', () => startLoot(false));
 
   function sync() {
@@ -57,6 +62,8 @@ export function attachPracticeFlow({ game, scenario, hud, mode }) {
     title.textContent = heading; text.textContent = message;
     action.textContent = label || ''; action.hidden = !label; action.onclick = run || null;
     back.textContent = cancel; exportButton.hidden = !exportable;
+    exportButton.textContent = manifest ? (saved ? 'Export result army' : 'Export pending army') : 'Export army';
+    launchExport.hidden = !manifest || !exportable;
     unsavedButton.hidden = true;
     const menu = document.getElementById('menu');
     if (menu.open) menu.close();
@@ -66,8 +73,8 @@ export function attachPracticeFlow({ game, scenario, hud, mode }) {
     else (focusCancel || !label ? back : action).focus({ preventScroll: true });
   }
   function showSaved() {
-    panel('Army saved', `${saved.army.reduce((n, b) => n + b.men, 0).toLocaleString()} surviving men and ${saved.depot.length} depot cards are saved. Continue opens your saved army in camp. Fresh practice starts with its original troops and gear.`,
-      'Continue', () => location.assign('./?camp'));
+    panel('Army saved', `${saved.army.reduce((n, b) => n + b.men, 0).toLocaleString()} surviving men and ${saved.depot.length} depot cards are saved. Continue opens your saved army in camp.${manifest ? ' Compare and issue new gear there.' : ' Fresh practice starts with its original troops and gear.'}`,
+      'Continue', () => location.assign('./?camp'), { exportable: !!manifest });
   }
   function recover() {
     panel(pending ? 'Army not saved' : 'Progress unavailable', failure || 'Your completed army is waiting to be saved. Retry loading to review saved progress, or export this army.',
@@ -86,6 +93,7 @@ export function attachPracticeFlow({ game, scenario, hud, mode }) {
     previous = baseline; return true;
   }
   async function reviewForSave() {
+    if (manifest) { savePending(); return; }
     if (saving || reading || reviewing || rewardActive) return;
     failure = null;
     if (!await readForReview()) return;
@@ -118,6 +126,16 @@ export function attachPracticeFlow({ game, scenario, hud, mode }) {
     reviewing = false; rewardActive = true; sync();
     game.paused = true; hud.setPaused(true); baselineKnown = authorized;
     dialog.close(); field.inert = true; failure = null;
+    if (manifest) {
+      reward = mountReward(document.body, { preparedOutcome: outcome, rememberReplay: false,
+        afterAction: { ...outcome.summary, why: savedResultWhy() },
+        onDone: () => {
+          if (saving || !rewardActive || saved) return;
+          rewardActive = false; pending = outcome.snapshot; baselineKnown = true; previous = manifest.baseline;
+          savePending();
+        } });
+      return;
+    }
     reward = mountReward(document.body, { army: outcome.army, depot: outcome.depot, awardId: outcome.awardId,
       seed: outcome.seed, grade: outcome.grade, captures: outcome.captures, afterAction: outcome.summary,
       onDone: (result) => {
@@ -131,6 +149,7 @@ export function attachPracticeFlow({ game, scenario, hud, mode }) {
     if (saving || reading || reviewing || rewardActive) return;
     if (!outcome) return;
     if (pending) { recover(); return; }
+    if (manifest) { startLoot(true); return; }
     failure = null; baselineKnown = false;
     if (!await readForReview()) return;
     if (previous?.awardId === outcome.awardId) { saved = previous; showSaved(); return; }
@@ -139,6 +158,10 @@ export function attachPracticeFlow({ game, scenario, hud, mode }) {
       panel('Replace saved army?', 'This practice reward replaces your completed saved army. Export that army before continuing if you want to keep it.',
         'Replace and open loot', () => startLoot(true), { cancel: 'Cancel', exportable: true, focusCancel: true });
     } else startLoot(true);
+  }
+  function savedResultWhy() {
+    return game.result.winner === 'US' ? 'Your saved formations won the practice encounter. Actual survivors and new loot return to camp.'
+      : 'Your saved formations lost the practice ground. Actual survivors and any stores still held return to camp.';
   }
   function openResult() {
     if (reviewing || rewardActive) return;
@@ -153,17 +176,17 @@ export function attachPracticeFlow({ game, scenario, hud, mode }) {
     if (saved) { showSaved(); return; }
     if (failure || pending) { recover(); return; }
     const message = outcome
-      ? `${game.result.why} ${outcome.summary.surviving.toLocaleString()} surviving men; ${outcome.summary.losses.toLocaleString()} lost. ${outcome.captures.length} held field crates. Open the practice quartermaster issue.`
+      ? `${manifest ? savedResultWhy() : game.result.why} ${outcome.summary.surviving.toLocaleString()} surviving men; ${outcome.summary.losses.toLocaleString()} lost. ${outcome.captures.length} held field crates. ${manifest ? 'Open only the new loot, save these survivors, then return to camp.' : 'Open the practice quartermaster issue.'}`
       : `${game.result.why} ${mode === 'historical' ? 'Historical battles grant no franchise rewards.' : 'Sandbox or altered battles grant no progress rewards.'}`;
-    panel(game.result.winner === 'US' ? 'Union victory' : 'Confederate victory', message, outcome ? 'Open the loot' : null, openLoot);
+    panel(game.result.winner === 'US' ? 'Union victory' : 'Confederate victory', message, outcome ? 'Open the loot' : null, openLoot, { exportable: !!manifest && !!outcome });
   }
   function finishResult() {
     if (captured) return;
     captured = true;
     game.paused = true; hud.setPaused(true); after.hidden = false;
     if (mode === 'practice') {
-      const awardId = `practice-${globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`;
-      try { outcome = practiceOutcome({ game, scenario, mode, awardId, seed: awardId }); }
+      const awardId = manifest?.awardId ?? `practice-${globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`;
+      try { outcome = manifest ? savedOutcome({ manifest, game }) : practiceOutcome({ game, scenario, mode, awardId, seed: awardId }); }
       catch (err) { hud.toast(err.message); }
     }
     openResult();

@@ -65,6 +65,7 @@ import { viewControls } from './test-view-ui.mjs';
 import { spacingControls } from './test-spacing-ui.mjs';
 import { momentControls } from './test-moments-ui.mjs';
 import { keyboardControls } from './test-keyboard-ui.mjs';
+import { deploymentProgress } from './test-deployment-ui.mjs';
 
 const READY_TIMEOUT_MS = 180_000;
 const VIEWPORT = { width: 1280, height: 720 };
@@ -1374,6 +1375,7 @@ async function main() {
     if (process.argv.includes('--spacing')) { result.mode = 'formation spacing only'; await sandboxAndDevice(browser, url, { spacingOnly: true }); return; }
     if (process.argv.includes('--moments')) { result.mode = 'field moments only'; await sandboxAndDevice(browser, url, { momentsOnly: true }); return; }
     if (process.argv.includes('--sandbox')) { result.mode = 'sandbox controls only'; await sandboxAndDevice(browser, url); return; }
+    if (process.argv.includes('--deployment')) { result.mode = 'saved deployment route'; await deploymentProgress({ browser, url, check, shot, result, watchErrors, native }); return; }
     if (process.argv.includes('--entry')) { result.mode = 'title and camp only'; await entryProgress({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--camp')) { result.mode = 'camp equipment only'; await campEquipment({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--intro')) { result.mode = 'unforced introductory play'; await introPlay({ browser, url, check, shot, result, watchErrors, native }); return; }
@@ -1615,6 +1617,7 @@ async function main() {
     await entryProgress({ browser, url, check, shot, result, watchErrors });
     await campEquipment({ browser, url, check, shot, result, watchErrors });
     await saveCoordination({ browser, url, check, shot, result, watchErrors });
+    await deploymentProgress({ browser, url, check, shot, result, watchErrors, native });
   } finally {
     if (browser) await browser.close().catch(() => {});
     await new Promise((resolve) => server.close(resolve));
