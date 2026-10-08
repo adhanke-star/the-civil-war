@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0056 · CI must fetch the exact historical comparison before testing (2026-10-08 UTC)
+
+The field-admission probe compares actual source at a pinned accepted commit. A one-commit checkout
+contains no such baseline. Fetch that exact commit with depth 1 and no tags, verify both required
+blobs and unchanged current HEAD before tests. Keep the original comparison and every predicate;
+a missing test input does not justify changing or skipping the control. The failed run stays failed.
+
+
 ## 0054 · Bound current ground before allocating a field (2026-10-07)
 
 Validate current route identity and complete ground before GPU allocation. The download guard
