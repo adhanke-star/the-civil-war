@@ -11,6 +11,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --ipc=host --init
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@v4
 
@@ -39,7 +45,22 @@ jobs:
 
       - run: npm ci
 
-      - run: npx playwright install --with-deps chromium
+      - name: Verify pinned Playwright runtime
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import { chromium } from 'playwright';
+          const lock = JSON.parse(fs.readFileSync('package-lock.json'));
+          const installed = JSON.parse(fs.readFileSync('node_modules/playwright/package.json'));
+          assert.equal(lock.packages['node_modules/playwright'].version, '1.63.0');
+          assert.equal(installed.version, '1.63.0');
+          assert.equal(process.env.PLAYWRIGHT_BROWSERS_PATH, '/ms-playwright');
+          const executable = chromium.executablePath();
+          assert.ok(executable.startsWith('/ms-playwright/'));
+          fs.accessSync(executable, fs.constants.X_OK);
+          console.log(JSON.stringify({ playwright: installed.version, executable, bakedDependencies: true }));
+          NODE
 
       - run: node tools/test-deployment.mjs
       - run: node tools/test-deployment.mjs --prove-fail

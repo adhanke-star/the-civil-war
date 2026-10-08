@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+### CI bootstrap uses the matching prebuilt runtime (2026-10-08)
+
+The exact capture candidate was cut off after543 passing checks when live APT font downloads used5m28s of the45-minute job. Use the official Playwright1.63.0 noble image pinned by manifest digest, verify its installed browser against the lockfile, and retain the same full serial549-check suite and45-minute ceiling. Container timing and full acceptance remain unrun; preserve the cancelled run.
+
 ### Capture-only diagnostic image binding repair (2026-10-08)
 
 CURRENT P3f4 CAPTURE REPAIR: exact111a7b8 CI37786108901 SUCCESS549/547unique47emptyaxes46streams63source15public; all12 F4 cloudPNG CLEAR. Acceptance BLOCKED: appearance screenshot shows ordinary two-line caption while pre-image metadata says one-line and crop truncates controls. Raw successful run, watcher/reader failure and14actualimages retained; no retroacceptance. Reader2 filename-only full-prefix correction exactinverse/all12 CRC gates unchanged. Root+readonlyhelper adopted diagnostic capture-only wrapper after untouched same-task and native-settled observations, forwards nativeHUDmethod with fixturecaption during image only, bounded256/nooverflow/fullcrop/before-afterexact/descriptor+inheritedabsence cleanup. Product/SW/Game/default/oracles/counts unchanged. Currentfrozen4/current63/virtualcapture-reservation-focus-legacyinverse; local68/next549CI14images/root-helper pending. AcceptedF3baseline0246/533 remains; F5draft15 unadopted until full549 acceptance, future565/16public. Preserve mainP2o11/dirtyroots/failures; solewriterroot/noledger/no newgoal/spending/devicechecks; continueautonomousloop.
