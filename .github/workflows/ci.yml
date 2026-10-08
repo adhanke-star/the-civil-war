@@ -10,7 +10,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -22,6 +22,15 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/main.js
           git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/entry.js
+
+      - name: Fetch pinned reinforcement comparison
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags --depth=1 origin aaf10145531130f3ec201d6332f6759599bc46a4
+          test "$(git rev-parse FETCH_HEAD)" = "aaf10145531130f3ec201d6332f6759599bc46a4"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git cat-file -e aaf10145531130f3ec201d6332f6759599bc46a4:src/main.js
+          test "$(git rev-parse aaf10145531130f3ec201d6332f6759599bc46a4:src/game.js)" = "$(git rev-parse HEAD:src/game.js)"
 
       - uses: actions/setup-node@v4
         with:

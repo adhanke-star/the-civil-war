@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+### 0059 · Initialize scheduled arrivals after every field subscriber
+The sole main field owner initializes the accepted reinforcement runtime after Hud/Input/practice/soldier-view listeners and before the first simulation step. Arrival markers, event feed, alerts and results use their original production subscribers. Fictional diagnostics carry no historical roster or timetable authority. Bounded banner/feed CSS reserves readable native actions and the measured objective; the interrupted P2o feedback lane remains separate. CI wall budget becomes45min from measured parent39m41s plus new browser checks; acceptance predicates/caps/oracles remain unchanged.
+
+
 ### 0058 · Scheduled units use the existing Game owner
 Reserve initial plus all authored arrivals before allocation; dispatch through real Unit/Battery, shared Combat/AI units and existing spawn/event/alert listeners. Keep a private per-Game cursor, explicit post-listener initialization, legacy scenario/initial-definition/RNG identities and no-schedule behavior. Force the scheduled horizon result after its arrivals even during auto-pause. Upstream field admission retains unchanged current limits; timeline validation is not hardware admission. P3e1 is CPU engine foundation only; main/HUD activation and native UI proof follow separately.
 

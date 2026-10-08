@@ -69,6 +69,7 @@ import { dockControls } from './test-dock-ui.mjs';
 import { headerControls, headerAfterAction, headerStores, headerIntro, finishHeader } from './test-header-ui.mjs';
 import { deploymentProgress } from './test-deployment-ui.mjs';
 import { soldierViewControls } from './test-soldier-view-ui.mjs';
+import { reinforcementUIControls } from './test-reinforcement-ui.mjs';
 import { fieldAdmissionControls } from './test-field-admission-ui.mjs';
 
 const READY_TIMEOUT_MS = 180_000;
@@ -1412,6 +1413,7 @@ async function main() {
     browser = await chromium.launch(native ? { channel: 'chrome', headless: false }
       : { headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     result.browser = `chromium ${browser.version()}`;
+    if (process.argv.includes('--reinforcement-ui')) { result.mode = 'scheduled reinforcement UI'; await reinforcementUIControls({ browser, url, check, shot, result, native }); return; }
     if (process.argv.includes('--field-admission')) { result.mode = 'current field admission'; await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native }); return; }
     if (process.argv.includes('--soldier-view')) { result.mode = 'held soldier-eye view'; await soldierViewControls({ browser, url, check, shot, result, watchErrors, native, focused: true }); return; }
     if (process.argv.includes('--save-coordination')) { result.mode = 'two-tab save coordination only';
@@ -1667,6 +1669,7 @@ async function main() {
     await campEquipment({ browser, url, check, shot, result, watchErrors });
     await saveCoordination({ browser, url, check, shot, result, watchErrors });
     await deploymentProgress({ browser, url, check, shot, result, watchErrors, native });
+    await reinforcementUIControls({ browser, url, check, shot, result, native });
     await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native });
     await soldierViewControls({ browser, url, check, shot, result, watchErrors, native });
   } finally {

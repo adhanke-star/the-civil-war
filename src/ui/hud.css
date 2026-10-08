@@ -376,3 +376,18 @@ body:has(.sb-toggle.sb-closed:not(.sb-left)) #soldier-view-hint { right: calc(va
   body:has(.sb-toggle.sb-left.sb-closed) #objective { left: calc(var(--edge) + 60px + env(safe-area-inset-left)); }
   body:has(.sb-toggle.sb-closed:not(.sb-left)) #objective { right: calc(var(--edge) + 60px + env(safe-area-inset-right)); }
 }
+
+/* Scheduled arrivals: wrap the complete reason and retain readable native actions. */
+#banner { background: #18161d; box-sizing: border-box; flex-wrap: wrap; width: max-content; max-width: calc(100vw - 16px); }
+#banner-text { flex: 1 1 240px; min-width: 0; overflow-wrap: anywhere; }
+#banner button { flex: none; }
+#feed { box-sizing: border-box; max-height: 176px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; }
+#feed button { min-height: 44px; font-size: 14px; }
+#feed button span { min-width: 0; overflow-wrap: anywhere; }
+#feed button:focus-visible { outline-offset: -4px; }
+@media (max-width: 600px) {
+  #banner { top: calc(var(--edge) + var(--top-h) + var(--objective-h) + 10px + env(safe-area-inset-top)); }
+  #banner-text { flex-basis: 100%; }
+  #banner button { padding: 0 12px; }
+  #feed { width: min(330px, calc(100vw - 16px)); max-height: 64px; bottom: calc(var(--edge) + var(--dock-h) + 120px + env(safe-area-inset-bottom)); }
+}

@@ -260,6 +260,9 @@ for (const event of ['select', 'remove']) game.on(event, () => {
   if (soldierView.active && !soldierView.valid()) soldierView.end('selection');
 });
 
+// All field subscribers must receive zero-time arrivals before the first simulation step.
+game.initializeReinforcements();
+
 // ---------------------------------------------------------------------------------------------------
 // Loop
 let last = performance.now();
