@@ -22,6 +22,7 @@ import { createProgressStore } from './franchise/save.js';
 import { attachPracticeFlow } from './franchise/practice-ui.js';
 import { introScenario } from './franchise/intro.js';
 import { attachPracticeField } from './ui/practice-field.js';
+import { prepareFieldScenario, loadFieldScenario } from './sim/phase.js';
 
 let fieldClaimed = false;
 // Importing this module has no field side effects. The owner commits navigation only after recheck.
@@ -39,10 +40,21 @@ export async function startField({ manifest = null, isCurrent = () => true, onAd
   fieldClaimed = true;
   let allocated = false;
   try {
+    const currentOwner = () => { if (!isCurrent()) throw new Error('Practice: deployment review was cancelled.'); };
+    const mode = playMode(location.search);
+    const ground = manifest ? null : await loadFieldScenario({ isCurrent });
+    currentOwner();
+    const routeId = manifest ? 'saved-practice' : mode === 'practice' && !new URLSearchParams(location.search).has('practice') ? 'first-command' : 'henry-hill';
+    // A saved manifest's scenario reference is the authoritative outcome identity.
+    const scenario = manifest ? (prepareFieldScenario(manifest.scenario, routeId), manifest.scenario)
+      : prepareFieldScenario(routeId === 'first-command' ? introScenario(ground) : ground, routeId);
+    document.getElementById('status').textContent = 'Loading the ground…';
+    const terrain = await loadTerrainData('./assets/terrain');
+    currentOwner();
     if (manifest) {
       const current = await createProgressStore().load();
       assertSavedLaunch(manifest, current);
-      if (!isCurrent()) throw new Error('Practice: deployment review was cancelled.');
+      currentOwner();
       onAdmitted();
     }
 
@@ -88,11 +100,6 @@ const gpuTier = import('detect-gpu')
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 2, 6000);
 
-statusEl.textContent = 'Loading the ground…';
-const terrain = await loadTerrainData('./assets/terrain');
-const mode = playMode(location.search);
-const ground = manifest ? null : await (await fetch('./assets/scenarios/henry-hill.json')).json();
-const scenario = manifest?.scenario ?? (mode === 'practice' && !new URLSearchParams(location.search).has('practice') ? introScenario(ground) : ground);
 const world = buildWorld(scene, terrain, scenario);
 Object.assign(stats, world.stats);
 

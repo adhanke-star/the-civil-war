@@ -69,6 +69,7 @@ import { dockControls } from './test-dock-ui.mjs';
 import { headerControls, headerAfterAction, headerStores, headerIntro, finishHeader } from './test-header-ui.mjs';
 import { deploymentProgress } from './test-deployment-ui.mjs';
 import { soldierViewControls } from './test-soldier-view-ui.mjs';
+import { fieldAdmissionControls } from './test-field-admission-ui.mjs';
 
 const READY_TIMEOUT_MS = 180_000;
 const VIEWPORT = { width: 1280, height: 720 };
@@ -1366,12 +1367,17 @@ async function phaseModelUnit() {
   try { const { phaseUnit } = await import('./test-phase.mjs'); const count = phaseUnit(); check('phase-model', count === 20, `${count} immutable phase categories; no launch/store/history authority`); }
   catch (error) { check('phase-model', false, error.message); }
 }
+async function fieldAdmissionModelUnit() {
+  try { const { fieldAdmissionUnit } = await import('./test-field-admission.mjs'); const count = await fieldAdmissionUnit(); check('field-admission-model', count === 23, `${count} immutable current-field and bounded-fetch categories`); }
+  catch (error) { check('field-admission-model', false, error.message); }
+}
 
 async function main() {
   await settingsUnit();
   await bakedUnit();
   await approvedPackUnit();
   await phaseModelUnit();
+  await fieldAdmissionModelUnit();
   await fs.mkdir(OUT_DIR, { recursive: true });
   const { server, url } = await startServer({ port: 0 });
   result.url = url;
@@ -1381,6 +1387,7 @@ async function main() {
     browser = await chromium.launch(native ? { channel: 'chrome', headless: false }
       : { headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     result.browser = `chromium ${browser.version()}`;
+    if (process.argv.includes('--field-admission')) { result.mode = 'current field admission'; await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native }); return; }
     if (process.argv.includes('--soldier-view')) { result.mode = 'held soldier-eye view'; await soldierViewControls({ browser, url, check, shot, result, watchErrors, native, focused: true }); return; }
     if (process.argv.includes('--save-coordination')) { result.mode = 'two-tab save coordination only';
       await saveCoordination({ browser, url, check, shot, result, watchErrors, trace: process.argv.includes('--save-trace') }); return;
@@ -1635,6 +1642,7 @@ async function main() {
     await campEquipment({ browser, url, check, shot, result, watchErrors });
     await saveCoordination({ browser, url, check, shot, result, watchErrors });
     await deploymentProgress({ browser, url, check, shot, result, watchErrors, native });
+    await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native });
     await soldierViewControls({ browser, url, check, shot, result, watchErrors, native });
   } finally {
     if (browser) await browser.close().catch(() => {});
@@ -1649,6 +1657,7 @@ if (process.argv.includes('--unit')) {
     check('settings', false, `the settings module failed to load or threw: ${err.message}`);
   }
   await phaseModelUnit();
+  await fieldAdmissionModelUnit();
   try {
     await bakedUnit();
     await approvedPackUnit();

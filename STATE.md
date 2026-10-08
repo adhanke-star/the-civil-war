@@ -16,4 +16,4 @@
 - **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
 - **Proof:** deployment21+21, named23+23/115/A126-B-A2, retained183+183/unit; native486/40axe/ALL138review; exactCI485/40axe/28logs/public4/source40.
 - **Coordination:** no ledger/competing writer; root sole writer; preserve workspace/Shiloh; no duplicate goal/scheduler.
-- **Runtime/WIP:** accepted HEAD1c11763; P2n exactCI37656475987/Pages37656475954 accepted. Original checkout P2o owned14/source49 BLOCKED nativeGPU-loss; all WIP/evidence/unrelated paths preserved. Isolated p3a-phase-contract checkout: pure phase foundation serial37/source50/20+20/independentCLEAR; integration pending; owns8paths, runtime browser/saves/rules/history unchanged; expectedCI506/41axe/32logs. No campaign launch/native phase acceptance claim.
+- **Current:** P3a4f6113a ACCEPTED. P3b source55r15 serial45/nativefield25/deployment69 PASS; owned14 integration/exactCI516-43axe-34logs-Pages9 pending. P3c clarification pending. P2o WIP/unrelated2 preserved; no v1/device claim.

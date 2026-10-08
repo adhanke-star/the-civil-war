@@ -2,7 +2,8 @@
 const q = new URLSearchParams(location.search);
 if (['intro', 'practice', 'battle', 'sandbox', 'tune'].some((key) => q.has(key))) {
   document.getElementById('battle').hidden = false;
-  await (await import('./main.js')).startField();
+  try { await (await import('./main.js')).startField(); }
+  catch { const { showFieldFailure } = await import('./ui/entry.js'); showFieldFailure(); }
 } else {
   const { mountEntry } = await import('./ui/entry.js');
   mountEntry({ camp: q.has('camp') || q.has('saved'), deploy: q.has('saved'),

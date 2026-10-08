@@ -1,5 +1,8 @@
 // Storage-free phase snapshots. No launch, reward, history-verification or GPU admission authority.
 import { equipmentProfile } from './equipment.js';
+import { DEPLOYMENT_LIMITS } from '../franchise/practice.js';
+import { FieldCaptures } from '../franchise/captures.js';
+import { VETERANCY } from '../reward/data.js';
 
 export const PHASE_LIMITS = Object.freeze({ bytes: 1024 * 1024, depth: 32 });
 const fail = message => { throw new Error('Phase: ' + message); };
@@ -105,4 +108,114 @@ export function preparePhase(input, phaseId) {
   if (!text(phaseId) || index === -1) fail('requested phase is absent.');
   return Object.freeze({ packId: pack.id, phaseId, index, previousId: pack.phases[index - 1]?.id ?? null,
     nextId: pack.phases[index + 1]?.id ?? null, scenario: pack.phases[index].scenario });
+}
+
+// Current Henry-ground input bounds, not hardware admission for future battle packs.
+export const FIELD_LIMITS = Object.freeze({ formations: DEPLOYMENT_LIMITS.formations * 2,
+  men: DEPLOYMENT_LIMITS.men * 2, guns: DEPLOYMENT_LIMITS.guns * 2, figures: DEPLOYMENT_LIMITS.figures * 2,
+  sites: 64, buildings: 256, trees: 4096, woods: 128, vertices: 4096, polygon: 1024, labels: 64,
+  labelText: 160, coordinate: 10000, dimension: 1000 });
+const fieldFail = message => { throw new Error('Field: ' + message); };
+const coordinate = value => finite(value) && Math.abs(value) <= FIELD_LIMITS.coordinate;
+const integer = value => Number.isSafeInteger(value) && value >= 0;
+const styles = new Set(['frame-house', 'stone-house', 'log-house', 'barn', 'shed']);
+
+/** Router-selected current field. Retain saved manifests' original scenario after validation. */
+export function prepareFieldScenario(input, routeId) {
+  const value = preparePhase({ version: 1, id: 'current-field', title: 'Current field',
+    phases: [{ id: 'field', scenario: input }] }, 'field').scenario;
+  if (!['henry-hill', 'first-command', 'saved-practice'].includes(routeId) || value.id !== routeId
+    || (own(value, 'practiceIntro') && typeof value.practiceIntro !== 'boolean')
+    || (own(value, 'savedPractice') && typeof value.savedPractice !== 'boolean')
+    || (routeId === 'henry-hill' && (value.practiceIntro || value.savedPractice))
+    || (routeId === 'first-command' && (value.practiceIntro !== true || value.savedPractice))
+    || (routeId === 'saved-practice' && (value.practiceIntro !== true || value.savedPractice !== true))) fieldFail('the definition does not match the selected route.');
+  if (!Array.isArray(value.sites) || value.sites.length > FIELD_LIMITS.sites
+    || !Array.isArray(value.woods) || value.woods.length > FIELD_LIMITS.woods) fieldFail('current ground needs bounded sites and woods.');
+  let buildings = 0, trees = 0, vertices = 0;
+  for (const site of value.sites) {
+    if (!record(site) || !coordinate(site.x) || !coordinate(site.z)
+      || (own(site, 'rot') && !finite(site.rot))
+      || ['yard', 'fenceRadius'].some(key => own(site, key) && (!coordinate(site[key]) || site[key] < 0))
+      || (own(site, 'embowered') && typeof site.embowered !== 'boolean')) fieldFail('site geometry is invalid.');
+    if (own(site, 'buildings')) {
+      if (!Array.isArray(site.buildings) || (buildings += site.buildings.length) > FIELD_LIMITS.buildings) fieldFail('building count is invalid.');
+      for (const b of site.buildings) if (!Array.isArray(b) || b.length !== 7 || !b.slice(0, 6).every(finite)
+        || !b.slice(0, 2).every(coordinate) || !b.slice(2, 5).every(n => n > 0 && n <= FIELD_LIMITS.dimension)
+        || !styles.has(b[6])) fieldFail('building geometry or style is unsupported.');
+    }
+    if (own(site, 'orchard')) {
+      const o = site.orchard;
+      if (!Array.isArray(o) || o.length !== 5 || !o.every(finite) || !o.slice(0, 2).every(coordinate)
+        || !o.slice(2, 4).every(n => integer(n) && n <= FIELD_LIMITS.trees)
+        || (trees += o[2] * o[3]) > FIELD_LIMITS.trees) fieldFail('orchard geometry or count is invalid.');
+    }
+  }
+  for (const wood of value.woods) if (!record(wood) || !Array.isArray(wood.polygon)
+    || wood.polygon.length < 3 || wood.polygon.length > FIELD_LIMITS.polygon
+    || (vertices += wood.polygon.length) > FIELD_LIMITS.vertices
+    || !wood.polygon.every(p => Array.isArray(p) && p.length === 2 && p.every(coordinate))) fieldFail('wood polygon is invalid.');
+  if (own(value, 'labels')) {
+    if (!Array.isArray(value.labels) || value.labels.length > FIELD_LIMITS.labels) fieldFail('label count is invalid.');
+    for (const label of value.labels) if (!record(label) || !text(label.text) || [...label.text].length > FIELD_LIMITS.labelText
+      || !coordinate(label.x) || !coordinate(label.z)
+      || (own(label, 'height') && (!finite(label.height) || label.height < 1 || label.height > FIELD_LIMITS.dimension))
+      || (own(label, 'angle') && !finite(label.angle))
+      || (own(label, 'italic') && typeof label.italic !== 'boolean')) fieldFail('label geometry or text is invalid.');
+  }
+  if (own(value, 'ai') && (!record(value.ai) || (own(value.ai, 'chargeReach') && (!finite(value.ai.chargeReach) || value.ai.chargeReach <= 0)))) fieldFail('AI definition is invalid.');
+  if (own(value, 'crates')) new FieldCaptures(value.crates);
+  let men = 0, guns = 0, figures = 0;
+  for (const unit of value.units) {
+    if (!Number.isSafeInteger(unit.men) || unit.men <= 0 || (own(unit, 'guns') && !integer(unit.guns))
+      || !coordinate(unit.x) || !coordinate(unit.z)
+      || (own(unit, 'xp') && (!Number.isInteger(unit.xp) || unit.xp < 1 || unit.xp > VETERANCY.length))
+      || (own(unit, 'morale') && (!finite(unit.morale) || unit.morale < 0 || unit.morale > 100))
+      || ['short', 'parent', 'notes', 'status'].some(key => own(unit, key) && typeof unit[key] !== 'string')
+      || (own(unit, 'regiments') && (!Array.isArray(unit.regiments) || !unit.regiments.every(r => typeof r === 'string')))
+      || (own(unit, 'commander') && unit.commander !== null && (!record(unit.commander) || !text(unit.commander.name)
+        || ['rank', 'portrait', 'portraitNote'].some(key => own(unit.commander, key) && typeof unit.commander[key] !== 'string')))) fieldFail('formation numbers or metadata are invalid.');
+    men += unit.men; guns += unit.guns || 0;
+    figures += Math.max(1, Math.round(unit.men / (unit.type === 'artillery' ? 4 : 5))) + 6;
+  }
+  if (value.units.length > FIELD_LIMITS.formations || men > FIELD_LIMITS.men || guns > FIELD_LIMITS.guns || figures > FIELD_LIMITS.figures) fieldFail('the whole current field exceeds its input bounds.');
+  if (!coordinate(value.objective.x) || !coordinate(value.objective.z) || value.objective.r > FIELD_LIMITS.coordinate
+    || value.opening?.some(o => o.points.some(p => !p.every(coordinate)))) fieldFail('objective or opening is outside current ground bounds.');
+  return value;
+}
+
+/** Bound the downloaded body before parsing; a pending read retains its caller's ownership. */
+export async function loadFieldScenario({ isCurrent = () => true, fetcher = globalThis.fetch } = {}) {
+  const current = () => { if (!isCurrent()) fieldFail('the field launch was cancelled.'); };
+  current();
+  const response = await fetcher('./assets/scenarios/henry-hill.json', { keepalive: true });
+  let reader;
+  try {
+    current();
+    if (!response.ok) fieldFail('the ground description could not be loaded.');
+    const length = response.headers.get('content-length');
+    if (length !== null && (!/^\d+$/.test(length) || !Number.isSafeInteger(Number(length)) || Number(length) > PHASE_LIMITS.bytes)) fieldFail('the ground description exceeds its download bound.');
+    if (!response.body) fieldFail('the ground description is empty.');
+    // Finish the bounded guard before native consumption can allocate the complete body.
+    // The original tee branch queues only the bytes consumed by this guard.
+    reader = response.clone().body.getReader();
+    let count = 0;
+    while (true) {
+      const { done, value } = await reader.read(); current();
+      if (done) break;
+      count += value.byteLength;
+      if (count > PHASE_LIMITS.bytes) fieldFail('the ground description exceeds its download bound.');
+    }
+    current();
+    const bytes = new Uint8Array(await response.arrayBuffer()); current();
+    if (bytes.byteLength !== count) fieldFail('the ground description stream is incomplete.');
+    return prepareFieldScenario(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)), 'henry-hill');
+  } catch (error) {
+    // Tee cancellation settles only after BOTH branches are cancelled. Issue both before awaiting.
+    const cancellations = [];
+    if (response.body && !response.body.locked) cancellations.push(response.body.cancel());
+    if (reader) cancellations.push(reader.cancel());
+    await Promise.allSettled(cancellations);
+    throw error;
+  } finally { reader?.releaseLock(); }
 }

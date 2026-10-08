@@ -1,6 +1,7 @@
 // Saved-army route proof. The first two encounters run ordinary UI orders and real frames only.
 // A distinctly labelled third terminal fixture tests stale writes; it is not playable evidence.
 import { promises as fs } from 'node:fs';
+import assert from 'node:assert/strict';
 import { AxeBuilder } from '@axe-core/playwright';
 import { SAMPLE_ARMY } from '../src/reward/data.js';
 import { validateSnapshot, exportSnapshot, MAX_SAVE_BYTES } from '../src/franchise/save.js';
@@ -322,12 +323,102 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
     await page.keyboard.press('Escape'); await idle(); await other.close();
 
     await seedProgress(page, JSON.stringify(equipped));
+    {
+    // A deliberately cancelled download has its own raw diagnostics; ordinary play keeps its watcher.
+    const page = await ctx.newPage(), diagnostic = result.deploymentDirectReviewCancel = { errors: [], requests: [], markers: [], controls: {} };
+    watchErrors(page, url, diagnostic.errors);
+    const ownedRequests = new Map(); let phase = 'holding-metadata', terminal;
+    const transport = new Promise(resolve => { terminal = resolve; });
+    page.on('request', request => {
+      if (!request.url().endsWith('/assets/scenarios/henry-hill.json')) return;
+      const row = { id: diagnostic.requests.length + 1, url: request.url(), method: request.method(), body: request.postData(), at: Date.now() };
+      diagnostic.requests.push(row); ownedRequests.set(request, row);
+    });
+    page.on('requestfailed', request => { const row = ownedRequests.get(request); if (row) { Object.assign(row, { failed: request.failure()?.errorText, terminalAt: Date.now(), terminalPhase: phase }); terminal(); } });
+    page.on('requestfinished', request => { const row = ownedRequests.get(request); if (row) { Object.assign(row, { finished: true, terminalAt: Date.now(), terminalPhase: phase }); terminal(); } });
+    await page.addInitScript(() => {
+      const fetch = Object.getOwnPropertyDescriptor(window, 'fetch'), cancel = Object.getOwnPropertyDescriptor(ReadableStream.prototype, 'cancel');
+      const clone = Object.getOwnPropertyDescriptor(Response.prototype, 'clone'), buffer = Object.getOwnPropertyDescriptor(Response.prototype, 'arrayBuffer');
+      const bodies = new WeakMap(), data = window.__metadataCancel = { responses: [], cancellations: [], events: [], clones: 0, nativeStarts: 0 };
+      const state = owner => ({ same: window.__entry?.deployment === owner, awardId: window.__entry?.deployment?.awardId,
+        busy: !!window.__entry?.importing, cancelled: !!window.__entry?.deployment?.cancelled, admitted: !!window.__entry?.deployment?.admitted,
+        open: !!document.getElementById('deploy-review')?.open, gpu: window.__deployGpu, writes: window.__deployWrites, puts: window.__progressPuts,
+        at: performance.timeOrigin + performance.now() });
+      window.fetch = async function (input, options) {
+        const owner = window.__entry?.deployment, started = state(owner), response = await fetch.value.call(this, input, options);
+        if (String(input).includes('/scenarios/henry-hill.json')) {
+          const row = { id: data.responses.length + 1, url: new URL(input, location.href).href, method: options?.method || 'GET', body: options?.body ?? null,
+            keepalive: options?.keepalive === true, status: response.status, started, received: state(owner) };
+          data.responses.push(row); if (response.body) bodies.set(response.body, { row, owner });
+        }
+        return response;
+      };
+      ReadableStream.prototype.cancel = function (...args) {
+        const binding = bodies.get(this); if (!binding) return cancel.value.apply(this, args);
+        const row = { id: binding.row.id, url: binding.row.url, kind: 'body', state: state(binding.owner), settled: false };
+        data.cancellations.push(row); const pending = cancel.value.apply(this, args);
+        pending.then(() => { row.settled = true; row.settledAt = performance.timeOrigin + performance.now(); }, error => { row.error = error.message; });
+        return pending;
+      };
+      Response.prototype.clone = function (...args) { if (bodies.has(this.body)) data.clones++; return clone.value.apply(this, args); };
+      Response.prototype.arrayBuffer = function (...args) { if (bodies.has(this.body)) data.nativeStarts++; return buffer.value.apply(this, args); };
+      const event = e => {
+        if ((e.type === 'keydown' || e.type === 'keyup') && e.key !== 'Escape') return;
+        if ((e.type === 'cancel' || e.type === 'close') && e.target.id !== 'deploy-review') return;
+        data.events.push({ type: e.type, key: e.key, trusted: e.isTrusted, state: state(window.__entry?.deployment) });
+      };
+      for (const type of ['keydown','keyup','cancel','close']) window.addEventListener(type, event, true);
+      window.__metadataCancelRestore = () => {
+        for (const type of ['keydown','keyup','cancel','close']) window.removeEventListener(type, event, true);
+        const descriptors = [[window,'fetch',fetch],[ReadableStream.prototype,'cancel',cancel],[Response.prototype,'clone',clone],[Response.prototype,'arrayBuffer',buffer]];
+        for (const [object,key,descriptor] of descriptors) Object.defineProperty(object,key,descriptor);
+        return descriptors.every(([object,key,descriptor]) => { const actual=Object.getOwnPropertyDescriptor(object,key); return Reflect.ownKeys(actual).length===Reflect.ownKeys(descriptor).length&&Reflect.ownKeys(descriptor).every(k=>actual[k]===descriptor[k]); });
+      };
+    });
+    const raw = () => progressRaw(page);
+    const counters = () => page.evaluate(() => ({ writes: window.__deployWrites, puts: window.__progressPuts, gpu: window.__deployGpu, legacy: window.__progressLegacyWrites, busy: window.__entry?.importing }));
+    const idle = () => page.waitForFunction(() => window.__entry && !window.__entry.importing);
+    const cancelled = async () => { await idle(); return !await page.locator('#deploy-review').evaluate((n) => n.open)
+      && (await counters()).gpu === 0 && await page.locator('#camp-deploy').evaluate((n) => n === document.activeElement); };
+    try {
     let releaseMetadata, metadataSeen, metadataHandled;
     const metadataGate = new Promise((r) => { releaseMetadata = r; }), metadataReady = new Promise((r) => { metadataSeen = r; });
     const metadataDone = new Promise((r) => { metadataHandled = r; });
     await page.route('**/assets/scenarios/henry-hill.json', async (route) => { metadataSeen(); await metadataGate; await route.continue(); metadataHandled(); });
     await page.goto(url + '?saved&quality=low', { waitUntil: 'domcontentloaded' }); await metadataReady;
+    diagnostic.before = await page.evaluate(() => ({ awardId: window.__entry.deployment.awardId, busy: window.__entry.importing, cancelled: window.__entry.deployment.cancelled, gpu: window.__deployGpu, writes: window.__deployWrites, puts: window.__progressPuts }));
+    // Keep the original trusted Escape, owner settlement, local guard and conservation assertions.
     await page.keyboard.press('Escape'); releaseMetadata(); await metadataDone; await page.unroute('**/assets/scenarios/henry-hill.json'); await idle();
+    phase = 'settled'; diagnostic.markers.push({ phase, at: Date.now() });
+    let timer; try { await Promise.race([transport,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('controlled metadata transport did not settle')),5000);})]); } finally { clearTimeout(timer); }
+    diagnostic.body = await page.evaluate(() => window.__metadataCancel); diagnostic.after = await counters();
+    diagnostic.rawExact = await raw() === JSON.stringify(equipped);
+    const valid = d => {
+      if (d.requests.length !== 1 || d.body.responses.length !== 1 || d.body.cancellations.length !== 1 || d.body.clones || d.body.nativeStarts || !d.rawExact) return false;
+      const request=d.requests[0], response=d.body.responses[0], cancellation=d.body.cancellations[0], before=d.before, owner=before.awardId;
+      if (request.id!==response.id || request.id!==cancellation.id || request.url!==response.url || request.url!==cancellation.url || request.method!=='GET' || response.method!=='GET' || request.body!==null || response.body!==null || response.status!==200 || !response.keepalive) return false;
+      if (!before.busy || before.cancelled || before.gpu!==0 || d.after.gpu!==0 || d.after.busy || d.after.writes!==before.writes || d.after.puts!==before.puts) return false;
+      const started=response.started, received=response.received, issued=cancellation.state;
+      if (!started.same || started.awardId!==owner || !started.busy || started.cancelled || !started.open
+        || !received.same || received.awardId!==owner || !received.busy || !received.cancelled || received.open
+        || cancellation.kind!=='body' || !issued.same || issued.awardId!==owner || !issued.busy || !issued.cancelled || issued.open || issued.admitted
+        || !cancellation.settled || cancellation.error || ![request.at,issued.at,cancellation.settledAt,request.terminalAt].every(Number.isFinite)
+        || request.at>issued.at+2 || issued.at>cancellation.settledAt || cancellation.settledAt>d.markers.find(x=>x.phase==='settled').at+2) return false;
+      for(const s of [started,received,issued])if(s.gpu!==0||s.writes!==before.writes||s.puts!==before.puts||s.admitted)return false;
+      const keys=d.body.events.filter(e=>['keydown','keyup'].includes(e.type));
+      if(keys.length!==2||keys.map(x=>x.type).join(',')!=='keydown,keyup'||!keys.every(e=>e.key==='Escape'&&e.trusted&&e.state.awardId===owner&&e.state.gpu===0)
+        || !d.body.events.some(e=>e.type==='cancel'&&e.trusted&&e.state.awardId===owner)||keys[0].state.at>issued.at)return false;
+      if(request.failed)return request.failed==='net::ERR_ABORTED'&&['holding-metadata','settled'].includes(request.terminalPhase)
+        && issued.at<=request.terminalAt+2&&cancellation.settledAt<=request.terminalAt+2&&d.errors.length===1&&d.errors[0]==='request failed: /assets/scenarios/henry-hill.json (net::ERR_ABORTED)';
+      return request.finished===true&&d.errors.length===0;
+    };
+    assert.ok(valid(diagnostic),'actual controlled cancellation binds exact request, owner, trusted Escape and awaited cleanup');
+    for(const [name,edit]of [
+      ['unexplainedError',d=>d.errors.push('unexplained error')],['wrongUrl',d=>d.requests[0].url+='?detached'],['wrongId',d=>d.body.cancellations[0].id++],
+      ['wrongOwner',d=>d.body.cancellations[0].state.awardId+='-other'],['untrustedEscape',d=>d.body.events.find(e=>e.type==='keydown').trusted=false],
+      ['releasedOwner',d=>d.body.cancellations[0].state.busy=false],['unsettledCancel',d=>d.body.cancellations[0].settled=false],['missingCancel',d=>d.body.cancellations=[]],['allocated',d=>d.after.gpu=1],
+    ]){const mutant=structuredClone(diagnostic);edit(mutant);assert.throws(()=>assert.ok(valid(mutant)),{code:'ERR_ASSERTION'});diagnostic.controls[name]=true;}
+    if(diagnostic.requests[0].failed){const late=structuredClone(diagnostic);late.body.cancellations[0].state.at=late.requests[0].terminalAt+1000;assert.throws(()=>assert.ok(valid(late)),{code:'ERR_ASSERTION'});diagnostic.controls.lateCancel=true;}
     const guard = await page.evaluate(async () => {
       const { savedDeployment } = await import('./src/franchise/practice.js'), { startField } = await import('./src/main.js');
       const m = savedDeployment({ baseline: window.__entry.saved, ground: {}, awardId: 'metadata-free-guard', seed: 1 });
@@ -335,6 +426,20 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
     });
     verdict('direct-review-cancel', guard && await cancelled() && await page.evaluate(() => window.__entry.mode === 'camp')
       && await raw() === JSON.stringify(equipped), 'direct saved route cancels held metadata to camp; authentic metadata-free launch explicitly refuses before read/allocation');
+    diagnostic.beforeGuard = { body: diagnostic.body, after: diagnostic.after, rawExact: diagnostic.rawExact };
+    diagnostic.body = await page.evaluate(() => window.__metadataCancel); diagnostic.after = await counters();
+    diagnostic.rawExact = await raw() === JSON.stringify(equipped);
+    assert.ok(valid(diagnostic),'metadata-free guard keeps every controlled diagnostic bound');
+    for (const [name, edit] of [
+      ['guardWrite', d => d.after.writes++], ['guardPut', d => d.after.puts++],
+      ['guardNative', d => d.body.nativeStarts++], ['guardClone', d => d.body.clones++], ['guardRaw', d => d.rawExact = false],
+    ]) { const mutant = structuredClone(diagnostic); edit(mutant); assert.throws(() => assert.ok(valid(mutant)), { code: 'ERR_ASSERTION' }); diagnostic.controls[name] = true; }
+    if (diagnostic.requests[0].failed) {
+      const late = structuredClone(diagnostic); late.body.cancellations[0].settledAt = late.requests[0].terminalAt + 1000;
+      assert.throws(() => assert.ok(valid(late)), { code: 'ERR_ASSERTION' }); diagnostic.controls.lateSettlement = true;
+    }
+    } finally { diagnostic.restored = await page.evaluate(() => window.__metadataCancelRestore()); assert.equal(diagnostic.restored,true); await page.close(); }
+    }
 
     await launch(); const first = await gameState();
     const renderer = await page.evaluate(() => { const gl = document.getElementById('battlefield').getContext('webgl2'), e = gl.getExtension('WEBGL_debug_renderer_info'); return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); });

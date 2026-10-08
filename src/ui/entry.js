@@ -4,9 +4,25 @@ import { get } from '../settings.js';
 import { brigCard, staticCard, itemLabel, defineRewardSettings } from '../reward/sequence.js';
 import { compare, bestFit } from '../reward/model.js';
 import { savedDeployment } from '../franchise/practice.js';
+import { loadFieldScenario } from '../sim/phase.js';
 
 const PAGE_SIZE = 12;
 const STYLE = { 'clean modern': 'modern', 'period desk': 'desk', hybrid: 'hybrid' };
+export function showFieldFailure() {
+  document.getElementById('battle').hidden = true;
+  const root = document.createElement('main'); root.id = 'front'; root.className = 'rw rw-counts';
+  root.dataset.uiStyle = STYLE[get('screens.cardStyle')] || 'modern';
+  const wrap = document.createElement('div'); wrap.className = 'entry-wrap';
+  const section = document.createElement('section'); section.id = 'entry-title'; section.setAttribute('aria-labelledby', 'field-failure-heading');
+  const heading = document.createElement('h1'); heading.id = 'field-failure-heading'; heading.tabIndex = -1;
+  heading.textContent = 'The battlefield could not be loaded';
+  const note = document.createElement('p'); note.id = 'entry-note';
+  note.textContent = 'Your saved army is unchanged. Return to camp and try again.';
+  const link = document.createElement('a'); link.id = 'field-return'; link.className = 'entry-primary';
+  link.href = './?camp'; link.textContent = 'Return to camp';
+  section.append(heading, note, link); wrap.append(section); root.append(wrap); document.body.append(root);
+  document.title = 'The Civil War — Return to camp'; heading.focus();
+}
 export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
   defineRewardSettings();
   const store = createProgressStore();
@@ -362,10 +378,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       saved = baseline; failed = false;
       // Admission precedes even small scenario metadata; no terrain/GPU/unit import is needed.
       savedDeployment({ baseline, ground: {}, awardId, seed: task.seed });
-      const response = await fetch('./assets/scenarios/henry-hill.json');
-      if (!currentDeployment(task)) return;
-      if (!response.ok) throw new Error('Practice: the practice ground description could not be loaded.');
-      const ground = await response.json();
+      const ground = await loadFieldScenario({ isCurrent: () => currentDeployment(task) });
       if (!currentDeployment(task)) return;
       if (ground.id !== 'henry-hill' || !Array.isArray(ground.sites) || !Array.isArray(ground.woods)) throw new Error('Practice: the practice ground description is invalid.');
       task.manifest = savedDeployment({ baseline, ground, awardId, seed: task.seed });

@@ -1,5 +1,15 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0054 · Bound current ground before allocating a field (2026-10-07)
+
+Validate current route identity and complete ground before GPU allocation. The download guard
+reads at most 1 MiB through EOF before native consumption; refusal awaits both stream branches,
+and pending launch work retains its owner through cleanup. Saved manifests keep their exact scenario
+identity and canonical save recheck. Observe deliberate review cancellation on its own page with
+raw request, trusted Escape, awaited cleanup and post-guard conservation evidence; preserve the
+ordinary play error watcher and every existing deployment assertion. Functional native checks
+do not establish art quality, full-battle performance, iPad access or new battle-pack admission.
+
 ## 0053 · A phase snapshot has no save or launch authority (2026-10-07)
 
 Validate the complete ordered pack before selecting a phase, then return detached deeply frozen
