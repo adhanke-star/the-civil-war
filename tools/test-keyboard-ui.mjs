@@ -91,8 +91,7 @@ export async function keyboardControls({ page, check, shot, result }) {
   await page.locator('#menu-btn').focus(); await page.keyboard.press('Enter'); await page.keyboard.press('Escape');
   check('keyboard-native-menu-button-focus-return', (await read()).focus === 'menu-btn', 'button and key share the menu lifecycle');
 
-  await page.evaluate(()=>window.__rootKeyboardDiag.mark('before-stale-select'));
-  await select('Franklin'); await page.evaluate(()=>window.__rootKeyboardDiag.mark('after-stale-select')); await page.keyboard.press('t'); await page.evaluate(()=>window.__rootKeyboardDiag.mark('after-stale-T')); await page.evaluate(async () => { window.__game.input.targeting.enemy.state = 'routing'; });
+  await select('Franklin'); await page.keyboard.press('t'); await page.evaluate(async () => { window.__game.input.targeting.enemy.state = 'routing'; });
   await page.evaluate(async () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))); const stale = await read();
   check('keyboard-native-stale-target-auto-cancel', !stale.target && stale.selected === 'franklin' && stale.orders === cancelStart.orders, 'render-time routed-target cancellation keeps selection and issues no order');
   await page.keyboard.press('b'); await page.keyboard.press('ArrowUp'); await page.evaluate(async () => window.dispatchEvent(new Event('blur')));

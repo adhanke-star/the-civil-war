@@ -41,8 +41,8 @@ jobs:
 
       - run: npx playwright install --with-deps chromium
 
-      - name: Focused keyboard diagnostic only (not full acceptance)
-        run: node tools/test.mjs --keyboard
+      - name: Prior sandbox sequence diagnostic only (not full acceptance)
+        run: node tools/test.mjs --sandbox
 
       - name: Upload test output
         if: always()
