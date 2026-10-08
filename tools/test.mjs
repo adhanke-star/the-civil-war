@@ -1788,7 +1788,7 @@ result.ok = exitCode === 0;
 result.durationMs = Date.now() - started;
 try {
   await fs.mkdir(OUT_DIR, { recursive: true });
-  await fs.writeFile(path.join(OUT_DIR, 'last-result.json'), JSON.stringify(result, null, 2) + '\n');
+  await fs.writeFile(path.join(OUT_DIR, 'last-result.json'), JSON.stringify(result) + '\n');
 } catch (err) {
   console.error(`FAIL write-result: ${err.message}`);
   exitCode = 1;
