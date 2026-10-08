@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+### CI container trusts only its canonical checkout (2026-10-08)
+
+The first pinned-container run failed before tests on Git’s ownership guard. Bind safe.directory to the exact verified CI workspace in command-scope environment configuration; assert the workspace and realpath before fetching pinned comparisons. Keep the matching image,45-minute limit and complete suite; change no global Git settings.
+
 ### CI bootstrap uses the matching prebuilt runtime (2026-10-08)
 
 The exact capture candidate was cut off after543 passing checks when live APT font downloads used5m28s of the45-minute job. Use the official Playwright1.63.0 noble image pinned by manifest digest, verify its installed browser against the lockfile, and retain the same full serial549-check suite and45-minute ceiling. Container timing and full acceptance remain unrun; preserve the cancelled run.
