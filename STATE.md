@@ -16,4 +16,4 @@
 - **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
 - **Proof:** deployment21+21, named23+23/115/A126-B-A2, retained183+183/unit; native486/40axe/ALL138review; exactCI485/40axe/28logs/public4/source40.
 - **Coordination:** no ledger/competing writer; root sole writer; preserve workspace/Shiloh; no duplicate goal/scheduler.
-- **Current:** P3f4 d919/549 accepted; F5 isolated active/source CLEAR; local75 PASS/full565 UNRUN; native/v1UNRUN.
+- **Current:** F4d919/549 accepted; F5b122 CIcancelled561/noJSON; repair75/unit22/2jobs45/source65; full565 UNRUN.

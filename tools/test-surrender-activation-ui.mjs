@@ -242,9 +242,9 @@ export function activationUIData(a) {
 
 export function finalizeActivationUI({ result, check }) {
   const a = result.surrenderActivation, access = a.accessibility, data = activationUIData(a);
-  a.categories = data.map((data, i) => { verifyActivationUI(i, data); check(ACTIVATION_UI_NAMES[i], true, 'Actual existing live route and source-bound terminal observation'); return { name: ACTIVATION_UI_NAMES[i], data }; });
-  a.controls = a.categories.map((c, i) => { try { verifyActivationUI(i, activationUIMutation(i, c.data)); throw new Error('Activation UI mutation escaped'); }
-    catch (e) { assert.equal(e.code, 'ERR_ASSERTION'); assert.ok(e.message.startsWith(ACTIVATION_UI_NAMES[i])); return { name: c.name, code: e.code, message: e.message }; } });
+  a.categories = data.map((value, i) => { verifyActivationUI(i, value); check(ACTIVATION_UI_NAMES[i], true, 'Actual existing live route and source-bound terminal observation'); return { name: ACTIVATION_UI_NAMES[i], dataSha256: hash(JSON.stringify(value)) }; });
+  a.controls = data.map((value, i) => { try { verifyActivationUI(i, activationUIMutation(i, value)); throw new Error('Activation UI mutation escaped'); }
+    catch (e) { assert.equal(e.code, 'ERR_ASSERTION'); assert.ok(e.message.startsWith(ACTIVATION_UI_NAMES[i])); return { name: ACTIVATION_UI_NAMES[i], code: e.code, message: e.message }; } });
   a.sources = result.surrenderActivationPure.sources;
   a.axe = { result: access.auditViews.slice(0, 2).flatMap(a => a.violations), reward: access.auditViews.slice(2).flatMap(a => a.violations) };
   a.native = false;
@@ -256,13 +256,16 @@ if (direct) {
   const full = JSON.parse(bytes), a = full.surrenderActivation, sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   assert.equal(full.ok, true); assert.equal(full.checks.length, 565); assert(full.checks.every(c => c.ok)); assert.equal(new Set(full.checks.map(c => c.name)).size, 563);
   assert.deepEqual(full.checks.map(c => c.name).sort(), EXPECTED_AGGREGATE_NAMES);
-  assert.deepEqual(a.categories.map(c => c.data), activationUIData(a));
+  const data = activationUIData(a);
+  assert.deepEqual(a.categories.map(c => c.name), ACTIVATION_UI_NAMES);
+  assert.deepEqual(a.categories.map(c => Object.keys(c).sort()), ACTIVATION_UI_NAMES.map(() => ['dataSha256', 'name']));
+  assert.deepEqual(a.categories.map(c => c.dataSha256), data.map(value => hash(JSON.stringify(value))));
   assert.equal(a.categories.length, 8); assert.equal(a.controls.length, 8); assert.equal(a.sources.length, 65);
   for (const s of a.sources) { const live = fs.readFileSync(s.path), git = execFileSync('git', ['show', sha + ':' + s.path]); assert.equal(live.length, s.bytes); assert.equal(hash(live), s.sha256); assert.deepEqual(live, git); }
   for (const i of a.accessibility.images) { assert(/^\.out\/activation-ui-saved-win-\d+-(result|reward)-(wide|narrow)\.png$/.test(i.path)); assert(!fs.lstatSync(i.path).isSymbolicLink()); assert(fs.realpathSync(i.path).startsWith(fs.realpathSync('.out') + '/')); const b = fs.readFileSync(i.path); assert.equal(b.length, i.bytes); assert.equal(hash(b), i.sha256); assert.equal(b.readUInt32BE(16), i.width); assert.equal(b.readUInt32BE(20), i.height); }
-  a.categories.forEach((c, i) => { assert.equal(c.name, ACTIVATION_UI_NAMES[i]); verifyActivationUI(i, c.data); });
-  const controls = a.categories.map((c, i) => { try { verifyActivationUI(i, activationUIMutation(i, c.data)); throw new Error('UI mutation escaped'); }
-    catch (e) { assert.equal(e.code, 'ERR_ASSERTION'); assert.ok(e.message.startsWith(ACTIVATION_UI_NAMES[i])); return { name: c.name, code: e.code, message: e.message }; } });
+  a.categories.forEach((c, i) => { assert.equal(c.name, ACTIVATION_UI_NAMES[i]); verifyActivationUI(i, data[i]); });
+  const controls = data.map((value, i) => { try { verifyActivationUI(i, activationUIMutation(i, value)); throw new Error('UI mutation escaped'); }
+    catch (e) { assert.equal(e.code, 'ERR_ASSERTION'); assert.ok(e.message.startsWith(ACTIVATION_UI_NAMES[i])); return { name: ACTIVATION_UI_NAMES[i], code: e.code, message: e.message }; } });
   assert.deepEqual(controls, a.controls);
   const out = { sha, raw: { path: p, bytes: bytes.length, sha256: hash(bytes) }, categories: a.categories.map(c => c.name), sourceBindings: a.sources,
     images: a.accessibility.images, scope: 'Reader of this fresh single live aggregate; not an independent replay', controls: process.argv.includes('--prove-fail') ? controls : undefined };

@@ -68,6 +68,84 @@ jobs:
           console.log(JSON.stringify({ playwright: installed.version, executable, bakedDependencies: true }));
           NODE
 
+      - run: npm test
+
+      - run: node tools/test-surrender-activation-ui.mjs
+      - run: node tools/test-surrender-activation-ui.mjs --prove-fail
+
+      - name: Upload test output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: .out/
+          include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
+
+  probes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --ipc=host --init
+    env:
+      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_KEY_0: safe.directory
+      GIT_CONFIG_VALUE_0: /__w/the-civil-war/the-civil-war
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout probe source
+        uses: actions/checkout@v4
+
+      - name: Fetch pinned probe current-field comparison
+        run: |
+          test "$GITHUB_WORKSPACE" = "/__w/the-civil-war/the-civil-war"
+          test "$(realpath "$GITHUB_WORKSPACE")" = "$GITHUB_WORKSPACE"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags --depth=1 origin 4f6113a624e0e533825c0be414bb36f3b073f726
+          test "$(git rev-parse FETCH_HEAD)" = "4f6113a624e0e533825c0be414bb36f3b073f726"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/main.js
+          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/entry.js
+
+      - name: Fetch pinned probe reinforcement comparison
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags --depth=1 origin aaf10145531130f3ec201d6332f6759599bc46a4
+          test "$(git rev-parse FETCH_HEAD)" = "aaf10145531130f3ec201d6332f6759599bc46a4"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git cat-file -e aaf10145531130f3ec201d6332f6759599bc46a4:src/main.js
+          node tools/test-surrender-runtime.mjs --verify-legacy-game
+
+      - name: Set up probe Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install probe dependencies
+        run: npm ci
+
+      - name: Verify pinned probe Playwright runtime
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import { chromium } from 'playwright';
+          const lock = JSON.parse(fs.readFileSync('package-lock.json'));
+          const installed = JSON.parse(fs.readFileSync('node_modules/playwright/package.json'));
+          assert.equal(lock.packages['node_modules/playwright'].version, '1.63.0');
+          assert.equal(installed.version, '1.63.0');
+          assert.equal(process.env.PLAYWRIGHT_BROWSERS_PATH, '/ms-playwright');
+          const executable = chromium.executablePath();
+          assert.ok(executable.startsWith('/ms-playwright/'));
+          fs.accessSync(executable, fs.constants.X_OK);
+          console.log(JSON.stringify({ playwright: installed.version, executable, bakedDependencies: true }));
+          NODE
+
       - run: node tools/test-deployment.mjs
       - run: node tools/test-deployment.mjs --prove-fail
 
@@ -131,16 +209,11 @@ jobs:
       - run: node tools/test-surrender-activation.mjs
       - run: node tools/test-surrender-activation.mjs --prove-fail
 
-      - run: npm test
-
-      - run: node tools/test-surrender-activation-ui.mjs
-      - run: node tools/test-surrender-activation-ui.mjs --prove-fail
-
-      - name: Upload test output
+      - name: Upload probe output
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-output
+          name: probe-output
           path: .out/
           include-hidden-files: true
           retention-days: 7

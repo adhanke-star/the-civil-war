@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+0070 (2026-10-08): Run the independent standalone probes and the complete aggregate in separate same-SHA jobs, each retaining its45-minute limit and pinned runtime. The original run timed out after561 passes with no result JSON. Preserve all48 probes, one fresh full aggregate and its two UI readers; bind both jobs and both artifacts before acceptance. No count, quality cap, product or service-worker change; runtime fit remains unmeasured.
+
+0069 (2026-10-08): Keep complete live encounter records once and bind each derived UI category by SHA-256 rather than serializing the same large manifest and outcome repeatedly. Reconstruct all eight category inputs from canonical records, require exact names/keys/digests, and retain every positive predicate and copied mutation in producer, reader and collector. The full-fixture size estimate exceeds the existing48MiB cap; actual size remains unmeasured. Preserve the original CI and all evidence; change no product, threshold or gate count.
+
 0068 (2026-10-08): Enable the existing surrender ledger through an explicit own boolean only for first-command and saved fictional encounters. Validate before scenario/manifest materialization; preserve byte-exact default builders and authored ground flags, immutable baseline and exact manifest scenario identity. Historical, practice, sandbox and tuning routes retain their existing behavior. Observe natural terminal outcomes and ordinary reward actions without prescribing winners; keep full source inverses, negative controls and exact-SHA acceptance before dependent work.
 
 ### CI container trusts only its canonical checkout (2026-10-08)
