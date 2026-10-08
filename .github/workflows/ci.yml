@@ -56,6 +56,9 @@ jobs:
       - run: node tools/test-reinforcement-runtime.mjs
       - run: node tools/test-reinforcement-runtime.mjs --prove-fail
 
+      - run: node tools/test-capture-accounting.mjs
+      - run: node tools/test-capture-accounting.mjs --prove-fail
+
       - run: node tools/test-equipment.mjs
       - run: node tools/test-equipment.mjs --prove-fail
 

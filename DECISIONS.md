@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+### 0060 · Account for prisoners and guns in the existing phase seam
+Use a detached immutable query on a prepared timeline and explicit caller trace. Reuse phase validation and provenance rather than add a persistent capture owner. Prisoners and missing men are disjoint loss components; physical gun identity, condition and possession remain distinct. Bound enumeration by current software limits before allocation and preserve authored weapon metadata as string/null. This foundation grants no surrender/capture eligibility, rewards, save, history or hardware authority.
+
+
 ### 0059 · Initialize scheduled arrivals after every field subscriber
 The sole main field owner initializes the accepted reinforcement runtime after Hud/Input/practice/soldier-view listeners and before the first simulation step. Arrival markers, event feed, alerts and results use their original production subscribers. Fictional diagnostics carry no historical roster or timetable authority. Bounded banner/feed CSS reserves readable native actions and the measured objective; the interrupted P2o feedback lane remains separate. CI wall budget becomes45min from measured parent39m41s plus new browser checks; acceptance predicates/caps/oracles remain unchanged.
 
@@ -49,6 +53,18 @@ scenario data and stable neighbor IDs. Retain every citation and metadata value 
 historical status. Unit IDs remain stable across phases. This simulation seam has no renderer,
 store, reward or route ownership; existing practice manifests continue to bind those identities.
 The pure foundation does not certify timed arrivals, carry-over, history or GPU admission.
+
+## 0052 · Field feedback shares a bounded reading area (2026-10-07)
+
+Reuse the existing toast region for instructions, alerts, Moments and recent events, with native
+scrolling between the measured objective and dock. Preserve their existing owners and lifetimes;
+transient toast retention cannot remove persistent children. Full feed text stays readable beside
+one dedicated contextual Fly button, preserving original handlers and six events. Reading owns
+its keys and preserves a real ghost; native cancellation and intentional Fly/Resume use separate
+evidence phases. Empty eligibility and instruction priority are synchronous CSS; narrow workbench
+editing temporarily hides the retained reading area. Prove the accepted-source overlap first,
+then native targets, reading, action effects and exact legacy-layout A/B/A2 restoration.
+
 
 ## 0051 · A cached targeting preview retains its complete path (2026-10-07)
 

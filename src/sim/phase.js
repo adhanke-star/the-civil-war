@@ -290,3 +290,98 @@ export function reinforcementWindow(plan, input) {
   return Object.freeze({ packId: plan.packId, phaseId: plan.phaseId, ...window,
     arrivals: Object.freeze(arrivals), notices: Object.freeze(notices), pending: Object.freeze(pending) });
 }
+
+/** Pure accounting requests, not evidence or authority for battlefield capture eligibility. */
+export function captureAccounting(plan, input) {
+  if (!reinforcementPlans.has(plan)) fail('capture accounting needs a prepared reinforcement timeline.');
+  const trace = snapshot(input); shape(trace, ['through', 'events'], 'capture accounting trace');
+  if (!finite(trace.through) || trace.through < 0 || trace.through > plan.horizon || !Array.isArray(trace.events)) fail('capture accounting interval or events are invalid.');
+  const budget = plan.budget.total;
+  if (budget.formations > FIELD_LIMITS.formations || budget.men > FIELD_LIMITS.men || budget.guns > FIELD_LIMITS.guns) fail('capture accounting exceeds current software applicability bounds.');
+  const roster = [...plan.scenario.units, ...(plan.scenario.reinforcements || [])];
+  const figures = roster.reduce((sum, unit) => sum + Math.max(1, Math.round(unit.men / (unit.type === 'artillery' ? 4 : 5))) + 6, 0);
+  if (figures > FIELD_LIMITS.figures) fail('capture accounting exceeds current software figure bounds.');
+  const units = roster.map((unit, index) => {
+    const arrivalAtSec = index < plan.scenario.units.length ? 0 : unit.atSec;
+    const arrived = arrivalAtSec <= trace.through;
+    return { unitId: unit.id, originSide: unit.side, arrivalAtSec, arrived, initialMen: unit.men,
+      presentMen: arrived ? unit.men : 0, pendingMen: arrived ? 0 : unit.men,
+      killedWounded: 0, missingMen: 0, capturedMen: 0, capturedBy: { US: 0, CS: 0 },
+      guns: Array.from({ length: unit.type === 'artillery' ? unit.guns : 0 }, (_, gunIndex) => ({
+        unitId: unit.id, gunIndex, originSide: unit.side, originWeapon: own(unit, 'weapon') ? unit.weapon : null,
+        ownerSide: unit.side, condition: 'serviceable', arrived })) };
+  });
+  const byId = new Map(units.map(unit => [unit.unitId, unit])), seen = new Map();
+  let last = -1, applied = 0, replayed = 0;
+  for (const event of trace.events) {
+    const common = ['id', 'atSec', 'unitId', 'kind'];
+    const menEvent = ['loss', 'missing', 'capture-men'].includes(event?.kind);
+    const gunEvent = ['disable-gun', 'capture-gun'].includes(event?.kind);
+    if (!menEvent && !gunEvent) fail('capture event kind is unsupported.');
+    const capture = event.kind === 'capture-men' || event.kind === 'capture-gun';
+    const keys = [...common, menEvent ? 'men' : 'gunIndex', ...(capture ? ['captorSide'] : [])];
+    shape(event, keys, 'capture event');
+    if (!text(event.id) || !text(event.unitId) || !finite(event.atSec) || event.atSec < 0 || event.atSec > trace.through) fail('capture event identity or time is invalid.');
+    const unit = byId.get(event.unitId);
+    if (!unit || event.atSec < unit.arrivalAtSec) fail('capture event formation is absent or not yet arrived.');
+    if (menEvent ? !finite(event.men) || event.men <= 0 : !Number.isSafeInteger(event.gunIndex) || event.gunIndex < 0 || event.gunIndex >= unit.guns.length) fail('capture event amount or gun identity is invalid.');
+    if (capture && !['US', 'CS'].includes(event.captorSide)) fail('capture event captor side is invalid.');
+    const canonical = JSON.stringify(keys.map(key => event[key]));
+    if (seen.has(event.id)) {
+      if (seen.get(event.id) !== canonical) fail('capture event id has changed payload.');
+      replayed++; continue;
+    }
+    if (event.atSec < last) fail('unique capture events must be chronological.');
+    if (menEvent) {
+      if (capture && event.captorSide === unit.originSide) fail('prisoners need the opposite origin side.');
+      if (event.men > unit.presentMen) fail('capture event overspends remaining men.');
+      const key = event.kind === 'loss' ? 'killedWounded' : event.kind === 'missing' ? 'missingMen' : 'capturedMen';
+      const next = unit[key] + event.men;
+      const components = { killedWounded: unit.killedWounded, missingMen: unit.missingMen, capturedMen: unit.capturedMen, [key]: next };
+      const lost = (components.killedWounded + components.missingMen) + components.capturedMen;
+      const present = unit.initialMen - lost;
+      if (!finite(next) || next <= unit[key] || !finite(lost) || lost > unit.initialMen || !finite(present) || present < 0 || present >= unit.presentMen) fail('capture event amount does not make representable progress.');
+      unit[key] = next; unit.presentMen = present;
+      if (capture) unit.capturedBy[event.captorSide] = next;
+    } else {
+      const gun = unit.guns[event.gunIndex];
+      if (event.kind === 'disable-gun') {
+        if (gun.condition === 'disabled') fail('gun disable event makes no change.');
+        gun.condition = 'disabled';
+      } else {
+        if (event.captorSide === gun.ownerSide) fail('gun capture event needs the opposite current owner.');
+        gun.ownerSide = event.captorSide;
+      }
+    }
+    seen.set(event.id, canonical); last = event.atSec; applied++;
+  }
+  const counters = () => ({ initialMen: 0, presentMen: 0, pendingMen: 0, killedWounded: 0, missingMen: 0,
+    capturedMen: 0, capturedBy: { US: 0, CS: 0 }, initialGuns: 0, pendingGuns: 0, retainedGuns: 0, netCapturedGuns: 0, disabledGuns: 0 });
+  const totals = { US: counters(), CS: counters() };
+  const possession = { US: { totalGuns: 0, fieldGuns: 0, pendingGuns: 0 }, CS: { totalGuns: 0, fieldGuns: 0, pendingGuns: 0 } };
+  const conserveMen = row => {
+    const accounted = (((row.presentMen + row.pendingMen) + row.killedWounded) + row.missingMen) + row.capturedMen;
+    if (Math.abs(row.initialMen - accounted) > 16 * Number.EPSILON * Math.max(1, row.initialMen)) fail('capture accounting men conservation failed.');
+  };
+  for (const unit of units) {
+    conserveMen(unit);
+    const total = totals[unit.originSide];
+    for (const key of ['initialMen', 'presentMen', 'pendingMen', 'killedWounded', 'missingMen', 'capturedMen']) total[key] += unit[key];
+    for (const side of ['US', 'CS']) total.capturedBy[side] += unit.capturedBy[side];
+    for (const gun of unit.guns) {
+      total.initialGuns++;
+      if (!gun.arrived) total.pendingGuns++;
+      if (gun.ownerSide === gun.originSide) total.retainedGuns++; else total.netCapturedGuns++;
+      if (gun.condition === 'disabled') total.disabledGuns++;
+      const held = possession[gun.ownerSide]; held.totalGuns++;
+      if (gun.arrived) held.fieldGuns++; else held.pendingGuns++;
+    }
+  }
+  for (const side of ['US', 'CS']) {
+    conserveMen(totals[side]);
+    if (totals[side].initialGuns !== totals[side].retainedGuns + totals[side].netCapturedGuns
+      || possession[side].totalGuns !== possession[side].fieldGuns + possession[side].pendingGuns) fail('capture accounting gun conservation failed.');
+  }
+  if (totals.US.initialGuns + totals.CS.initialGuns !== possession.US.totalGuns + possession.CS.totalGuns) fail('capture accounting physical gun total changed.');
+  return snapshot({ packId: plan.packId, phaseId: plan.phaseId, through: trace.through, applied, replayed, units, totals, possession });
+}

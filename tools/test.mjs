@@ -1396,6 +1396,16 @@ async function reinforcementRuntimeUnit() {
   } catch (error) { check('reinforcements-runtime', false, error.message); }
 }
 
+async function captureAccountingModelUnit() {
+  try {
+    const { captureAccountingEvidence } = await import('./test-capture-accounting.mjs');
+    const actual = captureAccountingEvidence();
+    result.captureAccounting = actual;
+    check('capture-accounting-model', actual.categories.length === 20 && actual.controls.length === 20,
+      '20 immutable capture accounting categories and intended semantic controls; no runtime capture authority');
+  } catch (error) { check('capture-accounting-model', false, error.message); }
+}
+
 async function main() {
   await settingsUnit();
   await bakedUnit();
@@ -1404,6 +1414,7 @@ async function main() {
   await fieldAdmissionModelUnit();
   await reinforcementModelUnit();
   await reinforcementRuntimeUnit();
+  await captureAccountingModelUnit();
   await fs.mkdir(OUT_DIR, { recursive: true });
   const { server, url } = await startServer({ port: 0 });
   result.url = url;
@@ -1688,6 +1699,7 @@ if (process.argv.includes('--unit')) {
   await fieldAdmissionModelUnit();
   await reinforcementModelUnit();
   await reinforcementRuntimeUnit();
+  await captureAccountingModelUnit();
   try {
     await bakedUnit();
     await approvedPackUnit();
