@@ -1,5 +1,10 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0062 · Opt-in surrender retains the original roster and casualty accounting (2026-10-08)
+
+P3f2 adopted before edits: existing Game/Combat/Unit owners, true-only descriptor-safe admission, symmetric current220m home corridor and uninterrupted6 simulation seconds. Preserve absent/false legacy hashes and source identities; Unit surrender returns exact remaining fractions without casualty RNG, removal or reserve refund. Atomic all-candidate accounting before Unit mutation/callbacks, source-order aggregate observations at one common time, gun condition distinct from possession. Source60/8changed52locks, owned12/serial53/24categories27intendedcontrols/fullCI532/public12; runtime/UI/history/reward/native claims require actual gates. F1 acceptance uses CRC-verified raw logs because gh2.91.0 silently truncates oversized lines; historical failed readbacks remain, runner stdout absence claim corrected.
+
+
 ### 0061 · Require evidence from standalone accounting commands
 A successful CI step without the probe evidence is not acceptance. Resolve the direct CLI path through realpath, matching existing probes, and prove ordinary/control execution through actual path aliases. Preserve the green aggregate and failed collector separately, then require fresh exact-SHA standalone and aggregate readback with unchanged counts and predicates. The hosted runner path cause remains unproven.
 

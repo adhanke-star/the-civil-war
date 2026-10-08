@@ -31,7 +31,7 @@ import { Ai } from './sim/ai.js';
 import { RULES } from './sim/rules.js';
 import { mulberry32, inWoods, PLAN } from './world/landscape.js';
 import { FieldCaptures } from './franchise/captures.js';
-import { prepareReinforcementTimeline, reinforcementWindow } from './sim/phase.js';
+import { prepareReinforcementTimeline, reinforcementWindow, captureAccounting } from './sim/phase.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -42,11 +42,171 @@ const ARC = (65 * Math.PI) / 180; // the firing arc each side of the facing (com
 const reinforcementState = new WeakMap();
 const pendingInfantry = (game, side) => {
   const state = reinforcementState.get(game);
-  return !!state && state.plan.events.some(e => e.atSec > state.cursor && e.unit.side === side
-    && (e.unit.type || 'infantry') === 'infantry');
+  return !!state && (state.plan.events.some(e => e.atSec > state.cursor && e.unit.side === side
+    && (e.unit.type || 'infantry') === 'infantry') || !!state.capture && [...captureCorridors(game).keys()].some(u => u.side === side && u.type === 'infantry'));
 };
 
+// Capture state remains ephemeral, inside the scheduled Game's existing WeakMap entry.
+const captureFail = message => { throw new Error('Surrender: ' + message); };
+const freezeCapture = value => {
+  if (value && typeof value === 'object') { for (const child of Object.values(value)) freezeCapture(child); Object.freeze(value); }
+  return value;
+};
+const captureState = game => reinforcementState.get(game)?.capture;
+
+function captureSources(plan) {
+  return [...plan.scenario.units, ...(plan.scenario.reinforcements || [])].map((def, index) => ({
+    def, arrivalAtSec: index < plan.scenario.units.length ? 0 : def.atSec,
+    unit: null, actualDef: null,
+  }));
+}
+
+function bindCaptureUnit(state, unit) {
+  const source = state.capture.sources.find(s => s.def.id === unit.id);
+  if (!source || source.unit) captureFail('formation identity was already bound or is absent.');
+  source.unit = unit; source.actualDef = unit.def;
+  source.slots = unit.gunSlots; source.pieces = (unit.gunSlots || []).map(slot => ({ slot, gun: slot.gun, limber: slot.limber }));
+}
+
+// Descriptor-safe comparisons of the small, validated identity/equipment fields. Never run a getter.
+function captureValue(value, depth = 0, seen = new Set()) {
+  if (depth > 32 || seen.has(value)) captureFail('source metadata exceeds its structural bounds.');
+  if (value === null || ['string', 'boolean', 'undefined'].includes(typeof value)) return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (!value || typeof value !== 'object' || ![Object.prototype, Array.prototype, null].includes(Object.getPrototypeOf(value))) captureFail('source metadata changed.');
+  seen.add(value);
+  const out = Array.isArray(value) ? [] : Object.create(null);
+  for (const key of Reflect.ownKeys(value)) {
+    if (Array.isArray(value) && key === 'length') continue;
+    const d = Object.getOwnPropertyDescriptor(value, key);
+    if (typeof key !== 'string' || !d || !('value' in d)) captureFail('source metadata descriptor changed.');
+    Object.defineProperty(out, key, { value: captureValue(d.value, depth + 1, seen), enumerable: true, configurable: true, writable: true });
+  }
+  seen.delete(value);
+  return out;
+}
+
+function captureProperty(value, key) {
+  const d = Object.getOwnPropertyDescriptor(value, key);
+  if (!d) { if (key in value) captureFail('inherited source metadata changed.'); return undefined; }
+  if (!('value' in d)) captureFail('source metadata descriptor changed.');
+  return captureValue(d.value);
+}
+
+function validateCaptureRoster(game, state) {
+  const capture = state.capture;
+  if (!state.initialized || capture.dispatching) captureFail('initialize the complete source roster before observing captures.');
+  const due = capture.sources.filter(s => s.arrivalAtSec <= game.simTime);
+  if (game.units.length !== due.length || new Set(game.units).size !== due.length) captureFail('the closed source roster changed.');
+  for (const s of capture.sources) {
+    if (s.arrivalAtSec > game.simTime) { if (s.unit) captureFail('formation arrived before its source offset.'); continue; }
+    const u = s.unit, d = s.def;
+    if (!u || !game.units.includes(u) || u.def !== s.actualDef || u.id !== d.id || u.side !== d.side
+      || u.type !== (d.type || 'infantry') || u.name !== d.name || u.menMax !== d.men
+      || u.guns !== (d.guns || 0) || u.weapon !== (d.weapon || 'smooth')
+      || !Number.isFinite(u.men) || u.men < 0 || u.men > d.men) captureFail('source formation identity or strength changed.');
+    for (const key of ['id', 'side', 'type', 'name', 'men', 'guns', 'weapon', 'equipment']) {
+      if (JSON.stringify(captureProperty(u.def, key)) !== JSON.stringify(d[key])) captureFail('source definition changed.');
+    }
+    if (JSON.stringify(captureProperty(u, 'equipment')) !== JSON.stringify(d.equipment)) captureFail('issued equipment changed.');
+    const n = d.type === 'artillery' ? d.guns : 0;
+    if (n ? !Array.isArray(u.gunSlots) || u.gunSlots.length !== n || u.gunSlots !== s.slots || u.gunSlots.some((g, k) => g !== s.pieces[k].slot || g.gun !== s.pieces[k].gun
+        || g.limber !== s.pieces[k].limber || typeof g.alive !== 'boolean')
+      : u.gunSlots !== undefined) captureFail('physical gun identities or conditions changed.');
+    const record = capture.records.get(d.id);
+    if (record && (u.men !== 0 || u.state !== 'captured'
+      || record.gunConditions.some((alive, k) => u.gunSlots[k].alive !== alive))) captureFail('a surrendered source formation changed.');
+    if (!record && u.state === 'captured') captureFail('a formation was surrendered outside its Game owner.');
+  }
+  return due;
+}
+
+// This is an as-of aggregate observation, not a retained chronology of individual casualty hits.
+function observeCaptures(game, state, proposed = state.capture.records) {
+  const due = validateCaptureRoster(game, state), events = [], through = game.simTime;
+  for (const s of due) {
+    const u = s.unit, d = s.def, record = proposed.get(d.id);
+    const append = (kind, fields, suffix = kind) => events.push({ id: d.id + ':' + suffix,
+      atSec: through, unitId: d.id, kind, ...fields });
+    if (record) append('capture-men', { men: record.men, captorSide: record.captorSide });
+    const lost = record ? record.killedWounded : d.men - u.men;
+    if (!Number.isFinite(lost) || lost < 0 || lost > d.men) captureFail('aggregate source loss is invalid.');
+    if (lost > 0) append('loss', { men: lost });
+    for (let k = 0; k < (d.type === 'artillery' ? d.guns : 0); k++) {
+      if (!u.gunSlots[k].alive) append('disable-gun', { gunIndex: k }, 'disabled-' + k);
+      if (record) append('capture-gun', { gunIndex: k, captorSide: record.captorSide }, 'gun-' + k);
+    }
+  }
+  const accounting = captureAccounting(state.plan, { through, events });
+  for (const s of due) {
+    const row = accounting.units.find(r => r.unitId === s.def.id), record = proposed.get(s.def.id);
+    const actual = record ? 0 : s.unit.men;
+    if (Math.abs(row.presentMen - actual) > 16 * Number.EPSILON * Math.max(1, row.initialMen)
+      || row.capturedMen !== (record?.men || 0)) captureFail('aggregate source conservation changed.');
+  }
+  const captures = state.capture.sources.filter(s => proposed.has(s.def.id)).map(s => {
+    const r = proposed.get(s.def.id), row = accounting.units.find(v => v.unitId === s.def.id);
+    return { unitId: s.def.id, originSide: s.def.side, captorSide: r.captorSide,
+      men: r.men, captureAtSec: r.captureAtSec, guns: row.guns.map(g => ({ ...g })) };
+  });
+  return freezeCapture({ observedAtSec: through, captures, accounting });
+}
+
+function captureCorridors(game) {
+  const sourceUnits = captureState(game).sources.map(source => source.unit).filter(Boolean);
+  const rows = sourceUnits.map(u => ({ unit: u, side: u.side, state: u.state, alive: u.alive, x: u.x, z: u.z }));
+  const blocked = new Map();
+  for (const router of rows) {
+    if (!router.alive || router.state !== 'routing') continue;
+    const home = router.side === 'US' ? -game.terrain.half + 40 : game.terrain.half - 40;
+    const forward = home - router.z, between = z => forward < 0 ? z < router.z && z > home : z > router.z && z < home;
+    if (forward === 0) continue;
+    let captor = null, distance = Infinity;
+    for (const enemy of rows) {
+      if (!enemy.alive || enemy.state !== 'steady' || enemy.side === router.side || !between(enemy.z)
+        || Math.abs(enemy.x - router.x) > 220) continue;
+      const d = Math.hypot(enemy.x - router.x, enemy.z - router.z);
+      if (d < distance) { distance = d; captor = enemy.unit; }
+    }
+    if (captor && !rows.some(friend => friend.unit !== router.unit && friend.alive && friend.state === 'steady'
+      && friend.side === router.side && Math.hypot(friend.x - router.x, friend.z - router.z) < distance)) blocked.set(router.unit, captor);
+  }
+  return blocked;
+}
+
+function commitSurrenders(game, state, before, h) {
+  const capture = state.capture, after = captureCorridors(game), timers = new Map(), proposed = new Map(capture.records), due = [];
+  for (const s of capture.sources) {
+    const u = s.unit;
+    if (!u || capture.records.has(s.def.id)) continue;
+    const elapsed = before.has(u) && after.has(u) ? (capture.timers.get(u) || 0) + h : 0;
+    timers.set(u, elapsed);
+    if (elapsed >= 6 && u.alive && u.state === 'routing') {
+      const captor = after.get(u);
+      if (!captor) continue;
+      proposed.set(s.def.id, { men: u.men, killedWounded: s.def.men - u.men,
+        captorSide: captor.side, captureAtSec: game.simTime, gunConditions: (u.gunSlots || []).map(g => g.alive) });
+      due.push(u);
+    }
+  }
+  // Refusal leaves surrender-owned timers, records, men, selection and callbacks unchanged.
+  observeCaptures(game, state, proposed);
+  for (const u of due) u.surrender();
+  capture.records = proposed; capture.timers = timers;
+  if (!due.length) return;
+  if (game.selection.some(u => due.includes(u))) {
+    for (const u of due) u.selected = false;
+    game.selection = game.selection.filter(u => !due.includes(u));
+    game.selected = game.selection.includes(game.selected) ? game.selected : game.selection[0] || null;
+    game.emit('select', game.selected);
+  }
+  for (const u of due) game.event(`${u.short} surrenders: ${proposed.get(u.id).men} prisoners.`, u, 'surrender');
+  game.alert(`${due.map(u => u.short).join(', ')} surrendered.`, due[0].x, due[0].z);
+}
+
 function dispatchReinforcements(game, state, through) {
+  if (state.capture) state.capture.dispatching = true;
+  try {
   const window = reinforcementWindow(state.plan, { after: state.cursor, through });
   state.cursor = through; // Commit ownership before invoking listeners, including a repeated initialization.
   const events = [...window.notices.map(e => ({ e, time: e.noticeAtSec, notice: true })),
@@ -61,12 +221,14 @@ function dispatchReinforcements(game, state, through) {
       const unit = game.makeUnit(e.unit, 100 + state.initialCount + e.sourceIndex);
       unit.order = unit.side === game.playerSide ? { type: 'hold' } : { type: 'hold', firm: true };
       game.units.push(unit);
+      if (state.capture) bindCaptureUnit(state, unit);
       game.emit('spawn', unit);
       game.event(`${name} arrives at ${e.unit.entry}.`, unit, 'reinforcement');
       arrived.push(unit);
     }
   }
   if (arrived.length && !game.over) game.alert(`${arrived.map(u => u.short).join(', ')} arrived.`, arrived[0].x, arrived[0].z);
+  } finally { if (state.capture) state.capture.dispatching = false; }
 }
 
 function scheduledReady(game, state) {
@@ -76,10 +238,13 @@ function scheduledReady(game, state) {
 export class Game {
   constructor({ scene, terrain, scenario, world, effects, playerSide = 'US' }) {
     // This validates structure, not hardware admission: routed definitions pass the field guard upstream.
-    const timeline = 'reinforcements' in scenario ? prepareReinforcementTimeline({ version: 1,
+    const timeline = 'reinforcements' in scenario || 'surrender' in scenario ? prepareReinforcementTimeline({ version: 1,
       id: 'game', title: 'Battle runtime', phases: [{ id: 'battle', scenario }] }, 'battle') : null;
-    if (timeline?.events.length) reinforcementState.set(this, { plan: timeline, cursor: null,
-      initialized: false, initialCount: scenario.units.length });
+    const surrender = timeline?.scenario.surrender === true;
+    if (surrender) captureAccounting(timeline, { through: 0, events: [] });
+    if (timeline?.events.length || surrender) reinforcementState.set(this, { plan: timeline, cursor: null,
+      initialized: false, initialCount: scenario.units.length, ...(surrender ? { capture: { sources: captureSources(timeline),
+        records: new Map(), timers: new Map(), pre: new Map(), dispatching: false } } : {}) });
     this.scene = scene;
     this.terrain = terrain;
     this.scenario = scenario;
@@ -129,6 +294,8 @@ export class Game {
 
     this.entities = new EntityManager();
     this.units = defs.map((d, k) => this.makeUnit(d, 100 + k));
+    const state = reinforcementState.get(this);
+    if (state?.capture) for (const unit of this.units) bindCaptureUnit(state, unit);
 
     const sites = PLAN.sites;
     const fenceField = world.fenceField;
@@ -139,6 +306,7 @@ export class Game {
       return { value: 1, kind: 'open' };
     };
     this.combat = new Combat({ units: this.units, terrain, coverAt: this.coverAt, fallen: this.fallen, fx: effects, rnd: this.rnd });
+    if (state?.capture) this.combat.rallyBlocked = u => state.capture.pre.has(u);
     this.ai = new Ai(this, scenario.ai || {});
     // the defenders begin under orders to hold their ground
     for (const u of this.units) if (u.side !== playerSide) u.order = { type: 'hold', firm: true };
@@ -247,6 +415,12 @@ export class Game {
     if (!state || state.initialized || this.over) return;
     state.initialized = true;
     dispatchReinforcements(this, state, 0);
+  }
+
+  /** Detached as-of prisoner and physical-gun accounting; legacy battles have no capture state. */
+  captureSnapshot() {
+    const state = reinforcementState.get(this);
+    return state?.capture ? observeCaptures(this, state) : null;
   }
 
   /** May the player order this unit? (His own side; the other side too with units.controlBothSides.) */
@@ -525,7 +699,10 @@ export class Game {
       if (!u.alive) continue;
       u.move(h, u.side === 'US' ? -this.terrain.half + 40 : this.terrain.half - 40);
     }
+    const pre = state?.capture ? captureCorridors(this) : null;
+    if (pre) state.capture.pre = pre;
     this.combat.step(h, this.simTime);
+    if (pre) commitSurrenders(this, state, pre, h);
     this.ai.step(h);
     this.slowT -= h;
     if (this.slowT <= 0) {
@@ -615,6 +792,7 @@ export class Game {
    * path as the scenario's units. Returns the unit, or null when the side's figure reserve is used up.
    */
   spawnUnit({ side, men = 1000, weapon = 'smooth', xp = 1, x, z, facing }) {
+    if (captureState(this)) captureFail('the prepared source roster is closed to sandbox spawns.');
     if (!Number.isInteger(xp) || xp < 1 || xp > 4) {
       this.emit('log', 'Choose Green, Trained, Veteran or Elite before placing a brigade.');
       return null;
@@ -642,6 +820,7 @@ export class Game {
   }
 
   removeUnit(u) {
+    if (captureState(this)) captureFail('the prepared source roster is retained after surrender.');
     const i = this.units.indexOf(u);
     if (i < 0) return false;
     this.units.splice(i, 1);

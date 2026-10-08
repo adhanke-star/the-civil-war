@@ -292,7 +292,7 @@ export class Combat {
     const routThresh = 18 - 1.5 * u.xp;
     if (u.state === 'routing') {
       // Rally: no enemy within 220 m for 6 s.
-      if (nearest > 220) u.rallyT += dt; else u.rallyT = 0;
+      if (nearest > 220 && !this.rallyBlocked?.(u)) u.rallyT += dt; else u.rallyT = 0;
       if (u.rallyT > 6) {
         u.state = 'wavering';
         u.morale = Math.max(u.morale, 30);

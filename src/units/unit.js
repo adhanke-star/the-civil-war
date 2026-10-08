@@ -524,6 +524,19 @@ export class Unit {
     }
   }
 
+  /** Leave active figures without creating casualties or changing source roster identity. */
+  surrender() {
+    if (!this.alive || this.state === 'captured') return 0;
+    const men = this.men;
+    this.men = 0;
+    this.state = 'captured';
+    this.stop();
+    this.order = { type: 'hold' };
+    this.target = null;
+    for (const figure of this.figures) if (figure.alive) { figure.alive = false; figure.gone = true; }
+    return men;
+  }
+
   /** Remove `menLost` men; the figures that die fall where they stand (see animate). */
   takeLosses(menLost, fallenPool, now) {
     if (menLost <= 0 || !this.alive) return;

@@ -1406,6 +1406,22 @@ async function captureAccountingModelUnit() {
   } catch (error) { check('capture-accounting-model', false, error.message); }
 }
 
+async function surrenderRuntimeModelUnit() {
+  try {
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const { stdout, stderr } = await promisify(execFile)(process.execPath,
+      [path.join(ROOT, 'tools/test-surrender-runtime.mjs')], { maxBuffer: 4 * 1024 * 1024 });
+    const lines = stdout.split('\n'), rows = lines.filter(line => line.startsWith('SURRENDER RUNTIME ACTUAL '));
+    if (rows.length !== 1 || stderr || !lines.includes('SURRENDER RUNTIME OK (24/24)')) throw new Error('Incomplete surrender runtime observations.');
+    const actual = JSON.parse(rows[0].slice('SURRENDER RUNTIME ACTUAL '.length));
+    result.surrenderRuntime = actual;
+    check('surrender-runtime', actual.categories.length === 24 && actual.controls.length === 27
+      && new Set(actual.categories.map(row => row.name)).size === 24 && actual.native === false,
+      '24 real Game CPU categories; 24 semantic readers and 3 executed Unit API faults; native/UI/reward capture unrun');
+  } catch (error) { check('surrender-runtime', false, error.message); }
+}
+
 async function main() {
   await settingsUnit();
   await bakedUnit();
@@ -1415,6 +1431,7 @@ async function main() {
   await reinforcementModelUnit();
   await reinforcementRuntimeUnit();
   await captureAccountingModelUnit();
+  await surrenderRuntimeModelUnit();
   await fs.mkdir(OUT_DIR, { recursive: true });
   const { server, url } = await startServer({ port: 0 });
   result.url = url;
@@ -1700,6 +1717,7 @@ if (process.argv.includes('--unit')) {
   await reinforcementModelUnit();
   await reinforcementRuntimeUnit();
   await captureAccountingModelUnit();
+  await surrenderRuntimeModelUnit();
   try {
     await bakedUnit();
     await approvedPackUnit();

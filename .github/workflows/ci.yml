@@ -30,7 +30,7 @@ jobs:
           test "$(git rev-parse FETCH_HEAD)" = "aaf10145531130f3ec201d6332f6759599bc46a4"
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git cat-file -e aaf10145531130f3ec201d6332f6759599bc46a4:src/main.js
-          test "$(git rev-parse aaf10145531130f3ec201d6332f6759599bc46a4:src/game.js)" = "$(git rev-parse HEAD:src/game.js)"
+          node tools/test-surrender-runtime.mjs --verify-legacy-game
 
       - uses: actions/setup-node@v4
         with:
@@ -58,6 +58,9 @@ jobs:
 
       - run: node tools/test-capture-accounting.mjs
       - run: node tools/test-capture-accounting.mjs --prove-fail
+
+      - run: node tools/test-surrender-runtime.mjs
+      - run: node tools/test-surrender-runtime.mjs --prove-fail
 
       - run: node tools/test-equipment.mjs
       - run: node tools/test-equipment.mjs --prove-fail
