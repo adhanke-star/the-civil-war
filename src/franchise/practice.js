@@ -1,6 +1,6 @@
 // Completed practice outcomes only. No campaign/battle save, historical loot, or invented captures.
 import { completedSnapshot, validateSnapshot, MAX_SAVE_BYTES } from './save.js';
-import { introScenario } from './intro.js';
+import { introScenario, surrenderOption } from './intro.js';
 import { ARMS, UNIQUES, CONDITIONS, VETERANCY, ISSUE_PLACE } from '../reward/data.js';
 import { gradeSpec, rollLoot, seedOf } from '../reward/model.js';
 
@@ -68,7 +68,9 @@ function lootReserve(baseline, scenario, awardId, seed) {
 }
 
 /** Read/validate/admit before importing the field. All capable formations or no deployment. */
-export function savedDeployment({ baseline, ground, awardId, seed }) {
+export function savedDeployment(input) {
+  const surrender = surrenderOption(input);
+  const { baseline, ground, awardId, seed } = input;
   const before = validateSnapshot(baseline);
   // Validate new metadata through the existing schema, without replacing any inventory identity.
   validateSnapshot({ ...before, awardId, seed });
@@ -82,7 +84,7 @@ export function savedDeployment({ baseline, ground, awardId, seed }) {
     || active.some((b) => b.kind === 'infantry' ? b.men > limits.infantryMen : b.men > limits.batteryMen || b.guns > limits.batteryGuns)) {
     fail('the whole active army exceeds this practice field. No troops were cut; return to camp or export the army.');
   }
-  const scenario = JSON.parse(JSON.stringify(introScenario(ground)));
+  const scenario = JSON.parse(JSON.stringify(introScenario(ground, surrender ? { surrender: true } : undefined)));
   scenario.id = 'saved-practice'; scenario.title = 'Your army on practice ground'; scenario.savedPractice = true;
   scenario.historyNote = 'Fictional saved-army exercise on reused Henry Hill terrain. Equipment and strengths are game values; this is not a historical engagement.';
   const used = new Set(before.army.map((b) => b.id));

@@ -71,6 +71,7 @@ import { deploymentProgress } from './test-deployment-ui.mjs';
 import { soldierViewControls } from './test-soldier-view-ui.mjs';
 import { reinforcementUIControls } from './test-reinforcement-ui.mjs';
 import { fieldAdmissionControls } from './test-field-admission-ui.mjs';
+import { finalizeActivationUI } from './test-surrender-activation-ui.mjs';
 
 const READY_TIMEOUT_MS = 180_000;
 const VIEWPORT = { width: 1280, height: 720 };
@@ -1438,6 +1439,28 @@ async function surrenderResultModelUnit() {
   } catch (error) { check('surrender-result', false, error.message); }
 }
 
+async function activationModelUnit(summary = false) {
+  const names = ['activation-route-positive', 'activation-route-isolation', 'activation-default-builder', 'activation-intro-definition',
+    'activation-saved-manifest', 'activation-invalid-option', 'activation-real-owner', 'activation-default-owner'];
+  try {
+    const { execFileSync } = await import('node:child_process');
+    const stdout = execFileSync(process.execPath, [path.join(ROOT, 'tools/test-surrender-activation.mjs')], { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
+    const lines = stdout.trimEnd().split('\n'), rows = lines.filter(l => l.startsWith('ACTIVATION ACTUAL '));
+    if (rows.length !== 1 || !lines.includes('ACTIVATION OK (8/8)')) throw new Error('Incomplete activation observations.');
+    const actual = JSON.parse(rows[0].slice('ACTIVATION ACTUAL '.length));
+    const { verifyActivation } = await import('./test-surrender-activation.mjs');
+    if (actual.categories.length !== 8 || actual.controls.length !== 8 || actual.sources.length !== 65
+      || actual.categories.map(c => c.name).join(',') !== names.join(',')) throw new Error('Activation category/source count mismatch.');
+    actual.categories.forEach((c, i) => verifyActivation(i, c.data));
+    result.surrenderActivationPure = actual;
+    if (summary) check('activation-model', true, '8 actual pure/CPU categories and 8 paired reader controls; current65 sources');
+    else actual.categories.forEach(c => check(c.name, true, 'Fixed before-edit defaults and explicit fictional CPU ownership'));
+  } catch (error) {
+    if (summary) check('activation-model', false, error.message);
+    else names.forEach(name => check(name, false, error.message));
+  }
+}
+
 async function main() {
   await settingsUnit();
   await bakedUnit();
@@ -1449,6 +1472,7 @@ async function main() {
   await captureAccountingModelUnit();
   await surrenderRuntimeModelUnit();
   await surrenderResultModelUnit();
+  await activationModelUnit();
   await fs.mkdir(OUT_DIR, { recursive: true });
   const { server, url } = await startServer({ port: 0 });
   result.url = url;
@@ -1720,6 +1744,7 @@ async function main() {
     }
     await reinforcementUIControls({ browser, url, check, shot, result, native });
     await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native });
+    finalizeActivationUI({ result, check });
     await soldierViewControls({ browser, url, check, shot, result, watchErrors, native });
   } finally {
     if (browser) await browser.close().catch(() => {});
@@ -1740,6 +1765,7 @@ if (process.argv.includes('--unit')) {
   await captureAccountingModelUnit();
   await surrenderRuntimeModelUnit();
   await surrenderResultModelUnit();
+  await activationModelUnit(true);
   try {
     await bakedUnit();
     await approvedPackUnit();

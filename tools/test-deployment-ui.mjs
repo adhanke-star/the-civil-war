@@ -6,6 +6,7 @@ import { AxeBuilder } from '@axe-core/playwright';
 import { SAMPLE_ARMY } from '../src/reward/data.js';
 import { validateSnapshot, exportSnapshot, MAX_SAVE_BYTES } from '../src/franchise/save.js';
 import { probeProgress, progressRaw, seedProgress, holdProgressTransaction, releaseProgressTransaction } from './test-progress-browser.mjs';
+import { installActivationObserver, readActivationObserver, closeActivationObserver, readAndCloseActivationObserver, activationAccessible } from './test-surrender-activation-ui.mjs';
 
 const copy = (v) => structuredClone(v), same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 export function deploymentFixture() {
@@ -40,6 +41,8 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
     };
   });
   const page = await ctx.newPage(), errors = [], requests = [];
+  const activation = result.surrenderActivation ||= { intro: null, saved: [], routes: [] };
+  let activationOwned = false, activationIndex = -1;
   watchErrors(page, url, errors); page.on('request', (r) => requests.push(r.url()));
   const fixture = deploymentFixture(), initial = exportSnapshot(fixture), axes = {};
   result.deploymentAxe = axes; result.deploymentFixtureBytes = Buffer.byteLength(initial);
@@ -103,6 +106,9 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
     await page.waitForFunction(() => !window.__game.practice.saving);
   }
   async function campAfter() {
+    if (activationOwned) {
+      activation.saved[activationIndex] = await readAndCloseActivationObserver(page); activationOwned = false;
+    }
     if (!await page.locator('#result').evaluate((n) => n.open)) await page.locator('#after-action').click();
     await page.locator('#result-action').click(); await page.waitForURL(/\?camp/); await idle();
   }
@@ -441,7 +447,9 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
     } finally { diagnostic.restored = await page.evaluate(() => window.__metadataCancelRestore()); assert.equal(diagnostic.restored,true); await page.close(); }
     }
 
-    await launch(); const first = await gameState();
+    await launch(); activationIndex = 0;
+    activation.saved[0] = { ready: await installActivationObserver(page, 'saved-win') }; activationOwned = true;
+    const first = await gameState();
     const renderer = await page.evaluate(() => { const gl = document.getElementById('battlefield').getContext('webgl2'), e = gl.getExtension('WEBGL_debug_renderer_info'); return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); });
     verdict('real-roster-budget', first.units.filter((u) => u.side === 'US').length === 3 && first.units.length === 4
       && first.allocation.men === 3080 && first.allocation.guns === 2 && first.time === 0 && first.paused
@@ -495,7 +503,7 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
       && same(end.outcome.snapshot.issued, equipped.issued)
       && same(end.outcome.snapshot.army.slice(3), equipped.army.slice(3)), 'first genuine terminal is deeply frozen; separate post-terminal mutation restored byte-for-byte');
     await axe('#result', 'terminal'); await shot(page, 'deployment-victory');
-    await lootStart();
+    activation.accessibility = await activationAccessible(page);
     verdict('fixed-new-loot', await page.evaluate(() => {
       const p = window.__game.practice, s = p.reward.state;
       return JSON.stringify(s.cards) === JSON.stringify(p.outcome.cards) && s.cards.length <= 7
@@ -526,6 +534,8 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
       card: n.lastElementChild.getBoundingClientRect().toJSON(), rect: n.getBoundingClientRect().toJSON() }));
     await page.setViewportSize({ width: 320, height: 480 }); await page.keyboard.press('s');
     const ready320 = await layoutReady(320);
+    activation.accessibility.skipWorks = await page.evaluate(() => window.__game.practice.reward.state.up.every(Boolean));
+    activation.accessibility.skipKeys = (await readActivationObserver(page)).keys.filter(e => e.key.toLowerCase() === 's' && e.trusted && e.rewardStep === 'b');
     await page.locator('.rw-deal').focus();
     const scrollBefore = await page.locator('.rw-deal').evaluate((n) => n.scrollTop);
     await page.keyboard.press('PageDown');
@@ -608,7 +618,9 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
     'actual Continue/reload reaches conserved 12+12 camp without field allocation/reward/write');
     await axe('#front', 'camp'); await shot(page, 'deployment-camp');
 
-    await launch(); const defeatFirst = await gameState();
+    await launch(); activationIndex = 1;
+    activation.saved[1] = { ready: await installActivationObserver(page, 'saved-defeat') }; activationOwned = true;
+    const defeatFirst = await gameState();
     await page.locator('#intro-start').click(); await selectFront(); await page.getByRole('button', { name: 'Hold fire', exact: true }).click();
     await waitLive(() => window.__game.game.units.some((u) => u.side === 'CS' && u.shots > 0) || window.__game.game.over);
     if (!await page.evaluate(() => window.__game.game.over)) {
@@ -625,25 +637,32 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
       && same(defeat.outcome.snapshot.issued, pending.issued), 'genuine Defeat new loot and actual survivors save exactly once against the second launch baseline');
     await campAfter();
 
-    // Controlled THIRD terminal: only stale-write and waiting Escape coverage, never win/defeat proof.
-    await launch(); await page.locator('#intro-start').click(); await page.getByRole('button', { name: 'Pause', exact: true }).click();
-    await page.evaluate(() => { const g = window.__game.game; g.result = { winner: 'US', why: 'Controlled stale-save fixture' };
-      g.over = true; window.__game.practice.finishResult(); });
+    // THIRD ordinary encounter: a genuine terminal before stale-write and waiting Escape coverage.
+    await launch(); activationIndex = 2;
+    activation.saved[2] = { ready: await installActivationObserver(page, 'saved-stale-natural') }; activationOwned = true;
+    await page.locator('#intro-start').click();
+    await waitLive(() => window.__game.game.over && document.getElementById('result').open);
     const stalePending = (await gameState()).outcome.snapshot, staleBaseline = (await gameState()).baseline;
     const tab = await ctx.newPage(); watchErrors(tab, url, errors); await tab.goto(url + '?camp'); await tab.waitForFunction(() => window.__entry?.mode === 'camp');
     const changed = validateSnapshot({ ...staleBaseline, awardId: 'other-tab-before-save', seed: 'other-tab-before-save' });
     await importIn(tab, changed); await lootStart(); await lootFinish();
+    activation.stale = { pending: JSON.stringify(stalePending), launchBaseline: JSON.stringify(staleBaseline),
+      otherTab: JSON.stringify(changed), savedAfterStale: await raw(), staleWrites: (await counters()).writes };
     verdict('other-tab-terminal-stale', await raw() === JSON.stringify(changed) && (await counters()).writes === 0
       && await page.locator('#result-text').textContent().then((s) => s.includes('changed')),
     'controlled third terminal plus genuine second-tab Import rejects stale save, no Replace prompt');
     await page.locator('#result-action').click(); await page.waitForFunction(() => !window.__game.practice.saving);
+    const retryPending = await exported('#result-export'), retryLaunch = await exported('#result-export-launch');
+    activation.stale.savedAfterRetry = await raw(); activation.stale.exportPending = JSON.stringify(retryPending); activation.stale.exportLaunch = JSON.stringify(retryLaunch);
     verdict('stale-retry-no-rebase', await raw() === JSON.stringify(changed) && (await counters()).writes === 0
-      && same(await exported('#result-export'), stalePending) && same(await exported('#result-export-launch'), staleBaseline)
+      && same(retryPending, stalePending) && same(retryLaunch, staleBaseline)
       && await page.getByRole('button', { name: /^Replace/ }).count() === 0, 'Retry uses the same launch baseline and exports; never adopts other-tab army');
     await importIn(tab, staleBaseline); await holdProgressTransaction(page); await page.locator('#result-action').click();
     await page.waitForFunction(() => window.__game.practice.saving); await page.keyboard.press('Escape'); const locationBeforeEscape = page.url();
     const waitingAfterEscape = await page.evaluate(() => window.__game.practice.saving); await releaseProgressTransaction(page);
     await page.waitForFunction(() => !window.__game.practice.saving);
+    activation.stale.finalWrites = (await counters()).writes; activation.stale.finalSaved = await raw();
+    activation.stale.waitingEscapeRetainedOwner = waitingAfterEscape && page.url() === locationBeforeEscape;
     verdict('saving-escape-no-navigation', waitingAfterEscape && page.url() === locationBeforeEscape
       && !await page.locator('#result').evaluate((n) => n.open) && (await counters()).writes === 1 && await raw() === JSON.stringify(stalePending),
     'controlled queued save Escape retains owner and later commits once without navigation'); await tab.close();
@@ -668,5 +687,5 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
     verdict('mixed-route-isolation', await page.evaluate(() => !window.__game.manifest && window.__game.game.scenario.id === 'henry-hill')
       && (await counters()).writes === 0 && await raw() === isolatedBaseline, 'explicit historical route keeps its own field and cannot inherit saved manifest/award');
     verdict('no-console-errors', errors.length === 0, errors.join('\n') || '0 page/console/request errors');
-  } finally { await ctx.close(); }
+  } finally { try { if (activationOwned) { activation.saved[activationIndex] = await readAndCloseActivationObserver(page); activationOwned = false; } } finally { await ctx.close(); } }
 }

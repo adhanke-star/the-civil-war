@@ -1,5 +1,7 @@
 # DECISIONS (newest first; one short entry each)
 
+0068 (2026-10-08): Enable the existing surrender ledger through an explicit own boolean only for first-command and saved fictional encounters. Validate before scenario/manifest materialization; preserve byte-exact default builders and authored ground flags, immutable baseline and exact manifest scenario identity. Historical, practice, sandbox and tuning routes retain their existing behavior. Observe natural terminal outcomes and ordinary reward actions without prescribing winners; keep full source inverses, negative controls and exact-SHA acceptance before dependent work.
+
 ### CI container trusts only its canonical checkout (2026-10-08)
 
 The first pinned-container run failed before tests on Git’s ownership guard. Bind safe.directory to the exact verified CI workspace in command-scope environment configuration; assert the workspace and realpath before fetching pinned comparisons. Keep the matching image,45-minute limit and complete suite; change no global Git settings.

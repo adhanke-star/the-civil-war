@@ -20,7 +20,7 @@ import { defineSandboxTools } from './ui/sandbox-tools.js';
 import { playMode, assertSavedLaunch } from './franchise/practice.js';
 import { createProgressStore } from './franchise/save.js';
 import { attachPracticeFlow } from './franchise/practice-ui.js';
-import { introScenario } from './franchise/intro.js';
+import { introScenario, fictionalSurrenderRoute } from './franchise/intro.js';
 import { attachPracticeField } from './ui/practice-field.js';
 import { prepareFieldScenario, loadFieldScenario } from './sim/phase.js';
 
@@ -47,7 +47,7 @@ export async function startField({ manifest = null, isCurrent = () => true, onAd
     const routeId = manifest ? 'saved-practice' : mode === 'practice' && !new URLSearchParams(location.search).has('practice') ? 'first-command' : 'henry-hill';
     // A saved manifest's scenario reference is the authoritative outcome identity.
     const scenario = manifest ? (prepareFieldScenario(manifest.scenario, routeId), manifest.scenario)
-      : prepareFieldScenario(routeId === 'first-command' ? introScenario(ground) : ground, routeId);
+      : prepareFieldScenario(routeId === 'first-command' ? introScenario(ground, { surrender: fictionalSurrenderRoute(location.search) }) : ground, routeId);
     document.getElementById('status').textContent = 'Loading the ground…';
     const terrain = await loadTerrainData('./assets/terrain');
     currentOwner();

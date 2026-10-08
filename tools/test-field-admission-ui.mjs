@@ -4,7 +4,8 @@ import { execFileSync } from 'node:child_process';
 import { AxeBuilder } from '@axe-core/playwright';
 import { deploymentFixture } from './test-deployment-ui.mjs';
 import { exportSnapshot, validateSnapshot } from '../src/franchise/save.js';
-import { introScenario } from '../src/franchise/intro.js';
+import { introScenario, fictionalSurrenderRoute } from '../src/franchise/intro.js';
+import { activationRouteRecord } from './test-surrender-activation-ui.mjs';
 import { probeProgress, progressRaw, seedProgress } from './test-progress-browser.mjs';
 
 const accepted = '4f6113a624e0e533825c0be414bb36f3b073f726';
@@ -323,7 +324,9 @@ export async function fieldAdmissionControls({ browser, url, check, shot, result
     record.savedIdentity.counters = await counters(page); record.savedIdentity.beforeCounters = savedBefore;
     await shot(page, 'field-admission-saved-identity'); await close(page);
 
-    for (const query of ['battle=henry-hill', 'intro', 'sandbox&battle=henry-hill&intro', 'tune&practice']) {
+    const activation = result.surrenderActivation ||= { intro: null, saved: [], routes: [] };
+    const queries = ['battle=henry-hill', 'intro', 'sandbox&battle=henry-hill&intro', 'tune&practice', 'practice', 'tune&intro'];
+    for (const query of queries) {
       page = await cleanPage('route:' + query); await page.goto(url + '?' + query + '&quality=low&nosw'); await page.waitForFunction(() => window.__ready, null, { timeout: 180000 });
       const state = await page.evaluate(() => {
         const { game, manifest } = window.__game; const frozen = v => !v || typeof v !== 'object' || Object.isFrozen(v) && Object.values(v).every(frozen);
@@ -337,11 +340,12 @@ export async function fieldAdmissionControls({ browser, url, check, shot, result
       if (await page.locator('#intro-start').isVisible()) await page.locator('#intro-start').click();
       await page.waitForFunction(() => window.__game.game.simTime > 0);
       state.after = await page.evaluate(() => JSON.stringify(window.__game.game.scenario));
-      const expected = state.id === 'first-command' ? introScenario(ground) : ground;
+      const expected = state.id === 'first-command' ? introScenario(ground, { surrender: fictionalSurrenderRoute('?' + query) }) : ground;
       state.sourceExact = state.before === JSON.stringify(expected);
       state.openingExact = JSON.stringify(state.opening) === JSON.stringify((expected.opening || []).map(o => ({ id: o.id, points: o.points })));
-      record.routes.push({ query, ...state });
-      await shot(page, 'field-admission-route-' + state.id + '-' + record.routes.length); await close(page);
+      if (queries.indexOf(query) < 4) record.routes.push({ query, ...state });
+      activation.routes.push({ ...await activationRouteRecord(page, query), sourceExact: state.sourceExact, openingExact: state.openingExact, renderer: state.renderer, gpu: state.gpu });
+      await shot(page, 'field-admission-route-' + state.id + '-' + (queries.indexOf(query) + 1)); await close(page);
     }
     const s = record.savedIdentity;
     verdict('immutable-current-routes', s.exact && s.frozen && s.definitions && s.before === s.after && s.counters.gpu === 1

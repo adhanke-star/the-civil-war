@@ -377,11 +377,11 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       task.baseline = baseline; task.raw = exportSnapshot(baseline);
       saved = baseline; failed = false;
       // Admission precedes even small scenario metadata; no terrain/GPU/unit import is needed.
-      savedDeployment({ baseline, ground: {}, awardId, seed: task.seed });
+      savedDeployment({ baseline, ground: {}, awardId, seed: task.seed, surrender: true });
       const ground = await loadFieldScenario({ isCurrent: () => currentDeployment(task) });
       if (!currentDeployment(task)) return;
       if (ground.id !== 'henry-hill' || !Array.isArray(ground.sites) || !Array.isArray(ground.woods)) throw new Error('Practice: the practice ground description is invalid.');
-      task.manifest = savedDeployment({ baseline, ground, awardId, seed: task.seed });
+      task.manifest = savedDeployment({ baseline, ground, awardId, seed: task.seed, surrender: true });
       saved = baseline; failed = false; render();
       const manifest = task.manifest;
       for (const def of manifest.scenario.units.filter((d) => d.side === 'US')) {

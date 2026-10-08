@@ -2,11 +2,14 @@
 // Separate controlled ownership fixtures below never stand in for introductory timing/play acceptance.
 import { AxeBuilder } from '@axe-core/playwright';
 import { probeProgress, progressRaw } from './test-progress-browser.mjs';
+import { installActivationObserver, readAndCloseActivationObserver } from './test-surrender-activation-ui.mjs';
 
 export async function introPlay({ browser, url, check, shot, result, watchErrors, native = false, afterIdle = null, afterStores = null }) {
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, reducedMotion: 'reduce', hasTouch: true });
   await probeProgress(ctx, { prefix: '__intro', readFlag: '__introReadBlocked', quotaFlag: '__introQuota' });
   const page = await ctx.newPage(), errors = []; watchErrors(page, url, errors);
+  const activation = result.surrenderActivation ||= { intro: null, saved: [], routes: [] };
+  let activationOwned = false;
   const load = async () => { await page.goto(`${url}?intro&quality=low`, { waitUntil: 'load' }); await page.waitForFunction(() => window.__ready && window.__game, null, { timeout: 180000 }); };
   const state = () => page.evaluate(() => {
     const { game: g, practice: p } = window.__game;
@@ -33,6 +36,7 @@ export async function introPlay({ browser, url, check, shot, result, watchErrors
       return e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
     });
     if (native) check('intro-native-renderer', !/swiftshader|llvmpipe|software/i.test(renderer), renderer);
+    activation.intro = { ready: await installActivationObserver(page, 'intro-instructed') }; activationOwned = true;
     const started = Date.now();
     await page.locator('#intro-start').click();
     check('intro-continue-focus', await page.locator('#battlefield').evaluate((n) => n === document.activeElement)
@@ -138,6 +142,8 @@ export async function introPlay({ browser, url, check, shot, result, watchErrors
       && saved.army.reduce((n, b) => n + b.men, 0) === end.outcome.summary.surviving,
       'real survivors and captured issue reach the atomic completed store');
     if (!saved) { result.introSaveFailure = await page.locator('#result-text').textContent(); return; }
+    activation.intro = await readAndCloseActivationObserver(page); activationOwned = false;
+    activation.intro.savedRaw = storedRaw;
     await page.getByRole('button', { name: 'Continue', exact: true }).click();
     await page.waitForURL(/\?camp/); await page.waitForFunction(() => window.__entry?.mode === 'camp');
     check('intro-continue-no-roll', await page.evaluate((id) => window.__entry.saved.awardId === id && window.__entry.saved.army.length === 2 && !window.__reward, saved.awardId),
@@ -196,5 +202,5 @@ export async function introPlay({ browser, url, check, shot, result, watchErrors
       && fixtures.contested.length === 0 && fixtures.retaken[0].side === 'CS' && fixtures.retaken[0].previous === 'US'
       && fixtures.lost.length === 0 && fixtures.recovered.length === 1, 'separate ownership fixture proves interruption, retake and no duplicate records');
     check('intro-no-console-errors', errors.length === 0, errors.join('\n') || '0 errors');
-  } finally { await ctx.close(); }
+  } finally { try { if (activationOwned) { activation.intro = await readAndCloseActivationObserver(page); activationOwned = false; } } finally { await ctx.close(); } }
 }
