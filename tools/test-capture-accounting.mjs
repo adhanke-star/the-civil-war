@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {captureAccounting, prepareReinforcementTimeline, FIELD_LIMITS, PHASE_LIMITS} from '../src/sim/phase.js';
@@ -118,4 +119,4 @@ export function captureAccountingActual() {return {scope:'Pure immutable query d
 export function captureAccountingControls() {return controls.map((control,i)=>{let caught;try{runCategory(i,control);}catch(error){caught=error;}assert.ok(caught?.code==='ERR_ASSERTION'&&caught.message.includes(intendedMessages[i]),'Control '+CAPTURE_ACCOUNTING_CHECKS[i][0]+' missed its intended assertion: '+caught?.message);return {category:CAPTURE_ACCOUNTING_CHECKS[i][0],code:caught.code,intended:intendedMessages[i],message:caught.message,semantic:true};});}
 export function captureAccountingEvidence() {return {...captureAccountingActual(),controls:captureAccountingControls()};}
 export function captureAccountingUnit() {const actual=captureAccountingActual();captureAccountingControls();return actual.categories.length;}
-if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){const actual=captureAccountingActual();console.log('CAPTURE ACCOUNTING ACTUAL '+JSON.stringify(actual));console.log('CAPTURE ACCOUNTING OK (20/20)');if(process.argv.includes('--prove-fail')){const controls=captureAccountingControls();for(const row of controls)console.log('CAUGHT '+row.category+' '+row.code+' '+row.intended);console.log('CAPTURE ACCOUNTING CONTROLS '+JSON.stringify(controls));console.log('CAPTURE ACCOUNTING MUTANTS CAUGHT (20/20)');}}
+if(process.argv[1]&&import.meta.url===pathToFileURL(fs.realpathSync(process.argv[1])).href){const actual=captureAccountingActual();console.log('CAPTURE ACCOUNTING ACTUAL '+JSON.stringify(actual));console.log('CAPTURE ACCOUNTING OK (20/20)');if(process.argv.includes('--prove-fail')){const controls=captureAccountingControls();for(const row of controls)console.log('CAUGHT '+row.category+' '+row.code+' '+row.intended);console.log('CAPTURE ACCOUNTING CONTROLS '+JSON.stringify(controls));console.log('CAPTURE ACCOUNTING MUTANTS CAUGHT (20/20)');}}

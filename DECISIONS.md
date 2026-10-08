@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+### 0061 · Require evidence from standalone accounting commands
+A successful CI step without the probe evidence is not acceptance. Resolve the direct CLI path through realpath, matching existing probes, and prove ordinary/control execution through actual path aliases. Preserve the green aggregate and failed collector separately, then require fresh exact-SHA standalone and aggregate readback with unchanged counts and predicates. The hosted runner path cause remains unproven.
+
+
 ### 0060 · Account for prisoners and guns in the existing phase seam
 Use a detached immutable query on a prepared timeline and explicit caller trace. Reuse phase validation and provenance rather than add a persistent capture owner. Prisoners and missing men are disjoint loss components; physical gun identity, condition and possession remain distinct. Bound enumeration by current software limits before allocation and preserve authored weapon metadata as string/null. This foundation grants no surrender/capture eligibility, rewards, save, history or hardware authority.
 
