@@ -101,7 +101,7 @@ jobs:
       - run: node tools/test-soldier-view.mjs
       - run: node tools/test-soldier-view.mjs --prove-fail
 
-      - run: npm test
+      - run: node tools/test.mjs --reinforcement-ui
 
       - name: Upload test output
         if: always()

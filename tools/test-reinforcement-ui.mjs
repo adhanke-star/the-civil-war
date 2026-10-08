@@ -50,13 +50,37 @@ function observeHud(Hud) {
       return value;
     }});
   }
+  window.__overlayTrace?.bindObjective(Hud.prototype);
 }
 async function observedPage({browser,url,baseline=false,width=1280,height=720,autoPause=true}) {
   assert.equal(Buffer.byteLength(FIXTURE),6792);assert.equal(hash(FIXTURE),FIXTURE_SHA);
   const {prepareFieldScenario}=await import('../src/sim/phase.js'); prepareFieldScenario(JSON.parse(FIXTURE),'henry-hill');
   const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
+  // Passive bounded diagnostic only: native callbacks and original objective setter still forward exactly.
+  await context.addInitScript(() => {
+    const resizeDescriptor=Object.getOwnPropertyDescriptor(window,'ResizeObserver'),NativeResizeObserver=resizeDescriptor.value;
+    const rows=[],bindings=[];let overflow=false,mutation=null,started=false,callbackCalls=0,forwardCalls=0;
+    const same=(a,b)=>Reflect.ownKeys(a).length===Reflect.ownKeys(b).length&&Reflect.ownKeys(a).every(k=>a[k]===b[k]);
+    function mark(phase,extra={}) {
+      if(rows.length>=1024){overflow=true;return;}
+      const rect=n=>{if(!n)return null;const r=n.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom,hidden:n.hidden,text:n.textContent}};
+      const root=document.documentElement,css=root?getComputedStyle(root):null;
+      rows.push({seq:rows.length,phase,at:performance.timeOrigin+performance.now(),query:location.search,width:innerWidth,height:innerHeight,ready:!!window.__ready,simTime:window.__game?.game.simTime??null,paused:window.__game?.game.paused??null,topH:css?.getPropertyValue('--top-h')??null,dockH:css?.getPropertyValue('--dock-h')??null,objectiveH:css?.getPropertyValue('--objective-h')??null,objective:rect(document.getElementById('objective')),banner:rect(document.getElementById('banner')),...extra});
+    }
+    const proxy=new Proxy(NativeResizeObserver,{construct(target,args,newTarget){
+      if(typeof args[0]!=='function')return Reflect.construct(target,args,newTarget);
+      const callback=args[0];return Reflect.construct(target,[function(...values){callbackCalls++;mark('native-resize-before',{targets:values[0].map(e=>e.target.id)});let output;try{output=Reflect.apply(callback,this,values);forwardCalls++;return output;}finally{mark('native-resize-after',{callbackReturnUndefined:output===undefined});}},...args.slice(1)],newTarget);
+    }});
+    Object.defineProperty(window,'ResizeObserver',{...resizeDescriptor,value:proxy});
+    function start(){if(started)return;started=true;mutation=new MutationObserver(entries=>mark('root-style-publication',{mutations:entries.length}));mutation.observe(document.documentElement,{attributes:true,attributeFilter:['style']});mark('document-ready');}
+    document.addEventListener('DOMContentLoaded',start,{once:true});
+    window.__overlayTrace={mark,bindObjective(owner){const key='objective',descriptor=Object.getOwnPropertyDescriptor(owner,key),original=descriptor.value;bindings.push({owner,key,descriptor});Object.defineProperty(owner,key,{...descriptor,value:function(...args){mark('objective-before',{incoming:args[0]});let value;try{value=Reflect.apply(original,this,args);return value;}finally{mark('objective-after',{returnUndefined:value===undefined});}}});},finish(){
+      mark('finally-before');for(const b of bindings)Object.defineProperty(b.owner,b.key,b.descriptor);Object.defineProperty(window,'ResizeObserver',resizeDescriptor);mutation?.disconnect();document.removeEventListener('DOMContentLoaded',start,{once:true});
+      const cleanup={resizeDescriptorExact:same(Object.getOwnPropertyDescriptor(window,'ResizeObserver'),resizeDescriptor),resizeOriginalRef:window.ResizeObserver===NativeResizeObserver,objectiveDescriptorsExact:bindings.every(b=>same(Object.getOwnPropertyDescriptor(b.owner,b.key),b.descriptor)),objectiveBindings:bindings.length,mutationDisconnected:!!mutation,DOMContentLoadedRemovalCalls:1,callbackCalls,forwardCalls};mark('finally-after');delete window.__overlayTrace;cleanup.globalAbsent=!Object.prototype.hasOwnProperty.call(window,'__overlayTrace');return{rows,overflow,cleanup,scope:'Passive observation only; layout reads can perturb timing; no cause/cure/native/full acceptance'};
+    }};
+  });
   const errors=[],warnings=[],routes=[];let page;
-  const close=async()=>{let restore;try{restore=page?await page.evaluate(()=>window.__e2?.restore()).catch(e=>({error:e.message})):null;await context.unrouteAll({behavior:'wait'});}finally{await context.close()}return restore||{notInstalled:true,refsExact:true,descriptorsExact:true,count:0}};
+  const close=async()=>{let restore;try{restore=page?await page.evaluate(()=>{const overlayDiagnostic=window.__overlayTrace?.finish();return{...window.__e2?.restore(),overlayDiagnostic};}).catch(e=>({error:e.message})):null;await context.unrouteAll({behavior:'wait'});}finally{await context.close()}return restore||{notInstalled:true,refsExact:true,descriptorsExact:true,count:0}};
   try {page=await context.newPage();
   page.on('pageerror',e=>errors.push({type:'pageerror',message:e.message,stack:e.stack}));
   page.on('console',m=>{if(m.type()==='error')errors.push({type:'console',message:m.text()});if(m.type()==='warning')warnings.push(m.text())});
@@ -127,7 +151,8 @@ async function readLayout(page) {
     });
     const panels=[panel,feed].filter(el=>!el.hidden&&el.getClientRects().length).map(el=>({id:el.id,...rect(el),overflow:el.scrollWidth>el.clientWidth}));
     const obstacles=['objective','tip'].map(id=>document.getElementById(id)).filter(e=>!e.hidden&&e.getClientRects().length).map(e=>({id:e.id,...rect(e)}));const overlap=(a,b)=>a.x<b.right&&a.right>b.x&&a.y<b.bottom&&a.bottom>b.y;const overlaps=panels.flatMap(a=>obstacles.filter(b=>overlap(a,b)).map(b=>[a.id,b.id]));if(panels.length===2&&overlap(panels[0],panels[1]))overlaps.push(['banner','feed']);
-    return {width:innerWidth,height:innerHeight,actions,panels,obstacles,overlaps,bannerOpaque:getComputedStyle(panel).backgroundColor==='rgb(24, 22, 29)'&&getComputedStyle(panel).opacity==='1',contained:panels.every(r=>r.x>=0&&r.right<=innerWidth&&r.y>=0&&r.bottom<=innerHeight&&!r.overflow),documentOverflow:document.documentElement.scrollWidth>innerWidth};
+    const actual = {width:innerWidth,height:innerHeight,actions,panels,obstacles,overlaps,bannerOpaque:getComputedStyle(panel).backgroundColor==='rgb(24, 22, 29)'&&getComputedStyle(panel).opacity==='1',contained:panels.every(r=>r.x>=0&&r.right<=innerWidth&&r.y>=0&&r.bottom<=innerHeight&&!r.overflow),documentOverflow:document.documentElement.scrollWidth>innerWidth};
+    window.__overlayTrace?.mark('original-readLayout',{original:actual});return actual;
   });
 }
 
