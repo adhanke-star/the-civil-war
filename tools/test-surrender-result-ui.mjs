@@ -76,7 +76,7 @@ export function verifySurrenderUI(index,data){const prefix=CASES[index].join(': 
 }
 export function surrenderUIMutation(index,data){const x=copy(data);switch(index){case 0:x.rows[0].initial.text='changed';break;case 1:x.initial.snapshotCalls=2;break;case 2:x.sameToken=false;break;case 3:x.rows[0].origin='CS';break;case 4:x.savedRows[0].floor=11;break;case 5:x.killed=100;break;case 6:x.disabled=0;break;case 7:x.ids.push('future');break;case 8:x.injected=1;break;case 9:x.afterCalls=2;break;case 10:x.lootVisible=true;break;case 11:x.auditViews[3].violations.push({id:'diagnostic'});break;}return x;}
 
-async function runActual(browser,url,stem){const categories=[],restores=[],images=[],auditViews=[];
+async function runActual(browser,url,stem){const categories=[],restores=[],images=[],auditViews=[];fs.mkdirSync('.out',{recursive:true});assert.equal(fs.realpathSync('.out'),fs.realpathSync('.')+'/.out','Output directory stays in the current project');
   async function one(config,fn){const p=await openPage(browser,url,config);try{return await fn(p);}finally{restores.push(await p.close());}}
   for(let index=0;index<12;index++){let data;
     if(index===0){const rows=[];for(const flag of['absent','false'])await one({saved:true,flag},async p=>{rows.push({initial:p.data.initial,opened:await rewardObservation(p.page),errors:p.errors,warnings:p.warnings});});data={rows};}
