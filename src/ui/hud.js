@@ -195,8 +195,12 @@ export class Hud {
     const menu = $('menu');
     $('menu-btn').addEventListener('click', (e) => this.openMenu(e.currentTarget));
     menu.addEventListener('close', () => {
+      // Native close is queued: a newer modal or newly focused field control owns focus now.
+      if (menu.open) return;
       const trigger = this.menuTrigger; this.menuTrigger = null;
-      if (trigger?.isConnected && !trigger.closest('[inert]')) trigger.focus({ preventScroll: true });
+      const active = document.activeElement;
+      if (trigger?.isConnected && !trigger.closest('[inert]')
+        && (!active?.isConnected || active === document.body || menu.contains(active))) trigger.focus({ preventScroll: true });
     });
     menu.addEventListener('keydown', (e) => {
       if (e.key !== 'Tab') return;

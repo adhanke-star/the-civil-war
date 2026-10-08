@@ -1,5 +1,17 @@
 # HANDOFF — Claude Code / Codex transfer (current plan: 2026-10-07)
 
+CURRENT P3f4 focus repair: 66/66 serial local gates passed (2026-10-08), including unit21, unchanged F4 result UI12+12, all source inverses, and controlled B/A2 with actual delivered HTTP body hashes. Original HUD replays stolen flag focus and cleared reopened trigger; repaired HUD preserves both. Root viewed eight actual local result/reward PNGs and verified normal/control semantic equality through the unchanged adopted reader; unchanged CSS and narrow scroll reach. Focus accessibility review CLEAR. Exact new CI547, 47 axes, 46 streams and all three cloud PNG quartets remain UNRUN; no spontaneous old-failure causality, native, F5 or v1 acceptance. Root sole writer; preserved main protected11 and all failed receipts.
+
+CURRENT P3f4 FOCUS REPAIR ACTIVE adopted2: rootsolewriter /private/tmp/the-civil-war-p3f4-focus-repair-20261008 HEAD4b40. Native-close controlled A proves newerflagfocus stolen->MenuEnterreopen->Tnull; settledcontrol properselection/attack. Both passiveCI51 and200 passed without spontaneousoldnull reproduction. Root-helper fullpolicy/scopeCLEAR; source63/owned7/local66/unit21/newCI547-545unique47axes46streams15public/native548 UNRUN. A2localonly retainedoriginalHUD bytes pre-importroute; Actions onlytwo positiveBcases. Existingold545predicates/current62-61-60subset/privateprojection/RNG/default/reward/geometry unchanged; mainprotected11+dirtyroots/failures conserved. Fullcriticalcontract appended below. F5draft3blocked untilactualaccepted547; v1UNRUN; continueautonomousloop.
+
+CURRENT P3f4 SANDBOX-SEQUENCE DIAGNOSTIC: root sole writer resumed20261008. Focused diagnostic3080337/CI37768820259 completedSUCCESS actual51PASS/2emptyaxes/1565passiverows/nooverflow/32matched removals/globalabsent; delayed native menu close moves focus after brigade selection, but null-target cause/cure NOTproven. Prior-sequence diagnostic41829299bfc388b560d9b138649041aa0ea44522 treef081859c107e9459f0184579ab1538bf8ef0b6e2 CI37770277135in_progress in /private/tmp/the-civil-war-p3f4-keyboard-diagnostic-20261008. Onlytwo diagnostic paths: removed3extra protocol timing marks/originalkeyboardbodyinverseexact4b40; existingCI --sandbox runs actual prior sandboxRuleTools/look/view/spacing/moments->keyboard. Root-helper source/indexCLEAR, all14mainworking fingerprints exact before docs relay, mainHEAD/origin4b40/indexEMPTY; diagdirtyrelaydocs/node_modules unadopted. Oldwatcher gone/completed377688raw already retained; NEVERrerun oldcollector/watcher. On newCIcompleted use existing rangedCRC reader node .out/p3f4-read-keyboard-diagnostic-ci-r1-20261008.mjs 37770277135 41829299bfc388b560d9b138649041aa0ea44522 once, inspect actual native trace/source/metadata/raw and ONEreadonlyhelper. No product/fix/default/oracle/threshold/wait/nullguard/RNG change; pass cannotprove cure. MainP2o11/unrelatedworkspace-Shiloh/dirtyroots/allfailedreceipts preserved. Acceptedparent0246 actual533 remains; F4candidate4b40FAILED172. F4actual545/47axes/46streams/62sources/15public/3PNGquartets/root-helper acceptance UNRUN; F5draft3unadopted/sourceblocked. Native546/iPad/art/performance/history/grade/arms/campaign/v1UNRUN; continue diagnosticloop/no milestone stop/newgoal/scheduler/spending/devicechecks.
+
+CURRENT P3f4 PASSIVE DIAGNOSTIC RUNNING: main/origin4b40 failed CI37765298497 actual172(171PASS+harnessNULL.enemy)/7emptyaxes; acceptedparent0246/533 remains. All46standalone including F4UI12+12 passed, aggregateF4UI notexecuted; rawfailedartifact/CRC/diagnostic skippedpost109 retained. Root one-writer mainindexEMPTY/protected11byteexact. Temporary /private/tmp/the-civil-war-p3f4-keyboard-diagnostic-20261008 branchp3f4-keyboard-diagnostic HEAD3080337a991aedf304b236d0686290ee2b704e37 treeb6bb95237b9ce37e1d2fde95c8953c79d4350fd5, exactCI37768820259in_progress; Pages not triggered. ONLYtwo diagnostic paths keyboardUI passive observers and existingCI narrowed to EXISTING node tools/test.mjs --keyboard; original body inversebyteexact/productunchanged/root-helperSCOPED_DIAGNOSTIC_CLEAR. No waits/method/RNG/threshold/nullguard/cause/fix/full545/native acceptance. Actual cancel/focusout/modifiers/all dialogs/inert/menuTrigger/selectedeligibility/rawtargeting nativecapture-bubble-microtask+frame transitions bounded2048+explicitoverflow; matching listenerremoval calls/globalabsence observed, native listener inactivitynotstimulated. Watcher1 session87492 in DIAGroot auto-retains exact completedbranch metadata/rangedCRCJSON fromnode .out/p3f4-watch-keyboard-diagnostic-r1-20261008.mjs; do not duplicate. Aftercompleted read actual keyboardMenuDiagnostic rows, source/blob/metadata/raw checks and ONE readonlyhelper; pass under passiveobservation cannotprove cure. Ifno reproduction choose boundedfull-prior-sandbox-sequence hypothesis from actualrecords, not luckrerun. F4 rootdirtyHEAD0246/sourcefreeze6/local62/unit21/root7/helper/proposed3/index3/PNGclarification preserved. Dependent F4acceptance/newexact54547axes46streams62sources15public/all3PNGquartets/roothelper stillUNRUN. F5draft3unadopted/sourceUNRUN. Preserve all oldP2o11/unknownworkspace/Shiloh/failures/dirtyroots; noreset/pull dirty/force/docs-onlyrecordcommit. Native546/iPad/art/performance/history/grade/arms/campaign/v1UNRUN; continue diagnosticloop/no milestone stop/newgoal/scheduler/spending/devicechecks.
+
+CURRENT P3f4 KEYBOARD DIAGNOSIS: mainHEAD/origin4b40/treebc79/indexEMPTY/protected11 workingbytes exact; CI37765298497 FAILED aggregate actual172checks one oldkeyboardUI null.enemy harness exception at line84 after Help/menu Escape/select/T;7 actualemptyaxe scopes, F4aggregate newUI not reached. All46standalone commands completedSUCCESS including repaired newUI12+12. Pages37765298467SUCCESS is not acceptance. Acceptedparent0246/actual533 remains. ExactfailedrawJSON525399B/be55261cdebc79cb9cbd8b77aa4ac20957f95b6c07df1e87627f460ad9bec0d7/range111319B/rawZIP234231B CRC/source/runtime/HUD/Input oldunchanged retained; diagnostic skippedpostsetup109 log omission explicit, oldacceptedreader untouched. Rootrecommendation temporarybranch focused existing --keyboard with passive nativeclose/focus/key/selection/target traces, ActionsONLY, no oldthreshold/oracle/product/renderer change, no nullguard or luckrerun. Sourcecause UNPROVEN; observer-onlypassing cannot prove cure. ParentF4local62r2/unit21/current62/root7/helper/proposed3/actualindex3/PNGsemanticclarification and fresh.output remedy all retained; priorfailedff52/37761831516 unchanged. F4acceptance/new545/full47axes/46streams/15public/newactualPNG/root-helper remain UNRUN. F5consolidateddraft3 unadopted, no gameplay source until dependency acceptance; atmostONEreadonlyhelper/no concurrentwriter. Preserve oldP2o11/allfailedreceipts/isolatedroots and.no reset/pull dirty/force/docs-onlyrecordcommit. Native546/iPad/P2o/art/performance/history/activation/grade/arms/recrew/v1UNRUN; continue diagnosticloop/no milestone stop/newgoal/scheduler/spending/devicechecks.
+
+CURRENT P3f4 CORRECTION PUSHED4b40a7459af7f87818ee3dae70ecccb779f2b159 treebc79d1ce8ff60d381c4d9023a4d46aae868f15c2: exact CI37765298497 in_progress; Pages37765298467 completedSUCCESS. Root/helper final local62r2/unit21/sourcefreeze6/full62/proposed3/actualindex3 CLEAR; correctioncached4 vsfailedff52/combined10 vsaccepted0246, protected11/current workingharnessEXACTunchanged. Fresh-runner output remedy independently proven initiallyABSENT and actual12+12; firstfailedCI37761831516/raw11/ENOENT retained, no retroacceptance. Root reader7 compares all semantic values EXACT and preserves separate per-producer image bytes/hashes: 39 actual decoded wide pixels differ, causeUNPROVEN, no tolerance or lucky rerun. All4 normal/differingcontrol actualimages viewed and filebound, unchanged WCAG/product/CSS/19restores/raw4axes/current61and60/sourceinverse13. Only after completedGREEN run node .out/p3f4-ui-collect-completed-r2-20261008.mjs 37765298497 4b40a7459af7f87818ee3dae70ecccb779f2b159 37765298467 then node .out/p3f4-root-actual-readback-r2-20261008.mjs 37765298497 4b40a7459af7f87818ee3dae70ecccb779f2b159, then node .out/p3f4-read-ci-producer-images-r1-20261008.mjs 37765298497 4b40a7459af7f87818ee3dae70ecccb779f2b159 normal, controls, aggregate as three separate invocations; active watcher2 autoexecutes this exact sequence, do not duplicate. Require actual545 ALLPASS exactaccepted533multiset+12/543unique/47exactemptyaxes/46actualstreams/full62live+git/current61and60/public15/Pages/root-helper CLEAR, each producer actual quartet CRC/hash/bytes/dims and independentviews. Old predicates unchanged; whole F4acceptance remainsUNRUN until all above. MainHEADorigin4b40/indexEMPTY/originalP2oWIP and relaydocs only; F4isolatedHEAD0246 dirtytestedfreeze6, neverreset/pull dirtyroots. Nextfeature source blocked until F4actualacceptance; bounded readonly activation preflight allowed. Native546/iPad/P2o/art/performance/history/grade/arms/recrew/v1UNRUN. Continue aftergreen/no milestone stop/newgoal/scheduler/spending/devicechecks.
+
 CURRENT P3f4 REPAIR LOCAL PASS: mainHEAD/origin failed-unaccepted ff52; acceptedparent remains0246/actual533. CI37761831516 FAILED fresh output ENOENT, first11 cases retained; producer-only existing.out mkdir/containment remedy, frozen6 full62, cold initiallyABSENT actual12+12 PASS. Final literal62 serialr2/unit21 and root actualreader7 CLEAR: full62/current61and60/inverse13/19restores/four raw empty axe/two canonical scopes; all model/UI/RNG/card UID/export/time/geometry values exact. Root ADOPTED narrow artifact-comparison clarification after independent helper actual review: normal/control result-wide files differ39 decoded pixels, causeUNPROVEN; per-producer screenshot bytes/hash identities separately retained/file-bound/decoded/viewed, all other semantics and logical image names exact. No pixel tolerance, lucky rerun, product/renderer/CSS/source/threshold/oracle/count change; prior strictreader4/reader6-WCAG historical-binding failures retained, reader7 separately binds unchanged four product/CSS files and archived oldtool/current6. Compare only F4 raster metadata at images and categories[11].data.images; retain all producer originals. Correction proposedcombined10 vsaccepted0246/cached4 vsfailedff52 (newprobe plus PLAN/HANDOFF/STATE), fresh current protected11 exact/no new harness edit. Collector2/rootreader2 frozen6/semanticcomparator preserve all old predicates/full545=accepted533 multiset+12/543unique/47exactemptyaxes/46actualstreams/full62live+git/current61and60/public15/Pages/root-helper actual acceptance mandatory; every producer image separately retained and verified. Failed rawZIPCRC/remedy/helper/WCAG/layout and all earlier receipts preserved. Next correction integration/commit/push/new exact545 CI UNRUN; no nextfeature product until acceptedF4. Native546/iPad/P2o/art/performance/history/activation/grade/arms/recrew/v1 UNRUN. Continue loop aftergreen/no newgoal/scheduler/spending/devicechecks/milestone stop.
 
 CURRENT P3f4 CI REPAIR: failedunaccepted mainHEAD/originff52d742816df3dcb4d3120be05eae8f6afa7661; acceptedparent remains0246/CI37750920353/Pages37750920233 actual533-45axes44streams61sources13public. CI37761831516 actualFAILED normal UI command: first11categories passed, first PNG write ENOENT because fresh runner had no .out. Exact failed metadata/rawZIP CRC/step11 actual/rawdiagnosis retained; no12/full545 acceptance. Root obvious in-scope remedy ONLY newUIproducer creates existing .out at runActual entry and asserts canonical project containment before output. No product/workflow/SW/default/oracle/threshold/count changes. Frozen6/source62changed6locked56 vsaccepted0246/owned10combined; fresh actual12cases/12reader rejections with initiallyABSENT outputdir, producer-createddirectory, all4PNGs/4emptyrawaudits/19restores/noGPU/current62 CLEAR. Final literal62 serialr2/unit21 and normal-control equality in progress; priorserial1/frozen5/all4PNG/WCAG/root-helper local/proposed2/realindex2 preserved, not substituted for newsource acceptance. Upcoming correction combined10 vsaccepted0246, cached4 vsfailedff52 (newprobe plus PLAN/HANDOFF/STATE), fresh protected11 currentmain exact with no additional harness change. Collector/readers must use frozen6 and actualcompletednewCI545/543unique/47exactaxes/46streams/full62 plus completeCURRENT61/60/public15/Pages/root-helperCLEAR; new run IDs pending. Preserve failedfresh-output/rawretention slash-normalization correction and earlier local/CI receipts; no reset/revert/forcepush/docs-onlyCIrecordcommit. Nextfeature source remains blocked until actualF4acceptance; readonlyactivationinventory retained. Native546/iPad/P2o/art/performance/history/activation/grade/arms/recrew/v1 UNRUN; continue loop, no milestone stop/newgoal/scheduler/spending/device checks.
@@ -3082,3 +3094,166 @@ node tools/test-soldier-view.mjs --prove-fail
 node tools/test.mjs --unit
 
 ADOPTION RECORD REQUIREMENTS: final root/helper challenge CLEAR; candidate1 and literal62/source-before-edit receipt hash-bound, parent acceptance exact. Append this complete consolidated contract to PLAN/HANDOFF, add decision0065 and STATE19 across ten retained roots after backups and containment guards; keep accepted and failed receipts. No source until actual adoption. Product6owners only above, main protected11 exact and no unknown cleanup. Baseline defaultproduction UI witnesses measured AFTER adoption but BEFORE product edits with actual parent modules and authentic savedfixedaward fixtures; diagnosticonly appboot suppression, no renderer/native proof. Full62 productbinding and complete orderedCURRENT61/60 required in every later reader.
+
+ADOPTED2 source-delivery clarification (authoritative over r1 ambiguous regressions.A2): A2 is LOCAL ONLY, one of local66. Read exact original4b40 HUD bytes from retained before-edit JSON base64 and verify bytes/SHA. Fresh per-variant browser context; route exact HUD response before goto/modulemap import, retain response URL/hash/request identity. All other runtime modules remain exact current candidate; no filesystem overwrite. CI does NOT execute A2 or need ignored contract/old gitobject; its two new positive B cases use patched committedHUD. Root/helper A/B/A2 local actual proof before push; exact547 Actions independently proves B2regressions+old545. No additional fetch/file/stream/count. Root/helper corrected-scope CLEAR.
+
+## P3f4 focus ownership repair contract (2026-10-08)
+
+Keep newly acquired connected outside focus during queued native menu close; retain a reopened modal trigger. Fix demonstrated focus-ownership defect, not claim spontaneous originalCI nullfailure reproduced.
+
+Controlled A demonstrated marker -> old Menu focus -> trusted Enter reopens Menu -> T ignored. Settled-close control selects/targets. Both passive cloud diagnostics passed without spontaneous old null.enemy reproduction. Preserve that distinction; no original cause/cure or F4/v1 acceptance claim.
+
+Owner root sole writer; at most one read-only helper, no concurrent edits. Main/origin4b40 remains dirty with protected11 plus relaydocs; isolated /private/tmp/the-civil-war-p3f4-focus-repair-20261008 branchp3f4-focus-repair HEAD4b40. No COORDINATION exists; read immediately if added. Preserve every old dirtyroot/failedreceipt/workspace/Shiloh. No reset/stash/pull dirty/force/unknown cleanup.
+
+Owned7: src/ui/hud.js, tools/test-keyboard-ui.mjs, sw.js, PLAN.md, HANDOFF.md, STATE.md, DECISIONS.md.
+Policy: if menu.open return BEFORE touching menuTrigger; when closed clear saved trigger, onlyfocusconnecteduninerttrigger if activebody/disconnected/stillinsideclosedmenu; Respect newly acquired outsideconnectedfocus; browsernative synchronousrestore alreadyhascorrecttrigger.
+Regression names: keyboard-native-close-preserves-new-focus, keyboard-native-stale-close-preserves-reopened-menu.
+Regression placement: One added call after original keyboard-progress-preserved and before result.keyboard; append function, inverse removes ONLYnewcall/newfunction.
+Regression actual evidence: Real current production Game/Hud/Input using existing livefield plus deliberate nativeclose+focus ordering, no timers/stateflags/RNG substitutions. Actual native Enter/T; 2cases/canonicaloldaxes unchanged; raw beforeafter/events/labels/progress/orders/time/ownedcleanup retained.
+B: Both raced and settled nativeAPI flows retain marker/Enterselect/Ttarget; focusguard is genuine patchedproductionmodule.
+A2: Delivered originalHUD bytes by controlled diagnostic route BEFORE module import; allothercandidatefiles identical. Originalrace must replay wrongfocus/openmenu/nullT. Retainsourcehash/requestevidence; no livefilewrite/byteexactcandidate unchanged.
+
+Source full63 = complete current old62 plus existing tools/test-keyboard-ui.mjs. Keep current model/UI arrays and validators exactly62/61/60 with complete ordered subsets; bind full63 independently. New source inverses undo ONLY HUD/keyboardUI/SW focus changes before running the unchanged F4/F3/F2 virtual inverse assertions. Fresh current63 hashes are distinct from those virtual reverted views. Allother60 sources locked4b40. Original keyboard body restores byteexact by removing only one added call and one appended function. HUD inverse restores4b40, SW version33->34 only. Main dirtyHud must preserve exact originalP2oWIP after removing only new block; stage isolatedcleanblob, never dirtymainblob.
+
+Local66 / unit21; fullCI547 ALLPASS,545unique = accepted533 exact multiset +12 originalF4 names +2 focus names. SAME47 exact empty axes,46 actual standalone streams,15 public files,source63/current62/61/60. No warning filter, oracle, threshold, existing deadline/45min CI change. Nativeexpected548/iPad/art/performance/history/activation/grade/arms/campaign/v1 UNRUN. F5draft3 blocked until actual accepted547.
+
+Exact serial gates:
+```bash
+node --check src/sim/phase.js
+node --check src/game.js
+node --check src/sim/combat.js
+node --check src/units/unit.js
+node --check tools/test-surrender-runtime.mjs
+node --check tools/test.mjs
+node --check sw.js
+node --check src/franchise/practice.js
+node --check tools/test-surrender-result.mjs
+node --check src/franchise/practice-ui.js
+node --check src/reward/sequence.js
+node --check tools/test-surrender-result-ui.mjs
+node .out/p3f4-focus-source-inverses-r1-20261008.mjs
+node tools/test-surrender-runtime.mjs --verify-legacy-game
+git diff --check
+node tools/test-surrender-result.mjs
+node tools/test-surrender-result.mjs --prove-fail
+node tools/test-surrender-result-ui.mjs
+node tools/test-surrender-result-ui.mjs --prove-fail
+node tools/test-surrender-runtime.mjs
+node tools/test-surrender-runtime.mjs --prove-fail
+node tools/test-deployment.mjs
+node tools/test-deployment.mjs --prove-fail
+node tools/test-phase.mjs
+node tools/test-phase.mjs --prove-fail
+node tools/test-field-admission.mjs
+node tools/test-field-admission.mjs --prove-fail
+node tools/test-reinforcements.mjs
+node tools/test-reinforcements.mjs --prove-fail
+node tools/test-reinforcement-runtime.mjs
+node tools/test-reinforcement-runtime.mjs --prove-fail
+node tools/test-capture-accounting.mjs
+node tools/test-capture-accounting.mjs --prove-fail
+node tools/test-equipment.mjs
+node tools/test-equipment.mjs --prove-fail
+node tools/test-reward.mjs
+node tools/test-reward.mjs --prove-fail
+node tools/test-save.mjs
+node tools/test-save.mjs --prove-fail
+node tools/test-practice.mjs
+node tools/test-practice.mjs --prove-fail
+node tools/test-captures.mjs
+node tools/test-captures.mjs --prove-fail
+node tools/test-intro.mjs
+node tools/test-intro.mjs --prove-fail
+node tools/test-sandbox-rules.mjs
+node tools/test-sandbox-rules.mjs --prove-fail
+node tools/test-look.mjs
+node tools/test-look.mjs --prove-fail
+node tools/test-view.mjs
+node tools/test-view.mjs --prove-fail
+node tools/test-spacing.mjs
+node tools/test-spacing.mjs --prove-fail
+node tools/test-residency.mjs
+node tools/test-residency.mjs --prove-fail
+node tools/test-moments.mjs
+node tools/test-moments.mjs --prove-fail
+node tools/test-keyboard.mjs
+node tools/test-keyboard.mjs --prove-fail
+node tools/test-soldier-view.mjs
+node tools/test-soldier-view.mjs --prove-fail
+node tools/test.mjs --unit
+node --check src/ui/hud.js
+node --check tools/test-keyboard-ui.mjs
+node .out/p3f4-focus-native-close-r1-20261008.mjs B
+node .out/p3f4-focus-native-close-r1-20261008.mjs A2
+```
+
+Beforeintegration root/helper actual local66/source63/CPU B+A2 source/request/control/restore/prooflimits CLEAR; all F4 UI actual12+12/four raw audit/2canonical scopes/19restores/default saved/RNGdraw0/source subsets retained. Review actual4 localF4 PNGs; existing CSS unchanged. Proposedowned7/all63 then actualindex7/all63/WIPinverse independentCLEAR. Commitmain/push onlyscoped7. Full new exact547 metadata/raw rangedZIPCRC/name multiset/47axes/46actualstreams/all63live+git/fullcurrent62/61/60/public15/Pages; actual normal/control/aggregate F4semanticdata exact except previously adopted separate producer raster identities. Download/view all3 actualF4 PNGquartets with CRC/hash/bytes/dims and root/helper independentlyCLEAR. New focus rawrecords positive/no accidentalorders/time/savechanges/realkeys/expected closes/stale trigger/owned cleanup bound to exact source and SHA. Keep old readers untouched; new collector extends exact545->547 names/count and independently adds63+2focusrecords, preserving all old predicates through fullcurrent62 input. No docs-onlyCIrecordcommit.
+
+HALT affectedslice for contradictory runtime/gate without bounded remedy, preservefailures and give recommendation; continue dependency-ready independent v1 work. At ordinary green continue loop, no milestone final. Stop only Aaron/actualv1release/enforcedlimit/unsafeownership/allusefulworkblocked; mandatory full live-git continuationpacket at actualterminal.
+
+Source inventory:
+- tools/test.mjs 133896B 4598bd5efa988403ca6d0113694d491b3165989751a33bf3d74d40f49a935490
+- .github/workflows/ci.yml 4017B 7266b48712717e2a459572e48682ed66e9ae9c7211d44067d56ba8886f3a8fdf
+- src/sim/phase.js 27263B 7d65196a7bc38cfd8f40e69bb00ba340ae3cfdd3345ee438d3a34aa7f6d7bf03
+- tools/test-reinforcements.mjs 12889B 03448053e03abb1cca25032c193d1676cfaeb1df1d9d3fb8734577cfcc3eeadb
+- src/main.js 17508B c5031e99824b945ccb9ace9194557367465d9a1aa15a77db7a3c2eddc6b7908c
+- sw.js 2485B 5b23311f3e822e07a50b365d0215b9f21d7fd2b278913a7f58d05b36da684dab
+- src/entry.js 1072B 135045ee1502e2951afbdfbb9be3f3284a3752b24ee72545ef68bf61c5b8ee69
+- src/ui/entry.js 35253B 62ec4d87f5e7287935e94fe1653c75f75a14257d5dbc28dba0ce8c8e15e1b351
+- tools/test-field-admission.mjs 15815B a843a78cf72b7d9464279a919f7792f7599f6d97c9b1831fc16bfda0009cefa5
+- tools/test-field-admission-ui.mjs 37430B eb76bbd6573cb9df336029992f627b1b7c9c61a71ef552f1df8944081eebeec4
+- tools/test-deployment-ui.mjs 60091B 5fb057e0adf35f9ce0bd8bcf35299554a20c926495f6bb2425d3df6df0d4f601
+- tools/test-phase.mjs 11442B 128a71c29d8217207f6f7b1f762a2d00f42bd2336482fe7a792271c29b8fe004
+- index.html 13810B 4fa414c5aecfba43c7aa91702af34f61a705afd7c3b269f57e956059faab1925
+- src/ui/hud.js 30656B db90b19d42bc46833813f154f559c1a60ffea4efa3d8ce8121e683e4151496b3
+- src/ui/hud.css 33208B a7a014127d4b4d2b8a95c3bfd6df6b3b71b7cf6325105c0ab7b81a9712944fc9
+- src/ui/input.js 29745B 84e707070fce8505d502be1c8e2f7cf68c3a99231406127bb8540b42bb9e4cec
+- tools/test-soldier-view-ui.mjs 64426B 7d14c78cea149dd96de5c7bbb6cc5c388aa5fcb6d7afa8a4567c7841cd95c425
+- tools/test-view-ui.mjs 23438B d69b4e16487bd3e112f308135da6fd4d7a373d1a9af09d66be013ec89b491ca4
+- tools/test-keyboard.mjs 16838B 84227415ab797d510764b0bfa448973f8adab1ddd0db1b026df734aa8a500864
+- src/render/rts-camera.js 10824B 9e4600c537a76c7f0b89e70959787ab5073da633f76a42b961fc24cf5ed9d2b2
+- tools/test-view.mjs 9795B 26f818b4ff18ac591ed36b3b1321b1d3bc435c4ce7d71bdde1a25061ff0540cd
+- src/ui/readout.js 5414B bc3a176eef31cff658a936fce85f411fcbcc65a85908718348a09ed20fc355fe
+- src/render/post.js 15823B 707f44b107d6a125f05b6e6132c81a7174fd06f9976ad148371b9076f4889baf
+- src/render/soldier-view.js 6995B 14f6e1e9944e77c1e07fd9f9f8d5c39b7cda3096d3a17fe2a4b6aa23dd457988
+- tools/test-soldier-view.mjs 18755B 0cb7b767ed36215f0015d85bcd1180babb51aa19bd5fd912666994a302ec9a68
+- tools/test-header-ui.mjs 56214B 5efd44f111b9d52296d8119ebe06727a043c24263d5abecb227091e2b323883e
+- tools/test-intro-ui.mjs 17157B 534ec78fbda0323a8eab23f00313f77e46e104171307289b94b40c7ed4ee378a
+- src/ui/entry.css 5397B 97241e26dab9e9b0cf325313b55f1e11d374e598a9832144a6e8199d44c8a8c1
+- src/franchise/practice.js 20001B 78f9a68a01fb35d3f1f5579afdaf768f5610c276b8f3523c658302d75f93e650
+- src/franchise/practice-ui.js 12422B 4e1d6cbd0e73f9019ddcd91f543edc7ff77b817ffa53929707d31b7e35360896
+- src/ui/practice-field.js 8773B b1a593e4c43476731d25f9acaad0f442f45ad1c36b636bc7328caf36cc1fa8ca
+- src/reward/sequence.js 58443B 64351d09d7eecdca6ca0a5da1d826575d66126a483a4b58df4f8b027f2c83dcd
+- src/reward/reward.css 38873B a885696aec63fde7e13ffc96a4e04c6197a0a3c721668149de784f2e7c2d3309
+- tools/test-deployment.mjs 24243B 04a8631272624ee6d33149974b8552cb74d8252eb37e937f342864f38823d396
+- src/franchise/save.js 14195B 73a5a205fc86b9298abe0b2fc4b03f29490a24cabec7c701635edb04f15bf7ad
+- src/reward/model.js 11976B da3497230427d1c9fbbe732cb7fc7a4671586942693c2edd5db4f3d155bd2671
+- src/reward/data.js 14397B 23ca8fcf1768180ca3969d4eb1048cd4cb9a3993c61877db0a2b4e0b43c3a6b6
+- src/units/unit.js 33573B 7191b91a62d6f96101c3b379abc6d14c4f4892a7d22f1810df186e455c861bd2
+- src/units/battery.js 16427B 0a4d3d53d1b7072108f6fb161ca543218a8b7d2eab64a39629b73b485384c9ab
+- src/sim/combat.js 16600B 2d9ce2ded615fdb2080a673bc3d858877eff87659db26881530c39115ccc8f75
+- src/game.js 45019B a7cf1007497264c5a1162bb0c0be2895051c3dd8502f3a533b7e4672aec743e9
+- src/ui/arrows.js 20515B 3e01e2bdd461eb4dd9ca95f79a133d9ab5cc02f6b6307a501ccce309b7bf8e17
+- src/sim/rules.js 3299B 98d8681c2093720b0b57a4d940c8f18f240fdc1ccb0c86893c067d484f636b8b
+- src/franchise/intro.js 1461B 9f2d16c5dcb5e8b49961dc12a29fcd68be1ac355a0210de5e00a5ea120e8246d
+- assets/scenarios/henry-hill.json 15406B 9723e0643f5cd408de448767e4d41ce711d46c486de9b60a1b0678b770dddf22
+- src/world/terrain.js 11381B 7a2891919a17fdb6b1115a3e5515d11ae70ad7513820f7aa3f8e0d5fe3a81f78
+- src/world/landscape.js 18606B 4ad275235e626720110a2d34b9e4180a0d2047f6eecdae3c411c43a4cdff6643
+- src/world/props.js 17821B 533a55e7ff4598359a58fb7a5ef7990d47e6da3f9b0ca5c2aba50c4f56596848
+- src/world/labels.js 10185B 02ebe257ce4fe53fd193adf533cd58793d77f4a3f06b99d5cdb1439985f37668
+- src/sim/equipment.js 4298B cfe33308be6dcaff8dbaaf2c89e331c806c98b9bb7deff750d25ae54d43fa312
+- tools/test-equipment.mjs 55438B f75ce659631a55ed2340e8c7e10b75c7c8555a0d44dd9774273a0da3714ec2e8
+- src/units/impostor.js 27177B 3bdacd864c66332d57413ea37588a84dcca62e18f8c1b03b168d1d9678701f97
+- tools/test-dock-ui.mjs 28171B 18c02a658ff3302bd595e5884562f72f13d212d419a1bb543995e4c32f9139da
+- src/world/world.js 3814B aa378f8c4eef0f52f22a79fb526f1307982432d3881d4900f245066edaf164d6
+- src/sim/ai.js 2385B 540c7a908750cc64d783be30723671723a67bf5a3dbd63a170870cc0105a02bc
+- src/franchise/captures.js 2215B 2a481ba903bffc482d157730755ce6cd548173595d147e0f6b95ada2c2f77490
+- tools/test-reinforcement-runtime.mjs 29863B 490af752bba1ca206341e664e226dabc85baea3e0da53af30f1b4f8ee72a9adb
+- tools/test-reinforcement-ui.mjs 41357B ba4f30c688eb98d35e9a5787d2d323871c6407ff78923d2fab360541e6f33455
+- tools/test-capture-accounting.mjs 21961B afafde5d42093c6aace4f4fe1a21e88c8ffcda39c900b81a29b506401eeb3886
+- tools/test-surrender-runtime.mjs 56960B 195bb3c763d0710a31efc64c5b55da458af06c3c679b6005b8acf5e600ec79be
+- tools/test-surrender-result.mjs 21452B 0fc1b6290d70ff3ca0b34ab8dfa23af237cbb99a2d036c498ea0de3fa2a61308
+- tools/test-surrender-result-ui.mjs 46774B a66cebad2b6586beb151d7a0198106a670d56e359fe3b2e7b77219b1f14a3d81
+- tools/test-keyboard-ui.mjs 14194B 5a9dfd35b4010098a9c354a3a48564ae14242c7a8cebce54f313dc5ee0ae88d6
+
+ADOPTED3 proof-strengthening amendment: local66 lasttwo commands are now node .out/p3f4-focus-native-close-r2-20261008.mjs B and node .out/p3f4-focus-native-close-r2-20261008.mjs A2 (each separate invocation). Retain r1 positive receipts; their request hash represented deliveredpayload, not independently read responsebody. r2 asserts actualHTTP response bytes/hash and actual oldclose->reopenedmodal trigger ownership in both local arms. Source63/product3/inverses/2CIpositivecases/54747axes46streams15public/owned7 unchanged. A2LOCALONLY; no Actions oldHUD/gitobject assumption. No luckrerun/no threshold/product change.

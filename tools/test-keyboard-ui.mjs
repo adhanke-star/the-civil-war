@@ -119,6 +119,70 @@ export async function keyboardControls({ page, check, shot, result }) {
   check('keyboard-native-help-close-activation', !await page.locator('#menu').evaluate((el) => el.open) && (await read()).focus === 'battlefield', 'keyboard reaches native Close, scrolls it into view and restores field focus');
   const after = await read();
   check('keyboard-progress-preserved', after.progress === before.progress && after.writes === before.writes, 'all actual keyboard orders/help/cancellation preserve exact saved progress and zero writes');
+  await menuFocusOwnership({ page, check, result });
   result.keyboard = { before, marched, groupGhost, groupEnd, fired, rects, after };
   await page.setViewportSize({ width: 1280, height: 720 });
+}
+
+/** Deliberately order native close/focus in one task; this is a focus-race regression, not a timing claim. */
+export async function menuFocusOwnership({ page, check, result }) {
+  await page.waitForFunction(() => !document.getElementById('menu').open && window.__game.hud.menuTrigger == null, null, { timeout: 10000 });
+  await page.evaluate(() => {
+    if (Object.hasOwn(window, '__menuFocusProof')) throw Error('Menu focus proof already owned');
+    const { game, hud, input } = window.__game, menu = document.getElementById('menu');
+    const flag = [...document.querySelectorAll('.marker')].find(el => el.querySelector('.nm')?.textContent === 'Franklin');
+    if (!flag) throw Error('Existing Franklin flag unavailable');
+    const rows = [], listeners = []; let closes = 0, overflow = false;
+    const describe = el => el ? { id: el.id || null, tag: el.tagName || null, marker: el.querySelector?.('.nm')?.textContent || null } : null;
+    const read = () => ({ at: performance.now(), focus: describe(document.activeElement), open: menu.open, trigger: describe(hud.menuTrigger),
+      selected: game.selected?.id || null, selection: game.selection.map(u => u.id), orders: game.orders || 0, time: game.simTime,
+      paused: game.paused, target: input.targeting ? { mode: input.targeting.mode, enemy: input.targeting.enemy?.id || null } : null });
+    const record = (phase, e) => { if (rows.length < 256) rows.push({ seq: rows.length, phase, type: e?.type || null, key: e?.key || null,
+      repeat: e?.repeat ?? null, trusted: e?.isTrusted ?? null, eventTarget: describe(e?.target), closes, ...read() }); else overflow = true; };
+    for (const type of ['close', 'focusin', 'focusout', 'keydown', 'keyup', 'click']) {
+      const fn = e => { if (type === 'close' && e.target === menu) closes++; record('capture', e); };
+      window.addEventListener(type, fn, true); listeners.push({ target: window, type, fn, capture: true });
+    }
+    const fn = e => record('close-after-production', e); menu.addEventListener('close', fn); listeners.push({ target: menu, type: 'close', fn, capture: false });
+    window.__menuFocusProof = { game, hud, input, flag, menu, read, record, closes: () => closes, finish() {
+      record('finally'); for (const { target, type, fn, capture } of listeners) target.removeEventListener(type, fn, capture);
+      const out = { rows, overflow, closes, listeners: listeners.length, removeCalls: listeners.length,
+        scope: 'Deliberate native dialog API ordering with trusted subsequent Enter/T; no spontaneous earlier-failure causality claim',
+        removalScope: 'Matched native listener removal calls and owned-global absence; inactivity not independently stimulated' };
+      delete window.__menuFocusProof; out.globalAbsent = !Object.hasOwn(window, '__menuFocusProof'); return out;
+    } };
+  });
+  const data = {};
+  try {
+    const progress = () => page.evaluate(async () => ({ raw: await window.__progressFixture.raw(), writes: window.__progressPuts + window.__progressLegacyWrites }));
+    data.progressBefore = await progress(); data.before = await page.evaluate(() => window.__menuFocusProof.read());
+    await page.locator('#menu-btn').focus(); await page.keyboard.press('Enter');
+    data.raced = await page.evaluate(() => { const w = window.__menuFocusProof; w.menu.close(); w.flag.focus(); w.record('same-task-new-focus'); return w.read(); });
+    await page.waitForFunction(() => { const w = window.__menuFocusProof; return w.closes() >= 1 && !w.menu.open && w.hud.menuTrigger == null; }, null, { timeout: 10000 });
+    data.settled = await page.evaluate(() => window.__menuFocusProof.read());
+    await page.keyboard.press('Enter'); data.entered = await page.evaluate(() => window.__menuFocusProof.read());
+    await page.keyboard.press('t'); data.targeted = await page.evaluate(() => window.__menuFocusProof.read());
+    check('keyboard-native-close-preserves-new-focus', data.raced.focus.marker === 'Franklin' && data.settled.focus.marker === 'Franklin'
+      && !data.entered.open && data.entered.selected === 'franklin' && data.targeted.target?.mode === 'attack' && !!data.targeted.target.enemy
+      && data.targeted.orders === data.before.orders && data.targeted.time === data.before.time && data.targeted.paused,
+    JSON.stringify({ raced: data.raced, settled: data.settled, entered: data.entered, targeted: data.targeted }));
+    await page.keyboard.press('Escape');
+    await page.locator('#menu-btn').focus(); await page.keyboard.press('Enter');
+    data.reopened = await page.evaluate(() => { const w = window.__menuFocusProof; w.menu.close(); w.flag.focus(); w.hud.openMenu(w.flag); w.record('same-task-reopened'); return w.read(); });
+    await page.waitForFunction(() => window.__menuFocusProof.closes() >= 2, null, { timeout: 10000 });
+    data.staleSettled = await page.evaluate(() => { const w = window.__menuFocusProof; return { ...w.read(), inside: !!document.activeElement.closest('#menu') }; });
+    await page.keyboard.press('Escape');
+    await page.waitForFunction(() => { const w = window.__menuFocusProof; return w.closes() >= 3 && !w.menu.open && w.hud.menuTrigger == null; }, null, { timeout: 10000 });
+    data.closed = await page.evaluate(() => window.__menuFocusProof.read()); data.progressAfter = await progress();
+    check('keyboard-native-stale-close-preserves-reopened-menu', data.reopened.open && data.reopened.trigger.marker === 'Franklin'
+      && data.staleSettled.open && data.staleSettled.trigger.marker === 'Franklin' && data.staleSettled.inside
+      && !data.closed.open && data.closed.trigger === null && data.closed.focus.marker === 'Franklin'
+      && data.closed.orders === data.before.orders && data.closed.time === data.before.time
+      && data.progressBefore.raw === data.progressAfter.raw && data.progressBefore.writes === data.progressAfter.writes,
+    JSON.stringify({ reopened: data.reopened, staleSettled: data.staleSettled, closed: data.closed, progressBefore: data.progressBefore, progressAfter: data.progressAfter }));
+  } finally {
+    data.restoration = await page.evaluate(() => window.__menuFocusProof.finish());
+    result.menuFocusOwnership = data;
+    if (data.restoration.overflow || !data.restoration.globalAbsent || data.restoration.listeners !== data.restoration.removeCalls) throw Error('Menu focus proof cleanup or trace bound failed');
+  }
 }
