@@ -33,6 +33,21 @@ let lastOnDone = null;
 let replayHandler = null;
 export function configureRewardReplay(handler) { replayHandler = handler; }
 
+/** Text only: physical prisoners and guns do not change saved rewards or crewed strength. */
+export function surrenderReportText(report) {
+  if (!report) return '';
+  const name = (side) => side === 'US' ? 'Union' : 'Confederate';
+  const rows = ['US', 'CS'].map((side) => {
+    const r = report.sides[side];
+    return `${name(side)}: ${r.killedWounded} killed or wounded; ${r.capturedMen} captured; ${r.prisonersTaken} prisoners taken.`
+      + (r.missingMen ? ` ${r.missingMen} missing.` : '')
+      + (r.pendingMen ? ` ${r.pendingMen} still to arrive.` : '')
+      + ` Guns: ${r.gunsTaken} taken, including ${r.disabledGunsTaken} disabled; ${r.gunsLost} lost.`;
+  });
+  for (const f of report.formations) rows.push(`${f.label}: ${f.men} captured by the ${name(f.captorSide)} side.`);
+  return rows.join(' ');
+}
+
 // ---- settings -----------------------------------------------------------------------------------------
 export function defineRewardSettings() {
   define('screens.revealPace', {
@@ -416,6 +431,7 @@ export function mountReward(root, opts = {}) {
       el('h1', { class: 'rw-grade', id: 'rw-aar-grade', 'data-grade': S.grade, text: S.grade }),
       el('p', { class: 'rw-grade-note', text: opts.afterAction?.why ?? GRADE_NOTES[S.grade] }),
       opts.afterAction ? el('p', { class: 'rw-hint', text: `${opts.afterAction.surviving.toLocaleString()} surviving men · ${opts.afterAction.losses.toLocaleString()} lost · ${opts.afterAction.guns} crewed guns. Practice rewards and ratings are game values; this does not record the historical outcome.` }) : null,
+      opts.afterAction?.surrenderResult ? el('p', { class: 'rw-hint', text: surrenderReportText(opts.afterAction.surrenderResult) }) : null,
       el('div', { class: 'rw-aar-stats' },
         el('p', { class: 'rw-aar-stat' }, el('b', { text: String(S.captures.length) }), el('span', { text: 'Captures' })),
         el('p', { class: 'rw-aar-stat' }, el('b', { text: String(nIssue) }), el('span', { text: 'Quartermaster issue' })),

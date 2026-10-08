@@ -1,5 +1,8 @@
 # DECISIONS (newest first; one short entry each)
 
+0065 (2026-10-08): Optional surrender reports reuse the existing result dialog and reward after-action text. Query the accepted private terminal projection once before award allocation; keep prisoners separate from killed/wounded, physical gun possession separate from condition and all original saved rewards unchanged. Production text APIs and bounded CPU/DOM proof precede integration; no launch activation, prisoner grading, arms loot or native/history authority. Full before-edit contract in PLAN/HANDOFF. Actual browser close events restore focus asynchronously; bounded readiness and stable native-frame observations preserve the same UI assertions without product or threshold changes.
+
+
 0064 (2026-10-08): Result observation follows unchanged Game objective cadence (6.125 after capture6; 7.125 after captures[7,6]); record both timestamps. Root/helper actual correction, no forced terminal or timer/rule changes; adopted2 supersedes terminal-at6 only.
 
 ## 0063 · Terminal surrender results use the original encounter

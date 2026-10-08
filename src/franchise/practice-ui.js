@@ -1,7 +1,7 @@
 // Same-page result -> reward -> single completed-progress store. The battlefield is inert during loot.
 import { createProgressStore, completedSnapshot, exportSnapshot } from './save.js';
-import { practiceOutcome, savedOutcome, assertSavedLaunch } from './practice.js';
-import { mountReward, configureRewardReplay } from '../reward/sequence.js';
+import { practiceOutcome, savedOutcome, assertSavedLaunch, surrenderOutcome } from './practice.js';
+import { mountReward, configureRewardReplay, surrenderReportText } from '../reward/sequence.js';
 
 export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null }) {
   if (manifest) assertSavedLaunch(manifest);
@@ -20,6 +20,7 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
   let captured = false, outcome = null, pending = null, saved = null, previous = null, failure = null, reward = null, baselineKnown = false;
   let saving = false, reviewing = false, rewardActive = false;
   let reading = false, readCancelled = false;
+  let surrenderResult = null, surrenderUnavailable = false;
   if (manifest) { previous = manifest.baseline; baselineKnown = true; }
 
   configureRewardReplay(() => hud.toast('Open the separate reward demo from the menu. Practice rewards use the completed battlefield.'));
@@ -128,7 +129,7 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
     dialog.close(); field.inert = true; failure = null;
     if (manifest) {
       reward = mountReward(document.body, { preparedOutcome: outcome, rememberReplay: false,
-        afterAction: { ...outcome.summary, why: savedResultWhy() },
+        afterAction: { ...outcome.summary, why: savedResultWhy(), ...(surrenderResult ? { surrenderResult } : {}) },
         onDone: () => {
           if (saving || !rewardActive || saved) return;
           rewardActive = false; pending = outcome.snapshot; baselineKnown = true; previous = manifest.baseline;
@@ -137,7 +138,8 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
       return;
     }
     reward = mountReward(document.body, { army: outcome.army, depot: outcome.depot, awardId: outcome.awardId,
-      seed: outcome.seed, grade: outcome.grade, captures: outcome.captures, afterAction: outcome.summary,
+      seed: outcome.seed, grade: outcome.grade, captures: outcome.captures,
+      afterAction: surrenderResult ? { ...outcome.summary, surrenderResult } : outcome.summary,
       onDone: (result) => {
         if (saving) return;
         rewardActive = false;
@@ -165,6 +167,10 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
   }
   function openResult() {
     if (reviewing || rewardActive) return;
+    if (surrenderUnavailable) {
+      panel('Result unavailable', 'The encounter report could not be verified. Inspect the field before continuing.', null, null);
+      return;
+    }
     if (reading) {
       panel('Loading saved progress', 'The saved-progress read is still in progress. Inspecting the field cancels this review.', null, null, { exportable: !!pending });
       return;
@@ -178,12 +184,20 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
     const message = outcome
       ? `${manifest ? savedResultWhy() : game.result.why} ${outcome.summary.surviving.toLocaleString()} surviving men; ${outcome.summary.losses.toLocaleString()} lost. ${outcome.captures.length} held field crates. ${manifest ? 'Open only the new loot, save these survivors, then return to camp.' : 'Open the practice quartermaster issue.'}`
       : `${game.result.why} ${mode === 'historical' ? 'Historical battles grant no franchise rewards.' : 'Sandbox or altered battles grant no progress rewards.'}`;
-    panel(game.result.winner === 'US' ? 'Union victory' : 'Confederate victory', message, outcome ? 'Open the loot' : null, openLoot, { exportable: !!manifest && !!outcome });
+    const report = surrenderReportText(surrenderResult);
+    panel(game.result.winner === 'US' ? 'Union victory' : 'Confederate victory', report ? `${message} ${report}` : message, outcome ? 'Open the loot' : null, openLoot, { exportable: !!manifest && !!outcome });
   }
   function finishResult() {
     if (captured) return;
     captured = true;
     game.paused = true; hud.setPaused(true); after.hidden = false;
+    // Validate the private encounter report before allocating or preparing any award.
+    try { surrenderResult = surrenderOutcome({ game, scenario }); }
+    catch {
+      surrenderUnavailable = true;
+      openResult();
+      return;
+    }
     if (mode === 'practice') {
       const awardId = manifest?.awardId ?? `practice-${globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`;
       try { outcome = manifest ? savedOutcome({ manifest, game }) : practiceOutcome({ game, scenario, mode, awardId, seed: awardId }); }

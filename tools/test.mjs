@@ -1714,6 +1714,10 @@ async function main() {
     await campEquipment({ browser, url, check, shot, result, watchErrors });
     await saveCoordination({ browser, url, check, shot, result, watchErrors });
     await deploymentProgress({ browser, url, check, shot, result, watchErrors, native });
+    {
+      const { surrenderResultUIControls } = await import('./test-surrender-result-ui.mjs');
+      await surrenderResultUIControls({ browser, url, check, result });
+    }
     await reinforcementUIControls({ browser, url, check, shot, result, native });
     await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native });
     await soldierViewControls({ browser, url, check, shot, result, watchErrors, native });

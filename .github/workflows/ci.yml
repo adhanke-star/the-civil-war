@@ -64,6 +64,8 @@ jobs:
 
       - run: node tools/test-surrender-result.mjs
       - run: node tools/test-surrender-result.mjs --prove-fail
+      - run: node tools/test-surrender-result-ui.mjs
+      - run: node tools/test-surrender-result-ui.mjs --prove-fail
 
       - run: node tools/test-equipment.mjs
       - run: node tools/test-equipment.mjs --prove-fail
