@@ -167,6 +167,7 @@ export class GunPool {
 }
 
 export class Battery extends Unit {
+  #gunMatricesInitialized = false;
   constructor(def, pool, gunPool, terrain, seed) {
     super(def, pool, terrain, seed);
     this.gunPool = gunPool;
@@ -292,6 +293,27 @@ export class Battery extends Unit {
   }
 
   animate(dt, time) {
+    if (this.state === 'captured') {
+      // Keep the last poses, including recoil. Before any animation, use the physical slots once.
+      if (!this.#gunMatricesInitialized) {
+        const T = this.terrain, s = FIGURE_SCALE, GP = this.gunPool;
+        for (const g of this.gunSlots) {
+          const y = T.heightAt(g.x, g.z);
+          if (!g.alive) {
+            GP.set(GP.guns[this.side], g.gun, g.x, y, g.z, g.yaw + 0.5, s, 0.12);
+            GP.hide(GP.limbers, g.limber);
+          } else {
+            const fs = Math.sin(g.yaw), fc = Math.cos(g.yaw);
+            const pitch = Math.atan2(T.heightAt(g.x + fs * 4, g.z + fc * 4) - T.heightAt(g.x - fs * 4, g.z - fc * 4), 8);
+            GP.set(GP.guns[this.side], g.gun, g.x, y, g.z, g.yaw, s, pitch);
+            GP.set(GP.limbers, g.limber, g.lmx, T.heightAt(g.lmx, g.lmz), g.lmz, g.lmyaw, s, 0);
+          }
+        }
+        this.#gunMatricesInitialized = true;
+      }
+      super.animate(dt, time);
+      return;
+    }
     const moving = this.follow.active || this.state === 'routing';
     if (moving) {
       this.stoppedT = 0;
@@ -347,6 +369,7 @@ export class Battery extends Unit {
         GP.set(GP.limbers, g.limber, g.lmx, T.heightAt(g.lmx, g.lmz), g.lmz, g.lmyaw, s, 0);
       }
     });
+    this.#gunMatricesInitialized = true;
     // drivers sit on the near-side horses of their limber
     for (const f of this.figures) {
       if (!f.mount || !f.alive) continue;

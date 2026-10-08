@@ -44,6 +44,15 @@ jobs:
           git cat-file -e aaf10145531130f3ec201d6332f6759599bc46a4:src/main.js
           node tools/test-surrender-runtime.mjs --verify-legacy-game
 
+      - name: Fetch pinned captured-gun comparison
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags --depth=1 origin b81dad641ff86c7586b13abf57dce257e299fef0
+          test "$(git rev-parse FETCH_HEAD)" = "b81dad641ff86c7586b13abf57dce257e299fef0"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/units/battery.js
+          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/game.js
+
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
@@ -119,6 +128,15 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git cat-file -e aaf10145531130f3ec201d6332f6759599bc46a4:src/main.js
           node tools/test-surrender-runtime.mjs --verify-legacy-game
+
+      - name: Fetch pinned probe captured-gun comparison
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags --depth=1 origin b81dad641ff86c7586b13abf57dce257e299fef0
+          test "$(git rev-parse FETCH_HEAD)" = "b81dad641ff86c7586b13abf57dce257e299fef0"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/units/battery.js
+          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/game.js
 
       - name: Set up probe Node
         uses: actions/setup-node@v4
@@ -208,6 +226,9 @@ jobs:
 
       - run: node tools/test-surrender-activation.mjs
       - run: node tools/test-surrender-activation.mjs --prove-fail
+
+      - run: node tools/test-captured-guns.mjs
+      - run: node tools/test-captured-guns.mjs --prove-fail
 
       - name: Upload probe output
         if: always()

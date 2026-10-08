@@ -1,5 +1,7 @@
 # DECISIONS (newest first; one short entry each)
 
+0072 (2026-10-08): Surrendered batteries retain their last physical gun and limber poses, including recoil. A private per-instance initialization flag handles capture before the first animation without moving slots; preserve the original normal path and Unit cleanup. Prove both sides, condition versus possession, exact parent A/B/A2 animation, zero post-capture RNG calls and signed-zero-preserving raw evidence before exact-SHA acceptance.
+
 0071 (2026-10-08): Serialize the complete aggregate result without indentation. Current CI is green but its packed JSON exceeds the unchanged1MiB cap; a lossless accepted-parent preflight preserves every parsed value and reduces size. Change one writer expression and retain all data, gates, source inverses and caps; fresh exact-SHA artifact acceptance is required.
 
 

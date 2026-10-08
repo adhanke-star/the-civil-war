@@ -1461,6 +1461,20 @@ async function activationModelUnit(summary = false) {
   }
 }
 
+async function capturedGunsModelUnit() {
+  try {
+    const { execFileSync } = await import('node:child_process');
+    const text = execFileSync(process.execPath, [path.join(ROOT, 'tools/test-captured-guns.mjs')], { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
+    const lines = text.trimEnd().split('\n'), rows = lines.filter(l => l.startsWith('CAPTURED GUNS ACTUAL '));
+    if (rows.length !== 1 || !lines.includes('CAPTURED GUNS OK (12/12)')) throw new Error('Incomplete captured-gun proof.');
+    const actual = JSON.parse(rows[0].slice('CAPTURED GUNS ACTUAL '.length));
+    const { verifyCapturedGunRecord } = await import('./test-captured-guns.mjs');
+    verifyCapturedGunRecord(actual);
+    result.capturedGuns = actual;
+    check('captured-guns-model', true, '12 actual CPU categories and 12 own controls; original A/B/A2, current66 source guards');
+  } catch (error) { check('captured-guns-model', false, error.message); }
+}
+
 async function main() {
   await settingsUnit();
   await bakedUnit();
@@ -1473,6 +1487,7 @@ async function main() {
   await surrenderRuntimeModelUnit();
   await surrenderResultModelUnit();
   await activationModelUnit();
+  await capturedGunsModelUnit();
   await fs.mkdir(OUT_DIR, { recursive: true });
   const { server, url } = await startServer({ port: 0 });
   result.url = url;
@@ -1766,6 +1781,7 @@ if (process.argv.includes('--unit')) {
   await surrenderRuntimeModelUnit();
   await surrenderResultModelUnit();
   await activationModelUnit(true);
+  await capturedGunsModelUnit();
   try {
     await bakedUnit();
     await approvedPackUnit();
