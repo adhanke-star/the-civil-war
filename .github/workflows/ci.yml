@@ -41,6 +41,9 @@ jobs:
       - run: node tools/test-field-admission.mjs
       - run: node tools/test-field-admission.mjs --prove-fail
 
+      - run: node tools/test-reinforcements.mjs
+      - run: node tools/test-reinforcements.mjs --prove-fail
+
       - run: node tools/test-equipment.mjs
       - run: node tools/test-equipment.mjs --prove-fail
 

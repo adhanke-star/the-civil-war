@@ -1372,12 +1372,18 @@ async function fieldAdmissionModelUnit() {
   catch (error) { check('field-admission-model', false, error.message); }
 }
 
+async function reinforcementModelUnit() {
+  try { const { reinforcementUnit } = await import('./test-reinforcements.mjs'); const count = reinforcementUnit(); check('reinforcements-model', count === 20, count + ' immutable reinforcement timeline and interval categories; no spawning/store authority'); }
+  catch (error) { check('reinforcements-model', false, error.message); }
+}
+
 async function main() {
   await settingsUnit();
   await bakedUnit();
   await approvedPackUnit();
   await phaseModelUnit();
   await fieldAdmissionModelUnit();
+  await reinforcementModelUnit();
   await fs.mkdir(OUT_DIR, { recursive: true });
   const { server, url } = await startServer({ port: 0 });
   result.url = url;
@@ -1658,6 +1664,7 @@ if (process.argv.includes('--unit')) {
   }
   await phaseModelUnit();
   await fieldAdmissionModelUnit();
+  await reinforcementModelUnit();
   try {
     await bakedUnit();
     await approvedPackUnit();

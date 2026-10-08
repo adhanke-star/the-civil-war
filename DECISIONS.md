@@ -1,5 +1,12 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0057 · Read setup commands independently of runner display headers (2026-10-08 UTC)
+
+GitHub Run group labels repeat the first command. Read the actual ordered command rows after
+stripping ANSI formatting, and require the exact six-command pinned setup including both HEAD
+checks. Preserve failed collector receipts; a display-parser correction changes no product or
+test acceptance predicate.
+
 ## 0056 · CI must fetch the exact historical comparison before testing (2026-10-08 UTC)
 
 The field-admission probe compares actual source at a pinned accepted commit. A one-commit checkout
@@ -7,6 +14,15 @@ contains no such baseline. Fetch that exact commit with depth 1 and no tags, ver
 blobs and unchanged current HEAD before tests. Keep the original comparison and every predicate;
 a missing test input does not justify changing or skipping the control. The failed run stays failed.
 
+
+## 0055 · Reinforcement offsets are game data; windows have no spawn authority (2026-10-08 UTC)
+
+Validate the whole pack and combined initial/scheduled roster before exposing a detached timeline.
+Reuse inferred simulation offsets without recasting them as verified historical hours. Stable
+arrival/notice order, combined budgets and pending-side counts are pure data. A stateless interval
+query can be repeated; the runtime caller must retain contiguous windows and bind exactly-once
+spawn, pool capacity, entry orders, objective rules and pause behavior in its own later contract.
+No historical army, saved cursor, renderer or runtime arrival is activated by this foundation.
 
 ## 0054 · Bound current ground before allocating a field (2026-10-07)
 

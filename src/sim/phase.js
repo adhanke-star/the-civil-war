@@ -3,6 +3,7 @@ import { equipmentProfile } from './equipment.js';
 import { DEPLOYMENT_LIMITS } from '../franchise/practice.js';
 import { FieldCaptures } from '../franchise/captures.js';
 import { VETERANCY } from '../reward/data.js';
+import { CLOCK_RATIO } from './combat.js';
 
 export const PHASE_LIMITS = Object.freeze({ bytes: 1024 * 1024, depth: 32 });
 const fail = message => { throw new Error('Phase: ' + message); };
@@ -218,4 +219,71 @@ export async function loadFieldScenario({ isCurrent = () => true, fetcher = glob
     await Promise.allSettled(cancellations);
     throw error;
   } finally { reader?.releaseLock(); }
+}
+
+// Ephemeral validation provenance, never a persisted cursor or strong-reference store.
+const reinforcementPlans = new WeakSet();
+function timelineUnit(unit) {
+  if (!Number.isSafeInteger(unit.men) || unit.men <= 0
+    || (unit.type === 'artillery' ? !Number.isSafeInteger(unit.guns) || unit.guns <= 0
+      : own(unit, 'guns') && unit.guns !== 0)
+    || (own(unit, 'xp') && (!Number.isInteger(unit.xp) || unit.xp < 1 || unit.xp > VETERANCY.length))
+    || (own(unit, 'morale') && (!finite(unit.morale) || unit.morale < 0 || unit.morale > 100))
+    || ['short', 'parent', 'notes', 'status'].some(key => own(unit, key) && typeof unit[key] !== 'string')
+    || (own(unit, 'regiments') && (!Array.isArray(unit.regiments) || !unit.regiments.every(r => typeof r === 'string')))
+    || (own(unit, 'commander') && unit.commander !== null && (!record(unit.commander) || !text(unit.commander.name)
+      || ['rank', 'portrait', 'portraitNote'].some(key => own(unit.commander, key) && typeof unit.commander[key] !== 'string')))) fail('reinforcement roster numbers or metadata are invalid.');
+}
+function timelineRows(value) {
+  const horizon = (clock(value.end) - clock(value.start)) * 60 / CLOCK_RATIO;
+  const rows = own(value, 'reinforcements') ? value.reinforcements : [];
+  if (!Array.isArray(rows)) fail('reinforcements must be an array.');
+  for (const row of rows) {
+    if (!record(row) || !finite(row.atSec) || row.atSec < 0 || row.atSec > horizon || !text(row.entry)
+      || (own(row, 'noticeSec') && (!finite(row.noticeSec) || row.noticeSec < 0 || row.noticeSec > row.atSec))) fail('reinforcement entry or phase offset is invalid.');
+  }
+  const roster = [...value.units, ...rows];
+  // Initial-only opening authority was already checked by preparePhase, before this union.
+  scenario({ ...value, units: roster });
+  for (const unit of roster) timelineUnit(unit);
+  const events = rows.map((unit, sourceIndex) => Object.freeze({ atSec: unit.atSec,
+    noticeAtSec: unit.atSec - (unit.noticeSec ?? 0), sourceIndex, unit }));
+  const arrival = events.slice().sort((a, b) => a.atSec - b.atSec || a.sourceIndex - b.sourceIndex);
+  const notices = events.slice().sort((a, b) => a.noticeAtSec - b.noticeAtSec || a.sourceIndex - b.sourceIndex);
+  const empty = () => ({ formations: 0, men: 0, guns: 0, figures: 0 });
+  const budget = { US: empty(), CS: empty(), total: empty() };
+  for (const unit of roster) for (const target of [budget[unit.side], budget.total]) {
+    target.formations++; target.men += unit.men; target.guns += unit.guns || 0;
+    target.figures += Math.round(unit.men / (unit.type === 'artillery' ? 4 : 5)) + 6;
+    if (!Object.values(target).every(Number.isSafeInteger)) fail('combined reinforcement budget is outside safe integer bounds.');
+  }
+  for (const row of Object.values(budget)) Object.freeze(row);
+  return { horizon, events: Object.freeze(arrival), notices: Object.freeze(notices), budget: Object.freeze(budget) };
+}
+
+/** Detached whole-pack timeline. Simulation offsets are game data, not verified historical hours. */
+export function prepareReinforcementTimeline(input, phaseId) {
+  const pack = snapshot(input), selected = preparePhase(pack, phaseId);
+  const timelines = pack.phases.map(phase => timelineRows(phase.scenario));
+  const plan = Object.freeze({ packId: selected.packId, phaseId: selected.phaseId,
+    index: selected.index, previousId: selected.previousId, nextId: selected.nextId,
+    scenario: pack.phases[selected.index].scenario, ...timelines[selected.index] });
+  reinforcementPlans.add(plan);
+  return plan;
+}
+
+/** Stateless interval query: callers must advance contiguous windows to avoid replaying arrivals. */
+export function reinforcementWindow(plan, input) {
+  if (!reinforcementPlans.has(plan)) fail('reinforcement timeline must be prepared in this session.');
+  const window = snapshot(input); shape(window, ['after', 'through'], 'reinforcement window');
+  if (!(window.after === null || finite(window.after) && window.after >= 0)
+    || !finite(window.through) || window.through < 0 || window.through > plan.horizon
+    || window.after !== null && window.after > window.through) fail('reinforcement window is outside its forward phase interval.');
+  const includes = at => (window.after === null || at > window.after) && at <= window.through;
+  const arrivals = plan.events.filter(event => includes(event.atSec));
+  const notices = plan.notices.filter(event => includes(event.noticeAtSec));
+  const pending = { US: 0, CS: 0 };
+  for (const event of plan.events) if (event.atSec > window.through) pending[event.unit.side]++;
+  return Object.freeze({ packId: plan.packId, phaseId: plan.phaseId, ...window,
+    arrivals: Object.freeze(arrivals), notices: Object.freeze(notices), pending: Object.freeze(pending) });
 }

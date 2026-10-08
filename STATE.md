@@ -16,4 +16,4 @@
 - **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
 - **Proof:** deployment21+21, named23+23/115/A126-B-A2, retained183+183/unit; native486/40axe/ALL138review; exactCI485/40axe/28logs/public4/source40.
 - **Coordination:** no ledger/competing writer; root sole writer; preserve workspace/Shiloh; no duplicate goal/scheduler.
-- **Current:** P3b32 CI37705593583 FAILED488/487PASS missingBASE4f; workflow-only5/source55r16 repair active/newCI516 pending. P3d56r2 serial48PASS/20+22 unintegrated; P3c/P2o preserved; no v1/device claim.
+- **Current:** P3b0a ACCEPTED CI37709240516/Pages37709240547:516/43/34logs/55source/9public+independentCLEAR. P3d56r3 serial48/20+22; owned8 integration/CI517 pending; P3e draft/P3c/P2o preserved/no v1 claim.
