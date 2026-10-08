@@ -284,7 +284,43 @@ export async function observeObjectiveReservation(page,{images=false,stem='objec
       const row=await page.evaluate(({caption,readSource,kind})=>{const read=(0,eval)('('+readSource+')');window.__game.hud.objective(kind==='appearance'?'':'Objective: hold.');const before=read();window.__game.hud.objective(caption);return{kind,caption,before,immediate:read()};},{caption,readSource:read.toString(),kind:index===0?'appearance':'wrap'});
       await page.waitForFunction(() => { const n=document.getElementById('objective'),b=document.getElementById('banner');return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--objective-h'))===n.getBoundingClientRect().height&&b.getBoundingClientRect().y>=n.getBoundingClientRect().bottom; });
       row.settled=await page.evaluate(readSource=>(0,eval)('('+readSource+')')(),read.toString());
-      if(images){const actual=await page.evaluate(readSource=>(0,eval)('('+readSource+')')(),read.toString()),top=Math.max(0,Math.floor(actual.objective.y)),bottom=Math.min(768,Math.ceil(actual.banner.bottom+4)),file='.out/'+stem+'-'+row.kind+'-'+Date.now()+'.png';assert(bottom>top);assert.equal(fs.realpathSync('.out'),fs.realpathSync('.')+'/.out');const png=await page.screenshot({type:'png',clip:{x:0,y:top,width:320,height:bottom-top}});assert(png.length<=512*1024);fs.writeFileSync(file,png,{flag:'wx'});pictures.push({name:row.kind,path:file,bytes:png.length,sha256:hash(png),width:320,height:bottom-top,actualAtImage:actual});}
+      if(images) {
+        let captureBefore,captureAfter,captureRestoration,png,clip,file;
+        try {
+          captureBefore=await page.evaluate(({caption,readSource})=>{
+            const {hud}=window.__game,original=hud.objective,descriptor=Object.getOwnPropertyDescriptor(hud,'objective'),calls=[];
+            const capture={original,descriptor,caption,calls,overflow:false};window.__objectiveImageCapture=capture;
+            Object.defineProperty(hud,'objective',{configurable:true,writable:true,value:function(...args){
+              if(calls.length<256)calls.push({requested:args[0],published:caption,receiverExact:this===hud});else capture.overflow=true;
+              return Reflect.apply(original,this,[caption,...args.slice(1)]);
+            }});
+            Reflect.apply(original,hud,[caption]);
+            return (0,eval)('('+readSource+')')();
+          },{caption,readSource:read.toString()});
+          assert.equal(captureBefore.caption,caption);assert.equal(captureBefore.cssHeight,captureBefore.objective.height);
+          assert(captureBefore.objective.y>=0&&captureBefore.banner.bottom+4<=768,'Complete objective and banner fit the viewport');
+          assert(captureBefore.banner.y>=captureBefore.objective.bottom);
+          for(const rect of [captureBefore.objective,captureBefore.banner])assert(rect.x>=0&&rect.right<=320);
+          assert.equal(captureBefore.width,320);assert.equal(captureBefore.paused,true);assert.equal(captureBefore.time,row.before.time);assert.equal(captureBefore.orders,row.before.orders);
+          clip={x:0,y:Math.floor(captureBefore.objective.y),width:320,height:Math.ceil(captureBefore.banner.bottom+4)-Math.floor(captureBefore.objective.y)};
+          assert(clip.height>0);assert.equal(fs.realpathSync('.out'),fs.realpathSync('.')+'/.out');
+          file='.out/'+stem+'-'+row.kind+'-'+Date.now()+'.png';png=await page.screenshot({type:'png',clip});
+          captureAfter=await page.evaluate(readSource=>(0,eval)('('+readSource+')')(),read.toString());
+          assert.deepEqual(captureAfter,captureBefore,'Fixture caption and measured geometry remain exact through screenshot');
+          assert(png.length<=512*1024);assert.equal(png.readUInt32BE(16),clip.width);assert.equal(png.readUInt32BE(20),clip.height);
+        } finally {
+          captureRestoration=await page.evaluate(()=>{
+            const c=window.__objectiveImageCapture;if(!c)return{installed:false};const {hud}=window.__game;
+            if(c.descriptor)Object.defineProperty(hud,'objective',c.descriptor);else delete hud.objective;
+            const out={installed:true,calls:c.calls,overflow:c.overflow,methodExact:hud.objective===c.original,ownDescriptorExact:c.descriptor?Reflect.ownKeys(c.descriptor).every(k=>Object.getOwnPropertyDescriptor(hud,'objective')[k]===c.descriptor[k]):!Object.prototype.hasOwnProperty.call(hud,'objective'),inheritedMethodRestored:!c.descriptor&&!Object.prototype.hasOwnProperty.call(hud,'objective')};
+            Reflect.apply(c.original,hud,[window.__objectiveReservation.caption]);delete window.__objectiveImageCapture;out.globalAbsent=!Object.prototype.hasOwnProperty.call(window,'__objectiveImageCapture');return out;
+          });
+        }
+        assert.equal(captureRestoration.installed,true);assert.equal(captureRestoration.overflow,false);
+        for(const key of ['methodExact','ownDescriptorExact','inheritedMethodRestored','globalAbsent'])assert.equal(captureRestoration[key],true,key);
+        assert(captureRestoration.calls.every(c=>c.published===caption&&c.receiverExact));
+        fs.writeFileSync(file,png,{flag:'wx'});pictures.push({name:row.kind,path:file,bytes:png.length,sha256:hash(png),width:clip.width,height:clip.height,scope:'Controlled fixture-caption illustration; original same-task acceptance precedes capture hook',actualAtImage:captureBefore,actualAfterImage:captureAfter,clip,captureRestoration});
+      }
       rows.push(row);
     }
   } finally {
