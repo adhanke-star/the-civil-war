@@ -1,5 +1,12 @@
 # PLAN — autonomous completion of v1 (Aaron, 2026-10-06; DECISIONS 0022)
 
+CURRENT P3f4 OBJECTIVE RESERVATION: sole writer root in /private/tmp/the-civil-war-p3f4-objective-reservation-20261008 at unaccepted269b6b0; comprehensive accepted baseline0246/533 remains. Actual fullCI37775915443 failed518/44axes on old narrow banner/objective overlap31.59375px. Passive diagnostic5adcbfe/37782357621 actual33PASS/2emptyaxes captured text insertion then CSS publication16ms later; original precise failure sequence untraced. Changed-text Hud.objective now synchronously measures/publishes objective height; native ResizeObserver retains viewport updates. SW34->35; appended two deliberate same-task regressions after unchanged12 reinforcementUI checks; no Game/CSS/default/harness/workflow/history change. Frozen3 source63/changed3locked60/owned7; measured local20figures within52cap,2units200men,no renderer. Actual delivered parent HUD A2 reproduces stale immediate heights; B8px separation in both states; independent source/B-A2/images CLEAR. Local68 serial PASS/unit21; root10actualPNG/readback CLEAR; CI549/547unique47axes46streams15public/full14actualPNGs/root-helper/native550/F5/v1 UNRUN. Preserve main protected11 with exact owned HUD inverse, all failed receipts and prior dirty roots; indexEMPTY. Continue after accepted green; no new goal/scheduler/spending/device checks.
+
+CURRENT P3f4 focus269b6b0 exactCI37775915443 FAILED actual518/517PASS/44emptyaxes: oldreinforcement narrow layout has banner/objective31.59375px overlap; exactraw8,912,354B SHA c2b5c715392590aa3ad0ef3dc286198e4ab0d2be1cb33db1b9f17879a232edc2 and rawlogCRC retained. Both newfocus2 and F4UI12 plus actualnormal/control semantic comparisons CLEAR as partial evidence only. AcceptedF3parent0246/533 remains authoritative; full547/root-helper/all3PNG acceptance UNRUN. Older parent narrow objective absent; source hypothesis unpublished objectiveheight UNPROVEN. Next bounded passive focused existing --reinforcement-ui diagnostic on Actions, preserve original reader/product/oracles/no added wait/nullguard/luckrerun. F5draft8 UNADOPTED/sourceblocked. Rootsolewriter/protected11 inverse exact/indexempty/allfailures+dirtyroots conserved; no native/v1 acceptance.
+
+
+CURRENT P3f4 focus candidate pushed 269b6b07bf504755e5cd39db07d8c19b0ce213cf (tree206caf6ab003431c20bafbdc96e551b0cbae5424). Exact CI37775915443 in progress; Pages37775915428 queued. Root/helper proposed7 and actualindex7/all63/60locked/protected11 inverse CLEAR, index empty after push. Local66 and controlled B/A2 passed; full547/47axes/46streams/15public/three actual PNG quartets/root-helper acceptance UNRUN. Accepted F3parent0246/533 remains authoritative. Next dependent F5 product source blocked until acceptance; readonly draft revision allowed. Preserve every failure and dirty root; no native/v1 acceptance.
+
 CURRENT P3f4 focus repair: 66/66 serial local gates passed (2026-10-08), including unit21, unchanged F4 result UI12+12, all source inverses, and controlled B/A2 with actual delivered HTTP body hashes. Original HUD replays stolen flag focus and cleared reopened trigger; repaired HUD preserves both. Root viewed eight actual local result/reward PNGs and verified normal/control semantic equality through the unchanged adopted reader; unchanged CSS and narrow scroll reach. Focus accessibility review CLEAR. Exact new CI547, 47 axes, 46 streams and all three cloud PNG quartets remain UNRUN; no spontaneous old-failure causality, native, F5 or v1 acceptance. Root sole writer; preserved main protected11 and all failed receipts.
 
 CURRENT P3f4 FOCUS REPAIR ACTIVE adopted2: rootsolewriter /private/tmp/the-civil-war-p3f4-focus-repair-20261008 HEAD4b40. Native-close controlled A proves newerflagfocus stolen->MenuEnterreopen->Tnull; settledcontrol properselection/attack. Both passiveCI51 and200 passed without spontaneousoldnull reproduction. Root-helper fullpolicy/scopeCLEAR; source63/owned7/local66/unit21/newCI547-545unique47axes46streams15public/native548 UNRUN. A2localonly retainedoriginalHUD bytes pre-importroute; Actions onlytwo positiveBcases. Existingold545predicates/current62-61-60subset/privateprojection/RNG/default/reward/geometry unchanged; mainprotected11+dirtyroots/failures conserved. Fullcriticalcontract appended below. F5draft3blocked untilactualaccepted547; v1UNRUN; continueautonomousloop.
@@ -3464,3 +3471,84 @@ Source inventory:
 - tools/test-keyboard-ui.mjs 14194B 5a9dfd35b4010098a9c354a3a48564ae14242c7a8cebce54f313dc5ee0ae88d6
 
 ADOPTED3 proof-strengthening amendment: local66 lasttwo commands are now node .out/p3f4-focus-native-close-r2-20261008.mjs B and node .out/p3f4-focus-native-close-r2-20261008.mjs A2 (each separate invocation). Retain r1 positive receipts; their request hash represented deliveredpayload, not independently read responsebody. r2 asserts actualHTTP response bytes/hash and actual oldclose->reopenedmodal trigger ownership in both local arms. Source63/product3/inverses/2CIpositivecases/54747axes46streams15public/owned7 unchanged. A2LOCALONLY; no Actions oldHUD/gitobject assumption. No luckrerun/no threshold/product change.
+
+
+### P3f4 objective reservation bounded execution contract (adopted 2026-10-08)
+
+CURRENT P3f4 OBJECTIVE RESERVATION: sole writer root in /private/tmp/the-civil-war-p3f4-objective-reservation-20261008 at unaccepted269b6b0; comprehensive accepted baseline0246/533 remains. Actual fullCI37775915443 failed518/44axes on old narrow banner/objective overlap31.59375px. Passive diagnostic5adcbfe/37782357621 actual33PASS/2emptyaxes captured text insertion then CSS publication16ms later; original precise failure sequence untraced. Changed-text Hud.objective now synchronously measures/publishes objective height; native ResizeObserver retains viewport updates. SW34->35; appended two deliberate same-task regressions after unchanged12 reinforcementUI checks; no Game/CSS/default/harness/workflow/history change. Frozen3 source63/changed3locked60/owned7; measured local20figures within52cap,2units200men,no renderer. Actual delivered parent HUD A2 reproduces stale immediate heights; B8px separation in both states; independent source/B-A2/images CLEAR. Local68 serial PASS/unit21; root10actualPNG/readback CLEAR; CI549/547unique47axes46streams15public/full14actualPNGs/root-helper/native550/F5/v1 UNRUN. Preserve main protected11 with exact owned HUD inverse, all failed receipts and prior dirty roots; indexEMPTY. Continue after accepted green; no new goal/scheduler/spending/device checks.
+
+Owned paths: src/ui/hud.js, tools/test-reinforcement-ui.mjs, sw.js, PLAN.md, HANDOFF.md, STATE.md, DECISIONS.md. Current full63/frozen3; exact reservation inverse to269 then virtual focus/F4/F3/F2 inverses, complete ordered62/61/60 arrays retained. Actual accepted533 name multiset +12F4 +2focus +2reservation =549. Old47 canonical axes,46 actual standalone streams and15public source bytes remain required. Immediate row accepted BEFORE native settled wait; separate control observes real publication. Restore original caption/method/clock/orders/scenario/RNG/global. Actual new2 images file/CRC/hash/dimensions/epoch plus all12 F4 images before acceptance. No next feature product source until accepted549; F5draft8 stays unadopted and must rebind565/563unique49axes50streams65sources17public/local75unit22 at fresh accepted parent. Fixed CI45min; no unmeasured timeout extension.
+
+Gate sequence (serial, fail retains receipt; local CPU/DOM only, heavy browser Actions):
+```sh
+node --check src/sim/phase.js
+node --check src/game.js
+node --check src/sim/combat.js
+node --check src/units/unit.js
+node --check tools/test-surrender-runtime.mjs
+node --check tools/test.mjs
+node --check sw.js
+node --check src/franchise/practice.js
+node --check tools/test-surrender-result.mjs
+node --check src/franchise/practice-ui.js
+node --check src/reward/sequence.js
+node --check tools/test-surrender-result-ui.mjs
+node .out/p3f4-reservation-source-inverses-r4-20261008.mjs
+node tools/test-surrender-runtime.mjs --verify-legacy-game
+git diff --check
+node tools/test-surrender-result.mjs
+node tools/test-surrender-result.mjs --prove-fail
+node tools/test-surrender-result-ui.mjs
+node tools/test-surrender-result-ui.mjs --prove-fail
+node tools/test-surrender-runtime.mjs
+node tools/test-surrender-runtime.mjs --prove-fail
+node tools/test-deployment.mjs
+node tools/test-deployment.mjs --prove-fail
+node tools/test-phase.mjs
+node tools/test-phase.mjs --prove-fail
+node tools/test-field-admission.mjs
+node tools/test-field-admission.mjs --prove-fail
+node tools/test-reinforcements.mjs
+node tools/test-reinforcements.mjs --prove-fail
+node tools/test-reinforcement-runtime.mjs
+node tools/test-reinforcement-runtime.mjs --prove-fail
+node tools/test-capture-accounting.mjs
+node tools/test-capture-accounting.mjs --prove-fail
+node tools/test-equipment.mjs
+node tools/test-equipment.mjs --prove-fail
+node tools/test-reward.mjs
+node tools/test-reward.mjs --prove-fail
+node tools/test-save.mjs
+node tools/test-save.mjs --prove-fail
+node tools/test-practice.mjs
+node tools/test-practice.mjs --prove-fail
+node tools/test-captures.mjs
+node tools/test-captures.mjs --prove-fail
+node tools/test-intro.mjs
+node tools/test-intro.mjs --prove-fail
+node tools/test-sandbox-rules.mjs
+node tools/test-sandbox-rules.mjs --prove-fail
+node tools/test-look.mjs
+node tools/test-look.mjs --prove-fail
+node tools/test-view.mjs
+node tools/test-view.mjs --prove-fail
+node tools/test-spacing.mjs
+node tools/test-spacing.mjs --prove-fail
+node tools/test-residency.mjs
+node tools/test-residency.mjs --prove-fail
+node tools/test-moments.mjs
+node tools/test-moments.mjs --prove-fail
+node tools/test-keyboard.mjs
+node tools/test-keyboard.mjs --prove-fail
+node tools/test-soldier-view.mjs
+node tools/test-soldier-view.mjs --prove-fail
+node tools/test.mjs --unit
+node --check src/ui/hud.js
+node --check tools/test-keyboard-ui.mjs
+node .out/p3f4-reservation-focus-native-close-r3-20261008.mjs B
+node .out/p3f4-reservation-focus-native-close-r3-20261008.mjs A2
+node .out/p3f4-reservation-native-objective-r4-20261008.mjs B
+node .out/p3f4-reservation-native-objective-r4-20261008.mjs A2
+```
+
+Integration: root/one read-only helper local68/source63/proposed7/protected11 inverse CLEAR; stage isolated7 blobs while conserving dirty main HUD WIP; actual index7/helper CLEAR; commit main then push; exactSHA CI/Pages success; once only node .out/p3f4-reservation-collect-completed-r1-20261008.mjs <CI> <SHA> <Pages>; node .out/p3f4-reservation-root-actual-readback-r1-20261008.mjs <CI> <SHA>; retain ranged ZIP/CRC original JSON/logs and inspect all14 producer PNGs/root-helper before acceptance. HALT on scope contradiction, unsafe ownership or failing gate without obvious bounded fix. Do not rerun unique collectors/producers or erase failures.

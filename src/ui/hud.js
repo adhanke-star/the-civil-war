@@ -595,7 +595,13 @@ export class Hud {
     while ($('toasts').children.length > 4) $('toasts').firstChild.remove();
   }
 
-  objective(text) { if ($('objective').textContent !== text) $('objective').textContent = text; }
+  objective(text) {
+    const objective = $('objective');
+    if (objective.textContent === text) return;
+    objective.textContent = text;
+    // Reserve new text in the same frame; ResizeObserver retains viewport-driven updates.
+    document.documentElement.style.setProperty('--objective-h', objective.getBoundingClientRect().height + 'px');
+  }
 
   result(title, text) {
     $('result-title').textContent = title;

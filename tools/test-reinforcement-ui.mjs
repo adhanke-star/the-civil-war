@@ -256,7 +256,45 @@ export async function reinforcementUIControls({browser,url,check,shot,result,nat
     const fresh=await state(page);save('density-and-restart',{...record.density,freshZeroIds:fresh.ids,freshSpawns:fresh.spawns});
     await page.locator('#banner-fly').focus();await page.keyboard.press('Enter');await settle(page);
     const narrow=await readable(page,320);record.narrowAxe=narrow.violations;save('narrow-readable-keyboard',narrow);await shot(page,'reinforcement-readable-narrow');
+    await objectiveReservationControls(page,result,check);
   });
   assert.deepEqual(record.errors,[],'ordinary candidate errors');assert.deepEqual(record.warnings,[],'ordinary candidate warnings, including driver warnings');assert.equal(record.restores.length,3);
   record.controls=readerControls(record.records);assert.equal(record.controls.length,12);record.ok=true;
+}
+
+// Deliberate UI-method regressions after the original real-field reader. No Game state or timing edits.
+export const OBJECTIVE_RESERVATION_NAMES = Object.freeze(['reinforcement-objective-reserve-on-appearance','reinforcement-objective-reserve-on-wrap']);
+export function verifyObjectiveReservation(index,row) {
+  const prefix=OBJECTIVE_RESERVATION_NAMES[index]+': ',eq=(a,b)=>assert.deepEqual(a,b,prefix);
+  eq(row.kind,index===0?'appearance':'wrap');eq(row.immediate.caption,row.caption);eq(row.immediate.cssHeight,row.immediate.objective.height);
+  assert.ok(row.immediate.objective.height>row.before.objective.height,prefix+' actual text height grows');
+  assert.ok(row.immediate.banner.y>=row.immediate.objective.bottom,prefix+' same-task objective/banner separation');
+  eq(row.immediate.width,320);eq(row.immediate.paused,true);eq(row.immediate.time,row.before.time);eq(row.immediate.orders,row.before.orders);
+  eq(row.settled.cssHeight,row.settled.objective.height);assert.ok(row.settled.banner.y>=row.settled.objective.bottom,prefix+' native settled separation');
+}
+export async function observeObjectiveReservation(page,{images=false,stem='objective-reservation'}={}) {
+  assert.match(stem,/^[a-z0-9-]+$/);const rows=[],pictures=[];
+  const original=await page.evaluate(()=>{const {game,hud}=window.__game,n=document.getElementById('objective');window.__objectiveReservation={caption:n.textContent,method:hud.objective,time:game.simTime,orders:game.orders||0,scenario:game.scenario,rng:[game.rnd,game.combat.rnd,...game.units.map(u=>u.rnd)]};hud.objective('');return{caption:window.__objectiveReservation.caption,time:game.simTime,orders:game.orders||0};});
+  const read=()=>{const rect=n=>{const r=n.getBoundingClientRect();return{x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom};},g=window.__game.game;return{caption:document.getElementById('objective').textContent,cssHeight:parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--objective-h')),objective:rect(document.getElementById('objective')),banner:rect(document.getElementById('banner')),width:innerWidth,time:g.simTime,paused:g.paused,orders:g.orders||0};};
+  let restoration;
+  try {
+    // Let the deliberately emptied diagnostic caption settle; acceptance is the later SAME-TASK read.
+    await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+    for(const [index,caption] of ['Objective: hold.','Objective: take Fictional point. Nobody holds it.'].entries()) {
+      const row=await page.evaluate(({caption,readSource,kind})=>{const read=(0,eval)('('+readSource+')');window.__game.hud.objective(kind==='appearance'?'':'Objective: hold.');const before=read();window.__game.hud.objective(caption);return{kind,caption,before,immediate:read()};},{caption,readSource:read.toString(),kind:index===0?'appearance':'wrap'});
+      await page.waitForFunction(() => { const n=document.getElementById('objective'),b=document.getElementById('banner');return parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--objective-h'))===n.getBoundingClientRect().height&&b.getBoundingClientRect().y>=n.getBoundingClientRect().bottom; });
+      row.settled=await page.evaluate(readSource=>(0,eval)('('+readSource+')')(),read.toString());
+      if(images){const actual=await page.evaluate(readSource=>(0,eval)('('+readSource+')')(),read.toString()),top=Math.max(0,Math.floor(actual.objective.y)),bottom=Math.min(768,Math.ceil(actual.banner.bottom+4)),file='.out/'+stem+'-'+row.kind+'-'+Date.now()+'.png';assert(bottom>top);assert.equal(fs.realpathSync('.out'),fs.realpathSync('.')+'/.out');const png=await page.screenshot({type:'png',clip:{x:0,y:top,width:320,height:bottom-top}});assert(png.length<=512*1024);fs.writeFileSync(file,png,{flag:'wx'});pictures.push({name:row.kind,path:file,bytes:png.length,sha256:hash(png),width:320,height:bottom-top,actualAtImage:actual});}
+      rows.push(row);
+    }
+  } finally {
+    restoration=await page.evaluate(()=>{const w=window.__objectiveReservation,{game,hud}=window.__game;hud.objective(w.caption);const out={originalCaptionExact:document.getElementById('objective').textContent===w.caption,methodExact:hud.objective===w.method,clockExact:game.simTime===w.time,ordersExact:(game.orders||0)===w.orders,scenarioExact:game.scenario===w.scenario,rngRefsExact:w.rng.every((f,i)=>f===[game.rnd,game.combat.rnd,...game.units.map(u=>u.rnd)][i])};delete window.__objectiveReservation;out.globalAbsent=!Object.prototype.hasOwnProperty.call(window,'__objectiveReservation');return out;});
+  }
+  return{scope:'Deliberate native HUD method insertion/wrap after unchanged real-field reader; no Game preset or native-device claim',original,rows,images:pictures,restoration};
+}
+async function objectiveReservationControls(page,result,check) {
+  const actual=await observeObjectiveReservation(page,{images:true,stem:'objective-reservation-ci'});result.reinforcementReservation=actual;
+  for(let i=0;i<2;i++){verifyObjectiveReservation(i,actual.rows[i]);check(OBJECTIVE_RESERVATION_NAMES[i],true,'same-task measured objective height reserves the visible arrival banner; native settled control');}
+  for(const value of Object.values(actual.restoration))assert.equal(value,true);
+  actual.controls=actual.rows.map((row,index)=>{const bad=structuredClone(row);bad.immediate.cssHeight=index===0?0:bad.before.objective.height;let error;try{verifyObjectiveReservation(index,bad);}catch(e){error=e;}assert.equal(error?.code,'ERR_ASSERTION');assert(error.message.startsWith(OBJECTIVE_RESERVATION_NAMES[index]+': '));return{name:OBJECTIVE_RESERVATION_NAMES[index],kind:'semantic-reader',code:error.code,message:error.message};});
 }
