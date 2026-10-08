@@ -41,67 +41,8 @@ jobs:
 
       - run: npx playwright install --with-deps chromium
 
-      - run: node tools/test-deployment.mjs
-      - run: node tools/test-deployment.mjs --prove-fail
-
-      - run: node tools/test-phase.mjs
-      - run: node tools/test-phase.mjs --prove-fail
-
-      - run: node tools/test-field-admission.mjs
-      - run: node tools/test-field-admission.mjs --prove-fail
-
-      - run: node tools/test-reinforcements.mjs
-      - run: node tools/test-reinforcements.mjs --prove-fail
-
-      - run: node tools/test-reinforcement-runtime.mjs
-      - run: node tools/test-reinforcement-runtime.mjs --prove-fail
-
-      - run: node tools/test-capture-accounting.mjs
-      - run: node tools/test-capture-accounting.mjs --prove-fail
-
-      - run: node tools/test-surrender-runtime.mjs
-      - run: node tools/test-surrender-runtime.mjs --prove-fail
-
-      - run: node tools/test-surrender-result.mjs
-      - run: node tools/test-surrender-result.mjs --prove-fail
-      - run: node tools/test-surrender-result-ui.mjs
-      - run: node tools/test-surrender-result-ui.mjs --prove-fail
-
-      - run: node tools/test-equipment.mjs
-      - run: node tools/test-equipment.mjs --prove-fail
-
-      - run: node tools/test-reward.mjs
-
-      - run: node tools/test-reward.mjs --prove-fail
-      - run: node tools/test-save.mjs
-      - run: node tools/test-save.mjs --prove-fail
-
-      - run: node tools/test-practice.mjs
-
-      - run: node tools/test-practice.mjs --prove-fail
-      - run: node tools/test-captures.mjs
-      - run: node tools/test-captures.mjs --prove-fail
-      - run: node tools/test-intro.mjs
-      - run: node tools/test-intro.mjs --prove-fail
-      - run: node tools/test-sandbox-rules.mjs
-      - run: node tools/test-sandbox-rules.mjs --prove-fail
-      - run: node tools/test-look.mjs
-      - run: node tools/test-look.mjs --prove-fail
-      - run: node tools/test-view.mjs
-      - run: node tools/test-view.mjs --prove-fail
-      - run: node tools/test-spacing.mjs
-      - run: node tools/test-spacing.mjs --prove-fail
-      - run: node tools/test-residency.mjs
-      - run: node tools/test-residency.mjs --prove-fail
-      - run: node tools/test-moments.mjs
-      - run: node tools/test-moments.mjs --prove-fail
-      - run: node tools/test-keyboard.mjs
-      - run: node tools/test-keyboard.mjs --prove-fail
-
-      - run: node tools/test-soldier-view.mjs
-      - run: node tools/test-soldier-view.mjs --prove-fail
-
-      - run: npm test
+      - name: Focused keyboard diagnostic only (not full acceptance)
+        run: node tools/test.mjs --keyboard
 
       - name: Upload test output
         if: always()

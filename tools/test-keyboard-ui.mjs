@@ -17,6 +17,16 @@ export async function keyboardControls({ page, check, shot, result }) {
         order: { type: u.order.type, dest: u.order.dest, endFacing: u.order.endFacing, target: u.order.target?.id, goal: u.order.goal } })) };
   });
   const near = (a, b, eps = 0.1) => Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) < eps;
+  await page.evaluate(() => {
+    if (Object.prototype.hasOwnProperty.call(window, '__rootKeyboardDiag')) throw Error('Diagnostic owner already exists');
+    const rows = [], installed = []; let overflow = false, raf = null, last = '';
+    const state = () => { const { game, input, hud } = window.__game; return { at: performance.now(), focus: document.activeElement?.id || '', menuOpen: document.getElementById('menu').open, openDialogs:[...document.querySelectorAll('dialog[open]')].map(n=>n.id), fieldInert:document.querySelector('main')?.inert??null, menuTrigger:hud.menuTrigger?.id||null, selected: game.selected?.id || null, selectedUnit:game.selected?{id:game.selected.id,side:game.selected.side,alive:game.selected.alive,state:game.selected.state,type:game.selected.type,inRoster:game.units.includes(game.selected)}:null,playerSide:game.playerSide,controlBoth:game.controlBoth,over:game.over,selection: game.selection.map(u=>u.id), paused: game.paused, time: game.simTime, orders: game.orders || 0, target: input.targeting ? { mode: input.targeting.mode, enemy: input.targeting.enemy?.id || null } : null, enemies: game.units.filter(u=>u.side!==game.playerSide).map(u=>({id:u.id,alive:u.alive,state:u.state,men:u.men})) }; };
+    const record = (phase, ev = null) => { const x={seq:rows.length,phase,type:ev?.type||null,key:ev?.key||null,eventTarget:ev?.target?.id||null,repeat:ev?.repeat??null,modifiers:ev?{shift:ev.shiftKey??null,ctrl:ev.ctrlKey??null,alt:ev.altKey??null,meta:ev.metaKey??null}:null,detail:ev?.detail??null,defaultPrevented:ev?.defaultPrevented??null,cancelBubble:ev?.cancelBubble??null,trusted:ev?.isTrusted??null,...state()};if(rows.length<2048)rows.push(x);else overflow=true; };
+    for(const target of [document,window])for(const type of ['keydown','keyup','click','focusin','focusout','close','cancel','blur'])for(const capture of [true,false]){const fn=ev=>{record(capture?'capture':'bubble',ev);if(capture)queueMicrotask(()=>record('microtask',ev));};target.addEventListener(type,fn,capture);installed.push({target,type,fn,capture});}
+    const frame=()=>{const x=state(),fingerprint=JSON.stringify([x.focus,x.menuOpen,x.openDialogs,x.fieldInert,x.selected,x.selection,x.target]);if(fingerprint!==last){last=fingerprint;record('frame-change');}raf=requestAnimationFrame(frame);};raf=requestAnimationFrame(frame);
+    window.__rootKeyboardDiag={mark:name=>record(name),finish:()=>{record('finally');cancelAnimationFrame(raf);for(const{target,type,fn,capture}of installed)target.removeEventListener(type,fn,capture);const out={scope:'Passive observed native events only; timing may change; no cure or product acceptance',overflow,rows,counts:{listeners:installed.length,removeCalls:installed.length,maxRows:2048},methodReplacement:false,restorationScope:'Actual matched-reference removal calls and owned-global absence; native listener inactivity not independently stimulated'};delete window.__rootKeyboardDiag;out.ownedGlobalAbsent=!Object.prototype.hasOwnProperty.call(window,'__rootKeyboardDiag');return out;}};
+  });
+  try {
   const before = await read(); await select('Franklin'); const selected = await read();
   check('keyboard-native-flag-selection', selected.selected === 'franklin' && selected.orders === before.orders, 'Enter on a native flag selects without an order');
   await page.keyboard.press('b'); const begun = await read();
@@ -81,7 +91,8 @@ export async function keyboardControls({ page, check, shot, result }) {
   await page.locator('#menu-btn').focus(); await page.keyboard.press('Enter'); await page.keyboard.press('Escape');
   check('keyboard-native-menu-button-focus-return', (await read()).focus === 'menu-btn', 'button and key share the menu lifecycle');
 
-  await select('Franklin'); await page.keyboard.press('t'); await page.evaluate(async () => { window.__game.input.targeting.enemy.state = 'routing'; });
+  await page.evaluate(()=>window.__rootKeyboardDiag.mark('before-stale-select'));
+  await select('Franklin'); await page.evaluate(()=>window.__rootKeyboardDiag.mark('after-stale-select')); await page.keyboard.press('t'); await page.evaluate(()=>window.__rootKeyboardDiag.mark('after-stale-T')); await page.evaluate(async () => { window.__game.input.targeting.enemy.state = 'routing'; });
   await page.evaluate(async () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)))); const stale = await read();
   check('keyboard-native-stale-target-auto-cancel', !stale.target && stale.selected === 'franklin' && stale.orders === cancelStart.orders, 'render-time routed-target cancellation keeps selection and issues no order');
   await page.keyboard.press('b'); await page.keyboard.press('ArrowUp'); await page.evaluate(async () => window.dispatchEvent(new Event('blur')));
@@ -121,4 +132,8 @@ export async function keyboardControls({ page, check, shot, result }) {
   check('keyboard-progress-preserved', after.progress === before.progress && after.writes === before.writes, 'all actual keyboard orders/help/cancellation preserve exact saved progress and zero writes');
   result.keyboard = { before, marched, groupGhost, groupEnd, fired, rects, after };
   await page.setViewportSize({ width: 1280, height: 720 });
+  } finally {
+    result.keyboardMenuDiagnostic=await page.evaluate(()=>window.__rootKeyboardDiag.finish());
+    console.log('KEYBOARD_MENU_DIAGNOSTIC '+JSON.stringify(result.keyboardMenuDiagnostic));
+  }
 }
