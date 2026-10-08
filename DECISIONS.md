@@ -1,5 +1,11 @@
 # DECISIONS (newest first; one short entry each)
 
+0064 (2026-10-08): Result observation follows unchanged Game objective cadence (6.125 after capture6; 7.125 after captures[7,6]); record both timestamps. Root/helper actual correction, no forced terminal or timer/rule changes; adopted2 supersedes terminal-at6 only.
+
+## 0063 · Terminal surrender results use the original encounter
+
+Extend the existing practice outcome seam with a storage-free terminal projection. Bind the exact encounter before any activation check; use the private Game accounting and original live Unit labels, preserving exact prisoners, separate casualties, pending formations, physical gun condition/possession and existing saved rewards. No new Game import, ledger, loot/recrew authority or historical result. Full before-edit contract in PLAN/HANDOFF adopted from root+helper draft2; UI/fictional launch activation follows separately.
+
 ## 0062 · Opt-in surrender retains the original roster and casualty accounting (2026-10-08)
 
 P3f2 adopted before edits: existing Game/Combat/Unit owners, true-only descriptor-safe admission, symmetric current220m home corridor and uninterrupted6 simulation seconds. Preserve absent/false legacy hashes and source identities; Unit surrender returns exact remaining fractions without casualty RNG, removal or reserve refund. Atomic all-candidate accounting before Unit mutation/callbacks, source-order aggregate observations at one common time, gun condition distinct from possession. Source60/8changed52locks, owned12/serial53/24categories27intendedcontrols/fullCI532/public12; runtime/UI/history/reward/native claims require actual gates. F1 acceptance uses CRC-verified raw logs because gh2.91.0 silently truncates oversized lines; historical failed readbacks remain, runner stdout absence claim corrected.

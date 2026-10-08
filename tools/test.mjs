@@ -1422,6 +1422,22 @@ async function surrenderRuntimeModelUnit() {
   } catch (error) { check('surrender-runtime', false, error.message); }
 }
 
+async function surrenderResultModelUnit() {
+  try {
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const { stdout, stderr } = await promisify(execFile)(process.execPath,
+      [path.join(ROOT, 'tools/test-surrender-result.mjs')], { maxBuffer: 4 * 1024 * 1024 });
+    const lines = stdout.split('\n'), rows = lines.filter(line => line.startsWith('SURRENDER RESULT ACTUAL '));
+    if (rows.length !== 1 || stderr || !lines.includes('SURRENDER RESULT OK (12/12)')) throw new Error('Incomplete surrender result observations.');
+    const actual = JSON.parse(rows[0].slice('SURRENDER RESULT ACTUAL '.length));
+    result.surrenderResult = actual;
+    check('surrender-result', actual.categories.length === 12 && actual.controls.length === 12
+      && new Set(actual.categories.map(row => row.name)).size === 12 && actual.sources.length === 61 && actual.native === false,
+      '12 real Game CPU result categories and semantic reader controls; no new reward, UI, history or native authority');
+  } catch (error) { check('surrender-result', false, error.message); }
+}
+
 async function main() {
   await settingsUnit();
   await bakedUnit();
@@ -1432,6 +1448,7 @@ async function main() {
   await reinforcementRuntimeUnit();
   await captureAccountingModelUnit();
   await surrenderRuntimeModelUnit();
+  await surrenderResultModelUnit();
   await fs.mkdir(OUT_DIR, { recursive: true });
   const { server, url } = await startServer({ port: 0 });
   result.url = url;
@@ -1718,6 +1735,7 @@ if (process.argv.includes('--unit')) {
   await reinforcementRuntimeUnit();
   await captureAccountingModelUnit();
   await surrenderRuntimeModelUnit();
+  await surrenderResultModelUnit();
   try {
     await bakedUnit();
     await approvedPackUnit();

@@ -218,3 +218,72 @@ export function practiceOutcome({ game, scenario, mode, awardId, seed }) {
   return { ...before, captures, summary: { starting, surviving, losses: starting - surviving,
     guns: before.army.reduce((n, b) => n + (b.guns || 0), 0), title: scenario.title, why: game.result.why } };
 }
+
+/** Terminal, as-of prisoners and physical possession. This grants no loot or save authority. */
+export function surrenderOutcome({ game, scenario }) {
+  if (!game || !scenario || scenario !== game.scenario) fail('surrender result needs the exact encounter.');
+  const flag = Object.getOwnPropertyDescriptor(scenario, 'surrender');
+  if ((!flag && 'surrender' in scenario) || (flag && !('value' in flag))) fail('invalid surrender activation descriptor.');
+  if (!flag || flag.value === false) return null;
+  if (flag.value !== true) fail('invalid surrender activation value.');
+  if (game.over !== true || !['US', 'CS'].includes(game.result?.winner)) fail('surrender result needs a completed encounter.');
+  // The existing Game owner validates its original source definitions, roster and gun identities.
+  const observation = game.captureSnapshot();
+  const finite = n => Number.isFinite(n) && n >= 0;
+  const accounting = observation?.accounting;
+  if (!observation || !finite(observation.observedAtSec) || observation.observedAtSec !== game.simTime
+    || accounting?.through !== observation.observedAtSec || accounting.packId !== 'game' || accounting.phaseId !== 'battle'
+    || !Array.isArray(accounting.units) || accounting.units.length > 10
+    || !Array.isArray(observation.captures) || observation.captures.length > accounting.units.length) fail('invalid surrender observation.');
+  const fields = ['initialMen', 'presentMen', 'pendingMen', 'killedWounded', 'missingMen', 'capturedMen'];
+  const sides = {};
+  for (const side of ['US', 'CS']) {
+    const total = accounting.totals?.[side], opposite = side === 'US' ? 'CS' : 'US';
+    if (!total || fields.some(key => !finite(total[key]))
+      || !finite(accounting.totals?.[opposite]?.capturedBy?.[side])) fail('invalid surrender totals.');
+    sides[side] = { ...Object.fromEntries(fields.map(key => [key, total[key]])),
+      prisonersTaken: accounting.totals[opposite].capturedBy[side], gunsLost: 0, gunsTaken: 0, disabledGunsTaken: 0 };
+  }
+  if (sides.US.initialMen + sides.CS.initialMen > 14480) fail('surrender result exceeds the admitted men bound.');
+  const rows = new Map(), captures = new Map(), pieces = [];
+  for (const row of accounting.units) {
+    if (!row || typeof row.unitId !== 'string' || !row.unitId || [...row.unitId].length > 160
+      || rows.has(row.unitId) || !['US', 'CS'].includes(row.originSide) || !Array.isArray(row.guns)) fail('invalid surrender source row.');
+    rows.set(row.unitId, row);
+    for (const [index, gun] of row.guns.entries()) {
+      if (gun.unitId !== row.unitId || gun.gunIndex !== index || gun.originSide !== row.originSide
+        || !['US', 'CS'].includes(gun.ownerSide) || !['disabled', 'serviceable'].includes(gun.condition)
+        || typeof gun.arrived !== 'boolean' || !(gun.originWeapon === null || typeof gun.originWeapon === 'string')
+        || (!gun.arrived && gun.ownerSide !== gun.originSide)) fail('invalid surrender physical piece.');
+      pieces.push(gun);
+      if (gun.ownerSide !== gun.originSide) {
+        sides[gun.originSide].gunsLost++;
+        if (gun.arrived) {
+          sides[gun.ownerSide].gunsTaken++;
+          if (gun.condition === 'disabled') sides[gun.ownerSide].disabledGunsTaken++;
+        }
+      }
+    }
+  }
+  if (pieces.length > 24) fail('surrender result exceeds the admitted gun bound.');
+  for (const capture of observation.captures) {
+    const row = rows.get(capture.unitId);
+    if (!row || captures.has(capture.unitId) || !row.arrived || capture.originSide !== row.originSide
+      || capture.captorSide !== (row.originSide === 'US' ? 'CS' : 'US')
+      || !finite(capture.men) || capture.men === 0 || capture.men !== row.capturedMen
+      || !finite(capture.captureAtSec) || capture.captureAtSec > observation.observedAtSec
+      || JSON.stringify(capture.guns) !== JSON.stringify(row.guns)) fail('invalid committed surrender record.');
+    captures.set(capture.unitId, capture);
+  }
+  const formations = accounting.units.filter(row => captures.has(row.unitId)).map(row => {
+    const capture = captures.get(row.unitId), unit = game.units.find(u => u.id === row.unitId && u.side === row.originSide);
+    if (!unit || typeof unit.name !== 'string' || !unit.name || unit.name !== unit.def?.name) fail('surrender label needs its original live formation.');
+    return { unitId: row.unitId, label: unit.name, originSide: row.originSide, captorSide: capture.captorSide,
+      men: capture.men, captureAtSec: capture.captureAtSec,
+      guns: capture.guns.map(gun => ({ unitId: gun.unitId, gunIndex: gun.gunIndex, originSide: gun.originSide,
+        originWeapon: gun.originWeapon, ownerSide: gun.ownerSide, condition: gun.condition, arrived: gun.arrived })) };
+  });
+  const result = { observedAtSec: observation.observedAtSec, sides, formations };
+  if (bytes(result) > MAX_SAVE_BYTES) fail('surrender result exceeds the admitted byte bound.');
+  return frozen(result);
+}
