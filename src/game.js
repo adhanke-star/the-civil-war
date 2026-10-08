@@ -31,15 +31,55 @@ import { Ai } from './sim/ai.js';
 import { RULES } from './sim/rules.js';
 import { mulberry32, inWoods, PLAN } from './world/landscape.js';
 import { FieldCaptures } from './franchise/captures.js';
+import { prepareReinforcementTimeline, reinforcementWindow } from './sim/phase.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const MIN_MEN_PER_FIGURE = Math.min(...MEN_PER_FIGURE_OPTIONS); // pools are sized for the densest choice
 const SPAWN_RESERVE = 2100; // figures per side kept free for sandbox spawns (four 2,500-man brigades at 1:5)
 const ARC = (65 * Math.PI) / 180; // the firing arc each side of the facing (combat.js)
+// Ephemeral state belongs to a real scheduled Game; borrowed legacy methods have no entry.
+const reinforcementState = new WeakMap();
+const pendingInfantry = (game, side) => {
+  const state = reinforcementState.get(game);
+  return !!state && state.plan.events.some(e => e.atSec > state.cursor && e.unit.side === side
+    && (e.unit.type || 'infantry') === 'infantry');
+};
+
+function dispatchReinforcements(game, state, through) {
+  const window = reinforcementWindow(state.plan, { after: state.cursor, through });
+  state.cursor = through; // Commit ownership before invoking listeners, including a repeated initialization.
+  const events = [...window.notices.map(e => ({ e, time: e.noticeAtSec, notice: true })),
+    ...window.arrivals.map(e => ({ e, time: e.atSec, notice: false }))];
+  events.sort((a, b) => a.time - b.time || Number(b.notice) - Number(a.notice) || a.e.sourceIndex - b.e.sourceIndex);
+  const arrived = [];
+  for (const { e, notice } of events) {
+    if (game.over) break;
+    const name = e.unit.short || e.unit.name;
+    if (notice) game.event(`${name} is approaching ${e.unit.entry}.`, null, 'reinforcement-notice', e.unit);
+    else {
+      const unit = game.makeUnit(e.unit, 100 + state.initialCount + e.sourceIndex);
+      unit.order = unit.side === game.playerSide ? { type: 'hold' } : { type: 'hold', firm: true };
+      game.units.push(unit);
+      game.emit('spawn', unit);
+      game.event(`${name} arrives at ${e.unit.entry}.`, unit, 'reinforcement');
+      arrived.push(unit);
+    }
+  }
+  if (arrived.length && !game.over) game.alert(`${arrived.map(u => u.short).join(', ')} arrived.`, arrived[0].x, arrived[0].z);
+}
+
+function scheduledReady(game, state) {
+  if (!state.initialized) throw new Error('Reinforcements: attach listeners and initialize before advancing the battle.');
+}
 
 export class Game {
   constructor({ scene, terrain, scenario, world, effects, playerSide = 'US' }) {
+    // This validates structure, not hardware admission: routed definitions pass the field guard upstream.
+    const timeline = 'reinforcements' in scenario ? prepareReinforcementTimeline({ version: 1,
+      id: 'game', title: 'Battle runtime', phases: [{ id: 'battle', scenario }] }, 'battle') : null;
+    if (timeline?.events.length) reinforcementState.set(this, { plan: timeline, cursor: null,
+      initialized: false, initialCount: scenario.units.length });
     this.scene = scene;
     this.terrain = terrain;
     this.scenario = scenario;
@@ -57,10 +97,11 @@ export class Game {
     this.spawned = { US: 0, CS: 0 };
 
     const defs = scenario.units;
+    const poolDefs = timeline?.events.length ? [...defs, ...timeline.events.map(e => e.unit)] : defs;
     // figures per side at the densest look.menPerFigure (5 men; 4 per crew figure in a battery), plus an
     // officer and slack
     setMenPerFigure(LOOK.menPerFigure);
-    const figs = (side) => defs.filter((d) => d.side === side).reduce((s, d) => s + Math.round(d.men / (d.type === 'artillery' ? MEN_PER_CREW_FIGURE : MIN_MEN_PER_FIGURE)) + 6, 0);
+    const figs = (side) => poolDefs.filter((d) => d.side === side).reduce((s, d) => s + Math.round(d.men / (d.type === 'artillery' ? MEN_PER_CREW_FIGURE : MIN_MEN_PER_FIGURE)) + 6, 0);
     const outline = !/\boutline=0\b/.test(globalThis.location ? location.search : '');
     this.reserve = { US: SPAWN_RESERVE, CS: SPAWN_RESERVE };
     const cap = (side) => figs(side) + SPAWN_RESERVE;
@@ -80,8 +121,8 @@ export class Game {
     };
     this.baked = { state: 'idle', atlas: null, error: null }; // idle | loading | ready | failed
     scene.add(this.impostors.US.mesh, this.impostors.CS.mesh);
-    this.horses = new HorsePool(defs.length + 2);
-    const gunsOf = (side) => defs.filter((d) => d.side === side).reduce((s, d) => s + (d.guns || 0), 0);
+    this.horses = new HorsePool(poolDefs.length + 2);
+    const gunsOf = (side) => poolDefs.filter((d) => d.side === side).reduce((s, d) => s + (d.guns || 0), 0);
     this.gunPool = new GunPool({ US: gunsOf('US'), CS: gunsOf('CS') });
     for (const p of [this.pools.US, this.pools.CS, this.fallen.US, this.fallen.CS, this.halos, this.horses]) scene.add(p.mesh);
     scene.add(...this.gunPool.meshes);
@@ -199,6 +240,14 @@ export class Game {
 
   on(ev, fn) { this.listeners[ev].push(fn); }
   emit(ev, ...a) { for (const fn of this.listeners[ev]) fn(...a); }
+
+  /** Call once after all field listeners are attached. Empty schedules preserve the legacy path. */
+  initializeReinforcements() {
+    const state = reinforcementState.get(this);
+    if (!state || state.initialized || this.over) return;
+    state.initialized = true;
+    dispatchReinforcements(this, state, 0);
+  }
 
   /** May the player order this unit? (His own side; the other side too with units.controlBothSides.) */
   controls(u) {
@@ -433,6 +482,19 @@ export class Game {
   // ---------------------------------------------------------------------------------------------------
   /** Advance the simulation by real seconds dt (scaled by speed and rules.battleSpeed, in fixed sub-steps). */
   step(dt) {
+    const state = reinforcementState.get(this);
+    if (state) {
+      if (this.over || this.paused) return 0;
+      scheduledReady(this, state);
+      let remaining = Math.min(0.25, dt) * this.speed * RULES.battleSpeed;
+      const before = this.simTime;
+      while (remaining > 0 && !this.paused && !this.over) {
+        const h = Math.min(0.05, remaining);
+        remaining -= h;
+        this.tick(h);
+      }
+      return this.simTime - before;
+    }
     if (this.paused) return 0;
     let simDt = Math.min(0.25, dt) * this.speed * RULES.battleSpeed;
     let out = 0;
@@ -446,7 +508,18 @@ export class Game {
   }
 
   tick(h) {
+    const state = reinforcementState.get(this);
+    if (state) {
+      if (this.over) return;
+      scheduledReady(this, state);
+      if (!Number.isFinite(h) || h < 0) throw new Error('Reinforcements: simulation delta must be finite and nonnegative.');
+      h = Math.min(h, Math.max(0, state.plan.horizon - this.simTime));
+      this.simTime = Math.min(state.plan.horizon, this.simTime + h);
+      dispatchReinforcements(this, state, this.simTime);
+      if (h === 0) { this.checkObjective(0, this.simTime === state.plan.horizon); return; }
+    } else {
     this.simTime += h;
+    }
     this.entities.update(h);
     for (const u of this.units) {
       if (!u.alive) continue;
@@ -472,7 +545,7 @@ export class Game {
       this.event(`${e.side === this.playerSide ? 'Your troops' : 'The enemy'} ${e.previous ? 'retake' : 'capture'} ${e.name}.`,
         null, 'capture', e);
     }
-    this.checkObjective(h);
+    this.checkObjective(h, !!state && this.simTime === state.plan.horizon);
   }
 
   /** A line for the event feed (clock time, sentence, where). */
@@ -489,9 +562,9 @@ export class Game {
   }
 
   /** Henry House Hill: who holds the plateau? Union wins by holding it at the end, or by breaking the defence. */
-  checkObjective(h) {
+  checkObjective(h, force = false) {
     this.objT = (this.objT || 0) - h;
-    if (this.objT > 0) return;
+    if (this.objT > 0 && !force) return;
     this.objT = 1;
     const o = this.objective;
     const strength = { US: 0, CS: 0 };
@@ -515,11 +588,11 @@ export class Game {
     const t = this.clockStart + this.simTime * CLOCK_RATIO;
     let result = null;
     if (this.scenario.practiceIntro) {
-      if (effective('US') === 0 || this.holder !== 'US') result = { winner: 'CS' };
-      else if (effective('CS') === 0 || t >= this.clockEnd) result = { winner: 'US' };
+      if (effective('US') === 0 && !pendingInfantry(this, 'US') || this.holder !== 'US') result = { winner: 'CS' };
+      else if (effective('CS') === 0 && !pendingInfantry(this, 'CS') || t >= this.clockEnd) result = { winner: 'US' };
     }
-    else if (effective('CS') === 0) result = { winner: 'US', why: 'The Confederate line on Henry House Hill has broken.' };
-    else if (effective('US') === 0) result = { winner: 'CS', why: 'Every Union brigade is in retreat.' };
+    else if (effective('CS') === 0 && !pendingInfantry(this, 'CS')) result = { winner: 'US', why: 'The Confederate line on Henry House Hill has broken.' };
+    else if (effective('US') === 0 && !pendingInfantry(this, 'US')) result = { winner: 'CS', why: 'Every Union brigade is in retreat.' };
     else if (t >= this.clockEnd) {
       result = this.holder === 'US'
         ? { winner: 'US', why: 'Union troops hold Henry House Hill at nightfall.' }
@@ -594,6 +667,22 @@ export class Game {
 
   /** Test/fast-forward hook: advance sim seconds without rendering, then stand every man in his slot. */
   fastForward(seconds) {
+    const state = reinforcementState.get(this);
+    if (state) {
+      if (this.over || this.paused) return this.simTime;
+      scheduledReady(this, state);
+      if (!Number.isFinite(seconds) || seconds < 0) throw new Error('Reinforcements: fast-forward time must be finite and nonnegative.');
+      let remaining = seconds;
+      while (remaining > 0 && !this.over && !this.paused) {
+        const h = Math.min(0.05, remaining);
+        this.tick(h);
+        remaining -= h;
+      }
+      if (this.over || this.paused) return this.simTime;
+      for (const u of this.units) u.snapFigures();
+      this.animate(0.05);
+      return this.simTime;
+    }
     const n = Math.ceil(seconds / 0.05);
     for (let i = 0; i < n; i++) this.tick(0.05);
     for (const u of this.units) u.snapFigures();

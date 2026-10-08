@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+### 0058 · Scheduled units use the existing Game owner
+Reserve initial plus all authored arrivals before allocation; dispatch through real Unit/Battery, shared Combat/AI units and existing spawn/event/alert listeners. Keep a private per-Game cursor, explicit post-listener initialization, legacy scenario/initial-definition/RNG identities and no-schedule behavior. Force the scheduled horizon result after its arrivals even during auto-pause. Upstream field admission retains unchanged current limits; timeline validation is not hardware admission. P3e1 is CPU engine foundation only; main/HUD activation and native UI proof follow separately.
+
+
 ## 0057 · Read setup commands independently of runner display headers (2026-10-08 UTC)
 
 GitHub Run group labels repeat the first command. Read the actual ordered command rows after

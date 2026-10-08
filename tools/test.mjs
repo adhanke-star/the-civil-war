@@ -1377,6 +1377,24 @@ async function reinforcementModelUnit() {
   catch (error) { check('reinforcements-model', false, error.message); }
 }
 
+async function reinforcementRuntimeUnit() {
+  try {
+    // Keep the real Game's settings registrations and fixture callbacks out of this process.
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const { stdout, stderr } = await promisify(execFile)(process.execPath,
+      [path.join(ROOT, 'tools/test-reinforcement-runtime.mjs')], { maxBuffer: 4 * 1024 * 1024 });
+    const lines = stdout.split('\n');
+    const rows = lines.filter(line => line.startsWith('RUNTIME ACTUAL '));
+    if (rows.length !== 1 || stderr || !lines.includes('REINFORCEMENT RUNTIME OK (20/20)')) throw new Error('Incomplete real Game runtime observations.');
+    const actual = JSON.parse(rows[0].slice('RUNTIME ACTUAL '.length));
+    result.reinforcementRuntime = actual;
+    check('reinforcements-runtime', actual.categories.length === 20
+      && new Set(actual.categories.map(row => row.category)).size === 20 && actual.native === false,
+    '20 actual real Game CPU categories, fixed pre-edit legacy oracle; native/UI activation unrun');
+  } catch (error) { check('reinforcements-runtime', false, error.message); }
+}
+
 async function main() {
   await settingsUnit();
   await bakedUnit();
@@ -1384,6 +1402,7 @@ async function main() {
   await phaseModelUnit();
   await fieldAdmissionModelUnit();
   await reinforcementModelUnit();
+  await reinforcementRuntimeUnit();
   await fs.mkdir(OUT_DIR, { recursive: true });
   const { server, url } = await startServer({ port: 0 });
   result.url = url;
@@ -1665,6 +1684,7 @@ if (process.argv.includes('--unit')) {
   await phaseModelUnit();
   await fieldAdmissionModelUnit();
   await reinforcementModelUnit();
+  await reinforcementRuntimeUnit();
   try {
     await bakedUnit();
     await approvedPackUnit();

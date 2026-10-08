@@ -166,8 +166,11 @@ export function prepareFieldScenario(input, routeId) {
   }
   if (own(value, 'ai') && (!record(value.ai) || (own(value.ai, 'chargeReach') && (!finite(value.ai.chargeReach) || value.ai.chargeReach <= 0)))) fieldFail('AI definition is invalid.');
   if (own(value, 'crates')) new FieldCaptures(value.crates);
+  // Validate the initial-only opening before checking the complete future roster.
+  if ('reinforcements' in value) timelineRows(value);
+  const roster = [...value.units, ...(value.reinforcements || [])];
   let men = 0, guns = 0, figures = 0;
-  for (const unit of value.units) {
+  for (const unit of roster) {
     if (!Number.isSafeInteger(unit.men) || unit.men <= 0 || (own(unit, 'guns') && !integer(unit.guns))
       || !coordinate(unit.x) || !coordinate(unit.z)
       || (own(unit, 'xp') && (!Number.isInteger(unit.xp) || unit.xp < 1 || unit.xp > VETERANCY.length))
@@ -179,7 +182,7 @@ export function prepareFieldScenario(input, routeId) {
     men += unit.men; guns += unit.guns || 0;
     figures += Math.max(1, Math.round(unit.men / (unit.type === 'artillery' ? 4 : 5))) + 6;
   }
-  if (value.units.length > FIELD_LIMITS.formations || men > FIELD_LIMITS.men || guns > FIELD_LIMITS.guns || figures > FIELD_LIMITS.figures) fieldFail('the whole current field exceeds its input bounds.');
+  if (roster.length > FIELD_LIMITS.formations || men > FIELD_LIMITS.men || guns > FIELD_LIMITS.guns || figures > FIELD_LIMITS.figures) fieldFail('the whole current field exceeds its input bounds.');
   if (!coordinate(value.objective.x) || !coordinate(value.objective.z) || value.objective.r > FIELD_LIMITS.coordinate
     || value.opening?.some(o => o.points.some(p => !p.every(coordinate)))) fieldFail('objective or opening is outside current ground bounds.');
   return value;
