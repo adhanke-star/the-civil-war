@@ -66,6 +66,9 @@ function scenario(value) {
   if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value.date) fail('date is invalid.');
   if (clock(value.end) <= clock(value.start)) fail('scenario needs a positive same-day clock window.');
   if (!Array.isArray(value.units) || !value.units.length) fail('scenario needs a roster.');
+  if ('batteryOverrun' in value && !own(value, 'batteryOverrun')) fail('battery overrun activation must be own data.');
+  if (own(value, 'batteryOverrun') && typeof value.batteryOverrun !== 'boolean') fail('battery overrun activation must be boolean.');
+  if (own(value, 'batteryOverrun') && value.batteryOverrun === true && (!own(value, 'surrender') || value.surrender !== true)) fail('battery overrun needs true surrender activation.');
   if (own(value, 'surrender') && typeof value.surrender !== 'boolean') fail('surrender activation must be boolean.');
   if (value.surrender === true && value.units.some(unit => !text(unit?.id) || [...unit.id].length > FIELD_LIMITS.labelText)) fail('surrender source identity exceeds current text bounds.');
   const ids = new Set();

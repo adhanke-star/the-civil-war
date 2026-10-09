@@ -39,7 +39,11 @@ const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 export class Combat {
-  constructor({ units, terrain, coverAt, fallen, fx, rnd, autoHaltSides = ['CS'] }) {
+  #batteryContact = null;
+  #stepDepth = 0;
+  constructor({ units, terrain, coverAt, fallen, fx, rnd, autoHaltSides = ['CS'], onBatteryContact = null }) {
+    if (onBatteryContact !== null && typeof onBatteryContact !== 'function') throw new Error('Combat: battery contact callback must be a function or null.');
+    this.#batteryContact = onBatteryContact;
     // `units` is the game's own array: spawns and removals change it in place, so this sees them.
     this.autoHalt = new Set(autoHaltSides);
     this.units = units;
@@ -109,6 +113,8 @@ export class Combat {
   }
 
   step(dt, time) {
+    this.#stepDepth++;
+    try {
     this.targetT -= dt;
     if (this.targetT <= 0) {
       this.targetT = 0.5;
@@ -124,12 +130,13 @@ export class Combat {
       if (!u.alive) continue;
       this.fireStep(u, dt, time);
     }
-    this.meleeStep(dt, time);
+    this.meleeStep(dt, time, this.#stepDepth === 1 ? this.#batteryContact : null);
     for (const u of this.units) {
       if (!u.alive) continue;
       this.moraleStep(u, dt);
       this.fatigueStep(u, dt);
     }
+    } finally { this.#stepDepth--; }
   }
 
   fireStep(u, dt, time) {
@@ -217,7 +224,7 @@ export class Combat {
     }
   }
 
-  meleeStep(dt, time) {
+  meleeStep(dt, time, onBatteryContact = null) {
     for (const u of this.units) u.melee = false;
     const done = new Set();
     for (const a of this.units) {
@@ -233,6 +240,7 @@ export class Combat {
         if (fwd > MELEE_RANGE + b.depth || fwd < -MELEE_RANGE || lat > a.halfFront + b.halfFront) continue;
         done.add(key);
         a.melee = b.melee = true;
+        if (a.type === 'infantry' && b.type === 'artillery') onBatteryContact?.(a, b);
         a.stop();
         const armA = a.type === 'artillery' ? 0.35 : 1;
         const armB = b.type === 'artillery' ? 0.35 : 1;

@@ -53,6 +53,16 @@ jobs:
           git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/units/battery.js
           git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/game.js
 
+      - name: Fetch pinned battery-overrun comparison
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags --depth=1 origin 0e505fd61dead1f95659eaa2f8652f31935a50bc
+          test "$(git rev-parse FETCH_HEAD)" = "0e505fd61dead1f95659eaa2f8652f31935a50bc"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/game.js
+          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/combat.js
+          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/phase.js
+
       - uses: actions/setup-node@v4
         with:
           node-version: lts/*
@@ -137,6 +147,16 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/units/battery.js
           git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/game.js
+
+      - name: Fetch pinned probe battery-overrun comparison
+        run: |
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git fetch --no-tags --depth=1 origin 0e505fd61dead1f95659eaa2f8652f31935a50bc
+          test "$(git rev-parse FETCH_HEAD)" = "0e505fd61dead1f95659eaa2f8652f31935a50bc"
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/game.js
+          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/combat.js
+          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/phase.js
 
       - name: Set up probe Node
         uses: actions/setup-node@v4
@@ -229,6 +249,8 @@ jobs:
 
       - run: node tools/test-captured-guns.mjs
       - run: node tools/test-captured-guns.mjs --prove-fail
+      - run: node tools/test-battery-overrun.mjs
+      - run: node tools/test-battery-overrun.mjs --prove-fail
 
       - name: Upload probe output
         if: always()

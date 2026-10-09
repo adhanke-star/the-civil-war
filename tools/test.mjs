@@ -1475,6 +1475,20 @@ async function capturedGunsModelUnit() {
   } catch (error) { check('captured-guns-model', false, error.message); }
 }
 
+async function batteryOverrunModelUnit() {
+  try {
+    const { execFileSync } = await import('node:child_process');
+    const text = execFileSync(process.execPath, [path.join(ROOT, 'tools/test-battery-overrun.mjs')], { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
+    const lines = text.trimEnd().split('\n'), rows = lines.filter(l => l.startsWith('BATTERY OVERRUN ACTUAL '));
+    if (rows.length !== 1 || !lines.includes('BATTERY OVERRUN OK (14/14)')) throw new Error('Incomplete battery overrun proof.');
+    const actual = JSON.parse(rows[0].slice('BATTERY OVERRUN ACTUAL '.length));
+    const { verifyBatteryOverrunRecord } = await import('./test-battery-overrun.mjs');
+    await verifyBatteryOverrunRecord(actual);
+    result.batteryOverrun = actual;
+    check('battery-overrun-model', true, '14 actual CPU categories and 14 own controls; full source67, exact default A/B/A2');
+  } catch (error) { check('battery-overrun-model', false, error.message); }
+}
+
 async function main() {
   await settingsUnit();
   await bakedUnit();
@@ -1488,6 +1502,7 @@ async function main() {
   await surrenderResultModelUnit();
   await activationModelUnit();
   await capturedGunsModelUnit();
+  await batteryOverrunModelUnit();
   await fs.mkdir(OUT_DIR, { recursive: true });
   const { server, url } = await startServer({ port: 0 });
   result.url = url;
@@ -1782,6 +1797,7 @@ if (process.argv.includes('--unit')) {
   await surrenderResultModelUnit();
   await activationModelUnit(true);
   await capturedGunsModelUnit();
+  await batteryOverrunModelUnit();
   try {
     await bakedUnit();
     await approvedPackUnit();

@@ -174,15 +174,25 @@ function captureCorridors(game) {
   return blocked;
 }
 
-function commitSurrenders(game, state, before, h) {
+function commitSurrenders(game, state, before, h, contacts = null) {
   const capture = state.capture, after = captureCorridors(game), timers = new Map(), proposed = new Map(capture.records), due = [];
+  const overruns = new Map();
+  if (contacts) for (const source of capture.sources) {
+    const attacker = source.unit;
+    if (!attacker?.alive || attacker.state !== 'steady') continue;
+    for (const [contactAttacker, battery] of contacts) {
+      if (contactAttacker === attacker && battery.alive && battery.state === 'routing'
+        && battery.side !== attacker.side && !overruns.has(battery)) overruns.set(battery, attacker);
+    }
+  }
   for (const s of capture.sources) {
     const u = s.unit;
     if (!u || capture.records.has(s.def.id)) continue;
     const elapsed = before.has(u) && after.has(u) ? (capture.timers.get(u) || 0) + h : 0;
-    timers.set(u, elapsed);
-    if (elapsed >= 6 && u.alive && u.state === 'routing') {
-      const captor = after.get(u);
+    const overrunCaptor = overruns.get(u);
+    timers.set(u, overrunCaptor ? 0 : elapsed);
+    if ((overrunCaptor || elapsed >= 6) && u.alive && u.state === 'routing') {
+      const captor = overrunCaptor || after.get(u);
       if (!captor) continue;
       proposed.set(s.def.id, { men: u.men, killedWounded: s.def.men - u.men,
         captorSide: captor.side, captureAtSec: game.simTime, gunConditions: (u.gunSlots || []).map(g => g.alive) });
@@ -238,13 +248,15 @@ function scheduledReady(game, state) {
 export class Game {
   constructor({ scene, terrain, scenario, world, effects, playerSide = 'US' }) {
     // This validates structure, not hardware admission: routed definitions pass the field guard upstream.
-    const timeline = 'reinforcements' in scenario || 'surrender' in scenario ? prepareReinforcementTimeline({ version: 1,
+    const timeline = 'reinforcements' in scenario || 'surrender' in scenario || 'batteryOverrun' in scenario ? prepareReinforcementTimeline({ version: 1,
       id: 'game', title: 'Battle runtime', phases: [{ id: 'battle', scenario }] }, 'battle') : null;
     const surrender = timeline?.scenario.surrender === true;
+    const overrun = timeline?.scenario.batteryOverrun === true;
     if (surrender) captureAccounting(timeline, { through: 0, events: [] });
     if (timeline?.events.length || surrender) reinforcementState.set(this, { plan: timeline, cursor: null,
       initialized: false, initialCount: scenario.units.length, ...(surrender ? { capture: { sources: captureSources(timeline),
-        records: new Map(), timers: new Map(), pre: new Map(), dispatching: false } } : {}) });
+        records: new Map(), timers: new Map(), pre: new Map(), dispatching: false,
+        overrun, contacts: null, tickActive: false } } : {}) });
     this.scene = scene;
     this.terrain = terrain;
     this.scenario = scenario;
@@ -305,7 +317,10 @@ export class Game {
       if (fenceField && fenceField.dist(x, z) < 14) return { value: 1.25, kind: 'fence line' };
       return { value: 1, kind: 'open' };
     };
-    this.combat = new Combat({ units: this.units, terrain, coverAt: this.coverAt, fallen: this.fallen, fx: effects, rnd: this.rnd });
+    this.combat = new Combat({ units: this.units, terrain, coverAt: this.coverAt, fallen: this.fallen, fx: effects, rnd: this.rnd,
+      onBatteryContact: state?.capture?.overrun ? (attacker, battery) => {
+        if (state.capture.contacts) state.capture.contacts.push([attacker, battery]);
+      } : null });
     if (state?.capture) this.combat.rallyBlocked = u => state.capture.pre.has(u);
     this.ai = new Ai(this, scenario.ai || {});
     // the defenders begin under orders to hold their ground
@@ -683,6 +698,10 @@ export class Game {
 
   tick(h) {
     const state = reinforcementState.get(this);
+    const guarded = state?.capture?.overrun === true;
+    if (guarded && state.capture.tickActive) captureFail('nested battery-overrun tick is unsupported.');
+    if (guarded) state.capture.tickActive = true;
+    try {
     if (state) {
       if (this.over) return;
       scheduledReady(this, state);
@@ -701,8 +720,11 @@ export class Game {
     }
     const pre = state?.capture ? captureCorridors(this) : null;
     if (pre) state.capture.pre = pre;
-    this.combat.step(h, this.simTime);
-    if (pre) commitSurrenders(this, state, pre, h);
+    const contacts = guarded && !this.paused ? [] : null;
+    if (contacts) state.capture.contacts = contacts;
+    try { this.combat.step(h, this.simTime); }
+    finally { if (guarded) state.capture.contacts = null; }
+    if (pre) commitSurrenders(this, state, pre, h, contacts);
     this.ai.step(h);
     this.slowT -= h;
     if (this.slowT <= 0) {
@@ -723,6 +745,7 @@ export class Game {
         null, 'capture', e);
     }
     this.checkObjective(h, !!state && this.simTime === state.plan.horizon);
+    } finally { if (guarded) state.capture.tickActive = false; }
   }
 
   /** A line for the event feed (clock time, sentence, where). */
