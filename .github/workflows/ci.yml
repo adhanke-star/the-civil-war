@@ -1,4 +1,4 @@
-name: F6c timeout timing diagnostic
+name: F6c soldier timeout timing diagnostic
 on:
   push:
     branches: [p3f6c-timeout-diagnosis]
@@ -16,11 +16,11 @@ jobs:
       GIT_CONFIG_KEY_0: safe.directory
       GIT_CONFIG_VALUE_0: /__w/the-civil-war/the-civil-war
       GIT_CONFIG_KEY_1: safe.directory
-      GIT_CONFIG_VALUE_1: /__w/the-civil-war/timeout-A
+      GIT_CONFIG_VALUE_1: /__w/the-civil-war/soldier-timeout-A
       GIT_CONFIG_KEY_2: safe.directory
-      GIT_CONFIG_VALUE_2: /__w/the-civil-war/timeout-B
+      GIT_CONFIG_VALUE_2: /__w/the-civil-war/soldier-timeout-B
       GIT_CONFIG_KEY_3: safe.directory
-      GIT_CONFIG_VALUE_3: /__w/the-civil-war/timeout-A2
+      GIT_CONFIG_VALUE_3: /__w/the-civil-war/soldier-timeout-A2
     defaults:
       run:
         shell: bash
@@ -43,18 +43,18 @@ jobs:
           node-version: 24.21.0
           cache: npm
       - run: npm ci
-      - name: Exact A B A2 source timing
+      - name: Exact A B A2 soldier source timing
         run: node tools/diagnose-f6c-timeout.mjs
-      - name: Retain complete diagnosis outputs
+      - name: Retain complete soldier diagnosis outputs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: f6c-timeout-diagnostic
+          name: f6c-soldier-timeout-diagnostic
           path: |
             .out/
-            /__w/the-civil-war/timeout-A/.out/
-            /__w/the-civil-war/timeout-B/.out/
-            /__w/the-civil-war/timeout-A2/.out/
+            /__w/the-civil-war/soldier-timeout-A/.out/
+            /__w/the-civil-war/soldier-timeout-B/.out/
+            /__w/the-civil-war/soldier-timeout-A2/.out/
           include-hidden-files: true
           retention-days: 7
           compression-level: 6
