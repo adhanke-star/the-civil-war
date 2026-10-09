@@ -16,4 +16,4 @@
 - **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
 - **Proof:** deployment21+21, named23+23/115/A126-B-A2, retained183+183/unit; native486/40axe/ALL138review; exactCI485/40axe/28logs/public4/source40.
 - **Coordination:** no ledger/competing writer; root sole writer; preserve workspace/Shiloh; no duplicate goal/scheduler.
-- **Current:** F6a0e accepted; F6b source67 adopted/local81-unit24/root-helper10PNG CLEAR; model1047634B/headroom942B; integration/CI567 pending; native/v1UNRUN.
+- **Current:** F6c isolated source68/local87+unit25/12+12 CLEAR; model386894B/headroom661682; integration/CI568/Pages17/new18/v1UNRUN. Root /private/tmp/the-civil-war-p3f6c-loadouts-outer-20261009; combined-local87-admission3 receipt; exact owned integration next.

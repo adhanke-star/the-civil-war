@@ -289,3 +289,26 @@ export function surrenderOutcome({ game, scenario }) {
   if (bytes(result) > MAX_SAVE_BYTES) fail('surrender result exceeds the admitted byte bound.');
   return frozen(result);
 }
+
+/** Original saved loadout descriptors and physical possession only; no item/loot/save award. */
+export function capturedLoadouts({ manifest, game }) {
+  assertSavedLaunch(manifest);
+  const report = surrenderOutcome({ game, scenario: manifest.scenario });
+  if (report === null) return null;
+  const live = new Map(game.units.map(unit => [unit.id, unit]));
+  const baseline = new Map(manifest.baseline.army.map(brigade => [brigade.id, brigade]));
+  const formations = report.formations.map(formation => {
+    const unit = live.get(formation.unitId);
+    if (!unit || !['infantry', 'artillery'].includes(unit.type)) fail('captured loadout needs its original formation type.');
+    const kind = unit.type === 'artillery' ? 'battery' : 'infantry', brigade = baseline.get(formation.unitId);
+    let loadout = null;
+    if (brigade) {
+      if (formation.originSide !== 'US' || brigade.kind !== kind
+        || JSON.stringify(unit.equipment) !== JSON.stringify(brigade.weapon)
+        || JSON.stringify(unit.def.equipment) !== JSON.stringify(brigade.weapon)) fail('captured loadout differs from the admitted saved baseline.');
+      loadout = brigade.weapon;
+    }
+    return { ...formation, kind, loadout };
+  });
+  return frozen({ observedAtSec: report.observedAtSec, formations });
+}

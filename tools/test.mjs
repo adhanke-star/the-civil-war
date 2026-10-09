@@ -1489,6 +1489,20 @@ async function batteryOverrunModelUnit() {
   } catch (error) { check('battery-overrun-model', false, error.message); }
 }
 
+async function capturedLoadoutsModelUnit() {
+  try {
+    const { execFileSync } = await import('node:child_process');
+    const text = execFileSync(process.execPath, [path.join(ROOT, 'tools/test-captured-loadouts.mjs')], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
+    const lines = text.trimEnd().split('\n'), rows = lines.filter(l => l.startsWith('CAPTURED LOADOUTS ACTUAL '));
+    if (rows.length !== 1 || !lines.includes('CAPTURED LOADOUTS OK (12/12)')) throw new Error('Incomplete captured loadout proof.');
+    const actual = JSON.parse(rows[0].slice('CAPTURED LOADOUTS ACTUAL '.length));
+    const { verifyCapturedLoadoutsRecord } = await import('./test-captured-loadouts.mjs');
+    await verifyCapturedLoadoutsRecord(actual);
+    result.capturedLoadouts = actual;
+    check('captured-loadouts-model', true, '12 actual CPU categories and 12 own controls; original authored descriptors, read-only source68');
+  } catch (error) { check('captured-loadouts-model', false, error.message); }
+}
+
 async function main() {
   await settingsUnit();
   await bakedUnit();
@@ -1503,6 +1517,7 @@ async function main() {
   await activationModelUnit();
   await capturedGunsModelUnit();
   await batteryOverrunModelUnit();
+  await capturedLoadoutsModelUnit();
   await fs.mkdir(OUT_DIR, { recursive: true });
   const { server, url } = await startServer({ port: 0 });
   result.url = url;
@@ -1798,6 +1813,7 @@ if (process.argv.includes('--unit')) {
   await activationModelUnit(true);
   await capturedGunsModelUnit();
   await batteryOverrunModelUnit();
+  await capturedLoadoutsModelUnit();
   try {
     await bakedUnit();
     await approvedPackUnit();
