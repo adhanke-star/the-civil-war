@@ -1,21 +1,18 @@
-name: CI
-
+name: Reward viewport diagnostic
 on:
   push:
-  pull_request:
-
+    branches: [p2-reward-viewport-diagnostic]
 permissions:
   contents: read
-
 jobs:
-  test:
+  viewport:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host --init
     env:
-      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_COUNT: '1'
       GIT_CONFIG_KEY_0: safe.directory
       GIT_CONFIG_VALUE_0: /__w/the-civil-war/the-civil-war
     defaults:
@@ -23,241 +20,76 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
-
-      - name: Fetch pinned current-field comparison
+      - name: Fetch exact accepted source
         run: |
+          test "$GITHUB_REF" = "refs/heads/p2-reward-viewport-diagnostic"
           test "$GITHUB_WORKSPACE" = "/__w/the-civil-war/the-civil-war"
           test "$(realpath "$GITHUB_WORKSPACE")" = "$GITHUB_WORKSPACE"
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 4f6113a624e0e533825c0be414bb36f3b073f726
-          test "$(git rev-parse FETCH_HEAD)" = "4f6113a624e0e533825c0be414bb36f3b073f726"
+          git fetch --no-tags --depth=1 origin 158cb60a1dd26e84161fcdc97342d7f239369f90
+          test "$(git rev-parse FETCH_HEAD)" = "158cb60a1dd26e84161fcdc97342d7f239369f90"
+          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:src/reward/sequence.js
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/main.js
-          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/entry.js
-
-      - name: Fetch pinned reinforcement comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin aaf10145531130f3ec201d6332f6759599bc46a4
-          test "$(git rev-parse FETCH_HEAD)" = "aaf10145531130f3ec201d6332f6759599bc46a4"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e aaf10145531130f3ec201d6332f6759599bc46a4:src/main.js
-          node tools/test-surrender-runtime.mjs --verify-legacy-game
-
-      - name: Fetch pinned captured-gun comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin b81dad641ff86c7586b13abf57dce257e299fef0
-          test "$(git rev-parse FETCH_HEAD)" = "b81dad641ff86c7586b13abf57dce257e299fef0"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/units/battery.js
-          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/game.js
-
-      - name: Fetch pinned battery-overrun comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 0e505fd61dead1f95659eaa2f8652f31935a50bc
-          test "$(git rev-parse FETCH_HEAD)" = "0e505fd61dead1f95659eaa2f8652f31935a50bc"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/game.js
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/combat.js
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/phase.js
-
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24.21.0
           cache: npm
-
       - run: npm ci
-
-      - name: Verify pinned Playwright runtime
+      - name: Diagnose untouched reward viewport
         run: |
-          node --input-type=module <<'NODE'
-          import assert from 'node:assert/strict';
-          import fs from 'node:fs';
-          import { chromium } from 'playwright';
-          const lock = JSON.parse(fs.readFileSync('package-lock.json'));
-          const installed = JSON.parse(fs.readFileSync('node_modules/playwright/package.json'));
-          assert.equal(lock.packages['node_modules/playwright'].version, '1.63.0');
-          assert.equal(installed.version, '1.63.0');
-          assert.equal(process.env.PLAYWRIGHT_BROWSERS_PATH, '/ms-playwright');
-          const executable = chromium.executablePath();
-          assert.ok(executable.startsWith('/ms-playwright/'));
-          fs.accessSync(executable, fs.constants.X_OK);
-          console.log(JSON.stringify({ playwright: installed.version, executable, bakedDependencies: true }));
-          NODE
+          mkdir .out
+          node --input-type=module <<'CAPACITY'
+          import fs from 'node:fs';import assert from 'node:assert/strict';
+          const out='/__w/the-civil-war/the-civil-war/.out',ROOT_CAP=314572800,RESERVATION=67108864,FREE=5000000000;
+          function outputBytes(p=out){assert(p===out||p.startsWith(out+'/'));assert(!p.includes('\\'));const st=fs.lstatSync(p);assert(!st.isSymbolicLink());assert.equal(fs.realpathSync(p),p);if(st.isDirectory())return fs.readdirSync(p).reduce((n,k)=>n+outputBytes(p+'/'+k),0);assert(st.isFile());return st.size;}
+          function free(){const d=fs.statfsSync(out);return d.bavail*d.bsize;}
+          assert.equal(process.env.GITHUB_WORKSPACE,'/__w/the-civil-war/the-civil-war');assert.equal(fs.realpathSync('.'),process.env.GITHUB_WORKSPACE);assert.equal(process.env.GITHUB_REF,'refs/heads/p2-reward-viewport-diagnostic');const n=outputBytes(),f=free();assert(n+RESERVATION<=ROOT_CAP);assert(f>=FREE+RESERVATION);fs.writeFileSync(out+'/reward-viewport-capacity-start.json',JSON.stringify({root:out,cap:ROOT_CAP,reservation:RESERVATION,minimumFree:FREE,outputBefore:n,freeBefore:f},null,2)+'\n',{flag:'wx'});console.log('REWARD VIEWPORT CAPACITY ADMITTED '+JSON.stringify({outputBefore:n,reservation:RESERVATION,freeBefore:f}));
+          CAPACITY
+          timeout --signal=TERM --kill-after=5s 300s node tools/test-reward-viewport-ui.mjs > .out/reward-viewport.stdout 2> .out/reward-viewport.stderr
+      - name: Bind complete reward viewport envelope
+        run: |
+          node --input-type=module <<'PROOF'
+          import fs from 'node:fs';import path from 'node:path';import assert from 'node:assert/strict';import {createHash} from 'node:crypto';import {execFileSync} from 'node:child_process';import {brotliCompressSync,brotliDecompressSync,constants} from 'node:zlib';
+          const LIMITS=Object.freeze({packed:1048576,member:1048576,raw:50331648,range:2097152,transfer:3145728,header:88});
+          const sha=b=>createHash('sha256').update(b).digest('hex');
+          function need(ok,code){if(!ok){const e=new Error(code);e.code=code;throw e;}}
+          function uint(n,cap,code){need(Number.isSafeInteger(n)&&n>0&&n<=cap,code);}
+          function encodeProof(raw){
+            need(Buffer.isBuffer(raw),'RAW_BUFFER');uint(raw.length,LIMITS.raw,'RAW_CAP');
+            const text=raw.toString('utf8');need(Buffer.from(text).equals(raw),'RAW_UTF8');JSON.parse(text);
+            const payload=brotliCompressSync(raw,{params:{[constants.BROTLI_PARAM_QUALITY]:6,[constants.BROTLI_PARAM_SIZE_HINT]:raw.length}});
+            uint(payload.length,LIMITS.member-LIMITS.header,'MEMBER_CAP');
+            const h=Buffer.alloc(88);h.write('CWPROOF1',0,'ascii');h.writeUInt32LE(1,8);h.writeUInt32LE(6,12);h.writeUInt32LE(raw.length,16);h.writeUInt32LE(payload.length,20);Buffer.from(sha(raw),'hex').copy(h,24);Buffer.from(sha(payload),'hex').copy(h,56);
+            const member=Buffer.concat([h,payload]);need(decodeProof(member).equals(raw),'ENCODER_EXACT');return member;
+          }
+          function decodeProof(member){
+            need(Buffer.isBuffer(member),'MEMBER_BUFFER');uint(member.length,LIMITS.member,'MEMBER_CAP');need(member.length>88,'HEADER_TRUNCATED');
+            need(member.subarray(0,8).equals(Buffer.from('CWPROOF1')),'HEADER_MAGIC');
+            need(member.readUInt32LE(8)===1,'HEADER_VERSION');need(member.readUInt32LE(12)===6,'HEADER_CODEC');
+            const rawBytes=member.readUInt32LE(16),payloadBytes=member.readUInt32LE(20);
+            uint(rawBytes,LIMITS.raw,'RAW_CAP');uint(payloadBytes,LIMITS.member-LIMITS.header,'PAYLOAD_CAP');need(member.length===88+payloadBytes,'PAYLOAD_LENGTH');
+            const payload=member.subarray(88);need(sha(payload)===member.subarray(56,88).toString('hex'),'PAYLOAD_DIGEST');
+            const decoded=brotliDecompressSync(payload,{maxOutputLength:rawBytes,info:true});
+            need(decoded.engine.bytesWritten===payload.length,'BROTLI_CONSUMPTION');need(decoded.buffer.length===rawBytes,'RAW_LENGTH');need(sha(decoded.buffer)===member.subarray(24,56).toString('hex'),'RAW_DIGEST');
+            const text=decoded.buffer.toString('utf8');need(Buffer.from(text).equals(decoded.buffer),'RAW_UTF8');JSON.parse(text);return decoded.buffer;
+          }
 
-      - run: npm test
-
-      - run: node tools/test-surrender-activation-ui.mjs
-      - run: node tools/test-surrender-activation-ui.mjs --prove-fail
-
-      - name: Upload test output
+          const root='/__w/the-civil-war/the-civil-war',parent='158cb60a1dd26e84161fcdc97342d7f239369f90',owned=['.github/workflows/ci.yml','tools/test-reward-viewport-ui.mjs'];assert.equal(process.env.GITHUB_WORKSPACE,root);assert.equal(fs.realpathSync('.'),root);assert.equal(process.env.GITHUB_REF,'refs/heads/p2-reward-viewport-diagnostic');assert.equal(fs.realpathSync(root+'/.out'),root+'/.out');assert(!fs.lstatSync(root+'/.out').isSymbolicLink());const git=(args)=>execFileSync('git',args,{maxBuffer:8*1024*1024});assert.equal(git(['rev-parse','HEAD']).toString().trim(),process.env.GITHUB_SHA);assert.equal(git(['status','--porcelain','--untracked-files=no']).toString(),'');
+          const parents=git(['ls-tree','-r','-z','--name-only',parent]).toString().split('\0').filter(Boolean),paths=git(['ls-tree','-r','-z','--name-only','HEAD']).toString().split('\0').filter(Boolean);assert.equal(parents.length,207);assert.equal(paths.length,208);assert.deepEqual(paths.filter(p=>!owned.includes(p)),parents.filter(p=>!owned.includes(p)));const sources=[];for(const p of paths){assert(!path.isAbsolute(p)&&!p.includes('..'));const full=root+'/'+p;assert.equal(fs.realpathSync(full),full);assert(!fs.lstatSync(full).isSymbolicLink());assert(fs.statSync(full).size<=100*1024*1024);const bytes=fs.readFileSync(full);assert(bytes.equals(git(['show','HEAD:'+p])));if(!owned.includes(p))assert(bytes.equals(git(['show',parent+':'+p])));sources.push({path:p,bytes:bytes.length,sha256:sha(bytes)});}
+          function read(p,cap){assert.equal(fs.realpathSync(p),p);assert(!fs.lstatSync(p).isSymbolicLink());const s=fs.statSync(p);assert(s.isFile()&&s.size<=cap);return fs.readFileSync(p);}
+          const out='/__w/the-civil-war/the-civil-war/.out',ROOT_CAP=314572800,RESERVATION=67108864,FREE=5000000000;
+          function outputBytes(p=out){assert(p===out||p.startsWith(out+'/'));assert(!p.includes('\\'));const st=fs.lstatSync(p);assert(!st.isSymbolicLink());assert.equal(fs.realpathSync(p),p);if(st.isDirectory())return fs.readdirSync(p).reduce((n,k)=>n+outputBytes(p+'/'+k),0);assert(st.isFile());return st.size;}
+          function free(){const d=fs.statfsSync(out);return d.bavail*d.bsize;}
+          const admission=JSON.parse(read(out+'/reward-viewport-capacity-start.json',65536));assert.equal(admission.root,out);assert.equal(admission.cap,ROOT_CAP);assert.equal(admission.reservation,RESERVATION);assert.equal(admission.minimumFree,FREE);assert(admission.outputBefore+RESERVATION<=ROOT_CAP);assert(admission.freeBefore>=FREE+RESERVATION);assert(outputBytes()<=admission.outputBefore+RESERVATION);assert(free()>=FREE);
+          const names=fs.readdirSync(root+'/.out'),reports=names.filter(n=>/^reward-viewport-\d+-actual\.json$/.test(n));assert.equal(reports.length,1);const raw=read(root+'/.out/'+reports[0],50331648),report=JSON.parse(raw);assert.equal(report.complete,true);assert.equal(report.failure,undefined);assert.equal(report.cleanupFailure,undefined);assert.equal(report.actualAcceptance,false);assert.equal(report.fixture.bounds.formations,4);assert.equal(report.fixture.bounds.men,920);assert.equal(report.fixture.bounds.guns,2);assert(Number.isSafeInteger(report.fixture.bounds.figures)&&report.fixture.bounds.figures>0&&report.fixture.bounds.figures<=240);assert.deepEqual(report.before,report.after);assert.deepEqual(report.before,report.nativeAfter);assert.deepEqual(report.next,report.referenceNext);assert.equal(report.pageRestore.restored,true);assert.equal(report.referenceRestore.restored,true);assert.equal(report.before.gpu,0);assert.equal(report.after.gpu,0);const stdout=read(root+'/.out/reward-viewport.stdout',16777216),stderr=read(root+'/.out/reward-viewport.stderr',16777216);assert.equal(stderr.length,0);const lines=stdout.toString().trimEnd().split('\n').filter(l=>l.startsWith('REWARD VIEWPORT ACTUAL '));assert.equal(lines.length,1);assert.deepEqual(JSON.parse(lines[0].slice('REWARD VIEWPORT ACTUAL '.length)),report);
+          assert(report.images.length>=3&&report.images.length<=5);for(const image of report.images){assert(/^\.out\/reward-viewport-\d+-(initial|bottom|top|scroll-control|focus-control)\.png$/.test(image.path));const b=read(root+'/'+image.path,524288);assert.equal(b.length,image.bytes);assert.equal(sha(b),image.sha256);assert(b.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])));}const envelope={scope:'PRIVATE_REWARD_VIEWPORT_DIAGNOSIS_ONLY',runId:process.env.GITHUB_RUN_ID,attempt:Number(process.env.GITHUB_RUN_ATTEMPT),sha:process.env.GITHUB_SHA,parent,owned,sourceInputs:{count:208,unchanged:206,sources},reportPath:reports[0],reportRaw:{bytes:raw.length,sha256:sha(raw),base64:raw.toString('base64')},report,stdout:{bytes:stdout.length,sha256:sha(stdout),base64:stdout.toString('base64')},stderr:{bytes:stderr.length,sha256:sha(stderr),base64:stderr.toString('base64')}};const bytes=Buffer.from(JSON.stringify(envelope,null,2)+'\n'),member=encodeProof(bytes);assert(decodeProof(member).equals(bytes));const beforeWrite=outputBytes();assert(beforeWrite+bytes.length+member.length+65536<=ROOT_CAP);assert(beforeWrite+bytes.length+member.length+65536<=admission.outputBefore+RESERVATION);assert(free()>=FREE+bytes.length+member.length+65536);fs.writeFileSync(root+'/.out/reward-viewport-envelope.json',bytes,{flag:'wx'});fs.writeFileSync(root+'/.out/reward-viewport-envelope.cwproof',member,{flag:'wx'});const finalBytes=outputBytes();assert(finalBytes<=ROOT_CAP&&finalBytes<=admission.outputBefore+RESERVATION);assert(free()>=FREE);fs.writeFileSync(out+'/reward-viewport-capacity-final.json',JSON.stringify({root:out,cap:ROOT_CAP,reservation:RESERVATION,outputBefore:admission.outputBefore,finalBytes,freeAfter:free(),complete:true},null,2)+'\n',{flag:'wx'});assert(outputBytes()<=ROOT_CAP);console.log('REWARD VIEWPORT ENVELOPE ACTUAL '+JSON.stringify({rawBytes:bytes.length,rawSha256:sha(bytes),memberBytes:member.length,memberSha256:sha(member),images:report.images.length,classification:report.classification,acceptance:'NONE'}));
+          PROOF
+      - name: Retain complete viewport diagnosis
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-output
+          name: reward-viewport-diagnostic
           path: .out/
           include-hidden-files: true
           retention-days: 7
-          if-no-files-found: warn
-
-  probes:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
-      options: --ipc=host --init
-    env:
-      GIT_CONFIG_COUNT: "1"
-      GIT_CONFIG_KEY_0: safe.directory
-      GIT_CONFIG_VALUE_0: /__w/the-civil-war/the-civil-war
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Checkout probe source
-        uses: actions/checkout@v4
-
-      - name: Fetch pinned probe current-field comparison
-        run: |
-          test "$GITHUB_WORKSPACE" = "/__w/the-civil-war/the-civil-war"
-          test "$(realpath "$GITHUB_WORKSPACE")" = "$GITHUB_WORKSPACE"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 4f6113a624e0e533825c0be414bb36f3b073f726
-          test "$(git rev-parse FETCH_HEAD)" = "4f6113a624e0e533825c0be414bb36f3b073f726"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/main.js
-          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/entry.js
-
-      - name: Fetch pinned probe reinforcement comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin aaf10145531130f3ec201d6332f6759599bc46a4
-          test "$(git rev-parse FETCH_HEAD)" = "aaf10145531130f3ec201d6332f6759599bc46a4"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e aaf10145531130f3ec201d6332f6759599bc46a4:src/main.js
-          node tools/test-surrender-runtime.mjs --verify-legacy-game
-
-      - name: Fetch pinned probe captured-gun comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin b81dad641ff86c7586b13abf57dce257e299fef0
-          test "$(git rev-parse FETCH_HEAD)" = "b81dad641ff86c7586b13abf57dce257e299fef0"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/units/battery.js
-          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/game.js
-
-      - name: Fetch pinned probe battery-overrun comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 0e505fd61dead1f95659eaa2f8652f31935a50bc
-          test "$(git rev-parse FETCH_HEAD)" = "0e505fd61dead1f95659eaa2f8652f31935a50bc"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/game.js
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/combat.js
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/phase.js
-
-      - name: Set up probe Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-          cache: npm
-
-      - name: Install probe dependencies
-        run: npm ci
-
-      - name: Verify pinned probe Playwright runtime
-        run: |
-          node --input-type=module <<'NODE'
-          import assert from 'node:assert/strict';
-          import fs from 'node:fs';
-          import { chromium } from 'playwright';
-          const lock = JSON.parse(fs.readFileSync('package-lock.json'));
-          const installed = JSON.parse(fs.readFileSync('node_modules/playwright/package.json'));
-          assert.equal(lock.packages['node_modules/playwright'].version, '1.63.0');
-          assert.equal(installed.version, '1.63.0');
-          assert.equal(process.env.PLAYWRIGHT_BROWSERS_PATH, '/ms-playwright');
-          const executable = chromium.executablePath();
-          assert.ok(executable.startsWith('/ms-playwright/'));
-          fs.accessSync(executable, fs.constants.X_OK);
-          console.log(JSON.stringify({ playwright: installed.version, executable, bakedDependencies: true }));
-          NODE
-
-      - run: node tools/test-deployment.mjs
-      - run: node tools/test-deployment.mjs --prove-fail
-
-      - run: node tools/test-phase.mjs
-      - run: node tools/test-phase.mjs --prove-fail
-
-      - run: node tools/test-field-admission.mjs
-      - run: node tools/test-field-admission.mjs --prove-fail
-
-      - run: node tools/test-reinforcements.mjs
-      - run: node tools/test-reinforcements.mjs --prove-fail
-
-      - run: node tools/test-reinforcement-runtime.mjs
-      - run: node tools/test-reinforcement-runtime.mjs --prove-fail
-
-      - run: node tools/test-capture-accounting.mjs
-      - run: node tools/test-capture-accounting.mjs --prove-fail
-
-      - run: node tools/test-surrender-runtime.mjs
-      - run: node tools/test-surrender-runtime.mjs --prove-fail
-
-      - run: node tools/test-surrender-result.mjs
-      - run: node tools/test-surrender-result.mjs --prove-fail
-      - run: node tools/test-surrender-result-ui.mjs
-      - run: node tools/test-surrender-result-ui.mjs --prove-fail
-
-      - run: node tools/test-equipment.mjs
-      - run: node tools/test-equipment.mjs --prove-fail
-
-      - run: node tools/test-reward.mjs
-
-      - run: node tools/test-reward.mjs --prove-fail
-      - run: node tools/test-save.mjs
-      - run: node tools/test-save.mjs --prove-fail
-
-      - run: node tools/test-practice.mjs
-
-      - run: node tools/test-practice.mjs --prove-fail
-      - run: node tools/test-captures.mjs
-      - run: node tools/test-captures.mjs --prove-fail
-      - run: node tools/test-intro.mjs
-      - run: node tools/test-intro.mjs --prove-fail
-      - run: node tools/test-sandbox-rules.mjs
-      - run: node tools/test-sandbox-rules.mjs --prove-fail
-      - run: node tools/test-look.mjs
-      - run: node tools/test-look.mjs --prove-fail
-      - run: node tools/test-view.mjs
-      - run: node tools/test-view.mjs --prove-fail
-      - run: node tools/test-spacing.mjs
-      - run: node tools/test-spacing.mjs --prove-fail
-      - run: node tools/test-residency.mjs
-      - run: node tools/test-residency.mjs --prove-fail
-      - run: node tools/test-moments.mjs
-      - run: node tools/test-moments.mjs --prove-fail
-      - run: node tools/test-keyboard.mjs
-      - run: node tools/test-keyboard.mjs --prove-fail
-
-      - run: node tools/test-soldier-view.mjs
-      - run: node tools/test-soldier-view.mjs --prove-fail
-
-      - run: node tools/test-surrender-activation.mjs
-      - run: node tools/test-surrender-activation.mjs --prove-fail
-
-      - run: node tools/test-captured-guns.mjs
-      - run: node tools/test-captured-guns.mjs --prove-fail
-      - run: node tools/test-battery-overrun.mjs
-      - run: node tools/test-battery-overrun.mjs --prove-fail
-
-      - name: Upload probe output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: probe-output
-          path: .out/
-          include-hidden-files: true
-          retention-days: 7
-          if-no-files-found: warn
+          compression-level: 6
