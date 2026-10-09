@@ -1,19 +1,19 @@
-# STATE (keep under 20 lines)
-- **Authority (2026-10-06):** DESIGN + DECISIONS 0022; PLAN P1-P7 is the autonomous completion path.
-- **Finish:** all three v1 battles and all v1 functions/flow. No deadline, new spending or hands-on checks.
-- **P1/P2a:** a2c29d3/d228fb9 integrated; persistence, actual result bridge and exact-SHA CI green.
-- **P2b:** 4a4a4ad; intro/crates; CI 37496336886 and Pages 37496336828 green; native full 125/125.
-- **P2c:** repair 2bf8f80; CI 37502279679/Pages 37502279685 green; native 157/157, focused repair 46/46.
-- **P2d:** 2d761db; 12+12, native full 169/169; CI 37503374519/Pages 37503374677 green.
-- **P2e:** repair48a1f72; CI37508495648/Pages37508497027 green; native186/186, isolated software20/20.
-- **P2f:** 13a9ee9; pure13+13/native209/209; CI37511709837/Pages37511709840 green.
-- **Art next:** residency37527814035 binds192frame cohorts; source-page limits fail; lossless frame layout next.
-- **Current play:** title Continue -> intro/saved camp; ?practice Henry rewards; historical/sandbox isolated.
-- **Missing:** final combat-feedback/workbench polish, living title/camp, campaign saves, phase packs and progression.
-- **Figures:** rigged default; second-pass baked Union and tinted Confederate placeholders remain.
-- **Approved art:** bake 820846f / 37347072866, sheets 1-12, 5,184 frames, nine looks per tier.
-- **Failed candidates:** UASTC 37360904656 and direct BC7/ASTC 37404193171; limits stay unchanged.
-- **Device:** historical baked Auto1:5 40.7/38.7fps(Oct4); new full native/iPad/memory still unverified.
-- **Proof:** deployment21+21, named23+23/115/A126-B-A2, retained183+183/unit; native486/40axe/ALL138review; exactCI485/40axe/28logs/public4/source40.
-- **Coordination:** no ledger/competing writer; root sole writer; preserve workspace/Shiloh; no duplicate goal/scheduler.
-- **Current:** F6c isolated source68/local87+unit25/12+12 CLEAR; model386894B/headroom661682; integration/CI568/Pages17/new18/v1UNRUN. Root /private/tmp/the-civil-war-p3f6c-loadouts-outer-20261009; combined-local87-admission3 receipt; exact owned integration next.
+# State
+2026-10-09 — user-requested safe stop; existing v1 NOT FINISHED.
+Docs-only closeout parent7287296; unchanged product source728 is NOT ACCEPTED.
+AcceptedF6b158cb60a1dd26e84161fcdc97342d7f239369f90/CI37913714310/Pages37913714346.
+F6c full37952988962 cancelled557ok/11finalsoldier+568acceptanceUNRUN.
+DIAG90dc0b4438eb49f31ffea9788c5197b45af53be0 clean/private, not for merge.
+Soldier37970371836 SUCCESS; complete4records/51-52-51/207-208-207 sources CLEAR_DIAG_ONLY.
+A313891/B323938/A2309833ms; query11984ms; aggregate timeout causeUNPROVED.
+Field37961197018 likewise did not reproduce broadslowdown; soldierPNGUNVIEWED.
+REWARD550c087bd0cfda3fbaaf460c1628d4c987090faf clean/private, not for merge.
+Focus37968732603 complete5root-helperPNG/3controls/native reading/focus CLEAR_DIAG_ONLY.
+BothEnter->b/fullauthority/6RNG exact; oldfailed37966820754 preserved.
+No MAIN focus adoption/ordinaryfieldboot/fullregression/fullAA/native/release acceptance.
+Next .out-only productionfocus source/inverse/count/model/reader/capacity contract; independentCLEAR.
+Protected11 and all historical dirtyroots/ignored failures preserved; indexEMPTY aftercommit.
+All activeActions/watchers/collectors/readbacks/helpers complete; staleowned readonlyaudit stopped.
+COORDINATIONabsent/owner released; re-establish solewriter before next edits.
+Fixedcaps unchanged; NEW lacks future68.5MB reservation, review isolated output admission.
+All remainingP2-P7/native/iPad/art/performance OPEN; no spending/deviceasks/goals/schedulers.
