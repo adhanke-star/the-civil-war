@@ -1,3 +1,342 @@
+**CURRENT — CONTEXT RELAY AT PHASE_A SOURCE-ONLY BOUNDARY (2026-10-09).** Existing v1 is NOT FINISHED. No product source adoption, implementation tests, new browser/PNG, fullCI or Pages was performed. Accepted authority remains F6b158cb60/37913714310/37913714346; product728 remains unaccepted after cancelled37952988962. MAIN protected11/indexempty and every historical dirtyroot/evidence remain intact. This relay is required by remaining session context, not a measured quota or another user stop.
+
+PROD=/private/tmp/the-civil-war-reward-focus-production-20261009, branch reward-focus-production/HEADe65bab6d8b86e1dee06dec201ba051e85130f54b, clean tracked checkout; one unstaged read-only node_modules link exactMAIN/node_modules. Only .out holds candidate/inventory/failures. Correct the opener typo: actual footer file src/reward/reward.css; sequence.css does not exist. Actual r3 source-only proof restores captured66/13changed53locked, overrun67/13changed54locked, loadouts68/10changed58locked and new70/all69 exact728 inverses. Full209generated/11owned198exacte65 and protected11 verified root/helper CLEAR_ACTUAL_DRAFT_SOURCE_ONLY. r1generator cardinality failure preserved; r2 full-file inverse draft superseded/preserved; r3 sparse output16376270B preserves currente65 docs. r3 intentionally emits failing placeholder checks: DO NOT execute its proposed tests or stage it.
+
+Strict partial byte check preserves all103 old aggregate fields plus full private8272008B report: raw36008455B SHA cc476043c63740494574d794d530da80964c8169864fa6272fb77423091acba1, rawheadroom14323193B; member400191B/deflate393742B. Root/helper CLEAR_STRICT_PARTIAL_BYTE_READBACK_ONLY. This is NOT completeZIP/source-record/semantic/A-B-A2/log/readers/production admission. All caps unchanged. PROD.out88271525B beforecloseout/free14584537088B;160MiB reservation remains conditional on fresh stat scans.
+
+Next bounded task: complete PhaseA new modular semantics/sourceA-B-A2/explicit restoration geometry/ordinary authority/fullmodel/consumer closure/literal local-gates/independent fullCLEAR. Move ordinary hook AFTER unchanged practice-reward-real-army check; r3’s current placement delays the original50ms opened snapshot. Proposed582/580unique/49axes/unit25/23PNG/public18/global70 are not frozen/actual acceptance; derive complete stream/order/matrix counts after code completion. PhaseB/C only after full reviewed admission. No luckyCI retry, timeout/cap/oracle waiver or fake observed records. Continue all dependency-ready existing P1-P7 after accepted boundaries; native/iPad/art/performance remain UNRUN. No new goals, spending or device asks. Root relinquishes ownership at completed docs relay; startup re-establishes one writer.
+
+### PhaseA source-only context-relay execution packet
+
+```text
+Resume the autonomous EXISTING-v1 completion loop on a fresh ChatGPT/Codex session from the 2026-10-09 CONTEXT RELAY after actual PhaseA source-only admission and strict partial byte feasibility. Existing v1 is NOT FINISHED.
+
+Keep the deliberately selected high-quality main model/effort; Aaron prefers 5.6 Sol/Ultra where available. Never silently downgrade. Root owns code, architecture, gameplay, integration and final acceptance. At most ONE read-only helper at a time: explicitly select gpt-6-luna/medium for inventory or gpt-6.1-sol/medium for independent quality. No simultaneous provider/file writers, browsers, collectors or watchers. Confirm sole-writer ownership from live processes and any coordination ledger before edits.
+
+OBJECTIVE AND TERMINAL CONDITION
+Finish ALL existing DESIGN/PLAN P1-P7 v1, including Shiloh, Stones River AND Chattanooga, all intended battle/franchise systems, and title -> briefing -> battle -> results/loot -> camp -> next phase. Continue after green checks, milestones, commits and CI; do not ask whether to continue or substitute planning for execution. Normal completion is actual P7 release with no remaining required v1 implementation, verification, defect, source/license or acceptance tasks. A foundation, diagnostic, green deployment or empty temporary queue is not v1 completion. No deadline, spending, accounts, paid tiers/SaaS, new goal/scheduler framework, or recurring Mac/iPad hands-on requests. Native-device evidence stays explicitly UNRUN where unavailable.
+
+The preceding safe-stop session stopped at Aaron’s request; the latest session stopped at a precise PhaseA boundary because remaining context could not safely finish the complete semantic/model/reader amendment and integration. No weekly quota was measured. This is not v1 completion. Existing implementation authorization resumes when this packet is pasted. Diagnose bounded failures without routine approval; HALT only an affected lane on contradiction, cap conflict, unsafe ownership or no bounded remedy, preserve evidence, and continue independent authorized v1 work. An explicit user stop or enforced provider/host/tool limit requires an honest resumable boundary and a full continuation packet.
+
+ROOTS / EXPECTED GIT / OWNERSHIP
+MAIN=/Users/aaronhanke/Developer/the-civil-war
+NEW=/private/tmp/the-civil-war-p3f6c-loadouts-outer-20261009
+NEXT=/private/tmp/the-civil-war-p3f6b-battery-overrun-20261008
+OLD=/private/tmp/the-civil-war-p3f5-record-schema-repair-20261008
+DIAG=/private/tmp/the-civil-war-p3f6c-timeout-diagnosis-20261009
+REWARD=/private/tmp/the-civil-war-reward-viewport-20261009
+PARTS=/Users/aaronhanke/Desktop/Video Game
+PARTS is frozen read-only at reference-freeze-2026-10-02. Never edit it.
+
+MAIN HEAD/origin/main: resolve the latest docs-only PhaseA context-relay commit with git rev-parse HEAD origin/main and git log -1; its exact parent is e65bab6d8b86e1dee06dec201ba051e85130f54b. Only HANDOFF.md, STATE.md, PLAN.md, DECISIONS.md changed in that relay; e65 itself was docs-only with product parent7287296ae3b1c90f3a43642f33e3e886e8b889e2. This closeout used [skip ci] to avoid new running work. No product CI or Pages acceptance attaches to that docs-only SHA. Every other tracked Git blob remains EXACT728. MAIN remains deliberately dirty in eleven protected WIP paths; index empty. Do not mistake a saved docs commit for a clean working tree or accepted F6c product.
+NEW HEAD158cb60a1dd26e84161fcdc97342d7f239369f90; deliberately dirty working68 plus pre-closeout docs4 reproduce MAIN728. NEXT HEAD0e505fd61dead1f95659eaa2f8652f31935a50bc; dirty working67 reproduces accepted158. OLD HEADb1221575b7a948aeb75e226c6c1dbde77e70dac5; dirty working66 reproduces accepted0e. These historical dirty HEADs must remain intact; do not sync their docs by overwriting them.
+DIAG branch p3f6c-timeout-diagnosis HEAD/origin90dc0b4438eb49f31ffea9788c5197b45af53be0, treec2d5fb302fcecacfbd087ee90b3256021b3368a6, clean tracked files / empty index;209 Git/2owned / 207exact 728. REWARD branch p2-reward-viewport-diagnostic HEAD/origin550c087bd0cfda3fbaaf460c1628d4c987090faf, tree1491a0f622b33bea7c1644cb6186debdf02af44f, clean tracked files / empty index;208 Git/4owned / 204exact 158; untracked read-only node_modules link stays unstaged. Both PRIVATE diagnostics are NOT FOR MAIN MERGE.
+COORDINATION.md was absent; root held sole ownership and relinquished it at stop. All project Actions runs/watchers/collectors/readback sessions finished; all helpers completed. Old owned read-only audit PIDs96214/96232 were identified by full command/cwd/start time/pipes and stopped via SIGTERM to96232, allowing parentbash to exit. They did NOT naturally complete and are not test evidence; both absent. REWARD/.out/v1-closeout-stale-readonly-audit-{stop,terminal}-r1-20261009.json records this. Do not kill unknown or newly reused PIDs.
+
+STARTUP COMMANDS (read-only; do not execute historical wx producers)
+cd /Users/aaronhanke/Developer/the-civil-war
+pwd
+git fetch --no-tags origin
+git status --short --branch
+git rev-parse HEAD origin/main
+git log -1 --format=fuller
+git diff --cached --stat
+git worktree list --porcelain
+gh run list --repo adhanke-star/the-civil-war --limit 12 --json databaseId,name,headSha,status,conclusion
+gh run view 37970371836 --repo adhanke-star/the-civil-war --json headSha,status,conclusion,jobs,url
+gh run view 37968732603 --repo adhanke-star/the-civil-war --json headSha,status,conclusion,jobs,url
+gh run view 37952988962 --repo adhanke-star/the-civil-war --json headSha,status,conclusion,jobs,url
+gh run view 37913714310 --repo adhanke-star/the-civil-war --json headSha,status,conclusion,url
+gh run view 37913714346 --repo adhanke-star/the-civil-war --json headSha,status,conclusion,url
+Reconcile every named root's status/HEAD/origin/index, process ownership and retained receipts before selecting work. Await existing runs; never cancel, duplicate or blindly retry them. Pull --ff-only ONLY if fully clean, needed and owned; current MAIN/NEW/NEXT/OLD are dirty. Never reset, stash, rebase, pull over, broad-add, force-push, prune or delete unknown evidence.
+
+READ ORDER
+AGENTS.md -> immediately COORDINATION.md if present -> HANDOFF.md newest safe-stop CURRENT and execution packet -> STATE.md -> PLAN.md finish line/P1-P7/battle-system/scope/autonomous loop and current F6c contracts -> DECISIONS0083/0082/0081/0080/0079/0078/0077/0076 -> DESIGN.md. If coordination appears, read FULL relevant lane owner/state/contract/probe/resume pointer before planning or edits; never drive another provider's lane. Then read current completed diagnostic receipts and source/index/model/protected snapshots. Live disk/Git overrides older CURRENT fronts, historical packet IDs and pending labels.
+
+read-only RESUME COMMAND (runs no producer, browser, network collector or tests)
+cd /private/tmp/the-civil-war-reward-viewport-20261009
+node --input-type=module - <<'NODE'
+import fs from 'node:fs';
+for (const p of ['.out/v1-safe-stop-terminal-r1-20261009.json','/private/tmp/the-civil-war-p3f6c-timeout-diagnosis-20261009/.out/p3f6c-soldier-timeout-independent-actual-readback-r1-20261009.json','.out/reward-focus-attribute-independent-actual-readback-r1.json']) {
+  const x=JSON.parse(fs.readFileSync(p)); console.log(p, JSON.stringify(x,null,2));
+}
+NODE
+All prior fixed-name watchers, collectors, root readers, control producers, admission scripts and failed readers have already run or are superseded. Never rerun them blindly: wx outputs/markers preserve single invocation. Future producers/readers require new versioned paths and fresh independently reviewed source/run/admission bindings.
+
+PRESERVED WIP / DO-NOT-TOUCH
+MAIN protected11: index.html; src/main.js; src/ui/hud.css; src/ui/hud.js; src/ui/input.js; tools/test-soldier-view-ui.mjs; tools/test-view-ui.mjs; tools/test.mjs; NEW-civil-war-video-game.code-workspace; docs/shiloh-preflight.md; tools/test-feedback-ui.mjs. Exact current hashes are in REWARD/.out/v1-stop-closeout-before-docs-r1-20261009.json and safe-stop-terminal receipt. tools/test.mjs CURRENT139239B SHA4cb9b1eced08887e162c058f82c6939af3c7da2dad04cd5f35c6e2d65fdb8fc3 contains protected P2o WIP plus owned F6c changes; original historical138162B hash is NOT its current hash. Preserve every byte. Never wholesale stage it or replace it with clean Git; use tested isolated candidate blobs for any owned integration and prove the protected working-file inverse separately. Never stage workspace/Shiloh files or dependency links.
+Keep all earlier worktrees listed by git worktree list, dirty sources/docs and ignored failures/HOLDs/superseded models/readers/PNG/raw logs. No deletion, reset, archive, offload or cleanup authority is granted by this packet. Existing source/history/combat/RNG/store/save/loot/fielding locks remain binding. Failed UASTC/BC7/ASTC candidates are not fieldable assets. No automatic/native/render/art approval from CI, Preview, silence or a diagnostic.
+
+ACTUALLY ACCEPTED PRODUCT BOUNDARY
+F6b158cb60a1dd26e84161fcdc97342d7f239369f90; CI37913714310 attempt1 and Pages37913714346 SUCCESS. Actual567ALLPASS/565unique/49emptyaxe scopes/54completeCLI streams/global67/captured66/activation65/17public/all18root and helper directly viewedPNG. Complete raw32953859B SHAb9367900153087c968bf688f09524a39d61db742adb86ebae8cd4b4c4b36579f; packed1046237B leaves2339B; rawlog6918211B SHAb0596f4f3594c9b4c9bed5b9777aca7df8ce9ce30233a9ec47c4764b23f6d7da. NEXT/.out/p3f6b-independent-actual-readback-r1-20261009.json is accepted receipt. F6a0e505fd61dead1f95659eaa2f8652f31935a50bc/37845732627/37845732638 remains its accepted ancestor. Historical artifacts11580300972/11581668808/11608984625 cannot be substituted for a new exact run.
+
+F6c728 IS COMMITTED/PUSHED BUT NOT ACCEPTED
+Source68=8changed60locked compared directly to158; all67 inverse files exact; older overrun67/captured66/activation65 subsets remain separate. Local87 PASS/unit25/query12positive+12owncontrols/local10root and helperPNG only. Existing original authored gear is distinct from generic runtime weapon and physical gun/limber identity; query has no reward/inventory/save/captor-fire/retake/recrew authority. Preserve descriptor-safe drift BEFORE restoration, source-order versus capture chronology, zero RNG and next5, equipment refusal distinct from six Game query refusals, full mutant/case/fixture records.
+Exact fullCI37952988962 attempt1 at728 CANCELLED at45-minute boundary:557ok/0FAIL, last soldier-focus-exit four seconds before cancellation; eleven final soldier checks UNRUN in aggregate. Probes113896292171 passed54CLI; Pages37952988948 SUCCESS. Both activation standalones skipped; downstream fullproofENOENT last-result.json; failedartifact11630165846 is NOT accepted proof. No hang or causal query slowdown proved.
+NEW complete failed ZIP1619126B SHA2feb43f82f6f1f9cf2d10e970d0d79beb33f6603b9b0451ab22c0da521d4f31f and step log7006973B SHA4947f890b52e34219946a684acb3b3b983c30d687f19a6b9f093d21a3eecede2 preserved under p3f6c-failed-ci-37952988962-* names.189 accepted adjacent intervals median1.815655x previous successful run; broad existing work slower. Cancellation is not explained by the last printed name or passing focused runs.
+Complete F6c model6 raw33006726B SHA3b994151ec86b2b7a5b188feb313088e7fa4296119d511a596ad1edd809330c8; wrappermember393345B SHA83ce68f87c3a7d9301bf54583af0d6217cd94b10fa0b49b28d1a1c54a15807ff. Node25 modeledpacked386894/headroom661682; Node24 packed386970/headroom661606; modeledlogs7032982. These are modeled values, not new fullCI actual bytes. NEW/.out/p3f6c-local87-combined-admission3-20261009.json61198B SHAa98085165933267885366aaf01cb36221c26d19e553681ea8c1eee6bc9b3c7a6 binds85retained corrected-admission2 gates plus corrected86/87admission3. Old local15 whitespace and86-refusal failures remain preserved.
+
+COMPLETED PRIVATE FIELD AND SOLDIER TIMING
+DIAG priorfb37deb5666481b825f5e7693eb8d7c6ff40efc1/run37961197018 attempt1/job113924163621 SUCCESS; complete A158/B728/A2=158 --field55/56/55. Four full records/207-208-207Git/fullstreams/CPU semantics/rawZIP root and helper CLEAR_DIAG_ONLY; shared ranges1044355B. A128029ms/B135854/A2123837ms; Bquery12202ms; ready-to-axe70032/67286/67371ms. Broad earlier1.8x slowdown not reproduced; causeUNPROVED. Receipt DIAG/.out/p3f6c-timeout-independent-actual-readback-r1-20261009.json.
+LatestDIAG90dc/run37970371836 attempt1/start2026-10-09T18:01:21Z/job113955142413 SUCCESS, job18:01:23–18:18:07Z. Source-exact fresh --soldier-view A158/B728/A2=15851/52/51 includes31/32CPU prelude plus20 ORIGINAL held-view predicates. Immutable Node24.21.0/Playwright1.63.0 container;600sec/phase/45min/job/owned PID-starttick-PGID teardown and complete forensics unchanged. All four full JSON envelopes restored; source207/208/207/fullcanonicalstreams/rawZIP+stepCRC/root CPU semantic validators+independent readback CLEAR_PRIVATE_SOLDIER_COMPLETE_DIAG_ONLY. Sharedranges1158809B. A313891ms/B323938ms/A2309833ms; held-to-final247333/246975/244623ms; Bquery11984ms; A2/A0.9870719453568277/B-parentmean1.0387222553565358. All20 original names/data retained, null default axe/empty held axe, exact source at158/728. Full independent reexecution of every20 predicate is limited by unretained closure inputs; aggregate sequencing, child CPU/RSS, host stability, timeout/query/soldier causality and full suite/device acceptance remain UNPROVED/UNRUN. Soldier PNG remain retained in cloud but UNVIEWED; no visual acceptance.
+DIAG receipts: p3f6c-soldier-timeout-four-actual-r1-20261009.json; restored-{actual,A,B,A2}-r1; raw-step-readback-r1; root-semantic-actual-r2; independent-actual-readback-r1. These are existing .out files. Rootreader-r1 wrong-root HOLD and corrected-r2 preserve exact version history. Watcher18078/collector80672/rootsemantic57914 all finished; never rerun them.
+
+COMPLETED PRIVATE REWARD FOCUS DIAGNOSTIC
+REWARD550c087bd0cfda3fbaaf460c1628d4c987090faf/run37968732603 attempt1/start17:47:20Z/job113949598144 SUCCESS.208 Git/4owned / 204exact 158; owns PRIVATEworkflow/probe plus two product files ONLY. Productcandidate: src/reward/sequence.js renderAfterAction headingtabindex-1 and initialheadingfocuspreventScroll; src/reward/reward.css after-actionfooter padding-bottom8px. Fonts, complete text, CTA/action, animations,3pxoutline+3pxoffset, Game/outcome/export/store/cards/army/RNG unchanged. PRIVATEworkflow/probe must never be cherry-picked into production wholesale.
+WholeJSON/fullstreams/source208/rawZIP+stepCRC/ranges1331363B/ALL5root+wcag-helper directly viewedPNG independently CLEAR_PRIVATE_FOCUS_COMPLETE_DIAG_ONLY.300x740/reduced-motion/4formations920men2guns214figures<=240cap/WebGL0 fixture; no ordinary field boot. Initialheading fullring visible; nativeTab reachesCTA; native reading103->0->103 exposesalltext; bottomCTA ring725.890625 insideclip728. Three genuine controls: offscreenheading, scrollrefusal, offscreenCTA. All exact native style-presence/raw attributes before/immediate/settled restoration equal original absent state; strict geometry restored. Both actual CTA Enter and freshheading Enter advance rewardstepa->b; sixnextGameRNG equal independentreference; snapshotcalls1/writes0/WebGL0/fullauthorityequal/cleanupPASS.53fullgeometrysamples retained and rederived.
+REWARD/.out/reward-focus-attribute-independent-actual-readback-r1.json is finalreceipt; restored-report/restored-envelope/actual-readback/raw-step-readback/root-semantic-actual-r1 files retained. All5 reward-viewport-1791568077688-{initial,bottom,top,scroll-control,focus-control}.png directly viewed. PriorFAILED37966820754/3a45945 report912126B/stdout357396B/stderr0/initialPNG161891B/rawCRC/artifact11634291766 preserved; old exactstyle-restoration FALSE, no Tab/native/Enter/RNG/fullcompletion claim. CSSOM causeUNPROVED and old failedrun never retroaccepted. Newattribute-witness proposal1 orderingHOLD/proposal2 correction and all old consumer HOlds preserved. No MAIN adoption, broad regression, ordinary field boot, full AA, native or release acceptance.
+
+LATEST ACTUAL PHASE_A BOUNDARY — CRITICAL AMENDMENT, 2026-10-09
+
+PROD=/private/tmp/the-civil-war-reward-focus-production-20261009, branch reward-focus-production, HEAD e65bab6d8b86e1dee06dec201ba051e85130f54b. Tracked checkout CLEAN/emptyindex; only untracked node_modules symlink, resolving EXACTLY to MAIN/node_modules (a real directory), stays unstaged. No product source has been adopted in PROD or MAIN. Generated candidates, producers, failures and receipts are only in PROD/.out. Virtual trees are drafts, not Git checkouts, accepted product or ready-to-run tests. No private workflow was copied. Do not overwrite historical NEW/NEXT/OLD/DIAG/REWARD. Latest MAIN docs relay leaves product728 and all11protected unchanged. COORDINATION absent/rootownership released at relay; re-establish solewriter before any further edits.
+
+Corrected opener contradiction: src/reward/sequence.css DOES NOT EXIST. Actual CSS seam is src/reward/reward.css:161, .rw-aar .rw-foot padding-bottom8px. Actual JS sequence:431/442 adds headingtabindex-1 and focuses headingpreventScroll. Both product files at158 and728 are exact; private550 contains exactly these changes. Correct every proposed/readback path to reward.css; preserve all original historical docs/receipts. This path correction resolves the naming contradiction only, not production admission.
+
+ACTUAL RUN evidence, all new fixed producers ALREADY INVOKED and must not be blindly rerun:
+- .out/reward-focus-admission-inventory-r1-20261009.mjs -> inventory-actual-r1: all208tracked e65 bytes, all68frozen source bytes, protected11, exact two seams. PASS, inventory-only.
+- .out/reward-focus-virtual-generator-r1-20261009.mjs: FAILED before writing candidate files. ERR_ASSERTION expected two identical setup-node stanzas; test uses - uses, probes use named stanza. failure-r1 retained with exact producer hash and honest missing standalone raw stream file (combined tool output only). No product/source edit.
+- generator-r2 PASS draft-generation-only; complete stdout1110B/stderr345B in generation-actual-r2. Expected stderr is Git’s three absent-probe-path diagnostics. .out/reward-focus-virtual-r2-20261009 full209 draft files total34795166B; whole-file inverse expansion made focus tool12472612B. Preserve this superseded draft; do not adopt it. Its docs come from728, unlike currente65.
+- generator-r3 PASS draft-generation-only; source15604B SHA1cf5974e09a340fa25330bdc7766aaa3e1c107805dd92a937aea3f9109d3b0b9; complete stdout1113B/stderr345B. Sparse exact-cardinality chronological replacements inverted in reverse replace whole-file duplication. .out/reward-focus-virtual-r3-20261009 full209 files total16376270B. Current e65 docs are preserved. Product3substitutions exactly match550. Historical parents/subsets/components/inner codecs remain unchanged. r3 has deliberate failing placeholder checks, no complete standalone dispatch, no sourceA/B/A2 or semantic verifier: DO NOT RUN its proposed UI/full/unit/standalone tests or stage its files.
+- .out/reward-focus-source-only-reader-r1-20261009.mjs PASS actual generated-source readback; complete stdout382B/stderr0. Source4469B SHA5a597fdfd469edffadba2bad6916c9f52bed5fd93633afa5eecf322c15ad2899. .out/reward-focus-source-only-actual-r1-20261009.json binds all209generated files/11owned198exacte65; protected11; actual captured66/13changed53locked, overrun67/13changed54locked, loadouts68/10changed58locked. New focus70 contains old68 plus tools/test-practice-ui.mjs and new focus probe; all69 existing source inverses restore EXACT728, unique ordered membership and realbytes checked. Runtime60/result62/activation65 historical inventories stay separate. Independent /root/focus_admission_review rehashed/reapplied all69 inverses, CLEAR_ACTUAL_DRAFT_SOURCE_ONLY. No cases, browser, test runner, GPU, fullmodel, production acceptance or CI executed.
+- .out/reward-focus-byte-feasibility-r1-20261009.mjs PASS STRICT PARTIAL LOWER BOUND ONLY. Source4121B SHAb6b453f5d1389a78b3471c29445827190d65a86d5bcf8b9b099cf8e048426f0b; complete stdout2216B/stderr0. Exact baseline model raw33006726 and complete private focus report8272008B conserved: all103 original parsed fields exact, new complete report exact. Outputs .out/reward-focus-partial-size-raw-r1-20261009.json36008455B SHAcc476043c63740494574d794d530da80964c8169864fa6272fb77423091acba1; member400191B SHA0865b47ec03e762f8f8a0dafbe8aa6731c7c9143c5039fa33575858d86259abb; deflate member393742B SHAbad4f8961a6283378199cb8f764fbf4e57a2b7fcdf527722f512caa5d925e69d. Raw headroom14323193B is ONLY this partial serialization’s headroom. CompleteZIP/containeroverhead/newsource records/ordinaryauthority/newABA/newrestoredgeometry/semanticmutants/CLI/rawlogs remain UNMODELED. Independent helper puredecoded envelopes/checked deflate consumption/full103fields/fullreport, CLEAR_STRICT_PARTIAL_BYTE_READBACK_ONLY. NEVER call it a complete production model or new packedZIP acceptance.
+
+Root and independent helper passed only the described source/partial-byte scopes. Syntax checks on generators/source-only reader and emitted four modules passed. All new product npmtest/browser/fullCI/Pages/native/visual gates UNRUN. No new PNG was rendered/viewed or product accepted. Current proposed counts, NOT frozen/actual:582ALLPASS/580unique = old568/566 plus13new focus names and1ordinary launch; unit25/49axe paths inherited, images23 = old18+5focus, public18 = old17+reward.css. Derive all final arrays/order/counts again after implementation; do not reuse estimated CLI totals (not yet reconciled). Global70 must include ordinary practice module; old68 deliberately does not. r3 actual historical counts13/53,13/54,10/58 are source-only measurements, not accepted record metadata. New expected Git209/11codeowned198exacte65 before4docs; with4owned docs proposed15owned194unowned.
+
+PROPOSED CODE OWNERSHIP, NOT ADOPTED: src/reward/sequence.js; src/reward/reward.css; sw.js (r3 proposedcw-v40); tools/test.mjs (clean isolated blob only); tools/test-practice-ui.mjs; tools/test-surrender-activation-ui.mjs; tools/test-captured-guns.mjs; tools/test-battery-overrun.mjs; tools/test-captured-loadouts.mjs; NEW tools/test-reward-focus-ui.mjs; .github/workflows/ci.yml; four docs. All other bytes exact currente65/728 as applicable. r3 CI proposes exactNode24.21.0 in BOTHjobs and explicit728fetch+guards in BOTHjob setup formats; immutablePlaywright/container/45min/oldparentguards/fullsoftwareload/old56canonical streams+producer/upload unchanged except reviewed additive UI-reader commands. Never copy private workflow wholesale. Prove amended reader/producer/log closure before adopting proposedCI.
+
+NEXT EXACT BOUNDED SLICE: complete the PhaseA production admission in PROD/.out using fresh r4-or-later versioned paths. Resume actualr3 source proofs; preserve r1failure/r2/r3 and every earlierreceipt. Root authors code/contract; one readonly gpt-6.1-sol/medium quality helper challenges. No source adoption or fullsuite retry yet.
+1. Read the complete actual source-only and partial-byte receipts plus r3 generator/proposal. Derive contract from actual source70 and all209Git bytes. Keep acceptedF6b authority/unacceptedF6c separate.
+2. Fix the ordinary practice hook: r3 inserted it BEFORE the original opened snapshot/50ms assertion. Move it AFTER the original practice-reward-real-army check, preserving original snapshot/assertion timing. Add a settled CSS/heading/full-ring witness and complete before/after Game/outcome/reward/cards/army/export/store/write/RNG-reference authority snapshot. Do not extend an old deadline, force focus/scroll, mutate simulation or replace original fit/action assertions.
+3. Finish the new modular regression from private test-reward-viewport-ui.mjs without copying its workflow. Retain every original fixture/native reading/nativeTab/three genuine DOM controls/exact rawstyle presence-value restoration/two actualEnter/next6RNG/error-warning/WebGL/cleanup assertion and full records. Newmodule calls browser only through existing fullsuite owner exactly once; preserve original suite order. Keep CPU fixture300x740 reducedmotion4formations920men2guns214figures<=240/WebGL0 distinct from ordinary field evidence.
+4. Append explicit geometryBefore/geometryAfter records at EACH heading/scroll/action restoration; the private producer asserted exactgeometry equality but did not retain every closure input needed for future independent replay. Preserve original asserts and add retained fullrecords, not fabricated observations. Strictly rederive all native sample text/ranges/clips/fullrings/reading/controls/authority/RNG from raw records. Add meaningful source A728/Bcandidate/A2=728 delivery of the TWO product seams only: exact servedsource bytes, requests/hash binds, original index delivery/fixture flags, native initial focus/Tab/reading and unchanged authority. Parent states fail the measured focused-heading predicate; candidate passes; restore all owned mutations byte-for-byte including rawattributes/listeners/descriptors/focus/settledgeometry/authority/RNG. No timing or renderer causality inferred. Modeled or prior separate records cannot substitute for actual fresh A/B/A2/fullaggregate.
+5. Define complete independent semantic reader/positive+ownnegative controls and standalone dispatch. Preserve13focus predicates plus ordinary predicate or explicitly review corrected final names if code-derived coverage differs; freeze exact full order/multiset, allAXE paths, CLI stream totals, PNG23/public18 or actual derived values. No placeholders or guessed counts may remain. Standalone readers consume the same complete fresh last-result JSON, retain original activation predicates/equality, report complete native earlyrefusals/caught messages and no filtered warnings.
+6. Recompute newest sparse source inverses bottom-up, newest-first then old historical exact inverses, preserving all historical parent SHAs/subsets/acceptedcomponents/codecs. Include global70 and69existing parent inverses; explicitly prove newprobe absent in parent, source-order/uniqueness, original exports/defaults and protectedMAIN11 conservation. Independently test all metadata/category0 digests and genuine own mutation refusal guards; source-only pass does not prove historical semantic readers. Keep equipment/query/surrender/gun/prisoner/reward authority/RNG locks.
+7. Build COMPLETE new aggregate model from full accepted/retained baseline and amended real-case records, preserving all old canonical traces/special undefined/-0/scalars/order/descriptors/mutations/cases/fixtures and full source matrices. Add full newregression/ordinary/A-B-A2/restore inputs and all reader controls with lossless reconstruction; no snapshots guessed or evidence omitted. Update category source records/digests, actual expected names/order, every complete normal/control stdout/stderr/log/setup/producer stream, exact CIuploadmember/completeZIP/publicbytes/PNGs/networkbudgets. Verify whole CWPROOF1 quality6/88header/rawSHA/strictconsumption roundtrip, accepted mode8/Brotli11 unchanged, packed/member1MiB/finalraw48MiB/logZIP16MiB/png512KiB/range2MiB/shared3MiB/45min. Partial36008455 must not be reused as full admission.
+8. Clone/version ALL affected existing consumerclosure/readers against source70/newcounts/outputs/newactualpinPENDING. Keep early-refusal/maxOutputLength/bytesWritten/206/length/window/attempt/artifactexpiry/CRC/descriptor/ZIPsecurity/exactCAUGHT gates. Seven serial readers plus newfocus image/semantic reads need literal commands/outputnames, root+helper directview of everyactual requiredPNG, full CRC-bound logs and servedbyte readback18 (or correctedderivedtotal). No oldfixed37952988962 collector can run. Freeze every literal local gate replacement to the historical87 list below, including four B/A2 noGPU DOM wrapper inverses and exact source/currentfixture binds, complete streams/outputadmissions and all newsource/semantic/model/control gates. Existing87 were already run on oldsource; never label retained gates as newcandidate passes.
+9. Write complete amended PLAN/HANDOFF acceptance invariants/literalgate list and independently CLEAR the entire source/model/reader/capacity contract. ONLY THEN PhaseB source adoption in owned isolated root based verified currentMAIN docscommit/product728. Future .out reservation must cover all drafts/backups/fullJSON/ZIP/rawlogs/PNGs/readers/closeout, not partial-fit estimates. Reserve160MiB was used for thisPhaseA; latest beforecloseout PROD.out88271525B/free14584537088B. Refresh totals before EVERY generated write. MAIN/NEW/NEXT/OLD remain too tight for blindly routing fullreadback; never evict oldevidence.
+
+AFTER FULL PHASE_A CLEAR ONLY: proceed PhaseB/C and ALL remaining v1 work as carried below. Preserve MAIN dirtyharness139239B SHA4cb9...; never overwrite/stage it wholesale. Integrate only explicit tested isolated blobs with exact inverse preservation and actualindex209/owned15/unowned194 or freshly derived fulltree binding. Ordinary product commit/push WITHOUT skipCI; one fresh exactSHA fullCI/Pages with full actual records/readers/allPNGs; failedCI next boundeddiagnosis, no luckyretry/cap/timeout/oracle change. Docs-only contextrelay uses skipCI, does not provide product acceptance. Continue dependency-ready P1-P7 after acceptance, no routine milestone stop.
+
+READONLY RESUME COMMAND FOR LATEST PHASE_A (NO PRODUCER OR TEST)
+cd /private/tmp/the-civil-war-reward-focus-production-20261009
+node --input-type=module - <<'NODE'
+import fs from 'node:fs';
+for (const p of ['.out/reward-focus-source-only-actual-r1-20261009.json','.out/reward-focus-source-only-invocation-r1-20261009.json','.out/reward-focus-byte-feasibility-actual-r1-20261009.json','.out/reward-focus-byte-feasibility-invocation-r1-20261009.json','.out/reward-focus-relay-terminal-r1-20261009.json']) {
+ const x=JSON.parse(fs.readFileSync(p)); console.log(p,JSON.stringify(x,null,2));
+}
+NODE
+Before choosing work also git -C /private/tmp/the-civil-war-reward-focus-production-20261009 status --short --branch; git -C /private/tmp/the-civil-war-reward-focus-production-20261009 rev-parse HEAD; git -C /private/tmp/the-civil-war-reward-focus-production-20261009 diff --cached --stat; verify exactnode_modules link and no foreignwriter/process. All oldproducer/readback commands below remain historical, not an execution script.
+
+EXACT NEXT BOUNDED TASK / PHASES / COMMIT BOUNDARIES
+Recommendation: freeze the PRODUCTION admission contract for the now-measured two-seam reward focus repair. Its actual control evidence supports a bounded fix; the isolated timing diagnostics support no causal timeout repair or lucky full-suite retry. Keep F6c aggregate acceptance OPEN.
+PhaseA is read-only / .out-only admission design in a capacity-admitted isolated root: reconcile above complete diagnostics, diff the TWO product seams at REWARD550 against accepted158 and source728; prove compatibility with MAIN728 and protected11; enumerate EVERY proposed production source/index/inverse/harness/SW/CI/consumer change BEFORE editing. Root alone authors the complete contract; one read-only quality helper challenges it. Do not invent future counts. Current68global includes locked CSS/sequence, so merely copying two files violates its60locked/source-inverse proof. Determine exact new changed/locked counts, inherited subset behavior, appended original UI predicates, candidate complete expected check order/multiset/axe scopes/CLI/public/image counts, full serialized records/logs/byte budget, A/B/A2 source delivery and all new mutation/restoration controls. Add no persistent subsystem or new evidence container. Preserve all historical manifests and accepted codecs. Write updated PLAN/HANDOFF acceptance invariants and literal gate list; independently CLEAR complete source/model/reader/capacity contract before adoption.
+PhaseB only after CLEAR: implement the minimum reviewed product diff and appended regression coverage in a NEW owned isolated candidate based on verifiedMAIN docs-closeout commit/source728. Preserve protectedWIP through exact separate source inverses; back up only whitelisted owned paths in admitted .out and version outputs. Retain all prior assertions, trusted/native event paths, fonts, full text, authority and RNG. Initial heading/Tab CTA/native full reading/three genuine negative controls/exact raw-attribute and settled geometry restore/two actualEnter actions/next6RNG must remain meaningful. Include ordinary field/reward launch coverage and unchanged save/loot behavior; no broadened focus or renderer rewrite. No source edit or privateworkflow integration without the amended exact acceptance contract.
+PhaseC after complete local gates/model/inverses/independent actual candidate+index CLEAR: stage ONLY explicit owned tested isolated blobs and docs; never MAIN dirtyharness wholesale. Independently compare proposed/index all Git entries and every unowned parent byte, protected11 inverse and unchanged history/defaults. Commit/push ordinary implementation SHA WITHOUT skip CI. Await exactly its required CI/Pages, read actual complete artifacts/full raw logs/metadata/source/semantics/publicbytes and directly inspect every required actual PNG root and independent helper. FailedCI is next diagnosis; no count/cap/timeout waiver or lucky retry. No acceptance from merged isolated runs. Release ownership/update docs at an accepted or preciseHALT boundary; then continue every dependency-ready P2-P7 slice rather than stopping at this repair.
+
+GATES / LIMITS / FULL ACTUAL READBACK CONTRACT
+Historical current87 local CPU/noGPU DOM gate commands are appended below verbatim for accounting; they ALREADY PASS and are NOT a blindly executable resume script. Oldsource/manifests and wx outputs must not be rerun or applied to changedCSS/sequence. The PhaseA amended production contract must carry a literal replacement list, versions/outputspace/counts and before/after invariants before execution. Heavy browser/full suite/stress/encoding/Blender on Actions, never Mac. Doc-only closeout used diff/source conservation checks; no new product tests run for docs.
+Current unacceptedF6c full contract (baseline BEFORE any focus amendment):568ALLPASS/566unique/49emptyaxe scopes/global68/overrun67/captured66/activation65/unit25/56canonicalCLI+1proofproducer=57total/probes54/test3CLI+producer1/17exactpublic/ALL18root and helperPNG. Do not retain these counts unchanged after adding tests; freeze correct additive numbers and exact order/multisets. A default query false/absent path must remain exact; all old captured12+12, overrun14+14/37transport+2supplemental, activation and foreign/descriptor/paused/zero/terminal/refusal controls stay genuine. Preserve original source matrices/Git bindings/inverses/inner complete numeric traces and zeroRNG.
+Wholeoutertransport CWPROOF1/Brotli6/88byteheader restores ALL rawJSON byte-for-byte/SHA; accepted inner mode8/Brotli11 remains exact. Retain complete original case/mutation/fixture/trace/specialundefined/-0/scalar/order/descriptor evidence. No summarization, arraydrop, sharding, cropped screenshots, filteredwarnings, fakepins or changingoracles. Lossless envelope fit alone is not source or product acceptance.
+Locked caps: packedZIP1MiB and wrappermember1MiB; each finalrawJSON48MiB; complete rawjobZIP/step/log16MiB; each selectedPNG512KiB; each HTTP range2MiB and shared cumulative percollector3MiB;45minCIjob; .out314572800B EACHroot; free>=5GB. A phase limit of 600 seconds applies only existing soldierdiagnostic, not production waiver. Refuse oversize/trailing/concatenated streams, excess inflate/allocation, malformed ZIP/descriptors/CRC/source/hash/range/content-length/window/attempt, unknown/duplicate/expired artifact or truncated stdout. Honor native early-refusal counters and exact caught messages. Never raise caps/quality thresholds/timeout or relax predicates.
+Before ANY generated write, stat-only scan concrete whitelisted .out root, realpath containment and no symlink; reserve all source backups+complete rawJSON/ZIP/logs+allactual PNG+reader receipts+closeout. MAIN.out309676939B and NEW.out254528097B before closeout; a full future F6c68.5MB reservation will NOT fit NEW's remaining space. Use a separately reviewed concrete isolated outputroot/admission, not removal of old54MBNodearchive/125MBbinary/failures. No home du/find, no files>100MB parsed, no outputoutside.out, no cloudoffload/evidencecatalog/Drive/deletion. Record refreshed actual totals, never assume this snapshot grants admission.
+Production CI commands after localCLEAR: npm ci; verify exact container/Node/Playwright and BOTH existing setup/history parent fetch guards; npm test in existing full software workload; both existing activation UI standalone commands; unchanged proofproducer/upload manifest and full probes job. Literal baseline test commands (already attempted at728, not authorized as a lucky rerun):
+
+  npm test
+  node tools/test-surrender-activation-ui.mjs
+  node tools/test-surrender-activation-ui.mjs --prove-fail
+
+Both standalone commands must retain their ORIGINAL UI predicates, full records, complete streams and aggregate equality in a fresh reviewed contract. The container is mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27; pin Node24.21.0 and Playwright1.63.0 unless a deliberate separately admitted runtime change is necessary. One exact full aggregate with retained last-result JSON for native UI readers; successful upload may exclude ONLY originalJSON in favor of exactcompletecwproof, failed upload preservesoriginal. Source guards before Node include parent158 in BOTHjobs and exact historical current-field4f6113a624e0e533825c0be414bb36f3b073f726/reinforcementaaf10145531130f3ec201d6332f6759599bc46a4/captured-gunb81dad641ff86c7586b13abf57dce257e299fef0/overrun0e/currentparent158 identities. Do not copy diagnosticworkflow into production.
+After push: git rev-parse HEAD; gh run list --repo adhanke-star/the-civil-war --commit NEW_SHA --limit 10 --json databaseId,name,headSha,status,conclusion; gh run view realCI_ID and realPAGES_ID with headSha/status/conclusion/jobs/url. Await terminal, bind actualSHA/attempt/start/job/uploadwindows/artifactidentity/expiry/exclusions. CompletedGREENpin must receive independent actual amendment CLEAR before one boundedcollector; cancelled37952988962 successpin/readers are obsolete and cannot be reused for a new run.
+Sevenserial readers required AFTER fresh exact completedgreen pin: completeaggregate collector; root fullsemantic/source/stream reader; F4PNG normal; F4PNG controls; F4PNG aggregate; objectivePNG; activationPNG. Use newly versioned independently reviewed counterparts of NEW/.out/p3f6c-outer-reader-p3f6a-{collect-completed-r3-20261008-review3-admission2,root-actual-readback-r3-20261008-review3-admission2,read-ci-f4-images-r2-20261008-review2-admission2,read-ci-objective-images-r2-20261008-review2-admission2,read-ci-new-images-r2-20261008-review2-admission2}.mjs, with realNEWCI/SHA/Pages pinned throughout and separate normal/controls/aggregate invocations. Freeze each literal new command and generated filenames in PhaseA/actualpin amendment; do not execute old fixed command37952988962 or pendingpin. Whole rawlogs must be CRC-bound (gh display may truncate huge lines), full orderedchecks and all canonical positive/control streams rederived, exact working+Git source/inverses and publicservedbytes checked. Root and independenthelper must DIRECTLY view ALL actual required PNG before finalCLEAR. If any gate fails, preserve raw failure and HALTaffected lane; no partial acceptance. NativeGPU/iPad/art/performance/fullAA remain separatelyUNRUN.
+
+OTHER READY V1 WORK AND SOURCE LOCKS
+Read-only sourceinventory already saved at DIAG/.out/v1-battle-source-inventory-r1-20261009.json. Current src/sim/phase.js pack shape is {version:1,id,title,phases:[{id,scenario}]}; only HenryHill actual route. Frozen old Shiloh JSON37939B/f30aba5292525bc403b203baa397b8d5c97ed83805a68c470c64e29628364075 has ONE HornetsNest modeledphase (US7/CS5+4arrivals), missing dawn/day2. StonesRiver63740B/479e9ed38456a53b348af5e1394fe5fc5cab27effa2b67bc99d982ac85ec66a9 has RoundForestDec31+McFaddensFordJan2; Chattanooga40836B/a21f691eabf709b18795f94e9ad0227342179bdfa740a9acf4a0c37c96fc27ec has OrchardKnob/Lookout/Missionary. These are reuse candidates, not approved newphasepacks or georeferenced terrain; oldVerified labels are not fresh two-source verification. Do not apportion unsourcedstrengths, invent units/people/ranks/presence/outcomes or turn schematic terrain into evidence. Protected docs/shiloh-preflight.md retains actual primaryscan pages112/277/282–285/602–603, Fraleylead,03:00vs04:45/04:55 Disputed,190Hardcastle inclusive-strength uncertainty and ungeoreferencedmaps. Reuse existing olddata/citations before newresearch; chronology Shilohfirst,3–5phases/battle15–20min each required. No historical outcome forcing.
+Remaining scopes are binding, not an optional expansion: P2feedback/workbench/contextloss/blackterrain/livingtitle/camp/fullHUD; P3retake/recrew/armsloot/cavalry/commanders/delegation/roads/terrain/friendlymask/AI/regiments/actualordersemantics; P4allthree battle packs/timedobjectives/grades/defeatcarryover/Grantloan/briefings/slavery-emancipation-USCT-homefront/30sreplay/three saves/Battlesnoloot/navigation; P5gearcombatOVR/fiverarities/supplieswearwagons/depotdatedshop/training/all 20badgesBronzeSilverGold/XFactors/reputation1–10/enemycarryover/records/~20–25OVRgrowth; P6approvedart/uniformcolours/terrain/effects/soundmusic/livingcamp/cards/gallery/settings/accessibility/nativeperf; P7agentfresh-firstreward/sustainedbattle/fullcampaignsave-reload-defeat-replay-camp/historicalnoloot/touchkeyboard/offlineupdate-recovery playthroughs, seededbalance/fullregression/stress/ChromiumWebKitFirefox/source-license/tagRelease. Nativeconstraints stay explicit; unavailable proofs do not authorize finishingclaims or recurringuserchecks. UG/Gettysburg-quality play/look is the bar, not highgatecounts.
+
+HALT / DOCUMENTATION / CLOSEOUT
+Before altering source, show one recommendation plus brief reason for a consequential reversible choice; existing authorized boundedwork does not need a routinepermission pause. Stop affectedphase on dirtysource/inverse contradiction, foreignowner/process, undecodable/fullmissingraw, unexplainedgatefailure, arbitraryfuture counts, unsupportedhistory, reservation/cap failure or invalidactualpin. Preserve precisely where it stopped and every failure receipt, restore ONLY owned experimentalmutations byte-for-byte with rawpresence/descriptors/listeners/geometry/authority/RNG checks, never unknownwork. Do not guess device/art/visualapproval.
+At each accepted or precisely documented resumable boundary sync HANDOFF/PLAN/STATE<20lines/materialDECISIONS, stageonlyownedtestedfiles/docs, independently inspect proposed+actualindex, commit/push/readexactSHA CI/Pages. Release/updatecoordination ifpresent; maintainone writer. Assess provider/sessioncapacity; no verifiedweeklyquota is available, so leave a freshsame provider packet if healthy or routeexplicitly toClaudeCodeOpus5.5high/xhighifavailable whencapacity requires it. Never silently lower mainquality.
+Required finalreport each session: exactHEAD/origin/clean-dirty/index/WIP/ownedfiles; completedRUNversusUNRUN with realrun/attempt/source/hash/count/PNG/rawlog/semantic evidence; private versus product versusnative acceptance; remainingv1defects/blockers/nextboundtask; activeprocess/owner/capacity status; saved/pushed docs; full fenced zero-context continuationpacket builtfrom live Git/disk. Final v1FINISHED ONLY actual P7 release with no requiredworkremaining. Userstop is an interruption; do not imply invisibleautonomousworkcontinues.
+
+HISTORICAL CURRENT87 LOCAL COMMANDS (ALREADY RUN/PASS; AMEND BEFORE FUTURE EXECUTION)
+# 1
+node --check src/sim/phase.js
+# 2
+node --check src/game.js
+# 3
+node --check src/sim/combat.js
+# 4
+node --check src/units/unit.js
+# 5
+node --check tools/test-surrender-runtime.mjs
+# 6
+node --check tools/test.mjs
+# 7
+node --check sw.js
+# 8
+node --check src/franchise/practice.js
+# 9
+node --check tools/test-surrender-result.mjs
+# 10
+node --check src/franchise/practice-ui.js
+# 11
+node --check src/reward/sequence.js
+# 12
+node --check tools/test-surrender-result-ui.mjs
+# 13
+node .out/p3f6c-source-inverses-admission2-20261009.mjs
+# 14
+node tools/test-surrender-runtime.mjs --verify-legacy-game
+# 15
+git diff --check
+# 16
+node tools/test-surrender-result.mjs
+# 17
+node tools/test-surrender-result.mjs --prove-fail
+# 18
+node tools/test-surrender-result-ui.mjs
+# 19
+node tools/test-surrender-result-ui.mjs --prove-fail
+# 20
+node tools/test-surrender-runtime.mjs
+# 21
+node tools/test-surrender-runtime.mjs --prove-fail
+# 22
+node tools/test-deployment.mjs
+# 23
+node tools/test-deployment.mjs --prove-fail
+# 24
+node tools/test-phase.mjs
+# 25
+node tools/test-phase.mjs --prove-fail
+# 26
+node tools/test-field-admission.mjs
+# 27
+node tools/test-field-admission.mjs --prove-fail
+# 28
+node tools/test-reinforcements.mjs
+# 29
+node tools/test-reinforcements.mjs --prove-fail
+# 30
+node tools/test-reinforcement-runtime.mjs
+# 31
+node tools/test-reinforcement-runtime.mjs --prove-fail
+# 32
+node tools/test-capture-accounting.mjs
+# 33
+node tools/test-capture-accounting.mjs --prove-fail
+# 34
+node tools/test-equipment.mjs
+# 35
+node tools/test-equipment.mjs --prove-fail
+# 36
+node tools/test-reward.mjs
+# 37
+node tools/test-reward.mjs --prove-fail
+# 38
+node tools/test-save.mjs
+# 39
+node tools/test-save.mjs --prove-fail
+# 40
+node tools/test-practice.mjs
+# 41
+node tools/test-practice.mjs --prove-fail
+# 42
+node tools/test-captures.mjs
+# 43
+node tools/test-captures.mjs --prove-fail
+# 44
+node tools/test-intro.mjs
+# 45
+node tools/test-intro.mjs --prove-fail
+# 46
+node tools/test-sandbox-rules.mjs
+# 47
+node tools/test-sandbox-rules.mjs --prove-fail
+# 48
+node tools/test-look.mjs
+# 49
+node tools/test-look.mjs --prove-fail
+# 50
+node tools/test-view.mjs
+# 51
+node tools/test-view.mjs --prove-fail
+# 52
+node tools/test-spacing.mjs
+# 53
+node tools/test-spacing.mjs --prove-fail
+# 54
+node tools/test-residency.mjs
+# 55
+node tools/test-residency.mjs --prove-fail
+# 56
+node tools/test-moments.mjs
+# 57
+node tools/test-moments.mjs --prove-fail
+# 58
+node tools/test-keyboard.mjs
+# 59
+node tools/test-keyboard.mjs --prove-fail
+# 60
+node tools/test-soldier-view.mjs
+# 61
+node tools/test-soldier-view.mjs --prove-fail
+# 62
+node tools/test.mjs --unit
+# 63
+node --check src/ui/hud.js
+# 64
+node --check tools/test-keyboard-ui.mjs
+# 65
+node .out/p3f6c-admission2-focus-native-close-r1-20261008.mjs B
+# 66
+node .out/p3f6c-admission2-focus-native-close-r1-20261008.mjs A2
+# 67
+node .out/p3f6c-admission2-native-objective-r1-20261008.mjs B
+# 68
+node .out/p3f6c-admission2-native-objective-r1-20261008.mjs A2
+# 69
+node --check src/main.js
+# 70
+node --check src/ui/entry.js
+# 71
+node --check src/franchise/intro.js
+# 72
+node --check tools/test-surrender-activation.mjs
+# 73
+node --check tools/test-surrender-activation-ui.mjs
+# 74
+node tools/test-surrender-activation.mjs
+# 75
+node tools/test-surrender-activation.mjs --prove-fail
+# 76
+node --check tools/test-captured-guns.mjs
+# 77
+node tools/test-captured-guns.mjs
+# 78
+node tools/test-captured-guns.mjs --prove-fail
+# 79
+node --check tools/test-battery-overrun.mjs
+# 80
+node tools/test-battery-overrun.mjs
+# 81
+node tools/test-battery-overrun.mjs --prove-fail
+# 82
+node --check tools/test-captured-loadouts.mjs
+# 83
+node tools/test-captured-loadouts.mjs
+# 84
+node tools/test-captured-loadouts.mjs --prove-fail
+# 85
+node .out/p3f6c-transport-controls-admission2-20261009.mjs
+# 86
+node .out/p3f6c-model-and-actual-readback-admission3-20261009.mjs
+# 87
+.out/node-v24.21.0-darwin-x64/bin/node .out/p3f6c-runtime-compatibility-admission3-20261009.mjs
+
+These historical87 commands ran in NEW, not the dirty MAIN tree. Each command retained its complete stdout/stderr, exit status, source and semantic receipt; B/A2 DOM fixtures require byte-for-byte restore and their original parent binds. New contracts must version their outputs instead of rerunning fixed names. CI artifacts expire after seven days; preserve local retained evidence and do not substitute expired or other-run artifacts.
+```
+
 **CURRENT — USER-REQUESTED SAFE STOP, ALL ACTIVE WORK FINISHED (2026-10-09).**
 
 Existing v1 is **NOT FINISHED**. This boundary stops because Aaron requested a new session. MAIN product Git boundary remains unaccepted F6c7287296ae3b1c90f3a43642f33e3e886e8b889e2; the new closeout commit changes only HANDOFF, STATE, PLAN and DECISIONS and uses [skip ci] to avoid launching new work. Every other tracked blob is exact728. MAIN remains deliberately dirty in the eleven protected WIP files, with an empty index after commit. Accepted product authority remains F6b158cb60a1dd26e84161fcdc97342d7f239369f90 / CI37913714310 attempt1 / Pages37913714346, actual567/49emptyaxe scopes/54CLI/source67/17public/all18root-helperPNG.

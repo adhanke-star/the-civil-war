@@ -1,19 +1,19 @@
 # State
-2026-10-09 — user-requested safe stop; existing v1 NOT FINISHED.
-Docs-only closeout parent7287296; unchanged product source728 is NOT ACCEPTED.
-AcceptedF6b158cb60a1dd26e84161fcdc97342d7f239369f90/CI37913714310/Pages37913714346.
-F6c full37952988962 cancelled557ok/11finalsoldier+568acceptanceUNRUN.
-DIAG90dc0b4438eb49f31ffea9788c5197b45af53be0 clean/private, not for merge.
-Soldier37970371836 SUCCESS; complete4records/51-52-51/207-208-207 sources CLEAR_DIAG_ONLY.
-A313891/B323938/A2309833ms; query11984ms; aggregate timeout causeUNPROVED.
-Field37961197018 likewise did not reproduce broadslowdown; soldierPNGUNVIEWED.
-REWARD550c087bd0cfda3fbaaf460c1628d4c987090faf clean/private, not for merge.
-Focus37968732603 complete5root-helperPNG/3controls/native reading/focus CLEAR_DIAG_ONLY.
-BothEnter->b/fullauthority/6RNG exact; oldfailed37966820754 preserved.
-No MAIN focus adoption/ordinaryfieldboot/fullregression/fullAA/native/release acceptance.
-Next .out-only productionfocus source/inverse/count/model/reader/capacity contract; independentCLEAR.
-Protected11 and all historical dirtyroots/ignored failures preserved; indexEMPTY aftercommit.
-All activeActions/watchers/collectors/readbacks/helpers complete; staleowned readonlyaudit stopped.
-COORDINATIONabsent/owner released; re-establish solewriter before next edits.
-Fixedcaps unchanged; NEW lacks future68.5MB reservation, review isolated output admission.
-All remainingP2-P7/native/iPad/art/performance OPEN; no spending/deviceasks/goals/schedulers.
+2026-10-09 — context relay at PhaseA source-only boundary; existing v1 NOT FINISHED.
+Docs-only relay parent e65bab6; product728 remains unaccepted.
+AcceptedF6b158cb60/CI37913714310/Pages37913714346 unchanged.
+F6c cancelled37952988962:557ok; full568/elevenfinalsoldier UNRUN.
+PROD=/private/tmp/the-civil-war-reward-focus-production-20261009 branchreward-focus-production.
+PROD trackedclean/HEADe65; only unstaged node_modules link exactMAIN/node_modules.
+Actualfooterpath src/reward/reward.css; sequence.css typo resolved, no adoption.
+r3 draft209Git/11owned198exacte65, protected11 and sparse inverses root-helper CLEAR_SOURCE_ONLY.
+Historical66/13changed53locked;67/13/54;68/10/58; new70/all69 exact728 inverses.
+r1generation failure/r2/r3 preserved; r3 placeholder tests DO NOT RUN or stage.
+Partialraw36008455/member400191/deflate393742; rawheadroom14323193,103oldfields+fullreport exact.
+Root-helper CLEAR_STRICT_PARTIAL_ONLY; completeZIP/model/semantics/A-B-A2/readers UNRUN.
+Next completePhaseA; move ordinaryhook AFTER unchanged practice-reward-real-army check.
+Proposed582/580unique/49axes/unit25/23PNG/public18 not frozen or accepted.
+No product tests/newbrowser/PNG/CI/Pages; all protectedWIP/historicalevidence preserved.
+COORDINATION absent; root relinquishes ownership after docsrelay, re-establish before edits.
+Caps unchanged; PROD.out88271525 beforecloseout/reserve160MiB/free14584537088; refreshstats.
+All remainingP2-P7/native/iPad/art/performance OPEN; no spending/deviceasks/goals.
