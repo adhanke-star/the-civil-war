@@ -428,7 +428,7 @@ export function mountReward(root, opts = {}) {
     const btn = primary('Open the loot', () => { sfx.play('whoosh'); go('b'); });
     const sec = el('section', { class: 'rw-step rw-aar', 'aria-labelledby': 'rw-aar-grade' },
       el('p', { class: 'rw-eyebrow', text: opts.afterAction ? `Practice · ${opts.afterAction.title}` : 'After action · placeholder phase' }),
-      el('h1', { class: 'rw-grade', id: 'rw-aar-grade', 'data-grade': S.grade, text: S.grade }),
+      el('h1', { class: 'rw-grade', id: 'rw-aar-grade', tabindex: '-1', 'data-grade': S.grade, text: S.grade }),
       el('p', { class: 'rw-grade-note', text: opts.afterAction?.why ?? GRADE_NOTES[S.grade] }),
       opts.afterAction ? el('p', { class: 'rw-hint', text: `${opts.afterAction.surviving.toLocaleString()} surviving men · ${opts.afterAction.losses.toLocaleString()} lost · ${opts.afterAction.guns} crewed guns. Practice rewards and ratings are game values; this does not record the historical outcome.` }) : null,
       opts.afterAction?.surrenderResult ? el('p', { class: 'rw-hint', text: surrenderReportText(opts.afterAction.surrenderResult) }) : null,
@@ -439,7 +439,7 @@ export function mountReward(root, opts = {}) {
       S.captures.length ? crates : el('p', { class: 'rw-dim', text: 'No crates captured this phase.' }),
       el('div', { class: 'rw-foot' }, btn));
     stage.append(sec);
-    btn.focus({ preventScroll: true });
+    sec.querySelector('.rw-grade').focus({ preventScroll: true });
     announce(`${S.grade}. ${S.captures.length} captures. ${S.cards.length} cards to open.`);
   }
 

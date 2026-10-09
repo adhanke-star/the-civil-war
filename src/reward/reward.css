@@ -158,7 +158,7 @@ body.sb-open-left .rw { left: var(--sb-w, 0px); }
   animation: rw-pop-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both; animation-delay: calc(var(--i) * 110ms + 550ms);
 }
 .rw-crate .rw-shape { width: 18px; height: 18px; }
-.rw-aar .rw-foot { margin-bottom: auto; animation: rw-fade-up 0.4s ease-out both 0.6s; }
+.rw-aar .rw-foot { margin-bottom: auto; padding-bottom: 8px; animation: rw-fade-up 0.4s ease-out both 0.6s; }
 
 /* ---- b. reveal ---------------------------------------------------------------------------------------- */
 .rw-reveal .rw-head { padding-bottom: 10px; }
