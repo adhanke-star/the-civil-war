@@ -1,341 +1,60 @@
-name: CI
-
+name: F6c timeout timing diagnostic
 on:
   push:
-  pull_request:
-
+    branches: [p3f6c-timeout-diagnosis]
 permissions:
   contents: read
-
 jobs:
-  test:
+  timing:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host --init
     env:
-      GIT_CONFIG_COUNT: "1"
+      GIT_CONFIG_COUNT: '4'
       GIT_CONFIG_KEY_0: safe.directory
       GIT_CONFIG_VALUE_0: /__w/the-civil-war/the-civil-war
+      GIT_CONFIG_KEY_1: safe.directory
+      GIT_CONFIG_VALUE_1: /__w/the-civil-war/timeout-A
+      GIT_CONFIG_KEY_2: safe.directory
+      GIT_CONFIG_VALUE_2: /__w/the-civil-war/timeout-B
+      GIT_CONFIG_KEY_3: safe.directory
+      GIT_CONFIG_VALUE_3: /__w/the-civil-war/timeout-A2
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v4
-
-      - name: Fetch pinned current-field comparison
+      - name: Fetch exact diagnostic input and historical source pins
         run: |
+          test "$GITHUB_REF" = "refs/heads/p3f6c-timeout-diagnosis"
           test "$GITHUB_WORKSPACE" = "/__w/the-civil-war/the-civil-war"
           test "$(realpath "$GITHUB_WORKSPACE")" = "$GITHUB_WORKSPACE"
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 4f6113a624e0e533825c0be414bb36f3b073f726
-          test "$(git rev-parse FETCH_HEAD)" = "4f6113a624e0e533825c0be414bb36f3b073f726"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/main.js
-          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/entry.js
-
-      - name: Fetch pinned reinforcement comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin aaf10145531130f3ec201d6332f6759599bc46a4
-          test "$(git rev-parse FETCH_HEAD)" = "aaf10145531130f3ec201d6332f6759599bc46a4"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e aaf10145531130f3ec201d6332f6759599bc46a4:src/main.js
-          node tools/test-surrender-runtime.mjs --verify-legacy-game
-
-      - name: Fetch pinned captured-gun comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin b81dad641ff86c7586b13abf57dce257e299fef0
-          test "$(git rev-parse FETCH_HEAD)" = "b81dad641ff86c7586b13abf57dce257e299fef0"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/units/battery.js
-          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/game.js
-
-      - name: Fetch pinned battery-overrun comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 0e505fd61dead1f95659eaa2f8652f31935a50bc
-          test "$(git rev-parse FETCH_HEAD)" = "0e505fd61dead1f95659eaa2f8652f31935a50bc"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/game.js
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/combat.js
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/phase.js
-
-      - name: Fetch pinned captured-loadout comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 158cb60a1dd26e84161fcdc97342d7f239369f90
-          test "$(git rev-parse FETCH_HEAD)" = "158cb60a1dd26e84161fcdc97342d7f239369f90"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:src/franchise/practice.js
-          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:tools/test-battery-overrun.mjs
-          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:tools/test-captured-guns.mjs
-
+          for proof_sha in 158cb60a1dd26e84161fcdc97342d7f239369f90 7287296ae3b1c90f3a43642f33e3e886e8b889e2 4f6113a624e0e533825c0be414bb36f3b073f726 aaf10145531130f3ec201d6332f6759599bc46a4 b81dad641ff86c7586b13abf57dce257e299fef0 0e505fd61dead1f95659eaa2f8652f31935a50bc; do
+            git fetch --no-tags --depth=1 origin "$proof_sha"
+            test "$(git rev-parse FETCH_HEAD)" = "$proof_sha"
+            git cat-file -e "$proof_sha:tools/test.mjs"
+            test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          done
       - uses: actions/setup-node@v4
         with:
-          node-version: lts/*
+          node-version: 24.21.0
           cache: npm
-
       - run: npm ci
-
-      - name: Verify pinned Playwright runtime
-        run: |
-          node --input-type=module <<'NODE'
-          import assert from 'node:assert/strict';
-          import fs from 'node:fs';
-          import { chromium } from 'playwright';
-          const lock = JSON.parse(fs.readFileSync('package-lock.json'));
-          const installed = JSON.parse(fs.readFileSync('node_modules/playwright/package.json'));
-          assert.equal(lock.packages['node_modules/playwright'].version, '1.63.0');
-          assert.equal(installed.version, '1.63.0');
-          assert.equal(process.env.PLAYWRIGHT_BROWSERS_PATH, '/ms-playwright');
-          const executable = chromium.executablePath();
-          assert.ok(executable.startsWith('/ms-playwright/'));
-          fs.accessSync(executable, fs.constants.X_OK);
-          console.log(JSON.stringify({ playwright: installed.version, executable, bakedDependencies: true }));
-          NODE
-
-      - run: npm test
-
-      - run: node tools/test-surrender-activation-ui.mjs
-      - run: node tools/test-surrender-activation-ui.mjs --prove-fail
-
-      - name: Run complete proof envelope transport
-        id: proof
+      - name: Exact A B A2 source timing
+        run: node tools/diagnose-f6c-timeout.mjs
+      - name: Retain complete diagnosis outputs
         if: always()
-        run: |
-          node --input-type=module <<'PROOF'
-          // PRIVATE proposed outer transport. No production adoption or acceptance authority.
-          import assert from 'node:assert/strict';
-          import {createHash} from 'node:crypto';
-          import {brotliCompressSync,brotliDecompressSync,inflateRawSync,constants} from 'node:zlib';
-          const LIMITS=Object.freeze({packed:1048576,member:1048576,raw:50331648,range:2097152,transfer:3145728,header:88});
-          const sha=b=>createHash('sha256').update(b).digest('hex');
-          function need(ok,code){if(!ok){const e=new Error(code);e.code=code;throw e;}}
-          function uint(n,cap,code){need(Number.isSafeInteger(n)&&n>0&&n<=cap,code);}
-          function encodeProof(raw){
-            need(Buffer.isBuffer(raw),'RAW_BUFFER');uint(raw.length,LIMITS.raw,'RAW_CAP');
-            const text=raw.toString('utf8');need(Buffer.from(text).equals(raw),'RAW_UTF8');JSON.parse(text);
-            const payload=brotliCompressSync(raw,{params:{[constants.BROTLI_PARAM_QUALITY]:6,[constants.BROTLI_PARAM_SIZE_HINT]:raw.length}});
-            uint(payload.length,LIMITS.member-LIMITS.header,'MEMBER_CAP');
-            const h=Buffer.alloc(88);h.write('CWPROOF1',0,'ascii');h.writeUInt32LE(1,8);h.writeUInt32LE(6,12);h.writeUInt32LE(raw.length,16);h.writeUInt32LE(payload.length,20);Buffer.from(sha(raw),'hex').copy(h,24);Buffer.from(sha(payload),'hex').copy(h,56);
-            const member=Buffer.concat([h,payload]);need(decodeProof(member).equals(raw),'ENCODER_EXACT');return member;
-          }
-          function decodeProof(member){
-            need(Buffer.isBuffer(member),'MEMBER_BUFFER');uint(member.length,LIMITS.member,'MEMBER_CAP');need(member.length>88,'HEADER_TRUNCATED');
-            need(member.subarray(0,8).equals(Buffer.from('CWPROOF1')),'HEADER_MAGIC');
-            need(member.readUInt32LE(8)===1,'HEADER_VERSION');need(member.readUInt32LE(12)===6,'HEADER_CODEC');
-            const rawBytes=member.readUInt32LE(16),payloadBytes=member.readUInt32LE(20);
-            uint(rawBytes,LIMITS.raw,'RAW_CAP');uint(payloadBytes,LIMITS.member-LIMITS.header,'PAYLOAD_CAP');need(member.length===88+payloadBytes,'PAYLOAD_LENGTH');
-            const payload=member.subarray(88);need(sha(payload)===member.subarray(56,88).toString('hex'),'PAYLOAD_DIGEST');
-            const decoded=brotliDecompressSync(payload,{maxOutputLength:rawBytes,info:true});
-            need(decoded.engine.bytesWritten===payload.length,'BROTLI_CONSUMPTION');need(decoded.buffer.length===rawBytes,'RAW_LENGTH');need(sha(decoded.buffer)===member.subarray(24,56).toString('hex'),'RAW_DIGEST');
-            const text=decoded.buffer.toString('utf8');need(Buffer.from(text).equals(decoded.buffer),'RAW_UTF8');JSON.parse(text);return decoded.buffer;
-          }
-
-          import fs from 'node:fs';
-          const expectedRoot='/__w/the-civil-war/the-civil-war';
-          need(process.env.GITHUB_WORKSPACE===expectedRoot&&fs.realpathSync(expectedRoot)===expectedRoot,'WORKSPACE');
-          const out=expectedRoot+'/.out';need(fs.realpathSync(out)===out&&!fs.lstatSync(out).isSymbolicLink(),'OUTPUT_ROOT');
-          const input=out+'/last-result.json',output=out+'/last-result.cwproof';
-          need(!fs.lstatSync(input).isSymbolicLink()&&fs.realpathSync(input)===input,'INPUT_PATH');uint(fs.statSync(input).size,LIMITS.raw,'RAW_CAP');need(!fs.existsSync(output),'OUTPUT_EXISTS');
-          const raw=fs.readFileSync(input),member=encodeProof(raw);need(decodeProof(member).equals(raw),'ROUNDTRIP');
-          fs.writeFileSync(output,member,{flag:'wx'});
-          console.log('PROOF ENVELOPE ACTUAL '+JSON.stringify({version:1,codec:'brotli6-whole-json',rawBytes:raw.length,rawSha256:sha(raw),memberBytes:member.length,memberSha256:sha(member),localJsonRetained:true,uploadOriginal:false}));
-          PROOF
-
-      - name: Upload test output
-        if: always() && steps.proof.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: test-output
+          name: f6c-timeout-diagnostic
           path: |
             .out/
-            !.out/last-result.json
+            /__w/the-civil-war/timeout-A/.out/
+            /__w/the-civil-war/timeout-B/.out/
+            /__w/the-civil-war/timeout-A2/.out/
           include-hidden-files: true
           retention-days: 7
-          if-no-files-found: warn
-
-      - name: Upload failed test output
-        if: always() && steps.proof.outcome != 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-output
-          path: .out/
-          include-hidden-files: true
-          retention-days: 7
-          if-no-files-found: warn
-
-  probes:
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    container:
-      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
-      options: --ipc=host --init
-    env:
-      GIT_CONFIG_COUNT: "1"
-      GIT_CONFIG_KEY_0: safe.directory
-      GIT_CONFIG_VALUE_0: /__w/the-civil-war/the-civil-war
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Checkout probe source
-        uses: actions/checkout@v4
-
-      - name: Fetch pinned probe current-field comparison
-        run: |
-          test "$GITHUB_WORKSPACE" = "/__w/the-civil-war/the-civil-war"
-          test "$(realpath "$GITHUB_WORKSPACE")" = "$GITHUB_WORKSPACE"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 4f6113a624e0e533825c0be414bb36f3b073f726
-          test "$(git rev-parse FETCH_HEAD)" = "4f6113a624e0e533825c0be414bb36f3b073f726"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/main.js
-          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/entry.js
-
-      - name: Fetch pinned probe reinforcement comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin aaf10145531130f3ec201d6332f6759599bc46a4
-          test "$(git rev-parse FETCH_HEAD)" = "aaf10145531130f3ec201d6332f6759599bc46a4"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e aaf10145531130f3ec201d6332f6759599bc46a4:src/main.js
-          node tools/test-surrender-runtime.mjs --verify-legacy-game
-
-      - name: Fetch pinned probe captured-gun comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin b81dad641ff86c7586b13abf57dce257e299fef0
-          test "$(git rev-parse FETCH_HEAD)" = "b81dad641ff86c7586b13abf57dce257e299fef0"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/units/battery.js
-          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/game.js
-
-      - name: Fetch pinned probe battery-overrun comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 0e505fd61dead1f95659eaa2f8652f31935a50bc
-          test "$(git rev-parse FETCH_HEAD)" = "0e505fd61dead1f95659eaa2f8652f31935a50bc"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/game.js
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/combat.js
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/phase.js
-
-      - name: Fetch pinned probe captured-loadout comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 158cb60a1dd26e84161fcdc97342d7f239369f90
-          test "$(git rev-parse FETCH_HEAD)" = "158cb60a1dd26e84161fcdc97342d7f239369f90"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:src/franchise/practice.js
-          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:tools/test-battery-overrun.mjs
-          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:tools/test-captured-guns.mjs
-
-      - name: Set up probe Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: lts/*
-          cache: npm
-
-      - name: Install probe dependencies
-        run: npm ci
-
-      - name: Verify pinned probe Playwright runtime
-        run: |
-          node --input-type=module <<'NODE'
-          import assert from 'node:assert/strict';
-          import fs from 'node:fs';
-          import { chromium } from 'playwright';
-          const lock = JSON.parse(fs.readFileSync('package-lock.json'));
-          const installed = JSON.parse(fs.readFileSync('node_modules/playwright/package.json'));
-          assert.equal(lock.packages['node_modules/playwright'].version, '1.63.0');
-          assert.equal(installed.version, '1.63.0');
-          assert.equal(process.env.PLAYWRIGHT_BROWSERS_PATH, '/ms-playwright');
-          const executable = chromium.executablePath();
-          assert.ok(executable.startsWith('/ms-playwright/'));
-          fs.accessSync(executable, fs.constants.X_OK);
-          console.log(JSON.stringify({ playwright: installed.version, executable, bakedDependencies: true }));
-          NODE
-
-      - run: node tools/test-deployment.mjs
-      - run: node tools/test-deployment.mjs --prove-fail
-
-      - run: node tools/test-phase.mjs
-      - run: node tools/test-phase.mjs --prove-fail
-
-      - run: node tools/test-field-admission.mjs
-      - run: node tools/test-field-admission.mjs --prove-fail
-
-      - run: node tools/test-reinforcements.mjs
-      - run: node tools/test-reinforcements.mjs --prove-fail
-
-      - run: node tools/test-reinforcement-runtime.mjs
-      - run: node tools/test-reinforcement-runtime.mjs --prove-fail
-
-      - run: node tools/test-capture-accounting.mjs
-      - run: node tools/test-capture-accounting.mjs --prove-fail
-
-      - run: node tools/test-surrender-runtime.mjs
-      - run: node tools/test-surrender-runtime.mjs --prove-fail
-
-      - run: node tools/test-surrender-result.mjs
-      - run: node tools/test-surrender-result.mjs --prove-fail
-      - run: node tools/test-surrender-result-ui.mjs
-      - run: node tools/test-surrender-result-ui.mjs --prove-fail
-
-      - run: node tools/test-equipment.mjs
-      - run: node tools/test-equipment.mjs --prove-fail
-
-      - run: node tools/test-reward.mjs
-
-      - run: node tools/test-reward.mjs --prove-fail
-      - run: node tools/test-save.mjs
-      - run: node tools/test-save.mjs --prove-fail
-
-      - run: node tools/test-practice.mjs
-
-      - run: node tools/test-practice.mjs --prove-fail
-      - run: node tools/test-captures.mjs
-      - run: node tools/test-captures.mjs --prove-fail
-      - run: node tools/test-intro.mjs
-      - run: node tools/test-intro.mjs --prove-fail
-      - run: node tools/test-sandbox-rules.mjs
-      - run: node tools/test-sandbox-rules.mjs --prove-fail
-      - run: node tools/test-look.mjs
-      - run: node tools/test-look.mjs --prove-fail
-      - run: node tools/test-view.mjs
-      - run: node tools/test-view.mjs --prove-fail
-      - run: node tools/test-spacing.mjs
-      - run: node tools/test-spacing.mjs --prove-fail
-      - run: node tools/test-residency.mjs
-      - run: node tools/test-residency.mjs --prove-fail
-      - run: node tools/test-moments.mjs
-      - run: node tools/test-moments.mjs --prove-fail
-      - run: node tools/test-keyboard.mjs
-      - run: node tools/test-keyboard.mjs --prove-fail
-
-      - run: node tools/test-soldier-view.mjs
-      - run: node tools/test-soldier-view.mjs --prove-fail
-
-      - run: node tools/test-surrender-activation.mjs
-      - run: node tools/test-surrender-activation.mjs --prove-fail
-
-      - run: node tools/test-captured-guns.mjs
-      - run: node tools/test-captured-guns.mjs --prove-fail
-      - run: node tools/test-battery-overrun.mjs
-      - run: node tools/test-battery-overrun.mjs --prove-fail
-      - run: node tools/test-captured-loadouts.mjs
-      - run: node tools/test-captured-loadouts.mjs --prove-fail
-
-      - name: Upload probe output
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: probe-output
-          path: .out/
-          include-hidden-files: true
-          retention-days: 7
-          if-no-files-found: warn
+          compression-level: 6
