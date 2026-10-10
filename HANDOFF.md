@@ -1,3 +1,1006 @@
+**CURRENT — RETAINED NAMED SCHEMA / LOGICAL CAP HALT (2026-10-10).** Existing v1 NOT FINISHED. AcceptedF6b158/product728 unaccepted unchanged. Once-only r2 exit0/stdout290B/stderr0: fullfocus+ordinary+explicitpointerwitness restore originalfailed bytes exact; member78325B/raw20232599B/3positive31ownrefusals; independent scoped CLEAR. Ordinarynestedwarnings[] remains[];4outerpointerwarnings HOLD. Baseline+namedraw53239325 exceeds50331648 by2907677; nativeLOGICAL_RAW_CAP/flatten0/aggregateEncode0/no fullmodel. Nativeperbuffer code does not resolve explicitly reserved cumulative meaning; popup clarification pending, silence not authority. Source29old+3newroles bound/replacementsUNIMPLEMENTED; rawfilehash separate from decodednamedsemantic hash. r1 preflightHOLD/uninvoked/sourcebyteexact retained. Sourcecatalog covers1860–63 but originalMay1p2 UNVIEWED/newVerified0. Protected11/eightindexes/historicalroots preserved; COORD absent/root releases after final saved/pushed audit. Next capanswer-gated complete .out production model/consumer/gates; independent freeoriginal strength/company/clock/metre research remains. No new browser/Actions/adoption/native/P7.
+
+## Zero-context continuation packet (2026-10-10 named schema cap halt)
+
+```text
+Resume the autonomous EXISTING-v1 completion loop from the 2026-10-10 RETAINED NAMED SCHEMA / LOGICAL CAP HALT boundary. Existing v1 is NOT FINISHED.
+
+CURRENT AUTHORITATIVE OVERRIDE — all unchanged critical contracts below remain binding.
+MAIN HEAD/origin LIVE_SCHEMA_DOCS_SHA resolves from schema-terminal-r1-20261010.json + livegit. Parent2d16382559c0f10a7bb0952460fd2421fc6bb183. Only4docs; 208tracked/4owned204exactparent AND product728. STATE19lines; protected11 unchanged; all8indexes empty. All7historicalroot HEAD/status unchanged. No productCI acceptance attaches to docsSHA.
+Root solewriter at startup; COORDINATION absent at this audit. Root relinquishes after terminal/finalaudit; allscripts/helpers terminal, no invisible continuation. One readonlygpt-6.1-sol/medium helper completed source/preflight/actual/docs audits. Main quality stays Aaron's selected highest tier; noquota measured. Freshsameprovider at actual consequential cap-decision boundary, no silent downgrade. No simultaneous writers/browsers/collectors/watchers.
+
+COMPLETE CURRENT CPU STUDY ONLY
+r1 initialsource warning-attribution contradiction caught in independent preflight; UNINVOKED. Originalr1schema+study restored BYTEEXACT to schema-preflight-hold-r1 hashes; preserve both.
+r2 syntax0, independentfullpreflightCLEAR, invokedONCE2026-10-10T10:47:57Z to10:48:38Z; exit0/stdout290B/stderr0.
+Schema .out/reward-focus-production-schema-r2-20261010.mjs5275B SHAe074889774494fc40276b7a9749aecc3e4ac90581e3f0e31826ab36caa5de97f.
+Study .out/reward-focus-production-schema-study-r2-20261010.mjs19019B SHAa97df23fe5e172cf7278da1e3edc4a8a630d2e9b3257c89826fbda19e2e72c29.
+One explicit rewardFocusPayload envelope version1/formatreward-focus-CWPROOF1/schema1/exactkeys/raw+memberlengths/SHA/canonicalbase64; CWPROOF1Brotli6/88header/nativecaps/strictconsumption.
+Raw has THREE EXPLICIT names: full rewardFocus; unchanged full rewardFocusOrdinary; ordinaryPointerWitness {keyOrder,outer} with every other original failed-report field. Original ordinary.warnings is[]; outer pointerWarnings has4. Never substitute attribution or omit pointer witness.
+Full originalfailed9776699B SHA319580f93b8834998422c558b7fed4fa43e3f48e39074574dc747c705795fb62 and full derivedfocus20027543B SHA9c508d6576d882435621eaf32fe57f23c5fd0e395a76a1e2ba50626fbf337cd6 reconstruct BYTEEXACT.
+Raw20232599B SHAe965f598c82780b0b5cc39205f77f03c554964e87e1a9c869473c0ef0f01dc15.
+Member78325B SHAe1245b61d6952eba50a73c4ff74d8ae53767432de97464daa02a8bad9a2f02c9.
+Storedpacket104713B SHAa01bf8486d2554a04aa84bf9ae72229f12ff62b036be399d8e928b3cd53c85ea at schema-payload-r2-20261010.json.
+Actual33938B SHA499945598369b7304bf208a63ca95c2b1373b4ca6690455da92b610a30100146 at schema-actual-r2-20261010.json.
+3 retainedpositives/31genuineownrefusals. Earlycap/schema controls0base64/0decompress/0record; actual trailing+concatenatedBROTLI_CONSUMPTION1/1/0. Preserve exactcaughtmessages/fullstreams. All13fullmutants/controls/categories/full70sources+69inverse/sourceABA/nativegeometry/restore preserved. Expected hashes trustedinputbinding only, not fresh production semantics.
+All29oldconsumer sources AND3newwriter/focusreader/producerroles fullysource-bound; every replacement UNIMPLEMENTED. Old contract booleanflags coarse: rawlog role9 hasrawLogsfalse; imageentryselector13 hastrue. Fullsource must drive closure, never these labels. Storedrawfilehash stays separate from decodednamedsemantic hashes; no flat reserialization.
+Independentactual CLEAR_RETAINED_NAMED_PACKET_AND_EXPECTED_LOGICAL_CAP_REFUSAL_ONLY. No complete model/producer/consumer implementation/sourceadoption/browser/Actions/native/P7 acceptance.
+
+CONSERVATIVE CAP HALT / USER CLARIFICATION
+Baseline33006726 + complete namedraw20232599 =53239325B;50331648cap exceeded2907677B BEFORE any newaggregatemetadata/streams. Native admitLogicalAggregate actually refused LOGICAL_RAW_CAP. flatten0/aggregateEncode0/fullmodelNOTgenerated. Do not rerun fixedstudy or claim packetfit clears PhaseA.
+Native historical codec only checks each serializedraw Buffer; HANDOFF/PLAN newest explicitly reserves cumulative logicaltotal meaning. Source observation is NOT productionpermission.
+Popup asks whether48MiB applies per actual stored/decoded native rawbuffer (recommended, historicalnativecontract, forbidoversizedflatten) OR cumulative reconstructedlogicaltotal. No answer recorded at this doc boundary. Check newest useranswer/liveledgers before choosingdependentwork; silence is not approval. Until explicitanswer keep conservative refusal. Either answer grants NO secondprivateprobe/browser/full-suite/sourceadoption. Othercaps exact.
+If cumulative total chosen, reject this representation and independently preflight a DIFFERENT lossless design retaining complete records/historicalfields; never evade it through perlayercaps/sharding/omission.
+If native-buffer rule expressly chosen, update explicit capcontract/design and remove only obsolete conservative interpretation in NEWversioned study after independentreview; preserve all raw/member/log/range/memoryguards. Build complete582 model/allconsumerreplacement/literalgates before product. Oldr2 remains historicalrefusal, neverretroaccept.
+
+READ ONLY CURRENT RESUME
+cd /private/tmp/the-civil-war-reward-focus-inputs-20261009
+node --input-type=module - <<'READBACK'
+import fs from 'node:fs';
+for(const n of ['schema-preflight-hold-r1-20261010.json','schema-preflight-r2-20261010.json','schema-invocation-r2-20261010.json','schema-actual-r2-20261010.json','schema-independent-r2-20261010.json','shiloh-hunt-archive-location-r1-20261010.json','schema-terminal-r1-20261010.json','schema-final-audit-r1-20261010.json']) console.log(n,JSON.stringify(JSON.parse(fs.readFileSync('.out/'+n)),null,2));
+READBACK
+Read fullr2schema/study/sourcebindings/payload/stdout/stderr next. These are readbacks; do NOT invokeoldstudy/producers again. Fresh work requires exactversionednewnames/inputbinds/budget/independentpreflight.
+
+INDEPENDENT SOURCE LOCATION ONLY
+Read-only websearch found Mishawaka-Penn-Harris PublicLibrary newspaperholdings catalog printedp16 titleSt.JosephValleyRegister rangeAug9 1860–Aug20 1863; catalog warns scattered/missingissues. https://www.mphpl.org/wp-content/uploads/2025/10/St-Joseph-County_Indiana_Newspapers.pdf
+This is catalogcoverage, NOT May1p2 survival/digitization or historicalcontent. LOCsn82014547 open403; MichianaMemory openJavascriptrequired; nointeractivebrowserrun. Webtool-visibletext only, no nativeHTTPbyte/hash proof. See shiloh-hunt-archive-location-r1-20261010.json1869B SHAb81b8c9f9e61b2562eafad53d5a006e167adae728b299e971ec479827ec26738.
+Originalnewspaper/8ORscans UNVIEWED THISRUN; prior4modernHTML/11claims/NewVerified0 remainHOLD. Hunt600 never admittedstrength. No librarycontact/account/spending authorized. Seek a FREE originalpage path or independently authored datedeffective/present/companyreturns; no sourcepromotion from catalogoroldVerified labels.
+
+NEXT BOUNDED SCOPE
+Dependent rewardfocuslane HALT on capmeaning and4unfilteredwarnings. Do not repeat greenCPU studies or move to product. Capanswer only permits explicitlyamended .out-only completeproduction architecture/model/all29old+newconsumers/literalgates; original oneprobe exhausted.
+While no capanswer: independentShiloh source-location/originalidentity-strength-time-metreadmission remainsauthorized. Read complete protectedpreflight/frozenold3files/source/codex/primaryregistry and fullfieldmap BEFORE research. Prefer free original Huntnewspaper/independentlydated returns; nativeboundedretrieval requires concreteonce-onlysource/spec/outputbudget/preflight/helperactual, noassumedcount. Missingfree original -> retain boundeddependencyHOLD and continue another justified missingoriginalsource, no invented strengths.
+Current rootoutputslice whole3145728B includes inspected4docbackups1376884B pluspacket/receipts;160MiB remainsUNUSED. Refresh total/nativefreedisk before ANY write. INPUTS.out beforethisslice138522825B; outputtotals latest in terminal. Never duplicate33–46MB raw files into nearcaproots. Any newisolatedroot needs overlap/concretebudget/owneradmission BEFORE creation. No deletion/offload.
+
+UNCHANGED FULL EXECUTION CONTRACT FOLLOWS (historical study sections are evidence, not queued commands).
+
+
+PROVIDER / ROLE / OBJECTIVE
+Keep Aaron's deliberate highest-quality main model/effort: 5.6 Sol/Ultra where available. Never silently downgrade. Root owns architecture, source, history, gameplay, integration and final acceptance.
+
+At most ONE READ_ONLY helper at a time. Explicitly select gpt-6.1-sol/medium for independent review or gpt-6-luna/medium for mechanical inventory. Give it exact readonly files, commands and acceptance questions. No simultaneous provider/file writers, browsers, collectors or watchers. No quota was measured; this relay targets the same provider at a documented admission/context boundary.
+
+Finish ALL existing DESIGN/PLAN P1–P7 v1, including Shiloh, Stones River AND Chattanooga, intended battle/franchise systems, and title -> briefing -> battle -> results/loot -> camp -> next phase. Terminal completion requires actual P7 release with no required implementation, verification, defect, source/license or acceptance work remaining.
+
+Continue dependency-ready authorized work after green checks, commits, CI and milestones. A diagnostic, foundation, deployment or empty temporary queue is not completion. No spending, accounts, paid services, expansion, goal/scheduler framework, deadline or recurring Mac/iPad hands-on asks. Inaccessible native evidence stays UNRUN.
+
+ROOTS
+MAIN=/Users/aaronhanke/Developer/the-civil-war
+INPUTS=/private/tmp/the-civil-war-reward-focus-inputs-20261009
+PROD=/private/tmp/the-civil-war-reward-focus-production-20261009
+NEW=/private/tmp/the-civil-war-p3f6c-loadouts-outer-20261009
+NEXT=/private/tmp/the-civil-war-p3f6b-battery-overrun-20261008
+OLD=/private/tmp/the-civil-war-p3f5-record-schema-repair-20261008
+DIAG=/private/tmp/the-civil-war-p3f6c-timeout-diagnosis-20261009
+REWARD=/private/tmp/the-civil-war-reward-viewport-20261009
+PARTS=/Users/aaronhanke/Desktop/Video Game
+
+PARTS is frozen readonly reference-freeze-2026-10-02:
+HEAD and peeled tag 24d5200d838fab00015e0ba6472ba9c9139b4d86.
+Never edit PARTS.
+
+EXPECTED LIVE GIT / OWNERSHIP
+MAIN HEAD=origin/main:
+LIVE_SCHEMA_DOCS_SHA
+parent:
+2d16382559c0f10a7bb0952460fd2421fc6bb183
+tree: resolve exactliveGit/schema-terminal-r1-20261010.json
+Commit: docs: retain named schema feasibility and logical cap halt [skip ci]
+
+Only HANDOFF.md, STATE.md, PLAN.md, DECISIONS.md changed.
+208 tracked paths / 4 owned docs / 204 other Git modes and OIDs exact parent AND product7287296ae3b1c90f3a43642f33e3e886e8b889e2.
+STATE has19lines. MAIN index empty; eleven protected WIP paths deliberately dirty.
+Root queried exact-SHA run-list live: []; helper checked cached terminal only. No product CI/Pages acceptance attaches to this docs SHA.
+
+INPUTS:
+branch reward-focus-inputs-private
+HEAD/upstream e9e1b4c743884c5405a55690ade4a4cda8225b15
+tree abc4d8e80a8f5cf51c1ef9a900f225cf03d0ea72
+Clean tracked/empty index; no dependency link.
+Private commit owns ONLY .github/workflows/ci.yml and tools/test-reward-focus-private.mjs, 209Git/2owned207exact002f024.
+Never merge/cherry-pick private workflow/probe into MAIN.
+
+PROD:
+HEAD e65bab6d8b86e1dee06dec201ba051e85130f54b
+Clean tracked/empty index; only untracked node_modules symlink resolving EXACT MAIN/node_modules.
+Keep dependency link unstaged. Do not assume upstream.
+
+NEW:
+HEAD158cb60a1dd26e84161fcdc97342d7f239369f90
+Dirty historical source/docs reproducing product728.
+
+NEXT:
+HEAD0e505fd61dead1f95659eaa2f8652f31935a50bc
+Dirty historical source/docs reproducing accepted158.
+
+OLD:
+HEADb1221575b7a948aeb75e226c6c1dbde77e70dac5
+Dirty historical source/docs reproducing0e.
+
+DIAG:
+Clean HEAD/upstream90dc0b4438eb49f31ffea9788c5197b45af53be0.
+
+REWARD:
+Clean tracked HEAD/upstream550c087bd0cfda3fbaaf460c1628d4c987090faf plus unstaged dependency link.
+
+All eight indexes were empty and seven other roots' HEAD/status states unchanged at final audit.
+Preserve ALL historical dirty sources/docs, accepted/failed/cancelled/HOLD artifacts and ignored evidence.
+
+COORDINATION.md was absent. Root ownership RELINQUISHED after terminal audit. All project scripts/readbacks/helper tasks terminal; no invisible continuation.
+Re-establish one writer at startup. If COORDINATION exists, read it immediately after AGENTS, before choosing work, planning, spawning or editing; verify full relevant owner/state/acceptance/probe/resume pointer against live Git. Do not drive another tool's lane.
+
+SAFE STARTUP — READONLY
+cd /Users/aaronhanke/Developer/the-civil-war
+pwd
+git fetch --no-tags origin
+git status --short --branch
+git rev-parse HEAD origin/main
+git log -1 --format=fuller
+git diff --cached --stat
+git worktree list --porcelain
+gh run list --repo adhanke-star/the-civil-war --limit 12 --json databaseId,name,headSha,status,conclusion
+gh run view 38021389470 --repo adhanke-star/the-civil-war --json headSha,status,conclusion,jobs,url
+gh run view 37952988962 --repo adhanke-star/the-civil-war --json headSha,status,conclusion,jobs,url
+gh run view 37913714310 --repo adhanke-star/the-civil-war --json headSha,status,conclusion,url
+gh run view 37913714346 --repo adhanke-star/the-civil-war --json headSha,status,conclusion,url
+
+Check every named root HEAD/index/status/upstream, protected hashes, relevant process commands/cwd/start identity and native .out capacities.
+Await existing jobs; never cancel, duplicate or rerun for luck.
+Pull --ff-only ONLY when fully clean, necessary and owned. MAIN/NEW/NEXT/OLD are dirty.
+No reset, stash, rebase, pull-over, broad-add, force-push, prune, offload or unknown deletion.
+
+READ ORDER
+AGENTS.md -> immediately COORDINATION.md if present -> HANDOFF newest CURRENT/full packet -> STATE.md -> PLAN.md finishline/P1–P7/battle systems/autonomous/current acceptance -> DECISIONS0088 through0076 -> DESIGN.md.
+
+Then INPUTS.out:
+v1-admission-terminal-r1-20261010.json
+v1-admission-final-audit-r1-20261010.json
+v1-admission-independent-review-r1-20261010.json
+v1-admission-continuation-final-r1-20261010.txt
+
+Full retained continuation:
+64690B
+SHA25617a7daabbd713ee7e54b7f074d5888c428573f21028e8d39f45b107d3dad0b66
+
+Read newest upload/source/warning actual packets and their full sources/stdout/stderr.
+Then cap-clarified, image-transport, fieldmap, cap-halt and private-failure receipts; semantic-r9/lossless-input-r3 full source/invocation; PROD virtual-proposal-r6/contract-derivation-r6; INPUTS virtual-proposal-r7.
+Git/disk override historical state.
+Do not rerun any fixed wx producer/collector/generator.
+
+READONLY RESUME COMMAND
+cd /private/tmp/the-civil-war-reward-focus-inputs-20261009
+node --input-type=module - <<'NODE'
+import fs from 'node:fs';
+for (const n of [
+ 'reward-focus-upload-study-actual-r3-20261010.json',
+ 'shiloh-fraley-source-admission-actual-r2-20261010.json',
+ 'reward-focus-warning-consumer-contract-r2-20261010.json',
+ 'v1-admission-independent-review-r1-20261010.json',
+ 'v1-admission-terminal-r1-20261010.json',
+ 'v1-admission-final-audit-r1-20261010.json'
+]) {
+ const x=JSON.parse(fs.readFileSync('.out/'+n));
+ console.log(n,JSON.stringify(x,null,2));
+}
+NODE
+
+This is readback, not producer reexecution. Read complete new source/full invocation streams/four HTML files next.
+
+PROTECTED WIP / DO-NOT-TOUCH
+MAIN protected11:
+index.html
+src/main.js
+src/ui/hud.css
+src/ui/hud.js
+src/ui/input.js
+tools/test-soldier-view-ui.mjs
+tools/test-view-ui.mjs
+tools/test.mjs
+NEW-civil-war-video-game.code-workspace
+docs/shiloh-preflight.md
+tools/test-feedback-ui.mjs
+
+Exact byte/hash bindings are in current terminal/before-apply receipts and PROD.out/reward-focus-relay-terminal-r1-20261009.json.
+tools/test.mjs is139239B:
+SHA2564cb9b1eced08887e162c058f82c6939af3c7da2dad04cd5f35c6e2d65fdb8fc3.
+It mixes protected P2o and owned F6c work. Never stage/replace this dirty file wholesale. Later integration uses isolated tested source blobs and a separate byte-exact protected working-file inverse.
+Never stage workspace/Shiloh preflight/dependency links.
+
+Preserve original positive/control/fixture/trace/descriptor/scalar/specialundefined/-0/order records, failed receipts, raw logs and full PNG.
+No changed thresholds/oracles/timeouts/quality, filtered warnings, omitted arrays, summarization, sharding, re-encoded/cropped PNG, fake future pins or automatic visual/native/art approval.
+Combat/RNG/save/loot/history/source locks remain binding.
+Failed soldier packaging is not fieldable art.
+
+CURRENT COMPLETED RUN — UPLOAD SELECTION ONLY
+INPUTS.out/reward-focus-upload-selection-r3-20261010.mjs:
+native streamed SHA, hardcoded root allowlist/realpath containment, symlink/type/traversal refusal, counts/path/metadata/root cap, O_NOFOLLOW reads and global identity/size/mtime/ctime revalidation.
+Requires quiescent sole-writer ownership. Do not claim malicious-race immunity.
+
+INPUTS.out/reward-focus-upload-study-r3-20261010.mjs:
+ran ONCE exit0/stdout205B/stderr0.
+Source10359B:
+SHA25640590ca0f218ec6fae21e57f103947210e89399a796a6548ff1268aa2d310684.
+
+Actual full retained snapshot:
+341files135208911B
+manifest54840B
+5positives/27distinct genuine refused controls
+all5local original PNG bytes/SHA/300x740 dimensions exact
+protected11 exact.
+
+Synthetic192-image names are explicitly synthetic controls. They are not an actual image/archive model and do not establish future fixed192 count.
+Snapshot predates five expected output files totaling61098B.
+Independent helper rehashed all341 actual files, reviewed all27 controls/full source/full streams/five PNG headers.
+CLEAR_CPU_UPLOAD_SELECTION_ONLY_NOT_COMPLETE_PHASEA.
+
+Files:
+reward-focus-upload-study-actual-r3-20261010.json
+reward-focus-upload-selection-retained-r3-20261010.json
+reward-focus-upload-study-invocation-r3-20261010.json
+reward-focus-upload-study-invocation-r3-20261010.stdout.log
+reward-focus-upload-study-invocation-r3-20261010.stderr.log
+
+r1 preflight HOLD lacked metadata bounds/global snapshot; uninvoked.
+r2 preflight HOLD had accidentally versioned old input filenames; uninvoked.
+Keep both. Never rerun r3's fixed exclusive outputs.
+
+Selection contract:
+success excludes ONLY root last-result.json;
+failure/probes exclude NOTHING.
+Hidden/nested files retained.
+Native bounds16384files/path1024B/metadata1048576B/root314572800B.
+Directory matching requires exact name/raw-size set at explicit prefix '' or '.out/'.
+Duplicate, extra or omitted entries genuinely refuse.
+Central-only matching does not verify body hashes: existing selected ranged CRC/SHA/dimension/namespace/window/provenance readers remain mandatory.
+
+CURRENT COMPLETED RUN — FRALEY DEPENDENCY PACKET ONLY
+INPUTS.out/shiloh-fraley-source-admission-r2-20261010.mjs:
+ran ONCE exit0/stdout579B/stderr0.
+Source11039B:
+SHA256cceb099d3efa3aae666929a3f3e9e7fd0acab0e32467dabba9315c6da8c52ec9.
+
+Four nativeHTTP200 full HTML:
+NPS Fraley33239B
+NPS12MI tablet35764B
+Daniel/Allen22221B
+Hunt modern transcription192172B
+total283396B.
+
+512KiB/source,2MiBshared,20sec/fetch,no redirects; shared budget blocks further requests.
+No browser, PNG or original scan ran.
+All11claims HOLD.
+newVerified0/sourcePromotionfalse.
+Six native/frozen input binds and protected11 exact.
+Independent CLEAR_RETAINED_MODERN_TEXT_AND_DEPENDENCY_PACKET_ONLY.
+
+Files:
+shiloh-fraley-source-admission-actual-r2-20261010.json
+shiloh-fraley-source-invocation-r2-20261010.json
+shiloh-fraley-source-invocation-r2-20261010.stdout.log
+shiloh-fraley-source-invocation-r2-20261010.stderr.log
+shiloh-fraley-source-nps-fraley-r2-20261010.html
+shiloh-fraley-source-nps-michigan-tablet-r2-20261010.html
+shiloh-fraley-source-daniel-allen-r2-20261010.html
+shiloh-fraley-source-hunt-transcription-lead-r2-20261010.html
+
+r1 budget preflight HOLD uninvoked; retain it. Do not rerun r2.
+Original newspaper and all8OR page scans UNVIEWED this session; protected preflight records prior inspection only.
+Protected docs/shiloh-preflight.md11610B:
+SHA256d3ea69756e562657fa02780dca2ebad1d13303dcd7bfe2542146bcfabc73b918.
+
+Source leads:
+https://www.nps.gov/places/fraley-field-tour-stop-7.htm
+https://www.nps.gov/shil/learn/historyculture/monument-detail.htm?id=A-76
+https://npshistory.com/publications/civil_war_series/22/sec4.htm
+https://dan-masters-civil-war.blogspot.com/2024/12/two-buckshot-in-my-side-and-musket-ball.html
+
+Modern Hunt transcription attributes an April14letter/May1 1862 StJoseph Valley Registerp2 and600scouting.
+Original authorship/company/detachment/time scope unbound.
+This is NOT admitted strength and does NOT expand250/190/280 uncertainty range.
+Postbattle25–30men/company cannot populate April6opening.
+
+Keep finite scope-dependent03:00/04:45/04:50/04:55 alternatives, never uniform interval/precise choice.
+Hardcastle190inclusive scope versus280reconstruction remains uncertain.
+Never sum flankers8+22 and7+8.
+VanHorn B/E/H captain names Schmitz/Eveans/Dill preserve original spelling; personal identity requires separate binding.
+Two Michigan letters missing.
+Moore/Woodyard five+five21Missouri and Allen/Woodyard4Wisconsin composition remains prior-source only, no admitted strengths.
+FirstBrigade April5return119+2671=2790 is one lineage, not armed-effective strength or equal-company shares.
+Tablet500yards is relative to camp, not an1862Fraley footprint.
+North approximately image-right and Thom/Andrews/Michler/Buell/Thompson/Reed reuse leads, road correction and metre controls remain unresolved.
+Do not copy licensed proprietary maps.
+
+CURRENT WARNING / CONSUMER / SCHEMA DESIGN — NOT ADMISSION
+INPUTS.out/reward-focus-warning-consumer-contract-r2-20261010.json:
+all29 existing consumer source files fully read and byte/hash bound;
+all41 prior absolute bindings exact;
+independent review preserved in v1-admission-independent-review-r1-20261010.json.
+r1 retained. r2 carries complete numeric caps and prevents late writer/.out manifest/self-reference/fixed192 errors.
+No implementation/full production model/reader closure exists.
+
+vendor/detect-gpu/dist/detect-gpu.esm.js readPixels is in Apple-GPU disambiguation.
+Calling branch requires normalizedrenderer=='apple gpu'.
+Actual renderer/branch unobserved. Static occurrence does not prove raw-warning origin.
+Private run used one Chromium browser: pointer first, keyboard next, CPU last; fourth warning stops repetition.
+Later empty warning arrays do not establish pointer-specific causality.
+CPU screenshots happen later and cannot by ordering alone explain earlier pointer warnings.
+
+Four complete unfiltered pointer warnings remain HOLD.
+Required ordinary [] gate FAILS.
+No filtering, renderer edits, waiver or causality claim.
+
+Separately necessary diagnostic remains PROPOSED/UNIMPLEMENTED/UNAUTHORIZED:
+fresh isolated Chromium processes;
+counterbalanced native pointer/keyboard;
+original timing/assertions/raw strings/[] gate;
+browser/context/page IDs, monotonic phases, console locations;
+exact delivered source and renderer identity.
+Optional observational readPixels wrapper requires exact receiver/arguments/return/throw behavior, descriptor restoration and uninstrumented control; browser internal readbacks may bypass wrapper.
+Concrete source/spec must be reviewed before requesting separate browser authority.
+Old one-probe permission is exhausted.
+
+Schema design proposal:
+ONE explicit rewardFocusPayload packet containing BOTH complete focus and ordinary records before actual last-result serialization.
+Exact version/format/schema/base64/member/rawSHA/length/native bounds/strict consumed bytes.
+Historical subtrees unchanged.
+Stored raw hash separate from decoded semantic digest.
+No generic recursive decoder, omissions, sharding or bundled image substitution.
+Prefer separately named native decoders over oversized flattened reserialization.
+Logical reconstructed total48MiB applicability remains UNRESOLVED.
+Never silently reinterpret the cap per layer or label partial feasibility production acceptance.
+
+Upload manifest design:
+actual dynamic complete postproducer/postprune selection;
+emit only in EXISTING complete proof-producer Actions stdout AFTER membercreation/final pruning and BEFORE upload;
+no .out tee/redirection, self-referential file or later writer/pruner.
+Amend literal producer/scheduling/raw-log readers for the marker without weakening comparisons.
+Keep same producer stream and60total streams; adding another CLI requires full contract amendment.
+Preserve all169 original screenshot namespace obligations,23 required forensic PNG and every other selected file; no fixed192 count.
+Directory match only establishes names/sizes; selected body CRC/SHA/dimensions/windows/provenance remain required.
+
+LATEST PRIVATE-PROBE AUTHORIZATION / FAILURE
+Aaron allowed ONE bounded PRIVATE Actions probe to obtain missing raw PhaseA inputs before complete production modeling.
+Consumed by38021389470 attempt1 at:
+e9e1b4c743884c5405a55690ade4a4cda8225b15.
+It FAILED; permission is exhausted, not unused.
+No second probe/browser/full-suite run/source adoption authorized.
+
+Job114122944219, start2026-10-10T03:40:26Z.
+Collection03:41:09–03:42:05 failed.
+Envelope/upload-admission/success-upload skipped.
+Failure upload succeeded03:42:05–06.
+Artifact11658242812 reward-focus-private-inputs-failure1376730B, expires2026-10-17T03:42:05Z, forensic-only.
+
+CPU mutation8 accessed activation.after.reward.army[0], but savedrewardarmy[] at this step while actualGame.units has4.
+TypeError occurred before intended refusal.
+Virtualr7 corrects ONLY to activation.after.game.units[0].men++ and binds all13 complete retained semanticMutants.
+Originalr6 failedsource/run remain preserved; no retroacceptance.
+
+Full report9776699B:
+SHA256319580f93b8834998422c558b7fed4fa43e3f48e39074574dc747c705795fb62.
+Forensic ZIP1376730B/all13entriesCRC.
+Rawlog ZIP18570B:
+SHA25601cdc10f1b2e584f4cd7f67b491f0441350ac3b5bc74895e3a1d53f2bb32cc0f.
+All13decodedentries53045B mapped including skips.
+One native206range1376730B fit2MiB/shared3MiB.
+Collector-r1 already invoked. Never rerun.
+
+Five original300x740PNG directly viewed by root/helper:
+initial161891B
+bottom156419B
+top161804B
+scroll-control156419B
+focus-control154568B
+total791101B.
+Names:
+reward-focus-private-failure-restored-reward-focus-virtual__.out__reward-focus-1791603711757-{initial,bottom,top,scroll-control,focus-control}.png.
+Diagnostic geometry/ring observations only, not product/art/native approval.
+
+CPU DERIVATION / VIRTUAL SOURCE
+Semanticr9 exit0/stdout420B/stderr0:
+13focus positives +ordinary1;
+14 genuine own controls;
+all70source/all69inverse728;
+complete geometry/restoration/Enter/authority/cleanup/sourceA-B-A2/RNG/ordinary records.
+Original values preserved; derived records add complete controlsProof/semanticMutants/categories/sources only.
+r7/r8failed receipts preserved. r8 source-order failure corrected inr9 to actual localeCompare ordering.
+
+Derivedfull focus20027543B:
+SHA2569c508d6576d882435621eaf32fe57f23c5fd0e395a76a1e2ba50626fbf337cd6.
+INPUTS.out/reward-focus-derived-report-r9-20261009.json.
+
+Candidate focusr7 module490774B:
+SHA256e44c32d22fa7f68c8059152610519994e1402011bea2c227bf90ccfdceb25c7a.
+Observedr6 module490611B:
+SHA256391d0c9b3e4fa6842ec3c9fd3af316f0773cbaa730dc708da1421f6e28d4123b.
+Derived CPU evidence is not fresh browser/aggregate/CI acceptance.
+
+INPUTS.out/reward-focus-virtual-r7-20261009:
+209files/11owned198exacte65;
+only focusmodule differsr6;
+all69 existing inverse728 exact.
+Never blindly duplicate this tree into near-cap roots.
+
+PRODUCT SEAMS / OWNED FILES / COUNT CONTRACT
+Product changes ONLY:
+src/reward/sequence.js renderAfterAction initialheading tabindex=-1 and focus({preventScroll:true});
+src/reward/reward.css .rw-aar .rw-foot padding-bottom8px.
+src/reward/sequence.css DOES NOT EXIST.
+
+Fonts/text/CTA/actions/animations/3pxoutline+3pxoffset/Game/outcome/export/store/cards/army/RNG unchanged.
+Ordinary hook AFTER original50ms practice-reward-real-army check (priorindex279), BEFORE practice-loot-input.
+13focus checks AFTER final soldier-view-no-console-errors.
+Do not delay original assertion timing.
+
+Future owned11code:
+.github/workflows/ci.yml
+src/reward/sequence.js
+src/reward/reward.css
+sw.js
+tools/test.mjs
+tools/test-practice-ui.mjs
+tools/test-surrender-activation-ui.mjs
+tools/test-captured-guns.mjs
+tools/test-battery-overrun.mjs
+tools/test-captured-loadouts.mjs
+new tools/test-reward-focus-ui.mjs
+
+Source209Git/11owned198exact;
+with4owned docs209Git/15owned194exact parent at isolated integration.
+Historical sparse inverses remain separate:
+captured66/13changed53locked
+overrun67/13changed54locked
+loadouts68/10changed58locked.
+Reverse newest-first bottom-up.
+Runtime60/result62/activation65 remain separate.
+Newfocus70=old68+practiceprobe+focusprobe; all69inverse728.
+
+Proposed—not actual—aggregate:
+582orderedchecks/580unique
+49 ORIGINAL explicit empty axe validators
+unit25
+18exact public files(old17+reward.css)
+23requiredPNG(old18+5)
+54canonical probeCLI
+4standalone readerCLI
+58CLI +aggregate npmtest1 +proofproducer1 =60complete streams.
+Old56+1 conflated aggregate and CLI; not future authority.
+No arbitrary new count or omitted/skipped/truncated stream.
+
+INPUT BYTE FEASIBILITY / HISTORICAL FAILURES
+BaselineF6c model6 exact103fields:
+raw33006726B:
+SHA2563b994151ec86b2b7a5b188feb313088e7fa4296119d511a596ad1edd809330c8.
+member393345B:
+SHA25683ce68f87c3a7d9301bf54583af0d6217cd94b10fa0b49b28d1a1c54a15807ff.
+NEW.out/p3f6c-admission6-member-model-20261009.cwproof.
+
+Naive baseline+fullfocus53034269B exceeds48MiB by2702621B BEFORE ordinary/metadata/streams.
+No raw-cap increase.
+
+r3 lossless single complete input bundle:
+old103fields/accepted inner mode8Brotli11 unchanged.
+ONE explicit CWPROOF1/Brotliquality6/88byteheader nested member.
+Complete originalreport/derivedfocus/semanticreceipt/forensicreadback/capturedsource recover exact bytes/SHA/format/newline/order/arrays/controls.
+Bundle30125841B:
+SHA2569493bb951f0a2645509b30b5bbb5d1b18d37cf69248edd44d518ef468968c53f.
+nestedmember127671B:
+SHA25607d78a37641e0991885893b4b120e5423eded8808abf787e1a384edccfe84d7c.
+Additiveaggregate33177262B:
+SHA256a9ae620281e6fc06379a44d858a5f5dbee205af7cb90b80eba9f02a71fd1d7a5.
+outermember521445B:
+SHA2562a834fc65ba6ac21a232900a927572e07d78224f826cba2a9d8a27a7a2cdd66e.
+Deflate6member515036B.
+
+r1 split-record study uninvoked after preflightHOLD.
+r2 syntaxfailed, never executed.
+r3 ran ONCE exit0/stdout855B/stderr0; full source/streams retained.
+CLEAR_SINGLE_COMPLETE_INPUT_BYTE_STUDY_ONLY.
+Not complete PhaseA/schema/consumer/product acceptance.
+
+Files:
+reward-focus-single-bundle-input-r3-20261009.json
+reward-focus-lossless-input-model-r3-20261009.cwproof
+reward-focus-lossless-input-byte-study-actual-r3-20261009.json
+plus corresponding complete source/invocation streams.
+
+Old wholeZIP interpretation refusal:
+member515036+fivePNG791286 compressed payload1306322B before headers/other18PNG.
+That wholeZIP1MiB interpretation is SUPERSEDED by Aaron.
+Preserve original refusal unchanged.
+
+All23-in-one-member study remains genuine failure:
+raw45838905B:
+SHA2563c2fc7908164a1016c9faba96f10da79a38993e67102f70b0ab6d1da58131bbf.
+Brotli6payload2914481B:
+SHA256e5cd25689419cf418e4fa4f7f4b75d711edd63d6d49d63ed1347a9d659d3cebd.
+Requiredmember2914569B exceeds1048576 by1865993.
+Native encodeProof refused MEMBER_CAP; no wrapper/finalZIP generated.
+Complete103fields/r3input/23PNG/10textstreams/rawlogZIP/6provenance/209source/29consumer hashes restored byteexact independently.
+This fails one representation, not every lossless design.
+External originalPNG do not need this bundle.
+
+All23required original PNG:
+2893868B total,19unique hashes.
+Old18=2102767B in NEXT.out/p3f6b-ci-37913714310-{normal,controls,aggregate,reservation,activation}-*-r1-20261008.png.
+New5=791101B are exact failedprivate originals.
+All169 model6 baseline screenshot paths are DISJOINT from23required namespaces.
+ALL169 actual original bodies and other uploaded files remain unmodeled; not146.
+No fixed192future count.
+Keep external original ZIP entries and original readers.
+
+Per-role original PNG bytes:
+normal567371
+controls567348
+aggregate463886
+objective39130
+activation465032
+newfocus791101.
+Modeled focus method0 upperbound:
+64KiBtail+2MiBcentral+30B/localheader+5fullPNG=2953939B,
+under3145728 by191789.
+This is modeled bound only, not actual future bytes or extra collector authority.
+
+CAPS / CAPACITY — NO WAIVERS
+Aaron's exact answer:
+“Historical proof-entry/member limits (Recommended)”.
+
+Whole final artifact ZIP1MiB is SUPERSEDED.
+All other caps unchanged:
+proof packed entry1048576B
+proof member1048576B
+raw JSON50331648B
+selectedPNG524288B
+HTTP range2097152B
+shared cumulative percollector3145728B
+rawlogZIP/decoded complete log16777216B
+CIjob45minutes
+.out314572800B EACHroot
+free disk>=5000000000B
+unused reservation167772160B
+ZIP archive uint32 guard4294967295.
+
+Never allocate/download whole archive.
+Reject oversize/trailing/concatenated streams, excess inflate/allocation, malformed ZIP/descriptor/CRC/hash/source/range/content-length/window/attempt, unknown/duplicate/expired artifact and truncated streams.
+Retain native early-refusal counters and exact caught messages.
+600sec/phase belongs only to existing private soldier diagnostic, not production timeout waiver.
+
+Before ANY generated write:
+stat-only concrete hardcoded whitelisted .out root;
+realpath containment/no symlink escape;
+include backups/fullraw/logs/PNG/receipts/closeout;
+preserve160MiB UNUSED reservation PLUS all planned outputs under300MiB.
+No home du/find; no parsing files>100MB.
+No deletion/prune/eviction/offload/Drive/evidencecatalog or outputoutside.out.
+For overwriting owned docs, inspect first and back up forensic originals; hardcoded whitelist, realpath/StartsWith containment, refuse UNC/\\ and symlink escapes.
+
+Latest INPUTS.out before final small audit138521445B; after160MiB reserve only~8.27MB headroom.
+Free14338904064B at terminal.
+Historical MAIN.out309676939B, NEW254528097B, NEXT266214796B, OLD289075206B, PROD140194700B.
+Refresh ALL native totals; snapshots are not admission.
+Do not create duplicate33–46MBraw output into tightroots.
+No deleting54MBNode archive/125MBbinary/failures to make room.
+If complete model needs another isolated outputroot, admit overlap/concrete bytebudget/ownership BEFORE creation.
+
+HISTORICAL NEXT SCHEMA TASK NOW COMPLETED ONLY AS RETAINED-INPUT FEASIBILITY
+Current r2 complete packet/31refusals/aggregateHALT override above. Oldr1/r2 wxstudies never reexecute. Production582/all29replacement/literalgateclosure remainsUNRUN. Check explicitcapanswer before anydependentnewversion.
+
+INDEPENDENT SHILOH NEXT TASK
+Continue missing-source admission while dependent product lanes held:
+read entire protected preflight, old frozen source/citation/primaryregistry and full fieldmap first;
+inspect free original May1 1862 StJoseph Valley Registerp2/HuntApril14letter;
+find independently dated effective/present/company returns;
+bind identity, strengthscope, chronology and georeferenced/metre controls.
+
+New versioned .out claim/dependency packet, full provenance/source-dependence, finite numeric uncertainty, independent preflight, once-only bounded invocation/fullstreams/actual readback.
+Only Inferred/Disputed until TWO independent original sources.
+No invented unit/rank/company/presence/strength/frontage/outcome.
+No equal-company shares, promoting oldVerified labels, whole-day44k into dawn, copied proprietary illustrations or schematic coordinate-to-metre invention.
+No battlepack/route/runtimeground edits until separately admitted.
+
+Current FIELD_LIMITS unchanged:
+10formations/14480men/24guns/2980figures.
+Fieldmap restored exact3oldfiles/6phases/rosters/notes/citations.
+All6literal scenarios genuinely refuse current preparePhase identity/schema.
+Only OrchardKnob numerically fits; no route/terrain/history acceptance.
+Unscaled old rows:
+Shiloh16/43863/77/8959hypotheticalfigures
+RoundForest18/17274/40/3615
+McFaddensFord8/13800/57/2868
+OrchardKnob7/12705/10/2596
+Lookout9/14860/6/3034
+Missionary11/28325/13/5748.
+Hypothetical figures apply existing formula after name mapping; no converter shipped.
+Preserve commander strings/notes/old atSec compression/schematic geometry.
+Never scale strengths/raise caps/invent clock/metre transform/regiment splits.
+
+Fieldmap/source packets:
+v1-battle-conversion-fieldmap-r1-20261010.mjs
+v1-battle-conversion-fieldmap-actual-r1-20261010.json
+v1-battle-conversion-fieldmap-invocation-r1-20261010.{json,stdout.log,stderr.log}
+reward-focus-image-transport-inventory-r1-20261010.json
+reward-focus-image-transport-actual-r1-20261010.json
+reward-focus-image-and-fieldmap-independent-review-r1-20261010.json.
+All fixed studies already invoked ONCE.
+
+ACCEPTED PRODUCT / UNACCEPTED F6c — KEEP SEPARATE
+Product authority F6b:
+158cb60a1dd26e84161fcdc97342d7f239369f90
+CI37913714310 attempt1 SUCCESS
+Pages37913714346 SUCCESS
+567checks/565unique/49emptyaxes/54completeCLI/global67/captured66/activation65/17public/all18PNG directly viewed root+helper.
+NEXT.out/p3f6b-independent-actual-readback-r1-20261009.json.
+Ancestor0e505fd/CI37845732627/Pages37845732638 accepted.
+Old artifacts cannot substitute new actualSHA/run.
+
+F6c728 committed/pushed/deployed BUT NOT ACCEPTED:
+7287296ae3b1c90f3a43642f33e3e886e8b889e2.
+Local87PASS/unit25/query12positive+12owncontrols/local10PNG reviewed.
+Source68=8changed60locked vs158/all67inverse.
+Query has no reward/inventory/save/captor-fire/retake/recrew authority.
+Original authoredgear, generic weapon and physicalgun/limber identity separate.
+Descriptor-safe drift before restore/sourceorder vs chronology/zeroRNG/next5/equipment refusal vs6Gamequery refusals/full mutants remain.
+
+CI37952988962 CANCELLED at45min:
+557ok/0fail; eleven final soldier checks UNRUN aggregate.
+Probes113896292171 passed54CLI.
+Pages37952988948 SUCCESS.
+Activationstandalones skipped; downstream proofENOENT.
+Failureartifact11630165846 NOT accepted proof.
+No hang/query-causality explanation proved.
+
+NEW.out/p3f6c-local87-combined-admission3-20261009.json:
+61198B
+SHA256a98085165933267885366aaf01cb36221c26d19e553681ea8c1eee6bc9b3c7a6.
+85retained correctedadmission2 gates +corrected86/87admission3.
+Old local15whitespace/86refusal failures retained.
+
+PRIVATE DIAGNOSTICS ARE NOT ADOPTION
+DIAG field A158/B728/A2=158 --field55/56/55 passed complete diagnostic scopes.
+A128029ms/B135854/A2123837ms; Bquery12202ms.
+Ready-to-axe70032/67286/67371ms.
+Prior broad1.8x slowdown not reproduced; causeUNPROVED.
+
+DIAG soldier run37970371836 at90dc:
+A/B/A2=51/52/51,31/32CPUprelude+20originalheld-view predicates.
+A313891ms/B323938ms/A2309833ms.
+Held-to-final247333/246975/244623ms; Bquery11984ms.
+All20originalnames/data/fullsource/fullstreams retained.
+Independent complete diagnosticCLEAR only.
+Aggregate scheduling, child CPU/RSS/host stability, timeout/query/soldier causality/fullsuite/device acceptance remain UNPROVED/UNRUN.
+SoldierPNG retained cloud UNVIEWED.
+Old watchers/collectors/readers finished; never rerun.
+
+REWARD private37968732603 at550c:
+208Git/4owned204exact158;
+privateworkflow/probe+2productseams only.
+Complete native300x740 reducedmotion fixture4formations920men2guns214figures/WebGL0.
+Initialheading/nativeTab/read103->0->103/bottomCTAring725.890625 inside728.
+Three genuine controls: offscreenheading/scrollrefusal/offscreenCTA.
+Full native rawattribute/style-presence/descriptor/listener/inert/immediate/settled geometry restore.
+Actual CTAEnter and freshheadingEnter advancea->b.
+Next6RNG independent equal/snapshot1/writes0/WebGL0/fullauthority/cleanup.
+All5PNG viewed root+wcaghelper, diagnosticCLEAR only.
+Old failed37966820754/style-restorationFALSE preserved.
+No ordinaryfield/fullAA/native/release/source adoption.
+
+FULL PHASE A / B / C CONTRACT
+PhaseA remains .out-only except exhausted one private input probe.
+Complete candidate source/model/consumer/producer/upload/CI/localgate/public/source/inverse/capacity architecture:
+209source/11owned198exact+4docs;
+historical matrices/category0/canonical semantic digests;
+582ordered/580unique/49originalaxes/60streams/18public;
+23requiredexternalPNG plus169baseline originals/all selectedotherfiles;
+70source/all69inverse728;
+full ordinary+13focus semantics/full mutants;
+exact geometry/restoration/A-B-A2 delivered source;
+nativeEnter/next6RNG/no extra snapshot/store/export authority;
+all29old+newfocus reader closure.
+Freeze literal VERSIONED replacement localgate list and CI commands.
+No future actual pins/bytes/manifests/dimensions fabricated.
+Independent complete CLEAR and warning resolution REQUIRED before PhaseB.
+
+PhaseB:
+minimum two product seams and appended coverage in owned isolated candidate based on verifiedMAINdocsSHA/product728.
+Preserve separate protectedWIP, original gates/fonts/text/action/RNG/trustednativeevents.
+Initialheading/nativeTab/alltextreading/three genuine controls;
+rawpresence/descriptors/listeners/inert/exactstyle/settledgeometry restore;
+actualEntera->b, next6independentRNG, no addedstores/snapshotauthority;
+ordinary real-field launch separate from CPUfixture.
+No renderer/combat/history redesign.
+
+PhaseC:
+actual amended localgates/unit/fullmodel/inverses/standalonepaths;
+independent proposed AND actualindexCLEAR;
+stage ONLY explicit isolated tested owned sourceblobs/docs;
+never whole dirtyMAIN harness.
+Commit/push implementationSHA WITHOUTskipCI.
+Await exact fullCI/Pages.
+After completedgreen independently admit actualpin/collector/readers.
+Read complete artifacts/rawlogs/semantics/source/publicbytes;
+root+helper directly view ALL23required actualPNG.
+Failure becomes next bounded diagnosis, never luckyretry/waiver.
+Syncdocs/coordination and continue dependency-ready P1–P7 after actual acceptance.
+
+PRODUCTION ACTIONS / FULL ACTUAL READBACK
+Heavy browser/fullsuite/stress/encoding/Blender on Actions, never Mac.
+No new browser/Actions authority presently exists.
+
+After complete PhaseA/localCLEAR/warning resolution:
+npm ci
+Verify exact container/Node/Playwright and BOTH setup/history parentfetch guards.
+npm test
+node tools/test-surrender-activation-ui.mjs
+node tools/test-surrender-activation-ui.mjs --prove-fail
+node tools/test-reward-focus-ui.mjs
+node tools/test-reward-focus-ui.mjs --prove-fail
+
+Run independently admitted complete proofproducer/uploadmanifest and full54CLI probejob.
+All4standalone commands retain original predicates/fullrecords/completestreams/aggregateequality.
+Exact CI inclusion/placement/order requires source-first frozen admission.
+58CLI+aggregate1+proofproducer1=60streams; no skipped stream accepted.
+
+Container:
+mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+Node24.21.0/Playwright1.63.0 unchanged absent separately admitted deliberate change.
+Local last-result.json retained for native UI readers.
+Successful uploaded .out excludes ONLY originallast-result.json in favor of exactwholecwproof; failed/probe uploads preserve everything.
+Never copy diagnostic workflow wholesale.
+
+BOTHjobs' history guards retain parent158 and exact:
+currentfield4f6113a624e0e533825c0be414bb36f3b073f726
+reinforcementaaf10145531130f3ec201d6332f6759599bc46a4
+capturedgunb81dad641ff86c7586b13abf57dce257e299fef0
+overrun0e
+currentparent158.
+
+After implementation push:
+git rev-parse HEAD
+gh run list --repo adhanke-star/the-civil-war --commit NEW_SHA --limit 10 --json databaseId,name,headSha,status,conclusion
+gh run view realCI_ID --repo adhanke-star/the-civil-war --json headSha,status,conclusion,jobs,url
+gh run view realPAGES_ID --repo adhanke-star/the-civil-war --json headSha,status,conclusion,jobs,url
+
+Await terminal; bind actualSHA/attempt/start/job/uploadwindows/artifactidentity/expiry/exclusions.
+CompletedGREENpin needs independent actual amendmentCLEAR before one bounded collector.
+Cancelled37952988962 successpins/readers obsolete for newrun.
+
+Required serial readers after fresh completedgreen:
+1 completeaggregatecollector
+2 rootfullsemantic/source/streamreader
+3 F4PNGnormal
+4 F4PNGcontrols
+5 F4PNGaggregate
+6 objectivePNG
+7 activationPNG
+then newfocus fullsemantic/ordinary/image readers/directviews.
+
+New independently reviewed versions of:
+NEW.out/p3f6c-outer-reader-p3f6a-collect-completed-r3-20261008-review3-admission2.mjs
+NEW.out/p3f6c-outer-reader-p3f6a-root-actual-readback-r3-20261008-review3-admission2.mjs
+NEW.out/p3f6c-outer-reader-p3f6a-read-ci-f4-images-r2-20261008-review2-admission2.mjs
+NEW.out/p3f6c-outer-reader-p3f6a-read-ci-objective-images-r2-20261008-review2-admission2.mjs
+NEW.out/p3f6c-outer-reader-p3f6a-read-ci-new-images-r2-20261008-review2-admission2.mjs.
+
+Freeze each literal newcommand/generatedfilename in PhaseA and actualpin amendment.
+Separate F4normal/controls/aggregate invocations.
+Do not execute oldfixed37952988962/pendingpin commands.
+Whole rawlogs CRCbound; gh display may truncate huge lines.
+Rederive full orderedchecks/canonicalpositive/controlstreams.
+Check working+Git source/inverses/publicservedbytes.
+Root AND independenthelper directly view ALL actual requiredPNG before finalCLEAR.
+Any missing/failed gate retains failure/HALTaffectedlane; no partial acceptance.
+NativeGPU/iPad/art/performance/fullAA separatelyUNRUN.
+
+HISTORICAL87LOCALGATES — ACCOUNTING ONLY, ALREADY RUN/PASS
+These ran in NEW, NOT dirtyMAIN.
+Do NOT blindly execute on current changedsource or rerun fixedwx producers.
+PhaseA must freeze independently admitted VERSIONED replacements, sourcebindings/outputspace/newfocus gates/count/order first.
+All historical commands retained fullstdout/stderr/exit/source/semanticreceipt.
+B/A2 DOM fixtures require byteexact restore/originalparentbinds.
+
+1. node --check src/sim/phase.js
+2. node --check src/game.js
+3. node --check src/sim/combat.js
+4. node --check src/units/unit.js
+5. node --check tools/test-surrender-runtime.mjs
+6. node --check tools/test.mjs
+7. node --check sw.js
+8. node --check src/franchise/practice.js
+9. node --check tools/test-surrender-result.mjs
+10. node --check src/franchise/practice-ui.js
+11. node --check src/reward/sequence.js
+12. node --check tools/test-surrender-result-ui.mjs
+13. node .out/p3f6c-source-inverses-admission2-20261009.mjs
+14. node tools/test-surrender-runtime.mjs --verify-legacy-game
+15. git diff --check
+16. node tools/test-surrender-result.mjs
+17. node tools/test-surrender-result.mjs --prove-fail
+18. node tools/test-surrender-result-ui.mjs
+19. node tools/test-surrender-result-ui.mjs --prove-fail
+20. node tools/test-surrender-runtime.mjs
+21. node tools/test-surrender-runtime.mjs --prove-fail
+22. node tools/test-deployment.mjs
+23. node tools/test-deployment.mjs --prove-fail
+24. node tools/test-phase.mjs
+25. node tools/test-phase.mjs --prove-fail
+26. node tools/test-field-admission.mjs
+27. node tools/test-field-admission.mjs --prove-fail
+28. node tools/test-reinforcements.mjs
+29. node tools/test-reinforcements.mjs --prove-fail
+30. node tools/test-reinforcement-runtime.mjs
+31. node tools/test-reinforcement-runtime.mjs --prove-fail
+32. node tools/test-capture-accounting.mjs
+33. node tools/test-capture-accounting.mjs --prove-fail
+34. node tools/test-equipment.mjs
+35. node tools/test-equipment.mjs --prove-fail
+36. node tools/test-reward.mjs
+37. node tools/test-reward.mjs --prove-fail
+38. node tools/test-save.mjs
+39. node tools/test-save.mjs --prove-fail
+40. node tools/test-practice.mjs
+41. node tools/test-practice.mjs --prove-fail
+42. node tools/test-captures.mjs
+43. node tools/test-captures.mjs --prove-fail
+44. node tools/test-intro.mjs
+45. node tools/test-intro.mjs --prove-fail
+46. node tools/test-sandbox-rules.mjs
+47. node tools/test-sandbox-rules.mjs --prove-fail
+48. node tools/test-look.mjs
+49. node tools/test-look.mjs --prove-fail
+50. node tools/test-view.mjs
+51. node tools/test-view.mjs --prove-fail
+52. node tools/test-spacing.mjs
+53. node tools/test-spacing.mjs --prove-fail
+54. node tools/test-residency.mjs
+55. node tools/test-residency.mjs --prove-fail
+56. node tools/test-moments.mjs
+57. node tools/test-moments.mjs --prove-fail
+58. node tools/test-keyboard.mjs
+59. node tools/test-keyboard.mjs --prove-fail
+60. node tools/test-soldier-view.mjs
+61. node tools/test-soldier-view.mjs --prove-fail
+62. node tools/test.mjs --unit
+63. node --check src/ui/hud.js
+64. node --check tools/test-keyboard-ui.mjs
+65. node .out/p3f6c-admission2-focus-native-close-r1-20261008.mjs B
+66. node .out/p3f6c-admission2-focus-native-close-r1-20261008.mjs A2
+67. node .out/p3f6c-admission2-native-objective-r1-20261008.mjs B
+68. node .out/p3f6c-admission2-native-objective-r1-20261008.mjs A2
+69. node --check src/main.js
+70. node --check src/ui/entry.js
+71. node --check src/franchise/intro.js
+72. node --check tools/test-surrender-activation.mjs
+73. node --check tools/test-surrender-activation-ui.mjs
+74. node tools/test-surrender-activation.mjs
+75. node tools/test-surrender-activation.mjs --prove-fail
+76. node --check tools/test-captured-guns.mjs
+77. node tools/test-captured-guns.mjs
+78. node tools/test-captured-guns.mjs --prove-fail
+79. node --check tools/test-battery-overrun.mjs
+80. node tools/test-battery-overrun.mjs
+81. node tools/test-battery-overrun.mjs --prove-fail
+82. node --check tools/test-captured-loadouts.mjs
+83. node tools/test-captured-loadouts.mjs
+84. node tools/test-captured-loadouts.mjs --prove-fail
+85. node .out/p3f6c-transport-controls-admission2-20261009.mjs
+86. node .out/p3f6c-model-and-actual-readback-admission3-20261009.mjs
+87. .out/node-v24.21.0-darwin-x64/bin/node .out/p3f6c-runtime-compatibility-admission3-20261009.mjs
+
+Historical unacceptedF6c target:
+568/566/49axes/global68/overrun67/captured66/activation65/unit25/17public/18PNG.
+Do not retain these counts unchanged after focus additions.
+Original captured12+12, overrun14+14/37transport+2supplemental, activation, foreign/descriptor/paused/zero/terminal/refusal controls remain genuine.
+Source matrices/inverses/complete numeric traces/zeroRNG unchanged.
+
+Whole outer CWPROOF1/Brotli6/88header restores rawJSON byteexact/SHA; accepted inner mode8Brotli11 exact.
+Envelope fit is not product/source acceptance.
+
+REMAINING EXISTING V1 — NO SCOPE SHRINK
+Current phasepack shape:
+{version:1,id,title,phases:[{id,scenario}]}
+Only HenryHill actualroute.
+DIAG.out/v1-battle-source-inventory-r1-20261009.json retained.
+
+Frozen oldShiloh37939B:
+SHA256f30aba5292525bc403b203baa397b8d5c97ed83805a68c470c64e29628364075.
+ONE HornetsNest modeledphase(US7/CS5+4arrivals), dawn/day2 missing.
+StonesRiver63740B:
+SHA256479e9ed38456a53b348af5e1394fe5fc5cab27effa2b67bc99d982ac85ec66a9.
+RoundForestDec31/McFaddensFordJan2.
+Chattanooga40836B:
+SHA256a21f691eabf709b18795f94e9ad0227342179bdfa740a9acf4a0c37c96fc27ec.
+OrchardKnob/Lookout/Missionary.
+Reuse candidates only, not approved phasepacks/georeferencedterrain.
+OldVerified is not fresh two-independent-source verification.
+Reuse olddata/citations before newresearch; Shilohfirst,3–5phases/battle15–20min each; no forcedhistoricaloutcome.
+
+P2:
+feedback/workbench/contextloss/blackterrain/livingtitle/camp/fullHUD.
+P3:
+retake/recrew/armsloot/cavalry/commanders/delegation/roads/terrain/friendlymask/AI/regiments/actualordersemantics.
+P4:
+all3battlepacks/timedobjectives/grades/defeatcarryover/Grantloan/briefings/slavery-emancipation-USCT-homefront/30sreplay/3saves/Battlesnoloot/navigation.
+P5:
+gearcombatOVR/5rarities/supplieswearwagons/depotdatedshop/training/all20badgesBronzeSilverGold/XFactors/reputation1–10/enemycarryover/records/~20–25OVRgrowth.
+P6:
+approvedart/uniformcolours/terrain/effects/soundmusic/livingcamp/cards/gallery/settings/accessibility/nativeperf.
+P7:
+agentfresh-firstreward/sustainedbattle/fullcampaignsave-reload-defeat-replay-camp/historicalnoloot/touchkeyboard/offlineupdate-recovery playthroughs;
+seededbalance/fullregression/stress/ChromiumWebKitFirefox/source-license/tagRelease.
+UG/Gettysburg-quality play/look is minimum.
+Unavailable proof does not authorize completion claims or recurring userdevicechecks.
+
+HALT / CONSERVATION / DOCUMENTATION
+Consequential reversible choices receive recommendation+briefreason; do not pause for routine already-authorized work.
+HALT affectedlane on:
+foreignowner/process;
+dirtysource/inverse contradiction;
+missing/undecodable fullraw;
+unexplained gate failure;
+arbitrary futurecounts;
+unsupportedhistory;
+cap/reservation failure;
+invalid actualpin;
+needed cap/oracle/timeout waiver;
+prompt/code contradiction.
+Retain full failure receipt, exact stoppedstate, options and recommendation.
+Never silently fix incidental out-of-scope bugs.
+Restore ONLY owned experimental mutations byteexact, including rawpresence/descriptors/listeners/geometry/authority/RNG; never unknown WIP.
+No invented quota/device/art/visualapproval.
+
+For .out-only schema/source research:
+syntax newJS -> independent fullsource/preflight -> once-only boundedCPU invocation/fullstreams -> native byte/hash/schema/refusal/restoration readback -> independent actual.
+Do not run dirtyMAIN npmtest/browser suites.
+Unexpected failure: new hypothesis/newversion, not retryforluck.
+
+Documentation boundary:
+Back up inspected4current owned docs inside guarded INPUTS.out before overwrite.
+Preserve historical HANDOFF/PLAN/DECISIONS material; STATE<20lines.
+git diff --check
+Compare proposed AND actualindex208tracked/4ownedDocs/204Git modes/OIDs exact currentparent/product728.
+All11protected workingbytes exact.
+All8indexes empty pre/post except intentional fourdocstage.
+Sevenhistorical states/heads unchanged.
+Stage ONLY:
+git add -- HANDOFF.md STATE.md PLAN.md DECISIONS.md
+Independent actualindexCLEAR.
+Commit docs-only with [skip ci] using literal messagefile when shellspecialcharacters present.
+Push main.
+Query exactSHA run-list and read actual[] or explain unexpectedrun.
+Save terminal/finalaudit and relinquish ownership/updateledger ifpresent.
+
+Implementation commits follow admitted PhaseA/B/C, explicit isolated testedblobs, independentindex, non-skipCI and exactCI/Pages actualreadback; docs-only gate does not substitute.
+
+Bash portablemacOS3.2; no associativearrays/mapfile/caseconversion.
+Readonly recon uses set -uo pipefail, NOT set -e.
+Never trust pipelineexit without pipefail/PIPESTATUS.
+No broadadd or shellinterpolation of unchecked text.
+No sudo password piping.
+No home scans, outputoutside.out, forensic deletion or spending.
+
+CLOSEOUT / PROVIDER RELAY
+At every acceptedmilestone or precisely documented resumable boundary:
+sync HANDOFF/PLAN/STATE/materialDECISIONS and coordination ifpresent;
+commit/push/read exactSHA as appropriate;
+assess session/provider capacity without inventing quota.
+If healthy, fresh sameprovider packet.
+If insufficient, relay to ClaudeCodeOpus5.5high/xhighwhereavailable with owner/lock transfer.
+Never silently downgrade mainquality.
+No simultaneous edits.
+
+Every projectcloseout MUST end with fenced zero-context copy-paste continuation builtfrom LIVEGit/disk.
+Carry objective/terminalcondition, provider/main/helperrouting, allrootstates/WIP, readorder/coordowner/locks, exactnextscope/phases/commitboundaries, files/do-not-touch, allcritical counts/caps/sourcehistorylocks, literalgate commands/artifactreadbacks/ownnegatives/A-B-A2/byteexactrestore, HALTs, docs/index/commit/push/release and requiredfinalreport.
+Pointers do not replace critical execution contracts.
+Finalreport:
+exactHEAD/origin/index/dirtyWIP/ownedfiles;
+RUN versus UNRUN with actualrun/attempt/source/hash/count/PNG/rawlog/semantic evidence;
+private versus product versus native acceptance;
+remainingv1/defects/blockers/nextboundedtask;
+process/owner/capacity status;
+saved/pushed docs;
+full fenced continuation.
+Only actual P7 release with no requiredwork remaining permits “v1FINISHED”.
+No invisible autonomous continuation after closeout.
+```
+
 **CURRENT — RETAINED UPLOAD SELECTION / FRALEY DEPENDENCY ADMISSION (2026-10-10).** Existing v1 NOT FINISHED. Docs-only relay parent eae24b4; product728/F6c unaccepted, acceptedF6b158 unchanged. Once-only uploadr3 exit0:341 retainedfiles135208911B/manifest54840B/5positives27ownrefusals/5originalPNG/protected11exact; independent CLEAR_CPU_UPLOAD_SELECTION_ONLY. Future upload/ZIP169+23/body acceptance UNRUN; no fixed192 futurecount. Modern-source r2 exit0:4HTML200/283396B/11claimdependencyrows/newVerified0; independent CLEAR_RETAINED_MODERN_TEXT_AND_DEPENDENCY_PACKET_ONLY. Hunt600 is unauthenticated/scoped lead, never admitted strength; original newspaper/8OR scans UNVIEWED this session. Warning/source29consumer contractr2 binds all roles/caps; Apple-GPU branch and shared-browser warning suppression remain causal hypotheses only. Four rawwarnings HOLD; private38021389470 exhausted. Proposed nested production schema unimplemented; reconstructed-total48MiB meaning unresolved, no cap waiver. Dynamic manifest belongs only in existing producer stdout after member/prune, no .out logging or later writers; literal producer/log readers must amend. Next .out-only explicit named schema/producer/consumer feasibility, full source/model/gates before any browser authority/adoption; independent Shiloh original-strength/identity/clock/metre work remains. Protected11/allhistoricalroots/indexempty preserved; COORD absent; root releases after saved/pushed audit.
 
 ## Zero-context continuation packet (2026-10-10 upload/Fraley admission)
