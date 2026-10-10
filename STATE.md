@@ -1,7 +1,7 @@
 # STATE
 2026-10-10 — ACTIVE same-thread autonomous existing-v1 loop.
 Root sole writer; COORD absent; indexempty; protected11 unchanged.
-Docs descendec93002; verify live HEAD/origin; pull ONLY clean.
+Docs descend0e608b7; verify live HEAD/origin; pull ONLY clean.
 Aaron: automatic compaction, compact checkpoints, no routine session stops.
 AcceptedF6b158; deployedF6c728 unaccepted; existingv1 P1–P7 unfinished.
 48MiB per stored/decoded native buffer; oversizedflatten forbidden.
@@ -12,8 +12,8 @@ Source matrix r5 once0/helperCLEAR: all209/198locks/69+65–67inverses exact.
 Warningdiagnostic source/CPUpreflight CLEAR only; PENDING pins refuse.
 All29 consumer SOURCE closure r3/helperCLEAR:35bodies109deps187imports32syntax.
 209Git/70sources/582ordered580unique49axes/60streams/18public/23PNG.
-169originalbodies missing: reviewed recovery scope approval PENDING.
-Selected23 preserved; no newcollector/browser/product authority yet.
+169originalbodies missing: bounded recovery APPROVED; execution UNRUN.
+ONE recovery64MiB/75MiB DIAG authorized; no browser/product authority.
 Runtime consumers/full169model/Node24/browser/nativeP7 remain UNRUN/HOLD.
 INPUTS.out146723474; checkpoint32768 slice remaining15124.
 Refresh totals/free before every write; retain160MiB unused reservation.
