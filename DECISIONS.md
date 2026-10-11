@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0101 — Align the private launch with the tested compositor configuration (2026-10-11)
+
+Four fresh default/explicit SwiftShader/explicit SwiftShader/default Chromium sessions yielded 4/0/0/4 warnings and disabled/enabled/enabled/disabled GPU compositing. Complete original ordinary checks pass all four; errors/dialogs empty. Corrected private afcd7faf/run38134610608 and full once-only readback independently clear the configuration effect, supporting --use-angle=swiftshader in the private whole-input harness (already used by the production headless suite). Internal C++ call path remains unobserved; no filtering, timing/oracle waiver or product adoption. Preserve failed metadata run38133755187 and all earlier evidence. SAME cumulative283856 transfer/462336 output; full-input and complete PhaseA/product582 remain UNRUN. Broad existing-v1 authority continues without routine popups; root stays active through automatic compaction.
+
 ## 0100 — Broad execution authority and complete diagnostic readback (2026-10-11)
 
 Aaron grants all permissions necessary to finish existingv1: diagnostics, fixes, tests, integration and release proceed without repeated approval popups. Prior one-attempt/no-retry execution blockers are superseded; resource/source/history/ownership and actual acceptance gates remain. Rawlogs8109B recovered; local readback once0/eight native UTC-second endpoint controls independently CLEAR_COMPLETE_OBSERVATIONAL_READBACK_ONLY_CAUSE_UNPROVED. Preserve full raw fractions and all failed attempts/drafts. Cumulative58807transfer/75067output under samecaps; four P/K/K/P arms each retain4 warnings before input, no errors/dialogs. Cause/warning gate HOLD; next narrow causal diagnosis under broad authority. Continue same thread; no product adoption or v1 completion claim.
