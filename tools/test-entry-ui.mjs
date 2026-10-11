@@ -57,13 +57,13 @@ export async function entryProgress({ browser, url, check, shot, result, watchEr
       'native delayed Continue read focuses a visible Loading status at320px and prevents repeated navigation');
     await shot(page, 'entry-loading-320');
     await releaseProgressTransaction(page); await page.waitForFunction(() => window.__entry?.mode === 'camp' && !window.__entry.importing);
-    check('entry-read-settlement-visible', await page.evaluate(() => document.activeElement.id === 'camp-practice'
+    check('entry-read-settlement-visible', await page.evaluate(() => document.activeElement.id === 'camp-begin-campaign'
       && (() => { const r = document.activeElement.getBoundingClientRect(); return r.y >= 0 && r.bottom <= innerHeight; })()),
-      'completed read/navigation scrolls the focused Practice action into view at320px');
+      'completed read/navigation scrolls the focused Begin the campaign action into view at320px');
     await shot(page, 'entry-loaded-focus-320');
     await page.setViewportSize({ width: 1024, height: 768 });
     check('entry-saved-continue-camp', await raw() === before && await page.evaluate(() => window.__entryWrites === 0
-      && window.__entry.saved.awardId === 'entry-original' && !window.__game && !window.__reward && document.activeElement.id === 'camp-practice'), 'saved Continue opens camp without writes/rolls and focuses a visible next action');
+      && window.__entry.saved.awardId === 'entry-original' && !window.__game && !window.__reward && document.activeElement.id === 'camp-begin-campaign'), 'saved Continue opens camp without writes/rolls and focuses a visible next action');
     check('entry-real-army-depot', await page.locator('#camp-army [data-brigade-id]').count() === 2
       && await page.locator('#camp-army').textContent().then((s) => s.includes('Depleted'))
       && await page.locator('#camp-depot [data-item-uid]').count() === 12
