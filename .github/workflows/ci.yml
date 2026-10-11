@@ -1,4 +1,4 @@
-name: Reward focus GPU path benchmark (private only)
+name: Original suite CPU profile (private only)
 on:
   push:
     branches: [reward-focus-inputs-private]
@@ -28,7 +28,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           test ! -e .out
           mkdir .out
-          cp tools/test-reward-focus-private.mjs .out/gpu-path-private-runner.mjs
+          cp tools/test-reward-focus-private.mjs .out/cpu-profile-private-runner.mjs
           git fetch --no-tags --depth=1 origin 2bac1ccd575c400629dec23df2f37fefb09f8b6e
           test "$(git rev-parse FETCH_HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
           git checkout --detach 2bac1ccd575c400629dec23df2f37fefb09f8b6e
@@ -39,17 +39,104 @@ jobs:
           node-version: 24.21.0
           cache: npm
       - run: npm ci
-      - name: Four serial real-field rendering measurements
-        run: node .out/gpu-path-private-runner.mjs
+      - name: Fetch pinned current-field comparison
+        run: |
+          test "$GITHUB_WORKSPACE" = "/__w/the-civil-war/the-civil-war"
+          test "$(realpath "$GITHUB_WORKSPACE")" = "$GITHUB_WORKSPACE"
+          test "$(git rev-parse HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
+          git fetch --no-tags --depth=1 origin 4f6113a624e0e533825c0be414bb36f3b073f726
+          test "$(git rev-parse FETCH_HEAD)" = "4f6113a624e0e533825c0be414bb36f3b073f726"
+          test "$(git rev-parse HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
+          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/main.js
+          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/entry.js
+
+      - name: Fetch pinned reinforcement comparison
+        run: |
+          test "$(git rev-parse HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
+          git fetch --no-tags --depth=1 origin aaf10145531130f3ec201d6332f6759599bc46a4
+          test "$(git rev-parse FETCH_HEAD)" = "aaf10145531130f3ec201d6332f6759599bc46a4"
+          test "$(git rev-parse HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
+          git cat-file -e aaf10145531130f3ec201d6332f6759599bc46a4:src/main.js
+          node tools/test-surrender-runtime.mjs --verify-legacy-game
+
+      - name: Fetch pinned captured-gun comparison
+        run: |
+          test "$(git rev-parse HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
+          git fetch --no-tags --depth=1 origin b81dad641ff86c7586b13abf57dce257e299fef0
+          test "$(git rev-parse FETCH_HEAD)" = "b81dad641ff86c7586b13abf57dce257e299fef0"
+          test "$(git rev-parse HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
+          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/units/battery.js
+          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/game.js
+
+      - name: Fetch pinned battery-overrun comparison
+        run: |
+          test "$(git rev-parse HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
+          git fetch --no-tags --depth=1 origin 0e505fd61dead1f95659eaa2f8652f31935a50bc
+          test "$(git rev-parse FETCH_HEAD)" = "0e505fd61dead1f95659eaa2f8652f31935a50bc"
+          test "$(git rev-parse HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
+          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/game.js
+          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/combat.js
+          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/phase.js
+
+      - name: Fetch pinned captured-loadout comparison
+        run: |
+          test "$(git rev-parse HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
+          git fetch --no-tags --depth=1 origin 158cb60a1dd26e84161fcdc97342d7f239369f90
+          test "$(git rev-parse FETCH_HEAD)" = "158cb60a1dd26e84161fcdc97342d7f239369f90"
+          test "$(git rev-parse HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
+          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:src/franchise/practice.js
+          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:tools/test-battery-overrun.mjs
+          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:tools/test-captured-guns.mjs
+
+      - name: Fetch pinned reward-focus comparison
+        run: |
+          test "$(git rev-parse HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
+          git fetch --no-tags --depth=1 origin 7287296ae3b1c90f3a43642f33e3e886e8b889e2
+          test "$(git rev-parse FETCH_HEAD)" = "7287296ae3b1c90f3a43642f33e3e886e8b889e2"
+          test "$(git rev-parse HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
+          git cat-file -e 7287296ae3b1c90f3a43642f33e3e886e8b889e2:src/reward/sequence.js
+          git cat-file -e 7287296ae3b1c90f3a43642f33e3e886e8b889e2:src/reward/reward.css
+          git cat-file -e 7287296ae3b1c90f3a43642f33e3e886e8b889e2:tools/test-captured-loadouts.mjs
+
+      - name: Observe unchanged original suite CPU and processes
+        id: profile
+        run: node .out/cpu-profile-private-runner.mjs
       - name: Preserve complete private diagnostic output
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: gpu-path-private-diagnostic
+          name: cpu-profile-private-diagnostic
           path: |
-            .out/gpu-path-private-runner.mjs
-            .out/gpu-path-private-actual.json
+            .out/cpu-profile-private-runner.mjs
+            .out/cpu-profile-private-actual.json
           include-hidden-files: true
           retention-days: 7
           compression-level: 6
           if-no-files-found: error
+      - name: Preserve all original producer files with native proof
+        if: always() && steps.profile.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpu-profile-original-output
+          path: |
+            .out/
+            !.out/last-result.json
+            !.out/cpu-profile-private-runner.mjs
+            !.out/cpu-profile-private-actual.json
+          include-hidden-files: true
+          retention-days: 7
+          compression-level: 6
+          if-no-files-found: warn
+      - name: Preserve all original producer failure files
+        if: always() && steps.profile.outcome != 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cpu-profile-original-failure-output
+          path: |
+            .out/
+            !.out/cpu-profile-private-runner.mjs
+            !.out/cpu-profile-private-actual.json
+          include-hidden-files: true
+          retention-days: 7
+          compression-level: 6
+          if-no-files-found: warn
