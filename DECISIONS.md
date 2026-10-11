@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0109 — Park the P2o feedback reader; terrain from TIGER; AI attacks; masking on (2026-10-11)
+
+P2o (one bounded feedback region) is parked on branch `p2o-feedback`, not shipped: its opaque box (up to 180 px tall) covers the top of the battlefield whenever a tip shows, which hid the tilt-shift band entirely and cut the visible saturation change from 96% to 60% of sampled pixels in CI. A lighter readability fix belongs to P6 HUD polish. MAIN's uncommitted copy stays untouched. Battle terrain comes from USGS 3DEP; roads from Census TIGERweb (public domain), since the National Map has no park roads and OSM geometry is ODbL. Modern roads stand in for period alignments (Inferred). AI units may now attack or wait in reserve; friendly lines mask fire by default (sandbox toggle), and golden oracles changed only where masking applies.
+
 ## 0108 — Return to the AGENTS.md light process (Aaron, 2026-10-11)
 
 Aaron chose the AGENTS.md §3 light process over the inherited proof regime: change → `npm test` → commit → push → green CI and Pages for that SHA → look at real screenshots. The byte-exact source locks (embedded copies of other files, parent-SHA inverses, sha256 source pins, CI-text matches), readback collectors, transfer caps and proof-envelope transport are retired for new work; tests keep only behavioural checks. Why: in three days that regime shipped one product fix, still unaccepted; test and proof tooling reached 6.5 MB against 0.8 MB of game source, and CI timed out because `npm test` was one serial 27–45 minute step. Old receipts and worktrees are kept, not deleted. The idle-redraw draft (resource diagnostic run 38163598547) is shelved, not adopted. History rules are unchanged: two independent sources per Verified claim and no invented people, ranks or presence.
