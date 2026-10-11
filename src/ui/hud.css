@@ -186,6 +186,27 @@ body dialog.field-loot-preview .rw { left: 0; right: 0; top: 60px; bottom: 0; }
 #orders button[aria-pressed="true"] { background: #4a6a2a; border-color: #b9ff7a; }
 #orders button[data-order="holdfire"][aria-pressed="true"] { background: #6a3a22; border-color: #ffb15c; }
 
+/* Delegation: the card's Delegate / Undo row (in the general's ochre) and the Attack / Defend / Support chooser. */
+.ucdelegate { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+#delegate-text { flex: 1 1 auto; min-width: 0; font-size: 13px; color: #f0c870; overflow-wrap: anywhere; }
+#delegate-btn, #delegate-undo, #delegate-chooser button { position: relative; min-width: 48px; min-height: 44px; background: rgba(40, 37, 46, 0.95);
+  border: 1px solid #b9790c; border-radius: 8px; cursor: pointer; font-size: 14px; }
+#delegate-btn { padding: 10px 22px 4px 10px; }
+#delegate-undo { padding: 4px 12px; }
+#delegate-undo[hidden], #delegate-chooser[hidden] { display: none; }
+#delegate-btn:hover:not(:disabled), #delegate-undo:hover, #delegate-chooser button:hover { background: rgba(70, 64, 82, 0.98); }
+#delegate-btn:disabled { color: #c9c2b4; border-color: #958da1; cursor: default; }
+#delegate-btn .key, #delegate-chooser .key { position: absolute; right: 4px; top: 1px; font-size: 12px; line-height: 1; color: var(--dim); }
+#delegate-btn:focus-visible, #delegate-undo:focus-visible, #delegate-chooser button:focus-visible { outline-offset: -4px; }
+#delegate-chooser { left: 50%; transform: translateX(-50%); bottom: calc(var(--edge) + var(--dock-h) + 8px + env(safe-area-inset-bottom));
+  width: max-content; max-width: calc(100vw - 2 * var(--edge) - env(safe-area-inset-left) - env(safe-area-inset-right)); box-sizing: border-box;
+  padding: 8px; z-index: 12; background: #18161d; border-color: #b9790c; }
+#dc-title { margin: 0 0 6px; font-size: 14px; overflow-wrap: anywhere; }
+.dc-roles { display: grid; grid-template-columns: repeat(4, minmax(64px, auto)); gap: 6px; }
+#delegate-chooser button { padding: 12px 26px 4px 10px; }
+#delegate-chooser button[data-role="cancel"] { border-color: #958da1; }
+@media (max-width: 400px) { .dc-roles { grid-template-columns: repeat(2, minmax(64px, 1fr)); } }
+
 #minimap-box { padding: 4px; box-sizing: border-box; height: calc(var(--mm) + 10px); }
 #minimap { display: block; width: var(--mm); height: var(--mm); border-radius: 4px; cursor: crosshair; touch-action: none; }
 #minimap-box.large { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); height: auto; z-index: 30; }

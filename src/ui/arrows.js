@@ -10,14 +10,17 @@
 // short arrow for the way it will face and, for the dragged order and the selected brigade, a translucent
 // sector of its firing arc at weapon range (batteries: rings at canister and full range).
 // Everything here draws on top of the battlefield (no depth test) so it stays readable over hills and smoke.
+// Delegated brigades (Game.delegate): the general's plan in the same line style but in ochre ('DL'), with a
+// small role mark at each delegated place: Attack a cross, Defend a square, Support a ring. While a place is
+// being picked (ui/input.js), previewDelegate draws a line from each brigade to it and a ringed dot there.
 
 import * as THREE from 'three';
 import { LOOK } from './look.js';
 import { on as onSetting } from '../settings.js';
 import { compareState, onCompare } from '../sandbox/compare.js';
 
-const COLORS = { US: new THREE.Color('#3f7fd8'), CS: new THREE.Color('#c8384a') };
-const INK = { US: new THREE.Color('#1d4fb8'), CS: new THREE.Color('#b02a36') };
+const COLORS = { US: new THREE.Color('#3f7fd8'), CS: new THREE.Color('#c8384a'), DL: new THREE.Color('#d39a1c') };
+const INK = { US: new THREE.Color('#1d4fb8'), CS: new THREE.Color('#b02a36'), DL: new THREE.Color('#b9790c') };
 const ARC = (65 * Math.PI) / 180;
 const _vp = new THREE.Vector4();
 
@@ -295,6 +298,8 @@ export class ArrowLayer {
     this.previewEnd = null; // { x, z, facing } of the dragged order's ghost
     this.unitArrows = new Map(); // unit id -> Group
     this.ghosts = new Map();
+    this.marks = new Map(); // `${role}:${x}:${z}` -> the role mark at a delegated place
+    this.markMat = new THREE.MeshBasicMaterial({ color: COLORS.DL, transparent: true, opacity: 0.95, depthTest: false, depthWrite: false });
     this.mats = new Map(); // `${style}:${side}:${clip}:${preview}` -> material
     this.ghostMats = { US: ghostMaterial('US'), CS: ghostMaterial('CS') };
     this.arcMats = { US: arcMaterial('US', 0.09), CS: arcMaterial('CS', 0.09), USc: arcMaterial('US', 0.16), CSc: arcMaterial('CS', 0.16) };
@@ -455,15 +460,83 @@ export class ArrowLayer {
         if (m) { this.disposeGroup(m); this.unitArrows.delete(u.id); }
         continue;
       }
-      // a halted line's path does not change: keep its mesh unless the style or scale changed
-      if (m && !u.follow.active && !rebuild) continue;
+      // a halted line's path does not change: keep its mesh unless the style, scale or shade changed
+      const shade = own && u.delegate ? 'DL' : u.side;
+      if (m && !u.follow.active && !rebuild && m.userData.shade === shade) continue;
       if (m) this.disposeGroup(m);
-      const { group } = this.lineGroup(u.path, u.side, Math.min(26, Math.max(12, u.halfFront * 0.22)), false);
+      const { group } = this.lineGroup(u.path, shade, Math.min(26, Math.max(12, u.halfFront * 0.22)), false);
+      group.userData.shade = shade;
       this.group.add(group);
       this.unitArrows.set(u.id, group);
     }
+    this.updateMarks(units, isMine, rebuild);
     // units removed from the field (sandbox)
     for (const [id, m] of this.unitArrows) if (!seen.has(id)) { this.disposeGroup(m); this.unitArrows.delete(id); }
     for (const [id, gh] of this.ghosts) if (!seen.has(id)) { this.dropGhost(gh.g); this.ghosts.delete(id); }
+  }
+
+  /** A role mark on the ground at (x, z): 'attack' a cross, 'defend' a square, 'support' a ring, 'pick' a ringed dot. */
+  roleMark(role, x, z) {
+    const r = Math.max(9, this.mpp * 9), w = Math.max(1.6, this.mpp * 2.6);
+    const g = new THREE.Group();
+    const geos = [];
+    if (role === 'attack') {
+      for (const a of [Math.PI / 4, -Math.PI / 4]) {
+        const dx = Math.sin(a) * r, dz = Math.cos(a) * r;
+        geos.push(barGeometry([x - dx, z - dz], [x + dx, z + dz], w, this.terrain));
+      }
+    } else if (role === 'defend') {
+      const k = r * 0.75;
+      const c = [[x - k, z - k], [x + k, z - k], [x + k, z + k], [x - k, z + k]];
+      for (let i = 0; i < 4; i++) geos.push(barGeometry(c[i], c[(i + 1) % 4], w, this.terrain));
+    } else {
+      geos.push(arcGeometry(x, z, 0, r - w, r, Math.PI, this.terrain));
+      if (role === 'pick') geos.push(arcGeometry(x, z, 0, 0, w, Math.PI, this.terrain));
+    }
+    for (const geo of geos) {
+      const m = new THREE.Mesh(geo, this.markMat);
+      m.frustumCulled = false;
+      m.renderOrder = 23;
+      g.add(m);
+    }
+    g.userData.role = role;
+    this.group.add(g);
+    return g;
+  }
+
+  /** One role mark per delegated place of the player's units; rebuilt when the set of places or the scale changes. */
+  updateMarks(units, isMine, rebuild) {
+    const want = new Map();
+    for (const u of units) {
+      const d = u.delegate;
+      if (!d || !u.alive || !isMine(u)) continue;
+      want.set(`${d.role}:${d.x}:${d.z}`, d);
+    }
+    for (const [key, g] of this.marks) {
+      if (want.has(key) && !rebuild) continue;
+      this.disposeGroup(g);
+      this.marks.delete(key);
+    }
+    for (const [key, d] of want) if (!this.marks.has(key)) this.marks.set(key, this.roleMark(d.role, d.x, d.z));
+  }
+
+  /**
+   * Picking a place to delegate to: a pencil line in the delegate shade from each brigade to (x, z) and a ringed
+   * dot there. Shares the preview slot with setPreview (clearPreview removes it).
+   */
+  previewDelegate(units, x, z) {
+    this.clearPreview();
+    const group = new THREE.Group();
+    for (const u of units) {
+      if (Math.hypot(x - u.x, z - u.z) < 8) continue;
+      const line = this.lineGroup([[u.x, u.z], [x, z]], 'DL', 12, true);
+      group.add(line.group);
+    }
+    const mark = this.roleMark('pick', x, z);
+    this.group.remove(mark);
+    group.add(mark);
+    this.preview = group;
+    this.group.add(group);
+    return group;
   }
 }

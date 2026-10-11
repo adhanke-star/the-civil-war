@@ -7,6 +7,10 @@
 //   attack  close on a target to effective range with line of sight, halt, fire, and follow it if it moves
 //           (attackStep); never charges on its own
 //   charge  only from the Charge button or key
+// Delegate (DESIGN.md 2 "Command"): delegate(units, role, x, z) hands own brigades to the AI (src/sim/ai.js) as
+// Attack, Defend or Support of a place (unit.delegate = { role, x, z, since }); any direct order to one of them
+// (order, orderGroup, orderSelected: move, attack, hold, charge, run, fall back, halt, hold fire) reclaims it
+// first and then runs exactly as for any other brigade; undelegate(units) reclaims and halts (the card's Undo).
 // A selection may hold several brigades (box select); a drag order moves them all, keeping their places
 // relative to the brigade dragged, turned with it. Brigade initiative (rules.initiative): a unit without
 // orders turns to face fire from beyond its arc when nothing is in front of it; it never advances unordered.
@@ -28,7 +32,7 @@ import { compareState } from './sandbox/compare.js';
 import { HaloPool } from './units/halos.js';
 import { HorsePool, HORSE_COATS } from './units/mounts.js';
 import { Combat, CLOCK_RATIO } from './sim/combat.js';
-import { Ai } from './sim/ai.js';
+import { Ai, DELEGATE_ROLES } from './sim/ai.js';
 import { RULES } from './sim/rules.js';
 import { mulberry32, inWoods, PLAN } from './world/landscape.js';
 import { FieldCaptures } from './franchise/captures.js';
@@ -529,6 +533,7 @@ export class Game {
   order(u, { type, points, target, endFacing }) {
     if (!this.controls(u)) return false;
     if (!u.canTakeOrders()) { this.emit('log', `${u.short} is routing and will not take orders.`); return false; }
+    this.reclaim(u); // a direct order takes a delegated brigade back
     let ok;
     if (type === 'attack') {
       ok = u.orderAttack(target, endFacing);
@@ -586,6 +591,7 @@ export class Game {
       return false;
     }
     let ok = false;
+    for (const u of group) this.reclaim(u); // a direct order takes delegated brigades back
     if (kind === 'holdfire') {
       const on = !group[0].holdFire;
       for (const u of group) u.holdFire = on;
@@ -606,6 +612,43 @@ export class Game {
     }
     if (ok) this.orders = (this.orders || 0) + 1;
     return ok;
+  }
+
+  /**
+   * Delegate own brigades (the player's side, able to take orders) to the AI as `role` ('attack', 'defend' or
+   * 'support') of the place (x, z), kept inside the ground. Each stops where it is; the AI plans its march on its
+   * next step. Returns how many were delegated.
+   */
+  delegate(units, role, x, z) {
+    if (!DELEGATE_ROLES.includes(role) || !Number.isFinite(x) || !Number.isFinite(z)) return 0;
+    const lim = this.terrain.half - 40;
+    x = Math.max(-lim, Math.min(lim, x)); z = Math.max(-lim, Math.min(lim, z));
+    const list = units.filter((u) => this.controls(u) && u.side === this.playerSide && u.canTakeOrders());
+    for (const u of list) {
+      u.stop();
+      u.order = { type: 'hold' };
+      u.delegate = { role, x, z, since: this.simTime };
+    }
+    if (!list.length) return 0;
+    this.orders = (this.orders || 0) + 1;
+    const word = role[0].toUpperCase() + role.slice(1);
+    this.emit('log', `${list.length === 1 ? list[0].short : `${list.length} brigades`} delegated: ${word}. Any order takes ${list.length === 1 ? 'it' : 'them'} back.`);
+    return list.length;
+  }
+
+  /** Clear a unit's delegation (a direct order, or Undo). True if it was delegated. */
+  reclaim(u) {
+    if (!u || !u.delegate) return false;
+    delete u.delegate;
+    return true;
+  }
+
+  /** Undo: reclaim the delegated brigades among `units`; each halts where it stands, under the player's orders again. */
+  undelegate(units) {
+    const list = units.filter((u) => this.controls(u) && this.reclaim(u));
+    for (const u of list) if (u.canTakeOrders()) u.orderHalt();
+    if (list.length) this.emit('log', `${list.length === 1 ? list[0].short : `${list.length} brigades`}: back under your orders.`);
+    return list.length;
   }
 
   /** Nearest enemy within 320 m, preferring those ahead of the line. */
@@ -658,7 +701,7 @@ export class Game {
     if (!t || !t.alive || t.state === 'routing' || !this.units.includes(t)) {
       u.stop();
       u.order = { type: 'hold' };
-      if (this.controls(u)) this.emit('log', `${u.short}: the enemy has gone; holding here.`); // AI attacks (ai.js) tell no one
+      if (this.controls(u) && !u.delegate) this.emit('log', `${u.short}: the enemy has gone; holding here.`); // AI and delegated attacks (ai.js) tell no one
       return;
     }
     const eff = this.effRange(u), rng = this.range(u);

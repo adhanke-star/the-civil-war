@@ -44,6 +44,9 @@
 // `node tools/test.mjs --reward` runs Node foundations and completed reward persistence UI only.
 // `node tools/test.mjs --campaign` runs the campaign title, slots, camp strip, Briefing, result and replay flow only
 // (tools/test-campaign-ui.mjs, also in shard 2).
+// `node tools/test.mjs --delegation` runs the delegation UI only (tools/test-delegation-ui.mjs, also in shard 3): select,
+// Delegate, pick a place, Attack by mouse and keyboard, the pencil line, the card's role and Undo, a drag that takes
+// the brigade back, Escape, axe and 320 px.
 // Full smoke includes real equip/reload/export/import, duplicate/conflict/quota/read failure recovery,
 // keyboard/focus, scoped compare/resume/import/launcher axe and 1024/320px target/layout checks.
 // SETTINGS_MODULE=<path> points the settings checks at another copy (used to prove the checks fail).
@@ -1752,6 +1755,7 @@ async function browserChecks(server, url) {
     if (process.argv.includes('--entry')) { result.mode = 'title and camp only'; await entryProgress({ browser, url, check, shot, result, watchErrors }); return; }
     // Imported on demand: its CPU half imports game modules that define settings, which would skew settingsUnit.
     if (process.argv.includes('--campaign')) { result.mode = 'campaign screens and flow'; const { campaignControls } = await import('./test-campaign-ui.mjs'); await campaignControls({ browser, url, check, shot, result, watchErrors }); return; }
+    if (process.argv.includes('--delegation')) { result.mode = 'delegation UI only'; const { delegationControls } = await import('./test-delegation-ui.mjs'); await delegationControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--camp')) { result.mode = 'camp equipment only'; await campEquipment({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--intro')) { result.mode = 'unforced introductory play'; await introPlay({ browser, url, check, shot, result, watchErrors, native }); return; }
     if (process.argv.includes('--practice')) { result.mode = 'practice result bridge only'; await practiceProgress({ browser, url, check, shot, result, watchErrors }); return; }
@@ -1789,13 +1793,15 @@ async function browserChecks(server, url) {
       const { rewardFocusControls } = await import('./test-reward-focus-ui.mjs');
       await rewardFocusControls({ browser, url, check, result });
     }
-    // Shard 3: surrender result, reinforcements, field admission and the soldier-eye view.
+    // Shard 3: surrender result, reinforcements, field admission, the soldier-eye view and delegation.
     if (runs(3)) {
       const { surrenderResultUIControls } = await import('./test-surrender-result-ui.mjs');
       await surrenderResultUIControls({ browser, url, check, result });
       await reinforcementUIControls({ browser, url, check, shot, result, native });
       await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native });
       await soldierViewControls({ browser, url, check, shot, result, watchErrors, native });
+      const { delegationControls } = await import('./test-delegation-ui.mjs');
+      await delegationControls({ browser, url, check, shot, result, watchErrors });
     }
     finalizeActivationUI({ result, check });
   } finally {

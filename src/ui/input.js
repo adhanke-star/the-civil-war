@@ -16,8 +16,11 @@
 //   box-select; two fingers pinch to zoom and drag to pan; double-tap a brigade to fly to it. The browser's
 //   own pinch and its compatibility mouse events after a touch are suppressed.
 // Keys: H hold, C charge, R run, F fall back, X halt, V hold fire, Space pause, 1/2/3 speed, M map, L army
-//   list, B march targeting, T ranged target, Enter commit, Esc cancel/deselect, ? help, G quality.
+//   list, B march targeting, T ranged target, Enter commit, Esc cancel/deselect, ? help, G delegate (with your own
+//   brigades selected; with none, G cycles quality).
 //   During march targeting arrows move the destination and Q/E face the ghost; Shift uses finer steps.
+// Delegate (the card's Delegate button or G): pick a place (click or tap the field, a drag still pans; or arrows and
+//   Enter, as march targeting), then the HUD chooser asks Attack, Defend or Support (Game.delegate); Esc cancels.
 
 import { RULES } from '../sim/rules.js';
 import { coverWord, minutesText, compass } from './hud.js';
@@ -70,14 +73,14 @@ export class Input {
     window.addEventListener('pointermove', (e) => this.move(e));
     window.addEventListener('pointerup', (e) => this.up(e));
     window.addEventListener('pointercancel', (e) => this.cancel(e));
-    window.addEventListener('pointerdown', () => this.cancelTargeting());
+    window.addEventListener('pointerdown', () => { if (!this.drag?.delegatePick) this.cancelTargeting(); });
     // Safari: no page pinch-zoom or rubber-band scroll over the field (touch-action: none covers the rest)
     for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
     for (const el of [canvas, document.getElementById('markers')]) el.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 
     this.wheelGesture = null;
     const onWheel = (e) => {
-      this.cancelTargeting();
+      if (this.targeting?.mode !== 'delegate') this.cancelTargeting(); // zooming to find a place keeps the pick
       e.preventDefault();
       this.rts.inertia = null;
       const kind = this.wheelKind(e);
@@ -101,6 +104,7 @@ export class Input {
     game.on('remove', () => this.refreshTargeting());
     hud.onOpenMenu = () => { rts.keys.clear(); this.cancel(); };
     hud.onDirectOrder = () => this.cancelTargeting();
+    hud.onDelegate = () => this.beginTargeting('delegate');
   }
 
   /**
@@ -145,7 +149,19 @@ export class Input {
   // ---------------------------------------------------------------------------------------------------
   down(e, markerUnit) {
     if (this.isCompatMouse(e)) return;
-    this.cancelTargeting();
+    if (this.targeting?.mode === 'delegate' && e.button === 0 && !this.drag && !this.pointers.size) {
+      // picking a place to delegate to: a click or tap picks it (on a flag: that brigade's place); a drag pans
+      this.game.effects.unlock();
+      if (e.pointerType === 'touch') this.lastTouch = performance.now();
+      this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, type: e.pointerType });
+      this.rts.inertia = null;
+      e.preventDefault();
+      const ground = markerUnit ? { x: markerUnit.x, z: markerUnit.z } : this.rts.pick(e.clientX, e.clientY, this.canvas);
+      this.drag = { x: e.clientX, y: e.clientY, id: e.pointerId, type: e.pointerType, mode: 'pan', ground, moved: false, delegatePick: true };
+      this.panSamples.length = 0;
+      return;
+    }
+    if (!this.drag?.delegatePick) this.cancelTargeting();
     this.game.effects.unlock();
     const touch = e.pointerType === 'touch';
     if (touch) {
@@ -234,7 +250,15 @@ export class Input {
     const ptr = this.pointers.get(e.pointerId);
     if (ptr) { ptr.x = e.clientX; ptr.y = e.clientY; }
     const d = this.drag;
-    if (!d) return;
+    if (!d) {
+      // picking a delegate place with a mouse: the place follows the pointer over the field
+      const t = this.targeting;
+      if (t && t.mode === 'delegate' && e.pointerType === 'mouse' && (e.target === this.canvas || e.target?.closest?.('#markers'))) {
+        const p = this.rts.pick(e.clientX, e.clientY, this.canvas);
+        if (p) { t.point.x = p.x; t.point.z = p.z; }
+      }
+      return;
+    }
     if (d.mode === 'pinch') { if (d.ids.includes(e.pointerId)) this.pinchMove(d); return; }
     if (d.mode === 'order' && d.twist && e.pointerId === d.twist.id) {
       const a = this.pointers.get(d.id), b = this.pointers.get(d.twist.id);
@@ -376,6 +400,7 @@ export class Input {
       if (d.enemy) g.orderGroup(d.unit, { type: 'attack', target: d.enemy });
       else if (len >= MIN_ORDER_M) g.orderGroup(d.unit, { type: 'move', points: pts, endFacing: d.face });
     } else if (d.mode === 'pan') {
+      if (d.delegatePick && !d.moved) { this.chooseDelegate(d.ground); return; }
       if (!d.moved) {
         if (d.keep) this.tapUnit(d.unit, e);
         else g.select(null);
@@ -459,6 +484,34 @@ export class Input {
     this.hud.setTargeting(message);
   }
 
+  /** The selected brigades that may be delegated: the player's own side, able to take orders. */
+  delegable() {
+    return this.game.orderable().filter((u) => u.side === this.game.playerSide);
+  }
+
+  /**
+   * The place is picked: keep its preview and ask Attack, Defend or Support (Hud.openDelegate). Choosing delegates
+   * the brigades selected when the place was picked; cancelling changes nothing. Either way the field has focus.
+   */
+  chooseDelegate(p) {
+    const units = this.delegable();
+    if (!p || !units.length) { this.cancelTargeting(); this.hud.toast('Pick a place on the field to delegate to.'); return false; }
+    this.targeting = null;
+    this.hud.setTargeting(null);
+    this.hud.setGhostLabel(null);
+    this.arrows.previewDelegate(units, p.x, p.z);
+    const who = units.length === 1 ? units[0].short : `${units.length} brigades`;
+    this.hud.openDelegate({
+      who,
+      onChoose: (role) => {
+        this.arrows.clearPreview();
+        if (!this.game.delegate(units, role, p.x, p.z)) this.hud.toast('Those brigades can no longer be delegated.');
+      },
+      onCancel: () => this.arrows.clearPreview(),
+    });
+    return true;
+  }
+
   eligibleTargets(leader) {
     return this.game.units.filter((u) => u.side !== leader.side && u.alive && u.state !== 'routing')
       .sort((a, b) => String(a.id).localeCompare(String(b.id)));
@@ -469,6 +522,10 @@ export class Input {
     if (!unit || !this.game.units.includes(unit) || !this.mine(unit)) {
       this.cancelTargeting(); this.hud.toast('Select a brigade that can take orders.'); return;
     }
+    if (mode === 'delegate' && !this.delegable().length) {
+      this.cancelTargeting(); this.hud.toast('Only your own brigades can be delegated.'); return;
+    }
+    this.hud.closeDelegate?.(null, false);
     const old = this.targeting, targets = mode === 'attack' ? this.eligibleTargets(unit) : [];
     if (mode === 'attack' && !targets.length) { this.cancelTargeting(); this.hud.toast('No enemy is available for ranged attack.'); return; }
     this.cancel(); this.rts.keys.clear(); this.rts.inertia = null;
@@ -488,6 +545,7 @@ export class Input {
     if (document.querySelector('main')?.inert || document.querySelector('dialog[open]') || g.selected !== d.unit
       || !g.units.includes(d.unit) || !this.mine(d.unit) || g.selection.length !== d.selection.length
       || g.selection.some((u, i) => u !== d.selection[i])) { this.cancelTargeting(); return false; }
+    if (d.mode === 'delegate') return this.refreshDelegate(d, announce);
     if (d.mode === 'attack' && !this.eligibleTargets(d.unit).includes(d.enemy)) {
       this.cancelTargeting(); this.hud.toast('That enemy is no longer available. Choose another target with T.'); return false;
     }
@@ -513,12 +571,32 @@ export class Input {
     return true;
   }
 
+  /** Delegate targeting: lines from the selected brigades to the place and a ring there; the status names the keys. */
+  refreshDelegate(d, announce) {
+    const units = this.delegable(), p = d.point;
+    if (!units.length) { this.cancelTargeting(); return false; }
+    const previewKey = JSON.stringify(['delegate', p.x, p.z, units.map((u) => [u.id, Math.round(u.x), Math.round(u.z)]), this.arrows.mpp, this.arrows.styles()]);
+    if (previewKey !== d.previewKey) {
+      this.arrows.previewDelegate(units, p.x, p.z);
+      d.previewKey = previewKey;
+    }
+    if (announce || !d.statusText) {
+      const distance = Math.round(Math.hypot(p.x - d.unit.x, p.z - d.unit.z));
+      const where = distance ? `${distance} m ${compass(Math.atan2(p.x - d.unit.x, p.z - d.unit.z))}` : 'where it stands';
+      const who = units.length === 1 ? units[0].short : `${units.length} brigades`;
+      d.statusText = `Delegate ${who}: pick the place (${where}) · click or tap it, or arrows 25 m / Shift 5 m · Enter chooses Attack, Defend or Support · Esc cancels`;
+    }
+    this.hud.setTargeting(d.statusText);
+    return true;
+  }
+
   targetingKey(e, k) {
     if (!this.refreshTargeting()) return false;
     const d = this.targeting;
     if (k === 'escape') { this.cancelTargeting(); return true; }
     if (k === 'enter') {
       if (e.repeat) return true;
+      if (d.mode === 'delegate') { this.chooseDelegate({ x: d.point.x, z: d.point.z }); return true; }
       let length = 0;
       for (let i = 1; i < (d.preview?.length || 0); i++) length += Math.hypot(d.preview[i][0] - d.preview[i - 1][0], d.preview[i][1] - d.preview[i - 1][1]);
       if (d.mode === 'march' && length < MIN_ORDER_M) { this.hud.toast('Move the destination at least 22 metres before ordering.'); return true; }
@@ -528,6 +606,7 @@ export class Input {
     }
     if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'q', 'e'].includes(k)) {
       if (d.mode === 'attack') { this.hud.toast('Ranged attacks face their target. Use T to choose another enemy, or B to march.'); return true; }
+      if (d.mode === 'delegate' && (k === 'q' || k === 'e')) return true; // the AI chooses the facing
       const step = e.shiftKey ? 5 : 25, angle = (e.shiftKey ? 5 : 15) * Math.PI / 180;
       if (k === 'q' || k === 'e') { d.face = (Number.isFinite(d.face) ? d.face : d.unit.facing) + (k === 'q' ? -angle : angle); d.faceSet = true; }
       else {
@@ -550,6 +629,7 @@ export class Input {
     if (onButton && (k === 'enter' || k === ' ')) return;
     if (k === '?') { e.preventDefault(); this.hud.openMenu(e.target); return; }
     if (k === 'b' || k === 't') { e.preventDefault(); if (!e.repeat) this.beginTargeting(k === 'b' ? 'march' : 'attack', e.shiftKey); return; }
+    if (k === 'g' && this.delegable().length) { e.preventDefault(); if (!e.repeat) this.beginTargeting('delegate'); return; }
     if (this.targeting) {
       const consumed = this.targetingKey(e, k);
       if (consumed || (!this.targeting && ['escape', 'enter', 'arrowleft', 'arrowright', 'arrowup', 'arrowdown', 'q', 'e'].includes(k))) { e.preventDefault(); return; }

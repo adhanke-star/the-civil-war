@@ -1,6 +1,9 @@
 // src/ui/hud.js: the battle HUD: brigade markers, the bottom dock (unit card, orders, minimap), the top strip
 // (clock, pause, speeds, army list button, balance bar), the army list, the event feed, the auto-pause banner
 // and the ghost label. Markers move every frame (O(units)); their text and the card refresh 4 times a second.
+// Delegation (Game.delegate): the card's Delegate button (G) starts picking a place (ui/input.js, via onDelegate);
+// the chooser (openDelegate) asks Attack, Defend or Support by button or key (A / D / S; Esc cancels, nothing
+// changes) and returns focus to the field. The card shows "Delegated: <role>" and Undo (Game.undelegate).
 
 import * as THREE from 'three';
 import { LOOK } from './look.js';
@@ -134,6 +137,12 @@ const rankShort = (r) => ({ 'Brigadier General': 'Brig. Gen.', Colonel: 'Col.', 
 const commanderLine = (u) => (u.commander && u.commander.name ? `${rankShort(u.commander.rank)} ${u.commander.name}`.trim() : '');
 const STATE_WORD = { steady: 'Steady', shaken: 'Shaken', wavering: 'Wavering', routing: 'Routing' };
 const STATE_GLYPH = { steady: '', shaken: '~', wavering: '!', routing: '✕' };
+const ROLE_WORD = { attack: 'Attack', defend: 'Defend', support: 'Support' };
+const ROLE_TIP = {
+  attack: 'Attack: march there, form line, hold it and engage enemies within 150 m (A)',
+  defend: 'Defend: go there and hold firm facing the enemy; counter-charge only a breaking foe (D)',
+  support: 'Support: stay about 150 m behind the friend fighting there, follow it up and take its place if it breaks (S)',
+};
 
 export class Hud {
   constructor({ camera, canvas, terrain, units, playerSide, rts, game, onSelect, onOrder, onPause, onSpeed, onQuality, onSound }) {
@@ -216,6 +225,7 @@ export class Hud {
     $('sound-toggle').addEventListener('change', (e) => onSound(e.target.checked));
     $('result-close').addEventListener('click', () => { $('result').close(); });
     $('army-btn').addEventListener('click', (e) => this.toggleArmy(undefined, e.currentTarget));
+    this.buildDelegate();
     $('army-close').addEventListener('click', () => this.toggleArmy(false));
     this.alertAt = null;
     this.momentBanner = document.createElement('p'); this.momentBanner.id = 'moment-banner';
@@ -241,6 +251,83 @@ export class Hud {
     onSetting('look.eventFeed', applyFeed);
     this.applyMarkerScale(LOOK.markerScale);
     onSetting('look.markerScale', (v) => this.applyMarkerScale(v));
+  }
+
+  /** The card's Delegate and Undo buttons, and the Attack / Defend / Support chooser (hidden until a place is picked). */
+  buildDelegate() {
+    this.delegateState = null;
+    $('delegate-btn')?.addEventListener('click', () => { this.onDirectOrder?.(); this.onDelegate?.(); });
+    $('delegate-undo')?.addEventListener('click', () => {
+      if (this.game) this.game.undelegate(this.game.selection);
+      this.updateOrders();
+      this.canvas.focus({ preventScroll: true });
+    });
+    const c = document.createElement('section');
+    c.id = 'delegate-chooser';
+    c.className = 'panel';
+    c.setAttribute('role', 'dialog');
+    c.setAttribute('aria-modal', 'false');
+    c.setAttribute('aria-labelledby', 'dc-title');
+    c.hidden = true;
+    c.innerHTML = '<p id="dc-title"></p><div class="dc-roles"></div>';
+    const row = c.querySelector('.dc-roles');
+    for (const [role, key] of [['attack', 'A'], ['defend', 'D'], ['support', 'S'], ['cancel', 'Esc']]) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.dataset.role = role;
+      const word = ROLE_WORD[role] || 'Cancel';
+      b.setAttribute('aria-label', word);
+      b.title = ROLE_TIP[role] || 'Cancel: delegate nothing (Esc)';
+      b.innerHTML = `${word}<span class="key" aria-hidden="true">${key}</span>`;
+      b.addEventListener('click', () => this.closeDelegate(role === 'cancel' ? null : role));
+      row.appendChild(b);
+    }
+    c.addEventListener('keydown', (e) => {
+      const k = e.key.toLowerCase();
+      if (k === 'escape') { e.preventDefault(); e.stopPropagation(); this.closeDelegate(null); return; }
+      const role = !e.metaKey && !e.ctrlKey && !e.altKey && { a: 'attack', d: 'defend', s: 'support' }[k];
+      if (role) { e.preventDefault(); e.stopPropagation(); this.closeDelegate(role); return; }
+      const buttons = [...row.children], i = buttons.indexOf(document.activeElement);
+      if (['arrowleft', 'arrowright', 'arrowup', 'arrowdown'].includes(k) && i >= 0) {
+        e.preventDefault(); e.stopPropagation();
+        const step = k === 'arrowleft' || k === 'arrowup' ? -1 : 1;
+        buttons[(i + step + buttons.length) % buttons.length].focus();
+        return;
+      }
+      if (k === 'tab') { // keep focus in the chooser until a choice is made
+        const first = buttons[0], last = buttons[buttons.length - 1];
+        if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+        else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        return;
+      }
+      if (/^[a-z0-9?+\-=]$/i.test(e.key) || ['Enter', ' ', 'PageUp', 'PageDown', 'Home', 'End'].includes(e.key)) e.stopPropagation();
+    });
+    document.body.appendChild(c);
+    this.chooser = c;
+    // a press anywhere else closes it unchanged (that press then does what it always does)
+    document.addEventListener('pointerdown', (e) => { if (this.delegateState && !c.contains(e.target)) this.closeDelegate(null, false); }, true);
+  }
+
+  /** Ask Attack, Defend or Support for `who`; onChoose(role) or onCancel() runs once, then focus returns to the field. */
+  openDelegate({ who, onChoose, onCancel }) {
+    this.closeDelegate(null, false);
+    this.delegateState = { onChoose, onCancel };
+    $('dc-title').textContent = `Delegate ${who} here:`;
+    this.chooser.hidden = false;
+    this.rts?.keys.clear();
+    this.chooser.querySelector('button').focus({ preventScroll: true });
+  }
+
+  /** Close the chooser: with a role, delegate; with none, change nothing. Refocus the field unless told not to. */
+  closeDelegate(role = null, refocus = true) {
+    const s = this.delegateState;
+    if (!s) return false;
+    this.delegateState = null;
+    this.chooser.hidden = true;
+    if (role) s.onChoose(role); else s.onCancel?.();
+    if (refocus) this.canvas.focus({ preventScroll: true });
+    this.updateOrders();
+    return true;
   }
 
   applyMarkerScale(v) {
@@ -311,6 +398,7 @@ export class Hud {
   }
 
   select(u) {
+    if (this.delegateState) this.closeDelegate(null, false); // a new selection drops a half-made delegation
     for (const [id, m] of this.markers) m.el.classList.toggle('selected', !!this.game && this.game.selection.some((v) => v.id === id));
     if (!this.game && this.selected) this.markers.get(this.selected.id)?.el.classList.remove('selected');
     if (this.selected !== u) $('unitcard').scrollTop = 0;
@@ -349,6 +437,17 @@ export class Hud {
       if (btn.dataset.order === 'run') btn.setAttribute('aria-pressed', String(!!(mine && u.run)));
       if (btn.dataset.order === 'holdfire') btn.setAttribute('aria-pressed', String(!!(mine && u.holdFire)));
     }
+    const del = $('delegate-btn');
+    if (del) {
+      const own = mine && (!this.game || u.side === this.game.playerSide);
+      if (del.disabled === own) del.disabled = !own;
+      const delegated = !!u && (this.game ? this.game.selection : [u]).some((v) => v.delegate && v.alive);
+      const undo = $('delegate-undo');
+      if (undo.hidden === delegated) undo.hidden = !delegated;
+      const text = u && u.delegate ? `Delegated: ${ROLE_WORD[u.delegate.role] || u.delegate.role}` : '';
+      const label = $('delegate-text');
+      if (label.textContent !== text) label.textContent = text;
+    }
   }
 
   updateCard(u) {
@@ -372,6 +471,7 @@ export class Hud {
   openMenu(trigger) {
     const menu = $('menu');
     if (menu.open) return;
+    this.closeDelegate(null, false);
     this.onOpenMenu?.(); this.menuTrigger = trigger;
     for (const r of menu.querySelectorAll('input[name=quality]')) r.checked = r.value === this.quality;
     menu.showModal();
@@ -417,8 +517,10 @@ export class Hud {
     const w = window.innerWidth, h = window.innerHeight;
     const bounds = { left: 4, right: w - 4, top: $('topbar').getBoundingClientRect().bottom + 4, bottom: h - 4 };
     // Reserve the actual visible panels rather than the entire dock's transparent bounding box.
-    const obstacles = ['unitcard', 'orders', 'minimap-box', 'objective', 'tip', 'intro-hint', 'army', 'field-stores', 'feed', 'moment-banner', 'keyboard-targeting'].flatMap((id) => {
-      const el = $(id), r = el.getBoundingClientRect();
+    const obstacles = ['unitcard', 'orders', 'minimap-box', 'objective', 'tip', 'intro-hint', 'army', 'field-stores', 'feed', 'moment-banner', 'keyboard-targeting', 'delegate-chooser'].flatMap((id) => {
+      const el = $(id);
+      if (!el) return [];
+      const r = el.getBoundingClientRect();
       return !el.hidden && r.width > 0 && r.height > 0 ? [{ x: r.x + r.width / 2, y: r.bottom, w: r.width, h: r.height }] : [];
     });
     const shown = [];

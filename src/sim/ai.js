@@ -21,6 +21,22 @@
 //   reserve  holds until `at`, or until an enemy comes within 350 m, or the objective holder becomes the enemy;
 //            then it is an attacker.
 // The charge and fallback rules above apply to every role. No randomness: the same battle runs the same way.
+//
+// Delegation (DESIGN.md 2 "Command"): the player's own brigades with `unit.delegate = { role, x, z, since }`
+// (Game.delegate) are driven here too, after the enemy pass, until a direct order reclaims them (Game.reclaim).
+// Units without it are never touched, so undelegated play and the enemy AI run exactly as before.
+//   attack   march (a move order: it halts to fight on the way) to its own point at the place, the units of one
+//            delegation side by side across the approach (centre, right, left, ...); a battery stops once an
+//            enemy is within its effective range. Arrived, it holds firm facing the nearest enemy and, if steady,
+//            engages (attack order: fire) the nearest enemy within 150 m of its point; an attack drawn more than
+//            260 m from the point is called off and the unit returns.
+//   defend   go to its point, then hold firm facing the nearest enemy (or the enemy's side of the field).
+//   support  trail 150 m behind the nearest friend at the place (an engaged one first: any own brigade not itself
+//            in support, within 450 m of the place), moving up when it moves; masking (combat.js) keeps it from
+//            firing through the friend, and with a clear shot in effective range it halts to fire like any march
+//            (it follows again once masked or out of range). If that friend routs or falls, it marches to the
+//            friend's last place and holds it. With no friend near, it waits at the place.
+// The charge rule (attack and defend) and the fallback rule (every role) are the same as above.
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 export const AI_ROLES = Object.freeze(['hold', 'attack', 'reserve']);
@@ -32,6 +48,13 @@ const ARRIVE = 25; // m: this close to its own final point a unit has arrived
 const SPREAD_GAP = 32; // m between neighbouring fronts (two minimum half-fronts of 4 m make 40 m at least)
 const GUN_STAND = 0.9; // a battery halts at this share of its effective range from its aim
 const EDGE = 40; // m kept inside the mapped ground
+export const DELEGATE_ROLES = Object.freeze(['attack', 'defend', 'support']);
+const ATTACK_REACH = 150; // m from its point: a delegated attacker engages enemies this close
+const ATTACK_LEASH = 260; // m from its point: an attack drawn further than this is called off
+const SUPPORT_BACK = 150; // m behind the friend it supports
+const SUPPORT_SLACK = 30; // m: this close to its trailing point a support stands
+const SUPPORT_NEAR = 450; // m from the place: friends this close may be supported
+const SUPPORT_REISSUE_S = 3; // sim s between march orders that follow a moving friend
 
 const clockSec = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 3600 + m * 60; };
 /** The unit's AI role: 'hold' unless its definition names attack or reserve. */
@@ -48,6 +71,7 @@ export class Ai {
     this.chargeReach = opts.chargeReach || 170;
     this.memo = new WeakMap(); // unit -> { active, issued, via } (attack and reserve roles only)
     this.groups = new Map(); // target key -> { dir, pos: Map(unit -> lateral offset), n, right, left }
+    this.delegation = new WeakMap(); // delegated own unit -> { d, aim, facing, issued, friend, spot, replaced }
   }
 
   step(dt) {
@@ -87,6 +111,23 @@ export class Ai {
         if (Math.abs(wrap(want - u.facing)) > 0.35) u.goalFacing = want;
       }
     }
+    // the player's delegated brigades (none: nothing here runs)
+    for (const u of units) {
+      if (!u.delegate || u.side !== this.game.playerSide || !u.alive || u.state === 'routing' || u.melee) continue;
+      const [near, nd] = this.nearestFoe(u);
+      this.delegated(u, near, nd);
+    }
+  }
+
+  /** The nearest enemy that is not routing, and its distance. */
+  nearestFoe(u) {
+    let near = null, nd = Infinity;
+    for (const e of this.game.units) {
+      if (e.side === u.side || !e.alive || e.state === 'routing') continue;
+      const d = Math.hypot(e.x - u.x, e.z - u.z);
+      if (d < nd) { nd = d; near = e; }
+    }
+    return [near, nd];
   }
 
   /** Hold firm where it stands and face the nearest threat (the defence's last two rules). */
@@ -248,5 +289,148 @@ export class Ai {
     else { pos = grp.left - SPREAD_GAP - h; grp.left = pos - h; }
     grp.n++;
     grp.pos.set(v, pos);
+  }
+
+  // ---------------------------------------------------------------------------------------------------
+  // Delegation: the player's own brigades given a place and a role (Game.delegate)
+
+  /**
+   * This unit's plan for its current delegation, made once for every unit delegated in the same act: the
+   * approach runs from their centroid to the place and their points stand side by side across it (as `place`).
+   */
+  plan(u) {
+    const m = this.delegation.get(u);
+    if (m && m.d === u.delegate) return m;
+    const d = u.delegate, g = this.game, lim = g.terrain.half - EDGE;
+    const same = (v) => v.delegate && v.side === u.side && v.alive && v.delegate.since === d.since && v.delegate.role === d.role
+      && v.delegate.x === d.x && v.delegate.z === d.z && this.delegation.get(v)?.d !== v.delegate;
+    const list = g.units.filter(same);
+    if (!list.includes(u)) list.push(u);
+    let sx = 0, sz = 0;
+    for (const v of list) { sx += v.x; sz += v.z; }
+    let dx = d.x - sx / list.length, dz = d.z - sz / list.length;
+    const len = Math.hypot(dx, dz);
+    if (len < 1) { dx = 0; dz = u.side === 'US' ? 1 : -1; } else { dx /= len; dz /= len; }
+    const grp = { pos: new Map(), n: 0, right: 0, left: 0 };
+    for (const v of list) {
+      this.place(grp, v);
+      const off = grp.pos.get(v);
+      const aim = [Math.max(-lim, Math.min(lim, d.x + dz * off)), Math.max(-lim, Math.min(lim, d.z - dx * off))];
+      this.delegation.set(v, { d: v.delegate, aim, facing: Math.atan2(dx, dz), issued: -Infinity, friend: null, spot: null, replaced: false });
+    }
+    return this.delegation.get(u);
+  }
+
+  /** The facing a defender forms on: toward the nearest enemy from (x, z), else toward the enemy's side of the field. */
+  defendFacing(u, x, z) {
+    const f = this.game.ghostFacing(x, z, u.side, undefined);
+    return Number.isFinite(f) ? f : u.side === 'US' ? 0 : Math.PI;
+  }
+
+  /** One delegated unit, twice a second: the shared charge and fallback rules, then its role. */
+  delegated(u, near, nd) {
+    const m = this.plan(u), role = u.delegate.role;
+    if (u.order.type === 'charge') return;
+    if (role !== 'support' && near) {
+      const ahead = Math.abs(wrap(Math.atan2(near.x - u.x, near.z - u.z) - u.facing)) < 1.1;
+      if (u.type === 'infantry' && u.state === 'steady' && nd < this.chargeReach && ahead &&
+          (near.state === 'wavering' || near.state === 'shaken' && near.men < u.men * 0.7)) {
+        u.orderCharge(near);
+        return;
+      }
+    }
+    if (near && u.state === 'wavering' && nd < 200 && near.men > u.men && !u.follow.active && (u.lastFallback || -99) < this.game.simTime - 25) {
+      u.lastFallback = this.game.simTime;
+      u.orderFallback(110);
+      return;
+    }
+    if (role === 'support') { this.support(u, m, near, nd); return; }
+    if (role === 'attack') {
+      if (u.order.type === 'attack') {
+        const t = u.order.target;
+        if (t && Math.hypot(t.x - m.aim[0], t.z - m.aim[1]) > ATTACK_LEASH) { u.orderHalt(); m.issued = -Infinity; }
+        return;
+      }
+      if (u.type === 'artillery' && near && nd <= this.gunReach(u)) {
+        if ((u.follow.active || u.engaged) && u.order.type === 'move') { u.stop(); u.order = { type: 'hold', firm: true }; }
+        this.holdFace(u, near, nd);
+        return;
+      }
+    }
+    if (u.follow.active || u.engaged) return; // on the way (halted to fight on a march resumes in combat.js)
+    if (Math.hypot(u.x - m.aim[0], u.z - m.aim[1]) >= ARRIVE) {
+      this.delegateMarch(u, m, m.aim, role === 'defend' ? this.defendFacing(u, m.aim[0], m.aim[1]) : m.facing, near, nd);
+      return;
+    }
+    if (role === 'attack' && u.state === 'steady') {
+      const foe = this.foeNear(u, m.aim, ATTACK_REACH);
+      if (foe && u.orderAttack(foe)) return;
+    }
+    this.holdFace(u, near, nd);
+  }
+
+  /** March a delegated unit to `aim` (not while wavering, fighting, just ordered or just fallen back). */
+  delegateMarch(u, m, aim, facing, near, nd, wait = REISSUE_S) {
+    const g = this.game;
+    if (u.state === 'wavering' || this.fighting(u) || g.simTime - m.issued < wait
+        || g.simTime - (u.lastFallback ?? -Infinity) < FALLBACK_COOL_S) { this.holdFace(u, near, nd); return; }
+    if (u.orderMove([[u.x, u.z], aim], { endFacing: facing })) m.issued = g.simTime;
+  }
+
+  /** The nearest enemy (not routing) within `reach` of point p. */
+  foeNear(u, p, reach) {
+    let best = null, bd = Infinity;
+    for (const e of this.game.units) {
+      if (e.side === u.side || !e.alive || e.state === 'routing' || Math.hypot(e.x - p[0], e.z - p[1]) > reach) continue;
+      const d = Math.hypot(e.x - u.x, e.z - u.z);
+      if (d < bd) { bd = d; best = e; }
+    }
+    return best;
+  }
+
+  /** The friend a support trails: own brigades near the place that are not in support, engaged first, then nearest the place. */
+  supported(u) {
+    const d = u.delegate;
+    let best = null, score = Infinity;
+    for (const v of this.game.units) {
+      if (v === u || v.side !== u.side || !v.alive || v.removed || v.state === 'routing' || v.delegate?.role === 'support') continue;
+      const r = Math.hypot(v.x - d.x, v.z - d.z);
+      if (r > SUPPORT_NEAR) continue;
+      const s = r + (v.target || v.engaged || v.melee ? 0 : 1e4);
+      if (s < score) { score = s; best = v; }
+    }
+    return best;
+  }
+
+  /** Support: trail the friend, follow it up, take its place if it breaks; with nobody to support, wait at the place. */
+  support(u, m, near, nd) {
+    const g = this.game, lim = g.terrain.half - EDGE;
+    let f = m.friend;
+    if (f && (!f.alive || f.removed || f.state === 'routing')) {
+      if (m.spot) { m.replaced = true; m.issued = -Infinity; }
+      m.friend = f = null;
+    }
+    if (m.replaced) { // hold the broken friend's place
+      if (u.follow.active || u.engaged) return;
+      if (Math.hypot(u.x - m.spot.x, u.z - m.spot.z) >= ARRIVE) this.delegateMarch(u, m, [m.spot.x, m.spot.z], m.spot.facing, near, nd);
+      else this.holdFace(u, near, nd);
+      return;
+    }
+    if (!f || !(f.target || f.engaged || f.melee)) { const next = this.supported(u); if (next) m.friend = f = next; }
+    if (!f) {
+      if (u.follow.active || u.engaged) return;
+      if (Math.hypot(u.x - u.delegate.x, u.z - u.delegate.z) >= ARRIVE) this.delegateMarch(u, m, [u.delegate.x, u.delegate.z], this.defendFacing(u, u.delegate.x, u.delegate.z), near, nd);
+      else this.holdFace(u, near, nd);
+      return;
+    }
+    m.spot = { x: f.x, z: f.z, facing: f.facing };
+    const back = [Math.max(-lim, Math.min(lim, f.x - Math.sin(f.facing) * SUPPORT_BACK)), Math.max(-lim, Math.min(lim, f.z - Math.cos(f.facing) * SUPPORT_BACK))];
+    const goal = u.follow.active && u.path ? u.path[u.path.length - 1] : [u.x, u.z];
+    if (Math.hypot(goal[0] - back[0], goal[1] - back[1]) <= SUPPORT_SLACK) {
+      if (!u.follow.active && !u.engaged) this.holdFace(u, near, nd);
+      return;
+    }
+    if (u.engaged) return; // halted to fight on the way; the march resumes in combat.js
+    this.delegateMarch(u, m, back, f.facing, near, nd, SUPPORT_REISSUE_S);
   }
 }
