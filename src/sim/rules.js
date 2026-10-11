@@ -52,6 +52,11 @@ const SPECS = {
     tab: 'Rules', type: 'range', default: 1, min: 0.5, max: 2, step: 0.05, label: 'Battle speed',
     note: 'Multiplies how fast battle time runs at every game speed (1x/2x/4x).',
   }],
+  // A game value, not sourced: about 15% per hour of close action (src/game.js commandStep).
+  commanderRisk: ['rules.commanderRisk', {
+    tab: 'Rules', type: 'range', default: 15, min: 0, max: 60, step: 1, label: 'Commander risk',
+    note: 'Chance in percent per hour of close action that a general or brigade commander within 120 m of fire is hit: half wounded, half killed. 0: commanders are never hit.',
+  }],
 };
 
 export const RULES = {};

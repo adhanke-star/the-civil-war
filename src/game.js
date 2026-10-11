@@ -16,6 +16,17 @@
 // orders turns to face fire from beyond its arc when nothing is in front of it; it never advances unordered.
 // Events: 'select', 'log' (a toast: replies to the player's own actions), 'event' ({ text, time, x, z, side, kind }), 'alert' (an auto-pause:
 // { text, x, z }), 'spawn' / 'remove' (a unit added or taken off the field in the sandbox).
+// Command (DESIGN.md §2 "Commanders"): scenario.commanders (optional; validated in sim/phase.js) are division,
+// corps or army generals, each a mounted figure riding ~160 m (120-200 m) behind the centre of his living brigades
+// that are not routing, never into their line. Inside his 300 m rally radius every brigade of his side rallies 50%
+// faster and loses morale 20% slower (combat.js setCommand); a brigade's own commander (unit.officer) does the same
+// for his brigade alone. Each tick a general or brigade commander within 120 m of a point that took fire may be hit
+// (rules.commanderRisk, % per hour of close action): wounded or killed, half each. That roll uses the command
+// stream, a second mulberry32 stream seeded from the game seed, and draws only while someone is in danger, so the
+// game stream (g.rnd) and every existing oracle are untouched. A hit ends his bonus, gives his brigades a one-time
+// -10 morale shock, and is reported in the feed and a toast; a brigade that loses its commander shows "Commander
+// down" until the battle ends (its successor stays generic unless the data names a sourced one). Fates in the data
+// are after-action text only; nothing is scripted. Command state lives in a WeakMap (no own Game keys).
 // Figures (src/ui/look.js): look.figureStyle picks rigged 3D figures or baked sprites (both, split-screen, while
 // it is compared); the atlas loads the first time baked is wanted and the rigged figures draw until it is in.
 // look.menPerFigure re-forms the infantry at 1:10 or 1:5, never denser than the phase's scenario.menPerFigure
@@ -24,13 +35,14 @@
 import { EntityManager } from 'yuka';
 import { Unit, MEN_PER_FIGURE_OPTIONS, MEN_PER_CREW_FIGURE, SPEED, setMenPerFigure } from './units/unit.js';
 import { Battery, GunPool } from './units/battery.js';
-import { SoldierPool, FallenPool, UNIFORMS, FIGURE_VIEW } from './units/soldier-mesh.js';
+import { SoldierPool, FallenPool, FlagPool, UNIFORMS, FIGURE_VIEW, FIGURE_SCALE } from './units/soldier-mesh.js';
+import { framePos } from './units/figure.js';
 import { ImpostorPool, loadBakedAtlas } from './units/impostor.js';
 import { LOOK } from './ui/look.js';
 import { on as onSetting } from './settings.js';
 import { compareState } from './sandbox/compare.js';
 import { HaloPool } from './units/halos.js';
-import { HorsePool, HORSE_COATS } from './units/mounts.js';
+import { HorsePool, HORSE_COATS, RallyRings } from './units/mounts.js';
 import { Combat, CLOCK_RATIO } from './sim/combat.js';
 import { Ai, DELEGATE_ROLES } from './sim/ai.js';
 import { RULES } from './sim/rules.js';
@@ -253,6 +265,175 @@ function dispatchReinforcements(game, state, through) {
   } finally { if (state.capture) state.capture.dispatching = false; }
 }
 
+// ---- command: generals, brigade commanders, rally and risk ---------------------------------------------
+export const COMMAND = Object.freeze({
+  radius: 300, // m: a general's rally radius
+  behind: 160, minBehind: 120, maxBehind: 200, clearRear: 60, // m behind his brigades' centre; clear of the rearmost
+  danger: 120, // m from a point that took fire
+  loss: 0.8, rally: 1.5, shock: 10,
+  ride: 5, gallop: 9, gallopBeyond: 80, // m/s; he gallops when farther than gallopBeyond from his place
+  leaveS: 30, // s a wounded general rides to the rear before he leaves the field
+});
+const RALLIED = Object.freeze({ loss: COMMAND.loss, rally: COMMAND.rally });
+const commandState = new WeakMap();
+const commandFail = (message) => { throw new Error('Command: ' + message); };
+const DOWN_KINDS = ['wounded', 'killed'];
+
+/** A runtime general from a scenario (or sandbox) definition. */
+function makeCommander(def, k) {
+  if (!def || typeof def !== 'object' || typeof def.id !== 'string' || !def.id || !['US', 'CS'].includes(def.side)
+    || typeof def.name !== 'string' || !def.name.trim() || !Array.isArray(def.units) || !def.units.length
+    || !Number.isFinite(def.x) || !Number.isFinite(def.z)) commandFail('a commander needs an id, side, name, units and a position.');
+  return { id: def.id, side: def.side, name: def.name, rank: typeof def.rank === 'string' ? def.rank : '', units: def.units.slice(),
+    sources: Array.isArray(def.sources) ? def.sources.slice() : [], status: def.status ?? '', fate: def.fate ?? null, successor: def.successor ?? null,
+    x: def.x, z: def.z, yaw: def.side === 'US' ? -Math.PI / 2 : Math.PI / 2, moving: false,
+    down: null, downAt: 0, gone: false, horse: -1, phase: (k * 0.618) % 1, coatVar: (k * 0.37 + 0.2) % 1, trouserVar: (k * 0.71 + 0.4) % 1,
+    coat: HORSE_COATS[(k + 3) % HORSE_COATS.length] };
+}
+
+/** "Brigadier General Benjamin M. Prentiss" (rank omitted when the data has none). */
+const titled = (rank, name) => (rank ? `${rank} ${name}` : name);
+
+/** The morale factor of a unit (combat.js): rallied inside a living general's radius or by its own commander. */
+function commandFactor(game, u) {
+  const st = commandState.get(game);
+  if (!st || !u.alive) return null;
+  if (u.officer && !u.commandDown) return RALLIED;
+  for (const c of st.commanders) {
+    if (c.down || c.side !== u.side) continue;
+    const dx = c.x - u.x, dz = c.z - u.z;
+    if (dx * dx + dz * dz <= COMMAND.radius * COMMAND.radius) return RALLIED;
+  }
+  return null;
+}
+
+/** Where a general rides: COMMAND.behind (120-200 m) behind his living, steady brigades' centre, clear of the rearmost. */
+function commanderPlace(game, c) {
+  let n = 0, cx = 0, cz = 0, fx = 0, fz = 0;
+  for (const u of game.units) {
+    if (!c.units.includes(u.id) || !u.alive || u.state === 'routing' || u.state === 'captured') continue;
+    n++; cx += u.x; cz += u.z; fx += Math.sin(u.facing); fz += Math.cos(u.facing);
+  }
+  if (!n) return null;
+  cx /= n; cz /= n;
+  let len = Math.hypot(fx, fz);
+  if (len < 1e-3) { fx = Math.sin(c.yaw); fz = Math.cos(c.yaw); len = 1; }
+  fx /= len; fz /= len;
+  let rear = 0;
+  for (const u of game.units) {
+    if (!c.units.includes(u.id) || !u.alive || u.state === 'routing' || u.state === 'captured') continue;
+    rear = Math.max(rear, -((u.x - cx) * fx + (u.z - cz) * fz));
+  }
+  const back = Math.min(COMMAND.maxBehind, Math.max(COMMAND.behind, rear + COMMAND.clearRear));
+  const lim = game.terrain.half - 30;
+  return { x: Math.max(-lim, Math.min(lim, cx - fx * back)), z: Math.max(-lim, Math.min(lim, cz - fz * back)), fx, fz, cx, cz, back };
+}
+
+function moveCommander(game, c, h) {
+  if (c.gone) return;
+  if (c.down) {
+    if (c.down !== 'wounded') return;
+    // a wounded general rides to his side's rear and leaves the field
+    const home = game.scenario.retreat?.[c.side];
+    const tx = home ? home[0] : c.x, tz = home ? home[1] : c.side === 'US' ? -game.terrain.half + 40 : game.terrain.half - 40;
+    const dx = tx - c.x, dz = tz - c.z, d = Math.hypot(dx, dz);
+    if (d > 1) { const step = Math.min(d, COMMAND.gallop * h); c.x += (dx / d) * step; c.z += (dz / d) * step; c.yaw = Math.atan2(dx, dz); }
+    c.moving = d > 1;
+    if (game.simTime - c.downAt >= COMMAND.leaveS) c.gone = true;
+    return;
+  }
+  const p = commanderPlace(game, c);
+  if (!p) { c.moving = false; return; }
+  const dx = p.x - c.x, dz = p.z - c.z, d = Math.hypot(dx, dz);
+  if (d > 2) {
+    const step = Math.min(d, (d > COMMAND.gallopBeyond ? COMMAND.gallop : COMMAND.ride) * h);
+    c.x += (dx / d) * step; c.z += (dz / d) * step;
+    c.yaw += wrap(Math.atan2(dx, dz) - c.yaw) * Math.min(1, h * 4);
+    c.moving = true;
+  } else {
+    c.yaw += wrap(Math.atan2(p.fx, p.fz) - c.yaw) * Math.min(1, h * 2);
+    c.moving = false;
+  }
+}
+
+/** A general (or a brigade's commander, `who` a Unit) is hit: report it, end his bonus, shock his brigades. */
+function commanderHit(game, who, kind) {
+  const st = commandState.get(game);
+  if (!st || !DOWN_KINDS.includes(kind)) return false;
+  let text;
+  if (who instanceof Unit) {
+    if (!who.officer || who.commandDown) return false;
+    const c = who.commander || {};
+    who.commandDown = { kind, at: game.simTime, name: c.name || '', rank: c.rank || '' };
+    who.morale = Math.max(0, who.morale - COMMAND.shock);
+    text = `${titled(c.rank, c.name)} is ${kind}.`;
+    game.event(text, who, 'commander');
+  } else {
+    if (!st.commanders.includes(who) || who.down) return false;
+    who.down = kind; who.downAt = game.simTime; who.moving = false;
+    for (const u of game.units) if (who.units.includes(u.id) && u.alive) u.morale = Math.max(0, u.morale - COMMAND.shock);
+    text = `${titled(who.rank, who.name)} is ${kind}.`;
+    game.event(text, null, 'commander', { x: who.x, z: who.z, side: who.side });
+  }
+  game.emit('log', text);
+  return true;
+}
+
+/** Per tick after the fire: generals ride; anyone within COMMAND.danger of a point that took fire may be hit. */
+function commandStep(game, h) {
+  const st = commandState.get(game);
+  if (!st) return;
+  const hits = game.combat.takeHits();
+  for (const c of st.commanders) moveCommander(game, c, h);
+  const risk = RULES.commanderRisk;
+  if (!hits.length || !(risk > 0) || h <= 0) return;
+  // per-tick chance from the hourly one, in historical time: 1 - (1 - H)^(t / 3600)
+  const p = 1 - Math.pow(1 - Math.min(0.99, risk / 100), (h * clockRatioOf(game)) / 3600);
+  const R2 = COMMAND.danger * COMMAND.danger;
+  const exposed = (x, z) => {
+    for (let i = 0; i < hits.length; i += 2) if ((hits[i] - x) ** 2 + (hits[i + 1] - z) ** 2 <= R2) return true;
+    return false;
+  };
+  const roll = (who) => {
+    const r = st.rnd(); st.draws++;
+    if (r < p / 2) commanderHit(game, who, 'killed');
+    else if (r < p) commanderHit(game, who, 'wounded');
+  };
+  for (const c of st.commanders) if (!c.down && !c.gone && exposed(c.x, c.z)) roll(c);
+  for (const u of game.units) {
+    if (!u.officer || u.commandDown || !u.alive || u.state === 'captured') continue;
+    const [x, z] = u.officerSlot();
+    if (exposed(x, z)) roll(u);
+  }
+}
+
+/** Generals on horseback (render only), the colours and the rally rings of the selection. */
+function animateCommand(game, simDt) {
+  const st = commandState.get(game);
+  if (!st) return;
+  const s = FIGURE_SCALE * FIGURE_VIEW.scale, hs = s * 0.92, T = game.terrain;
+  const rings = [];
+  for (const c of st.commanders) {
+    if (c.horse < 0 && !c.gone) c.horse = game.horses.alloc(c.coat);
+    if (c.gone) { if (c.horse >= 0) game.horses.set(c.horse, 0, -500, 0, 0, 0.001); continue; }
+    const y = T.heightAt(c.x, c.z);
+    if (c.horse >= 0) game.horses.set(c.horse, c.x, y, c.z, c.yaw, hs);
+    const pool = game.pools[c.side];
+    if (c.down === 'killed') {
+      const p = Math.min(1, Math.max(0, (game.simTime - c.downAt) / 0.8));
+      const lx = c.x + Math.cos(c.yaw) * 1.6 * hs * p, lz = c.z - Math.sin(c.yaw) * 1.6 * hs * p;
+      pool.push(lx, T.heightAt(lx, lz) + (1 - p) * (1.52 - 0.98) * hs, lz, c.yaw, s, framePos('fall-back', p), 0, 0, 0, c.coatVar, c.trouserVar, 0, 1);
+      continue;
+    }
+    c.phase += simDt * (c.moving ? 2.4 : 0.5);
+    pool.push(c.x, y + (1.52 - 0.98) * hs, c.z, c.yaw, s, framePos('ride', c.phase), 0, 0, 0, c.coatVar, c.trouserVar, 0, 1);
+    const shown = st.selected === c || game.selection.some((u) => c.units.includes(u.id));
+    if (game.halos) game.halos.push(c.x, y, c.z, c.yaw, 1.8, 2.9, shown ? 1 : 0, 0);
+    if (!c.down && shown) rings.push({ x: c.x, z: c.z, r: COMMAND.radius, side: c.side });
+  }
+  st.rings.show(rings);
+}
+
 function scheduledReady(game, state) {
   if (!state.initialized) throw new Error('Reinforcements: attach listeners and initialize before advancing the battle.');
 }
@@ -337,7 +518,15 @@ export class Game {
     };
     this.baked = { state: 'idle', atlas: null, error: null }; // idle | loading | ready | failed
     scene.add(this.impostors.US.mesh, this.impostors.CS.mesh);
-    this.horses = new HorsePool(poolDefs.length + 2);
+    const commanders = Array.isArray(scenario.commanders) ? scenario.commanders : [];
+    this.horses = new HorsePool(poolDefs.length + 2 + (commanders.length ? commanders.length + 4 : 0));
+    // two colours per regiment block (unit.js pushColours)
+    const colours = poolDefs.reduce((n, d) => n + ((d.type || 'infantry') === 'infantry' && Array.isArray(d.regiments)
+      && d.regiments.length >= 1 && d.regiments.length <= 8 ? 2 * d.regiments.length : 0), 0);
+    const flags = new FlagPool(colours, { date: scenario.date });
+    scene.add(flags.mesh);
+    commandState.set(this, { commanders: commanders.map(makeCommander), selected: null, flags, rings: new RallyRings(scene, terrain),
+      rnd: mulberry32(((scenario.seed ?? 18610721) ^ 0x5c0a3d) >>> 0), draws: 0 });
     const gunsOf = (side) => poolDefs.filter((d) => d.side === side).reduce((s, d) => s + (d.guns || 0), 0);
     this.gunPool = new GunPool({ US: gunsOf('US'), CS: gunsOf('CS') });
     for (const p of [this.pools.US, this.pools.CS, this.fallen.US, this.fallen.CS, this.halos, this.horses]) scene.add(p.mesh);
@@ -361,6 +550,7 @@ export class Game {
         if (state.capture.contacts) state.capture.contacts.push([attacker, battery]);
       } : null });
     if (state?.capture) this.combat.rallyBlocked = u => state.capture.pre.has(u);
+    this.combat.setCommand((u) => commandFactor(this, u));
     this.ai = new Ai(this, scenario.ai || {});
     // the defenders begin under orders to hold their ground; AI attack and reserve roles (u.def.ai, ai.js) hold
     // the same way until they activate, then the AI replaces this with move orders (a firm hold blocks nothing)
@@ -461,6 +651,7 @@ export class Game {
     u.horses = this.horses;
     u.fallenPool = this.fallen[d.side];
     if (u.officer) u.officer.coat = HORSE_COATS[seed % HORSE_COATS.length];
+    if (u.bearers) u.flags = commandState.get(this)?.flags ?? null;
     this.entities.add(u.vehicle);
     return u;
   }
@@ -490,6 +681,8 @@ export class Game {
   // ---------------------------------------------------------------------------------------------------
   // Selection
   select(u, { add = false } = {}) {
+    const command = commandState.get(this);
+    if (command) command.selected = null;
     if (u && !u.alive) u = null;
     if (add && u) {
       if (this.selection.includes(u)) {
@@ -515,6 +708,8 @@ export class Game {
 
   /** Box select: only units the player may order; the first becomes the primary. */
   selectMany(list) {
+    const command = commandState.get(this);
+    if (command) command.selected = null;
     const mine = list.filter((u) => this.controls(u));
     for (const v of this.selection) v.selected = false;
     this.selection = mine;
@@ -808,6 +1003,7 @@ export class Game {
     try { this.combat.step(h, this.simTime); }
     finally { if (guarded) state.capture.contacts = null; }
     if (pre) commitSurrenders(this, state, pre, h, contacts);
+    commandStep(this, h);
     this.ai.step(h);
     this.slowT -= h;
     if (this.slowT <= 0) {
@@ -983,6 +1179,7 @@ export class Game {
     this.pools.CS.setView(camera, renderHeightPx);
     this.impostors.US.setView(camera);
     this.impostors.CS.setView(camera);
+    commandState.get(this)?.flags.setView(camera);
   }
 
   /** Animate figures with the (speed-scaled) sim delta; refill and upload the instance buffers. */
@@ -993,7 +1190,9 @@ export class Game {
     this.impostors.US.begin();
     this.impostors.CS.begin();
     this.halos.begin();
+    commandState.get(this)?.flags.begin();
     for (const u of this.units) u.animate(simDt, this.simTime);
+    animateCommand(this, simDt);
     this.flushAll();
   }
 
@@ -1007,7 +1206,53 @@ export class Game {
     this.halos.flush();
     this.horses.flush();
     this.gunPool.flush();
+    commandState.get(this)?.flags.flush();
   }
+
+  // ---------------------------------------------------------------------------------------------------
+  // Command (see the header): generals, their selection and rings, forced hits for the sandbox and tests.
+  /** The generals (runtime objects: id, side, name, rank, units, x, z, down, gone, ...), in data order. */
+  get commanders() { return commandState.get(this)?.commanders ?? []; }
+
+  /** The general selected (his ring shows), or null. Selecting a brigade clears it. */
+  get selectedCommander() { return commandState.get(this)?.selected ?? null; }
+
+  /** Select a general (by object or id): brigades are deselected and his rally radius shows. */
+  selectCommander(c) {
+    const st = commandState.get(this);
+    const found = st && st.commanders.find((v) => v === c || v.id === c);
+    this.select(null);
+    if (found && !found.gone) st.selected = found;
+    this.emit('select', null);
+    return st?.selected ?? null;
+  }
+
+  /** Add a general during the battle (sandbox and tests): same fields as scenario.commanders. */
+  addCommander(def) {
+    const st = commandState.get(this);
+    if (st.commanders.some((c) => c.id === def?.id)) commandFail('commander ids must be unique.');
+    const c = makeCommander(def, st.commanders.length);
+    st.commanders.push(c);
+    return c;
+  }
+
+  /** The living generals whose rally radius covers u now. */
+  generalsOver(u) {
+    return this.commanders.filter((c) => !c.down && c.side === u.side && Math.hypot(c.x - u.x, c.z - u.z) <= COMMAND.radius);
+  }
+
+  /** Does u rally faster and lose morale slower now (a general's radius or its own commander)? */
+  rallied(u) { return commandFactor(this, u) !== null; }
+
+  /** Force a hit (sandbox and tests): `who` a general (object or id) or a Unit with a commander; kind wounded|killed. */
+  commanderDown(who, kind = 'killed') {
+    const st = commandState.get(this);
+    const target = who instanceof Unit ? who : st?.commanders.find((c) => c === who || c.id === who);
+    return !!target && commanderHit(this, target, kind);
+  }
+
+  /** Test hook: the command stream (rnd, draws), the flag pool and the rings. Not for game code. */
+  commandState() { return commandState.get(this) ?? null; }
 
   /** Figure triangles submitted this frame (both sides, all levels of detail, with outlines). */
   figureTriangles() {

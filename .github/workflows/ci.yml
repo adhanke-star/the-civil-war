@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 
-# The browser run is split into three parallel shards (tools/test.mjs --shard=N) so each job stays well
+# The browser run is split into four parallel shards (tools/test.mjs --shard=N) so each job stays well
 # under the 45-minute cap. The probes job runs every Node/CPU behaviour file and its --prove-fail controls.
 jobs:
   test:
@@ -16,7 +16,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host --init
@@ -46,7 +46,7 @@ jobs:
           console.log('playwright 1.63.0', chromium.executablePath());
           "
 
-      - name: Browser checks (shard ${{ matrix.shard }} of 3)
+      - name: Browser checks (shard ${{ matrix.shard }} of 4)
         run: node tools/test.mjs --shard=${{ matrix.shard }}
 
       - name: Upload test output
@@ -84,7 +84,7 @@ jobs:
           for name in deployment phase field-admission reinforcements reinforcement-runtime capture-accounting \
             surrender-runtime surrender-result surrender-result-ui equipment reward save practice captures intro \
             sandbox-rules look view spacing residency moments keyboard soldier-view surrender-activation \
-            captured-guns battery-overrun captured-loadouts packs large ai masking campaign campaign-ui ground delegation shiloh; do
+            captured-guns battery-overrun captured-loadouts packs large ai masking campaign campaign-ui ground delegation shiloh command; do
             for mode in "" --prove-fail; do
               echo "::group::node tools/test-$name.mjs $mode"
               node "tools/test-$name.mjs" $mode

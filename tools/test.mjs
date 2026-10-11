@@ -37,7 +37,7 @@
 //      the panel; Units/Moments tools spawn, shell, rout and remove a generic brigade; the order line compares
 //      split-screen (both styles, each clipped); axe has no serious/critical violations with the panel open; no console errors
 //   device-*: device.html prints a GPU tier line and finishes the ratio-1 benchmark without console errors
-// `node tools/test.mjs --shard=N` (N = 1, 2 or 3) runs one CI slice of the full run; CI runs all three in parallel.
+// `node tools/test.mjs --shard=N` (N = 1-4) runs one CI slice of the full run; CI runs all four in parallel.
 // `node tools/test.mjs --unit` runs only the Node checks (settings, baked-maths; no browser, writes nothing).
 // `node tools/test.mjs --s1` runs the settings, sandbox and device checks only (skips the battle page).
 // `node tools/test.mjs --field` runs the settings and battle-page checks only (skips the sandbox and device pages).
@@ -47,6 +47,9 @@
 // `node tools/test.mjs --delegation` runs the delegation UI only (tools/test-delegation-ui.mjs, also in shard 3): select,
 // Delegate, pick a place, Attack by mouse and keyboard, the pencil line, the card's role and Undo, a drag that takes
 // the brigade back, Escape, axe and 320 px.
+// `node tools/test.mjs --command` runs the commanders and regiments UI only (tools/test-command-ui.mjs, also in shard 3):
+// a fictional general's mounted figure and marker, his rally ring on selection, the regiment tooltip on hover and
+// on the card's list, "Commander down" after a forced kill, axe and screenshots.
 // Full smoke includes real equip/reload/export/import, duplicate/conflict/quota/read failure recovery,
 // keyboard/focus, scoped compare/resume/import/launcher axe and 1024/320px target/layout checks.
 // SETTINGS_MODULE=<path> points the settings checks at another copy (used to prove the checks fail).
@@ -79,7 +82,7 @@ import { reinforcementUIControls } from './test-reinforcement-ui.mjs';
 import { fieldAdmissionControls } from './test-field-admission-ui.mjs';
 import { finalizeActivationUI } from './test-surrender-activation-ui.mjs';
 
-// `--shard=N` (1-3) runs one CI slice of the full browser run; the Node unit checks run in shard 3. No flag = everything.
+// `--shard=N` (1-4) runs one CI slice of the full browser run; the Node unit checks run in shard 3. No flag = everything.
 const SHARD = Number((process.argv.find((a) => a.startsWith("--shard=")) || "=0").split("=")[1]) || 0;
 const runs = (n) => SHARD === 0 || SHARD === n;
 const READY_TIMEOUT_MS = 180_000;
@@ -1757,6 +1760,7 @@ async function browserChecks(server, url) {
     if (process.argv.includes('--campaign')) { result.mode = 'campaign screens and flow'; const { campaignControls } = await import('./test-campaign-ui.mjs'); await campaignControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--packs-ui')) { result.mode = 'battle packs only'; const { packsUIControls } = await import('./test-packs-ui.mjs'); await packsUIControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--delegation')) { result.mode = 'delegation UI only'; const { delegationControls } = await import('./test-delegation-ui.mjs'); await delegationControls({ browser, url, check, shot, result, watchErrors }); return; }
+    if (process.argv.includes('--command')) { result.mode = 'commanders and regiments UI only'; const { commandControls } = await import('./test-command-ui.mjs'); await commandControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--camp')) { result.mode = 'camp equipment only'; await campEquipment({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--intro')) { result.mode = 'unforced introductory play'; await introPlay({ browser, url, check, shot, result, watchErrors, native }); return; }
     if (process.argv.includes('--practice')) { result.mode = 'practice result bridge only'; await practiceProgress({ browser, url, check, shot, result, watchErrors }); return; }
@@ -1774,7 +1778,7 @@ async function browserChecks(server, url) {
     }
     if (runs(1)) await battlePage(browser, url);
     if (process.argv.includes('--field')) { result.mode = 'field only (sandbox and device pages skipped)'; return; }
-    if (SHARD) result.mode = `CI shard ${SHARD} of 3`;
+    if (SHARD) result.mode = `CI shard ${SHARD} of 4`;
     // Shard 1: battle page, sandbox and the introductory fight (the header checks span the sandbox and intro stages).
     if (runs(1)) {
       await sandboxAndDevice(browser, url);
@@ -1801,9 +1805,15 @@ async function browserChecks(server, url) {
       await reinforcementUIControls({ browser, url, check, shot, result, native });
       await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native });
       await soldierViewControls({ browser, url, check, shot, result, watchErrors, native });
-      { const { packsUIControls } = await import('./test-packs-ui.mjs'); await packsUIControls({ browser, url, check, shot, result, watchErrors }); }
       const { delegationControls } = await import('./test-delegation-ui.mjs');
       await delegationControls({ browser, url, check, shot, result, watchErrors });
+    }
+    // Shard 4: commanders and regiments, then every shipped battle-pack phase on its own terrain.
+    if (runs(4)) {
+      const { commandControls } = await import('./test-command-ui.mjs');
+      await commandControls({ browser, url, check, shot, result, watchErrors });
+      const { packsUIControls } = await import('./test-packs-ui.mjs');
+      await packsUIControls({ browser, url, check, shot, result, watchErrors });
     }
     finalizeActivationUI({ result, check });
   } finally {

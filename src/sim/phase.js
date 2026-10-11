@@ -97,6 +97,35 @@ function unitAi(ai, value) {
   if (own(ai, 'target') && !point(ai.target)) fail('unit AI target must be a finite [x, z].');
   if (own(ai, 'via') && (!Array.isArray(ai.via) || ai.via.length > 6 || !ai.via.every(point))) fail('unit AI via must be at most 6 finite [x, z] points.');
 }
+// Optional scenario.commanders (src/game.js "Command"): division, corps or army generals over listed brigades of
+// their own side (initial or reinforcement roster). Never invent a person: each names its sources and a status line;
+// `fate` is after-action text only; `successor` (also allowed on a unit's commander) must be sourced.
+export const COMMANDER_LIMITS = Object.freeze({ commanders: 24, units: 48, sources: 16 });
+const COMMANDER_KEYS = ['id', 'side', 'name', 'rank', 'units', 'x', 'z', 'sources', 'status', 'fate', 'successor'];
+const sourceList = list => Array.isArray(list) && list.length >= 1 && list.length <= COMMANDER_LIMITS.sources && list.every(text);
+function successor(value) {
+  if (!record(value) || Object.keys(value).some(key => !['name', 'rank', 'sources'].includes(key)) || !text(value.name)
+    || (own(value, 'rank') && !text(value.rank)) || !sourceList(value.sources)) fail('a successor needs a name and sources (rank optional).');
+}
+function commanders(value) {
+  const list = value.commanders;
+  if (!Array.isArray(list) || list.length > COMMANDER_LIMITS.commanders) fail('commanders must be an array of at most 24.');
+  const roster = new Map();
+  for (const unit of [...value.units, ...(Array.isArray(value.reinforcements) ? value.reinforcements : [])]) if (record(unit) && text(unit.id)) roster.set(unit.id, unit);
+  const ids = new Set();
+  for (const c of list) {
+    if (!record(c) || Object.keys(c).some(key => !COMMANDER_KEYS.includes(key))) fail('commander has unsupported fields.');
+    if (!text(c.id) || ids.has(c.id) || roster.has(c.id)) fail('commander ids must be nonempty, unique and distinct from unit ids.');
+    ids.add(c.id);
+    if (!['US', 'CS'].includes(c.side) || !text(c.name) || !text(c.rank) || !text(c.status)) fail('commander needs a side, name, rank and status.');
+    if (!finite(c.x) || !finite(c.z) || Math.abs(c.x) > FIELD_LIMITS.coordinate || Math.abs(c.z) > FIELD_LIMITS.coordinate) fail('commander position must be finite and on the ground.');
+    if (!sourceList(c.sources)) fail('commander needs 1 to 16 sources.');
+    if (own(c, 'fate') && !text(c.fate)) fail('commander fate must be text.');
+    if (own(c, 'successor')) successor(c.successor);
+    if (!Array.isArray(c.units) || !c.units.length || c.units.length > COMMANDER_LIMITS.units || new Set(c.units).size !== c.units.length
+      || c.units.some(id => !roster.has(id) || roster.get(id).side !== c.side)) fail('commander units must be 1 to 48 distinct brigades of his side in the roster.');
+  }
+}
 function scenario(value) {
   if (!record(value) || !['id', 'title', 'battle', 'date'].every(key => text(value[key]))) fail('scenario needs its identity, title, battle and date.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value.date)) fail('date needs YYYY-MM-DD.');
@@ -118,6 +147,9 @@ function scenario(value) {
     if (!['x', 'z', 'facing', 'men'].every(key => finite(unit[key])) || unit.men <= 0) fail('unit geometry and positive strength must be finite.');
     if (own(unit, 'guns') && (!Number.isInteger(unit.guns) || unit.guns < 0)) fail('gun count must be a nonnegative integer.');
     if (own(unit, 'ai')) unitAi(unit.ai, value);
+    if (own(unit, 'regimentMen') && (!Array.isArray(unit.regimentMen) || !Array.isArray(unit.regiments) || unit.regimentMen.length !== unit.regiments.length
+      || !unit.regimentMen.every(n => Number.isSafeInteger(n) && n > 0))) fail('regiment men must be positive integers, one per regiment.');
+    if (own(unit, 'commander') && record(unit.commander) && own(unit.commander, 'successor')) successor(unit.commander.successor);
     if (own(unit, 'equipment')) {
       try { equipmentProfile(unit.equipment, unit.type || 'infantry'); }
       catch (error) { fail('unit equipment is invalid: ' + error.message); }
@@ -127,6 +159,7 @@ function scenario(value) {
   if (!record(objective) || !text(objective.name) || !['x', 'z', 'r'].every(key => finite(objective[key])) || objective.r <= 0) fail('objective geometry is invalid.');
   if (own(objective, 'mode')) fail('objective mode is unsupported; the scenario attacker defines it.');
   battleFields(value);
+  if (own(value, 'commanders')) commanders(value);
   if (own(value, 'opening')) {
     if (!Array.isArray(value.opening)) fail('opening must be an array.');
     const ordered = new Set();

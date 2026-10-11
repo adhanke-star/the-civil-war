@@ -1,6 +1,7 @@
-// src/units/mounts.js: horses: a low-poly saddle horse (about 110 triangles) for officers and limber
-// teams. One InstancedMesh (HorsePool) holds the officers' mounts; limber teams are merged into the
-// limber geometry in battery.js with horseGeometry().
+// src/units/mounts.js: horses: a low-poly saddle horse (about 110 triangles) for officers, generals and limber
+// teams. One InstancedMesh (HorsePool) holds the officers' and generals' mounts; limber teams are merged into the
+// limber geometry in battery.js with horseGeometry(). RallyRings draws a general's rally radius (src/game.js) as a
+// faint ring laid on the ground, shown while he or one of his brigades is selected.
 
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -91,4 +92,52 @@ export class HorsePool {
     this.mesh.count = this.used;
     this.mesh.instanceMatrix.needsUpdate = true;
   }
+}
+
+const RING_SEGMENTS = 96;
+const RING_COLOR = { US: '#a9c4ff', CS: '#ffb4a2' };
+
+/** Faint ground rings (one line loop each, made on first use); show([{ x, z, r, side }]) per frame. */
+export class RallyRings {
+  constructor(scene, terrain) {
+    this.scene = scene;
+    this.terrain = terrain;
+    this.rings = [];
+  }
+
+  /** The rings drawn this frame (the rest hide). Positions follow the ground; rebuilt only when a ring moves. */
+  show(list) {
+    for (let k = 0; k < list.length; k++) {
+      let ring = this.rings[k];
+      if (!ring) {
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(RING_SEGMENTS * 3), 3));
+        ring = new THREE.LineLoop(geo, new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.5, depthWrite: false }));
+        ring.frustumCulled = false;
+        ring.renderOrder = 3;
+        ring.name = 'rally-ring';
+        ring.userData = { key: '' };
+        this.scene.add(ring);
+        this.rings.push(ring);
+      }
+      const { x, z, r, side } = list[k];
+      const key = `${x.toFixed(1)},${z.toFixed(1)},${r}`;
+      if (ring.userData.key !== key) {
+        const a = ring.geometry.attributes.position.array;
+        for (let i = 0; i < RING_SEGMENTS; i++) {
+          const t = (i / RING_SEGMENTS) * Math.PI * 2, px = x + Math.cos(t) * r, pz = z + Math.sin(t) * r;
+          a[i * 3] = px; a[i * 3 + 1] = this.terrain.heightAt(px, pz) + 1.5; a[i * 3 + 2] = pz;
+        }
+        ring.geometry.attributes.position.needsUpdate = true;
+        ring.userData.key = key;
+      }
+      ring.material.color.set(RING_COLOR[side] || '#ffffff');
+      ring.userData.side = side;
+      ring.visible = true;
+    }
+    for (let k = list.length; k < this.rings.length; k++) this.rings[k].visible = false;
+  }
+
+  /** How many rings are drawn now (tests). */
+  get shown() { return this.rings.filter((r) => r.visible).length; }
 }

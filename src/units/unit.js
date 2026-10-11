@@ -18,6 +18,16 @@
 //
 // Directions: yaw/facing f means forward = (sin f, cos f) in (x, z); lateral = (cos f, -sin f).
 //
+// Regiments (DESIGN.md §4b): an infantry brigade with 2-8 named regiments (def.regiments; optional def.regimentMen
+// weights) stands as that many contiguous blocks, files split by men in proportion (equal without regimentMen), with
+// REGIMENT_GAP metres of extra space between neighbouring blocks (a column: the blocks in sequence, the same gap
+// between them). look.regimentGaps off restores the gapless layout exactly. Each block (one named regiment too) has
+// a colour party: the two front-rank men nearest its centre carry the side's national colour and a plain regimental
+// colour (soldier-mesh.js FlagPool). Hover names the regiment (regimentAt); regiments are never orderable.
+//
+// Command (game.js commandStep): a brigade commander can be hit (commandDown = { kind: 'wounded'|'killed', at });
+// a wounded officer rides to the rear and leaves the field, a killed one falls beside his standing horse.
+//
 // Orders (set by game.js): move (march to the mark; may halt on the way to fight, see pauseMarch), attack
 // (close on a target to effective range and fire; the game steers it), charge, fallback, hold. holdFire is a
 // standing flag on the unit, not an order: it survives new orders until toggled off.
@@ -30,6 +40,36 @@ import { mulberry32 } from '../world/landscape.js';
 import { RULES } from '../sim/rules.js';
 import { LOOK } from '../ui/look.js';
 import { equipmentProfile } from '../sim/equipment.js';
+import { define, on as onSetting } from '../settings.js';
+
+// look.regimentGaps: registered here (the formation owns it); mirrored for the layout's hot path.
+export const REGIMENT_GAP = 4; // m of extra space between neighbouring regiment blocks (scaled by formation spacing)
+export const REGIMENT_MAX = 8;
+let regimentGaps = define('look.regimentGaps', {
+  tab: 'Look', type: 'toggle', default: true, label: 'Regiment gaps',
+  note: 'Shows each named regiment of a brigade as its own block with a small gap (about 4 m) between blocks; off closes the gaps (the brigade\'s front is that much narrower). Picking, combat contact and order ghosts use the line as drawn.',
+});
+onSetting('look.regimentGaps', (v) => { regimentGaps = v; });
+export const regimentGapsOn = () => regimentGaps;
+
+/** Split n figures among weights by largest remainder; every regiment gets one when n allows. */
+export function apportion(n, weights) {
+  const W = weights.reduce((a, b) => a + b, 0);
+  const quota = weights.map((w) => (n * w) / W);
+  const counts = quota.map(Math.floor);
+  let left = n - counts.reduce((a, b) => a + b, 0);
+  const order = quota.map((q, i) => [q - Math.floor(q), i]).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
+  for (let k = 0; left > 0; k = (k + 1) % order.length, left--) counts[order[k][1]]++;
+  if (n >= weights.length) {
+    for (let i = 0; i < counts.length; i++) {
+      if (counts[i] > 0) continue;
+      let j = 0;
+      for (let m = 1; m < counts.length; m++) if (counts[m] > counts[j]) j = m;
+      counts[j]--; counts[i]++;
+    }
+  }
+  return counts;
+}
 
 export let MEN_PER_FIGURE = 10; // live binding: max(look.menPerFigure, the phase minimum) (the game calls setMenPerFigure)
 export const MEN_PER_FIGURE_OPTIONS = [10, 5];
@@ -67,6 +107,7 @@ const FALL_S = 0.8; // s a hit man takes to fall
 const WALK_CYCLE = 1.3; // m of ground per two steps, life size
 const RUN_CYCLE = 2.0;
 const BLEND_RATE = 5; // 1/s crossfade between clips
+const OFFICER_LEAVE_S = 25; // s a wounded commander takes riding to the rear before he leaves the field
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
@@ -174,6 +215,14 @@ export class Unit {
     this.follow.active = false;
     this.vehicle.steering.add(this.follow);
 
+    // regiments: blocks for an infantry brigade with 1..REGIMENT_MAX named regiments (one block: no gap, colours only)
+    const nReg = this.type === 'infantry' && Array.isArray(this.regiments) ? this.regiments.length : 0;
+    if (nReg >= 1 && nReg <= REGIMENT_MAX) {
+      const men = def.regimentMen;
+      this.regCount = nReg;
+      this.regWeights = Array.isArray(men) && men.length === nReg && men.every((m) => Number.isFinite(m) && m > 0) ? men.slice() : this.regiments.map(() => 1);
+      this.bearers = [];
+    }
     // figures
     this.menPerFigure = this.type === 'artillery' ? MEN_PER_CREW_FIGURE : MEN_PER_FIGURE;
     this.figures = this.makeFigures(Math.max(1, Math.round(this.men / this.menPerFigure)), def.x, def.z, def.facing);
@@ -219,6 +268,12 @@ export class Unit {
       const pick = [...figures].sort(() => this.rnd() - 0.5).slice(0, k);
       for (const f of pick) f.skirmisher = true;
     }
+    if (this.regCount) {
+      // contiguous runs of figures per regiment, in proportion to its men (no random draws)
+      const counts = apportion(n, this.regWeights);
+      let i = 0;
+      for (let r = 0; r < counts.length; r++) for (let c = 0; c < counts[r]; c++) figures[i++].reg = r;
+    }
     return figures;
   }
 
@@ -245,6 +300,7 @@ export class Unit {
 
   /** Assign line slots (two dense ranks plus the skirmish screen) to living figures, keeping neighbours. */
   layout() {
+    if (this.regCount > 1 && regimentGaps) { this.layoutBlocks(); this.pickBearers(); return; }
     const spacing = this.spacing;
     const live = this.figures.filter((f) => f.alive);
     const screen = this.formation === 'line' ? live.filter((f) => f.skirmisher) : [];
@@ -270,16 +326,103 @@ export class Unit {
     this.halfFront = Math.max(4, ((files - 1) / 2) * FILE_SPACING * spacing);
     this.depth = (ranks * RANK_SPACING + (screen.length ? SKIRMISH_AHEAD * 0.5 : 0)) * spacing;
     this.files = files;
+    if (this.blockGaps) this.blockGaps = 0;
+    if (this.regCount) this.pickBearers();
+  }
+
+  /** The line as regiment blocks side by side (regiment order, left to right), REGIMENT_GAP between blocks. */
+  layoutBlocks() {
+    const spacing = this.spacing;
+    const live = this.figures.filter((f) => f.alive);
+    const screen = this.formation === 'line' ? live.filter((f) => f.skirmisher) : [];
+    const body = screen.length ? live.filter((f) => !f.skirmisher) : live;
+    const ranks = body.length > 14 ? RANKS : 1;
+    const groups = Array.from({ length: this.regCount }, () => []);
+    for (const f of body) groups[f.reg].push(f);
+    const filled = groups.filter((g) => g.length);
+    const files = filled.reduce((n, g) => n + Math.ceil(g.length / ranks), 0);
+    const gaps = Math.max(0, filled.length - 1);
+    const width = (files - 1) * FILE_SPACING + gaps * REGIMENT_GAP; // centre of the first file to the last, unscaled
+    let x0 = -width / 2;
+    for (const g of filled) {
+      g.sort((a, b) => a.lx - b.lx || a.rank - b.rank);
+      for (let k = 0; k < g.length; k++) {
+        const f = g[k], file = Math.floor(k / ranks), rank = k % ranks;
+        f.lx = (x0 + file * FILE_SPACING) * spacing;
+        f.lz = ((ranks - 1) / 2 - rank) * RANK_SPACING * spacing;
+        f.rank = rank;
+      }
+      x0 += Math.ceil(g.length / ranks) * FILE_SPACING + REGIMENT_GAP;
+    }
+    screen.sort((a, b) => a.lx - b.lx);
+    for (let k = 0; k < screen.length; k++) {
+      const f = screen[k];
+      f.lx = (k - (screen.length - 1) / 2) * SKIRMISH_SPACING * spacing;
+      f.lz = (SKIRMISH_AHEAD + (k % 2) * 4) * spacing;
+      f.rank = -1;
+    }
+    this.halfFront = Math.max(4, (width / 2) * spacing);
+    this.depth = (ranks * RANK_SPACING + (screen.length ? SKIRMISH_AHEAD * 0.5 : 0)) * spacing;
+    this.files = files;
+    this.blockGaps = gaps;
+  }
+
+  /**
+   * Each regiment's colour party: the two men nearest the centre of its front (line: rank 0, column: its first rank);
+   * bearers[r] = [national, regimental] (either may be null for a block of one man or none).
+   */
+  pickBearers() {
+    const column = this.formation === 'column';
+    const out = this.bearers;
+    out.length = this.regCount;
+    for (let r = 0; r < this.regCount; r++) {
+      let lo = Infinity, hi = -Infinity, first = Infinity;
+      for (const f of this.figures) {
+        if (!f.alive || f.reg !== r || f.skirmisher && !column) continue;
+        if (column) { if (f.crank < first) first = f.crank; } else if (f.rank === 0) { if (f.lx < lo) lo = f.lx; if (f.lx > hi) hi = f.lx; }
+      }
+      const mid = (lo + hi) / 2;
+      let a = null, b = null, da = Infinity, db = Infinity;
+      for (const f of this.figures) {
+        if (!f.alive || f.reg !== r || f.skirmisher && !column) continue;
+        if (column ? f.crank !== first : f.rank !== 0) continue;
+        const d = column ? Math.abs(f.cfile) + f.i * 1e-9 : Math.abs(f.lx - mid);
+        if (d < da) { b = a; db = da; a = f; da = d; } else if (d < db) { b = f; db = d; }
+      }
+      out[r] = a ? [a, b] : null;
+    }
+  }
+
+  /** The regiment (index) of the living man nearest (x, z) within `reach` metres, or -1. */
+  regimentAt(x, z, reach = 9) {
+    if (!this.regCount) return -1;
+    let best = -1, bd = reach * reach;
+    for (const f of this.figures) {
+      if (!f.alive) continue;
+      const d = (f.x - x) ** 2 + (f.z - z) ** 2;
+      if (d < bd) { bd = d; best = f.reg; }
+    }
+    return best;
+  }
+
+  /** About how many of the brigade's men stand in regiment r now (its share of the living figures). */
+  regimentMen(r) {
+    if (!this.regCount || !this.alive) return 0;
+    let n = 0, all = 0;
+    for (const f of this.figures) if (f.alive) { all++; if (f.reg === r) n++; }
+    return all ? Math.round((this.men * n) / all) : 0;
   }
 
   /** Half the width of the brigade's front once it stands in line (also while it marches in column). */
   lineHalfFront() {
     if (this.formation !== 'column' || !this.files) return this.halfFront;
+    if (this.blockGaps) return Math.max(4, (((this.files - 1) * FILE_SPACING + this.blockGaps * REGIMENT_GAP) / 2) * this.spacing);
     return Math.max(4, ((this.files - 1) / 2) * FILE_SPACING * this.spacing);
   }
 
   /** Column of fours along the trail: slot k = rank k/4 at COLUMN_RANK_SPACING back along the trail. */
   layoutColumn() {
+    if (this.regCount > 1 && regimentGaps) { this.layoutColumnBlocks(); this.pickBearers(); return; }
     const rankSpacing = COLUMN_RANK_SPACING * this.spacing;
     const live = this.figures.filter((f) => f.alive).sort((a, b) => a.order - b.order);
     const ranks = Math.ceil(live.length / COLUMN_FILES);
@@ -320,6 +463,52 @@ export class Unit {
     }
     this.halfFront = COLUMN_FILES * COLUMN_FILE_SPACING * this.spacing * 0.5 + 6;
     this.depth = Math.max(10, ranks * rankSpacing);
+    if (this.regCount) this.pickBearers();
+  }
+
+  /** The column as regiment blocks in sequence: each block starts a new rank, REGIMENT_GAP behind the last. */
+  layoutColumnBlocks() {
+    const rankSpacing = COLUMN_RANK_SPACING * this.spacing, gap = REGIMENT_GAP * this.spacing;
+    const live = this.figures.filter((f) => f.alive).sort((a, b) => a.reg - b.reg || a.order - b.order);
+    // distance of each rank's slot behind the head, along the trail
+    const dist = [];
+    let at = rankSpacing * 0.5;
+    for (let i = 0, k = 0; i < live.length; i++, k++) {
+      if (i > 0 && live[i].reg !== live[i - 1].reg) {
+        k = 0;
+        at += rankSpacing + gap;
+      } else if (k > 0 && k % COLUMN_FILES === 0) at += rankSpacing;
+      if (k % COLUMN_FILES === 0) dist.push(at);
+      const f = live[i];
+      f.crank = dist.length - 1;
+      f.cfile = (k % COLUMN_FILES) - (COLUMN_FILES - 1) / 2;
+      f.rank = f.crank === 0 ? 0 : 1;
+    }
+    // resample the trail from the head backwards at those distances
+    const slots = this.columnSlots;
+    slots.length = 0;
+    const T = this.trail;
+    let px = this.x, pz = this.z, walked = 0, k = T.length - 1, tx = 0, tz = 1;
+    while (slots.length < dist.length && k >= 0) {
+      const [cx, cz] = T[k];
+      const dx = cx - px, dz = cz - pz, seg = Math.hypot(dx, dz);
+      if (seg > 1e-6) { tx = -dx / seg; tz = -dz / seg; }
+      const need = dist[slots.length] - walked;
+      if (seg >= need) {
+        const t = need / seg;
+        px += dx * t; pz += dz * t; walked += need;
+        slots.push([px, pz, Math.atan2(tx, tz)]);
+      } else {
+        walked += seg; px = cx; pz = cz; k--;
+      }
+    }
+    while (slots.length < dist.length) {
+      const last = slots[slots.length - 1] || [this.x, this.z, this.facing];
+      const step = dist[slots.length] - (slots.length ? dist[slots.length - 1] : 0);
+      slots.push([last[0] - Math.sin(last[2]) * step, last[1] - Math.cos(last[2]) * step, last[2]]);
+    }
+    this.halfFront = COLUMN_FILES * COLUMN_FILE_SPACING * this.spacing * 0.5 + 6;
+    this.depth = Math.max(10, (dist.length ? dist[dist.length - 1] : 0) + rankSpacing * 0.5);
   }
 
   slotWorld(f) {
@@ -713,6 +902,15 @@ export class Unit {
       if (halos && (haloKind || rigged)) halos.push(f.x, y, f.z, f.yaw, (haloKind ? 1.45 : 1.7) * V.scale, (haloKind ? 1.2 : 1.1) * V.scale, haloKind, haloStr, haloKind ? 0 : rc);
     }
     if (this.officer) this.animateOfficer(dt, time);
+    if (this.flags && this.bearers && this.alive && this.state !== 'captured') this.pushColours(this.flags, s);
+  }
+
+  /** Where the brigade commander rides (sim state only, no render state): [x, z]. Behind the line's centre, ahead of a column. */
+  officerSlot() {
+    const fs = Math.sin(this.facing), fc = Math.cos(this.facing);
+    if (this.formation === 'column' && this.columnSlots.length) return [this.x + fs * 9 + fc * 5, this.z + fc * 9 - fs * 5];
+    const back = this.state === 'routing' ? 4 : RANK_SPACING * this.spacing + 7;
+    return [this.x - fs * back + fc * 3, this.z - fc * back - fs * 3];
   }
 
   /** The brigade commander on horseback behind the centre of the line (ahead of a column). */
@@ -721,15 +919,10 @@ export class Unit {
     const s = FIGURE_SCALE * FIGURE_VIEW.scale;
     const T = this.terrain;
     if (o.horse < 0 && this.horses) o.horse = this.horses.alloc(o.coat || '#5a3a26');
+    if (this.commandDown) { this.animateOfficerDown(dt, time); return; }
     if (!this.alive) { if (o.horse >= 0) this.horses.set(o.horse, 0, -500, 0, 0, 0.001); return; }
-    const fs = Math.sin(this.facing), fc = Math.cos(this.facing);
-    let tx, tz, tyaw;
-    if (this.formation === 'column' && this.columnSlots.length) {
-      tx = this.x + fs * 9 + fc * 5; tz = this.z + fc * 9 - fs * 5; tyaw = this.facing;
-    } else {
-      const back = this.state === 'routing' ? 4 : RANK_SPACING * this.spacing + 7;
-      tx = this.x - fs * back + fc * 3; tz = this.z - fc * back - fs * 3; tyaw = this.facing;
-    }
+    const [tx, tz] = this.officerSlot();
+    const tyaw = this.facing;
     const dx = tx - o.x, dz = tz - o.z;
     const d = Math.hypot(dx, dz);
     const unitSpeed = Math.hypot(this.vehicle.velocity.x, this.vehicle.velocity.z);
@@ -746,6 +939,51 @@ export class Unit {
     // the rider's hip sits on the saddle (1.5 m up the horse); his root pivot is 0.98 m up the figure
     this.pool.push(o.x, y + (1.52 - 0.98) * hs, o.z, o.yaw, s, framePos('ride', o.phase), 0, 0, 0, o.coatVar, o.trouserVar, 0, 1);
     if (this.halos) this.halos.push(o.x, y, o.z, o.yaw, 1.6, 2.6, this.selected ? 1 : 0, 0);
+  }
+
+  /**
+   * A fallen brigade commander: killed, he falls from the saddle and lies beside his standing horse; wounded, he
+   * rides to the rear (away from the line) and leaves the field after OFFICER_LEAVE_S.
+   */
+  animateOfficerDown(dt, time) {
+    const o = this.officer, down = this.commandDown;
+    const s = FIGURE_SCALE * FIGURE_VIEW.scale, hs = s * 0.92;
+    const T = this.terrain;
+    const hide = () => { if (o.horse >= 0) this.horses.set(o.horse, 0, -500, 0, 0, 0.001); };
+    if (down.kind === 'killed') {
+      const y = T.heightAt(o.x, o.z);
+      if (o.horse >= 0) this.horses.set(o.horse, o.x, y, o.z, o.yaw, hs);
+      const p = Math.min(1, Math.max(0, (time - down.at) / FALL_S));
+      const lx = o.x + Math.cos(o.yaw) * 1.6 * hs, lz = o.z - Math.sin(o.yaw) * 1.6 * hs; // beside the horse
+      const fx = o.x + (lx - o.x) * p, fz = o.z + (lz - o.z) * p;
+      const fy = T.heightAt(fx, fz) + (1 - p) * (1.52 - 0.98) * hs;
+      this.pool.push(fx, fy, fz, o.yaw, s, framePos('fall-back', p), 0, 0, 0, o.coatVar, o.trouserVar, 0, 1);
+      return;
+    }
+    const t = time - down.at;
+    if (t > OFFICER_LEAVE_S) { hide(); return; }
+    if (o.leaveYaw === undefined) o.leaveYaw = wrap(this.facing + Math.PI);
+    const step = SPEED.run * dt;
+    o.x += Math.sin(o.leaveYaw) * step; o.z += Math.cos(o.leaveYaw) * step;
+    o.yaw += wrap(o.leaveYaw - o.yaw) * Math.min(1, dt * 4);
+    o.phase += dt * 2.6;
+    const y = T.heightAt(o.x, o.z);
+    if (o.horse >= 0) this.horses.set(o.horse, o.x, y, o.z, o.yaw, hs);
+    this.pool.push(o.x, y + (1.52 - 0.98) * hs, o.z, o.yaw, s, framePos('ride', o.phase), 0, 0, 0, o.coatVar, o.trouserVar, 0, 1);
+  }
+
+  /** The colour party of every regiment block: national and regimental colour beside their bearers (render only). */
+  pushColours(flags, s) {
+    const T = this.terrain;
+    for (const pair of this.bearers) {
+      if (!pair) continue;
+      for (let k = 0; k < 2; k++) {
+        const f = pair[k];
+        if (!f || !f.alive) continue;
+        const x = f.x + Math.cos(f.yaw) * 0.42 * s, z = f.z - Math.sin(f.yaw) * 0.42 * s; // in his right hand
+        flags.push(x, T.heightAt(x, z), z, this.side, k === 0 ? 'national' : 'regimental', s);
+      }
+    }
   }
 
   /**

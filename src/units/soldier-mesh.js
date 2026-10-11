@@ -343,3 +343,114 @@ export const UNIFORMS = {
 };
 
 export { BONE_COUNT, CLIP_ROWS };
+
+// ---------------------------------------------------------------------------------------------------------
+// Regimental colours (unit.js pushColours): one textured quad per flag (staff, finial and flag in one atlas tile),
+// all flags in one InstancedMesh (one draw call), each turned to face the camera about its staff. Tiles: the US
+// national colour (stars and stripes), the Confederate national colour of the battle's date (First National
+// "Stars and Bars" before 1 May 1863, Second National after), and a PLAIN regimental colour in each side's tone:
+// no regiment's specific design is drawn, because none is sourced here (DESIGN.md §4b).
+export const FLAG_TILE = { US_NATIONAL: 0, CS_FIRST_NATIONAL: 1, CS_SECOND_NATIONAL: 2, US_REGIMENTAL: 3, CS_REGIMENTAL: 4 };
+const FLAG_TILES = 5, TILE_W = 32, TILE_H = 64; // px per tile; the quad is 1.5 m x 3 m at life size
+const FLAG_W = 1.5, FLAG_H = 3.0, STAFF_PX = 2, FLAG_ROWS = 20; // flag: 30 x 20 px at the top of the tile
+
+/** Which national colour a side carried on an ISO date (YYYY-MM-DD). */
+export function nationalTile(side, date = '') {
+  if (side === 'US') return FLAG_TILE.US_NATIONAL;
+  return typeof date === 'string' && date >= '1863-05-01' ? FLAG_TILE.CS_SECOND_NATIONAL : FLAG_TILE.CS_FIRST_NATIONAL;
+}
+
+/** The atlas as RGBA bytes, row 0 at the bottom (v = 0): drawn procedurally, so it needs no canvas or download. */
+export function flagAtlasData() {
+  const W = FLAG_TILES * TILE_W, data = new Uint8Array(W * TILE_H * 4);
+  const hex = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
+  const RED = hex('#b02a2e'), WHITE = hex('#efe9da'), BLUE = hex('#26387a'), STAFF = hex('#5a4630'), GOLD = hex('#c9a646');
+  const set = (tile, x, row, c) => { const o = ((row * W) + tile * TILE_W + x) * 4; data[o] = c[0]; data[o + 1] = c[1]; data[o + 2] = c[2]; data[o + 3] = 255; };
+  const fw = TILE_W - STAFF_PX; // flag width in px
+  const dots = (cx, cy, x, y, r) => (x - cx) ** 2 + (y - cy) ** 2 <= r * r;
+  const design = {
+    [FLAG_TILE.US_NATIONAL]: (x, y) => {
+      if (x < 13 && y < 11) return x % 3 === 1 && y % 3 === 1 ? WHITE : BLUE; // canton with rows of stars
+      return Math.floor(y / (FLAG_ROWS / 13)) % 2 ? WHITE : RED;
+    },
+    [FLAG_TILE.CS_FIRST_NATIONAL]: (x, y) => {
+      if (x < 13 && y < 13) {
+        for (let i = 0; i < 11; i++) { const a = (i / 11) * Math.PI * 2; if (dots(6.5 + Math.cos(a) * 4.2, 6.5 + Math.sin(a) * 4.2, x + 0.5, y + 0.5, 0.75)) return WHITE; }
+        return BLUE;
+      }
+      return y < FLAG_ROWS / 3 || y >= (2 * FLAG_ROWS) / 3 ? RED : WHITE;
+    },
+    [FLAG_TILE.CS_SECOND_NATIONAL]: (x, y) => {
+      if (x < 13 && y < 12) { // red canton with a blue saltire
+        const u = x / 12, v = y / 11;
+        return Math.abs(u - v) < 0.14 || Math.abs(u + v - 1) < 0.14 ? ((x + y) % 3 === 0 ? WHITE : BLUE) : RED;
+      }
+      return WHITE;
+    },
+    [FLAG_TILE.US_REGIMENTAL]: () => BLUE,
+    [FLAG_TILE.CS_REGIMENTAL]: () => RED,
+  };
+  for (let tile = 0; tile < FLAG_TILES; tile++) {
+    for (let row = 0; row < TILE_H - 2; row++) for (let x = 0; x < STAFF_PX; x++) set(tile, x, row, STAFF);
+    for (let row = TILE_H - 3; row < TILE_H; row++) for (let x = 0; x < STAFF_PX + 1; x++) set(tile, x, row, GOLD);
+    for (let y = 0; y < FLAG_ROWS; y++) { // y from the top of the flag
+      const row = TILE_H - 4 - y;
+      for (let x = 0; x < fw; x++) set(tile, STAFF_PX + x, row, design[tile](x, y));
+    }
+  }
+  return { data, width: W, height: TILE_H };
+}
+
+/** Every regiment's colours: push() per flag each frame between begin() and flush(). */
+export class FlagPool {
+  constructor(capacity, { date = '' } = {}) {
+    this.capacity = Math.max(1, capacity);
+    this.date = date;
+    const { data, width, height } = flagAtlasData();
+    const tex = new THREE.DataTexture(data, width, height, THREE.RGBAFormat);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter; tex.generateMipmaps = false;
+    tex.needsUpdate = true;
+    const geo = new THREE.PlaneGeometry(1, 1).translate(0.5 - (STAFF_PX / 2) / TILE_W, 0.5, 0); // the staff's foot at the origin
+    this.tile = new THREE.InstancedBufferAttribute(new Float32Array(this.capacity), 1);
+    this.tile.setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('aTile', this.tile);
+    const mat = new THREE.MeshBasicMaterial({ map: tex, alphaTest: 0.5, side: THREE.DoubleSide, color: 0xe6e6e6 });
+    mat.onBeforeCompile = (shader) => {
+      shader.vertexShader = 'attribute float aTile;\n' + shader.vertexShader.replace('#include <uv_vertex>',
+        `#include <uv_vertex>\n#ifdef USE_MAP\n  vMapUv.x = (vMapUv.x + aTile) / ${FLAG_TILES}.0;\n#endif`);
+    };
+    mat.customProgramCacheKey = () => 'flag-atlas';
+    this.mesh = new THREE.InstancedMesh(geo, mat, this.capacity);
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    this.mesh.frustumCulled = false;
+    this.mesh.count = 0;
+    this.mesh.name = 'colours';
+    this.used = 0;
+    this.cam = new THREE.Vector3(0, 1e4, 0);
+  }
+
+  setView(camera) { this.cam.copy(camera.position); }
+
+  begin() { this.used = 0; }
+
+  /** A flag at the staff's foot (x, y, z): kind 'national' or 'regimental', s the figure scale. */
+  push(x, y, z, side, kind, s) {
+    if (this.used >= this.capacity) return;
+    const i = this.used++;
+    const yaw = Math.atan2(this.cam.x - x, this.cam.z - z); // face the camera about the staff
+    const c = Math.cos(yaw), sn = Math.sin(yaw), w = FLAG_W * s, h = FLAG_H * s;
+    const te = this.mesh.instanceMatrix.array, o = i * 16;
+    te[o] = c * w; te[o + 1] = 0; te[o + 2] = -sn * w; te[o + 3] = 0;
+    te[o + 4] = 0; te[o + 5] = h; te[o + 6] = 0; te[o + 7] = 0;
+    te[o + 8] = sn; te[o + 9] = 0; te[o + 10] = c; te[o + 11] = 0;
+    te[o + 12] = x; te[o + 13] = y; te[o + 14] = z; te[o + 15] = 1;
+    this.tile.array[i] = kind === 'national' ? nationalTile(side, this.date) : side === 'US' ? FLAG_TILE.US_REGIMENTAL : FLAG_TILE.CS_REGIMENTAL;
+  }
+
+  flush() {
+    this.mesh.count = this.used;
+    this.mesh.instanceMatrix.needsUpdate = true;
+    this.tile.needsUpdate = true;
+  }
+}

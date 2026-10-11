@@ -20,6 +20,11 @@
 //     while another living brigade or battery of its own side stands closer than that enemy and its front
 //     (half-width + MASK_PAD, across its facing) crosses the line from the shooter's centre to the enemy's centre.
 //     Guns do not fire over friends either (v1). unit.masked marks a unit with targets in range but every one masked.
+//   - command (src/game.js, DESIGN.md §2 "Commanders"): setCommand(fn) gives each unit a morale factor
+//     ({ loss, rally } or null): morale losses (fire, casualties, flanking, panic, melee) are multiplied by `loss`
+//     and a routing unit's rally clock and the out-of-contact recovery by `rally` (a general's 300 m radius or the
+//     brigade's own commander: loss 0.8, rally 1.5). With a command set, every point that takes fire this step
+//     (each volley's target centre, both sides of a melee) is kept for takeHits(); without one nothing is kept.
 // FIRE_BASE and the drains are tuned for a few minutes of fighting per brigade, not sourced (as in the old
 // model, where FIRE_BASE was "tuned so the loop runs ~90 s"). The sandbox multipliers rules.fireEffect and
 // rules.moraleLoss scale them at the point of use; the constants here stay as they are.
@@ -46,6 +51,8 @@ const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 export class Combat {
   #batteryContact = null;
   #stepDepth = 0;
+  #command = null; // (unit) => { loss, rally } | null (game.js commandFactor)
+  #hits = null; // flat [x, z, ...] of points that took fire since the last takeHits(); null: not kept
   constructor({ units, terrain, coverAt, fallen, fx, rnd, autoHaltSides = ['CS'], onBatteryContact = null }) {
     if (onBatteryContact !== null && typeof onBatteryContact !== 'function') throw new Error('Combat: battery contact callback must be a function or null.');
     this.#batteryContact = onBatteryContact;
@@ -59,6 +66,20 @@ export class Combat {
     this.rnd = rnd;
     this.targetT = 0;
     this.log = [];
+  }
+
+  /** Morale factors per unit (or null to clear); also starts keeping the points that take fire. */
+  setCommand(factor) {
+    this.#command = typeof factor === 'function' ? factor : null;
+    this.#hits = this.#command ? [] : null;
+  }
+
+  /** The points that took fire since the last call ([x, z, ...], read and cleared). */
+  takeHits() {
+    if (!this.#hits) return [];
+    const out = this.#hits;
+    this.#hits = [];
+    return out;
   }
 
   enemiesOf(u) {
@@ -245,6 +266,7 @@ export class Combat {
     const rate = FIRE_BASE * (fireMen / 1500) * pow * rngF * xpF * ammoF * morF * fatF * art * arc * wav / (t.cover * heightAdv) * RULES.fireEffect;
     const cas = Math.min(t.men, rate * period * (0.78 + this.rnd() * 0.44));
     t.takeLosses(cas, this.fallen[t.side], time);
+    if (this.#hits) this.#hits.push(t.x, t.z);
     t.underFire = 1.4;
     if (arc > 1) t.flanked = 1.0;
     t.casTick = (t.casTick || 0) + cas;
@@ -277,6 +299,7 @@ export class Combat {
         if (fwd > MELEE_RANGE + b.depth || fwd < -MELEE_RANGE || lat > a.halfFront + b.halfFront) continue;
         done.add(key);
         a.melee = b.melee = true;
+        if (this.#hits) this.#hits.push(a.x, a.z, b.x, b.z);
         if (a.type === 'infantry' && b.type === 'artillery') onBatteryContact?.(a, b);
         a.stop();
         const armA = a.type === 'artillery' ? 0.35 : 1;
@@ -293,8 +316,8 @@ export class Combat {
         b.takeLosses(bCas, this.fallen[b.side], time);
         a.casTick = (a.casTick || 0) + aCas;
         b.casTick = (b.casTick || 0) + bCas;
-        if (r < 0.85) a.morale -= 18 * dt * RULES.moraleLoss;
-        if (r > 1.18) b.morale -= 18 * dt * RULES.moraleLoss;
+        if (r < 0.85) a.morale -= 18 * dt * RULES.moraleLoss * (this.#command?.(a)?.loss ?? 1);
+        if (r > 1.18) b.morale -= 18 * dt * RULES.moraleLoss * (this.#command?.(b)?.loss ?? 1);
         a.fatigue = Math.min(100, a.fatigue + 2.4 * dt * RULES.fatigueGain);
         b.fatigue = Math.min(100, b.fatigue + 2.4 * dt * RULES.fatigueGain);
       }
@@ -310,7 +333,9 @@ export class Combat {
     u.casTick = 0;
     // Losses drive morale (old factor 60 with a -1.1/s under-fire drain suited a ~90 s fight; over a
     // several-minute fight the flat drain alone broke a brigade that had lost 10%).
-    const ml = RULES.moraleLoss;
+    const k = this.#command ? this.#command(u) : null;
+    const ml = RULES.moraleLoss * (k ? k.loss : 1);
+    const rallyRate = k ? k.rally : 1;
     u.morale -= (((cas / u.menMax) * 150) / rally) * ml;
     const enemies = this.enemiesOf(u);
     const nearest = enemies.reduce((m, e) => Math.min(m, Math.hypot(e.x - u.x, e.z - u.z)), Infinity);
@@ -327,7 +352,7 @@ export class Combat {
       }
     }
     u.fireLoad *= Math.exp(-dt / 4);
-    if (u.state !== 'routing' && u.underFire <= 0 && nearest > 0.9 * RANGE.rifled) u.morale += 1.1 * dt;
+    if (u.state !== 'routing' && u.underFire <= 0 && nearest > 0.9 * RANGE.rifled) u.morale += 1.1 * dt * rallyRate;
     // Resupply from the trains behind the line (M1 simplification; the old model used a supply wagon).
     if (u.state !== 'routing' && u.underFire <= 0 && nearest > 300) u.ammo = Math.min(100, u.ammo + 2 * dt);
     u.underFire = Math.max(0, u.underFire - dt);
@@ -337,7 +362,7 @@ export class Combat {
     const routThresh = 18 - 1.5 * u.xp;
     if (u.state === 'routing') {
       // Rally: no enemy within 220 m for 6 s.
-      if (nearest > 220 && !this.rallyBlocked?.(u)) u.rallyT += dt; else u.rallyT = 0;
+      if (nearest > 220 && !this.rallyBlocked?.(u)) u.rallyT += dt * rallyRate; else u.rallyT = 0;
       if (u.rallyT > 6) {
         u.state = 'wavering';
         u.morale = Math.max(u.morale, 30);

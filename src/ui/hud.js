@@ -4,6 +4,11 @@
 // Delegation (Game.delegate): the card's Delegate button (G) starts picking a place (ui/input.js, via onDelegate);
 // the chooser (openDelegate) asks Attack, Defend or Support by button or key (A / D / S; Esc cancels, nothing
 // changes) and returns focus to the field. The card shows "Delegated: <role>" and Undo (Game.undelegate).
+// Command (Game "Command"): a brigade whose commander fell shows "Commander down" on its marker and card (the
+// successor stays "next in command" unless the data names a sourced one); the card says when a general's rally
+// radius covers the brigade and lists its regiments (focus or hover one: a tooltip names it; not orderable).
+// Hovering a regiment block on the field shows the same tooltip. Each general has a small star marker; selecting
+// it shows his rally radius (Game.selectCommander) and describes him in the empty card.
 
 import * as THREE from 'three';
 import { LOOK } from './look.js';
@@ -133,8 +138,26 @@ export const coverWord = (v) => (v >= 1.5 ? 'strong' : v >= 1.3 ? 'good' : 'ligh
 /** Historical minutes in words. */
 export const minutesText = (m) => (m < 1 ? 'under a minute' : `${Math.round(m)} min`);
 
+const titled = (rank, name) => (rank ? `${rank} ${name}` : name);
 const rankShort = (r) => ({ 'Brigadier General': 'Brig. Gen.', Colonel: 'Col.', Captain: 'Capt.', Lieutenant: 'Lt.', 'First Lieutenant': '1st Lt.', Major: 'Maj.' }[r] || r || '');
 const commanderLine = (u) => (u.commander && u.commander.name ? `${rankShort(u.commander.rank)} ${u.commander.name}`.trim() : '');
+/** The card's name line: the commander, or his successor once he is down (generic unless sourced). */
+function cardWho(u) {
+  const c = u.commander;
+  if (u.commandDown) {
+    const s = c && c.successor;
+    return s && s.name ? `${rankShort(s.rank)} ${s.name} (next in command)`.trim() : 'Next in command';
+  }
+  return c && c.name ? `${rankShort(c.rank)} ${c.name}` : u.name;
+}
+/** The card's command line: who fell, or which general's radius covers the brigade. */
+function commandText(u, game) {
+  const d = u.commandDown;
+  if (d) return `Commander down: ${titled(d.rank, d.name)} ${d.kind}.`;
+  const g = game && game.generalsOver ? game.generalsOver(u) : [];
+  if (g.length) return `Rallied by ${rankShort(g[0].rank)} ${g[0].name} (within 300 m): faster rally, steadier morale.`;
+  return '';
+}
 const STATE_WORD = { steady: 'Steady', shaken: 'Shaken', wavering: 'Wavering', routing: 'Routing' };
 const STATE_GLYPH = { steady: '', shaken: '~', wavering: '!', routing: '✕' };
 const ROLE_WORD = { attack: 'Attack', defend: 'Defend', support: 'Support' };
@@ -251,6 +274,109 @@ export class Hud {
     onSetting('look.eventFeed', applyFeed);
     this.applyMarkerScale(LOOK.markerScale);
     onSetting('look.markerScale', (v) => this.applyMarkerScale(v));
+    this.buildCommand();
+  }
+
+  /** The card's command line and regiment list, the regiment tooltip, field hover, and the generals' markers. */
+  buildCommand() {
+    this.generalMarkers = new Map();
+    this.emptyText = $('uc-empty')?.textContent ?? '';
+    const body = $('uc-body');
+    if (body) {
+      const line = document.createElement('p');
+      line.id = 'uc-command'; line.className = 'uccommand'; line.hidden = true;
+      const regs = document.createElement('ul');
+      regs.id = 'uc-regiments'; regs.className = 'ucregs'; regs.hidden = true;
+      regs.setAttribute('aria-label', 'Regiments of this brigade (they move with it; order the brigade)');
+      const before = body.querySelector('.ucdelegate');
+      body.insertBefore(line, before); body.insertBefore(regs, before);
+    }
+    const tip = document.createElement('div');
+    tip.id = 'regiment-tip'; tip.setAttribute('role', 'tooltip'); tip.hidden = true;
+    document.body.appendChild(tip);
+    this.regTip = tip;
+    this.hover = null; // { x, y } client point over the field while no button is held
+    this.hoverT = 0;
+    this.canvas?.addEventListener('pointermove', (e) => { this.hover = e.buttons ? null : { x: e.clientX, y: e.clientY }; if (e.buttons) this.hideRegimentTip('field'); });
+    this.canvas?.addEventListener('pointerleave', () => { this.hover = null; this.hideRegimentTip('field'); });
+  }
+
+  /** The tooltip naming regiment r of u, beside (x, y); `from` is who owns it ('field' or 'card'). */
+  showRegimentTip(u, r, x, y, from) {
+    const tip = this.regTip;
+    const text = `${u.regiments[r]}: about ${u.regimentMen(r)} men of ${u.short}. Not separately orderable: order the brigade.`;
+    if (tip.textContent !== text) tip.textContent = text;
+    tip.dataset.from = from; tip.dataset.unit = u.id; tip.dataset.regiment = String(r);
+    tip.hidden = false;
+    const w = tip.offsetWidth || 220, h = tip.offsetHeight || 24;
+    const left = Math.max(4, Math.min(window.innerWidth - w - 4, x + 14)), top = Math.max(4, Math.min(window.innerHeight - h - 4, y - h - 10));
+    tip.style.transform = `translate(${left.toFixed(1)}px, ${top.toFixed(1)}px)`;
+  }
+
+  hideRegimentTip(from) {
+    if (this.regTip && !this.regTip.hidden && (!from || this.regTip.dataset.from === from)) this.regTip.hidden = true;
+  }
+
+  /** Field hover: the regiment block under the pointer (at most ten times a second). */
+  updateHover(dt) {
+    this.hoverT -= dt;
+    if (this.hoverT > 0) return;
+    this.hoverT = 0.1;
+    const h = this.hover;
+    if (!h || !this.rts || !this.game) { this.hideRegimentTip('field'); return; }
+    const p = this.rts.pick(h.x, h.y, this.canvas);
+    let hit = null;
+    if (p) for (const u of this.units) {
+      if (!u.alive || !u.regCount || !u.contains(p.x, p.z, 12)) continue;
+      const r = u.regimentAt(p.x, p.z);
+      if (r >= 0) { hit = [u, r]; break; }
+    }
+    if (hit) this.showRegimentTip(hit[0], hit[1], h.x, h.y, 'field');
+    else this.hideRegimentTip('field');
+  }
+
+  /** The card's regiment list for u (rebuilt when the selection changes). */
+  fillRegiments(u) {
+    const list = $('uc-regiments');
+    if (!list) return;
+    list.replaceChildren();
+    const names = u && u.regCount ? u.regiments : [];
+    list.hidden = !names.length;
+    names.forEach((name, r) => {
+      const li = document.createElement('li');
+      li.tabIndex = 0;
+      li.textContent = name;
+      li.dataset.regiment = String(r);
+      const show = () => { const b = li.getBoundingClientRect(); this.showRegimentTip(u, r, b.left, b.top, 'card'); li.setAttribute('aria-describedby', 'regiment-tip'); };
+      const hide = () => { this.hideRegimentTip('card'); li.removeAttribute('aria-describedby'); };
+      li.addEventListener('focus', show); li.addEventListener('blur', hide);
+      li.addEventListener('pointerenter', show); li.addEventListener('pointerleave', () => { if (document.activeElement !== li) hide(); });
+      list.appendChild(li);
+    });
+  }
+
+  /** The generals' small star markers: made on first sight, placed with the brigade markers. */
+  generalMarker(c) {
+    let m = this.generalMarkers.get(c.id);
+    if (m) return m;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = `gmarker ${c.side.toLowerCase()}`;
+    b.innerHTML = '<span class="gstar" aria-hidden="true">★</span><span class="gname"></span>';
+    const last = c.name.split(' ').pop();
+    b.querySelector('.gname').textContent = `${rankShort(c.rank)} ${last}`.trim();
+    b.addEventListener('click', (e) => { e.stopPropagation(); this.game?.selectCommander(c); });
+    $('markers').appendChild(b);
+    m = { el: b, w: 0, h: 0, last: '' };
+    this.generalMarkers.set(c.id, m);
+    return m;
+  }
+
+  /** Words for a general: name, his brigades, his state, what the radius does. */
+  generalText(c) {
+    const shorts = c.units.map((id) => this.units.find((u) => u.id === id)?.short || id).join(', ');
+    const state = c.down ? ` ${c.down === 'killed' ? 'Killed' : 'Wounded'} in action.` : ' Brigades of his side within 300 m of him rally faster and lose morale more slowly.';
+    return `${titled(c.rank, c.name)}, commanding ${shorts}.${state}`;
   }
 
   /** The card's Delegate and Undo buttons, and the Attack / Defend / Support chooser (hidden until a place is picked). */
@@ -349,7 +475,7 @@ export class Hud {
     b.type = 'button';
     b.className = `marker ${u.side.toLowerCase()}`;
     b.innerHTML = `<span class="info"><span class="nm"></span><span class="cmd"></span><span class="st"></span></span>${markerSvg(u.side, u.type)}<span class="hf" aria-hidden="true">HOLD FIRE</span>`
-      + '<span class="mstr"><span class="sbar"><i></i></span><span class="glyph"></span><span class="str"></span></span><span class="act"></span>';
+      + '<span class="mstr"><span class="sbar"><i></i></span><span class="glyph"></span><span class="str"></span></span><span class="cdn" aria-hidden="true">Commander down</span><span class="act"></span>';
     b.querySelector('.nm').textContent = u.short;
     b.querySelector('.cmd').textContent = commanderLine(u);
     // pointer presses go through ui/input.js (select, drag an order, double-tap); a click without a pointer
@@ -362,7 +488,7 @@ export class Hud {
     this.markerLinks.appendChild(link);
     $('markers').appendChild(b);
     this.markers.set(u.id, {
-      el: b, link, str: b.querySelector('.str'), act: b.querySelector('.act'), bar: b.querySelector('.sbar i'), glyph: b.querySelector('.glyph'), st: b.querySelector('.st'),
+      el: b, link, cmd: b.querySelector('.cmd'), lastDown: false, str: b.querySelector('.str'), act: b.querySelector('.act'), bar: b.querySelector('.sbar i'), glyph: b.querySelector('.glyph'), st: b.querySelector('.st'),
       last: '', lastAct: '', lastTip: '', lastState: '', lastBar: '', lastHf: null,
     });
     this.armyDirty = true;
@@ -407,6 +533,12 @@ export class Hud {
     $('uc-empty').hidden = !!u;
     $('uc-body').hidden = !u;
     this.armyDirty = true;
+    const general = !u && this.game ? this.game.selectedCommander : null;
+    for (const [id, gm] of this.generalMarkers || []) gm.el.classList.toggle('selected', !!general && general.id === id);
+    const empty = $('uc-empty');
+    if (empty) { const text = general ? this.generalText(general) : this.emptyText; if (empty.textContent !== text) empty.textContent = text; }
+    this.fillRegiments(u);
+    this.hideRegimentTip('card');
     if (!u) {
       this.updateOrders();
       return;
@@ -421,9 +553,9 @@ export class Hud {
       p.style.backgroundImage = '';
       p.textContent = c && c.name ? c.name.split(' ').map((w) => w[0]).filter((ch) => /[A-Z]/.test(ch)).slice(-2).join('') : u.short[0];
     }
-    const who = c && c.name ? `${rankShort(c.rank)} ${c.name}` : u.name;
     const n = this.game ? this.game.selection.length : 1;
-    $('uc-name').textContent = `${who} — ${u.parent || u.name}${n > 1 ? ` (+${n - 1} more selected)` : ''}`;
+    this.cardMore = n > 1 ? ` (+${n - 1} more selected)` : '';
+    $('uc-name').textContent = `${cardWho(u)} — ${u.parent || u.name}${this.cardMore}`;
     this.cardTimer = 0;
     this.updateCard(u);
     this.updateOrders();
@@ -458,6 +590,16 @@ export class Hud {
     set('cover', Math.min(100, (u.cover - 1) * 100));
     set('reload', u.reload * 100);
     $('uc-cas').textContent = String(Math.round(u.casualties));
+    const name = `${cardWho(u)} — ${u.parent || u.name}${this.cardMore || ''}`;
+    if ($('uc-name').textContent !== name) $('uc-name').textContent = name;
+    $('uc-portrait').classList.toggle('down', !!u.commandDown);
+    const line = $('uc-command');
+    if (line) {
+      const text = commandText(u, this.game);
+      if (line.textContent !== text) line.textContent = text;
+      line.hidden = !text;
+      line.classList.toggle('down', !!u.commandDown);
+    }
     $('uc-state').textContent = `${intention(u).replace(/^[^:]*: /, '')}${u.coverKind && u.coverKind !== 'open' ? ` In ${u.coverKind}.` : ''}`;
   }
 
@@ -553,6 +695,8 @@ export class Hud {
         s.m.link.style.display = '';
       }
     }
+    this.placeGenerals(placed, bounds, obstacles, w, h);
+    this.updateHover(dt);
     this.placeGhostLabel();
     this.cardTimer -= dt;
     if (this.cardTimer > 0) return;
@@ -561,7 +705,7 @@ export class Hud {
     for (const u of this.units) {
       const m = this.markers.get(u.id);
       if (!m || !u.alive) continue;
-      const tip = intention(u);
+      const tip = intention(u) + (u.commandDown ? ' Commander down.' : '');
       if (tip !== m.lastTip) {
         m.el.title = tip;
         m.el.setAttribute('aria-label', `${tip}${u.selected ? ' Selected.' : ''}`);
@@ -586,8 +730,36 @@ export class Hud {
     if (this.minimap) this.minimap.draw();
   }
 
+  /** Place each general's star marker among the brigade markers (hidden once he has left the field). */
+  placeGenerals(placed, bounds, obstacles, w, h) {
+    if (!this.game) return;
+    const selected = this.game.selectedCommander;
+    for (const c of this.game.commanders) {
+      const m = this.generalMarker(c);
+      _v.set(c.x, this.terrain.heightAt(c.x, c.z) + 12, c.z).project(this.camera);
+      const off = c.gone || _v.z > 1 || _v.x < -1.1 || _v.x > 1.1 || _v.y < -1.1 || _v.y > 1.1;
+      m.el.classList.toggle('hidden', off);
+      if (off) continue;
+      if (!m.w || this.sizeTimer <= 0) { const r = m.el.getBoundingClientRect(); m.w = r.width; m.h = r.height; }
+      const sx = (_v.x * 0.5 + 0.5) * w, sy = (-_v.y * 0.5 + 0.5) * h;
+      const p = markerPosition({ x: sx, y: sy, w: m.w || 50, h: m.h || 30 }, placed, bounds, obstacles);
+      placed.push({ ...p, w: m.w || 50, h: m.h || 30 });
+      m.el.style.transform = `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px) translate(-50%, -100%)`;
+      const text = this.generalText(c) + (selected === c ? ' Selected: his rally radius is shown.' : ' Select to show his rally radius.');
+      if (text !== m.last) { m.el.title = text; m.el.setAttribute('aria-label', text); m.last = text; }
+      m.el.classList.toggle('down', !!c.down);
+      m.el.classList.toggle('selected', selected === c);
+    }
+  }
+
   /** Strength bar (fill = men left, pattern and glyph = morale), number, state and activity words. */
   refreshMarker(u, m) {
+    const down = !!u.commandDown;
+    if (down !== m.lastDown) {
+      m.el.classList.toggle('cmd-down', down);
+      m.cmd.textContent = down ? 'Commander down' : commanderLine(u);
+      m.lastDown = down;
+    }
     const label = String(Math.round(u.men));
     if (label !== m.last) { m.str.textContent = label; m.last = label; }
     const bar = `${Math.max(2, Math.round((u.men / u.menMax) * 100))}%`;
