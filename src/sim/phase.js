@@ -77,6 +77,16 @@ function battleFields(value) {
   if (own(value, 'retreat') && (!record(value.retreat) || Object.keys(value.retreat).some(key => !['US', 'CS'].includes(key) || !point(value.retreat[key])))) fail('retreat points are invalid.');
   if (own(value, 'season') && !['summer', 'spring', 'autumn', 'winter'].includes(value.season)) fail('season is unsupported.');
 }
+// Optional per-unit AI role (src/sim/ai.js): { role: hold|attack|reserve, at?: 'HH:MM', target?: [x, z], via?: up to 6 [x, z] }.
+const AI_KEYS = ['role', 'at', 'target', 'via'];
+function unitAi(ai, value) {
+  if (!record(ai) || Object.keys(ai).some(key => !AI_KEYS.includes(key))) fail('unit AI has unsupported fields.');
+  if (!['hold', 'attack', 'reserve'].includes(ai.role)) fail('unit AI role must be hold, attack or reserve.');
+  if (own(ai, 'at') && (typeof ai.at !== 'string' || !/^\d{2}:\d{2}$/.test(ai.at) || +ai.at.slice(0, 2) > 23 || +ai.at.slice(3) > 59
+    || clock(ai.at) < clock(value.start) || clock(ai.at) > clock(value.end))) fail('unit AI time must be HH:MM within the battle clock.');
+  if (own(ai, 'target') && !point(ai.target)) fail('unit AI target must be a finite [x, z].');
+  if (own(ai, 'via') && (!Array.isArray(ai.via) || ai.via.length > 6 || !ai.via.every(point))) fail('unit AI via must be at most 6 finite [x, z] points.');
+}
 function scenario(value) {
   if (!record(value) || !['id', 'title', 'battle', 'date'].every(key => text(value[key]))) fail('scenario needs its identity, title, battle and date.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value.date)) fail('date needs YYYY-MM-DD.');
@@ -97,6 +107,7 @@ function scenario(value) {
     if (own(unit, 'weapon') && !(unit.type === 'artillery' ? ['parrott', 'napoleon', 'smbart'] : ['smooth', 'rifled']).includes(unit.weapon)) fail('generic weapon is unsupported for this unit type.');
     if (!['x', 'z', 'facing', 'men'].every(key => finite(unit[key])) || unit.men <= 0) fail('unit geometry and positive strength must be finite.');
     if (own(unit, 'guns') && (!Number.isInteger(unit.guns) || unit.guns < 0)) fail('gun count must be a nonnegative integer.');
+    if (own(unit, 'ai')) unitAi(unit.ai, value);
     if (own(unit, 'equipment')) {
       try { equipmentProfile(unit.equipment, unit.type || 'infantry'); }
       catch (error) { fail('unit equipment is invalid: ' + error.message); }
@@ -211,6 +222,7 @@ export function prepareFieldScenario(input, routeId) {
   if (roster.length > FIELD_LIMITS.formations || men > FIELD_LIMITS.men || guns > FIELD_LIMITS.guns || figures > FIELD_LIMITS.figures) fieldFail('the whole current field exceeds its input bounds.');
   if (!coordinate(value.objective.x) || !coordinate(value.objective.z) || value.objective.r > FIELD_LIMITS.coordinate
     || value.opening?.some(o => o.points.some(p => !p.every(coordinate)))) fieldFail('objective or opening is outside current ground bounds.');
+  if (roster.some(unit => own(unit, 'ai') && [...(unit.ai.target ? [unit.ai.target] : []), ...(unit.ai.via || [])].some(p => !p.every(coordinate)))) fieldFail('unit AI route is outside current ground bounds.');
   return value;
 }
 

@@ -21,8 +21,10 @@ RULES.autoPause = false; RULES.battleSpeed = 1;
 settings.set('look.menPerFigure', 10); settings.set('look.formationSpacing', 1); LOOK.figureStyle = 'rigged';
 
 // Henry Hill, real roster, end moved to 14:01 (15 simulation seconds), run 16 s on flat ground. Values observed
-// on the pre-pack parent 1e34040 with this same run; never recomputed from the candidate.
-const HENRY_ORACLE = {"over":true,"winner":"CS","why":"The Confederates still hold Henry House Hill. (In 1861 they held it, and the Union army fell back to Washington.)","resultKeys":["why","winner"],"clock":{"date":"21st July 1861","time":"14:01","frac":1},"simTime":16.000000000000092,"holder":"CS","men":[["franklin",2000,"steady"],["willcox",2000,"steady"],["sherman",2989.5206983638323,"steady"],["ricketts",120,"steady"],["griffin",120,"steady"],["jackson",2600,"steady"],["bee",1900,"steady"],["hampton",596.5554956267405,"steady"],["rockbridge",100,"steady"],["staunton",96.89210993752894,"steady"]],"next":0.008045169059187174};
+// on the pre-pack parent 1e34040 with this same run; never recomputed from the candidate. 2026-10-11 friendly-fire masking
+// (rules.friendlyMask): re-observed with masking on; the 1e34040 values (sherman 2989.5206983638323, bee 1900, hampton
+// 596.5554956267405) reproduced exactly with rules.friendlyMask=false before this update.
+const HENRY_ORACLE = {"over":true,"winner":"CS","why":"The Confederates still hold Henry House Hill. (In 1861 they held it, and the Union army fell back to Washington.)","resultKeys":["why","winner"],"clock":{"date":"21st July 1861","time":"14:01","frac":1},"simTime":16.000000000000092,"holder":"CS","men":[["franklin",2000,"steady"],["willcox",2000,"steady"],["sherman",2989.490286766961,"steady"],["ricketts",120,"steady"],["griffin",120,"steady"],["jackson",2600,"steady"],["bee",1897.648148912486,"steady"],["hampton",600,"steady"],["rockbridge",100,"steady"],["staunton",96.89210993752894,"steady"]],"next":0.008045169059187174};
 
 const API = { loadBattlePack, preparePhase, prepareReinforcementTimeline, transform: s => s };
 

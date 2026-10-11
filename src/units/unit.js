@@ -141,6 +141,7 @@ export class Unit {
     this.casualties = 0;
     this.rallyT = 0;
     this.target = null;
+    this.masked = false; // every enemy it could fire on is behind a friendly brigade (combat.js masks)
     this.nearestEnemy = Infinity;
     this.selected = false;
     this.path = null; // remaining order path [[x,z]...] for the arrow

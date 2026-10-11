@@ -16,6 +16,10 @@
 //     rules.moveOrder (src/sim/rules.js): 'fight' (default) halts the march at the same distance, fires, and
 //     resumes once the enemy is gone, out of range or routing; 'march' keeps marching and fires on the move.
 //   - Hold Fire (unit.holdFire) stops a unit firing; it still turns and moves.
+//   - no fire through friends (DESIGN.md §4b "Masked", rules.friendlyMask): a shooter does not fire at an enemy
+//     while another living brigade or battery of its own side stands closer than that enemy and its front
+//     (half-width + MASK_PAD, across its facing) crosses the line from the shooter's centre to the enemy's centre.
+//     Guns do not fire over friends either (v1). unit.masked marks a unit with targets in range but every one masked.
 // FIRE_BASE and the drains are tuned for a few minutes of fighting per brigade, not sourced (as in the old
 // model, where FIRE_BASE was "tuned so the loop runs ~90 s"). The sandbox multipliers rules.fireEffect and
 // rules.moraleLoss scale them at the point of use; the constants here stay as they are.
@@ -34,6 +38,7 @@ const RELOAD = { musket: 60 / 3 / CLOCK_RATIO, gun: 60 / 2 / CLOCK_RATIO }; // s
 const FIRE_BASE = 1.5;
 const ARC = (65 * Math.PI) / 180;
 const MELEE_RANGE = 34;
+const MASK_PAD = 8; // m added to each side of a friend's front when it masks the line of fire
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -92,12 +97,37 @@ export class Combat {
     return this.range(u) * (u.type === 'artillery' ? EFFECTIVE.artillery : EFFECTIVE.infantry);
   }
 
+  /**
+   * Does a living friend of u (not u itself) stand across u's line of fire to e? The friend's centre is nearer u
+   * than e is, and its front segment (centre ± (halfFront + MASK_PAD) across its facing) crosses the segment from
+   * u's centre to e's centre. No allocation: called per candidate target and before every volley.
+   */
+  masks(u, e) {
+    const sx = u.x, sz = u.z, dx = e.x - sx, dz = e.z - sz;
+    const reach2 = dx * dx + dz * dz;
+    for (const f of this.units) {
+      if (f === u || f.side !== u.side || !f.alive) continue;
+      const fx = f.x - sx, fz = f.z - sz;
+      if (fx * fx + fz * fz >= reach2) continue;
+      const h = f.halfFront + MASK_PAD, s = Math.sin(f.facing), c = Math.cos(f.facing);
+      // front from p = F + (c, -s)·h to F - (c, -s)·h, i.e. p + w·r for w in [0, 1] (relative to the shooter)
+      const px = fx + c * h, pz = fz - s * h, rx = -2 * c * h, rz = 2 * s * h;
+      const den = dx * rz - dz * rx;
+      if (den === 0) continue; // parallel: the line of fire runs along the front, not across it
+      const t = (px * rz - pz * rx) / den, w = (px * dz - pz * dx) / den;
+      if (t >= 0 && t <= 1 && w >= 0 && w <= 1) return true;
+    }
+    return false;
+  }
+
   pickTargets() {
+    const mask = RULES.friendlyMask;
     for (const u of this.units) {
       u.target = null;
+      u.masked = false;
       if (!u.alive || u.state === 'routing' || u.ammo <= 0) continue;
       const rng = this.range(u);
-      let best = null, bestScore = -Infinity;
+      let best = null, bestScore = -Infinity, maskedAny = false;
       for (const e of this.enemiesOf(u)) {
         const d = Math.hypot(e.x - u.x, e.z - u.z) - e.halfFront * 0.4;
         if (d > rng) continue;
@@ -106,9 +136,14 @@ export class Combat {
         if (off > ARC + Math.atan2(e.halfFront, Math.max(1, d)) * 0.8) continue;
         if (!this.los(u, e)) continue;
         const score = (rng - d) / rng + 0.4 * (this.arcMult(u, e) - 1) + 0.5 * (1 - e.men / e.menMax) + (e.state === 'routing' ? -0.6 : 0);
-        if (score > bestScore) { bestScore = score; best = e; }
+        if (score > bestScore) {
+          // a masked enemy is passed over for the best one with a clear line (checked only when it would win)
+          if (mask && this.masks(u, e)) { maskedAny = true; continue; }
+          bestScore = score; best = e;
+        }
       }
       u.target = best;
+      u.masked = !best && maskedAny;
     }
   }
 
@@ -174,6 +209,8 @@ export class Combat {
     const period = (u.equipmentProfile ? u.equipmentProfile.reloadSeconds : (isArt ? RELOAD.gun : RELOAD.musket)) * (1 + 0.5 * (u.fatigue / 100)) * (moving ? 1.5 : 1);
     if (u.reload < 1) u.reload = Math.min(1, u.reload + dt / period);
     if (!canFire || u.reload < 1) return;
+    // A friend that stepped across the line since the last target pick masks this volley; re-pick next time.
+    if (RULES.friendlyMask && this.masks(u, t)) { u.target = null; u.masked = true; u.firing = false; return; }
     this.volleyAt(u, t, time, moving, period);
   }
 

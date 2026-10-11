@@ -92,6 +92,7 @@ export function activity(u) {
   if (u.type === 'artillery' && !u.unlimbered) return ['Unlimbering', 'move'];
   if (u.firing) return [o === 'attack' ? 'Attacking' : 'Firing', 'hot'];
   if (u.holdFire && u.target) return ['Holding fire', 'warn'];
+  if (u.masked && !u.holdFire) return ['Masked', 'warn']; // wants to fire, but friends stand across every line
   if (u.state === 'wavering') return ['Wavering', 'warn'];
   if (o === 'attack') return ['Attacking', 'hot'];
   return [o === 'hold' && u.order.firm ? 'Holding' : 'Halted', 'idle'];

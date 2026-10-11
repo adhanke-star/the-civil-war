@@ -231,7 +231,7 @@ function dispatchReinforcements(game, state, through) {
     if (notice) game.event(`${name} is approaching ${e.unit.entry}.`, null, 'reinforcement-notice', e.unit);
     else {
       const unit = game.makeUnit(e.unit, 100 + state.initialCount + e.sourceIndex);
-      unit.order = unit.side === game.playerSide ? { type: 'hold' } : { type: 'hold', firm: true };
+      unit.order = unit.side === game.playerSide ? { type: 'hold' } : { type: 'hold', firm: true }; // an AI role rides on unit.def.ai
       game.units.push(unit);
       if (state.capture) bindCaptureUnit(state, unit);
       game.emit('spawn', unit);
@@ -350,7 +350,8 @@ export class Game {
       } : null });
     if (state?.capture) this.combat.rallyBlocked = u => state.capture.pre.has(u);
     this.ai = new Ai(this, scenario.ai || {});
-    // the defenders begin under orders to hold their ground
+    // the defenders begin under orders to hold their ground; AI attack and reserve roles (u.def.ai, ai.js) hold
+    // the same way until they activate, then the AI replaces this with move orders (a firm hold blocks nothing)
     for (const u of this.units) if (u.side !== playerSide) u.order = { type: 'hold', firm: true };
     const [hh, mm] = scenario.start.split(':').map(Number);
     const [eh, em] = scenario.end.split(':').map(Number);
@@ -648,7 +649,7 @@ export class Game {
     if (!t || !t.alive || t.state === 'routing' || !this.units.includes(t)) {
       u.stop();
       u.order = { type: 'hold' };
-      this.emit('log', `${u.short}: the enemy has gone; holding here.`);
+      if (this.controls(u)) this.emit('log', `${u.short}: the enemy has gone; holding here.`); // AI attacks (ai.js) tell no one
       return;
     }
     const eff = this.effRange(u), rng = this.range(u);
@@ -760,7 +761,8 @@ export class Game {
     if (this.slowT <= 0) {
       this.slowT = 0.5;
       for (const u of this.units) {
-        if (!u.alive || !this.controls(u)) continue;
+        if (!u.alive) continue;
+        if (!this.controls(u)) { if (u.order.type === 'attack') this.attackStep(u); continue; } // an AI attacker (ai.js) closing on a foe
         if (u.order.type === 'attack') this.attackStep(u);
         else this.initiativeStep(u);
       }

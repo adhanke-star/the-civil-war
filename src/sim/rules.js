@@ -16,6 +16,10 @@ const SPECS = {
     tab: 'Rules', type: 'toggle', default: true, label: 'Brigade initiative',
     note: 'Brigades without orders turn to face an enemy firing into their flank; they never advance or charge on their own.',
   }],
+  friendlyMask: ['rules.friendlyMask', {
+    tab: 'Rules', type: 'toggle', default: true, label: 'No fire through friends',
+    note: 'A brigade or battery does not fire while one of its own brigades stands across its line of fire; its marker reads Masked. It still fires at any other enemy in range with a clear line. Off: fire passes through friends as if they were not there.',
+  }],
   autoPause: ['rules.autoPause', {
     tab: 'Rules', type: 'toggle', default: true, label: 'Auto-pause',
     note: 'Pauses the battle with a one-line banner when one of your brigades routs or the objective you hold is threatened.',

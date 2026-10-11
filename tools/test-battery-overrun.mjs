@@ -96,7 +96,11 @@ const CASES=[
   const formation=report.formations.find(u=>u.unitId===f.b.id),record=capt(f)[0];assert.equal(formation.men,record.men);assert.equal(formation.guns.length,f.b.guns);
   const data={authentic:practice.assertSavedLaunch(manifest,baseline)===manifest,captureFrames,report,record,savedBattery,terminal:summarize(f),sameToken:true,sameExport:true,sameCards:true,beforeCardCount:before.cards.length,afterCardCount:after.cards.length,physicalGunAwarded:false,readonlyFrozen:true,actualFigureCount:f.g.figureCount()};clean(f);return data;},
 ];
-function nested(index){const data={rows:[]};const modes=index===8?['caught-nested','callback-throws']:['nested-only','external-prior','direct-prior'];
+// The nested fixtures inject faults from a CS volley fired across its own charging line at the battery, so they pin
+// rules.friendlyMask off (masking itself is tools/test-masking.mjs); with masking on that volley never comes and case 9's
+// nested-only mode would pass without exercising nested combat.
+function nested(index){const prev=RULES.friendlyMask;RULES.friendlyMask=false;try{return nestedFixture(index);}finally{RULES.friendlyMask=prev;}}
+function nestedFixture(index){const data={rows:[]};const modes=index===8?['caught-nested','callback-throws']:['nested-only','external-prior','direct-prior'];
  for(const mode of modes){let f,latched=false,callbackError=false;const inner=[];const s=scenario();if(!mode.endsWith('prior'))s.units.push(def('shooter','CS',{x:-100,z:80,weapon:'rifled'}));
   const effects={boom(){},volley(){if(latched)return;latched=true;
    if(index===8){for(const dt of [.125,0]){const before={time:f.g.simTime,capture:f.g.captureSnapshot(),events:structuredClone(f.events)};let error;try{f.g.tick(dt);}catch(e){error=e;}assert(error&&error.message.includes('nested battery-overrun tick'));const after={time:f.g.simTime,capture:f.g.captureSnapshot(),events:structuredClone(f.events)};assert.deepEqual(after,before);inner.push({dt,error:error.message,before,after});}if(mode==='callback-throws'){callbackError=true;throw new Error('Intentional CPU effect failure');}}

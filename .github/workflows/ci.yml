@@ -84,7 +84,7 @@ jobs:
           for name in deployment phase field-admission reinforcements reinforcement-runtime capture-accounting \
             surrender-runtime surrender-result surrender-result-ui equipment reward save practice captures intro \
             sandbox-rules look view spacing residency moments keyboard soldier-view surrender-activation \
-            captured-guns battery-overrun captured-loadouts packs; do
+            captured-guns battery-overrun captured-loadouts packs ai masking; do
             for mode in "" --prove-fail; do
               echo "::group::node tools/test-$name.mjs $mode"
               node "tools/test-$name.mjs" $mode
