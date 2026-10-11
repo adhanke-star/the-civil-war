@@ -78,7 +78,12 @@ function pineGeometry(tiers = 4, seg = 7) {
   return g;
 }
 
-export function buildTrees(terrain, trees) {
+// Default far radius for tree chunks: the scene fog's far distance (world.js passes its own). Fog is by view
+// depth, so a chunk whose nearest point lies deeper than this is drawn entirely in the flat fog colour.
+export const TREE_FAR = 3600;
+const _forward = new THREE.Vector3(); // per-frame scratch (no allocations in updateLod)
+
+export function buildTrees(terrain, trees, { far = TREE_FAR } = {}) {
   const group = new THREE.Group();
   group.name = 'trees';
   const CH = 320; // chunk size (m): the camera frustum culls whole chunks, and each picks a level of detail
@@ -122,14 +127,27 @@ export function buildTrees(terrain, trees) {
     mesh.instanceColor.needsUpdate = true;
     mesh.computeBoundingSphere();
     group.add(mesh);
-    lods.push({ mesh, hi: isPine ? pine : canopy, lo: isPine ? pineLo : canopyLo, center: mesh.boundingSphere.center.clone() });
+    // the lo geometry's bounds can exceed the hi one's; pad the chunk radius so the far test stays conservative
+    lods.push({ mesh, hi: isPine ? pine : canopy, lo: isPine ? pineLo : canopyLo, center: mesh.boundingSphere.center.clone(), radius: mesh.boundingSphere.radius + 10 });
     count += list.length;
   }
   group.userData.count = count;
-  /** Pick each chunk's detail from its distance to the camera (call once per frame). */
-  group.userData.updateLod = (camera, near) => {
+  group.userData.chunks = lods.length;
+  group.userData.far = far;
+  /**
+   * Pick each chunk's detail from its distance to the camera, and hide chunks wholly beyond the far radius
+   * along the view direction (call once per frame; `far` defaults to the fog distance given at build time).
+   */
+  group.userData.updateLod = (camera, near, farDepth = group.userData.far) => {
+    const p = camera.position;
+    camera.getWorldDirection(_forward);
     for (const l of lods) {
-      const g = camera.position.distanceTo(l.center) < near ? l.hi : l.lo;
+      const c = l.center;
+      const depth = (c.x - p.x) * _forward.x + (c.y - p.y) * _forward.y + (c.z - p.z) * _forward.z;
+      const visible = depth - l.radius <= farDepth;
+      if (l.mesh.visible !== visible) l.mesh.visible = visible;
+      if (!visible) continue;
+      const g = p.distanceTo(c) < near ? l.hi : l.lo;
       if (l.mesh.geometry !== g) l.mesh.geometry = g;
     }
   };

@@ -111,14 +111,34 @@ export const PLAN = {
   woods: [],
   woodsNote: '',
   labels: [],
+  // Default ground cover (scenario.ground, validated in src/sim/phase.js). 'fields' is open farmland with
+  // woods polygons (Henry Hill); 'woods' is forest everywhere except the clearings (Shiloh). Absent = fields.
+  ground: { base: 'fields', clearings: [], spacing: 13 },
 };
 
-/** Install the sourced plan data from the scenario JSON (sites, woods, labels). */
+// Woods grid step (m): 13 is the Henry Hill stand spacing; scenario.ground.treeSpacing may raise it.
+export const TREE_SPACING = Object.freeze({ min: 13, max: 30, default: 13 });
+// Hard cap on placed tree instances; placeTreesWithin widens the woods grid until the total fits.
+export const TREE_BUDGET = 60000;
+
+const bbox = (poly) => {
+  const b = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const [x, z] of poly) { b[0] = Math.min(b[0], x); b[1] = Math.min(b[1], z); b[2] = Math.max(b[2], x); b[3] = Math.max(b[3], z); }
+  return b;
+};
+
+/** Install the sourced plan data from the scenario JSON (sites, woods, labels, ground cover). */
 export function setPlan(scenario) {
   PLAN.sites = scenario.sites || [];
   PLAN.woods = (scenario.woods || []).map((w) => w.polygon);
   PLAN.woodsNote = scenario.woodsNote || '';
   PLAN.labels = scenario.labels || [];
+  const g = scenario.ground;
+  PLAN.ground = {
+    base: g?.base === 'woods' ? 'woods' : 'fields',
+    clearings: (g?.clearings || []).map((c) => ({ name: c.name, polygon: c.polygon, box: bbox(c.polygon) })),
+    spacing: g?.treeSpacing ?? TREE_SPACING.default,
+  };
 }
 
 // ---------------------------------------------------------------------------------------------------
@@ -308,8 +328,52 @@ export function inWoods(x, z) {
   return false;
 }
 
+/** Inside one of the open-farmland clearings of a woods-base ground (bounding box first, then the polygon). */
+export function inClearing(x, z) {
+  for (const c of PLAN.ground.clearings) {
+    const b = c.box;
+    if (x < b[0] || x > b[2] || z < b[1] || z > b[3]) continue;
+    if (pointInPolygon(x, z, c.polygon)) return true;
+  }
+  return false;
+}
+
+/** Forest cover: woods polygons, plus everything outside the clearings when the ground base is woods. */
+export function inForest(x, z) {
+  if (PLAN.ground.base === 'woods' && !inClearing(x, z)) return true;
+  return inWoods(x, z);
+}
+
+// Lone and hedgerow tree samples: 16000 over the Henry Hill square (half 1300 - 8 m). A fields base keeps
+// exactly 16000 (today's placement); a woods base scales them by area so its clearings get the same density.
+const LONE_SAMPLES = 16000, LONE_REF_HALF = 1292, LONE_MAX = 120000;
+
+/**
+ * Trees under the TREE_BUDGET cap: when the woods grid at the scenario's spacing would place more than `budget`
+ * trees in total, the spacing is raised (0.5 m steps, deterministic) until the total fits. Returns the trees and
+ * the effective and requested spacing. Last resort, if even a much wider grid cannot fit: drop the list's tail.
+ */
+export function placeTreesWithin(terrain, streams, roadField, streamField, parcels, { seed = 21, budget = TREE_BUDGET } = {}) {
+  const requested = PLAN.ground.spacing;
+  let spacing = requested;
+  let run = forestTrees(terrain, streams, roadField, streamField, parcels, seed, spacing);
+  for (let i = 0; run.trees.length > budget && i < 16; i++) {
+    const keep = run.forest - (run.trees.length - budget); // woods-grid trees that would still fit
+    const factor = keep > 0 ? Math.sqrt(run.forest / keep) * 1.01 : 2;
+    spacing = Math.max(spacing + 0.5, Math.ceil(spacing * factor * 2) / 2);
+    run = forestTrees(terrain, streams, roadField, streamField, parcels, seed, spacing);
+  }
+  if (run.trees.length > budget) run.trees.length = budget;
+  // forest: how many leading entries are woods-grid trees (the rest are stream, field, farm and orchard trees)
+  return { trees: run.trees, spacing, requested, forest: Math.min(run.forest, run.trees.length) };
+}
+
 /** Trees: woods fill, stream-bank rows, hedgerows on some field edges, lone field trees, orchards. */
-export function placeTrees(terrain, streams, roadField, streamField, parcels, { seed = 21 } = {}) {
+export function placeTrees(terrain, streams, roadField, streamField, parcels, { seed = 21, spacing = PLAN.ground.spacing } = {}) {
+  return forestTrees(terrain, streams, roadField, streamField, parcels, seed, spacing).trees;
+}
+
+function forestTrees(terrain, streams, roadField, streamField, parcels, seed, spacing) {
   const rnd = mulberry32(seed);
   const trees = []; // [x, z, radius, kind] kind 0 woods/deciduous, 1 pine, 2 orchard
   const half = terrain.half - 8;
@@ -325,20 +389,21 @@ export function placeTrees(terrain, streams, roadField, streamField, parcels, { 
     return Math.abs(along) < 0.32 * h * L.text.length + h && Math.abs(across) < 0.75 * h;
   });
 
-  // Woods: a jittered grid of open stands (crowns 5-7.5 m, 13 m apart, so grass shows between them),
-  // with conifers grouped where the noise is high and mixed in singly elsewhere.
-  const W = 13;
+  // Woods: a jittered grid of open stands (crowns 5-7.5 m, 13 m apart by default, so grass shows between
+  // them), with conifers grouped where the noise is high and mixed in singly elsewhere.
+  const W = spacing;
   for (let z = -half; z < half; z += W) {
     for (let x = -half; x < half; x += W) {
       const px = x + (rnd() - 0.5) * W * 0.9;
       const pz = z + (rnd() - 0.5) * W * 0.9;
-      if (!inWoods(px, pz)) continue;
+      if (!inForest(px, pz)) continue;
       if (nearRoad(px, pz, 9) || nearStream(px, pz, 3) || nearSite(px, pz, 45)) continue;
       const pn = valueNoise(px * 0.012, pz * 0.012);
       const pine = pn > 0.74 || (pn > 0.5 && rnd() < 0.12);
       trees.push([px, pz, pine ? 4.5 + rnd() * 2 : 5 + rnd() * 2.5, pine ? 1 : 0]);
     }
   }
+  const forest = trees.length;
   // Stream banks.
   for (const s of streams) {
     const pts = s.points;
@@ -359,10 +424,11 @@ export function placeTrees(terrain, streams, roadField, streamField, parcels, { 
     }
   }
   // Hedgerow trees along about a third of the field edges, and lone trees.
-  for (let i = 0; i < 16000; i++) {
+  const samples = PLAN.ground.base === 'woods' ? Math.min(LONE_MAX, Math.round(LONE_SAMPLES * (half / LONE_REF_HALF) ** 2)) : LONE_SAMPLES;
+  for (let i = 0; i < samples; i++) {
     const x = (rnd() * 2 - 1) * half;
     const z = (rnd() * 2 - 1) * half;
-    if (inWoods(x, z) || nearRoad(x, z, 8) || nearSite(x, z, 30) || onLabel(x, z)) continue;
+    if (inForest(x, z) || nearRoad(x, z, 8) || nearSite(x, z, 30) || onLabel(x, z)) continue;
     const p = parcels.lookup(x, z, 6);
     if (p.edge) {
       if (hash2(p.id, 3.3) < 0.5) trees.push([x, z, 3.8 + rnd() * 2.4, 0]);
@@ -392,7 +458,7 @@ export function placeTrees(terrain, streams, roadField, streamField, parcels, { 
       }
     }
   }
-  return trees;
+  return { trees, forest };
 }
 
 /** Fence segments [x, z, angle, len, kind]: kind 0 straight post-and-rail along roads, 1 worm (zig-zag) in fields. */
@@ -415,7 +481,7 @@ export function placeFences(terrain, roads, parcels, { seed = 7 } = {}) {
           if (valueNoise((ax + t) * 0.02, side * 10 + az * 0.02) < 0.28) continue; // gaps and gates
           const x = ax + ((bx - ax) * t) / len + nx * side * 7.5;
           const z = az + ((bz - az) * t) / len + nz * side * 7.5;
-          if (Math.abs(x) > half || Math.abs(z) > half || inWoods(x, z)) continue;
+          if (Math.abs(x) > half || Math.abs(z) > half || inForest(x, z)) continue;
           segs.push([x, z, ang, SEG, 0]);
         }
       }
@@ -426,7 +492,7 @@ export function placeFences(terrain, roads, parcels, { seed = 7 } = {}) {
     const x = (rnd() * 2 - 1) * half;
     const z = (rnd() * 2 - 1) * half;
     const near = PLAN.sites.some((s) => Math.hypot(s.x - x, s.z - z) < (s.fenceRadius || 0));
-    if (!near || inWoods(x, z)) continue;
+    if (!near || inForest(x, z)) continue;
     const p = parcels.lookup(x, z, 2.2);
     if (!p.edge) continue;
     segs.push([x, z, p.edgeAngle + (rnd() < 0.5 ? 0.3 : -0.3), SEG, 1]);

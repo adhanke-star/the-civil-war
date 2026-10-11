@@ -19,20 +19,29 @@ export function paintGround(terrain, parcels, roads, streams, trees, sunDir) {
   const half = terrain.half;
   const size = terrain.size;
 
-  // Woods mask via native polygon fill.
+  // Woods mask via native polygon fill. A woods-base ground starts as forest floor everywhere, cuts its
+  // clearings back to open farmland, then adds any woods polygons (which may stand inside a clearing).
   const maskCanvas = document.createElement('canvas');
   maskCanvas.width = maskCanvas.height = P_RES;
   const mctx = maskCanvas.getContext('2d', { willReadFrequently: true });
   const toP = (x, z) => [((x + half) / size) * P_RES, ((z + half) / size) * P_RES];
-  mctx.fillStyle = '#000';
+  const fillPolys = (polys) => {
+    for (const poly of polys) {
+      mctx.beginPath();
+      poly.forEach(([x, z], i) => { const [px, pz] = toP(x, z); if (i) mctx.lineTo(px, pz); else mctx.moveTo(px, pz); });
+      mctx.closePath();
+      mctx.fill();
+    }
+  };
+  const woodsBase = PLAN.ground.base === 'woods';
+  mctx.fillStyle = woodsBase ? '#fff' : '#000';
   mctx.fillRect(0, 0, P_RES, P_RES);
-  mctx.fillStyle = '#fff';
-  for (const poly of PLAN.woods) {
-    mctx.beginPath();
-    poly.forEach(([x, z], i) => { const [px, pz] = toP(x, z); if (i) mctx.lineTo(px, pz); else mctx.moveTo(px, pz); });
-    mctx.closePath();
-    mctx.fill();
+  if (woodsBase) {
+    mctx.fillStyle = '#000';
+    fillPolys(PLAN.ground.clearings.map((c) => c.polygon));
   }
+  mctx.fillStyle = '#fff';
+  fillPolys(PLAN.woods);
   const mask = mctx.getImageData(0, 0, P_RES, P_RES).data;
 
   // Parcels, per pixel.

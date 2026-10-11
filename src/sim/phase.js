@@ -177,6 +177,26 @@ const fieldFail = message => { throw new Error('Field: ' + message); };
 const coordinate = value => finite(value) && Math.abs(value) <= FIELD_LIMITS.coordinate;
 const integer = value => Number.isSafeInteger(value) && value >= 0;
 const styles = new Set(['frame-house', 'stone-house', 'log-house', 'barn', 'shed']);
+// Optional default ground cover (src/world/landscape.js setPlan): absent keeps today's open-fields ground.
+export const GROUND_LIMITS = Object.freeze({ clearings: 64, spacingMin: 13, spacingMax: 30 });
+const GROUND_KEYS = ['base', 'clearings', 'treeSpacing'];
+/** Validate scenario.ground; clearing vertices share the woods' vertex budget. Returns the running vertex count. */
+function groundCover(ground, vertices) {
+  if (!record(ground) || Object.keys(ground).some(key => !GROUND_KEYS.includes(key))) fieldFail('ground has unsupported fields.');
+  if (!['fields', 'woods'].includes(ground.base)) fieldFail('ground base must be fields or woods.');
+  if (own(ground, 'treeSpacing') && (!finite(ground.treeSpacing) || ground.treeSpacing < GROUND_LIMITS.spacingMin
+    || ground.treeSpacing > GROUND_LIMITS.spacingMax)) fieldFail('tree spacing must be from 13 to 30 metres.');
+  if (own(ground, 'clearings')) {
+    if (ground.base !== 'woods') fieldFail('clearings need a woods ground base.');
+    if (!Array.isArray(ground.clearings) || ground.clearings.length > GROUND_LIMITS.clearings) fieldFail('clearing count is invalid.');
+    for (const c of ground.clearings) if (!record(c) || Object.keys(c).some(key => key !== 'name' && key !== 'polygon')
+      || !text(c.name) || [...c.name].length > FIELD_LIMITS.labelText || !Array.isArray(c.polygon)
+      || c.polygon.length < 3 || c.polygon.length > FIELD_LIMITS.polygon
+      || (vertices += c.polygon.length) > FIELD_LIMITS.vertices
+      || !c.polygon.every(p => Array.isArray(p) && p.length === 2 && p.every(coordinate))) fieldFail('clearing polygon is invalid.');
+  }
+  return vertices;
+}
 
 /** Router-selected current field. Retain saved manifests' original scenario after validation. */
 export function prepareFieldScenario(input, routeId) {
@@ -214,6 +234,7 @@ export function prepareFieldScenario(input, routeId) {
     || wood.polygon.length < 3 || wood.polygon.length > FIELD_LIMITS.polygon
     || (vertices += wood.polygon.length) > FIELD_LIMITS.vertices
     || !wood.polygon.every(p => Array.isArray(p) && p.length === 2 && p.every(coordinate))) fieldFail('wood polygon is invalid.');
+  if (own(value, 'ground')) vertices = groundCover(value.ground, vertices);
   if (own(value, 'labels')) {
     if (!Array.isArray(value.labels) || value.labels.length > FIELD_LIMITS.labels) fieldFail('label count is invalid.');
     for (const label of value.labels) if (!record(label) || !text(label.text) || [...label.text].length > FIELD_LIMITS.labelText
