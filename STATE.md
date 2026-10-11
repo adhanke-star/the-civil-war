@@ -1,19 +1,19 @@
 # STATE
 2026-10-11 — ACTIVE same-thread autonomous EXISTING-v1 loop.
-Root solewriter; one existing readonlyhelper; COORD absent; protected11 exact.
+Root solewriter; existing readonlyhelper; COORD absent; protected11 exact.
 Aaron authorizes necessary v1 execution; no routine permission popups.
-Caps/source/history/ownership and actual acceptance gates remain.
-AcceptedF6b158; deployedF6c728 unaccepted; existingP1–P7 unfinished.
-48MiB PER native raw buffer; oversizedflatten prohibited.
-Recovery169PNG+2exports/all182bodies DONE; preservebytes.
-Private380b9ddd owns2transportfiles;207historical locks exact002.
-Run38138980441/attempt1/job114468692634 SUCCESS; fullreadbackcomplete.
-14checks/14genuinecontrols/emptywarnings;70sources/all69parentexact.
-All15members/fulljoblogs/uploadwindows;5originalPNG root+helperviewed.
-Node24 exactcompression; preserve originalNode25HOLD/allfailedruns.
-Collector846741+closed2216994=3063735; offlineadded0; no reset.
-SourceR6 CPU independently209/11owned198,69/65/66/67GitinverseCLEAR.
-568retained+14futureUNRUN; full582model/32roles/literal29gatespending.
-CurrentDIAG phase10MiB max111497193; noMAIN.out allocation.
-Next completePhaseA model/consumer/gate closure beforetwo productseams.
-PhaseA/product582/native/art/fullAA/P7 UNRUN; v1unfinished.
+AcceptedF6b158; deployedF6c728 unaccepted; P1–P7 unfinished.
+48MiB PER native raw buffer; oversized flatten prohibited.
+169originalPNG+2exports/all182bodies retained; no omitted evidence.
+Private380b9ddd/run38138980441 full14checks/14controls/zero warnings CLEAR.
+Matching Node24; preserve Node25 HOLD/all failed runs.
+Collector3063735 cumulative bytes; offline added0; no reset.
+PhaseA independently complete:209/11owned198;70/all69 inverse exact.
+582order580unique49axes60streams18public23forensic model CLEAR.
+568historical outcomes exact;14fresh full-suite outcomes UNRUN.
+32roles/38support files/88versioned local commands independently CLEAR.
+Historical B/A2 remain historical; current-SHA fresh CI required.
+Next PhaseB11 owned sources/TWO runtime seams in isolated PROD.
+Admit finite24MiB DIAG readback; code408831B PROD; execute CPU gates.
+Then index review/implementation commit/fullCI+Pages/23image readback.
+Product582/native/art/fullAA/P7 UNRUN; v1 unfinished.
