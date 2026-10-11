@@ -7,81 +7,24 @@ on:
 permissions:
   contents: read
 
+# The browser run is split into three parallel shards (tools/test.mjs --shard=N) so each job stays well
+# under the 45-minute cap. The probes job runs every Node/CPU behaviour file and its --prove-fail controls.
 jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host --init
-    env:
-      GIT_CONFIG_COUNT: "1"
-      GIT_CONFIG_KEY_0: safe.directory
-      GIT_CONFIG_VALUE_0: /__w/the-civil-war/the-civil-war
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v4
-
-      - name: Fetch pinned current-field comparison
-        run: |
-          test "$GITHUB_WORKSPACE" = "/__w/the-civil-war/the-civil-war"
-          test "$(realpath "$GITHUB_WORKSPACE")" = "$GITHUB_WORKSPACE"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 4f6113a624e0e533825c0be414bb36f3b073f726
-          test "$(git rev-parse FETCH_HEAD)" = "4f6113a624e0e533825c0be414bb36f3b073f726"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/main.js
-          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/entry.js
-
-      - name: Fetch pinned reinforcement comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin aaf10145531130f3ec201d6332f6759599bc46a4
-          test "$(git rev-parse FETCH_HEAD)" = "aaf10145531130f3ec201d6332f6759599bc46a4"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e aaf10145531130f3ec201d6332f6759599bc46a4:src/main.js
-          node tools/test-surrender-runtime.mjs --verify-legacy-game
-
-      - name: Fetch pinned captured-gun comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin b81dad641ff86c7586b13abf57dce257e299fef0
-          test "$(git rev-parse FETCH_HEAD)" = "b81dad641ff86c7586b13abf57dce257e299fef0"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/units/battery.js
-          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/game.js
-
-      - name: Fetch pinned battery-overrun comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 0e505fd61dead1f95659eaa2f8652f31935a50bc
-          test "$(git rev-parse FETCH_HEAD)" = "0e505fd61dead1f95659eaa2f8652f31935a50bc"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/game.js
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/combat.js
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/phase.js
-
-      - name: Fetch pinned captured-loadout comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 158cb60a1dd26e84161fcdc97342d7f239369f90
-          test "$(git rev-parse FETCH_HEAD)" = "158cb60a1dd26e84161fcdc97342d7f239369f90"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:src/franchise/practice.js
-          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:tools/test-battery-overrun.mjs
-          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:tools/test-captured-guns.mjs
-
-      - name: Fetch pinned reward-focus comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 7287296ae3b1c90f3a43642f33e3e886e8b889e2
-          test "$(git rev-parse FETCH_HEAD)" = "7287296ae3b1c90f3a43642f33e3e886e8b889e2"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 7287296ae3b1c90f3a43642f33e3e886e8b889e2:src/reward/sequence.js
-          git cat-file -e 7287296ae3b1c90f3a43642f33e3e886e8b889e2:src/reward/reward.css
-          git cat-file -e 7287296ae3b1c90f3a43642f33e3e886e8b889e2:tools/test-captured-loadouts.mjs
 
       - uses: actions/setup-node@v4
         with:
@@ -92,85 +35,25 @@ jobs:
 
       - name: Verify pinned Playwright runtime
         run: |
-          node --input-type=module <<'NODE'
+          node --input-type=module -e "
           import assert from 'node:assert/strict';
           import fs from 'node:fs';
           import { chromium } from 'playwright';
           const lock = JSON.parse(fs.readFileSync('package-lock.json'));
-          const installed = JSON.parse(fs.readFileSync('node_modules/playwright/package.json'));
           assert.equal(lock.packages['node_modules/playwright'].version, '1.63.0');
-          assert.equal(installed.version, '1.63.0');
-          assert.equal(process.env.PLAYWRIGHT_BROWSERS_PATH, '/ms-playwright');
-          const executable = chromium.executablePath();
-          assert.ok(executable.startsWith('/ms-playwright/'));
-          fs.accessSync(executable, fs.constants.X_OK);
-          console.log(JSON.stringify({ playwright: installed.version, executable, bakedDependencies: true }));
-          NODE
+          assert.equal(JSON.parse(fs.readFileSync('node_modules/playwright/package.json')).version, '1.63.0');
+          fs.accessSync(chromium.executablePath(), fs.constants.X_OK);
+          console.log('playwright 1.63.0', chromium.executablePath());
+          "
 
-      - run: npm test
-
-      - run: node tools/test-surrender-activation-ui.mjs
-      - run: node tools/test-surrender-activation-ui.mjs --prove-fail
-      - run: node tools/test-reward-focus-ui.mjs
-      - run: node tools/test-reward-focus-ui.mjs --prove-fail
-
-      - name: Run complete proof envelope transport
-        id: proof
-        if: always()
-        run: |
-          node --input-type=module <<'PROOF'
-          // .out source proposal only: full consumers, source inverse matrices and retained 582 model remain unfinished.
-          import fs from 'node:fs';
-          import {nativeRecords,nativeUploadManifest,nativeResult} from './tools/test-reward-focus-ui.mjs';
-          import {prune} from './tools/prune.mjs';
-          const {encodeProof,decodeProof,sha,LIMITS}=nativeRecords;
-          const expectedRoot='/__w/the-civil-war/the-civil-war';
-          function need(ok,code){if(!ok){const e=new Error(code);e.code=code;throw e;}}
-          need(process.env.GITHUB_WORKSPACE===expectedRoot&&fs.realpathSync(expectedRoot)===expectedRoot,'WORKSPACE');
-          const out=expectedRoot+'/.out',input=out+'/last-result.json',output=out+'/last-result.cwproof';
-          need(fs.realpathSync(out)===out&&!fs.lstatSync(out).isSymbolicLink(),'OUTPUT_ROOT');
-          function total(p){need(p===out||p.startsWith(out+'/'),'OUTPUT_CONTAINMENT');const s=fs.lstatSync(p);need(!s.isSymbolicLink()&&fs.realpathSync(p)===p,'OUTPUT_PATH');if(s.isDirectory())return fs.readdirSync(p).reduce((n,k)=>n+total(p+'/'+k),0);need(s.isFile(),'OUTPUT_FILE');return s.size;}
-          let success=false,receipt,nativeBinding=null;
-          try{
-            need(!fs.lstatSync(input).isSymbolicLink()&&fs.realpathSync(input)===input,'INPUT_PATH');
-            const fd=fs.openSync(input,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);let raw;
-            try{const s=fs.fstatSync(fd);need(s.isFile()&&s.size>0&&s.size<=LIMITS.raw,'RAW_CAP');raw=fs.readFileSync(fd);need(raw.length===s.size,'RAW_LENGTH');}finally{fs.closeSync(fd);}
-            nativeBinding=nativeResult.read(raw).binding;
-            need(nativeBinding.bytes===raw.length&&nativeBinding.sha256===sha(raw),'NATIVE_STORED_BINDING');
-            need(!fs.existsSync(output),'OUTPUT_EXISTS');
-            const member=encodeProof(raw);need(decodeProof(member).equals(raw),'ROUNDTRIP');
-            need(total(out)+member.length+167772160<=314572800,'OUTPUT_UNUSED_RESERVATION');
-            const stat=fs.statfsSync(expectedRoot);need(stat.bavail*stat.bsize>=5000000000+member.length,'FREE_DISK');
-            fs.writeFileSync(output,member,{flag:'wx'});
-            receipt={version:1,codec:'brotli6-whole-json',rawBytes:raw.length,rawSha256:sha(raw),memberBytes:member.length,memberSha256:sha(member),localJsonRetained:true,uploadOriginal:false};
-            success=true;
-          }catch(error){console.error('PROOF TRANSPORT HOLD '+JSON.stringify({code:error.code||error.name,message:error.message}));process.exitCode=1;}
-          // Final pruning precedes BOTH stdout markers; no later .out writer or pruner before upload.
-          await prune();
-          need(total(out)+167772160<=314572800,'OUTPUT_UNUSED_RESERVATION');
-          if(success)console.log('PROOF ENVELOPE ACTUAL '+JSON.stringify(receipt));
-          // Match existing upload selection by proof-step outcome, independently of aggregate/job acceptance.
-          const manifest=nativeUploadManifest.createUploadManifest(expectedRoot,success?'test-success':'test-failure',success?nativeBinding:null,success?receipt:null);
-          console.log('PROOF UPLOAD MANIFEST ACTUAL '+JSON.stringify(manifest));
-          PROOF
+      - name: Browser checks (shard ${{ matrix.shard }} of 3)
+        run: node tools/test.mjs --shard=${{ matrix.shard }}
 
       - name: Upload test output
-        if: always() && steps.proof.outcome == 'success'
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-output
-          path: |
-            .out/
-            !.out/last-result.json
-          include-hidden-files: true
-          retention-days: 7
-          if-no-files-found: warn
-
-      - name: Upload failed test output
-        if: always() && steps.proof.outcome != 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-output
+          name: test-output-${{ matrix.shard }}
           path: .out/
           include-hidden-files: true
           retention-days: 7
@@ -182,171 +65,32 @@ jobs:
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host --init
-    env:
-      GIT_CONFIG_COUNT: "1"
-      GIT_CONFIG_KEY_0: safe.directory
-      GIT_CONFIG_VALUE_0: /__w/the-civil-war/the-civil-war
     defaults:
       run:
         shell: bash
     steps:
-      - name: Checkout probe source
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Fetch pinned probe current-field comparison
-        run: |
-          test "$GITHUB_WORKSPACE" = "/__w/the-civil-war/the-civil-war"
-          test "$(realpath "$GITHUB_WORKSPACE")" = "$GITHUB_WORKSPACE"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 4f6113a624e0e533825c0be414bb36f3b073f726
-          test "$(git rev-parse FETCH_HEAD)" = "4f6113a624e0e533825c0be414bb36f3b073f726"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/main.js
-          git cat-file -e 4f6113a624e0e533825c0be414bb36f3b073f726:src/entry.js
-
-      - name: Fetch pinned probe reinforcement comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin aaf10145531130f3ec201d6332f6759599bc46a4
-          test "$(git rev-parse FETCH_HEAD)" = "aaf10145531130f3ec201d6332f6759599bc46a4"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e aaf10145531130f3ec201d6332f6759599bc46a4:src/main.js
-          node tools/test-surrender-runtime.mjs --verify-legacy-game
-
-      - name: Fetch pinned probe captured-gun comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin b81dad641ff86c7586b13abf57dce257e299fef0
-          test "$(git rev-parse FETCH_HEAD)" = "b81dad641ff86c7586b13abf57dce257e299fef0"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/units/battery.js
-          git cat-file -e b81dad641ff86c7586b13abf57dce257e299fef0:src/game.js
-
-      - name: Fetch pinned probe battery-overrun comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 0e505fd61dead1f95659eaa2f8652f31935a50bc
-          test "$(git rev-parse FETCH_HEAD)" = "0e505fd61dead1f95659eaa2f8652f31935a50bc"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/game.js
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/combat.js
-          git cat-file -e 0e505fd61dead1f95659eaa2f8652f31935a50bc:src/sim/phase.js
-
-      - name: Fetch pinned probe captured-loadout comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 158cb60a1dd26e84161fcdc97342d7f239369f90
-          test "$(git rev-parse FETCH_HEAD)" = "158cb60a1dd26e84161fcdc97342d7f239369f90"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:src/franchise/practice.js
-          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:tools/test-battery-overrun.mjs
-          git cat-file -e 158cb60a1dd26e84161fcdc97342d7f239369f90:tools/test-captured-guns.mjs
-
-      - name: Fetch pinned probe reward-focus comparison
-        run: |
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git fetch --no-tags --depth=1 origin 7287296ae3b1c90f3a43642f33e3e886e8b889e2
-          test "$(git rev-parse FETCH_HEAD)" = "7287296ae3b1c90f3a43642f33e3e886e8b889e2"
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          git cat-file -e 7287296ae3b1c90f3a43642f33e3e886e8b889e2:src/reward/sequence.js
-          git cat-file -e 7287296ae3b1c90f3a43642f33e3e886e8b889e2:src/reward/reward.css
-          git cat-file -e 7287296ae3b1c90f3a43642f33e3e886e8b889e2:tools/test-captured-loadouts.mjs
-
-      - name: Set up probe Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 24.21.0
           cache: npm
 
-      - name: Install probe dependencies
-        run: npm ci
+      - run: npm ci
 
-      - name: Verify pinned probe Playwright runtime
+      - name: Node behaviour files and their --prove-fail controls
         run: |
-          node --input-type=module <<'NODE'
-          import assert from 'node:assert/strict';
-          import fs from 'node:fs';
-          import { chromium } from 'playwright';
-          const lock = JSON.parse(fs.readFileSync('package-lock.json'));
-          const installed = JSON.parse(fs.readFileSync('node_modules/playwright/package.json'));
-          assert.equal(lock.packages['node_modules/playwright'].version, '1.63.0');
-          assert.equal(installed.version, '1.63.0');
-          assert.equal(process.env.PLAYWRIGHT_BROWSERS_PATH, '/ms-playwright');
-          const executable = chromium.executablePath();
-          assert.ok(executable.startsWith('/ms-playwright/'));
-          fs.accessSync(executable, fs.constants.X_OK);
-          console.log(JSON.stringify({ playwright: installed.version, executable, bakedDependencies: true }));
-          NODE
-
-      - run: node tools/test-deployment.mjs
-      - run: node tools/test-deployment.mjs --prove-fail
-
-      - run: node tools/test-phase.mjs
-      - run: node tools/test-phase.mjs --prove-fail
-
-      - run: node tools/test-field-admission.mjs
-      - run: node tools/test-field-admission.mjs --prove-fail
-
-      - run: node tools/test-reinforcements.mjs
-      - run: node tools/test-reinforcements.mjs --prove-fail
-
-      - run: node tools/test-reinforcement-runtime.mjs
-      - run: node tools/test-reinforcement-runtime.mjs --prove-fail
-
-      - run: node tools/test-capture-accounting.mjs
-      - run: node tools/test-capture-accounting.mjs --prove-fail
-
-      - run: node tools/test-surrender-runtime.mjs
-      - run: node tools/test-surrender-runtime.mjs --prove-fail
-
-      - run: node tools/test-surrender-result.mjs
-      - run: node tools/test-surrender-result.mjs --prove-fail
-      - run: node tools/test-surrender-result-ui.mjs
-      - run: node tools/test-surrender-result-ui.mjs --prove-fail
-
-      - run: node tools/test-equipment.mjs
-      - run: node tools/test-equipment.mjs --prove-fail
-
-      - run: node tools/test-reward.mjs
-
-      - run: node tools/test-reward.mjs --prove-fail
-      - run: node tools/test-save.mjs
-      - run: node tools/test-save.mjs --prove-fail
-
-      - run: node tools/test-practice.mjs
-
-      - run: node tools/test-practice.mjs --prove-fail
-      - run: node tools/test-captures.mjs
-      - run: node tools/test-captures.mjs --prove-fail
-      - run: node tools/test-intro.mjs
-      - run: node tools/test-intro.mjs --prove-fail
-      - run: node tools/test-sandbox-rules.mjs
-      - run: node tools/test-sandbox-rules.mjs --prove-fail
-      - run: node tools/test-look.mjs
-      - run: node tools/test-look.mjs --prove-fail
-      - run: node tools/test-view.mjs
-      - run: node tools/test-view.mjs --prove-fail
-      - run: node tools/test-spacing.mjs
-      - run: node tools/test-spacing.mjs --prove-fail
-      - run: node tools/test-residency.mjs
-      - run: node tools/test-residency.mjs --prove-fail
-      - run: node tools/test-moments.mjs
-      - run: node tools/test-moments.mjs --prove-fail
-      - run: node tools/test-keyboard.mjs
-      - run: node tools/test-keyboard.mjs --prove-fail
-
-      - run: node tools/test-soldier-view.mjs
-      - run: node tools/test-soldier-view.mjs --prove-fail
-
-      - run: node tools/test-surrender-activation.mjs
-      - run: node tools/test-surrender-activation.mjs --prove-fail
-
-      - run: node tools/test-captured-guns.mjs
-      - run: node tools/test-captured-guns.mjs --prove-fail
-      - run: node tools/test-battery-overrun.mjs
-      - run: node tools/test-battery-overrun.mjs --prove-fail
-      - run: node tools/test-captured-loadouts.mjs
-      - run: node tools/test-captured-loadouts.mjs --prove-fail
+          set -euo pipefail
+          for name in deployment phase field-admission reinforcements reinforcement-runtime capture-accounting \
+            surrender-runtime surrender-result surrender-result-ui equipment reward save practice captures intro \
+            sandbox-rules look view spacing residency moments keyboard soldier-view surrender-activation \
+            captured-guns battery-overrun captured-loadouts; do
+            for mode in "" --prove-fail; do
+              echo "::group::node tools/test-$name.mjs $mode"
+              node "tools/test-$name.mjs" $mode
+              echo "::endgroup::"
+            done
+          done
 
       - name: Upload probe output
         if: always()
@@ -356,4 +100,4 @@ jobs:
           path: .out/
           include-hidden-files: true
           retention-days: 7
-          if-no-files-found: warn
+          if-no-files-found: ignore

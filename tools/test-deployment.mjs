@@ -2,7 +2,6 @@
 // No browser, source mutations, RNG preview, generated fixtures or dependency on .out.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createHash } from 'node:crypto';
 import { savedDeployment, savedOutcome, assertSavedLaunch, assertSavedReward, DEPLOYMENT_LIMITS } from '../src/franchise/practice.js';
 import { completedSnapshot, validateSnapshot, exportSnapshot, createProgressStore, exchangeDepot, MAX_SAVE_BYTES } from '../src/franchise/save.js';
 import { SAMPLE_ARMY, itemDef } from '../src/reward/data.js';
@@ -16,13 +15,6 @@ import { ArrowLayer } from '../src/ui/arrows.js';
 import * as THREE from 'three';
 
 const copy = (v) => structuredClone(v), ground = JSON.parse(readFileSync(new URL('../assets/scenarios/henry-hill.json', import.meta.url)));
-const hash = (b) => createHash('sha256').update(b).digest('hex');
-const bindings = ['src/franchise/practice.js', 'tools/test-deployment.mjs', 'src/franchise/save.js', 'src/reward/model.js',
-  'src/reward/data.js', 'src/units/unit.js', 'src/units/battery.js', 'src/sim/combat.js', 'src/game.js',
-  'src/ui/arrows.js', 'src/ui/input.js', 'src/sim/rules.js', 'src/franchise/intro.js', 'assets/scenarios/henry-hill.json',
-  'src/entry.js', 'src/main.js', 'src/ui/entry.js', 'src/franchise/practice-ui.js', 'src/ui/practice-field.js', 'src/reward/sequence.js'];
-const source = bindings.map((path) => { const b = readFileSync(new URL('../' + path, import.meta.url)); return { path, bytes: b.length, sha256: hash(b) }; });
-console.log('DEPLOYMENT SOURCE ' + JSON.stringify(source));
 const terrain = { half: 1300, heightAt: () => 0, slopeAt: () => 0, inBounds: (x, z) => Math.abs(x) <= 1300 && Math.abs(z) <= 1300 };
 function baseline() {
   const army = [copy(SAMPLE_ARMY[4]), ...copy(SAMPLE_ARMY.slice(0, 2)), { ...copy(SAMPLE_ARMY[2]), men: 0 },

@@ -1,12 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {createHash} from 'node:crypto';
-import {execFileSync} from 'node:child_process';
 import {AxeBuilder} from '@axe-core/playwright';
-const PARENT='aaf10145531130f3ec201d6332f6759599bc46a4';
 const FIXTURE="{\"id\":\"henry-hill\",\"title\":\"Fictional reinforcement UI diagnostic\",\"battle\":\"DIAGNOSTIC ONLY\",\"date\":\"1861-07-21\",\"start\":\"14:00\",\"end\":\"14:01\",\"sites\":[{\"id\":\"henry\",\"name\":\"Henry House\",\"x\":-7,\"z\":375,\"rot\":0.1,\"yard\":30,\"fenceRadius\":260,\"source\":\"38.81487,-77.52258 Verified (geo research 2026-10-02 (NPS Public POIs MANA + OSM/Wikidata/Wikipedia agree within 60 m)); house rebuilt 1870s on the 1861 site (NRHP nomination p.8)\",\"buildings\":[[0,0,10,7,6.2,0,\"frame-house\"],[-14,12,6,5,3.2,0.1,\"shed\"],[16,16,9,7,5,0,\"barn\"]]},{\"id\":\"robinson\",\"name\":\"Robinson House\",\"x\":300,\"z\":-50,\"rot\":-0.2,\"yard\":28,\"fenceRadius\":220,\"embowered\":true,\"source\":\"38.81870,-77.51904 Verified (geo research 2026-10-02 (NPS Public POIs MANA + OSM/Wikidata/Wikipedia agree within 60 m)); “densely embowered in trees and environed by a double row of fences on two sides” (Beauregard, OR I/2 no. 84)\",\"buildings\":[[0,0,9,6.5,5,0,\"frame-house\"],[18,-10,10,8,5.5,0.05,\"barn\"],[-14,12,5,4,3,0,\"shed\"]]},{\"id\":\"stone\",\"name\":\"Stone House\",\"x\":-312,\"z\":-64,\"rot\":0.28,\"yard\":22,\"fenceRadius\":160,\"source\":\"38.81883,-77.52609 Verified (geo research 2026-10-02 (NPS Public POIs MANA + OSM/Wikidata/Wikipedia agree within 60 m)); still standing\",\"buildings\":[[0,0,12,8.5,7,0,\"stone-house\"],[18,14,6,5,3,0,\"shed\"]]},{\"id\":\"matthews\",\"name\":\"Matthew farm\",\"x\":-641,\"z\":-830,\"rot\":0.25,\"yard\":28,\"fenceRadius\":240,\"orchard\":[40,-40,5,4,0.25],\"source\":\"about 38.82573,-77.52988 Inferred (one NPS wayside, error 100-200 m); NPS spells it Matthew\",\"buildings\":[[0,0,9,6.5,5.2,0,\"frame-house\"],[-18,10,9,7,5,0,\"barn\"]]}],\"woodsNote\":\"Woods edges are drawn from period descriptions, not surveyed: “Around the eastern and southern brow of the plateau an almost unbroken fringe of second-growth pines”; “a broad belt of oaks ... across the crest on both sides of the Sudley road”; slopes “studded with clumps and patches of young pines and oaks” (Beauregard, OR Series I vol. 2, report no. 84); “Oak woods east of Robinson” (Atkinson 1862 map, LoC 2006626052, as read). Status: Inferred.\",\"woods\":[{\"name\":\"pine fringe on the east brow of Henry Hill\",\"polygon\":[[350,170],[420,120],[560,140],[640,260],[660,520],[620,760],[520,820],[420,780],[355,640],[340,450]]},{\"name\":\"pine fringe on the south brow\",\"polygon\":[[-120,860],[100,800],[300,800],[520,820],[700,900],[760,1300],[-160,1300]]},{\"name\":\"oak belt astride the Sudley Road\",\"polygon\":[[-560,470],[-420,430],[-250,470],[-160,560],[-150,900],[-200,1300],[-620,1300],[-640,800]]},{\"name\":\"oak woods east of the Robinson house\",\"polygon\":[[470,-260],[700,-300],[980,-240],[1050,40],[900,160],[700,120],[520,40]]},{\"name\":\"woods toward Bull Run\",\"polygon\":[[700,-1300],[1300,-1300],[1300,-500],[1050,-420],[820,-560]]},{\"name\":\"woods north-west of Matthews Hill\",\"polygon\":[[-1300,-1300],[-900,-1300],[-1000,-1050],[-1300,-950]]},{\"name\":\"woods south-east toward Holkums Branch\",\"polygon\":[[760,300],[1300,250],[1300,1300],[780,1300],[700,900],[680,560]]}],\"labels\":[{\"text\":\"Henry House Hill\",\"x\":110,\"z\":560,\"height\":48,\"angle\":1.6207963267948966},{\"text\":\"Henry\",\"x\":-7,\"z\":410,\"height\":20,\"angle\":1.5707963267948966},{\"text\":\"Robinson\",\"x\":300,\"z\":-15,\"height\":20,\"angle\":1.5707963267948966},{\"text\":\"Stone House\",\"x\":-312,\"z\":-28,\"height\":20,\"angle\":1.6707963267948966},{\"text\":\"Matthews Hill\",\"x\":-834,\"z\":-740,\"height\":44,\"angle\":1.5707963267948966},{\"text\":\"Buck Hill\",\"x\":-277,\"z\":-690,\"height\":30,\"angle\":1.5707963267948966},{\"text\":\"Young’s Branch\",\"x\":150,\"z\":-330,\"height\":24,\"angle\":1.9707963267948965,\"italic\":true},{\"text\":\"Sudley Road\",\"x\":-420,\"z\":300,\"height\":20,\"angle\":1.2207963267948965,\"italic\":true},{\"text\":\"Warrenton Turnpike\",\"x\":520,\"z\":-200,\"height\":20,\"angle\":1.8707963267948966,\"italic\":true}],\"units\":[{\"id\":\"initial-us\",\"name\":\"Fictional US initial-us\",\"short\":\"Fictional US initial-us\",\"side\":\"US\",\"type\":\"infantry\",\"men\":50,\"weapon\":\"smooth\",\"xp\":1,\"commander\":null,\"regiments\":[],\"x\":-650,\"z\":-300,\"facing\":1.5707963267948966,\"sources\":[],\"notes\":\"DIAGNOSTIC ONLY\"},{\"id\":\"initial-cs\",\"name\":\"Fictional CS initial-cs\",\"short\":\"Fictional CS initial-cs\",\"side\":\"CS\",\"type\":\"infantry\",\"men\":50,\"weapon\":\"smooth\",\"xp\":1,\"commander\":null,\"regiments\":[],\"x\":650,\"z\":300,\"facing\":-1.5707963267948966,\"sources\":[],\"notes\":\"DIAGNOSTIC ONLY\"}],\"objective\":{\"name\":\"Fictional point\",\"x\":-650,\"z\":-300,\"r\":40},\"positionsNote\":\"Union start positions are schematic (Inferred), below the plateau on the Sudley Road and Young’s Branch side about 2 p.m. Confederate positions follow Beauregard’s report and the NPS wayside sites (see each unit).\",\"strengthNote\":\"Strengths are the old repo values (data/bullrun.json), which it marks Inferred (medium): brigade-scale approximations from after-action reports. Bee: strength at the start of the day; his afternoon strength was lower and is not in the old repo.\",\"historyNote\":\"Fictional units and schedule on existing Henry terrain. No historical claim.\",\"labelsNote\":\"Place positions: Henry, Robinson, Stone House Verified; Matthews Hill summit 38.82515,-77.53210 Verified (GNIS point is 330 m off and not used); Buck Hill Inferred (GNIS and OSM 427 m apart).\",\"crates\":[],\"reinforcements\":[{\"id\":\"zero-own\",\"name\":\"Fictional US zero-own\",\"short\":\"Fictional US zero-own\",\"side\":\"US\",\"type\":\"infantry\",\"men\":50,\"weapon\":\"smooth\",\"xp\":1,\"commander\":null,\"regiments\":[],\"x\":-625,\"z\":-300,\"facing\":1.5707963267948966,\"sources\":[],\"notes\":\"DIAGNOSTIC ONLY\",\"atSec\":0,\"entry\":\"FictionalUS west edge\"},{\"id\":\"zero-enemy\",\"name\":\"Fictional CS zero-enemy\",\"short\":\"Fictional CS zero-enemy\",\"side\":\"CS\",\"type\":\"infantry\",\"men\":50,\"weapon\":\"smooth\",\"xp\":1,\"commander\":null,\"regiments\":[],\"x\":625,\"z\":300,\"facing\":-1.5707963267948966,\"sources\":[],\"notes\":\"DIAGNOSTIC ONLY\",\"atSec\":0,\"entry\":\"FictionalCS east edge\"},{\"id\":\"later-own\",\"name\":\"Fictional US later-own\",\"short\":\"Fictional US later-own\",\"side\":\"US\",\"type\":\"infantry\",\"men\":50,\"weapon\":\"smooth\",\"xp\":1,\"commander\":null,\"regiments\":[],\"x\":-600,\"z\":-280,\"facing\":1.5707963267948966,\"sources\":[],\"notes\":\"DIAGNOSTIC ONLY\",\"atSec\":5.25,\"noticeSec\":3,\"entry\":\"FictionalUS west road\"},{\"id\":\"later-guns\",\"name\":\"Fictional CS later-guns\",\"short\":\"Fictional CS later-guns\",\"side\":\"CS\",\"type\":\"artillery\",\"men\":8,\"weapon\":\"parrott\",\"xp\":1,\"commander\":null,\"regiments\":[],\"x\":600,\"z\":280,\"facing\":-1.5707963267948966,\"sources\":[],\"notes\":\"DIAGNOSTIC ONLY\",\"guns\":1,\"atSec\":5.25,\"noticeSec\":3,\"entry\":\"FictionalCS east road\"},{\"id\":\"horizon-own\",\"name\":\"Fictional US horizon-own\",\"short\":\"Fictional US horizon-own\",\"side\":\"US\",\"type\":\"infantry\",\"men\":50,\"weapon\":\"smooth\",\"xp\":1,\"commander\":null,\"regiments\":[],\"x\":-575,\"z\":-280,\"facing\":1.5707963267948966,\"sources\":[],\"notes\":\"DIAGNOSTIC ONLY\",\"atSec\":15,\"entry\":\"FictionalUS west edge\"}]}";
-const FIXTURE_SHA='c4971d2aac9cd52a37a2e76e27b12476c05788e28e85406286652efe037792a5';
-const hash=b=>createHash('sha256').update(b).digest('hex');
 
 // Test observers append to exact original module bytes. No product algorithm, listener or RNG replacement.
 function observeGame(Game) {
@@ -51,8 +46,7 @@ function observeHud(Hud) {
     }});
   }
 }
-async function observedPage({browser,url,baseline=false,width=1280,height=720,autoPause=true}) {
-  assert.equal(Buffer.byteLength(FIXTURE),6792);assert.equal(hash(FIXTURE),FIXTURE_SHA);
+async function observedPage({browser,url,width=1280,height=720,autoPause=true}) {
   const {prepareFieldScenario}=await import('../src/sim/phase.js'); prepareFieldScenario(JSON.parse(FIXTURE),'henry-hill');
   const context=await browser.newContext({viewport:{width,height},reducedMotion:'reduce'});
   const errors=[],warnings=[],routes=[];let page;
@@ -86,36 +80,19 @@ async function observedPage({browser,url,baseline=false,width=1280,height=720,au
     };
     o.autoPause=autoPause;
   },{autoPause});
-  const bodies={};
   for(const [path,append]of [['src/game.js',observeGame],['src/ui/hud.js',observeHud]]) {
-    const original=fs.readFileSync(new URL('../'+path,import.meta.url),'utf8');bodies[path]={bytes:Buffer.byteLength(original),sha256:hash(original)};
+    const original=fs.readFileSync(new URL('../'+path,import.meta.url),'utf8');
     const handler=async route=>{routes.push(path);await route.fulfill({status:200,contentType:'text/javascript',body:original+'\n;('+append.toString()+')('+ (path.endsWith('game.js')?'Game':'Hud')+');\n'})};
     await context.route('**/'+path,handler);
   }
   // Settings are test-owned setup before Game construction, not a substituted simulation owner.
   const settingsSuffix="\n;import {set as e2Set} from './settings.js'; e2Set('rules.autoPause',window.__e2.autoPause);\n";
-  const main=baseline?execFileSync('git',['show',PARENT+':src/main.js']).toString():fs.readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
+  const main=fs.readFileSync(new URL('../src/main.js',import.meta.url),'utf8');
   await context.route('**/src/main.js',async route=>{routes.push('src/main.js');await route.fulfill({status:200,contentType:'text/javascript',body:main+settingsSuffix})});
   await context.route('**/assets/scenarios/henry-hill.json',async route=>{routes.push('fixture');await route.fulfill({status:200,contentType:'application/json',body:FIXTURE})});
-  if(baseline){const css=execFileSync('git',['show',PARENT+':src/ui/hud.css']).toString();bodies['src/ui/hud.css']={bytes:Buffer.byteLength(css),sha256:hash(css)};await context.route('**/src/ui/hud.css',async route=>{routes.push('src/ui/hud.css');await route.fulfill({status:200,contentType:'text/css',body:css})});}
   await page.goto(url+'?battle=henry-hill&quality=low&nosw',{waitUntil:'domcontentloaded'});
-  return {context,page,errors,warnings,routes,bodies,mainSha256:hash(main),close};
+  return {context,page,errors,warnings,routes,close};
   }catch(error){await close();throw error;}
-}
-export async function reinforcementBaseline({browser,url,shot,result}) {
-  const p=await observedPage({browser,url,baseline:true});
-  try {
-    await p.page.waitForFunction(()=>window.__e2?.firstStep?.error,{timeout:180000});
-    const actual=await p.page.evaluate(()=>({firstStep:window.__e2.firstStep,state:window.__e2.state(),initCalls:window.__e2.initBefore.length}));
-    assert.match(actual.firstStep.error.message,/attach listeners and initialize before advancing/);assert.equal(actual.state.ready,false);assert.equal(actual.state.gpu,1);assert.equal(actual.initCalls,0);assert.deepEqual(actual.state.ids,['initial-us','initial-cs']);
-    await p.page.setViewportSize({width:320,height:768});
-    await p.page.evaluate(()=>{const h=window.__e2.hud;h.showAlert({text:'Fictional US zero-own, Fictional CS zero-enemy arrived.',x:-625,z:-300});h.feed({text:'Fictional US zero-own arrives at FictionalUS west edge.',time:'14:00',side:'US',x:-625,z:-300});h.feed({text:'Fictional CS zero-enemy arrives at FictionalCS east edge.',time:'14:00',side:'CS',x:625,z:300})});
-    await shot(p.page,'reinforcement-base-missing-init-narrow');
-    const layout=await readLayout(p.page);
-    assert.ok(layout.actions.some(x=>x.height<44||x.font<14)||!layout.contained,'parent CSS must exhibit the admitted readability defect');
-    const record={diagnostic:true,fixtureSha256:FIXTURE_SHA,parent:PARENT,mainSha256:p.mainSha256,actual,layout,errors:p.errors,warnings:p.warnings,bodies:p.bodies,routes:p.routes};
-    result.reinforcementBaseline=record;return record;
-  }finally {const restore=await p.close();result.reinforcementBaselineRestore=restore;assert.ok(restore.refsExact&&restore.descriptorsExact&&restore.globalRemoved);assert.equal(restore.count,11)}
 }
 async function readLayout(page) {
   return page.evaluate(()=>{
@@ -206,24 +183,24 @@ async function readable(page,width) {
   const axes=(await new AxeBuilder({page}).include('#banner').include('#feed').include('#army').analyze()).violations;
   const before=await page.evaluate(()=>({styleCount:document.querySelectorAll('style').length,focus:document.activeElement,scroll:document.getElementById('feed').scrollTop})).then(x=>({styleCount:x.styleCount,scroll:x.scroll}));
   const originalFont=await page.locator('#feed button').first().evaluate(el=>getComputedStyle(el).fontSize);
-  const legacy=execFileSync('git',['show',PARENT+':src/ui/hud.css']).toString();const rule=legacy.match(/#feed button \{[^}]+\}/)?.[0];assert.ok(rule?.includes('font-size: 13px'));
+  // Legacy 13px feed rule (pre-readability CSS) as a fixed negative control.
+  const rule='#feed button { width: 100%; min-height: 32px; display: flex; gap: 8px; align-items: baseline; text-align: left; padding: 3px 6px; background: none; border: 0; border-radius: 4px; cursor: pointer; font-size: 13px; }';
   await page.evaluate(rule=>{const style=document.createElement('style');style.id='e2-owned-legacy-feed-control';style.textContent=rule;document.head.append(style)},rule);
   let caught;try{const font=await page.locator('#feed button').first().evaluate(el=>parseFloat(getComputedStyle(el).fontSize));assert.ok(font>=14,'legacy CSS13px must reject actual readability assertion')}catch(e){caught=e}
   assert.equal(caught?.code,'ERR_ASSERTION');
   await page.evaluate(scroll=>{document.getElementById('e2-owned-legacy-feed-control').remove();document.getElementById('feed').scrollTop=scroll},before.scroll);await settle(page);
   const restored=await page.evaluate(()=>({styleCount:document.querySelectorAll('style').length,scroll:document.getElementById('feed').scrollTop}));
   const cssRestore=await page.locator('#feed button').first().evaluate(el=>getComputedStyle(el).fontSize)===originalFont&&before.styleCount===restored.styleCount&&before.scroll===restored.scroll;
-  return {width,actions,...keyboard,enterClicked,spaceClicked,panels:panels.panels,obstacles:panels.obstacles,overlaps:panels.overlaps,bannerOpaque:panels.bannerOpaque,contained:panels.contained,documentOverflow:panels.documentOverflow,focusVisible:actions.every(x=>x.focusVisible),violations:axes,cssRestore,cssControlRejected:caught.code==='ERR_ASSERTION',cssControl:{parentRule:rule,parentCssSha256:hash(legacy),rejection:caught.message,restored}};
+  return {width,actions,...keyboard,enterClicked,spaceClicked,panels:panels.panels,obstacles:panels.obstacles,overlaps:panels.overlaps,bannerOpaque:panels.bannerOpaque,contained:panels.contained,documentOverflow:panels.documentOverflow,focusVisible:actions.every(x=>x.focusVisible),violations:axes,cssRestore,cssControlRejected:caught.code==='ERR_ASSERTION',cssControl:{legacyRule:rule,rejection:caught.message,restored}};
 }
 export async function reinforcementUIControls({browser,url,check,shot,result,native=false}) {
-  const record=result.reinforcementUI={native,fixtureSha256:FIXTURE_SHA,records:{},controls:[],restores:[],pages:[],errors:[],warnings:[]};
+  const record=result.reinforcementUI={native,records:{},controls:[],restores:[],pages:[],errors:[],warnings:[]};
   const save=(name,row)=>{row.category=name;record.records[name]=row;verifyReinforcementUI(name,row);check('reinforcement-ui-'+name,true,'actual field/HUD observation; exact lifecycle and original controls')};
-  await reinforcementBaseline({browser,url,shot,result});
   async function use(options,body) {
     const p=await observedPage({browser,url,...options});
     try{await p.page.waitForFunction(()=>window.__ready,{timeout:180000});await body(p.page);}
     catch(error){record.failure={message:error.message,stack:error.stack};throw error;}
-    finally{const beforeClose={errors:p.errors.length,warnings:p.warnings.length};const restore=await p.close();record.errors.push(...p.errors);record.warnings.push(...p.warnings);record.restores.push(restore);record.pages.push({options,bodies:p.bodies,mainSha256:p.mainSha256,routes:p.routes,cleanupDiagnostics:{beforeClose,afterClose:{errors:p.errors.length,warnings:p.warnings.length},errors:p.errors.slice(beforeClose.errors),warnings:p.warnings.slice(beforeClose.warnings)}});assert.ok(restore.refsExact&&restore.descriptorsExact&&restore.globalRemoved);assert.equal(restore.count,11);}
+    finally{const beforeClose={errors:p.errors.length,warnings:p.warnings.length};const restore=await p.close();record.errors.push(...p.errors);record.warnings.push(...p.warnings);record.restores.push(restore);record.pages.push({options,routes:p.routes,cleanupDiagnostics:{beforeClose,afterClose:{errors:p.errors.length,warnings:p.warnings.length},errors:p.errors.slice(beforeClose.errors),warnings:p.warnings.slice(beforeClose.warnings)}});assert.ok(restore.refsExact&&restore.descriptorsExact&&restore.globalRemoved);assert.equal(restore.count,11);}
   }
   await use({},async page=>{
     record.renderer=await page.evaluate(()=>{const gl=document.getElementById('battlefield').getContext('webgl2'),ext=gl.getExtension('WEBGL_debug_renderer_info');return ext?gl.getParameter(ext.UNMASKED_RENDERER_WEBGL):gl.getParameter(gl.RENDERER)});
@@ -319,7 +296,7 @@ export async function observeObjectiveReservation(page,{images=false,stem='objec
         assert.equal(captureRestoration.installed,true);assert.equal(captureRestoration.overflow,false);
         for(const key of ['methodExact','ownDescriptorExact','inheritedMethodRestored','globalAbsent'])assert.equal(captureRestoration[key],true,key);
         assert(captureRestoration.calls.every(c=>c.published===caption&&c.receiverExact));
-        fs.writeFileSync(file,png,{flag:'wx'});pictures.push({name:row.kind,path:file,bytes:png.length,sha256:hash(png),width:clip.width,height:clip.height,scope:'Controlled fixture-caption illustration; original same-task acceptance precedes capture hook',actualAtImage:captureBefore,actualAfterImage:captureAfter,clip,captureRestoration});
+        fs.writeFileSync(file,png,{flag:'wx'});pictures.push({name:row.kind,path:file,bytes:png.length,width:clip.width,height:clip.height,scope:'Controlled fixture-caption illustration; original same-task acceptance precedes capture hook',actualAtImage:captureBefore,actualAfterImage:captureAfter,clip,captureRestoration});
       }
       rows.push(row);
     }

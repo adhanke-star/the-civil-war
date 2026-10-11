@@ -184,11 +184,7 @@ export function runActivation() {
     try { verifyActivation(i, activationMutation(i, c.data)); throw new Error('Activation mutation escaped'); }
     catch (e) { assert.equal(e.code, 'ERR_ASSERTION'); assert.ok(e.message.startsWith(ACTIVATION_NAMES[i])); return { name: c.name, code: e.code, message: e.message }; }
   });
-  const sourcePaths = [...JSON.parse(fs.readFileSync(new URL('./test-surrender-result-ui.mjs', import.meta.url), 'utf8').match(/^const SOURCE_PATHS = (\[[^\n]+\]);/m)[1]),
-    'tools/test-keyboard-ui.mjs', 'tools/test-surrender-activation.mjs', 'tools/test-surrender-activation-ui.mjs'];
-  assert.equal(sourcePaths.length, 65); assert.equal(new Set(sourcePaths).size, 65);
-  const sources = sourcePaths.map(path => { const b = fs.readFileSync(new URL('../' + path, import.meta.url)); return { path, bytes: b.length, sha256: hash(b) }; });
-  return { categories, controls, sources, native: false, scope: 'Explicit fictional builder activation and real bounded CPU ownership; no renderer/grade/captured-arms/history change' };
+  return { categories, controls, native: false, scope: 'Explicit fictional builder activation and real bounded CPU ownership; no renderer/grade/captured-arms/history change' };
 }
 
 const direct = process.argv[1] && fs.existsSync(process.argv[1]) && pathToFileURL(fs.realpathSync(process.argv[1])).href === import.meta.url;

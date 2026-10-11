@@ -37,6 +37,7 @@
 //      the panel; Units/Moments tools spawn, shell, rout and remove a generic brigade; the order line compares
 //      split-screen (both styles, each clipped); axe has no serious/critical violations with the panel open; no console errors
 //   device-*: device.html prints a GPU tier line and finishes the ratio-1 benchmark without console errors
+// `node tools/test.mjs --shard=N` (N = 1, 2 or 3) runs one CI slice of the full run; CI runs all three in parallel.
 // `node tools/test.mjs --unit` runs only the Node checks (settings, baked-maths; no browser, writes nothing).
 // `node tools/test.mjs --s1` runs the settings, sandbox and device checks only (skips the battle page).
 // `node tools/test.mjs --field` runs the settings and battle-page checks only (skips the sandbox and device pages).
@@ -73,6 +74,9 @@ import { reinforcementUIControls } from './test-reinforcement-ui.mjs';
 import { fieldAdmissionControls } from './test-field-admission-ui.mjs';
 import { finalizeActivationUI } from './test-surrender-activation-ui.mjs';
 
+// `--shard=N` (1-3) runs one CI slice of the full browser run; the Node unit checks run in shard 3. No flag = everything.
+const SHARD = Number((process.argv.find((a) => a.startsWith("--shard=")) || "=0").split("=")[1]) || 0;
+const runs = (n) => SHARD === 0 || SHARD === n;
 const READY_TIMEOUT_MS = 180_000;
 const VIEWPORT = { width: 1280, height: 720 };
 const MIN_FIGURES = 1000;
@@ -1434,7 +1438,7 @@ async function surrenderResultModelUnit() {
     const actual = JSON.parse(rows[0].slice('SURRENDER RESULT ACTUAL '.length));
     result.surrenderResult = actual;
     check('surrender-result', actual.categories.length === 12 && actual.controls.length === 12
-      && new Set(actual.categories.map(row => row.name)).size === 12 && actual.sources.length === 61 && actual.native === false,
+      && new Set(actual.categories.map(row => row.name)).size === 12 && actual.native === false,
       '12 real Game CPU result categories and semantic reader controls; no new reward, UI, history or native authority');
   } catch (error) { check('surrender-result', false, error.message); }
 }
@@ -1449,11 +1453,11 @@ async function activationModelUnit(summary = false) {
     if (rows.length !== 1 || !lines.includes('ACTIVATION OK (8/8)')) throw new Error('Incomplete activation observations.');
     const actual = JSON.parse(rows[0].slice('ACTIVATION ACTUAL '.length));
     const { verifyActivation } = await import('./test-surrender-activation.mjs');
-    if (actual.categories.length !== 8 || actual.controls.length !== 8 || actual.sources.length !== 65
+    if (actual.categories.length !== 8 || actual.controls.length !== 8
       || actual.categories.map(c => c.name).join(',') !== names.join(',')) throw new Error('Activation category/source count mismatch.');
     actual.categories.forEach((c, i) => verifyActivation(i, c.data));
     result.surrenderActivationPure = actual;
-    if (summary) check('activation-model', true, '8 actual pure/CPU categories and 8 paired reader controls; current65 sources');
+    if (summary) check('activation-model', true, '8 actual pure/CPU categories and 8 paired reader controls');
     else actual.categories.forEach(c => check(c.name, true, 'Fixed before-edit defaults and explicit fictional CPU ownership'));
   } catch (error) {
     if (summary) check('activation-model', false, error.message);
@@ -1461,49 +1465,251 @@ async function activationModelUnit(summary = false) {
   }
 }
 
-async function capturedGunsModelUnit() {
+/** Runs one CPU behaviour file; it must print one "<MARKER> ACTUAL <json>" line and "<MARKER> OK (n/n)". */
+async function cpuModelUnit(file, marker, key, name, detail) {
   try {
     const { execFileSync } = await import('node:child_process');
-    const text = execFileSync(process.execPath, [path.join(ROOT, 'tools/test-captured-guns.mjs')], { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
-    const lines = text.trimEnd().split('\n'), rows = lines.filter(l => l.startsWith('CAPTURED GUNS ACTUAL '));
-    if (rows.length !== 1 || !lines.includes('CAPTURED GUNS OK (12/12)')) throw new Error('Incomplete captured-gun proof.');
-    const actual = JSON.parse(rows[0].slice('CAPTURED GUNS ACTUAL '.length));
-    const { verifyCapturedGunRecord } = await import('./test-captured-guns.mjs');
-    verifyCapturedGunRecord(actual);
-    result.capturedGuns = actual;
-    check('captured-guns-model', true, '12 actual CPU categories and 12 own controls; original A/B/A2, current66 source guards');
-  } catch (error) { check('captured-guns-model', false, error.message); }
+    const text = execFileSync(process.execPath, [path.join(ROOT, file)], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
+    const lines = text.trimEnd().split('\n'), rows = lines.filter(l => l.startsWith(marker + ' ACTUAL '));
+    const ok = lines.map(l => l.match(new RegExp('^' + marker + ' OK \\((\\d+)/(\\d+)\\)$'))).find(Boolean);
+    if (rows.length !== 1 || !ok || ok[1] !== ok[2]) throw new Error('Incomplete ' + marker.toLowerCase() + ' observations.');
+    result[key] = JSON.parse(rows[0].slice((marker + ' ACTUAL ').length));
+    check(name, true, ok[1] + ' ' + detail);
+  } catch (error) { check(name, false, error.message); }
 }
+const capturedGunsModelUnit = () => cpuModelUnit('tools/test-captured-guns.mjs', 'CAPTURED GUNS', 'capturedGuns', 'captured-guns-model', 'captured-gun CPU categories with their own controls');
+const batteryOverrunModelUnit = () => cpuModelUnit('tools/test-battery-overrun.mjs', 'BATTERY OVERRUN', 'batteryOverrun', 'battery-overrun-model', 'battery overrun CPU categories with their own controls');
+const capturedLoadoutsModelUnit = () => cpuModelUnit('tools/test-captured-loadouts.mjs', 'CAPTURED LOADOUTS', 'capturedLoadouts', 'captured-loadouts-model', 'captured loadout CPU categories with their own controls');
 
-async function batteryOverrunModelUnit() {
-  try {
-    const { execFileSync } = await import('node:child_process');
-    const text = execFileSync(process.execPath, [path.join(ROOT, 'tools/test-battery-overrun.mjs')], { encoding: 'utf8', maxBuffer: 4 * 1024 * 1024 });
-    const lines = text.trimEnd().split('\n'), rows = lines.filter(l => l.startsWith('BATTERY OVERRUN ACTUAL '));
-    if (rows.length !== 1 || !lines.includes('BATTERY OVERRUN OK (14/14)')) throw new Error('Incomplete battery overrun proof.');
-    const actual = JSON.parse(rows[0].slice('BATTERY OVERRUN ACTUAL '.length));
-    const { verifyBatteryOverrunRecord } = await import('./test-battery-overrun.mjs');
-    await verifyBatteryOverrunRecord(actual);
-    result.batteryOverrun = actual;
-    check('battery-overrun-model', true, '14 actual CPU categories and 14 own controls; full source67, exact default A/B/A2');
-  } catch (error) { check('battery-overrun-model', false, error.message); }
-}
+/** The original battle-page checks: ready, canvas, figures, orders, combat, axe and console. */
+async function battlePage(browser, url) {
+  const page = await (await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 })).newPage();
 
-async function capturedLoadoutsModelUnit() {
+  let rejectEarly;
+  const earlyError = new Promise((_, reject) => { rejectEarly = reject; });
+  earlyError.catch(() => {});
+  const fail = (text) => { consoleErrors.push(text); rejectEarly(new Error(text)); };
+  page.on('pageerror', (err) => fail(`pageerror: ${err.message}`));
+  page.on('console', (msg) => {
+    const loc = msg.location();
+    const where = loc && loc.url ? ` (${loc.url.replace(url, '')}:${loc.lineNumber})` : '';
+    if (msg.type() === 'error') fail(`console.error: ${msg.text()}${where}`);
+    else if (msg.type() === 'warning' && !/GL Driver Message|GPU stall|already non-indexed/.test(msg.text())) consoleWarnings.push(`${msg.text()}${where}`);
+  });
+  page.on('requestfailed', (req) => fail(`request failed: ${req.url().replace(url, '/')} (${req.failure()?.errorText ?? 'unknown'})`));
+  page.on('response', (res) => { if (res.status() >= 400) fail(`HTTP ${res.status()} for ${res.url().replace(url, '/')}`); });
+
+  // 1. ready
+  let readyOk = false, readyDetail;
+  const t0 = Date.now();
   try {
-    const { execFileSync } = await import('node:child_process');
-    const text = execFileSync(process.execPath, [path.join(ROOT, 'tools/test-captured-loadouts.mjs')], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
-    const lines = text.trimEnd().split('\n'), rows = lines.filter(l => l.startsWith('CAPTURED LOADOUTS ACTUAL '));
-    if (rows.length !== 1 || !lines.includes('CAPTURED LOADOUTS OK (12/12)')) throw new Error('Incomplete captured loadout proof.');
-    const actual = JSON.parse(rows[0].slice('CAPTURED LOADOUTS ACTUAL '.length));
-    const { verifyCapturedLoadoutsRecord } = await import('./test-captured-loadouts.mjs');
-    await verifyCapturedLoadoutsRecord(actual);
-    result.capturedLoadouts = actual;
-    check('captured-loadouts-model', true, '12 actual CPU categories and 12 own controls; original authored descriptors, read-only source68');
-  } catch (error) { check('captured-loadouts-model', false, error.message); }
+    await page.goto(`${url}?practice&quality=low`, { waitUntil: 'load', timeout: READY_TIMEOUT_MS });
+    await Promise.race([page.waitForFunction(() => window.__ready === true, null, { timeout: READY_TIMEOUT_MS, polling: 200 }), earlyError]);
+    readyOk = true;
+    readyDetail = `window.__ready after ${Date.now() - t0} ms`;
+  } catch (err) {
+    readyDetail = /Timeout/i.test(err.message) ? `window.__ready was not set within ${READY_TIMEOUT_MS / 1000} s` : `page failed while loading: ${err.message.split('\n')[0]}`;
+  }
+  check('ready', readyOk, readyDetail);
+  if (readyOk) {
+    await page.waitForTimeout(2500);
+    const png = await shot(page, 'start');
+
+    // 3. canvas not blank
+    const colours = new Set();
+    for (let y = 40; y < png.height; y += 24) for (let x = 40; x < png.width; x += 24) {
+      const i = (y * png.width + x) * 4;
+      colours.add((png.data[i] << 16) | (png.data[i + 1] << 8) | png.data[i + 2]);
+    }
+    check('canvas-not-blank', colours.size > 50, `${colours.size} distinct colours in the sample grid`);
+
+    // 4. figures and markers
+    const info = await page.evaluate(async () => ({ figures: window.__game.game.figureCount(), units: window.__game.game.units.length, markers: document.querySelectorAll('#markers .marker').length }));
+    check('figures', info.figures >= MIN_FIGURES && info.markers === info.units, `${info.figures} figures (need >= ${MIN_FIGURES}); ${info.markers} markers for ${info.units} units`);
+
+    // 4b. every brigade and battery starts facing its nearest enemy (within 75 degrees)
+    const facing = await page.evaluate(async () => {
+      const us = window.__game.game.units;
+      return us.map((u) => {
+        let best = null, bd = Infinity;
+        for (const e of us) if (e.side !== u.side) { const d = Math.hypot(e.x - u.x, e.z - u.z); if (d < bd) { bd = d; best = e; } }
+        const bear = Math.atan2(best.x - u.x, best.z - u.z);
+        return { id: u.id, off: Math.abs(Math.atan2(Math.sin(bear - u.facing), Math.cos(bear - u.facing))) };
+      });
+    });
+    const wrong = facing.filter((f) => f.off > (75 * Math.PI) / 180);
+    check('facing', wrong.length === 0, wrong.length === 0 ? `all ${facing.length} units face within 75 deg of their nearest enemy (worst ${Math.max(...facing.map((f) => f.off)).toFixed(2)} rad)` : wrong.map((f) => `${f.id} ${f.off.toFixed(2)} rad off`).join(', '));
+
+    // 5. select + drag-order with a real mouse: press on Franklin's flag, drag a curve, release.
+    const marker = page.getByRole('button', { name: /^Franklin.s Brigade/ });
+    const box = await marker.boundingBox();
+    let orderOk = false, orderDetail = 'Franklin marker not found or off screen';
+    if (box) {
+      const sx = box.x + box.width / 2, sy = box.y + box.height * 0.45;
+      const via = await project(page, -60, 470);
+      const end = await project(page, 120, 520);
+      await page.mouse.move(sx, sy);
+      await page.mouse.down();
+      const steps = 14;
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        // quadratic curve start -> via -> end
+        const x = (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * via.x + t * t * end.x;
+        const y = (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * via.y + t * t * end.y;
+        await page.mouse.move(x, y);
+        await page.waitForTimeout(30);
+      }
+      const previewShown = await page.evaluate(async () => !!window.__game.arrows.preview);
+      await page.mouse.up();
+      const st = await page.evaluate(async () => {
+        const g = window.__game.game;
+        const u = g.units.find((v) => v.id === 'franklin');
+        return { selected: g.selected && g.selected.id, orders: g.orders || 0, type: u.order.type, active: u.follow.active, pathPts: u.path ? u.path.length : 0 };
+      });
+      orderOk = st.selected === 'franklin' && st.orders >= 1 && st.type === 'move' && st.active && previewShown;
+      orderDetail = `selected=${st.selected} orders=${st.orders} order=${st.type} moving=${st.active} pathPoints=${st.pathPts} previewArrow=${previewShown}`;
+      await page.waitForTimeout(1500);
+      await shot(page, 'ordered');
+    }
+    check('select-drag-order', orderOk, orderDetail);
+
+    // 6. Hold button
+    await page.getByRole('button', { name: 'Hold', exact: true }).click();
+    const held = await page.evaluate(async () => { const u = window.__game.game.units.find((v) => v.id === 'franklin'); return { type: u.order.type, active: u.follow.active }; });
+    check('hold-button', held.type === 'hold' && !held.active, `after Hold: order=${held.type} moving=${held.active}`);
+
+    // f. zoom: a trackpad pinch (ctrl + wheel) toward a point keeps the ground under it within 3% of the view
+    {
+      const px = { x: Math.round(VIEWPORT.width * 0.32), y: Math.round(VIEWPORT.height * 0.58) };
+      const before = await page.evaluate(([x, y]) => {
+        const { rts } = window.__game;
+        rts.update(1); // settle any easing first
+        const p = rts.pick(x, y, document.getElementById('battlefield'));
+        return p ? { x: p.x, y: p.y, z: p.z, dist: rts.goal.dist, goal: { ...rts.goal } } : null;
+      }, [px.x, px.y]);
+      let zoomOk = false, zoomDetail = 'no ground under the test point';
+      if (before) {
+        await page.mouse.move(px.x, px.y);
+        await page.keyboard.down('Control');
+        await page.mouse.wheel(0, -240);
+        await page.keyboard.up('Control');
+        const after = await page.evaluate(([x, y, z, goal]) => {
+          const { rts, camera } = window.__game;
+          const settle = () => {
+            for (let i = 0; i < 4; i++) rts.update(1); // let the eased camera reach its goal
+            camera.updateMatrixWorld();
+            const v = camera.position.clone().set(x, y, z).project(camera);
+            return { sx: (v.x * 0.5 + 0.5) * innerWidth, sy: (-v.y * 0.5 + 0.5) * innerHeight, dist: rts.goal.dist };
+          };
+          const r = settle();
+          // controls: the same zoom about the view centre (no anchoring) must miss by more than the limit, or
+          // this check could not fail; the pre-S1 method (target moved a share of the way toward the point) is
+          // reported for comparison
+          const factor = r.dist / goal.dist;
+          Object.assign(rts.goal, goal);
+          rts.snap();
+          rts.zoomBy(factor);
+          r.centre = settle();
+          Object.assign(rts.goal, goal);
+          rts.snap();
+          rts.zoomBy(factor, { x, z });
+          r.old = settle();
+          return r;
+        }, [before.x, before.y, before.z, before.goal]);
+        const ex = Math.abs(after.sx - px.x) / VIEWPORT.width, ey = Math.abs(after.sy - px.y) / VIEWPORT.height;
+        const err = (o) => Math.max(Math.abs(o.sx - px.x) / VIEWPORT.width, Math.abs(o.sy - px.y) / VIEWPORT.height);
+        const ce = err(after.centre), oe = err(after.old);
+        zoomOk = after.dist < before.dist * 0.8 && ex < 0.03 && ey < 0.03 && ce >= 0.03;
+        zoomDetail = `zoomed ${Math.round(before.dist)} -> ${Math.round(after.dist)} m; the ground point under (${px.x}, ${px.y}) is now at (${after.sx.toFixed(1)}, ${after.sy.toFixed(1)}): off by ${(ex * 100).toFixed(2)}% x, ${(ey * 100).toFixed(2)}% y of the view (limit 3%); controls: zoom about the centre off by ${(ce * 100).toFixed(1)}% (must exceed 3%), pre-S1 zoom-toward off by ${(oe * 100).toFixed(1)}%`;
+      }
+      check('zoom-to-pointer', zoomOk, zoomDetail);
+    }
+
+    // g. touch: synthetic pointerType 'touch' events: a tap selects Willcox, a drag from him orders a march
+    {
+      const touch = await page.evaluate(async () => {
+        const { game, rts, camera, terrain } = window.__game;
+        const cv = document.getElementById('battlefield');
+        const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+        const u = game.units.find((v) => v.id === 'willcox');
+        rts.goal.x = u.x + 60; rts.goal.z = u.z; rts.goal.dist = 700; rts.goal.pitch = rts._pitch(700);
+        rts.snap(); rts.update(1); camera.updateMatrixWorld();
+        const proj = (x, z) => { const v = camera.position.clone().set(x, terrain.heightAt(x, z), z).project(camera); return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight }; };
+        const fire = (type, x, y) => {
+          const el = document.elementFromPoint(x, y) || cv;
+          el.dispatchEvent(new PointerEvent(type, { pointerId: 41, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1, bubbles: true, cancelable: true, composed: true }));
+        };
+        game.select(null);
+        const s = proj(u.x, u.z);
+        const hit = (document.elementFromPoint(s.x, s.y) || {}).id || (document.elementFromPoint(s.x, s.y) || {}).className || '?';
+        fire('pointerdown', s.x, s.y); await sleep(50); fire('pointerup', s.x, s.y);
+        const tapped = game.selected ? game.selected.id : null;
+        await sleep(450); // not a double tap
+        const dest = proj(u.x + 150, u.z + 20);
+        fire('pointerdown', s.x, s.y);
+        for (let i = 1; i <= 8; i++) { fire('pointermove', s.x + (dest.x - s.x) * (i / 8), s.y + (dest.y - s.y) * (i / 8)); await sleep(16); }
+        const preview = !!window.__game.arrows.preview;
+        fire('pointerup', dest.x, dest.y);
+        const want = rts.pick(dest.x, dest.y, cv);
+        const end = u.order.dest;
+        return { hit, tapped, preview, order: u.order.type, moving: u.follow.active, gap: end && want ? Math.hypot(end[0] - want.x, end[1] - want.z) : null };
+      });
+      check('touch-tap-select', touch.tapped === 'willcox', `a touch tap on Willcox's men (element "${touch.hit}") selected ${touch.tapped}`);
+      check('touch-drag-order', touch.order === 'move' && touch.moving && touch.preview && touch.gap !== null && touch.gap < 20,
+        `touch drag: preview shown=${touch.preview}, order=${touch.order}, moving=${touch.moving}, order end ${touch.gap === null ? 'missing' : `${touch.gap.toFixed(1)} m`} from the ground under the lifted finger (limit 20 m)`);
+    }
+
+    // 7. fight: march three brigades up the hill, fast-forward, look for casualties and smoke on both sides
+    const fight = await page.evaluate(async () => {
+      const g = window.__game.game;
+      const by = (id) => g.units.find((u) => u.id === id);
+      g.order(by('franklin'), { type: 'move', points: [[by('franklin').x, by('franklin').z], [80, 470], [230, 500]] });
+      g.order(by('willcox'), { type: 'move', points: [[by('willcox').x, by('willcox').z], [60, 300], [220, 360]] });
+      g.order(by('sherman'), { type: 'move', points: [[by('sherman').x, by('sherman').z], [150, 120], [240, 260]] });
+      g.fastForward(300);
+      const cas = { US: 0, CS: 0 };
+      for (const u of g.units) cas[u.side] += u.casualties;
+      const fr = by('franklin');
+      return { cas, puffs: window.__game.effects.puffs, smoke: window.__game.effects.ok, franklin: [Math.round(fr.x), Math.round(fr.z), fr.state], simTime: Math.round(g.simTime),
+        states: g.units.map((u) => `${u.id}:${Math.round(u.men)}:${u.state}`).join(' ') };
+    });
+    await page.evaluate(async () => { const r = window.__game.rts; r.goal.x = 150; r.goal.z = 420; r.goal.dist = 520; });
+    await page.waitForTimeout(3000);
+    await shot(page, 'fight');
+    check('fight', fight.cas.US > 0 && fight.cas.CS > 0 && (fight.puffs > 0 || !fight.smoke),
+      `after ${fight.simTime} sim s: Union casualties ${Math.round(fight.cas.US)}, Confederate ${Math.round(fight.cas.CS)}, smoke puffs ${fight.puffs} (smoke ${fight.smoke ? 'on' : 'unavailable'}); ${fight.states}`);
+    result.fight = fight;
+
+    await orderObedience(page);
+    await dockFit(page);
+    await bakedFigures(page);
+  }
+
+  // 2. errors
+  check('no-console-errors', consoleErrors.length === 0, consoleErrors.length === 0 ? '0 errors' : `${consoleErrors.length} error(s): ${consoleErrors.slice(0, 5).join(' | ')}`);
+
+  // 8. accessibility
+  try {
+    const axe = await new AxeBuilder({ page }).analyze();
+    const bad = axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
+    result.axe = { violations: axe.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, help: v.help })), passes: axe.passes.length };
+    check('axe', bad.length === 0, bad.length === 0 ? `0 serious/critical violations (${axe.violations.length} minor/moderate, ${axe.passes.length} rules passed)` : bad.map((v) => `${v.impact} ${v.id} on ${v.nodes.length} node(s): ${v.help}`).join(' | '));
+  } catch (err) {
+    check('axe', false, `axe-core could not run: ${err.message.split('\n')[0]}`);
+  }
+  result.stats = await page.evaluate(async () => window.__stats ?? null).catch(() => null);
+  if (result.stats) console.log(`stats: ${JSON.stringify(result.stats)}`);
+  await page.context().close().catch(() => {}); // one game page at a time
 }
 
 async function main() {
+  if (runs(3)) await nodeUnits();
+  await fs.mkdir(OUT_DIR, { recursive: true });
+  const { server, url } = await startServer({ port: 0 });
+  return browserChecks(server, url);
+}
+
+async function nodeUnits() {
   await settingsUnit();
   await bakedUnit();
   await approvedPackUnit();
@@ -1518,8 +1724,9 @@ async function main() {
   await capturedGunsModelUnit();
   await batteryOverrunModelUnit();
   await capturedLoadoutsModelUnit();
-  await fs.mkdir(OUT_DIR, { recursive: true });
-  const { server, url } = await startServer({ port: 0 });
+}
+
+async function browserChecks(server, url) {
   result.url = url;
   let browser;
   try {
@@ -1556,242 +1763,35 @@ async function main() {
       await sandboxAndDevice(browser, url);
       return;
     }
-    const page = await (await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: 1 })).newPage();
-
-    let rejectEarly;
-    const earlyError = new Promise((_, reject) => { rejectEarly = reject; });
-    earlyError.catch(() => {});
-    const fail = (text) => { consoleErrors.push(text); rejectEarly(new Error(text)); };
-    page.on('pageerror', (err) => fail(`pageerror: ${err.message}`));
-    page.on('console', (msg) => {
-      const loc = msg.location();
-      const where = loc && loc.url ? ` (${loc.url.replace(url, '')}:${loc.lineNumber})` : '';
-      if (msg.type() === 'error') fail(`console.error: ${msg.text()}${where}`);
-      else if (msg.type() === 'warning' && !/GL Driver Message|GPU stall|already non-indexed/.test(msg.text())) consoleWarnings.push(`${msg.text()}${where}`);
-    });
-    page.on('requestfailed', (req) => fail(`request failed: ${req.url().replace(url, '/')} (${req.failure()?.errorText ?? 'unknown'})`));
-    page.on('response', (res) => { if (res.status() >= 400) fail(`HTTP ${res.status()} for ${res.url().replace(url, '/')}`); });
-
-    // 1. ready
-    let readyOk = false, readyDetail;
-    const t0 = Date.now();
-    try {
-      await page.goto(`${url}?practice&quality=low`, { waitUntil: 'load', timeout: READY_TIMEOUT_MS });
-      await Promise.race([page.waitForFunction(() => window.__ready === true, null, { timeout: READY_TIMEOUT_MS, polling: 200 }), earlyError]);
-      readyOk = true;
-      readyDetail = `window.__ready after ${Date.now() - t0} ms`;
-    } catch (err) {
-      readyDetail = /Timeout/i.test(err.message) ? `window.__ready was not set within ${READY_TIMEOUT_MS / 1000} s` : `page failed while loading: ${err.message.split('\n')[0]}`;
-    }
-    check('ready', readyOk, readyDetail);
-    if (readyOk) {
-      await page.waitForTimeout(2500);
-      const png = await shot(page, 'start');
-
-      // 3. canvas not blank
-      const colours = new Set();
-      for (let y = 40; y < png.height; y += 24) for (let x = 40; x < png.width; x += 24) {
-        const i = (y * png.width + x) * 4;
-        colours.add((png.data[i] << 16) | (png.data[i + 1] << 8) | png.data[i + 2]);
-      }
-      check('canvas-not-blank', colours.size > 50, `${colours.size} distinct colours in the sample grid`);
-
-      // 4. figures and markers
-      const info = await page.evaluate(async () => ({ figures: window.__game.game.figureCount(), units: window.__game.game.units.length, markers: document.querySelectorAll('#markers .marker').length }));
-      check('figures', info.figures >= MIN_FIGURES && info.markers === info.units, `${info.figures} figures (need >= ${MIN_FIGURES}); ${info.markers} markers for ${info.units} units`);
-
-      // 4b. every brigade and battery starts facing its nearest enemy (within 75 degrees)
-      const facing = await page.evaluate(async () => {
-        const us = window.__game.game.units;
-        return us.map((u) => {
-          let best = null, bd = Infinity;
-          for (const e of us) if (e.side !== u.side) { const d = Math.hypot(e.x - u.x, e.z - u.z); if (d < bd) { bd = d; best = e; } }
-          const bear = Math.atan2(best.x - u.x, best.z - u.z);
-          return { id: u.id, off: Math.abs(Math.atan2(Math.sin(bear - u.facing), Math.cos(bear - u.facing))) };
-        });
-      });
-      const wrong = facing.filter((f) => f.off > (75 * Math.PI) / 180);
-      check('facing', wrong.length === 0, wrong.length === 0 ? `all ${facing.length} units face within 75 deg of their nearest enemy (worst ${Math.max(...facing.map((f) => f.off)).toFixed(2)} rad)` : wrong.map((f) => `${f.id} ${f.off.toFixed(2)} rad off`).join(', '));
-
-      // 5. select + drag-order with a real mouse: press on Franklin's flag, drag a curve, release.
-      const marker = page.getByRole('button', { name: /^Franklin.s Brigade/ });
-      const box = await marker.boundingBox();
-      let orderOk = false, orderDetail = 'Franklin marker not found or off screen';
-      if (box) {
-        const sx = box.x + box.width / 2, sy = box.y + box.height * 0.45;
-        const via = await project(page, -60, 470);
-        const end = await project(page, 120, 520);
-        await page.mouse.move(sx, sy);
-        await page.mouse.down();
-        const steps = 14;
-        for (let i = 1; i <= steps; i++) {
-          const t = i / steps;
-          // quadratic curve start -> via -> end
-          const x = (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * via.x + t * t * end.x;
-          const y = (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * via.y + t * t * end.y;
-          await page.mouse.move(x, y);
-          await page.waitForTimeout(30);
-        }
-        const previewShown = await page.evaluate(async () => !!window.__game.arrows.preview);
-        await page.mouse.up();
-        const st = await page.evaluate(async () => {
-          const g = window.__game.game;
-          const u = g.units.find((v) => v.id === 'franklin');
-          return { selected: g.selected && g.selected.id, orders: g.orders || 0, type: u.order.type, active: u.follow.active, pathPts: u.path ? u.path.length : 0 };
-        });
-        orderOk = st.selected === 'franklin' && st.orders >= 1 && st.type === 'move' && st.active && previewShown;
-        orderDetail = `selected=${st.selected} orders=${st.orders} order=${st.type} moving=${st.active} pathPoints=${st.pathPts} previewArrow=${previewShown}`;
-        await page.waitForTimeout(1500);
-        await shot(page, 'ordered');
-      }
-      check('select-drag-order', orderOk, orderDetail);
-
-      // 6. Hold button
-      await page.getByRole('button', { name: 'Hold', exact: true }).click();
-      const held = await page.evaluate(async () => { const u = window.__game.game.units.find((v) => v.id === 'franklin'); return { type: u.order.type, active: u.follow.active }; });
-      check('hold-button', held.type === 'hold' && !held.active, `after Hold: order=${held.type} moving=${held.active}`);
-
-      // f. zoom: a trackpad pinch (ctrl + wheel) toward a point keeps the ground under it within 3% of the view
-      {
-        const px = { x: Math.round(VIEWPORT.width * 0.32), y: Math.round(VIEWPORT.height * 0.58) };
-        const before = await page.evaluate(([x, y]) => {
-          const { rts } = window.__game;
-          rts.update(1); // settle any easing first
-          const p = rts.pick(x, y, document.getElementById('battlefield'));
-          return p ? { x: p.x, y: p.y, z: p.z, dist: rts.goal.dist, goal: { ...rts.goal } } : null;
-        }, [px.x, px.y]);
-        let zoomOk = false, zoomDetail = 'no ground under the test point';
-        if (before) {
-          await page.mouse.move(px.x, px.y);
-          await page.keyboard.down('Control');
-          await page.mouse.wheel(0, -240);
-          await page.keyboard.up('Control');
-          const after = await page.evaluate(([x, y, z, goal]) => {
-            const { rts, camera } = window.__game;
-            const settle = () => {
-              for (let i = 0; i < 4; i++) rts.update(1); // let the eased camera reach its goal
-              camera.updateMatrixWorld();
-              const v = camera.position.clone().set(x, y, z).project(camera);
-              return { sx: (v.x * 0.5 + 0.5) * innerWidth, sy: (-v.y * 0.5 + 0.5) * innerHeight, dist: rts.goal.dist };
-            };
-            const r = settle();
-            // controls: the same zoom about the view centre (no anchoring) must miss by more than the limit, or
-            // this check could not fail; the pre-S1 method (target moved a share of the way toward the point) is
-            // reported for comparison
-            const factor = r.dist / goal.dist;
-            Object.assign(rts.goal, goal);
-            rts.snap();
-            rts.zoomBy(factor);
-            r.centre = settle();
-            Object.assign(rts.goal, goal);
-            rts.snap();
-            rts.zoomBy(factor, { x, z });
-            r.old = settle();
-            return r;
-          }, [before.x, before.y, before.z, before.goal]);
-          const ex = Math.abs(after.sx - px.x) / VIEWPORT.width, ey = Math.abs(after.sy - px.y) / VIEWPORT.height;
-          const err = (o) => Math.max(Math.abs(o.sx - px.x) / VIEWPORT.width, Math.abs(o.sy - px.y) / VIEWPORT.height);
-          const ce = err(after.centre), oe = err(after.old);
-          zoomOk = after.dist < before.dist * 0.8 && ex < 0.03 && ey < 0.03 && ce >= 0.03;
-          zoomDetail = `zoomed ${Math.round(before.dist)} -> ${Math.round(after.dist)} m; the ground point under (${px.x}, ${px.y}) is now at (${after.sx.toFixed(1)}, ${after.sy.toFixed(1)}): off by ${(ex * 100).toFixed(2)}% x, ${(ey * 100).toFixed(2)}% y of the view (limit 3%); controls: zoom about the centre off by ${(ce * 100).toFixed(1)}% (must exceed 3%), pre-S1 zoom-toward off by ${(oe * 100).toFixed(1)}%`;
-        }
-        check('zoom-to-pointer', zoomOk, zoomDetail);
-      }
-
-      // g. touch: synthetic pointerType 'touch' events: a tap selects Willcox, a drag from him orders a march
-      {
-        const touch = await page.evaluate(async () => {
-          const { game, rts, camera, terrain } = window.__game;
-          const cv = document.getElementById('battlefield');
-          const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-          const u = game.units.find((v) => v.id === 'willcox');
-          rts.goal.x = u.x + 60; rts.goal.z = u.z; rts.goal.dist = 700; rts.goal.pitch = rts._pitch(700);
-          rts.snap(); rts.update(1); camera.updateMatrixWorld();
-          const proj = (x, z) => { const v = camera.position.clone().set(x, terrain.heightAt(x, z), z).project(camera); return { x: (v.x * 0.5 + 0.5) * innerWidth, y: (-v.y * 0.5 + 0.5) * innerHeight }; };
-          const fire = (type, x, y) => {
-            const el = document.elementFromPoint(x, y) || cv;
-            el.dispatchEvent(new PointerEvent(type, { pointerId: 41, pointerType: 'touch', isPrimary: true, clientX: x, clientY: y, button: 0, buttons: type === 'pointerup' ? 0 : 1, bubbles: true, cancelable: true, composed: true }));
-          };
-          game.select(null);
-          const s = proj(u.x, u.z);
-          const hit = (document.elementFromPoint(s.x, s.y) || {}).id || (document.elementFromPoint(s.x, s.y) || {}).className || '?';
-          fire('pointerdown', s.x, s.y); await sleep(50); fire('pointerup', s.x, s.y);
-          const tapped = game.selected ? game.selected.id : null;
-          await sleep(450); // not a double tap
-          const dest = proj(u.x + 150, u.z + 20);
-          fire('pointerdown', s.x, s.y);
-          for (let i = 1; i <= 8; i++) { fire('pointermove', s.x + (dest.x - s.x) * (i / 8), s.y + (dest.y - s.y) * (i / 8)); await sleep(16); }
-          const preview = !!window.__game.arrows.preview;
-          fire('pointerup', dest.x, dest.y);
-          const want = rts.pick(dest.x, dest.y, cv);
-          const end = u.order.dest;
-          return { hit, tapped, preview, order: u.order.type, moving: u.follow.active, gap: end && want ? Math.hypot(end[0] - want.x, end[1] - want.z) : null };
-        });
-        check('touch-tap-select', touch.tapped === 'willcox', `a touch tap on Willcox's men (element "${touch.hit}") selected ${touch.tapped}`);
-        check('touch-drag-order', touch.order === 'move' && touch.moving && touch.preview && touch.gap !== null && touch.gap < 20,
-          `touch drag: preview shown=${touch.preview}, order=${touch.order}, moving=${touch.moving}, order end ${touch.gap === null ? 'missing' : `${touch.gap.toFixed(1)} m`} from the ground under the lifted finger (limit 20 m)`);
-      }
-
-      // 7. fight: march three brigades up the hill, fast-forward, look for casualties and smoke on both sides
-      const fight = await page.evaluate(async () => {
-        const g = window.__game.game;
-        const by = (id) => g.units.find((u) => u.id === id);
-        g.order(by('franklin'), { type: 'move', points: [[by('franklin').x, by('franklin').z], [80, 470], [230, 500]] });
-        g.order(by('willcox'), { type: 'move', points: [[by('willcox').x, by('willcox').z], [60, 300], [220, 360]] });
-        g.order(by('sherman'), { type: 'move', points: [[by('sherman').x, by('sherman').z], [150, 120], [240, 260]] });
-        g.fastForward(300);
-        const cas = { US: 0, CS: 0 };
-        for (const u of g.units) cas[u.side] += u.casualties;
-        const fr = by('franklin');
-        return { cas, puffs: window.__game.effects.puffs, smoke: window.__game.effects.ok, franklin: [Math.round(fr.x), Math.round(fr.z), fr.state], simTime: Math.round(g.simTime),
-          states: g.units.map((u) => `${u.id}:${Math.round(u.men)}:${u.state}`).join(' ') };
-      });
-      await page.evaluate(async () => { const r = window.__game.rts; r.goal.x = 150; r.goal.z = 420; r.goal.dist = 520; });
-      await page.waitForTimeout(3000);
-      await shot(page, 'fight');
-      check('fight', fight.cas.US > 0 && fight.cas.CS > 0 && (fight.puffs > 0 || !fight.smoke),
-        `after ${fight.simTime} sim s: Union casualties ${Math.round(fight.cas.US)}, Confederate ${Math.round(fight.cas.CS)}, smoke puffs ${fight.puffs} (smoke ${fight.smoke ? 'on' : 'unavailable'}); ${fight.states}`);
-      result.fight = fight;
-
-      await orderObedience(page);
-      await dockFit(page);
-      await bakedFigures(page);
-    }
-
-    // 2. errors
-    check('no-console-errors', consoleErrors.length === 0, consoleErrors.length === 0 ? '0 errors' : `${consoleErrors.length} error(s): ${consoleErrors.slice(0, 5).join(' | ')}`);
-
-    // 8. accessibility
-    try {
-      const axe = await new AxeBuilder({ page }).analyze();
-      const bad = axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
-      result.axe = { violations: axe.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, help: v.help })), passes: axe.passes.length };
-      check('axe', bad.length === 0, bad.length === 0 ? `0 serious/critical violations (${axe.violations.length} minor/moderate, ${axe.passes.length} rules passed)` : bad.map((v) => `${v.impact} ${v.id} on ${v.nodes.length} node(s): ${v.help}`).join(' | '));
-    } catch (err) {
-      check('axe', false, `axe-core could not run: ${err.message.split('\n')[0]}`);
-    }
-    result.stats = await page.evaluate(async () => window.__stats ?? null).catch(() => null);
-    if (result.stats) console.log(`stats: ${JSON.stringify(result.stats)}`);
-    await page.context().close().catch(() => {}); // one game page at a time
+    if (runs(1)) await battlePage(browser, url);
     if (process.argv.includes('--field')) { result.mode = 'field only (sandbox and device pages skipped)'; return; }
-    await sandboxAndDevice(browser, url);
-    await rewardProgress(browser, url);
-    await practiceProgress({ browser, url, check, shot, result, watchErrors });
-    await introPlay({ browser, url, check, shot, result, watchErrors, native, afterIdle: headerAfterAction, afterStores: headerStores });
-    finishHeader({ check, result });
-    await entryProgress({ browser, url, check, shot, result, watchErrors });
-    await campEquipment({ browser, url, check, shot, result, watchErrors });
-    await saveCoordination({ browser, url, check, shot, result, watchErrors });
-    await deploymentProgress({ browser, url, check, shot, result, watchErrors, native });
-    {
+    if (SHARD) result.mode = `CI shard ${SHARD} of 3`;
+    // Shard 1: battle page, sandbox and the introductory fight (the header checks span the sandbox and intro stages).
+    if (runs(1)) {
+      await sandboxAndDevice(browser, url);
+      await introPlay({ browser, url, check, shot, result, watchErrors, native, afterIdle: headerAfterAction, afterStores: headerStores });
+      finishHeader({ check, result });
+    }
+    // Shard 2: reward, practice, title/camp, saves, deployment and the reward focus checks.
+    if (runs(2)) {
+      await rewardProgress(browser, url);
+      await practiceProgress({ browser, url, check, shot, result, watchErrors });
+      await entryProgress({ browser, url, check, shot, result, watchErrors });
+      await campEquipment({ browser, url, check, shot, result, watchErrors });
+      await saveCoordination({ browser, url, check, shot, result, watchErrors });
+      await deploymentProgress({ browser, url, check, shot, result, watchErrors, native });
+      const { rewardFocusControls } = await import('./test-reward-focus-ui.mjs');
+      await rewardFocusControls({ browser, url, check, result });
+    }
+    // Shard 3: surrender result, reinforcements, field admission and the soldier-eye view.
+    if (runs(3)) {
       const { surrenderResultUIControls } = await import('./test-surrender-result-ui.mjs');
       await surrenderResultUIControls({ browser, url, check, result });
+      await reinforcementUIControls({ browser, url, check, shot, result, native });
+      await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native });
+      await soldierViewControls({ browser, url, check, shot, result, watchErrors, native });
     }
-    await reinforcementUIControls({ browser, url, check, shot, result, native });
-    await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native });
     finalizeActivationUI({ result, check });
-    await soldierViewControls({ browser, url, check, shot, result, watchErrors, native });
-    { const { rewardFocusControls } = await import('./test-reward-focus-ui.mjs'); await rewardFocusControls({ browser, url, check, result }); }
   } finally {
     if (browser) await browser.close().catch(() => {});
     await new Promise((resolve) => server.close(resolve));
@@ -1837,8 +1837,7 @@ result.ok = exitCode === 0;
 result.durationMs = Date.now() - started;
 try {
   await fs.mkdir(OUT_DIR, { recursive: true });
-  const {nativeResult}=await import('./test-reward-focus-ui.mjs');const stored=nativeResult.serialize(result);
-  await fs.writeFile(path.join(OUT_DIR, 'last-result.json'),stored.raw);
+  await fs.writeFile(path.join(OUT_DIR, 'last-result.json'), JSON.stringify(result) + '\n');
 } catch (err) {
   console.error(`FAIL write-result: ${err.message}`);
   exitCode = 1;

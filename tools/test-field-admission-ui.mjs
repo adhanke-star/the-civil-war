@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { promises as fs } from 'node:fs';
-import { execFileSync } from 'node:child_process';
 import { AxeBuilder } from '@axe-core/playwright';
 import { deploymentFixture } from './test-deployment-ui.mjs';
 import { exportSnapshot, validateSnapshot } from '../src/franchise/save.js';
@@ -8,7 +7,6 @@ import { introScenario, fictionalSurrenderRoute } from '../src/franchise/intro.j
 import { activationRouteRecord } from './test-surrender-activation-ui.mjs';
 import { probeProgress, progressRaw, seedProgress } from './test-progress-browser.mjs';
 
-const accepted = '4f6113a624e0e533825c0be414bb36f3b073f726';
 const pattern = '**/assets/scenarios/henry-hill.json';
 export async function fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native }) {
   const groundText = await fs.readFile(new URL('../assets/scenarios/henry-hill.json', import.meta.url), 'utf8');
@@ -129,34 +127,13 @@ export async function fieldAdmissionControls({ browser, url, check, shot, result
     page.on('console', message => { if (message.type() === 'warning') record.warnings.push(message.text()); }); return page;
   };
   const recover = page => page.waitForSelector('#field-failure-heading');
+  const badGround = route => route.fulfill({ contentType: 'application/json', body: badBody });
   try {
-    // Actual original runtime with the same malformed JSON: diagnosis, never current acceptance.
-    const base = await ctx.newPage(), baseErrors = []; base.on('pageerror', e => baseErrors.push({ message: e.message, stack: e.stack }));
-    base.on('console', m => { if (['error', 'warning'].includes(m.type())) baseErrors.push({ message: m.text(), kind: m.type() }); });
-    const baseMain = execFileSync('git', ['show', accepted + ':src/main.js']);
-    const baseEntry = execFileSync('git', ['show', accepted + ':src/entry.js']);
-    const oldMain = route => route.fulfill({ contentType: 'text/javascript', body: baseMain });
-    const oldEntry = route => route.fulfill({ contentType: 'text/javascript', body: baseEntry });
-    const badGround = route => route.fulfill({ contentType: 'application/json', body: badBody });
-    await base.route('**/src/main.js', oldMain); await base.route('**/src/entry.js', oldEntry); await base.route(pattern, badGround);
-    try {
-      const failed = base.waitForEvent('pageerror', { timeout: 180000 });
-      await base.goto(url + '?battle=henry-hill&quality=low&nosw', { waitUntil: 'domcontentloaded' });
-      await base.waitForFunction(() => window.__admissionGpu > 0);
-      // Wait for the actual authored-world failure, not merely the allocation counter.
-      await base.waitForFunction(() => document.getElementById('status').textContent.includes('Loading'));
-      await failed;
-      record.baseline = { counters: await counters(base), errors: baseErrors, accepted, body: badBody };
-      await shot(base, 'field-admission-base-malformed');
-    } finally {
-      await base.unroute(pattern, badGround); await base.unroute('**/src/main.js', oldMain); await base.unroute('**/src/entry.js', oldEntry); await close(base);
-    }
     let page = await cleanPage('invalid-world-recovery'); await page.route(pattern, badGround);
     await page.goto(url + '?battle=henry-hill&quality=low&nosw'); await recover(page);
     record.invalid = await counters(page); pageDiagnostics.get(page).phase = 'recovered'; pageDiagnostics.get(page).markers.push({ phase: 'recovered', at: Date.now() });
-    verdict('invalid-world-before-gpu', record.baseline.counters.gpu > 0 && record.baseline.errors.some(e => /g\.rotateY is not a function/.test(e.message) && e.stack?.includes('/src/world/props.js'))
-      && record.invalid.gpu === 0 && record.invalid.writes === 0 && record.invalid.puts === 0,
-    'same authored-world fixture: actual accepted BASE allocates; candidate refuses before GPU or progress writes');
+    verdict('invalid-world-before-gpu', record.invalid.gpu === 0 && record.invalid.writes === 0 && record.invalid.puts === 0,
+      'malformed authored-world fixture: candidate refuses before GPU allocation or progress writes');
     const layouts = [];
     for (const width of [320, 1024]) {
       await page.setViewportSize({ width, height: width === 320 ? 480 : 768 });

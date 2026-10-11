@@ -1,5 +1,4 @@
 // Each actual Game runs in a serial exiting CPU child. No browser or native claims.
-const SOURCE_PATHS=["tools/test.mjs",".github/workflows/ci.yml","src/sim/phase.js","tools/test-reinforcements.mjs","src/main.js","sw.js","src/entry.js","src/ui/entry.js","tools/test-field-admission.mjs","tools/test-field-admission-ui.mjs","tools/test-deployment-ui.mjs","tools/test-phase.mjs","index.html","src/ui/hud.js","src/ui/hud.css","src/ui/input.js","tools/test-soldier-view-ui.mjs","tools/test-view-ui.mjs","tools/test-keyboard.mjs","src/render/rts-camera.js","tools/test-view.mjs","src/ui/readout.js","src/render/post.js","src/render/soldier-view.js","tools/test-soldier-view.mjs","tools/test-header-ui.mjs","tools/test-intro-ui.mjs","src/ui/entry.css","src/franchise/practice.js","src/franchise/practice-ui.js","src/ui/practice-field.js","src/reward/sequence.js","src/reward/reward.css","tools/test-deployment.mjs","src/franchise/save.js","src/reward/model.js","src/reward/data.js","src/units/unit.js","src/units/battery.js","src/sim/combat.js","src/game.js","src/ui/arrows.js","src/sim/rules.js","src/franchise/intro.js","assets/scenarios/henry-hill.json","src/world/terrain.js","src/world/landscape.js","src/world/props.js","src/world/labels.js","src/sim/equipment.js","tools/test-equipment.mjs","src/units/impostor.js","tools/test-dock-ui.mjs","src/world/world.js","src/sim/ai.js","src/franchise/captures.js","tools/test-reinforcement-runtime.mjs","tools/test-reinforcement-ui.mjs","tools/test-capture-accounting.mjs","tools/test-surrender-runtime.mjs","tools/test-surrender-result.mjs"];
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { execFileSync as run } from 'node:child_process';
@@ -160,8 +159,7 @@ export function runSurrenderResult() {
  const controls=[];for(let index=0;index<12;index++){try{verifySurrenderResult(index,surrenderResultMutation(index,categories[index].data));throw new Error('Semantic mutation escaped');}
   catch(e){assert.equal(e.code,'ERR_ASSERTION');assert.ok(e.message.startsWith(CASES[index].join(': ')));controls.push({name:CASES[index][0],kind:'semantic',code:e.code,message:e.message});}}
  assert.equal(new Set(controls.map(c=>c.name)).size,12);
- const sources=SOURCE_PATHS.map(path=>{const b=fs.readFileSync(new URL('../'+path,import.meta.url));return{path,bytes:b.length,sha256:hash(b)};});
- return{categories,controls,sources,native:false,scope:'Terminal read-only result of actual opt-in Game CPU captures; no new reward, UI, history or native authority'};
+ return{categories,controls,native:false,scope:'Terminal read-only result of actual opt-in Game CPU captures; no new reward, UI, history or native authority'};
 }
 const direct=process.argv[1]&&fs.existsSync(process.argv[1])&&pathToFileURL(fs.realpathSync(process.argv[1])).href===import.meta.url;
 if(direct){if(process.argv[2]==='--child')console.log(JSON.stringify(await childCase(Number(process.argv[3]))));else{
