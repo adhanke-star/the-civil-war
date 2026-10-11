@@ -1,19 +1,19 @@
 # STATE
 2026-10-11 — ACTIVE same-thread autonomous EXISTING-v1 loop.
-Root solewriter; existing readonlyhelper; COORD absent; protected11 exact.
-Aaron authorizes necessary v1 execution; no routine permission popups.
-AcceptedF6b158; deployedF6c728 unaccepted; P1–P7 unfinished.
-48MiB PER native raw buffer; oversized flatten prohibited.
-169originalPNG+2exports/all182bodies retained; no omitted evidence.
-Private380b9ddd/run38138980441 full14checks/14controls/zero warnings CLEAR.
-Matching Node24; preserve Node25 HOLD/all failed runs.
-Collector3063735 cumulative bytes; offline added0; no reset.
-PhaseA independently complete:209/11owned198;70/all69 inverse exact.
-582order580unique49axes60streams18public23forensic model CLEAR.
-568historical outcomes exact;14fresh full-suite outcomes UNRUN.
-32roles/38support files/88versioned local commands independently CLEAR.
-Historical B/A2 remain historical; current-SHA fresh CI required.
-Next PhaseB11 owned sources/TWO runtime seams in isolated PROD.
-Admit finite24MiB DIAG readback; code408831B PROD; execute CPU gates.
-Then index review/implementation commit/fullCI+Pages/23image readback.
-Product582/native/art/fullAA/P7 UNRUN; v1 unfinished.
+Root solewriter; readonlyhelper schema_review; COORD absent; protected11 exact.
+Broad v1 execution authorized; no routine permission popups/new-session stops.
+AcceptedF6b158; deployedF6c728 and2bac unaccepted; P1–P7 unfinished.
+Product2bac1ccd/fullCI38147059655 cancelled45min; probes success.
+566completed checks pass; final soldier/focus checks incomplete.
+Pages38147059648 success is deployment only.
+Original failedCI logs all93CRC verified;1677981 cumulative bytes.
+Privatef1c0e338/run38152744567 failed metadata request before samples.
+Original privateartifact/log readback clear;64096 transferbytes.
+Next reviewed bounded GPU-path diagnostic on immutable2bac.
+Local88 exits clear; rawstdio13–74 unretained; freshcompleteCI mandatory.
+PhaseA209/70all69;58258049axes60streams18public23forensic preserved.
+169originalPNG+2exports/all182bodies retained; private14/14 historical clear.
+32MiB DIAG finiteplan max138912866; reserve160MiB/free5GB.
+48MiB PER native rawbuffer; member1MiB/transfer3MiB/CI45min unchanged.
+ActualCIpin/support amendments UNADOPTED; no luckyretry/oracle waiver.
+Product/native/art/fullAA/P7 UNRUN; v1 unfinished.
