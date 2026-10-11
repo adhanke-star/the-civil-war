@@ -1,6 +1,7 @@
-// tools/fetch-terrain.mjs: build the small terrain assets for the Henry House Hill to Matthews Hill slice.
+// tools/fetch-terrain.mjs: build the small terrain assets for one battlefield (configs in tools/terrain-config.mjs).
 //
-//   node tools/fetch-terrain.mjs
+//   node tools/fetch-terrain.mjs [id]          (default henry-hill; writes assets/terrain/<id>.{bin,json})
+//   node tools/fetch-terrain.mjs <id> --list   (print every road and stream name in the box, write nothing)
 //
 // Sources (all US federal works, public domain):
 //   - Elevation: USGS 3DEP bare-earth DEM, ImageServer exportImage (float32 GeoTIFF), read with geotiff.js.
@@ -25,10 +26,15 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.join(ROOT, '.out', 'terrain');
 const ASSETS = path.join(ROOT, 'assets', 'terrain');
 
-export const CENTER = { lat: 38.81825, lon: -77.5225 };
-const HALF = 1300; // metres from centre to each edge
-const GRID = 513; // heightmap samples per side (martini needs 2^n + 1)
-const FETCH = 1025; // DEM pixels requested per side, then smoothed down to GRID
+import { TERRAIN } from './terrain-config.mjs';
+const ID = process.argv[2] && !process.argv[2].startsWith('--') ? process.argv[2] : 'henry-hill';
+const LIST = process.argv.includes('--list');
+const CFG = TERRAIN[ID];
+if (!CFG) throw new Error(`no terrain config "${ID}" (have: ${Object.keys(TERRAIN).join(', ')})`);
+export const CENTER = CFG.center;
+const HALF = CFG.halfSize; // metres from centre to each edge
+const GRID = CFG.grid ?? 513; // heightmap samples per side (martini needs 2^n + 1)
+const FETCH = 2 * GRID - 1; // DEM pixels requested per side, then smoothed down to GRID
 const PHI = (CENTER.lat * Math.PI) / 180;
 const M_PER_DEG_LAT = 111132.92 - 559.82 * Math.cos(2 * PHI) + 1.175 * Math.cos(4 * PHI);
 const M_PER_DEG_LON = 111412.84 * Math.cos(PHI) - 93.5 * Math.cos(3 * PHI);
@@ -46,7 +52,13 @@ const DEM_URL =
   '&interpolation=RSP_BilinearInterpolation&f=image';
 const QUERY = `geometry=${bboxStr}&geometryType=esriGeometryEnvelope&inSR=4326&outSR=4326` +
   '&spatialRel=esriSpatialRelIntersects&outFields=*&f=geojson';
-const ROADS_URL = (layer) => `https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/${layer}/query?${QUERY}`;
+// Roads: USGS The National Map (default) or Census TIGERweb (CFG.roadSource 'tiger': has park and county roads). Both public domain.
+const TIGER = CFG.roadSource === 'tiger';
+const ROAD_LAYERS = TIGER ? [4, 6, 8, 9] : [29, 30, 31];
+const ROADS_URL = (layer) => TIGER
+  ? `https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer/${layer}/query?${QUERY}`
+  : `https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer/${layer}/query?${QUERY}`;
+const roadName = (p) => p.name || p.NAME || p.FULLNAME || '';
 const NHD_URL = `https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer/6/query?${QUERY}`;
 
 const project = ([lon, lat]) => [
@@ -132,7 +144,15 @@ function linesOf(features, nameOf, wanted) {
   return out;
 }
 
+async function listNames() {
+  const names = new Map();
+  for (const layer of ROAD_LAYERS) for (const f of (await (await get(ROADS_URL(layer), 'roads')).json()).features) names.set('road ' + (roadName(f.properties) || '?'), 1);
+  for (const f of (await (await get(NHD_URL, 'NHD')).json()).features) names.set('stream ' + (f.properties.gnis_name || '?'), 1);
+  console.log([...names.keys()].sort().join('\n'));
+}
+
 async function main() {
+  if (LIST) return listNames();
   await fs.mkdir(OUT, { recursive: true });
   await fs.mkdir(ASSETS, { recursive: true });
 
@@ -185,40 +205,39 @@ async function main() {
     }
   }
   const gz = zlib.gzipSync(Buffer.from(q.buffer), { level: 9 });
-  await fs.writeFile(path.join(ASSETS, 'henry-hill.bin'), gz);
+  await fs.writeFile(path.join(ASSETS, `${ID}.bin`), gz);
 
   // 2. Roads (layers 29-31: controlled-access, secondary and local connecting roads; Sudley Rd spans several).
   const roadsGeo = { features: [] };
-  for (const layer of [29, 30, 31]) roadsGeo.features.push(...(await (await get(ROADS_URL(layer), 'roads')).json()).features);
-  const roads = linesOf(roadsGeo.features, (p) => p.name || '', ['Lee Hwy', 'Sudley Rd']).map((r) => ({
-    ...r,
-    name: r.name.includes('Lee') ? 'Warrenton Turnpike' : 'Sudley Road',
-    modern: r.name,
-  }));
+  for (const layer of ROAD_LAYERS) roadsGeo.features.push(...(await (await get(ROADS_URL(layer), 'roads')).json()).features);
+  // Each config road maps a modern name fragment to its period name and kind ('pike' draws wider).
+  const roads = CFG.roads.flatMap((c) => linesOf(roadsGeo.features, roadName, [c.match])
+    .map((r) => ({ ...r, name: c.name, modern: r.name, ...(c.kind ? { kind: c.kind } : {}) })));
 
   // 3. Streams.
   const nhd = await (await get(NHD_URL, 'NHD')).json();
-  const streams = linesOf(nhd.features, (p) => p.gnis_name || '', ['Youngs Branch', 'Chinn Branch', 'Holkums Branch', 'Dogans Branch', 'Bull Run']);
+  const streams = CFG.streams.flatMap((c) => linesOf(nhd.features, (p) => p.gnis_name || '', [c.match])
+    .map((r) => ({ ...r, ...(c.name ? { name: c.name } : {}), ...(c.kind ? { kind: c.kind } : {}) })));
 
   const meta = {
-    name: 'Henry House Hill to Matthews Hill (First Bull Run, 21 July 1861)',
+    name: CFG.name,
     frame: 'local metres: origin at center, +x east, +z south; equirectangular',
     center: CENTER,
     halfSize: HALF,
     grid: GRID,
     cellSize: (2 * HALF) / (GRID - 1),
     bbox: BBOX,
-    heights: { file: 'henry-hill.bin', encoding: 'gzip(Int16LE row-delta of 5 cm steps above minM; prefix-sum each row), row 0 = north', stepM: 0.05, minM: Math.round(min * 100) / 100, maxM: Math.round(max * 100) / 100 },
+    heights: { file: `${ID}.bin`, encoding: 'gzip(Int16LE row-delta of 5 cm steps above minM; prefix-sum each row), row 0 = north', stepM: 0.05, minM: Math.round(min * 100) / 100, maxM: Math.round(max * 100) / 100 },
     roads,
     streams,
     sources: [
       { what: 'elevation', title: 'USGS 3D Elevation Program (3DEP) bare-earth DEM', url: DEM_URL, license: 'public domain (US federal work)', fetched: new Date().toISOString().slice(0, 10) },
-      { what: 'roads', title: 'USGS The National Map transportation (Lee Hwy, Sudley Rd: modern alignments of the 1861 roads)', url: ROADS_URL(30).replace('/30/', '/{29,30,31}/'), license: 'public domain (US federal work)' },
+      { what: 'roads', title: `${TIGER ? 'US Census Bureau TIGERweb transportation' : 'USGS The National Map transportation'} (${CFG.roadsNote})`, url: ROADS_URL(ROAD_LAYERS[0]).replace(`/${ROAD_LAYERS[0]}/`, `/{${ROAD_LAYERS}}/`), license: 'public domain (US federal work)' },
       { what: 'streams', title: 'USGS National Hydrography Dataset flowlines', url: NHD_URL, license: 'public domain (US federal work)' },
     ],
   };
-  await fs.writeFile(path.join(ASSETS, 'henry-hill.json'), JSON.stringify(meta, null, 1) + '\n');
-  const st = await fs.stat(path.join(ASSETS, 'henry-hill.bin'));
+  await fs.writeFile(path.join(ASSETS, `${ID}.json`), JSON.stringify(meta, null, 1) + '\n');
+  const st = await fs.stat(path.join(ASSETS, `${ID}.bin`));
   console.log(`heights: ${GRID}x${GRID}, ${min.toFixed(1)}..${max.toFixed(1)} m, ${st.size} B gzip`);
   console.log(`roads: ${roads.map((r) => `${r.name}(${r.points.length})`).join(', ')}`);
   console.log(`streams: ${streams.map((s) => `${s.name}(${s.points.length})`).join(', ')}`);

@@ -59,6 +59,24 @@ function clock(value) {
   if (hour > 23 || minute > 59) fail('clock is outside a day.');
   return hour * 60 + minute;
 }
+// Optional battle-pack fields. Absent fields keep the Henry Hill defaults (seed, clock, camera, rules).
+export const PACK_ID = /^[a-z0-9-]{1,40}$/;
+const point = value => Array.isArray(value) && value.length === 2 && value.every(finite);
+const VICTORY_TEXTS = ['attackerHolds', 'defenderHolds', 'attackerBroken', 'defenderBroken', 'draw'];
+function battleFields(value) {
+  if (own(value, 'terrain') && (typeof value.terrain !== 'string' || !PACK_ID.test(value.terrain))) fail('terrain name is invalid.');
+  if (own(value, 'camera')) {
+    const c = value.camera;
+    if (!record(c) || !point(c.target) || !finite(c.yaw) || !finite(c.dist) || c.dist < 100 || c.dist > 4000) fail('camera needs a finite target, yaw and a distance of 100 to 4000.');
+  }
+  for (const key of ['subtitle', 'statusText']) if (own(value, key) && typeof value[key] !== 'string') fail(key + ' must be a string.');
+  if (own(value, 'seed') && !Number.isSafeInteger(value.seed)) fail('seed must be a safe integer.');
+  if (own(value, 'clockRatio') && (!finite(value.clockRatio) || value.clockRatio < 1 || value.clockRatio > 60)) fail('clock ratio must be finite, from 1 to 60.');
+  if (own(value, 'attacker') && !['US', 'CS'].includes(value.attacker)) fail('attacker must be US or CS.');
+  if (own(value, 'victory') && (!record(value.victory) || Object.keys(value.victory).some(key => !VICTORY_TEXTS.includes(key) || typeof value.victory[key] !== 'string'))) fail('victory texts are invalid.');
+  if (own(value, 'retreat') && (!record(value.retreat) || Object.keys(value.retreat).some(key => !['US', 'CS'].includes(key) || !point(value.retreat[key])))) fail('retreat points are invalid.');
+  if (own(value, 'season') && !['summer', 'spring', 'autumn', 'winter'].includes(value.season)) fail('season is unsupported.');
+}
 function scenario(value) {
   if (!record(value) || !['id', 'title', 'battle', 'date'].every(key => text(value[key]))) fail('scenario needs its identity, title, battle and date.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value.date)) fail('date needs YYYY-MM-DD.');
@@ -86,6 +104,8 @@ function scenario(value) {
   }
   const objective = value.objective;
   if (!record(objective) || !text(objective.name) || !['x', 'z', 'r'].every(key => finite(objective[key])) || objective.r <= 0) fail('objective geometry is invalid.');
+  if (own(objective, 'mode')) fail('objective mode is unsupported; the scenario attacker defines it.');
+  battleFields(value);
   if (own(value, 'opening')) {
     if (!Array.isArray(value.opening)) fail('opening must be an array.');
     const ordered = new Set();
@@ -130,10 +150,11 @@ const styles = new Set(['frame-house', 'stone-house', 'log-house', 'barn', 'shed
 export function prepareFieldScenario(input, routeId) {
   const value = preparePhase({ version: 1, id: 'current-field', title: 'Current field',
     phases: [{ id: 'field', scenario: input }] }, 'field').scenario;
-  if (!['henry-hill', 'first-command', 'saved-practice'].includes(routeId) || value.id !== routeId
+  // 'pack' is any battle-pack phase: the Henry Hill rules without a fixed identity.
+  if (!['henry-hill', 'first-command', 'saved-practice', 'pack'].includes(routeId) || (routeId !== 'pack' && value.id !== routeId)
     || (own(value, 'practiceIntro') && typeof value.practiceIntro !== 'boolean')
     || (own(value, 'savedPractice') && typeof value.savedPractice !== 'boolean')
-    || (routeId === 'henry-hill' && (value.practiceIntro || value.savedPractice))
+    || ((routeId === 'henry-hill' || routeId === 'pack') && (value.practiceIntro || value.savedPractice))
     || (routeId === 'first-command' && (value.practiceIntro !== true || value.savedPractice))
     || (routeId === 'saved-practice' && (value.practiceIntro !== true || value.savedPractice !== true))) fieldFail('the definition does not match the selected route.');
   if (!Array.isArray(value.sites) || value.sites.length > FIELD_LIMITS.sites
@@ -195,9 +216,25 @@ export function prepareFieldScenario(input, routeId) {
 
 /** Bound the downloaded body before parsing; a pending read retains its caller's ownership. */
 export async function loadFieldScenario({ isCurrent = () => true, fetcher = globalThis.fetch } = {}) {
+  return boundedJson('./assets/scenarios/henry-hill.json', { isCurrent, fetcher }, value => prepareFieldScenario(value, 'henry-hill'));
+}
+
+/** One phase of `assets/packs/<packId>.json`, validated as a pack and then as the current field. */
+export async function loadBattlePack({ packId, phaseId, isCurrent = () => true, fetcher = globalThis.fetch } = {}) {
+  if (typeof packId !== 'string' || !PACK_ID.test(packId)) fail('battle pack id is invalid.');
+  if (phaseId !== undefined && phaseId !== null && !text(phaseId)) fail('requested phase is absent.');
+  return boundedJson(`./assets/packs/${packId}.json`, { isCurrent, fetcher }, pack => {
+    const first = record(pack) && Array.isArray(pack.phases) && record(pack.phases[0]) ? pack.phases[0].id : undefined;
+    const prepared = preparePhase(pack, phaseId ?? first);
+    if (prepared.packId !== packId) fail('battle pack identity does not match its file.');
+    return Object.freeze({ ...prepared, scenario: prepareFieldScenario(prepared.scenario, 'pack') });
+  });
+}
+
+async function boundedJson(url, { isCurrent, fetcher }, finish) {
   const current = () => { if (!isCurrent()) fieldFail('the field launch was cancelled.'); };
   current();
-  const response = await fetcher('./assets/scenarios/henry-hill.json', { keepalive: true });
+  const response = await fetcher(url, { keepalive: true });
   let reader;
   try {
     current();
@@ -218,7 +255,7 @@ export async function loadFieldScenario({ isCurrent = () => true, fetcher = glob
     current();
     const bytes = new Uint8Array(await response.arrayBuffer()); current();
     if (bytes.byteLength !== count) fieldFail('the ground description stream is incomplete.');
-    return prepareFieldScenario(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)), 'henry-hill');
+    return finish(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes)));
   } catch (error) {
     // Tee cancellation settles only after BOTH branches are cancelled. Issue both before awaiting.
     const cancellations = [];
@@ -243,7 +280,7 @@ function timelineUnit(unit) {
       || ['rank', 'portrait', 'portraitNote'].some(key => own(unit.commander, key) && typeof unit.commander[key] !== 'string')))) fail('reinforcement roster numbers or metadata are invalid.');
 }
 function timelineRows(value) {
-  const horizon = (clock(value.end) - clock(value.start)) * 60 / CLOCK_RATIO;
+  const horizon = (clock(value.end) - clock(value.start)) * 60 / (value.clockRatio ?? CLOCK_RATIO);
   const rows = own(value, 'reinforcements') ? value.reinforcements : [];
   if (!Array.isArray(rows)) fail('reinforcements must be an array.');
   for (const row of rows) {

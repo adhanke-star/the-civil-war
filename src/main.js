@@ -22,7 +22,7 @@ import { createProgressStore } from './franchise/save.js';
 import { attachPracticeFlow } from './franchise/practice-ui.js';
 import { introScenario, fictionalSurrenderRoute } from './franchise/intro.js';
 import { attachPracticeField } from './ui/practice-field.js';
-import { prepareFieldScenario, loadFieldScenario } from './sim/phase.js';
+import { prepareFieldScenario, loadFieldScenario, loadBattlePack } from './sim/phase.js';
 
 let fieldClaimed = false;
 // Importing this module has no field side effects. The owner commits navigation only after recheck.
@@ -42,14 +42,18 @@ export async function startField({ manifest = null, isCurrent = () => true, onAd
   try {
     const currentOwner = () => { if (!isCurrent()) throw new Error('Practice: deployment review was cancelled.'); };
     const mode = playMode(location.search);
-    const ground = manifest ? null : await loadFieldScenario({ isCurrent });
+    // ?battle=<packId>[&phase=<phaseId>]: any battle pack but Henry Hill, which keeps its own route.
+    const query = new URLSearchParams(location.search), packId = manifest ? null : query.get('battle');
+    const pack = packId && packId !== 'henry-hill'
+      ? await loadBattlePack({ packId, phaseId: query.get('phase') ?? undefined, isCurrent }) : null;
+    const ground = manifest || pack ? null : await loadFieldScenario({ isCurrent });
     currentOwner();
-    const routeId = manifest ? 'saved-practice' : mode === 'practice' && !new URLSearchParams(location.search).has('practice') ? 'first-command' : 'henry-hill';
+    const routeId = manifest ? 'saved-practice' : pack ? 'pack' : mode === 'practice' && !new URLSearchParams(location.search).has('practice') ? 'first-command' : 'henry-hill';
     // A saved manifest's scenario reference is the authoritative outcome identity.
-    const scenario = manifest ? (prepareFieldScenario(manifest.scenario, routeId), manifest.scenario)
+    const scenario = manifest ? (prepareFieldScenario(manifest.scenario, routeId), manifest.scenario) : pack ? pack.scenario
       : prepareFieldScenario(routeId === 'first-command' ? introScenario(ground, { surrender: fictionalSurrenderRoute(location.search) }) : ground, routeId);
     document.getElementById('status').textContent = 'Loading the ground…';
-    const terrain = await loadTerrainData('./assets/terrain');
+    const terrain = await loadTerrainData('./assets/terrain', scenario.terrain ?? 'henry-hill');
     currentOwner();
     if (manifest) {
       const current = await createProgressStore().load();
@@ -104,7 +108,9 @@ const world = buildWorld(scene, terrain, scenario);
 Object.assign(stats, world.stats);
 
 // Opening view: both armies between the clock and the bottom panels; the pitch follows the zoom.
-const rts = new RtsCamera(camera, terrain, scenario.practiceIntro
+const rts = new RtsCamera(camera, terrain, scenario.camera
+  ? { target: [...scenario.camera.target], yaw: scenario.camera.yaw, dist: scenario.camera.dist }
+  : scenario.practiceIntro
   ? { target: [-300, -610], yaw: -Math.PI / 2 - 0.12, dist: 740 }
   : { target: [-60, 200], yaw: -Math.PI / 2 - 0.12, dist: 1150 });
 const effects = new Effects(scene, terrain, rts);
@@ -156,9 +162,10 @@ function setQuality(mode) {
   hud.setQuality(post.mode);
 }
 
-document.getElementById('history-note').textContent = scenario.historyNote;
+document.getElementById('history-note').textContent = pack ? scenario.historyNote ?? '' : scenario.historyNote;
 document.getElementById('menu-title').textContent = scenario.title;
-document.getElementById('menu-subtitle').textContent = scenario.practiceIntro ? 'Fictional teaching exercise · Henry Hill terrain' : 'First Bull Run · 21 July 1861 · 2:00 p.m.';
+document.getElementById('menu-subtitle').textContent = pack ? scenario.subtitle ?? scenario.title
+  : scenario.practiceIntro ? 'Fictional teaching exercise · Henry Hill terrain' : 'First Bull Run · 21 July 1861 · 2:00 p.m.';
 document.title = `The Civil War — ${scenario.title}`;
 game.on('select', (u) => hud.select(u));
 game.on('log', (text) => hud.toast(text));
@@ -184,8 +191,8 @@ const readout = new Readout({ scene, terrain, camera, game, layer: document.getE
 defineSandboxTools({ game, rts, effects, hud });
 practiceFlow = attachPracticeFlow({ game, scenario, hud, mode, manifest });
 const practiceField = attachPracticeField({ game, scenario, hud, camera, terrain, rts, effects, manifest });
-document.getElementById('play-mode').textContent = mode === 'practice'
-  ? 'Practice · rewards enabled' : mode === 'historical' ? 'Historical battle · no franchise rewards' : 'Sandbox · no progress rewards';
+document.getElementById('play-mode').textContent = pack || mode === 'historical' ? 'Historical battle · no franchise rewards'
+  : mode === 'practice' ? 'Practice · rewards enabled' : 'Sandbox · no progress rewards';
 // keep the pause/speed buttons in step with keyboard changes
 const togglePause = game.togglePause.bind(game);
 game.togglePause = () => { const p = togglePause(); hud.setPaused(p); return p; };
@@ -321,7 +328,7 @@ function frame(now) {
     const c = game.clockText();
     hud.setClock(c.date, c.time, c.frac);
     const o = game.objective;
-    hud.objective(`Objective: take ${o.name}. ${game.holder === 'US' ? 'Union troops hold it.' : game.holder === 'CS' ? 'The Confederates hold it.' : game.holder === 'contested' ? 'Contested.' : 'Nobody holds it.'}`);
+    hud.objective(`Objective: ${(scenario.attacker ?? 'US') === game.playerSide ? 'take' : 'hold'} ${o.name}. ${game.holder === 'US' ? 'Union troops hold it.' : game.holder === 'CS' ? 'The Confederates hold it.' : game.holder === 'contested' ? 'Contested.' : 'Nobody holds it.'}`);
     fpsFrames = 0;
     fpsTime = 0;
   }
@@ -332,13 +339,15 @@ function frame(now) {
   if (!window.__ready) {
     window.__ready = true;
     statusEl.textContent = manifest ? 'Your saved army is ready. Continue begins the fictional exercise; losses return to camp.' : scenario.practiceIntro ? 'Your first command is ready. Continue begins the fictional practice fight.'
+      : pack ? scenario.statusText ?? `${scenario.title} is ready. Select a brigade, then drag to give it orders.`
       : 'Henry House Hill, 21 July 1861. Union brigades are below the hill; Jackson holds the crest.';
   }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
-window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, readout, soldierView, gpuTier, practice: practiceFlow, practiceField, manifest };
+window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, readout, soldierView, gpuTier, practice: practiceFlow, practiceField, manifest,
+  pack: pack ? { packId: pack.packId, phaseId: pack.phaseId, nextId: pack.nextId } : null };
 
 // Developer tuning panel (lil-gui), only with ?tune in the URL; players never load it.
 if (new URLSearchParams(location.search).has('tune')) {

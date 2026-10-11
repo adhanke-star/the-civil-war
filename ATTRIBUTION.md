@@ -25,6 +25,11 @@
   https://carto.nationalmap.gov/arcgis/rest/services/transportation/MapServer — public domain.
 - `assets/terrain/henry-hill.json` streams — USGS National Hydrography Dataset,
   https://hydro.nationalmap.gov/arcgis/rest/services/nhd/MapServer — public domain.
+- `assets/terrain/{shiloh,stones-river,chattanooga,lookout-mountain}.{bin,json}` — elevation from the USGS 3DEP
+  bare-earth DEM (as above, public domain); streams from the USGS National Hydrography Dataset (public domain);
+  roads from the US Census Bureau TIGERweb transportation service,
+  https://tigerweb.geo.census.gov/arcgis/rest/services/TIGERweb/Transportation/MapServer — public domain (US
+  federal work). Modern roads stand in for the period alignments named in tools/terrain-config.mjs (Inferred).
 - `assets/portraits/jackson.jpg` — crop of "Stonewall Jackson.jpg" (derivative of NARA 526067),
   https://commons.wikimedia.org/wiki/File:Stonewall_Jackson.jpg — public domain. Photographed 1863.
 - `assets/portraits/sherman.jpg` — crop of "General William T. Sherman - NARA - 527045.jpg",

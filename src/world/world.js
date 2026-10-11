@@ -24,9 +24,11 @@ export function buildWorld(scene, terrain, scenario) {
   setPlan(scenario);
   const sun = makeSun();
   const meta = terrain.meta;
-  const pike = meta.roads.find((r) => r.name === 'Warrenton Turnpike');
-  const a = pike.points[0], b = pike.points[pike.points.length - 1];
-  const angle = Math.atan2(b[1] - a[1], b[0] - a[0]);
+  // Parcels line up with the main road: a pike, else the Warrenton Turnpike, else the first road, else east-west.
+  const roads = meta.roads || [];
+  const pike = roads.find((r) => r.kind === 'pike') || roads.find((r) => r.name === 'Warrenton Turnpike') || roads[0];
+  const a = pike?.points?.[0], b = pike?.points?.[pike.points.length - 1];
+  const angle = a && b ? Math.atan2(b[1] - a[1], b[0] - a[0]) : 0;
 
   const t0 = performance.now();
   const roadField = new LineField(terrain.half, meta.roads);

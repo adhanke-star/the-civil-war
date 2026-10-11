@@ -449,7 +449,8 @@ export class Unit {
 
   // ---------------------------------------------------------------------------------------------------
   // Per-frame movement (Yuka EntityManager updates the vehicle before this).
-  move(dt, homeZ) {
+  /** homeZ: the friendly map edge a rout runs to; home ([x, z], a scenario retreat point) overrides it. */
+  move(dt, homeZ, home = null) {
     const o = this.order;
     const v = this.vehicle;
     let speed = SPEED.walk;
@@ -470,10 +471,16 @@ export class Unit {
     if (this.state === 'routing') {
       this.follow.active = false;
       this.setFormation('line');
-      const dz = homeZ - this.z;
-      const goalYaw = Math.atan2(0, dz);
-      v.velocity.set(0, 0, Math.sign(dz) * speed);
-      this.goalFacing = goalYaw;
+      if (home) {
+        const dx = home[0] - this.x, dz = home[1] - this.z, d = Math.hypot(dx, dz);
+        if (d > 1) { v.velocity.set((dx / d) * speed, 0, (dz / d) * speed); this.goalFacing = Math.atan2(dx, dz); }
+        else v.velocity.set(0, 0, 0);
+      } else {
+        const dz = homeZ - this.z;
+        const goalYaw = Math.atan2(0, dz);
+        v.velocity.set(0, 0, Math.sign(dz) * speed);
+        this.goalFacing = goalYaw;
+      }
       this.facing += wrap(this.goalFacing - this.facing) * Math.min(1, dt * 3);
     } else if (this.follow.active) {
       // trim the arrow behind the unit

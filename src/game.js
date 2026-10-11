@@ -40,6 +40,8 @@ const SPAWN_RESERVE = 2100; // figures per side kept free for sandbox spawns (fo
 const ARC = (65 * Math.PI) / 180; // the firing arc each side of the facing (combat.js)
 // Ephemeral state belongs to a real scheduled Game; borrowed legacy methods have no entry.
 const reinforcementState = new WeakMap();
+// Read from the scenario, not an own field, so borrowed Game methods (tests) and pinned key lists still work.
+const clockRatioOf = (game) => game.scenario.clockRatio ?? CLOCK_RATIO;
 const pendingInfantry = (game, side) => {
   const state = reinforcementState.get(game);
   return !!state && (state.plan.events.some(e => e.atSec > state.cursor && e.unit.side === side
@@ -245,6 +247,31 @@ function scheduledReady(game, state) {
   if (!state.initialized) throw new Error('Reinforcements: attach listeners and initialize before advancing the battle.');
 }
 
+/**
+ * Battle-pack victory (the scenario names its attacker): a broken side loses; at the end the attacker
+ * wins only by holding the objective alone, a contested objective is a draw, anything else is the
+ * defender's. Grade is from the player's side. Henry Hill and practice keep their own rules above.
+ */
+function packResult(game, effective, ended) {
+  const A = game.scenario.attacker, D = A === 'US' ? 'CS' : 'US';
+  const V = game.scenario.victory || {}, o = game.objective;
+  const name = (side) => (side === 'US' ? 'Union' : 'Confederate');
+  let result = null;
+  if (effective(D) === 0 && !pendingInfantry(game, D)) result = { winner: A, why: V.defenderBroken ?? `The ${name(D)} line has broken.` };
+  else if (effective(A) === 0 && !pendingInfantry(game, A)) result = { winner: D, why: V.attackerBroken ?? `The ${name(A)} line has broken.` };
+  else if (ended) {
+    if (game.holder === A) result = { winner: A, why: V.attackerHolds ?? `${name(A)} troops hold ${o.name} at the end of the day.` };
+    else if (game.holder === 'contested') result = { winner: null, draw: true, why: V.draw ?? `${o.name} is still contested at the end of the day.` };
+    else result = { winner: D, why: V.defenderHolds ?? `The ${name(A)} attack did not take ${o.name}.` };
+  }
+  if (!result) return null;
+  const ps = game.playerSide, enemy = ps === 'US' ? 'CS' : 'US', lost = { US: 0, CS: 0 };
+  for (const u of game.units) lost[u.side] += Math.max(0, (u.menMax || 0) - (u.men || 0));
+  result.grade = result.draw ? 'draw' : result.winner !== ps ? 'defeat'
+    : lost[enemy] > 0 && lost[enemy] >= 2 * lost[ps] ? 'decisive' : 'victory';
+  return result;
+}
+
 export class Game {
   constructor({ scene, terrain, scenario, world, effects, playerSide = 'US' }) {
     // This validates structure, not hardware admission: routed definitions pass the field guard upstream.
@@ -262,7 +289,7 @@ export class Game {
     this.scenario = scenario;
     this.effects = effects;
     this.playerSide = playerSide;
-    this.rnd = mulberry32(18610721);
+    this.rnd = mulberry32(scenario.seed ?? 18610721);
     this.paused = false;
     this.speed = 1;
     this.simTime = 0;
@@ -362,6 +389,9 @@ export class Game {
     }
     return changed;
   }
+
+  /** Historical seconds per simulation second: the scenario's clockRatio, else CLOCK_RATIO. */
+  get clockRatio() { return clockRatioOf(this); }
 
   /** Start loading the baked atlas (once); the rigged figures draw until it is ready. */
   ensureBaked() {
@@ -608,7 +638,7 @@ export class Game {
 
   /** March time in historical minutes for `len` metres at the walking pace (the ghost's label). */
   marchMinutes(len) {
-    return (len / (SPEED.walk * RULES.marchSpeed)) * (this.scenario.practiceIntro ? 1 : CLOCK_RATIO) / 60;
+    return (len / (SPEED.walk * RULES.marchSpeed)) * (this.scenario.practiceIntro ? 1 : clockRatioOf(this)) / 60;
   }
 
   /** Attack order: close to effective range with line of sight, halt and fire; follow a target that moves. */
@@ -657,7 +687,7 @@ export class Game {
     if (this.scenario.practiceIntro) return { date: 'Practice',
       time: `${String(Math.floor(this.simTime / 60)).padStart(2, '0')}:${String(Math.floor(this.simTime % 60)).padStart(2, '0')}`,
       frac: Math.min(1, this.simTime / 45) };
-    const t = this.clockStart + this.simTime * CLOCK_RATIO;
+    const t = this.clockStart + this.simTime * clockRatioOf(this);
     const h = Math.floor(t / 3600), m = Math.floor((t % 3600) / 60);
     const [y, mo, d] = this.scenario.date.split('-').map(Number);
     const sfx = d % 10 === 1 && d !== 11 ? 'st' : d % 10 === 2 && d !== 12 ? 'nd' : d % 10 === 3 && d !== 13 ? 'rd' : 'th';
@@ -716,7 +746,7 @@ export class Game {
     this.entities.update(h);
     for (const u of this.units) {
       if (!u.alive) continue;
-      u.move(h, u.side === 'US' ? -this.terrain.half + 40 : this.terrain.half - 40);
+      u.move(h, u.side === 'US' ? -this.terrain.half + 40 : this.terrain.half - 40, this.scenario.retreat?.[u.side] ?? null);
     }
     const pre = state?.capture ? captureCorridors(this) : null;
     if (pre) state.capture.pre = pre;
@@ -761,7 +791,7 @@ export class Game {
     this.emit('alert', { text, x, z });
   }
 
-  /** Henry House Hill: who holds the plateau? Union wins by holding it at the end, or by breaking the defence. */
+  /** Who holds the objective? Henry House Hill: Union wins by holding it at the end, or by breaking the defence; packs use packResult. */
   checkObjective(h, force = false) {
     this.objT = (this.objT || 0) - h;
     if (this.objT > 0 && !force) return;
@@ -785,12 +815,13 @@ export class Game {
     }
     const effective = (side) => this.units.filter((u) => u.side === side && u.alive && u.state !== 'routing' && u.type === 'infantry').length;
     if (this.over) return;
-    const t = this.clockStart + this.simTime * CLOCK_RATIO;
+    const t = this.clockStart + this.simTime * clockRatioOf(this);
     let result = null;
     if (this.scenario.practiceIntro) {
       if (effective('US') === 0 && !pendingInfantry(this, 'US') || this.holder !== 'US') result = { winner: 'CS' };
       else if (effective('CS') === 0 && !pendingInfantry(this, 'CS') || t >= this.clockEnd) result = { winner: 'US' };
     }
+    else if (this.scenario.attacker) result = packResult(this, effective, t >= this.clockEnd || force);
     else if (effective('CS') === 0 && !pendingInfantry(this, 'CS')) result = { winner: 'US', why: 'The Confederate line on Henry House Hill has broken.' };
     else if (effective('US') === 0 && !pendingInfantry(this, 'US')) result = { winner: 'CS', why: 'Every Union brigade is in retreat.' };
     else if (t >= this.clockEnd) {

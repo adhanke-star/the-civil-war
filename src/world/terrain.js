@@ -11,8 +11,9 @@ import Martini from '@mapbox/martini';
 
 export const EXAGGERATION = 2.0;
 
-export async function loadTerrainData(base) {
-  const meta = await (await fetch(`${base}/henry-hill.json`)).json();
+export async function loadTerrainData(base, name = 'henry-hill') {
+  if (!/^[a-z0-9-]{1,40}$/.test(name)) throw new Error(`terrain name "${name}" is invalid`);
+  const meta = await (await fetch(`${base}/${name}.json`)).json();
   const res = await fetch(`${base}/${meta.heights.file}`);
   if (!res.ok) throw new Error(`heightmap HTTP ${res.status}`);
   // Read the whole download first: piping res.body straight into the decompressor let the gzip end

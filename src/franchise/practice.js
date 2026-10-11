@@ -228,7 +228,7 @@ export function surrenderOutcome({ game, scenario }) {
   if ((!flag && 'surrender' in scenario) || (flag && !('value' in flag))) fail('invalid surrender activation descriptor.');
   if (!flag || flag.value === false) return null;
   if (flag.value !== true) fail('invalid surrender activation value.');
-  if (game.over !== true || !['US', 'CS'].includes(game.result?.winner)) fail('surrender result needs a completed encounter.');
+  if (game.over !== true || !(['US', 'CS'].includes(game.result?.winner) || game.result?.winner === null && game.result.draw === true)) fail('surrender result needs a completed encounter.');
   // The existing Game owner validates its original source definitions, roster and gun identities.
   const observation = game.captureSnapshot();
   const finite = n => Number.isFinite(n) && n >= 0;

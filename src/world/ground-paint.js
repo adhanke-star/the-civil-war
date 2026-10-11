@@ -113,7 +113,7 @@ export function paintGround(terrain, parcels, roads, streams, trees, sunDir) {
 
   // Streams: wide muddy banks, then water, then a light ripple line.
   for (const s of streams) {
-    const big = s.name === 'Bull Run';
+    const big = s.kind === 'river' || s.name === 'Bull Run';
     ctx.strokeStyle = 'rgba(122,98,52,0.9)';
     ctx.lineWidth = (big ? 26 : 13) * S;
     path(ctx, s.points); ctx.stroke();
@@ -133,7 +133,7 @@ export function paintGround(terrain, parcels, roads, streams, trees, sunDir) {
 
   // Roads: dark verge, orange-tan bed, lighter crown; the turnpike is wider and paler.
   for (const r of roads) {
-    const pike = r.name === 'Warrenton Turnpike';
+    const pike = r.kind === 'pike' || r.name === 'Warrenton Turnpike';
     const w = pike ? 10 : 8;
     ctx.strokeStyle = 'rgba(70,56,30,0.55)';
     ctx.lineWidth = (w + 5) * S;

@@ -3,6 +3,8 @@ import { createProgressStore, completedSnapshot, exportSnapshot } from './save.j
 import { practiceOutcome, savedOutcome, assertSavedLaunch, surrenderOutcome } from './practice.js';
 import { mountReward, configureRewardReplay, surrenderReportText } from '../reward/sequence.js';
 
+const GRADE_TEXT = { decisive: 'Decisive victory', victory: 'Victory', draw: 'Draw', defeat: 'Defeat' };
+
 export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null }) {
   if (manifest) assertSavedLaunch(manifest);
   const store = createProgressStore();
@@ -181,11 +183,14 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
     }
     if (saved) { showSaved(); return; }
     if (failure || pending) { recover(); return; }
+    const grade = GRADE_TEXT[game.result.grade] || '';
     const message = outcome
       ? `${manifest ? savedResultWhy() : game.result.why} ${outcome.summary.surviving.toLocaleString()} surviving men; ${outcome.summary.losses.toLocaleString()} lost. ${outcome.captures.length} held field crates. ${manifest ? 'Open only the new loot, save these survivors, then return to camp.' : 'Open the practice quartermaster issue.'}`
-      : `${game.result.why} ${mode === 'historical' ? 'Historical battles grant no franchise rewards.' : 'Sandbox or altered battles grant no progress rewards.'}`;
+      : `${game.result.why}${grade ? ` Result: ${grade}.` : ''} ${mode === 'historical' ? 'Historical battles grant no franchise rewards.' : 'Sandbox or altered battles grant no progress rewards.'}`;
     const report = surrenderReportText(surrenderResult);
-    panel(game.result.winner === 'US' ? 'Union victory' : 'Confederate victory', report ? `${message} ${report}` : message, outcome ? 'Open the loot' : null, openLoot, { exportable: !!manifest && !!outcome });
+    // Battle-pack results may be a draw (winner null) and carry the player's grade.
+    const heading = game.result.winner === 'US' ? 'Union victory' : game.result.winner === 'CS' ? 'Confederate victory' : 'Drawn battle';
+    panel(heading, report ? `${message} ${report}` : message, outcome ? 'Open the loot' : null, openLoot, { exportable: !!manifest && !!outcome });
   }
   function finishResult() {
     if (captured) return;
