@@ -70,6 +70,7 @@ import { dockControls } from './test-dock-ui.mjs';
 import { headerControls, headerAfterAction, headerStores, headerIntro, finishHeader } from './test-header-ui.mjs';
 import { deploymentProgress } from './test-deployment-ui.mjs';
 import { soldierViewControls } from './test-soldier-view-ui.mjs';
+import { feedbackControls } from './test-feedback-ui.mjs';
 import { reinforcementUIControls } from './test-reinforcement-ui.mjs';
 import { fieldAdmissionControls } from './test-field-admission-ui.mjs';
 import { finalizeActivationUI } from './test-surrender-activation-ui.mjs';
@@ -1734,6 +1735,7 @@ async function browserChecks(server, url) {
     browser = await chromium.launch(native ? { channel: 'chrome', headless: false }
       : { headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     result.browser = `chromium ${browser.version()}`;
+    if (process.argv.includes('--feedback')) { result.mode = 'bounded field feedback'; await feedbackControls({ browser, url, check, shot, result, watchErrors, native, focused: true }); return; }
     if (process.argv.includes('--reinforcement-ui')) { result.mode = 'scheduled reinforcement UI'; await reinforcementUIControls({ browser, url, check, shot, result, native }); return; }
     if (process.argv.includes('--field-admission')) { result.mode = 'current field admission'; await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native }); return; }
     if (process.argv.includes('--soldier-view')) { result.mode = 'held soldier-eye view'; await soldierViewControls({ browser, url, check, shot, result, watchErrors, native, focused: true }); return; }
@@ -1783,13 +1785,14 @@ async function browserChecks(server, url) {
       const { rewardFocusControls } = await import('./test-reward-focus-ui.mjs');
       await rewardFocusControls({ browser, url, check, result });
     }
-    // Shard 3: surrender result, reinforcements, field admission and the soldier-eye view.
+    // Shard 3: surrender result, reinforcements, field admission, the soldier-eye view and field feedback.
     if (runs(3)) {
       const { surrenderResultUIControls } = await import('./test-surrender-result-ui.mjs');
       await surrenderResultUIControls({ browser, url, check, result });
       await reinforcementUIControls({ browser, url, check, shot, result, native });
       await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native });
       await soldierViewControls({ browser, url, check, shot, result, watchErrors, native });
+      await feedbackControls({ browser, url, check, shot, result, watchErrors, native });
     }
     finalizeActivationUI({ result, check });
   } finally {

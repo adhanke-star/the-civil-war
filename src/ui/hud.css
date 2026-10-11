@@ -195,7 +195,7 @@ body dialog.field-loot-preview .rw { left: 0; right: 0; top: 60px; bottom: 0; }
 #tip { bottom: calc(var(--edge) + var(--dock-h) + 10px + env(safe-area-inset-bottom)); left: calc(var(--edge) + env(safe-area-inset-left)); margin: 0; padding: 8px 14px; font-size: 14px; max-width: min(460px, 40vw); pointer-events: none; }
 #tip[hidden] { display: none; }
 #toasts { position: fixed; top: calc(var(--top-h) + 64px); left: 50%; transform: translateX(-50%); display: grid; gap: 6px; pointer-events: none; z-index: 11; }
-#toasts p { margin: 0; padding: 6px 12px; background: var(--panel); border-radius: 6px; font: 15px Georgia, serif; text-align: center; animation: fade 5s forwards; }
+#toasts > .transient-toast { margin: 0; padding: 6px 12px; background: var(--panel); border-radius: 6px; font: 15px Georgia, serif; text-align: center; animation: fade 5s forwards; }
 @keyframes fade { 0%, 80% { opacity: 1; } 100% { opacity: 0; } }
 
 /* ---- on the field: box select, ghost label, casualty numbers ----------------------------------------- */
@@ -376,6 +376,53 @@ body:has(.sb-toggle.sb-closed:not(.sb-left)) #soldier-view-hint { right: calc(va
   body:has(.sb-toggle.sb-left.sb-closed) #objective { left: calc(var(--edge) + 60px + env(safe-area-inset-left)); }
   body:has(.sb-toggle.sb-closed:not(.sb-left)) #objective { right: calc(var(--edge) + 60px + env(safe-area-inset-right)); }
 }
+
+/* One bounded field reader. Original child owners retain visibility, messages and lifetimes. */
+body #toasts {
+  top: var(--feedback-top, calc(var(--top-h) + var(--objective-h) + 12px));
+  left: var(--feedback-left, 8px); right: var(--feedback-right, 8px); bottom: auto;
+  transform: none; width: auto; height: min(180px, var(--feedback-height));
+  box-sizing: border-box; display: none; flex-direction: column; align-items: stretch; gap: 4px;
+  overflow-x: hidden; overflow-y: auto; overflow-wrap: anywhere; overscroll-behavior: contain;
+  touch-action: pan-y; scrollbar-gutter: stable; padding: 2px 18px 2px 2px;
+  border: 1px solid var(--panel-edge); border-radius: 8px; background: #18161d;
+  pointer-events: auto; z-index: 11; font-size: 14px;
+}
+body #toasts:has(> .transient-toast:not(:empty)),
+body #toasts:has(> #banner:not([hidden]) #banner-text:not(:empty)),
+body #toasts:has(> #moment-banner:not([hidden]):not(:empty)),
+body #toasts:has(> #feed:not([hidden]):not(:empty)),
+body.soldier-view #toasts:has(> #soldier-view-hint:not([hidden]):not(:empty)),
+body.keyboard-targeting #toasts:has(> #keyboard-targeting:not([hidden]):not(:empty)),
+body:not(.soldier-view):not(.keyboard-targeting) #toasts:has(> #intro-hint:not([hidden]):not(:empty)),
+body:not(.soldier-view):not(.keyboard-targeting) #toasts:has(> #tip:not([hidden]):not(:empty)) { display: flex; }
+body #toasts > * { flex: none; order: 1; min-width: 0; }
+body #toasts > [hidden] { display: none !important; }
+body #toasts > :is(#tip, #intro-hint, #keyboard-targeting, #soldier-view-hint, #banner, #moment-banner, #feed) {
+  position: static; inset: auto; transform: none; width: 100%; max-width: none;
+  margin: 0; box-sizing: border-box; font-size: 14px; pointer-events: auto;
+}
+body #toasts > :is(#tip, #intro-hint, #keyboard-targeting, #soldier-view-hint) {
+  overscroll-behavior: auto;
+  order: 0; min-height: 44px; max-height: calc(min(180px, var(--feedback-height)) - 6px);
+  padding: 2px 4px; overflow-x: hidden; overflow-y: auto; line-height: 1.35;
+}
+body #toasts > #intro-hint { order: -1; }
+body.keyboard-targeting #toasts > #keyboard-targeting { order: -2; }
+body.soldier-view #toasts > #soldier-view-hint { order: -3; padding: 1px 4px; }
+body.soldier-view #toasts > :is(#tip, #intro-hint),
+body.keyboard-targeting #toasts > :is(#tip, #intro-hint) { display: none; }
+body #toasts > #banner { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 2px; }
+body #toasts #banner-text { grid-column: 1 / -1; overflow-wrap: anywhere; }
+body #toasts > #moment-banner { padding: 4px; }
+body #toasts > #feed { display: grid; gap: 6px; padding: 2px; list-style: none; }
+body #toasts > #feed:empty { display: none; }
+body #toasts #feed li { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+body #toasts #feed button { width: auto; justify-self: start; display: block; min-height: 44px; min-width: 44px;
+  padding: 0 12px; font-size: 14px; text-align: center; border: 1px solid #958da1; background: #302d38; }
+body #toasts button:focus-visible, body #toasts:focus-visible,
+body #toasts > :is(#tip, #intro-hint, #keyboard-targeting):focus-visible { outline-offset: -4px; }
+@media (max-width: 899px) { body:has(#sb-panel:not([hidden])) #toasts { display: none !important; } }
 
 /* Scheduled arrivals: wrap the complete reason and retain readable native actions. */
 #banner { background: #18161d; box-sizing: border-box; flex-wrap: wrap; width: max-content; max-width: calc(100vw - 16px); }

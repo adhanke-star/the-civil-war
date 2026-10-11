@@ -154,6 +154,7 @@ export class Hud {
         const height = dock.getBoundingClientRect().height;
         document.documentElement.style.setProperty('--dock-h', height + 'px');
         document.documentElement.style.setProperty('--objective-h', $('objective').getBoundingClientRect().height + 'px');
+        this.layoutFeedback();
       });
     });
     this.dockObserver.observe(dock);
@@ -165,11 +166,15 @@ export class Hud {
     });
     $('unitcard').addEventListener('focus', () => { this.rts?.keys.clear(); if (this.rts) this.rts.inertia = null; });
     // Reading and native buttons own their keys. Defaults still scroll/click; keyup clears RTS keys.
-    for (const id of ['topbar', 'army', 'field-stores', 'objective', 'tip', 'intro-hint', 'keyboard-targeting']) {
+    for (const id of ['topbar', 'army', 'field-stores', 'objective', 'tip', 'intro-hint', 'keyboard-targeting', 'toasts']) {
       const region = $(id);
       region.addEventListener('focusin', () => { this.rts?.keys.clear(); if (this.rts) this.rts.inertia = null; });
       region.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
+          if (id === 'toasts') {
+            if (!e.target.closest('#keyboard-targeting')) { e.stopPropagation(); this.canvas.focus({ preventScroll: true }); }
+            return;
+          }
           if (id === 'army') { e.stopPropagation(); this.toggleArmy(false); }
           else if (id === 'field-stores') e.stopPropagation(); // Keep the existing same-element Close listener.
           else if (['objective', 'tip', 'intro-hint', 'keyboard-targeting'].includes(id)) this.canvas.focus({ preventScroll: true });
@@ -223,6 +228,11 @@ export class Hud {
     $('banner-fly').addEventListener('click', () => { if (this.alertAt && this.onFly) this.onFly(this.alertAt.x, this.alertAt.z); });
     $('banner-resume').addEventListener('click', () => { if (this.onResume) this.onResume(); });
 
+    // Reuse the original nodes and handlers. Only transient toast children expire or hit their cap.
+    $('toasts').append(...['tip', 'intro-hint', 'keyboard-targeting', 'soldier-view-hint', 'banner'].map($), this.momentBanner, $('feed'));
+    this.feedbackOwner = null;
+    this.layoutFeedback();
+
     this.ghostLabel = $('ghost-label');
     this.ghostAt = null;
     this.dragLabel = null;
@@ -247,6 +257,45 @@ export class Hud {
     // Stack/hit rectangles must use the new CSS dimensions on the next frame, including while paused.
     for (const m of this.markers.values()) { m.w = 0; m.h = 0; }
     this.sizeTimer = 0;
+  }
+
+  /** One native reading area between actual HUD edges, including either workbench side. */
+  layoutFeedback() {
+    const region = $('toasts'), top = $('topbar').getBoundingClientRect(), objective = $('objective').getBoundingClientRect();
+    const dock = $('dock').getBoundingClientRect();
+    const y = Math.max(top.bottom, objective.height ? objective.bottom : top.bottom) + 2;
+    let left = 8, right = 8;
+    const panel = $('sb-panel');
+    if (innerWidth >= 900 && panel && !panel.hidden) {
+      const p = panel.getBoundingClientRect();
+      if (document.body.classList.contains('sb-open-left')) left = p.right + 8;
+      else right = innerWidth - p.left + 8;
+    }
+    const toggle = document.querySelector('.sb-toggle');
+    if (toggle && !toggle.hidden && toggle.getClientRects().length) {
+      const t = toggle.getBoundingClientRect();
+      const bottom = y + Math.min(180, dock.top - 2 - y);
+      if (t.bottom > y && t.top < bottom) {
+        if (toggle.classList.contains('sb-left')) left = Math.max(left, t.right + 4);
+        else right = Math.max(right, innerWidth - t.left + 4);
+      }
+    }
+    for (const [key, value] of [['top', y], ['height', dock.top - 2 - y], ['left', left], ['right', right]]) {
+      const name = '--feedback-' + key, text = value + 'px';
+      if (region.style.getPropertyValue(name) !== text) region.style.setProperty(name, text);
+    }
+    // Visibility depends only on the original child owners, never on this parent's clipped layout.
+    const held = document.body.classList.contains('soldier-view'), targeting = document.body.classList.contains('keyboard-targeting');
+    const owner = ['soldier-view-hint', 'keyboard-targeting', 'intro-hint', 'tip'].find(id => {
+      const e = $(id);
+      return !e.hidden && e.textContent.trim() && (id === 'soldier-view-hint' ? held
+        : id === 'keyboard-targeting' ? targeting : !held && !targeting);
+    }) || null;
+    if (owner !== this.feedbackOwner) {
+      this.feedbackOwner = owner;
+      if (owner) region.prepend($(owner));
+      region.scrollTop = 0;
+    }
   }
 
   showMoment(moment) {
@@ -413,10 +462,11 @@ export class Hud {
 
   /** Per frame: place markers (stacked so none hides another); every 0.25 s refresh numbers. */
   update(dt) {
+    this.layoutFeedback();
     const w = window.innerWidth, h = window.innerHeight;
     const bounds = { left: 4, right: w - 4, top: $('topbar').getBoundingClientRect().bottom + 4, bottom: h - 4 };
     // Reserve the actual visible panels rather than the entire dock's transparent bounding box.
-    const obstacles = ['unitcard', 'orders', 'minimap-box', 'objective', 'tip', 'intro-hint', 'army', 'field-stores', 'feed', 'moment-banner', 'keyboard-targeting'].flatMap((id) => {
+    const obstacles = ['unitcard', 'orders', 'minimap-box', 'objective', 'army', 'field-stores', 'toasts'].flatMap((id) => {
       const el = $(id), r = el.getBoundingClientRect();
       return !el.hidden && r.width > 0 && r.height > 0 ? [{ x: r.x + r.width / 2, y: r.bottom, w: r.width, h: r.height }] : [];
     });
@@ -560,23 +610,28 @@ export class Hud {
   }
 
   // ---- event feed -----------------------------------------------------------------------------------------
-  /** One event ({ text, time, x, z, side }): the newest at the bottom, the last six kept; click flies there. */
+  /** Full event text and one contextual Fly action; keep the newest six without stealing reading focus. */
   feed(ev) {
     const list = $('feed');
     const li = document.createElement('li');
     const b = document.createElement('button');
     b.type = 'button';
-    b.innerHTML = '<time></time><span></span>';
-    b.querySelector('time').textContent = ev.time;
-    const span = b.querySelector('span');
+    const time = document.createElement('time'), span = document.createElement('span');
+    time.textContent = ev.time;
     span.textContent = ev.text;
     if (ev.side) span.className = ev.side.toLowerCase();
     if (Number.isFinite(ev.x)) b.addEventListener('click', () => { if (this.onFly) this.onFly(ev.x, ev.z); });
     else b.disabled = true;
     b.title = Number.isFinite(ev.x) ? 'Fly there' : '';
-    li.appendChild(b);
+    b.textContent = 'Fly there';
+    b.setAttribute('aria-label', `Fly there: ${time.textContent} ${span.textContent}`);
+    li.append(time, span, b);
     list.appendChild(li);
-    while (list.children.length > 6) list.firstChild.remove();
+    while (list.children.length > 6) {
+      const removed = list.firstChild, focused = removed.contains(document.activeElement);
+      removed.remove();
+      if (focused) $('toasts').focus({ preventScroll: true });
+    }
   }
 
   toggleMinimap() { if (this.minimap) this.minimap.toggleLarge(); }
@@ -589,10 +644,14 @@ export class Hud {
 
   toast(text) {
     const p = document.createElement('p');
+    p.className = 'transient-toast';
+    p.setAttribute('role', 'status');
+    p.setAttribute('aria-live', 'polite');
     p.textContent = text;
     $('toasts').appendChild(p);
     setTimeout(() => p.remove(), 5200);
-    while ($('toasts').children.length > 4) $('toasts').firstChild.remove();
+    const transient = [...$('toasts').querySelectorAll(':scope > .transient-toast')];
+    while (transient.length > 4) transient.shift().remove();
   }
 
   objective(text) {

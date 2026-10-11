@@ -90,7 +90,7 @@ async function observers(page) {
     const overlay = () => {
       const camera = x.camera, failures = [], markerRects = [], shown = [], expectedStyle = document.createElement('span').style;
       const bounds = { left: 4, right: innerWidth - 4, top: document.getElementById('topbar').getBoundingClientRect().bottom + 4, bottom: innerHeight - 4 };
-      const obstacles = ['unitcard', 'orders', 'minimap-box', 'objective', 'tip', 'intro-hint', 'army', 'field-stores', 'feed', 'moment-banner', 'keyboard-targeting'].flatMap(id => {
+      const obstacles = ['unitcard', 'orders', 'minimap-box', 'objective', 'army', 'field-stores', 'toasts'].flatMap(id => {
         const e = document.getElementById(id), r = e.getBoundingClientRect();
         return !e.hidden && r.width > 0 && r.height > 0 ? [{ x: r.x + r.width / 2, y: r.bottom, w: r.width, h: r.height }] : [];
       });

@@ -69,8 +69,13 @@ export class Input {
     hud.onMarkerDown = (u, e) => this.down(e, u);
     window.addEventListener('pointermove', (e) => this.move(e));
     window.addEventListener('pointerup', (e) => this.up(e));
-    window.addEventListener('pointercancel', (e) => this.cancel(e));
-    window.addEventListener('pointerdown', () => this.cancelTargeting());
+    window.addEventListener('pointercancel', (e) => {
+      if (e.target?.closest?.('#toasts') && !this.pointers.has(e.pointerId)) return;
+      this.cancel(e);
+    });
+    window.addEventListener('pointerdown', (e) => {
+      if (!e.target?.closest?.('#toasts')) this.cancelTargeting();
+    });
     // Safari: no page pinch-zoom or rubber-band scroll over the field (touch-action: none covers the rest)
     for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, (e) => e.preventDefault(), { passive: false });
     for (const el of [canvas, document.getElementById('markers')]) el.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
@@ -544,6 +549,7 @@ export class Input {
 
   key(e) {
     if (document.querySelector('main')?.inert || document.querySelector('dialog[open]')) { this.rts.keys.clear(); this.cancelTargeting(); return; }
+    if (e.target?.closest?.('#toasts') && !(e.key === 'Escape' && e.target.closest('#keyboard-targeting'))) return;
     if (e.target?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), #sb-panel') || e.metaKey || e.ctrlKey || e.altKey) return;
     const k = e.key.toLowerCase();
     const onButton = !!e.target?.closest?.('button, a[href], [role="button"]');

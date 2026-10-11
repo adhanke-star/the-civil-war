@@ -228,6 +228,7 @@ const soldierView = new SoldierView({ camera, rts, game, terrain, post,
     canvas.focus({ preventScroll: true });
     document.body.classList.add('soldier-view');
     hint.hidden = false;
+    hud.layoutFeedback();
     statusEl.textContent = 'Soldier-eye inspection. Release I to return to the map.';
     arrows.group.visible = false;
     readout.mesh.visible = false;

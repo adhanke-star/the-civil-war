@@ -117,7 +117,7 @@ export async function viewControls({ page, check, shot, result }) {
       && high.units === cameraBefore.units && high.time === cameraBefore.time && high.paused, 'keyboard elevation changes goal pitch by30degrees while centre/distance/yaw/paused units/time stay exact');
     await page.locator('#sb-toggle').click(); await page.waitForTimeout(900); highSettled = await state();
     const diagnostic = await page.evaluate(() => {
-      const panels = ['unitcard', 'orders', 'minimap-box', 'objective', 'tip', 'intro-hint', 'army', 'field-stores', 'feed'].map((id) => document.getElementById(id))
+      const panels = ['unitcard', 'orders', 'minimap-box', 'objective', 'army', 'field-stores', 'toasts'].map((id) => document.getElementById(id))
         .filter((n) => !n.hidden).map((n) => n.getBoundingClientRect()).filter((r) => r.width && r.height);
       const highMarkers = [...window.__game.hud.markers.entries()].filter(([, m]) => !m.el.classList.contains('hidden')).map(([id, m]) => {
         const b = m.el.getBoundingClientRect(), f = m.el.querySelector('svg').getBoundingClientRect(), x = f.x + f.width / 2, y = f.y + f.height / 2;
