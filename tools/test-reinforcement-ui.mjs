@@ -183,8 +183,8 @@ async function readable(page,width) {
   const axes=(await new AxeBuilder({page}).include('#banner').include('#feed').include('#army').analyze()).violations;
   const before=await page.evaluate(()=>({styleCount:document.querySelectorAll('style').length,focus:document.activeElement,scroll:document.getElementById('feed').scrollTop})).then(x=>({styleCount:x.styleCount,scroll:x.scroll}));
   const originalFont=await page.locator('#feed button').first().evaluate(el=>getComputedStyle(el).fontSize);
-  // Legacy 13px feed rule (pre-readability CSS) as a fixed negative control.
-  const rule='#feed button { width: 100%; min-height: 32px; display: flex; gap: 8px; align-items: baseline; text-align: left; padding: 3px 6px; background: none; border: 0; border-radius: 4px; cursor: pointer; font-size: 13px; }';
+  // Legacy 13px feed rule (pre-readability CSS) as a fixed negative control; !important so it beats the bounded reader's rule.
+  const rule='#feed button { width: 100%; min-height: 32px; display: flex; gap: 8px; align-items: baseline; text-align: left; padding: 3px 6px; background: none; border: 0; border-radius: 4px; cursor: pointer; font-size: 13px !important; }';
   await page.evaluate(rule=>{const style=document.createElement('style');style.id='e2-owned-legacy-feed-control';style.textContent=rule;document.head.append(style)},rule);
   let caught;try{const font=await page.locator('#feed button').first().evaluate(el=>parseFloat(getComputedStyle(el).fontSize));assert.ok(font>=14,'legacy CSS13px must reject actual readability assertion')}catch(e){caught=e}
   assert.equal(caught?.code,'ERR_ASSERTION');
