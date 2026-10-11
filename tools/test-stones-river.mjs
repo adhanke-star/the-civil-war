@@ -264,7 +264,7 @@ export const STONES_RIVER_CHECKS = [
   ['campaign', async (api) => {
     const raw = api.campaign(), pack = api.shipped();
     const def = await run('campaign', () => validateCampaign(raw));
-    assert.deepEqual(def.phases.map((p) => [p.packId, p.phaseId, p.loan === true]), [...SHILOH_LADDER, ...PHASE_IDS.map((id) => [PACK_ID, id, false])],
+    assert.deepEqual(def.phases.slice(0, SHILOH_LADDER.length + PHASE_IDS.length).map((p) => [p.packId, p.phaseId, p.loan === true]), [...SHILOH_LADDER, ...PHASE_IDS.map((id) => [PACK_ID, id, false])],
       'campaign: the ladder is Shiloh then the four Stones River phases, none on loan');
     assert.equal(def.franchise.length, 11, 'campaign: the Shiloh franchise roster is unchanged');
     // play the ladder with empty results: each first arrival at a Stones River phase enlists its joins, and every
@@ -281,7 +281,8 @@ export const STONES_RIVER_CHECKS = [
       for (const u of roster(field).filter((v) => v.side === 'US')) assert.ok(u.equipment, `campaign: ${id}/${u.id} takes the field without franchise equipment`);
       save = record(save);
     }
-    assert.equal(save.army.length, def.franchise.length + def.phases.reduce((n, p) => n + (p.joins?.length || 0), 0), 'campaign: the finished ladder\'s army is the franchise plus every join, once');
+    // Recording the last Stones River phase also enlists the next phase's joins (a later battle's first phase).
+    assert.equal(save.army.length, def.franchise.length + def.phases.slice(0, SHILOH_LADDER.length + PHASE_IDS.length + 1).reduce((n, p) => n + (p.joins?.length || 0), 0), 'campaign: the army after Stones River is the franchise plus every join reached, once');
   }],
   ['headless-run', async (api) => {
     for (const { id, scenario } of api.shipped().phases) {

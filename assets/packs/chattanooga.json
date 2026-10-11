@@ -1,0 +1,1821 @@
+{
+  "version": 1,
+  "id": "chattanooga",
+  "title": "Chattanooga",
+  "phases": [
+    {
+      "id": "orchard-knob",
+      "scenario": {
+        "id": "chattanooga-orchard-knob",
+        "title": "Orchard Knob",
+        "battle": "Chattanooga (Orchard Knob, Lookout Mountain, Missionary Ridge)",
+        "subtitle": "Wood's division advances from Fort Wood, 23 November 1863",
+        "date": "1863-11-23",
+        "start": "13:30",
+        "end": "15:30",
+        "terrain": "chattanooga",
+        "season": "autumn",
+        "seed": 18631123,
+        "clockRatio": 7,
+        "menPerFigure": 5,
+        "attacker": "US",
+        "objective": {
+          "name": "Orchard Knob (Indian Hill) and the rocky ridge south of it",
+          "x": -1056,
+          "z": 640,
+          "r": 350
+        },
+        "retreat": {
+          "US": [-2837,22],
+          "CS": [28,606]
+        },
+        "camera": {
+          "target": [-2032,279],
+          "yaw": -1.92,
+          "dist": 1800
+        },
+        "victory": {
+          "attackerHolds": "Orchard Knob is in Union hands at 15:30. (In 1863 Wood's division took it, and the rocky ridge south of it, by about 15:00.)",
+          "defenderHolds": "The Confederates still hold Orchard Knob at 15:30. (In 1863 they did not: the 24th Alabama was driven off and the 28th captured almost whole.)",
+          "attackerBroken": "Wood's advance has broken before Orchard Knob.",
+          "defenderBroken": "The Confederate screen on Orchard Knob has broken.",
+          "draw": "Orchard Knob is still contested at 15:30."
+        },
+        "briefing": {
+          "text": [
+            "After its defeat at Chickamauga the Army of the Cumberland was besieged in Chattanooga, its men and animals starving, until Grant's \"Cracker Line\" through Brown's Ferry reopened supply at the end of October.",
+            "The Confederacy was fighting to preserve slavery.",
+            "At about 13:30 on 23 November, ordered only to find out whether Bragg was leaving, Wood's division stepped off from Fort Wood in parade order with Sheridan's on its right, against about 634 men of the 24th and 28th Alabama holding Orchard Knob.",
+            "Bragg had already weakened his own line by sending Longstreet against Knoxville, and he later called the loss of the knob a picket line driven in.",
+            "Take the knob and the barricaded ridge south of it, then hold them: the half-starved army of a month before carried the position in about an hour."
+          ],
+          "quote": {
+            "text": "The troops moved into line and position with such regularity and precision as to present the appearance of a formation for review or parade, and the enemy's pickets, but a few hundred feet off, were apparently awaiting a display or military pageant when our skirmish line advanced and opened fire.",
+            "who": "Maj. Gen. Gordon Granger, commanding the Fourth Army Corps",
+            "source": "Official Records, Ser. I, vol. 31, pt. 2, p. 129 (Granger report No. 10)"
+          },
+          "sources": [
+            "https://npshistory.com/publications/civil_war_series/9/sec4.htm",
+            "https://www.nps.gov/chch/learn/historyculture/orchard-knob.htm",
+            "https://archive.org/details/warofrebellion312unit",
+            "https://www.battlefields.org/learn/civil-war/battles/chattanooga",
+            "https://en.wikipedia.org/wiki/Chattanooga_campaign"
+          ]
+        },
+        "ground": {
+          "base": "fields",
+          "treeSpacing": 18
+        },
+        "woods": [
+          {
+            "name": "The belt of woods west of Orchard Knob (Willich went through it; Hazen crossed it)",
+            "polygon": [[-1465,19],[-1405,84],[-1394,246],[-1474,464],[-1562,639],[-1656,738],[-1761,832],[-1820,757],[-1824,585],[-1760,360],[-1659,175],[-1548,2]]
+          },
+          {
+            "name": "The rocky wooded rise just south of Orchard Knob (the 28th Alabama's barricades)",
+            "polygon": [[-968,668],[-904,691],[-945,826],[-1014,963],[-1104,1007],[-1168,1015],[-1218,979],[-1182,854],[-1118,722],[-1030,672]]
+          },
+          {
+            "name": "Woods toward Citico Creek (where Beatty's regiments took the rifle pits in flank)",
+            "polygon": [[-567,-388],[-483,-317],[-527,-172],[-615,-55],[-719,33],[-831,64],[-921,33],[-965,-51],[-983,-165],[-907,-300],[-792,-423],[-658,-440]]
+          }
+        ],
+        "woodsNote": "Orchard Knob and Missionary Ridge: open valley ground (\"nearly a mile of mostly open ground\", NPS) with the woods the reports name drawn as ovals. Lookout Mountain: a wooded mountainside with the Cravens farm, the fields at the mountain's foot and Bald Hill cleared. Sizes and shapes are not sourced (Inferred). Fought in late November fog and cold (Jackson; Hooker).",
+        "sites": [],
+        "labels": [
+          {
+            "text": "Orchard Knob",
+            "x": -1067,
+            "z": 440,
+            "height": 34,
+            "angle": 1.92
+          },
+          {
+            "text": "Missionary Ridge",
+            "x": 750,
+            "z": 707,
+            "height": 50,
+            "angle": 1.92
+          },
+          {
+            "text": "Fort Wood",
+            "x": -2737,
+            "z": -38,
+            "height": 28,
+            "angle": 1.92
+          },
+          {
+            "text": "Bushy Knob (now the National Cemetery)",
+            "x": -2543,
+            "z": 1116,
+            "height": 22,
+            "angle": 1.92
+          },
+          {
+            "text": "Bird's Mill Road",
+            "x": 294,
+            "z": 1648,
+            "height": 24,
+            "angle": 1.92
+          },
+          {
+            "text": "Bragg's headquarters",
+            "x": -283,
+            "z": 2751,
+            "height": 26,
+            "angle": 1.92
+          },
+          {
+            "text": "Citico Creek",
+            "x": -1198,
+            "z": -1237,
+            "height": 26,
+            "angle": 1.92,
+            "italic": true
+          },
+          {
+            "text": "Tennessee River",
+            "x": -1767,
+            "z": -1646,
+            "height": 44,
+            "angle": 1.92,
+            "italic": true
+          }
+        ],
+        "labelsNote": "Place labels sit at HMDB, OSM, NPS and cemetery points, or on the terrain assets' own lines for the Bird's Mill Road and the streams (Inferred).",
+        "units": [
+          {
+            "id": "us-hazen-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Hazen's Brigade",
+            "short": "Hazen",
+            "commander": {
+              "name": "William B. Hazen",
+              "rank": "Brigadier General"
+            },
+            "parent": "2nd Brigade, 3rd Division (Wood), IV Corps (Granger), Army of the Cumberland",
+            "regiments": [
+              "6th Indiana",
+              "5th Kentucky",
+              "6th Kentucky",
+              "23rd Kentucky",
+              "1st Ohio",
+              "6th Ohio",
+              "41st Ohio",
+              "93rd Ohio",
+              "124th Ohio"
+            ],
+            "men": 2256,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -2462,
+            "z": 611,
+            "facing": 1.309,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 72 (Hazen), pp. 279-281: \"in all 2,256 effective officers and men\" (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 61 (Wood), pp. 254-256 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, organization of the forces under Grant, p. 16 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec4: https://npshistory.com/publications/civil_war_series/9/sec4.htm"
+            ],
+            "status": "Identity Verified; strength Inferred: 2,256 effective, Hazen's own report (the 41st and 93rd Ohio's 447 engaged agree); weapon rifled: Inferred, not sourced to the brigade (no ordnance return for this brigade; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the right of Wood's front line on the open slope south of Fort Wood; it crossed open field, the railroad and a belt of woods to the barricaded ridge south of the knob; franchise lineage: Hazen's 19th Brigade of Shiloh and Stones River: the 41st Ohio and 6th Kentucky, with the 6th Indiana, 5th Kentucky, 1st Ohio and 93rd Ohio of the Stones River us-rousseau-brigade (Baldwin's), merged into it in October 1863 (the regiment lists of the Stones River and Chattanooga orders of battle)."
+          },
+          {
+            "id": "us-gibson-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Willich's Brigade",
+            "short": "Willich",
+            "commander": {
+              "name": "August Willich",
+              "rank": "Brigadier General"
+            },
+            "parent": "1st Brigade, 3rd Division (Wood), IV Corps (Granger), Army of the Cumberland",
+            "regiments": [
+              "25th Illinois",
+              "35th Illinois",
+              "89th Illinois",
+              "32nd Indiana",
+              "68th Indiana",
+              "8th Kansas",
+              "15th Ohio",
+              "49th Ohio",
+              "15th Wisconsin"
+            ],
+            "men": 1721,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -2369,
+            "z": 280,
+            "facing": 1.222,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 62 (Willich), pp. 263-264 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 61 (Wood), pp. 255-256 and the 20 February 1864 dispatch, p. 263 (5,200 effective) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Nos. 63, 68, 71 (25th Illinois 260; 8th Kansas 219; 15th Wisconsin 130) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec4: https://npshistory.com/publications/civil_war_series/9/sec4.htm"
+            ],
+            "status": "Identity Verified; strength Estimated: Wood's 5,200 effective plus his 190 losses of 23 November, less Hazen's 2,256 = 3,134 for Willich and Beatty; four sourced regiments fixed (909) and the other twelve at 185.4 each: 130 + 219 + 260 + 6 x 185.4 = 1,721, error several hundred; weapon rifled: Inferred, not sourced to the brigade (a 49th Ohio company drew Enfields in 1863; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the left of Wood's front line south of Fort Wood, the 8th Kansas skirmishing ahead; it went through the woods straight at the summit; franchise lineage: W. H. Gibson's 6th Brigade of Shiloh and Willich's brigade of Stones River: the 15th and 49th Ohio, 32nd Indiana and 89th Illinois (Verified)."
+          },
+          {
+            "id": "us-boyle-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Samuel Beatty's Brigade",
+            "short": "S. Beatty",
+            "commander": {
+              "name": "Samuel Beatty",
+              "rank": "Brigadier General"
+            },
+            "parent": "3rd Brigade, 3rd Division (Wood), IV Corps (Granger), Army of the Cumberland",
+            "regiments": [
+              "79th Indiana",
+              "86th Indiana",
+              "9th Kentucky",
+              "17th Kentucky",
+              "13th Ohio",
+              "19th Ohio",
+              "59th Ohio"
+            ],
+            "men": 1412,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -2518,
+            "z": 41,
+            "facing": 1.222,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 82 (S. Beatty), pp. 300-301 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 61 (Wood), pp. 254, 256 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 88 (Manderson, 19th Ohio: 300 on 23 November) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, organization, p. 17 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit"
+            ],
+            "status": "Identity Verified; strength Estimated: as Willich, 300 (19th Ohio) + 6 x 185.4 = 1,412; weapon rifled: Inferred, not sourced to the brigade (no ordnance return for this brigade; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: division reserve in double column closed en masse behind Willich's left; two regiments later went through the woods toward Citico Creek; franchise lineage: Boyle's 11th Brigade of Shiloh (the 19th and 59th Ohio and 9th Kentucky) and Grider's brigade of Samuel Beatty's division at Stones River (the 19th Ohio, 9th Kentucky and 79th Indiana); the 86th Indiana and 13th Ohio of the Stones River us-fyffe-brigade were merged into it (regiment lists of the three orders of battle)."
+          },
+          {
+            "id": "us-wagner-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Wagner's Brigade",
+            "short": "Wagner",
+            "commander": {
+              "name": "George D. Wagner",
+              "rank": "Brigadier General"
+            },
+            "parent": "2nd Brigade, 2nd Division (Sheridan), IV Corps (Granger), Army of the Cumberland",
+            "regiments": [
+              "100th Illinois",
+              "15th Indiana",
+              "40th Indiana",
+              "57th Indiana",
+              "58th Indiana",
+              "26th Ohio",
+              "97th Ohio"
+            ],
+            "men": 1800,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -2543,
+            "z": 916,
+            "facing": 1.396,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 38 (Wagner): \"about 1,800\" engaged (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 39 (Lane), p. 213: \"about 2,000\" (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 27 (Sheridan), pp. 188-189 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec4 (Sheridan guards Wood's right): https://npshistory.com/publications/civil_war_series/9/sec4.htm"
+            ],
+            "status": "Identity Verified; strength Disputed: about 1,800 (Wagner) against about 2,000 (Lane), both for the 25 November assault; no loss on 23 November (Sheridan); weapon rifled: Inferred, not sourced to the brigade (no ordnance return for this brigade; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the northern slope of Bushy Knob on Wood's right; it advanced en echelon after the knob fell and halted about 300 yards forward; franchise lineage: Wagner's brigade of Stones River (the 15th, 40th and 57th Indiana and 97th Ohio), with the 100th Illinois, 58th Indiana and 26th Ohio of the Stones River us-hascall-brigade merged into it (Verified)."
+          },
+          {
+            "id": "us-roberts-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Harker's Brigade",
+            "short": "Harker",
+            "commander": {
+              "name": "Charles G. Harker",
+              "rank": "Colonel"
+            },
+            "parent": "3rd Brigade, 2nd Division (Sheridan), IV Corps (Granger), Army of the Cumberland",
+            "regiments": [
+              "22nd Illinois",
+              "27th Illinois",
+              "42nd Illinois",
+              "51st Illinois",
+              "79th Illinois",
+              "3rd Kentucky",
+              "64th Ohio",
+              "65th Ohio",
+              "125th Ohio"
+            ],
+            "men": 2100,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -2543,
+            "z": 1266,
+            "facing": 1.396,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 27 (Sheridan), p. 188: about 6,000 effective in 25 regiments (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 38 (Wagner) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 10 (Granger), p. 129 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, organization, p. 16 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit"
+            ],
+            "status": "Identity Verified; strength Estimated: Sheridan's 6,000 less Wagner's 1,800, split 9:9 with Sherman's brigade = 2,100; weapon rifled: Inferred, not sourced to the brigade (no ordnance return for this brigade; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the southern slope of Bushy Knob, the extreme Union right near Moore's road; commander: rank Inferred (Colonel in the OR-derived order of battle); franchise lineage: Roberts's brigade of Stones River: the 22nd, 27th, 42nd and 51st Illinois, all four (Verified)."
+          },
+          {
+            "id": "us-fort-wood-guns",
+            "side": "US",
+            "type": "artillery",
+            "name": "Fort Wood heavy guns",
+            "short": "Fort Wood",
+            "parent": "Heavy artillery of the Chattanooga line under Brig. Gen. John M. Brannan, chief of artillery; the battery that served them is not identified",
+            "regiments": [
+              "Fort Wood (crew battery not identified)"
+            ],
+            "men": 120,
+            "guns": 6,
+            "weapon": "parrott",
+            "xp": 2,
+            "x": -2737,
+            "z": 22,
+            "facing": 1.222,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 180 (Brannan), pp. 551-553: four 4 1/2-inch Rodman guns and two 30-pounder Parrotts in Fort Wood (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 61 (Wood), p. 254 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Battery crew: game value of 20 men per gun (no sourced crew strength)"
+            ],
+            "status": "Identity Inferred (the guns; the crew battery is not identified); guns Inferred: 6 from one OCR-garbled sentence of Brannan; weapon parrott: rifled siege pieces, the closest game type; crew Estimated: game value 20 per gun; xp 2 (trained): crew not identified; position Inferred: in Fort Wood; the heavy guns opened about noon and the infantry advanced \"under cover of the guns\"."
+          },
+          {
+            "id": "cs-28th-alabama",
+            "side": "CS",
+            "type": "infantry",
+            "name": "28th Alabama Infantry",
+            "short": "28th Alabama",
+            "commander": {
+              "name": "W. L. Butler",
+              "rank": "Major"
+            },
+            "parent": "Manigault's Brigade, Hindman's Division (Brig. Gen. Patton Anderson commanding), Army of Tennessee",
+            "regiments": [
+              "28th Alabama Infantry"
+            ],
+            "men": 377,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -1041,
+            "z": 809,
+            "facing": -1.833,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 72 (Hazen), pp. 280-281: 146 captured with the colours (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, No. 61 (Wood), pp. 253, 256 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Army of Tennessee organization, 20 November 1863, p. 659 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 3 (Serial 56), regimental strength return, 14 December 1863 (231 effective)",
+              "NPS Chickamauga and Chattanooga NMP, Orchard Knob (about 634 for the two regiments): https://www.nps.gov/chch/learn/historyculture/orchard-knob.htm"
+            ],
+            "status": "Identity Verified; strength Estimated: 231 effective on 14 December plus the 146 captured = 377 (a floor); weapon rifled: Inferred, not sourced to the brigade (the 6,175 small arms captured at Chattanooga were \"mostly Enfield\", OR XXXI/2 pp. 99-100; the arms collected in front of Sherman were about 91% rifled, p. 583); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: behind log-and-stone barricades on the north slope of the rocky rise just south of the knob, drawn on the 3DEP rise; commander: Butler on the OR organizations and the marker; one veteran's account names John C. Reid (unresolved)."
+          },
+          {
+            "id": "cs-24th-alabama",
+            "side": "CS",
+            "type": "infantry",
+            "name": "24th Alabama Infantry",
+            "short": "24th Alabama",
+            "commander": {
+              "name": "N. N. Davis",
+              "rank": "Colonel"
+            },
+            "parent": "Manigault's Brigade, Hindman's Division (Brig. Gen. Patton Anderson commanding), Army of Tennessee",
+            "regiments": [
+              "24th Alabama Infantry"
+            ],
+            "men": 257,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -998,
+            "z": 470,
+            "facing": -1.92,
+            "sources": [
+              "NPS Chickamauga and Chattanooga NMP, Orchard Knob (about 634 for the 24th and 28th Alabama): https://www.nps.gov/chch/learn/historyculture/orchard-knob.htm",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Army of Tennessee organization, 20 November 1863, p. 659 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 3 (Serial 56), regimental strength return, 14 December 1863 (231 effective)"
+            ],
+            "status": "Identity Inferred (NPS pages; the OR does not name the summit's holders); strength Estimated: NPS 634 less the 28th's 377 = 257; weapon rifled: Inferred, not sourced to the brigade (the 6,175 small arms captured at Chattanooga were \"mostly Enfield\", OR XXXI/2 pp. 99-100; the arms collected in front of Sherman were about 91% rifled, p. 583); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: on the knob and the rifle pits at its base; exact ground not established."
+          }
+        ],
+        "positionsNote": "Wood's division forms on the open slope south and east of Fort Wood (Willich left, Hazen right, Beatty in double column behind Willich's left) and Sheridan's Wagner and Harker on the north and south slopes of Bushy Knob, now the National Cemetery (Wood, Sheridan). The 28th Alabama holds log-and-stone barricades on the rocky rise just south of the knob and the 24th the knob and its rifle pits (Hazen, Wood; NPS). The knob is drawn at the HMDB monuments and the 3DEP summit, not the OSM point 390 m west. Sheridan's reserve brigade (not engaged) and Bridges's battery (placed on the knob only that night) are not fielded. All positions Inferred.",
+        "strengthNote": "Hazen's 2,256 effective is his own report (Inferred). Willich and Beatty split Wood's 5,200 \"effective at Mission Ridge\" (a February 1864 dispatch) plus the 23 November losses, less Hazen, by regiment after fixing four sourced regiments (Estimated). Wagner's 1,800 is Disputed (about 2,000 in another report, both for 25 November); Harker's 2,100 is Sheridan's 6,000 less Wagner, halved (Estimated). The two Alabama regiments are NPS's \"about 634\" split by the 14 December return plus the 146 captured (Estimated). Fort Wood's six heavy guns rest on one OR sentence (Inferred); crews are a game value of 20 per gun.",
+        "historyNote": "Wood's division took Orchard Knob and the rocky ridge south of it by about 15:00, capturing the 28th Alabama almost whole with its colours for about 190 killed and wounded; Grant and Thomas chose to hold and entrench the knob, a mile from Missionary Ridge, rather than recall Wood."
+      }
+    },
+    {
+      "id": "lookout-mountain",
+      "scenario": {
+        "id": "chattanooga-lookout-mountain",
+        "title": "Lookout Mountain",
+        "battle": "Chattanooga (Orchard Knob, Lookout Mountain, Missionary Ridge)",
+        "subtitle": "Hooker clears the Cravens House bench below the palisades, 24 November 1863",
+        "date": "1863-11-24",
+        "start": "08:30",
+        "end": "15:00",
+        "terrain": "lookout-mountain",
+        "season": "autumn",
+        "seed": 18631124,
+        "clockRatio": 22,
+        "menPerFigure": 5,
+        "attacker": "US",
+        "objective": {
+          "name": "the Cravens House bench below the palisades",
+          "x": -85,
+          "z": 202,
+          "r": 250
+        },
+        "retreat": {
+          "US": [-1300,-1600],
+          "CS": [124,1672]
+        },
+        "camera": {
+          "target": [-1208,637],
+          "yaw": -0.785,
+          "dist": 2000
+        },
+        "victory": {
+          "attackerHolds": "Hooker's men hold the Cravens House bench at 15:00. (In 1863 they held it from about 13:00-14:00 on, in fog.)",
+          "defenderHolds": "The Cravens House bench is still in Confederate hands at 15:00. (In 1863 it was not.)",
+          "attackerBroken": "Hooker's attack has broken on the slope below the palisades.",
+          "defenderBroken": "The Confederate line on the bench has broken.",
+          "draw": "The Cravens House bench is still contested at 15:00."
+        },
+        "briefing": {
+          "text": [
+            "On 24 November Hooker's three borrowed divisions, 9,681 men by his own count, crossed Lookout Creek in fog to clear the bench below the palisades of Lookout Mountain; nobody stormed the summit.",
+            "Geary's division crossed unopposed upstream at Wauhatchie and swept along the slope while Woods and Grose crossed near the creek's mouth about 11:00, so Walthall's Mississippians, strung along more than a mile of picket line, were struck in flank and rear.",
+            "The Confederate defence failed on its own commanders' decisions: Walker's division had been withdrawn the night before, and the division commander, Brig. Gen. John K. Jackson, stayed a mile behind the line, so Moore and Walthall fought without orders or support.",
+            "Hooker's men had fought off a Confederate attack on the newly opened Cracker Line at Wauhatchie, in this valley, a month before.",
+            "Take the Cravens House bench, which covers the road off the mountain's north end, and hold it against Moore's brigade and Pettus's regiments coming down from the summit; do not climb the palisades."
+          ],
+          "quote": {
+            "text": "The movements of the enemy were very rapid. An impenetrable fog hung around the mountain all day.",
+            "who": "Brig. Gen. John K. Jackson, C.S.A., commanding Cheatham's division, closing his report on \"the unfortunate disaster on Lookout Mountain\"",
+            "source": "Official Records, Ser. I, vol. 31, pt. 2, p. 691"
+          },
+          "sources": [
+            "https://npshistory.com/publications/civil_war_series/9/sec5.htm",
+            "https://archive.org/details/warofrebellion312unit",
+            "https://www.battlefields.org/learn/maps/chattanooga-lookout-mountain-nov-24-1863",
+            "https://www.battlefields.org/learn/civil-war/battles/chattanooga",
+            "https://en.wikipedia.org/wiki/Chattanooga_campaign",
+            "https://en.wikipedia.org/wiki/Battle_of_Lookout_Mountain"
+          ]
+        },
+        "ground": {
+          "base": "woods",
+          "clearings": [
+            {
+              "name": "The Cravens farm on the bench: house yard, peach orchard and fields",
+              "polygon": [[29,334],[-35,394],[-149,409],[-274,337],[-366,255],[-403,166],[-435,67],[-365,7],[-245,-1],[-111,55],[-16,149],[67,253]]
+            },
+            {
+              "name": "The fields at the mountain's foot along Lookout Creek (Candy's regiments scoured them)",
+              "polygon": [[-196,-801],[-79,-712],[-232,-532],[-420,-361],[-646,-331],[-818,-321],[-992,-342],[-963,-493],[-892,-659],[-661,-777],[-454,-886],[-273,-887]]
+            },
+            {
+              "name": "Bald Hill and the batteries' ground west of the creek",
+              "polygon": [[-1131,-1399],[-1131,-1267],[-1330,-1175],[-1537,-1156],[-1707,-1190],[-1783,-1284],[-1740,-1396],[-1594,-1486],[-1392,-1548],[-1197,-1509]]
+            }
+          ],
+          "treeSpacing": 18
+        },
+        "woods": [],
+        "woodsNote": "Orchard Knob and Missionary Ridge: open valley ground (\"nearly a mile of mostly open ground\", NPS) with the woods the reports name drawn as ovals. Lookout Mountain: a wooded mountainside with the Cravens farm, the fields at the mountain's foot and Bald Hill cleared. Sizes and shapes are not sourced (Inferred). Fought in late November fog and cold (Jackson; Hooker).",
+        "sites": [
+          {
+            "id": "cravens-house",
+            "name": "Cravens House (the \"white house\")",
+            "x": -128,
+            "z": 244,
+            "rot": 0.4,
+            "yard": 22,
+            "fenceRadius": 140,
+            "source": "35.0138,-85.3414 Inferred (OSM; the house was rebuilt in the 1950s on the 1855 site); the peach orchard is in Geary's and Ireland's reports; footprint and orchard placement are game stand-ins",
+            "buildings": [
+              [
+                0,
+                0,
+                12,
+                8,
+                6.5,
+                0,
+                "frame-house"
+              ],
+              [
+                18,
+                10,
+                7,
+                5,
+                3.6,
+                0,
+                "shed"
+              ]
+            ],
+            "orchard": [-70,45,7,5,0.4]
+          }
+        ],
+        "labels": [
+          {
+            "text": "Lookout Mountain",
+            "x": -833,
+            "z": 1166,
+            "height": 52,
+            "angle": 0.785
+          },
+          {
+            "text": "Cravens House",
+            "x": -128,
+            "z": 194,
+            "height": 28,
+            "angle": 0.785
+          },
+          {
+            "text": "Lookout Point (the palisades)",
+            "x": -374,
+            "z": 470,
+            "height": 26,
+            "angle": 0.785
+          },
+          {
+            "text": "Lookout Creek",
+            "x": -1181,
+            "z": -1158,
+            "height": 32,
+            "angle": 0.785,
+            "italic": true
+          },
+          {
+            "text": "Chattanooga Creek",
+            "x": 1047,
+            "z": -243,
+            "height": 28,
+            "angle": 0.785,
+            "italic": true
+          },
+          {
+            "text": "Tennessee River",
+            "x": 481,
+            "z": -590,
+            "height": 44,
+            "angle": 0.785,
+            "italic": true
+          },
+          {
+            "text": "Lookout Valley",
+            "x": -1695,
+            "z": -676,
+            "height": 34,
+            "angle": 0.785
+          }
+        ],
+        "labelsNote": "Place labels sit at HMDB, OSM, NPS and cemetery points, or on the terrain assets' own lines for the Bird's Mill Road and the streams (Inferred).",
+        "units": [
+          {
+            "id": "us-cobham-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Cobham's Brigade",
+            "short": "Cobham",
+            "commander": {
+              "name": "George A. Cobham Jr.",
+              "rank": "Colonel"
+            },
+            "parent": "2nd Brigade, 2nd Division (Geary), XII Corps, Hooker's command",
+            "regiments": [
+              "29th Pennsylvania",
+              "111th Pennsylvania"
+            ],
+            "men": 574,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -1553,
+            "z": 1242,
+            "facing": 2.443,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Geary report, pp. 390 and 409 (36 officers and 538 men engaged) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Cobham report, pp. 424-426 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, organization table, p. 17 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Wikipedia, Chattanooga campaign order of battle: Union (OR-derived; not independent of the OR)"
+            ],
+            "status": "Identity Verified; strength Inferred: 574 in Geary's table of the force engaged (one source; two regiments, the 109th Pennsylvania stayed in camp); weapon rifled: Inferred from corps-level evidence (most Federal infantry carried rifle-muskets by the end of 1863); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the right of Geary's first line, hugging the foot of the palisades; drawn about 1.5 km north-east of the Wauhatchie crossing."
+          },
+          {
+            "id": "us-ireland-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Ireland's Brigade",
+            "short": "Ireland",
+            "commander": {
+              "name": "David Ireland",
+              "rank": "Colonel"
+            },
+            "parent": "3rd Brigade, 2nd Division (Geary), XII Corps, Hooker's command",
+            "regiments": [
+              "60th New York",
+              "102nd New York",
+              "137th New York",
+              "149th New York"
+            ],
+            "men": 775,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -1648,
+            "z": 858,
+            "facing": 2.443,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Ireland report, pp. 435-437 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Geary report, pp. 392-396 and table p. 409 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Godard, Lane, Randall and Eldredge reports, pp. 438-446 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Greene on Culp's Hill, Gettysburg Discussion Group (gdg.org): the brigade \"armed largely with Enfield rifles\" in July 1863"
+            ],
+            "status": "Identity Verified; strength Inferred: 775 in Geary's table (the 60th, 102nd and 149th New York's reported 554 leave a plausible 221 for the 137th); weapon rifled: Inferred (the former Greene's brigade carried mostly Enfields in July 1863, one secondary source); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the centre of Geary's first line, the 102nd New York skirmishing with its left on Lookout Creek; it took the Cravens yard and two guns about 12:30."
+          },
+          {
+            "id": "us-candy-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Candy's Brigade",
+            "short": "Candy",
+            "commander": {
+              "name": "Charles Candy",
+              "rank": "Colonel"
+            },
+            "parent": "1st Brigade, 2nd Division (Geary), XII Corps, Hooker's command",
+            "regiments": [
+              "5th Ohio (about 50 men)",
+              "7th Ohio",
+              "66th Ohio",
+              "28th Pennsylvania",
+              "147th Pennsylvania"
+            ],
+            "men": 1010,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -1756,
+            "z": 444,
+            "facing": 2.443,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Geary report, pp. 390 and 409 (58 officers and 952 men engaged) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Candy report, pp. 411-412; Ahl report, p. 413 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Wikipedia, Chattanooga campaign order of battle: Union (OR-derived; not independent of the OR)"
+            ],
+            "status": "Identity Verified; strength Inferred: 1,010 in Geary's table, the engaged column only (the 29th Ohio and seven companies of the 5th Ohio held the picket line); weapon rifled: Inferred from corps-level evidence; xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the left of Geary's line in echelon toward Lookout Creek; commander: Candy was hurt in a fall between 14:00 and 15:00 (Disputed) and Col. William R. Creighton took the brigade."
+          },
+          {
+            "id": "us-price-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Whitaker's Brigade",
+            "short": "Whitaker",
+            "commander": {
+              "name": "Walter C. Whitaker",
+              "rank": "Brigadier General"
+            },
+            "parent": "2nd Brigade, 1st Division (Brig. Gen. Charles Cruft), IV Corps, attached to Geary on 24 November",
+            "regiments": [
+              "8th Kentucky",
+              "96th Illinois",
+              "35th Indiana",
+              "40th Ohio",
+              "51st Ohio",
+              "99th Ohio"
+            ],
+            "men": 1465,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -1757,
+            "z": 1472,
+            "facing": 2.443,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Cruft report, pp. 141-146 (110 officers and 1,355 men) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Geary report, p. 390 (the same figures) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Whitaker report, pp. 154-157 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec5: https://npshistory.com/publications/civil_war_series/9/sec5.htm"
+            ],
+            "status": "Identity Verified; strength Verified: 1,465 in both Cruft's and Geary's reports (they may share Whitaker's return); weapon rifled: Inferred, not sourced to the brigade (no ordnance return for this brigade; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the second line about 300 yards behind Geary's first, its right opposite Cobham's centre; by about 13:00 at the Cravens house wall (Whitaker claims the lead; Geary and Ireland put him behind, Disputed); franchise lineage: Price's brigade of Stones River: the 8th Kentucky, 35th Indiana and 51st and 99th Ohio, four of its five regiments (Verified)."
+          },
+          {
+            "id": "us-sahm-battery",
+            "side": "US",
+            "type": "artillery",
+            "name": "Battery K, 1st Ohio Light Artillery (Sahm)",
+            "short": "Sahm",
+            "commander": {
+              "name": "Nicholas Sahm",
+              "rank": "Lieutenant"
+            },
+            "parent": "XI Corps battery lent to Hooker, under Maj. John A. Reynolds (XII Corps chief of artillery)",
+            "regiments": [
+              "Battery K, 1st Ohio Light Artillery"
+            ],
+            "men": 80,
+            "guns": 4,
+            "weapon": "napoleon",
+            "xp": 3,
+            "x": -1300,
+            "z": -1400,
+            "facing": 0.698,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Reynolds report, pp. 452-454 (\"four light 12-pounders\") (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Geary report, p. 391 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Osterhaus report, p. 599 (a Napoleon battery) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Battery crew: game value of 20 men per gun (no sourced crew strength)"
+            ],
+            "status": "Identity Verified; guns Verified: 4 light 12-pounders (Reynolds, Geary); weapon napoleon; crew Estimated: game value 20 per gun; xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: Bald Hill west of Lookout Creek, firing across the creek from about 11:00; it cannot reach the bench."
+          },
+          {
+            "id": "us-wiedrich-battery",
+            "side": "US",
+            "type": "artillery",
+            "name": "Battery I, 1st New York Light Artillery (Wiedrich)",
+            "short": "Wiedrich",
+            "commander": {
+              "name": "Michael Wiedrich",
+              "rank": "Captain"
+            },
+            "parent": "XI Corps battery lent to Hooker, under Maj. John A. Reynolds",
+            "regiments": [
+              "Battery I, 1st New York Light Artillery (two sections)"
+            ],
+            "men": 80,
+            "guns": 4,
+            "weapon": "parrott",
+            "xp": 3,
+            "x": -1698,
+            "z": -1301,
+            "facing": 1.047,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Reynolds report, p. 452 (\"six 3-inch guns ... four of which were in position\") (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Geary report, p. 391 (two sections) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Battery crew: game value of 20 men per gun (no sourced crew strength)"
+            ],
+            "status": "Identity Verified; guns Verified: 4 of the battery's six 3-inch rifles in position (Reynolds, Geary); weapon parrott: 3-inch rifles, the game's rifled class; crew Estimated: game value 20 per gun; xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: a hill opposite Lookout Point behind Bald Hill, west of the creek."
+          },
+          {
+            "id": "cs-walthall-brigade",
+            "side": "CS",
+            "type": "infantry",
+            "name": "Walthall's Brigade",
+            "short": "Walthall",
+            "commander": {
+              "name": "Edward C. Walthall",
+              "rank": "Brigadier General"
+            },
+            "parent": "Cheatham's Division (Brig. Gen. John K. Jackson commanding), Hardee's Corps",
+            "regiments": [
+              "24th Mississippi",
+              "27th Mississippi",
+              "29th Mississippi",
+              "30th Mississippi",
+              "34th Mississippi"
+            ],
+            "men": 1489,
+            "weapon": "smooth",
+            "xp": 3,
+            "x": -848,
+            "z": 244,
+            "facing": -0.873,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Walthall report, pp. 692-696 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Jackson report, pp. 684-691 (1,489 effective on the 20 November return) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Geary report, p. 392 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Ordnance records of Walthall's brigade (NARA, transcribed on the Authentic Campaigner forum; secondary)"
+            ],
+            "status": "Identity Verified; strength Inferred: 1,489 effective on 20 November, quoted by Jackson (a December return may imply up to about 1,669); weapon smooth: Inferred (1863 ordnance records of two of five regiments show mostly .69 smoothbores); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the main line of log-and-stone breastworks and camp on the plateau west of the Cravens house, about a third of the brigade out on a picket line over a mile long."
+          },
+          {
+            "id": "cs-moore-brigade",
+            "side": "CS",
+            "type": "infantry",
+            "name": "Moore's Brigade",
+            "short": "Moore",
+            "commander": {
+              "name": "John C. Moore",
+              "rank": "Brigadier General"
+            },
+            "parent": "Cheatham's Division (Brig. Gen. John K. Jackson commanding), Hardee's Corps",
+            "regiments": [
+              "37th Alabama",
+              "40th Alabama",
+              "42nd Alabama"
+            ],
+            "men": 1205,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -32,
+            "z": 601,
+            "facing": -2.443,
+            "ai": {
+              "role": "reserve",
+              "at": "13:00"
+            },
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Moore report, pp. 704-706 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Jackson report, pp. 688-690 (1,205 effective on 20 November) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Stevenson report, p. 720 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec5 (Moore, \"roughly 1,000\"): https://npshistory.com/publications/civil_war_series/9/sec5.htm",
+              "American Battlefield Trust, Lookout Mountain map page: https://www.battlefields.org/learn/maps/chattanooga-lookout-mountain-nov-24-1863"
+            ],
+            "status": "Identity Verified; strength Inferred: 1,205 (Jackson; the 14 December return plus the 24 November losses gives about 1,211, against NPS's \"roughly 1,000\"); weapon rifled: Inferred, not sourced to the brigade (the 6,175 small arms captured at Chattanooga were \"mostly Enfield\", OR XXXI/2 pp. 99-100; the arms collected in front of Sherman were about 91% rifled, p. 583); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the trenches about 400 yards south of the Cravens house on the right of Walthall's line; AI reserve at 13:00: the American Battlefield Trust calls Moore's action a counterattack at about 13:00, while Moore's own report describes moving into the trenches and holding them until between 15:00 and 16:00 (Disputed)."
+          },
+          {
+            "id": "cs-howell-section",
+            "side": "CS",
+            "type": "artillery",
+            "name": "Gibson's section, Howell's Georgia Battery",
+            "short": "Howell (section)",
+            "commander": {
+              "name": "R. T. Gibson",
+              "rank": "Second Lieutenant"
+            },
+            "parent": "Howell's (Georgia) Battery, Walker's division artillery",
+            "regiments": [
+              "Howell's Georgia Battery (one section)"
+            ],
+            "men": 40,
+            "guns": 2,
+            "weapon": "smbart",
+            "xp": 3,
+            "x": -153,
+            "z": 244,
+            "facing": -1.745,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Gibson report, pp. 716-717 (two 6-pounders to the Cravens house) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Jackson report, p. 691 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Geary report, p. 396 (two pieces captured) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Battery crew: game value of 20 men per gun (no sourced crew strength)"
+            ],
+            "status": "Identity Verified; guns Verified: 2 six-pounders (Gibson, Geary); weapon smbart; crew Estimated: game value 20 per gun; xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the Cravens house yard; without horses, the section never fired and was overrun about 12:30."
+          }
+        ],
+        "reinforcements": [
+          {
+            "id": "us-ammen-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Grose's Brigade",
+            "short": "Grose",
+            "commander": {
+              "name": "William Grose",
+              "rank": "Colonel"
+            },
+            "parent": "3rd Brigade, 1st Division (Cruft), IV Corps",
+            "regiments": [
+              "59th Illinois",
+              "75th Illinois",
+              "84th Illinois",
+              "9th Indiana",
+              "36th Indiana",
+              "24th Ohio"
+            ],
+            "men": 1624,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -1112,
+            "z": -709,
+            "facing": 0.524,
+            "atSec": 409.1,
+            "noticeSec": 30,
+            "entry": "across Lookout Creek on Woods's pole bridge",
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Cruft report, p. 142 (113 officers and 1,511 men) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Grose report, pp. 169-171 (\"effective force, officers and men, 1,693\") (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Hooker report, p. 316 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec5: https://npshistory.com/publications/civil_war_series/9/sec5.htm"
+            ],
+            "status": "Identity Verified; strength Disputed: 1,624 (Cruft's table, itemised) against 1,693 (Grose); weapon rifled: Inferred, not sourced to the brigade (no ordnance return for this brigade; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: opposite the destroyed railroad bridge until it crossed at Woods's pole bridge about 11:00-11:30 and climbed on Woods's right; arrival time Disputed: 11:00 (Hooker) or 11:30 (Cruft); franchise lineage: Ammen's 10th Brigade of Shiloh and Grose's brigade of Stones River: the 36th Indiana and 24th Ohio, with the 84th Illinois (Verified)."
+          },
+          {
+            "id": "us-woods-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Woods's Brigade",
+            "short": "Woods",
+            "commander": {
+              "name": "Charles R. Woods",
+              "rank": "Brigadier General"
+            },
+            "parent": "1st Brigade, 1st Division (Osterhaus), XV Corps, attached to Hooker on the evening of 23 November",
+            "regiments": [
+              "76th Ohio",
+              "3rd Missouri",
+              "12th Missouri",
+              "17th Missouri",
+              "27th Missouri",
+              "29th Missouri",
+              "31st Missouri",
+              "32nd Missouri"
+            ],
+            "men": 1585,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -934,
+            "z": -633,
+            "facing": 0.524,
+            "atSec": 409.1,
+            "noticeSec": 30,
+            "entry": "across Lookout Creek on his own pole bridge",
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Osterhaus report, pp. 598-600 (regimental strengths, 1,863 for nine regiments) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Woods report, pp. 606-608 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Parker ammunition statement, p. 582 (.58 and .54 elongated ball only) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec5: https://npshistory.com/publications/civil_war_series/9/sec5.htm"
+            ],
+            "status": "Identity Verified; strength Estimated: Osterhaus's 1,863 less the 13th Illinois (278), which he says stayed with the Napoleon battery until evening = 1,585 (Woods lists all nine crossing, so Disputed); weapon rifled: Inferred (the Army of the Tennessee expended only rifle-musket cartridges on 24-27 November); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the east bank at the pole bridge about 800 yards above the railroad bridge; it swung east along the mountain's foot."
+          },
+          {
+            "id": "us-williamson-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Williamson's Brigade",
+            "short": "Williamson",
+            "commander": {
+              "name": "James A. Williamson",
+              "rank": "Colonel"
+            },
+            "parent": "2nd Brigade, 1st Division (Osterhaus), XV Corps, attached to Hooker",
+            "regiments": [
+              "9th Iowa",
+              "26th Iowa",
+              "31st Iowa"
+            ],
+            "men": 713,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -1037,
+            "z": -515,
+            "facing": 0.524,
+            "atSec": 654.5,
+            "noticeSec": 30,
+            "entry": "across Lookout Creek behind Woods",
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Osterhaus report, pp. 598-600 (regimental strengths) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Williamson report, p. 614 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Parker ammunition statement, p. 582 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit"
+            ],
+            "status": "Identity Verified; strength Estimated: the 31st (215), 9th (285) and 26th Iowa (213) = 713, the regiments that reached the mountainside before 15:00; the rest guarded batteries; weapon rifled: Inferred (Army of the Tennessee ammunition); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: it crossed after Woods and climbed toward the Cravens house; the 31st Iowa relieved Geary's men about 14:00; arrival time Estimated: Osterhaus does not state it."
+          },
+          {
+            "id": "cs-pettus-brigade",
+            "side": "CS",
+            "type": "infantry",
+            "name": "Pettus's Brigade (three regiments)",
+            "short": "Pettus",
+            "commander": {
+              "name": "Edmund W. Pettus",
+              "rank": "Brigadier General"
+            },
+            "parent": "Stevenson's Division, Hardee's Corps (the 23rd and 30th Alabama stayed on the summit)",
+            "regiments": [
+              "20th Alabama",
+              "31st Alabama",
+              "46th Alabama"
+            ],
+            "men": 1158,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -176,
+            "z": 520,
+            "facing": -2.618,
+            "atSec": 777.3,
+            "noticeSec": 30,
+            "entry": "down the Summertown road from the summit",
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Pettus report, pp. 731-733 (9 killed, 38 wounded, 9 missing) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Stevenson report, p. 720 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Jackson report, p. 689 (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 3 (Serial 56), Army of Tennessee return, 14 December 1863 (20th, 31st and 46th Alabama 1,102 effective)"
+            ],
+            "status": "Identity Verified; strength Estimated: 1,102 effective on 14 December plus 56 lost on 24 November = 1,158, about +/-10%; weapon rifled: Inferred, not sourced to the brigade (the 6,175 small arms captured at Chattanooga were \"mostly Enfield\", OR XXXI/2 pp. 99-100; the arms collected in front of Sherman were about 91% rifled, p. 583); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: about 300 yards south of the Cravens house, left of the road with its left on the rock bluff, relieving Walthall; arrival time Disputed: a little past 13:00 (Stevenson) to after 14:00 (NPS Series); 13:15 used."
+          }
+        ],
+        "positionsNote": "Geary crossed Lookout Creek at the old mill near Wauhatchie, about 2.5 miles up the creek and off the drawn map, so his three brigades open on the lower west slope at the map's south-west edge (about 1.5 km north-east of the crossing), Cobham on the right under the palisades, Ireland in the centre and Candy on the left toward the creek, with Whitaker's brigade about 300 yards behind (Geary, Cobham, Ireland). Walthall's main line and camp are on the plateau west of the Cravens house, Moore's brigade in the trenches about 400 yards south of the house and Gibson's two guns in its yard (Walthall, Moore, Jackson, Gibson). Woods and Grose cross at Woods's pole bridge at 11:00; part of Williamson's brigade follows; Pettus's three regiments come down the Summertown road at 13:15 (Disputed: 13:00 to after 14:00). Sahm's and Wiedrich's guns fire from the hills west of the creek. The peach orchard, stone wall and road junction are not located. All positions Inferred.",
+        "strengthNote": "Cobham, Ireland and Candy are Geary's own table of the force engaged (OCR-garbled, Inferred); Whitaker's 1,465 is in both Cruft's and Geary's reports (Verified); Grose's 1,624 is Disputed against his own 1,693. Woods and Williamson are Osterhaus's regimental figures less the regiments he says stayed with the batteries until evening (Estimated). Walthall's 1,489 and Moore's 1,205 are 20 November effective totals quoted by Jackson (Inferred); Pettus's 1,158 is the 14 December return plus his losses (Estimated). Crews are a game value of 20 per gun.",
+        "historyNote": "Geary's, Cruft's and Osterhaus's brigades took the Cravens House bench by about 13:00-14:00 and held a line 400-500 yards beyond it in the fog; Walthall's brigade lost 845 men captured, Moore and Pettus held a second line until Bragg ordered the mountain abandoned, and the Confederates were gone by the early hours of 25 November."
+      }
+    },
+    {
+      "id": "missionary-ridge",
+      "scenario": {
+        "id": "chattanooga-missionary-ridge",
+        "title": "Missionary Ridge",
+        "battle": "Chattanooga (Orchard Knob, Lookout Mountain, Missionary Ridge)",
+        "subtitle": "The Army of the Cumberland takes the rifle pits, then the crest, 25 November 1863",
+        "date": "1863-11-25",
+        "start": "15:40",
+        "end": "17:30",
+        "terrain": "chattanooga",
+        "season": "autumn",
+        "seed": 18631125,
+        "clockRatio": 6,
+        "menPerFigure": 10,
+        "attacker": "US",
+        "objective": {
+          "name": "the crest from the Bird's Mill Road break toward Bragg's headquarters",
+          "x": 150,
+          "z": 1993,
+          "r": 550
+        },
+        "retreat": {
+          "US": [-2540,57],
+          "CS": [1725,1600]
+        },
+        "camera": {
+          "target": [-617,1290],
+          "yaw": -1.745,
+          "dist": 2600
+        },
+        "victory": {
+          "attackerHolds": "The Union holds the crest at 17:30. (In 1863 the centre broke at the Bird's Mill Road a few minutes before 17:00 and the crest was in Union hands by about 17:30.)",
+          "defenderHolds": "Bragg's centre still holds the crest at 17:30. (In 1863 it did not.)",
+          "attackerBroken": "The Union assault has broken on the slope of Missionary Ridge.",
+          "defenderBroken": "The Confederate centre on Missionary Ridge has broken.",
+          "draw": "The crest of Missionary Ridge is still contested at 17:30."
+        },
+        "briefing": {
+          "text": [
+            "On 25 November the Army of the Cumberland, besieged and half-starved in Chattanooga a month before, was ordered to take only the rifle pits at the foot of Missionary Ridge when six signal guns fired (about 15:30-15:40; accounts differ).",
+            "The pits proved a trap under the guns on the crest, and brigade by brigade, largely without orders, the men climbed on.",
+            "The Confederate defence was weaker than its ground: Anderson's division was split between the base and the crest, the works sat on the topographic crest above dead ground, and Breckinridge had left the centre with no reserve, a failure of command and engineering by Bragg and Breckinridge rather than of courage.",
+            "Take the pits, then the crest at the Bird's Mill Road, where Willich's and Hazen's brigades broke Tucker's Mississippians a few minutes before 17:00, and turn along the crest toward Bragg's headquarters."
+          ],
+          "quote": {
+            "text": "By whose orders are those troops going up the hill?",
+            "who": "Ulysses S. Grant, to Thomas, as the Union lines climbed past the rifle pits",
+            "source": "American Battlefield Trust, Chattanooga (the wording as quoted there; Wikipedia and the NPS Series paraphrase the same exchange)"
+          },
+          "sources": [
+            "https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+            "https://www.battlefields.org/learn/civil-war/battles/chattanooga",
+            "https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge",
+            "https://archive.org/details/warofrebellion312unit",
+            "https://en.wikipedia.org/wiki/Chattanooga_campaign"
+          ]
+        },
+        "ground": {
+          "base": "fields",
+          "treeSpacing": 18
+        },
+        "woods": [
+          {
+            "name": "The belt of woods west of Orchard Knob (Willich went through it; Hazen crossed it)",
+            "polygon": [[-1465,19],[-1405,84],[-1394,246],[-1474,464],[-1562,639],[-1656,738],[-1761,832],[-1820,757],[-1824,585],[-1760,360],[-1659,175],[-1548,2]]
+          },
+          {
+            "name": "The rocky wooded rise just south of Orchard Knob (the 28th Alabama's barricades)",
+            "polygon": [[-968,668],[-904,691],[-945,826],[-1014,963],[-1104,1007],[-1168,1015],[-1218,979],[-1182,854],[-1118,722],[-1030,672]]
+          },
+          {
+            "name": "Woods toward Citico Creek (where Beatty's regiments took the rifle pits in flank)",
+            "polygon": [[-567,-388],[-483,-317],[-527,-172],[-615,-55],[-719,33],[-831,64],[-921,33],[-965,-51],[-983,-165],[-907,-300],[-792,-423],[-658,-440]]
+          }
+        ],
+        "woodsNote": "Orchard Knob and Missionary Ridge: open valley ground (\"nearly a mile of mostly open ground\", NPS) with the woods the reports name drawn as ovals. Lookout Mountain: a wooded mountainside with the Cravens farm, the fields at the mountain's foot and Bald Hill cleared. Sizes and shapes are not sourced (Inferred). Fought in late November fog and cold (Jackson; Hooker).",
+        "sites": [],
+        "labels": [
+          {
+            "text": "Orchard Knob",
+            "x": -1067,
+            "z": 440,
+            "height": 34,
+            "angle": 1.745
+          },
+          {
+            "text": "Missionary Ridge",
+            "x": 750,
+            "z": 707,
+            "height": 50,
+            "angle": 1.745
+          },
+          {
+            "text": "Fort Wood",
+            "x": -2737,
+            "z": -38,
+            "height": 28,
+            "angle": 1.745
+          },
+          {
+            "text": "Bushy Knob (now the National Cemetery)",
+            "x": -2543,
+            "z": 1116,
+            "height": 22,
+            "angle": 1.745
+          },
+          {
+            "text": "Bird's Mill Road",
+            "x": 294,
+            "z": 1648,
+            "height": 24,
+            "angle": 1.745
+          },
+          {
+            "text": "Bragg's headquarters",
+            "x": -283,
+            "z": 2751,
+            "height": 26,
+            "angle": 1.745
+          },
+          {
+            "text": "Citico Creek",
+            "x": -1198,
+            "z": -1237,
+            "height": 26,
+            "angle": 1.745,
+            "italic": true
+          },
+          {
+            "text": "Tennessee River",
+            "x": -1767,
+            "z": -1646,
+            "height": 44,
+            "angle": 1.745,
+            "italic": true
+          }
+        ],
+        "labelsNote": "Place labels sit at HMDB, OSM, NPS and cemetery points, or on the terrain assets' own lines for the Bird's Mill Road and the streams (Inferred).",
+        "units": [
+          {
+            "id": "us-phelps-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Phelps's Brigade",
+            "short": "Phelps",
+            "commander": {
+              "name": "Edward H. Phelps",
+              "rank": "Colonel"
+            },
+            "parent": "3rd Brigade, 3rd Division (Baird), XIV Corps (Palmer), Army of the Cumberland",
+            "regiments": [
+              "10th Indiana",
+              "74th Indiana",
+              "4th Kentucky",
+              "10th Kentucky",
+              "14th Ohio",
+              "38th Ohio"
+            ],
+            "men": 1469,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -804,
+            "z": -256,
+            "facing": 1.396,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Hays report and the 74th Indiana and 14th Ohio reports (248 and 274) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Phelps on the left, opposite Vaughan): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "NPS Chickamauga and Chattanooga NMP, Missionary Ridge page",
+              "Wikipedia, Battle of Missionary Ridge (cites Cozzens, Woodworth): https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge",
+              "Wikipedia, Chattanooga campaign order of battle: Union (OR-derived; not independent of the OR)"
+            ],
+            "status": "Identity Verified; strength Estimated: no brigade or regimental strength in the reports; 6 regiments times 244.8, the pooled mean of 12 sourced XIV Corps regiments on 25 November (Van Derveer 1,679 for 7; Moore's demi-brigade 737 for 3; 74th Indiana 248; 14th Ohio 274) = 1,469, about +/-20%; weapon rifled: Inferred, not sourced to the brigade (the 74th Indiana lost 7 Austrian and 2 Springfield rifles on 25 November; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the left of Baird's division and of the whole assault line, opposite Vaughan; commander: Phelps was killed as he reached the crest; Col. William H. Hays took the brigade."
+          },
+          {
+            "id": "us-van-derveer-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Van Derveer's Brigade",
+            "short": "Van Derveer",
+            "commander": {
+              "name": "Ferdinand Van Derveer",
+              "rank": "Colonel"
+            },
+            "parent": "2nd Brigade, 3rd Division (Baird), XIV Corps (Palmer), Army of the Cumberland",
+            "regiments": [
+              "75th Indiana",
+              "87th Indiana",
+              "101st Indiana",
+              "2nd Minnesota",
+              "9th Ohio",
+              "35th Ohio",
+              "105th Ohio"
+            ],
+            "men": 1679,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -801,
+            "z": 99,
+            "facing": 1.396,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Van Derveer report, inclosure p. 529: 102 officers and 1,577 men engaged in the assault (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Van Derveer's report (OR XXXI/2) as transcribed at ironbrigader.com (2025/11/16)",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7: https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Wikipedia, Chattanooga campaign order of battle: Union (OR-derived; not independent of the OR)"
+            ],
+            "status": "Identity Verified; strength Inferred: 1,679, Van Derveer's own table of the force engaged on 25 November; weapon rifled: Inferred, not sourced to the brigade (no ordnance return for this brigade; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the centre of Baird's division, about 1,200 yards from the ridge; its skirmishers were in the pits five minutes after the order."
+          },
+          {
+            "id": "us-turchin-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Turchin's Brigade",
+            "short": "Turchin",
+            "commander": {
+              "name": "John B. Turchin",
+              "rank": "Brigadier General"
+            },
+            "parent": "1st Brigade, 3rd Division (Baird), XIV Corps (Palmer), Army of the Cumberland",
+            "regiments": [
+              "82nd Indiana",
+              "11th Ohio",
+              "17th Ohio",
+              "31st Ohio",
+              "36th Ohio",
+              "89th Ohio",
+              "92nd Ohio"
+            ],
+            "men": 1714,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -804,
+            "z": 450,
+            "facing": 1.396,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Turchin report (composition) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Turchin started up the ridge at 16:10): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "NPS Chickamauga and Chattanooga NMP, Missionary Ridge page",
+              "American Battlefield Trust, Chattanooga (Turchin the left wing of Baird's division): https://www.battlefields.org/learn/civil-war/battles/chattanooga",
+              "Wikipedia, Chattanooga campaign order of battle: Union (OR-derived; not independent of the OR)"
+            ],
+            "status": "Identity Verified; strength Estimated: no brigade or regimental strength in the reports; 7 regiments times 244.8, the pooled mean of 12 sourced XIV Corps regiments on 25 November (Van Derveer 1,679 for 7; Moore's demi-brigade 737 for 3; 74th Indiana 248; 14th Ohio 274) = 1,714, about +/-20%; weapon rifled: Inferred, not sourced to the brigade (no ordnance return for this brigade; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the right of Baird's division beside Wood's, climbing opposite Manigault."
+          },
+          {
+            "id": "us-boyle-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Samuel Beatty's Brigade",
+            "short": "S. Beatty",
+            "commander": {
+              "name": "Samuel Beatty",
+              "rank": "Brigadier General"
+            },
+            "parent": "3rd Brigade, 3rd Division (Wood), IV Corps (Granger), Army of the Cumberland",
+            "regiments": [
+              "79th Indiana",
+              "86th Indiana",
+              "9th Kentucky",
+              "17th Kentucky",
+              "13th Ohio",
+              "19th Ohio",
+              "59th Ohio"
+            ],
+            "men": 1361,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -902,
+            "z": 796,
+            "facing": 1.396,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, p. 263 (Wood: 5,200 effective at Missionary Ridge) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, pp. 279-281 (Hazen) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Beatty and Dick (86th Indiana) reports (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7: https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Wikipedia, Battle of Missionary Ridge (cites Cozzens, Woodworth): https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge"
+            ],
+            "status": "Identity Verified; strength Estimated: Wood's 5,200 less Hazen's 2,089 = 3,111, split 9:7 with Willich = 1,361 (Willich's sampled regiments run above this average, so Beatty may be high); weapon rifled: Inferred, not sourced to the brigade (no ordnance return for this brigade; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the left of Wood's division in front of Orchard Knob (NPS; Hazen does not place it, so Disputed); it followed Willich and Hazen up the slope."
+          },
+          {
+            "id": "us-gibson-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Willich's Brigade",
+            "short": "Willich",
+            "commander": {
+              "name": "August Willich",
+              "rank": "Brigadier General"
+            },
+            "parent": "1st Brigade, 3rd Division (Wood), IV Corps (Granger), Army of the Cumberland",
+            "regiments": [
+              "25th Illinois",
+              "35th Illinois",
+              "89th Illinois",
+              "32nd Indiana",
+              "68th Indiana",
+              "8th Kansas",
+              "15th Ohio",
+              "49th Ohio",
+              "15th Wisconsin"
+            ],
+            "men": 1750,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -955,
+            "z": 1150,
+            "facing": 1.396,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, p. 263 (Wood: 5,200 effective) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Willich report; Nodine and Martin reports (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Willich reached the pits first): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Hazen's report (OR XXXI/2) as transcribed at ironbrigader.com",
+              "Wikipedia, Battle of Missionary Ridge (cites Cozzens, Woodworth): https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge"
+            ],
+            "status": "Identity Verified; strength Estimated: 3,111 (as Beatty) times 9/16 = 1,750 (perhaps low: the 25th Illinois and 8th Kansas reported 260 and 219); weapon rifled: Inferred, not sourced to the brigade (no ordnance return for this brigade; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the centre of Wood's division on Hazen's left, starting slightly ahead; it broke over the Bird's Mill Road works and wheeled north."
+          },
+          {
+            "id": "us-hazen-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Hazen's Brigade",
+            "short": "Hazen",
+            "commander": {
+              "name": "William B. Hazen",
+              "rank": "Brigadier General"
+            },
+            "parent": "2nd Brigade, 3rd Division (Wood), IV Corps (Granger), Army of the Cumberland",
+            "regiments": [
+              "6th Indiana",
+              "5th Kentucky",
+              "6th Kentucky",
+              "23rd Kentucky",
+              "1st Ohio",
+              "6th Ohio",
+              "41st Ohio",
+              "93rd Ohio",
+              "124th Ohio"
+            ],
+            "men": 2089,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -1050,
+            "z": 1500,
+            "facing": 1.484,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, pp. 279-281 (Hazen's two reports: 2,256 effective; 167 lost on 23 November) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Hazen's report (OR XXXI/2) as transcribed at ironbrigader.com",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Hazen overran Tucker and drove south): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Wikipedia, Battle of Missionary Ridge (cites Cozzens, Woodworth): https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge"
+            ],
+            "status": "Identity Verified; strength Estimated: 2,256 less the 167 lost on 23 November = 2,089 (the morning skirmish losses of 25 November not subtracted); weapon rifled: Inferred, not sourced to the brigade (no ordnance return for this brigade; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the right of Wood's division, Sheridan's on its right; it halted about five minutes at the pits, then climbed to the Bird's Mill Road and turned south along the crest."
+          },
+          {
+            "id": "us-wagner-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Wagner's Brigade",
+            "short": "Wagner",
+            "commander": {
+              "name": "George D. Wagner",
+              "rank": "Brigadier General"
+            },
+            "parent": "2nd Brigade, 2nd Division (Sheridan), IV Corps (Granger), Army of the Cumberland",
+            "regiments": [
+              "100th Illinois",
+              "15th Indiana",
+              "40th Indiana",
+              "57th Indiana",
+              "58th Indiana",
+              "26th Ohio",
+              "97th Ohio"
+            ],
+            "men": 2000,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -1205,
+            "z": 1858,
+            "facing": 1.396,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, pp. 212-213 (the brigade \"went into action with an aggregate of about 2,000\") (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Sheridan report (6,000 effective, 25 regiments) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Wagner reached the empty pits first; lost 730): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Wikipedia, Battle of Missionary Ridge (cites Cozzens, Woodworth): https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge"
+            ],
+            "status": "Identity Verified; strength Disputed: about 2,000 against about 1,800 (the two figures are attributed differently in the research: Wagner's and Lane's reports); weapon rifled: Inferred, not sourced to the brigade (no ordnance return for this brigade; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the left of Sheridan's division on Wood's right; it drove up toward Bate's position."
+          },
+          {
+            "id": "us-roberts-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Harker's Brigade",
+            "short": "Harker",
+            "commander": {
+              "name": "Charles G. Harker",
+              "rank": "Colonel"
+            },
+            "parent": "3rd Brigade, 2nd Division (Sheridan), IV Corps (Granger), Army of the Cumberland",
+            "regiments": [
+              "22nd Illinois",
+              "27th Illinois",
+              "42nd Illinois",
+              "51st Illinois",
+              "79th Illinois",
+              "3rd Kentucky",
+              "64th Ohio",
+              "65th Ohio",
+              "125th Ohio"
+            ],
+            "men": 2000,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -1454,
+            "z": 2205,
+            "facing": 1.396,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Sheridan report (6,000 effective) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, pp. 212-213 (Wagner, about 2,000) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Harker and Opdycke reports (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Harker captured Cobb's battery near Bragg's headquarters): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Wikipedia, Battle of Missionary Ridge (cites Cozzens, Woodworth): https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge"
+            ],
+            "status": "Identity Verified; strength Estimated: Sheridan's 6,000 less Wagner's 2,000, split 9:9 with Sherman = 2,000; weapon rifled: Inferred, not sourced to the brigade (no ordnance return for this brigade; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the centre of Sheridan's division, right of Wagner; it fought about 90 minutes and took Cobb's battery; commander: rank Inferred (Colonel in the OR-derived order of battle)."
+          },
+          {
+            "id": "us-greusel-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "F. T. Sherman's Brigade",
+            "short": "F. T. Sherman",
+            "commander": {
+              "name": "Francis T. Sherman",
+              "rank": "Colonel"
+            },
+            "parent": "1st Brigade, 2nd Division (Sheridan), IV Corps (Granger), Army of the Cumberland",
+            "regiments": [
+              "36th Illinois",
+              "44th Illinois",
+              "73rd Illinois",
+              "74th Illinois",
+              "88th Illinois",
+              "22nd Indiana",
+              "2nd Missouri",
+              "15th Missouri",
+              "24th Wisconsin"
+            ],
+            "men": 2000,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -1713,
+            "z": 2554,
+            "facing": 1.396,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Sheridan report (6,000 effective) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, pp. 212-213 (Wagner) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Official Records Ser. I Vol. XXXI Pt. 2, F. T. Sherman report (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Sherman came up more slowly and broke Strahl's second line): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Wikipedia, Battle of Missionary Ridge (cites Cozzens, Woodworth): https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge"
+            ],
+            "status": "Identity Verified; strength Estimated: as Harker, 2,000; weapon rifled: Inferred, not sourced to the brigade (no ordnance return for this brigade; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the right of Sheridan's division, between Harker and Johnson's division; franchise lineage: Sill's (Greusel's) 1st Brigade of Sheridan's division at Stones River: the 36th and 88th Illinois and 24th Wisconsin (Sherman commanded the 88th), with the 44th and 73rd Illinois and 2nd and 15th Missouri of the Stones River us-schaefer-brigade merged into it (Verified)."
+          },
+          {
+            "id": "us-carlin-1st-brigade",
+            "side": "US",
+            "type": "infantry",
+            "name": "Carlin's Brigade",
+            "short": "Carlin",
+            "commander": {
+              "name": "William P. Carlin",
+              "rank": "Brigadier General"
+            },
+            "parent": "1st Brigade, 1st Division (R. W. Johnson), XIV Corps (Palmer), Army of the Cumberland",
+            "regiments": [
+              "104th Illinois",
+              "38th Indiana",
+              "42nd Indiana",
+              "88th Indiana",
+              "2nd Ohio",
+              "33rd Ohio",
+              "94th Ohio",
+              "10th Wisconsin"
+            ],
+            "men": 1958,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -1947,
+            "z": 2846,
+            "facing": 1.484,
+            "sources": [
+              "Official Records Ser. I Vol. XXXI Pt. 2, Carlin report and seven regimental reports (no strength) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Carlin took his part of the crest at 17:30): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Wikipedia, Battle of Missionary Ridge (cites Cozzens, Woodworth): https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge",
+              "American Battlefield Trust, Chattanooga (Johnson on the extreme right): https://www.battlefields.org/learn/civil-war/battles/chattanooga",
+              "Wikipedia, Chattanooga campaign order of battle: Union (OR-derived; not independent of the OR)"
+            ],
+            "status": "Identity Verified; strength Estimated: no brigade or regimental strength in the reports; 8 regiments times 244.8, the pooled mean of 12 sourced XIV Corps regiments on 25 November (Van Derveer 1,679 for 7; Moore's demi-brigade 737 for 3; 74th Indiana 248; 14th Ohio 274) = 1,958, about +/-20%; weapon rifled: Inferred, not sourced to the brigade (no ordnance return for this brigade; the Army of the Cumberland was largely rifle-armed by late 1863 and the OR ordnance lists name Enfield, Springfield and Austrian rifle-muskets, OR XXXI/2 p. 100); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the extreme right of the assault line toward Rossville Gap, which is off the drawn map: drawn at its south-west edge; it climbed hesitantly on steep ground and reached the crest last."
+          },
+          {
+            "id": "cs-vaughan-brigade",
+            "side": "CS",
+            "type": "infantry",
+            "name": "Vaughan's Brigade",
+            "short": "Vaughan",
+            "commander": {
+              "name": "Alfred J. Vaughan Jr.",
+              "rank": "Brigadier General"
+            },
+            "parent": "Anderson's (Hindman's) Division, Hardee's Corps; Breckinridge commanding this part of the ridge",
+            "regiments": [
+              "11th Tennessee",
+              "12th Tennessee (with the 47th)",
+              "13th Tennessee (with the 154th)",
+              "29th Tennessee"
+            ],
+            "men": 1260,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": 794,
+            "z": 2,
+            "facing": -1.745,
+            "sources": [
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Phelps opposite Vaughan; Vaughan's retreat ended the fighting on the centre and right): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Wikipedia, Chattanooga campaign order of battle: Confederate (OR-derived; not independent of the OR)",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Cheatham and Cleburne reports (the five brigade strengths) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit"
+            ],
+            "status": "Identity Inferred (NPS Series and the OOB); strength Estimated: no sourced 25 November strength; a flat 1,260, the mean of five sourced Army of Tennessee brigade effective strengths of November 1863 (Moore 1,205 and Walthall 1,489 on the 20 November return, quoted by Jackson; Lowrey 1,330, Smith 1,266 and Liddell 1,016 taken into the fight, Cleburne), low confidence (four consolidated Tennessee units: probably high); weapon rifled: Inferred, not sourced to the brigade (the 6,175 small arms captured at Chattanooga were \"mostly Enfield\", OR XXXI/2 pp. 99-100; the arms collected in front of Sherman were about 91% rifled, p. 583); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the north end of Anderson's line on the crest, opposite Phelps."
+          },
+          {
+            "id": "cs-deas-brigade",
+            "side": "CS",
+            "type": "infantry",
+            "name": "Deas's Brigade",
+            "short": "Deas",
+            "commander": {
+              "name": "Zachariah C. Deas",
+              "rank": "Brigadier General"
+            },
+            "parent": "Anderson's (Hindman's) Division, Hardee's Corps; Breckinridge commanding this part of the ridge",
+            "regiments": [
+              "19th Alabama",
+              "22nd Alabama",
+              "25th Alabama",
+              "39th Alabama",
+              "50th Alabama",
+              "17th Alabama Battalion Sharpshooters"
+            ],
+            "men": 1260,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": 104,
+            "z": 402,
+            "facing": -1.833,
+            "sources": [
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Deas commands the base pits; one volley at 200 yards, then up the slope): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Wikipedia, Battle of Missionary Ridge (cites Cozzens, Woodworth): https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge",
+              "Wikipedia, Chattanooga campaign order of battle: Confederate (OR-derived; not independent of the OR)",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Cheatham and Cleburne reports (the five brigade strengths) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit"
+            ],
+            "status": "Identity Verified; strength Estimated: no sourced 25 November strength; a flat 1,260, the mean of five sourced Army of Tennessee brigade effective strengths of November 1863 (Moore 1,205 and Walthall 1,489 on the 20 November return, quoted by Jackson; Lowrey 1,330, Smith 1,266 and Liddell 1,016 taken into the fight, Cleburne), low confidence; weapon rifled: Inferred, not sourced to the brigade (the 6,175 small arms captured at Chattanooga were \"mostly Enfield\", OR XXXI/2 pp. 99-100; the arms collected in front of Sherman were about 91% rifled, p. 583); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the base rifle pits north of Manigault, opposite Turchin and Van Derveer (the rest of his brigade was on the ridge)."
+          },
+          {
+            "id": "cs-waters-battery",
+            "side": "CS",
+            "type": "artillery",
+            "name": "Waters's Alabama Battery (Hamilton)",
+            "short": "Waters",
+            "commander": {
+              "name": "William P. Hamilton",
+              "rank": "Lieutenant"
+            },
+            "parent": "Courtney's artillery battalion, Hindman's Division, with Deas's brigade",
+            "regiments": [
+              "Alabama Battery (Waters')"
+            ],
+            "men": 80,
+            "guns": 4,
+            "weapon": "napoleon",
+            "xp": 3,
+            "x": 756,
+            "z": 446,
+            "facing": -1.745,
+            "sources": [
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Waters's battery's four guns, three lost): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Army of Tennessee organization, 20 November 1863 (Lt. William P. Hamilton) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Wikipedia, Chattanooga campaign order of battle: Confederate (OR-derived; not independent of the OR)",
+              "Battery crew: game value of 20 men per gun (no sourced crew strength)"
+            ],
+            "status": "Identity Inferred; guns Inferred: 4 (NPS Series, one source); weapon napoleon: an unsourced guess (most of the 40 guns captured at Chattanooga were smoothbores, OR p. 99); crew Estimated: game value 20 per gun; xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: on the ridge with Deas's brigade north of the Bird's Mill Road."
+          },
+          {
+            "id": "cs-manigault-brigade",
+            "side": "CS",
+            "type": "infantry",
+            "name": "Manigault's Brigade",
+            "short": "Manigault",
+            "commander": {
+              "name": "Arthur M. Manigault",
+              "rank": "Brigadier General"
+            },
+            "parent": "Anderson's (Hindman's) Division, Hardee's Corps; Breckinridge commanding this part of the ridge",
+            "regiments": [
+              "24th Alabama",
+              "28th Alabama",
+              "34th Alabama",
+              "10th South Carolina",
+              "19th South Carolina"
+            ],
+            "men": 1260,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": 639,
+            "z": 902,
+            "facing": -1.833,
+            "sources": [
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7: https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "NPS Chickamauga and Chattanooga NMP, Missionary Ridge page",
+              "Wikipedia, Battle of Missionary Ridge (cites Cozzens, Woodworth): https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge",
+              "Wikipedia, Chattanooga campaign order of battle: Confederate (OR-derived; not independent of the OR)",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Cheatham and Cleburne reports (the five brigade strengths) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit"
+            ],
+            "status": "Identity Verified; strength Estimated: no sourced 25 November strength; a flat 1,260, the mean of five sourced Army of Tennessee brigade effective strengths of November 1863 (Moore 1,205 and Walthall 1,489 on the 20 November return, quoted by Jackson; Lowrey 1,330, Smith 1,266 and Liddell 1,016 taken into the fight, Cleburne), low confidence (the 2,315 on a park tablet is Chickamauga's, not used); weapon rifled: Inferred, not sourced to the brigade (the 6,175 small arms captured at Chattanooga were \"mostly Enfield\", OR XXXI/2 pp. 99-100; the arms collected in front of Sherman were about 91% rifled, p. 583); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: front rank in the base works and rear rank on the crest, between Deas and Tucker; drawn on the crest."
+          },
+          {
+            "id": "cs-tucker-brigade",
+            "side": "CS",
+            "type": "infantry",
+            "name": "Anderson's Brigade (Tucker)",
+            "short": "Tucker",
+            "commander": {
+              "name": "William F. Tucker",
+              "rank": "Colonel"
+            },
+            "parent": "Anderson's (Hindman's) Division, Hardee's Corps; Breckinridge commanding this part of the ridge",
+            "regiments": [
+              "7th Mississippi",
+              "9th Mississippi",
+              "10th Mississippi",
+              "41st Mississippi",
+              "44th Mississippi",
+              "9th Mississippi Battalion Sharpshooters"
+            ],
+            "men": 1260,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": 411,
+            "z": 1562,
+            "facing": -1.745,
+            "sources": [
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Tucker's Mississippians collapsed at the Bird's Mill road a few minutes before 17:00): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Wikipedia, Battle of Missionary Ridge (cites Cozzens, Woodworth): https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge",
+              "Wikipedia, Chattanooga campaign order of battle: Confederate (OR-derived; not independent of the OR)",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Cheatham and Cleburne reports (the five brigade strengths) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit"
+            ],
+            "status": "Identity Verified; strength Estimated: no sourced 25 November strength; a flat 1,260, the mean of five sourced Army of Tennessee brigade effective strengths of November 1863 (Moore 1,205 and Walthall 1,489 on the 20 November return, quoted by Jackson; Lowrey 1,330, Smith 1,266 and Liddell 1,016 taken into the fight, Cleburne), low confidence; weapon rifled: Inferred, not sourced to the brigade (the 6,175 small arms captured at Chattanooga were \"mostly Enfield\", OR XXXI/2 pp. 99-100; the arms collected in front of Sherman were about 91% rifled, p. 583); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the crest breastworks along the Bird's Mill Road, where the line first broke."
+          },
+          {
+            "id": "cs-bate-brigade",
+            "side": "CS",
+            "type": "infantry",
+            "name": "Bate's Brigade (Tyler)",
+            "short": "Tyler",
+            "commander": {
+              "name": "Robert C. Tyler",
+              "rank": "Colonel"
+            },
+            "parent": "Breckinridge's Division (Bate commanding), Breckinridge's Corps",
+            "regiments": [
+              "37th Georgia",
+              "4th Georgia Battalion Sharpshooters",
+              "10th Tennessee",
+              "15th Tennessee (with the 37th)",
+              "20th Tennessee",
+              "30th Tennessee",
+              "1st Tennessee Battalion"
+            ],
+            "men": 1260,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -446,
+            "z": 1952,
+            "facing": -1.92,
+            "sources": [
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Bate's brigades left at the base; Tyler's routed): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Wikipedia, Battle of Missionary Ridge (cites Cozzens, Woodworth): https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge",
+              "Wikipedia, Chattanooga campaign order of battle: Confederate (OR-derived; not independent of the OR)",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Cheatham and Cleburne reports (the five brigade strengths) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit"
+            ],
+            "status": "Identity Inferred; strength Estimated: no sourced 25 November strength; a flat 1,260, the mean of five sourced Army of Tennessee brigade effective strengths of November 1863 (Moore 1,205 and Walthall 1,489 on the 20 November return, quoted by Jackson; Lowrey 1,330, Smith 1,266 and Liddell 1,016 taken into the fight, Cleburne), low confidence (seven small units); weapon rifled: Inferred, not sourced to the brigade (the 6,175 small arms captured at Chattanooga were \"mostly Enfield\", OR XXXI/2 pp. 99-100; the arms collected in front of Sherman were about 91% rifled, p. 583); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the lower works at the base of the ridge south of the break; commander: Tyler was wounded (Wikipedia's OOB) or killed (the NPS Series as relayed); Disputed."
+          },
+          {
+            "id": "cs-finley-brigade",
+            "side": "CS",
+            "type": "infantry",
+            "name": "Florida Brigade (Finley)",
+            "short": "Finley",
+            "commander": {
+              "name": "Jesse J. Finley",
+              "rank": "Brigadier General"
+            },
+            "parent": "Breckinridge's Division (Bate commanding), Breckinridge's Corps",
+            "regiments": [
+              "1st Florida (with the 3rd)",
+              "4th Florida",
+              "6th Florida",
+              "7th Florida",
+              "1st Florida Cavalry (dismounted)"
+            ],
+            "men": 1260,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -844,
+            "z": 2298,
+            "facing": -1.92,
+            "sources": [
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Bragg tried to rally Tucker, Finley and Gibson): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Wikipedia, Battle of Missionary Ridge (cites Cozzens, Woodworth): https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge",
+              "Wikipedia, Chattanooga campaign order of battle: Confederate (OR-derived; not independent of the OR)",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Cheatham and Cleburne reports (the five brigade strengths) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit"
+            ],
+            "status": "Identity Inferred; strength Estimated: no sourced 25 November strength; a flat 1,260, the mean of five sourced Army of Tennessee brigade effective strengths of November 1863 (Moore 1,205 and Walthall 1,489 on the 20 November return, quoted by Jackson; Lowrey 1,330, Smith 1,266 and Liddell 1,016 taken into the fight, Cleburne), low confidence (the Florida regiments were small, so probably high); weapon rifled: Inferred, not sourced to the brigade (the 6,175 small arms captured at Chattanooga were \"mostly Enfield\", OR XXXI/2 pp. 99-100; the arms collected in front of Sherman were about 91% rifled, p. 583); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: the base of the ridge south of Tyler, toward Bragg's headquarters; commander: rank Disputed (Brigadier General in Wikipedia's OOB; an OR-derived table lists him as the colonel of the 6th Florida)."
+          },
+          {
+            "id": "cs-cobb-battery",
+            "side": "CS",
+            "type": "artillery",
+            "name": "Cobb's Kentucky Battery (Gracey)",
+            "short": "Cobb",
+            "commander": {
+              "name": "Frank P. Gracey",
+              "rank": "Lieutenant"
+            },
+            "parent": "Slocomb's artillery battalion, Breckinridge's Division",
+            "regiments": [
+              "Kentucky Battery (Cobb's)"
+            ],
+            "men": 80,
+            "guns": 4,
+            "weapon": "napoleon",
+            "xp": 3,
+            "x": -395,
+            "z": 2686,
+            "facing": -1.92,
+            "sources": [
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (four Napoleon twelve-pounders beside Bragg's headquarters, taken by Harker): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "NPS Chickamauga and Chattanooga NMP, Bragg Reservation (Cobb's guns mark the position)",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Army of Tennessee organization, 20 November 1863 (Lt. Frank P. Gracey) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit",
+              "Battery crew: game value of 20 men per gun (no sourced crew strength)"
+            ],
+            "status": "Identity Verified; guns Verified: 4 Napoleons (NPS Series; the battery's history); weapon napoleon; crew Estimated: game value 20 per gun; xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: on the narrow crest beside Bragg's headquarters, drawn on the 3DEP crest west of the reservation centroid; commander: Gracey on the 20 November organization (Inferred)."
+          },
+          {
+            "id": "cs-strahl-brigade",
+            "side": "CS",
+            "type": "infantry",
+            "name": "Strahl's Brigade",
+            "short": "Strahl",
+            "commander": {
+              "name": "Otho F. Strahl",
+              "rank": "Brigadier General"
+            },
+            "parent": "Stewart's Division, Breckinridge's Corps",
+            "regiments": [
+              "4th Tennessee (with the 5th)",
+              "19th Tennessee",
+              "24th Tennessee",
+              "31st Tennessee",
+              "33rd Tennessee"
+            ],
+            "men": 1260,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -479,
+            "z": 2877,
+            "facing": -1.92,
+            "sources": [
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Strahl and Stovall defended the crest; Stewart pulled them out about 17:15): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Wikipedia, Battle of Missionary Ridge (cites Cozzens, Woodworth): https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge",
+              "Wikipedia, Chattanooga campaign order of battle: Confederate (OR-derived; not independent of the OR)",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Cheatham and Cleburne reports (the five brigade strengths) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit"
+            ],
+            "status": "Identity Verified; strength Estimated: no sourced 25 November strength; a flat 1,260, the mean of five sourced Army of Tennessee brigade effective strengths of November 1863 (Moore 1,205 and Walthall 1,489 on the 20 November return, quoted by Jackson; Lowrey 1,330, Smith 1,266 and Liddell 1,016 taken into the fight, Cleburne), low confidence (December returns of two of its regiments suggest only 800 to 1,000); weapon rifled: Inferred, not sourced to the brigade (the 6,175 small arms captured at Chattanooga were \"mostly Enfield\", OR XXXI/2 pp. 99-100; the arms collected in front of Sherman were about 91% rifled, p. 583); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: on the ridge south of Bragg's headquarters, off the drawn map: drawn at the south edge beside it."
+          },
+          {
+            "id": "cs-stovall-brigade",
+            "side": "CS",
+            "type": "infantry",
+            "name": "Stovall's Brigade",
+            "short": "Stovall",
+            "commander": {
+              "name": "Marcellus A. Stovall",
+              "rank": "Brigadier General"
+            },
+            "parent": "Stewart's Division, Breckinridge's Corps",
+            "regiments": [
+              "40th Georgia",
+              "41st Georgia",
+              "42nd Georgia",
+              "43rd Georgia",
+              "52nd Georgia"
+            ],
+            "men": 1260,
+            "weapon": "rifled",
+            "xp": 3,
+            "x": -281,
+            "z": 2907,
+            "facing": -1.92,
+            "sources": [
+              "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7: https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+              "Wikipedia, Battle of Missionary Ridge (cites Cozzens, Woodworth): https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge",
+              "Wikipedia, Chattanooga campaign order of battle: Confederate (OR-derived; not independent of the OR)",
+              "Official Records Ser. I Vol. XXXI Pt. 2, Stewart's division casualty table (Stovall lost 84) (archive.org OCR text; page numbers from OCR): https://archive.org/details/warofrebellion312unit"
+            ],
+            "status": "Identity Inferred; strength Estimated: no sourced 25 November strength; a flat 1,260, the mean of five sourced Army of Tennessee brigade effective strengths of November 1863 (Moore 1,205 and Walthall 1,489 on the 20 November return, quoted by Jackson; Lowrey 1,330, Smith 1,266 and Liddell 1,016 taken into the fight, Cleburne), low confidence; weapon rifled: Inferred, not sourced to the brigade (the 6,175 small arms captured at Chattanooga were \"mostly Enfield\", OR XXXI/2 pp. 99-100; the arms collected in front of Sherman were about 91% rifled, p. 583); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: on the crest south of Bragg's headquarters beside Strahl, off the drawn map: drawn at the south edge."
+          }
+        ],
+        "positionsNote": "The Union line runs from Baird's division on the left (Phelps, Van Derveer, Turchin) through Wood's (Beatty, Willich, Hazen) in front of Orchard Knob and Sheridan's (Wagner, Harker, F. T. Sherman) to Carlin on the right, about 1,200 yards from the ridge (NPS; Van Derveer). On the ridge from north to south: Vaughan, Deas (in the base pits) with Waters's battery, Manigault, Tucker at the Bird's Mill Road, Bate's brigade under Tyler and the Florida brigade at the base south of the break, Cobb's battery beside Bragg's headquarters, then Strahl and Stovall (NPS; Wikipedia). The terrain ends about 150 m south of the Bragg Reservation, so Strahl and Stovall (south of headquarters) are drawn at the south edge beside it and Carlin (toward Rossville Gap) at the south-west edge, all compressed; the Bird's Mill Road is the terrain's modern alignment, about 1.2 km north of Bragg's headquarters. All positions Inferred.",
+        "strengthNote": "Van Derveer's 1,679 is his table of the force engaged (Inferred); Wagner's about 2,000 is Disputed against about 1,800. Hazen is his 2,256 less his 23 November losses; Willich and Beatty split Wood's 5,200 by regiment; Harker and Sherman halve Sheridan's 6,000 less Wagner; Turchin, Phelps and Carlin use a pooled 244.8 men per regiment (all Estimated). No Confederate brigade strength for 25 November was found: all eight are a flat 1,260 (Estimated, likely high for the consolidated Tennessee and Florida brigades; NPS gives about 16,000 Confederates on the ridge, Wikipedia about 20,000, Disputed). Crews are a game value of 20 per gun. No Union battery is named in the sources for this sector, so none is fielded.",
+        "historyNote": "The Union centre took the base rifle pits and then the crest in about an hour; the line first broke at the Bird's Mill Road a few minutes before 17:00, Harker's brigade took Cobb's battery beside Bragg's headquarters, and Bragg's army retreated toward Dalton, its centre broken."
+      }
+    }
+  ]
+}

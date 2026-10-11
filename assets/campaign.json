@@ -59,6 +59,24 @@
       { "unitId": "us-stevens-battery", "label": "26th Pennsylvania Battery (Stevens), Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "sixPdr", "vet": "trained" },
       { "unitId": "us-board-of-trade-battery", "label": "Chicago Board of Trade Battery (Stokes), Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "sixPdr", "vet": "trained" },
       { "unitId": "us-standart-battery", "label": "Battery B, 1st Ohio Light Artillery (Standart), 2nd Division, Army of the Cumberland", "kind": "battery", "men": 60, "guns": 3, "weapon": "sixPdr", "vet": "trained" }
+    ] },
+    { "packId": "chattanooga", "phaseId": "orchard-knob", "joins": [
+      { "unitId": "us-fort-wood-guns", "label": "Fort Wood heavy guns (Chattanooga line heavy artillery, Department of the Cumberland)", "kind": "battery", "men": 120, "guns": 6, "weapon": "parrott10", "vet": "trained" }
+    ] },
+    { "packId": "chattanooga", "phaseId": "lookout-mountain", "joins": [
+      { "unitId": "us-cobham-brigade", "label": "Cobham's Brigade (2nd Brigade, 2nd Division, XII Corps, Hooker's command)", "kind": "infantry", "men": 574, "weapon": "springfield", "vet": "veteran" },
+      { "unitId": "us-ireland-brigade", "label": "Ireland's Brigade (3rd Brigade, 2nd Division, XII Corps, Hooker's command)", "kind": "infantry", "men": 775, "weapon": "enfield", "vet": "veteran" },
+      { "unitId": "us-candy-brigade", "label": "Candy's Brigade (1st Brigade, 2nd Division, XII Corps, Hooker's command)", "kind": "infantry", "men": 1010, "weapon": "springfield", "vet": "veteran" },
+      { "unitId": "us-woods-brigade", "label": "Woods's Brigade (1st Brigade, 1st Division, XV Corps, Army of the Tennessee)", "kind": "infantry", "men": 1585, "weapon": "springfield", "vet": "veteran" },
+      { "unitId": "us-williamson-brigade", "label": "Williamson's Brigade (2nd Brigade, 1st Division, XV Corps, Army of the Tennessee)", "kind": "infantry", "men": 713, "weapon": "springfield", "vet": "veteran" },
+      { "unitId": "us-sahm-battery", "label": "Battery K, 1st Ohio Light Artillery (Sahm), XI Corps", "kind": "battery", "men": 80, "guns": 4, "weapon": "napoleon", "vet": "veteran" },
+      { "unitId": "us-wiedrich-battery", "label": "Battery I, 1st New York Light Artillery (Wiedrich), XI Corps", "kind": "battery", "men": 80, "guns": 4, "weapon": "ordnance3", "vet": "veteran" }
+    ] },
+    { "packId": "chattanooga", "phaseId": "missionary-ridge", "joins": [
+      { "unitId": "us-phelps-brigade", "label": "Phelps's Brigade (3rd Brigade, 3rd Division, XIV Corps, Army of the Cumberland)", "kind": "infantry", "men": 1469, "weapon": "springfield", "vet": "veteran" },
+      { "unitId": "us-van-derveer-brigade", "label": "Van Derveer's Brigade (2nd Brigade, 3rd Division, XIV Corps, Army of the Cumberland)", "kind": "infantry", "men": 1679, "weapon": "springfield", "vet": "veteran" },
+      { "unitId": "us-turchin-brigade", "label": "Turchin's Brigade (1st Brigade, 3rd Division, XIV Corps, Army of the Cumberland)", "kind": "infantry", "men": 1714, "weapon": "springfield", "vet": "veteran" },
+      { "unitId": "us-carlin-1st-brigade", "label": "Carlin's Brigade (1st Brigade, 1st Division, XIV Corps, Army of the Cumberland)", "kind": "infantry", "men": 1958, "weapon": "springfield", "vet": "veteran" }
     ] }
   ]
 }

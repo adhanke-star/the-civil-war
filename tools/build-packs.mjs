@@ -15,6 +15,9 @@
 //   - draws each 1862 field clearing (a woods-based pack) or wood (a fields-based pack, src.groundBase 'fields') as a
 //     deterministic irregular oval around its landmark;
 //   - lays every label to read left to right from the phase's opening camera (label angle = -camera yaw);
+//   - lets a phase fight on its own terrain asset (phase.terrain, default the pack's src.terrain): every position in
+//     that phase is projected with THAT terrain's centre, and a clearing, wood, site or label that names a `terrain`
+//     is drawn only in phases on that terrain (absent: every phase); phase.groundBase overrides src.groundBase;
 //   - validates every phase with preparePhase and prepareFieldScenario(..., 'pack') before writing.
 // Output is deterministic (no clock, no randomness) with a fixed key order, so tools/test-shiloh.mjs can rebuild
 // it in memory and compare byte for byte.
@@ -131,11 +134,22 @@ function unitRow(src, f, phase, resolve, extra) {
 /** Build one pack from its curated module (an object with id, title, terrain, landmarks, formations, phases). */
 export function buildPackFrom(src) {
   if (!PACK_ID.test(src.id)) throw new Error(`build-packs: invalid pack id "${src.id}"`);
-  const frame = terrainFrame(src.terrain);
-  const resolve = resolver(frame, src.landmarks);
+  // One projection per terrain asset: a phase on another terrain resolves every position about that terrain's centre.
+  const resolvers = new Map();
+  const resolverFor = name => {
+    if (!PACK_ID.test(name)) throw new Error(`build-packs: invalid terrain name "${name}"`);
+    if (!resolvers.has(name)) resolvers.set(name, resolver(terrainFrame(name), src.landmarks));
+    return resolvers.get(name);
+  };
+  resolverFor(src.terrain);
+  // [item, index in its source list] for the items drawn on `terrain` (an item without `terrain` is drawn everywhere);
+  // the index seeds the oval, so a polygon never changes with the terrain filter.
+  const on = (list, terrain) => (list || []).map((item, i) => [item, i]).filter(([item]) => !item.terrain || item.terrain === terrain);
   const formations = new Map(src.formations.map(f => [f.id, f]));
   const report = [];
   const phases = src.phases.map((phase, index) => {
+    const terrain = phase.terrain ?? src.terrain, resolve = resolverFor(terrain);
+    const groundBase = phase.groundBase ?? src.groundBase;
     const ident = id => { const f = formations.get(id); if (!f) throw new Error(`build-packs: ${phase.id}: unknown formation ${id}`); return f; };
     const camera = { target: resolve(phase.camera.target, `${phase.id} camera`), yaw: round3(facingOf(phase.camera.lookBearing) + Math.PI), dist: phase.camera.dist };
     camera.yaw = round3(Math.atan2(Math.sin(camera.yaw), Math.cos(camera.yaw)));
@@ -150,7 +164,7 @@ export function buildPackFrom(src) {
     const labelAngle = round3(-camera.yaw);
     const scenario = {
       id: `${src.id}-${phase.id}`, title: phase.title, battle: src.battle, subtitle: phase.subtitle, date: phase.date,
-      start: phase.start, end: phase.end, terrain: src.terrain, season: src.season, seed: phase.seed,
+      start: phase.start, end: phase.end, terrain, season: src.season, seed: phase.seed,
       clockRatio: phase.clockRatio, menPerFigure, attacker: phase.attacker,
       objective: { name: phase.objective.name, x: ox, z: oz, r: phase.objective.r },
       retreat: Object.fromEntries(Object.entries(phase.retreat).map(([side, p]) => [side, resolve(p, `${phase.id} retreat ${side}`)])),
@@ -158,13 +172,13 @@ export function buildPackFrom(src) {
       victory: { ...phase.victory },
       briefing: { text: [...phase.briefing.text], ...(phase.briefing.quote ? { quote: { ...phase.briefing.quote } } : {}), sources: [...phase.briefing.sources] },
       // A woods-based pack clears its named fields; a fields-based pack plants its named woods (src.woods).
-      ground: src.groundBase === 'fields' ? { base: 'fields', treeSpacing: src.treeSpacing }
-        : { base: 'woods', clearings: src.clearings.map((c, i) => ({ name: c.name, polygon: oval(resolve(c.at, c.name), { ...c.shape, seed: i + 1 }) })), treeSpacing: src.treeSpacing },
-      woods: (src.woods || []).map((w, i) => ({ name: w.name, polygon: oval(resolve(w.at, w.name), { ...w.shape, seed: i + 1 }) })),
+      ground: groundBase === 'fields' ? { base: 'fields', treeSpacing: src.treeSpacing }
+        : { base: 'woods', clearings: on(src.clearings, terrain).map(([c, i]) => ({ name: c.name, polygon: oval(resolve(c.at, c.name), { ...c.shape, seed: i + 1 }) })), treeSpacing: src.treeSpacing },
+      woods: on(src.woods, terrain).map(([w, i]) => ({ name: w.name, polygon: oval(resolve(w.at, w.name), { ...w.shape, seed: i + 1 }) })),
       woodsNote: src.woodsNote,
-      sites: src.sites.map(s => { const [x, z] = resolve(s.at, s.name); return { id: s.id, name: s.name, x, z, rot: s.rot, yard: s.yard,
+      sites: on(src.sites, terrain).map(([s]) => { const [x, z] = resolve(s.at, s.name); return { id: s.id, name: s.name, x, z, rot: s.rot, yard: s.yard,
         ...(s.fenceRadius ? { fenceRadius: s.fenceRadius } : {}), source: s.source, buildings: s.buildings.map(b => [...b]), ...(s.orchard ? { orchard: [...s.orchard] } : {}) }; }),
-      labels: src.labels.map(l => { const [x, z] = resolve(l.at, l.text); return { text: l.text, x, z, height: l.height, angle: labelAngle, ...(l.italic ? { italic: true } : {}) }; }),
+      labels: on(src.labels, terrain).map(([l]) => { const [x, z] = resolve(l.at, l.text); return { text: l.text, x, z, height: l.height, angle: labelAngle, ...(l.italic ? { italic: true } : {}) }; }),
       labelsNote: src.labelsNote,
       units,
       ...(reinforcements.length ? { reinforcements } : {}),
@@ -173,7 +187,7 @@ export function buildPackFrom(src) {
       historyNote: phase.historyNote,
     };
     const sum = (rows, side, key) => rows.filter(u => !side || u.side === side).reduce((s, u) => s + (u[key] || 0), 0);
-    report.push({ phase: phase.id, formations: roster.length, US: sum(roster, 'US', 'men'), CS: sum(roster, 'CS', 'men'), men: sum(roster, null, 'men'),
+    report.push({ phase: phase.id, terrain, formations: roster.length, US: sum(roster, 'US', 'men'), CS: sum(roster, 'CS', 'men'), men: sum(roster, null, 'men'),
       guns: sum(roster, null, 'guns'), ratio: menPerFigure, figures: figuresAt(roster, menPerFigure), clockRatio: phase.clockRatio,
       playSec: (clockMin(phase.end) - clockMin(phase.start)) * 60 / phase.clockRatio, reinforcements: reinforcements.length });
     return { id: phase.id, scenario };
