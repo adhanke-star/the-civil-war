@@ -1,4 +1,5 @@
-// Completed practice outcomes only. No campaign/battle save, historical loot, or invented captures.
+// Completed practice outcomes, and the shared result->reward bridge a campaign pack phase also uses
+// (phaseOutcome). No save authority here and no invented captures.
 import { completedSnapshot, validateSnapshot, MAX_SAVE_BYTES } from './save.js';
 import { introScenario, surrenderOption } from './intro.js';
 import { ARMS, UNIQUES, CONDITIONS, VETERANCY, ISSUE_PLACE } from '../reward/data.js';
@@ -19,6 +20,25 @@ function frozen(v) {
 const capable = (b) => b.men > 0 && (b.kind === 'infantry' || b.guns > 0);
 const lootUid = (awardId, seed, i) => `${awardId}.L${seedOf(seed).toString(36)}-${i}`;
 const captureOrigin = (c) => `Captured: ${c.name} (fictional practice stores)`;
+
+/** Card ratings for a veterancy level 1-4 (game values shared by practice and the campaign roster). */
+export const vetBase = (xp) => ({ fire: 25 + xp * 10, melee: 30 + xp * 8, morale: 40 + xp * 8, drill: 30 + xp * 10 });
+
+/** Crates one side holds at the end, checked against the encounter's own crate list. */
+export function heldCaptures(game, side, crateList, origin) {
+  const held = game.fieldCaptures?.held(side) || [], crates = new Map((crateList || []).map((c) => [c.id, c])), ids = new Set();
+  if (!Array.isArray(held) || held.length > crates.size) fail('invalid field captures.');
+  for (const c of held) {
+    if (!c || !crates.has(c.id) || ids.has(c.id) || c.tier !== crates.get(c.id).tier) fail('invalid field captures.');
+    ids.add(c.id);
+  }
+  return held.map((c) => ({ id: c.id, tier: c.tier, from: origin(crates.get(c.id)) }));
+}
+
+/** The deterministic loot roll of one award: same award identity and seed, same cards. */
+export function awardCards({ awardId, seed, grade, captures }) {
+  return rollLoot({ seed, grade, captures }).cards.map((c) => ({ ...c, uid: `${awardId}.${c.uid}` }));
+}
 
 /** Definitions may be imported without field allocation; only an admitted manifest can boot. */
 export function assertSavedLaunch(manifest, current) {
@@ -146,16 +166,9 @@ export function savedOutcome({ manifest, game }) {
     const u = units.get(b.id), men = Math.floor(u.men);
     return { ...b, men, ...(b.kind === 'battery' ? { guns: men ? u.gunSlots.filter((g) => g.alive).length : 0 } : {}) };
   });
-  const held = game.fieldCaptures?.held('US') || [], crateIds = new Set(), crates = new Map(scenario.crates.map((c) => [c.id, c]));
-  if (!Array.isArray(held) || held.length > crates.size) fail('invalid field captures.');
-  for (const c of held) {
-    if (!c || !crates.has(c.id) || crateIds.has(c.id) || c.tier !== crates.get(c.id).tier) fail('invalid field captures.');
-    crateIds.add(c.id);
-  }
-  const captures = held.map((c) => ({ id: c.id, tier: c.tier, from: captureOrigin(crates.get(c.id)) }));
+  const captures = heldCaptures(game, 'US', scenario.crates, captureOrigin);
   const grade = game.result.winner === 'US' ? 'Victory' : 'Defeat';
-  const loot = rollLoot({ seed, grade, captures });
-  const cards = loot.cards.map((c) => ({ ...c, uid: `${awardId}.${c.uid}` }));
+  const cards = awardCards({ awardId, seed, grade, captures });
   // Existing strict validator catches every identity collision before returning a pending result.
   const snapshot = validateSnapshot({ ...baseline, awardId, seed, grade, army, depot: [...baseline.depot, ...cards] });
   if (cards.length > manifest.reserve.cards || bytes(snapshot) > manifest.reserve.bytes) fail('loot exceeded the admitted result reservation.');
@@ -195,7 +208,7 @@ export function practiceOutcome({ game, scenario, mode, awardId, seed }) {
     starting += u.menMax;
     const brigade = { id: u.id, label: u.name, kind: u.type === 'artillery' ? 'battery' : 'infantry', men,
       vet: ['green', 'trained', 'veteran', 'elite'][xp - 1],
-      base: { fire: 25 + xp * 10, melee: 30 + xp * 8, morale: 40 + xp * 8, drill: 30 + xp * 10 },
+      base: vetBase(xp),
       weapon: { uid: `${awardId}.${u.id}`, itemId: `practice-${u.weapon}`, tier: 'common', conditionId: 'serviceable',
         from: 'Practice equipment; exact historical model unspecified' } };
     if (brigade.kind === 'battery') {
@@ -208,17 +221,44 @@ export function practiceOutcome({ game, scenario, mode, awardId, seed }) {
   const grade = game.result.winner === game.playerSide ? 'Victory' : 'Defeat';
   const before = completedSnapshot({ awardId, army, depot: [], issued: [], seed, grade });
   const surviving = before.army.reduce((n, b) => n + b.men, 0);
-  const held = game.fieldCaptures?.held(game.playerSide) || [];
-  const crateDefs = new Map((scenario.crates || []).map((c) => [c.id, c]));
-  const crateIds = new Set();
-  if (!Array.isArray(held) || held.length > crateDefs.size) fail('invalid field captures.');
-  for (const c of held) {
-    if (!c || !crateDefs.has(c.id) || crateIds.has(c.id) || c.tier !== crateDefs.get(c.id).tier) fail('invalid field captures.');
-    crateIds.add(c.id);
-  }
-  const captures = held.map((c) => ({ id: c.id, tier: c.tier, from: `Captured: ${crateDefs.get(c.id).name} (fictional practice stores)` }));
+  const captures = heldCaptures(game, game.playerSide, scenario.crates, captureOrigin);
   return { ...before, captures, summary: { starting, surviving, losses: starting - surviving,
     guns: before.army.reduce((n, b) => n + (b.guns || 0), 0), title: scenario.title, why: game.result.why } };
+}
+
+const GAME_GRADES = { decisive: 'Decisive', victory: 'Victory', draw: 'Draw', defeat: 'Defeat' };
+
+/**
+ * One finished battle-pack phase: end strength of every formation (both sides, unarrived reinforcements at
+ * their authored strength), the grade, held captures and the deterministic loot of `awardId`. Rejects an
+ * altered roster exactly like practiceOutcome. Grants nothing by itself; the campaign records it.
+ */
+export function phaseOutcome({ game, scenario, awardId, seed }) {
+  if (!game || !scenario || game.scenario !== scenario || game.playerSide !== 'US' || game.over !== true
+    || !(['US', 'CS'].includes(game.result?.winner) || (game.result?.winner === null && game.result.draw === true))) fail('only a completed, unaltered battle phase grants rewards.');
+  if (typeof awardId !== 'string' || !awardId || awardId.length > 80) fail('a battle phase needs a bounded award identity.');
+  const defs = new Map([...scenario.units, ...(scenario.reinforcements || [])].map((d) => [d.id, d])), live = new Map();
+  if (!Array.isArray(game.units) || game.units.length > defs.size) fail('an altered roster cannot grant rewards.');
+  for (const u of game.units) {
+    const d = u && defs.get(u.id);
+    if (!d || live.has(u.id) || u.side !== d.side || u.type !== (d.type || 'infantry') || u.name !== d.name || u.menMax !== d.men
+      || u.weapon !== (d.weapon || 'smooth') || u.xp !== (d.xp || 1) || JSON.stringify(u.equipment) !== JSON.stringify(d.equipment)) fail('an altered roster cannot grant rewards.');
+    if (!Number.isFinite(u.men) || u.men < 0 || u.men > u.menMax) fail('invalid surviving strength.');
+    if (d.type === 'artillery' && (!Array.isArray(u.gunSlots) || u.gunSlots.length !== d.guns
+      || u.gunSlots.some((g) => !g || typeof g.alive !== 'boolean'))) fail('invalid surviving gun state.');
+    live.set(u.id, u);
+  }
+  if (scenario.units.some((d) => !live.has(d.id))) fail('an altered roster cannot grant rewards.');
+  const units = [...defs.values()].map((d) => {
+    const u = live.get(d.id), men = u ? Math.floor(u.men) : d.men;
+    const row = { id: d.id, side: d.side, menStart: d.men, men };
+    if (d.type === 'artillery') Object.assign(row, { gunsStart: d.guns, guns: !u ? d.guns : men ? u.gunSlots.filter((g) => g.alive).length : 0 });
+    return row;
+  });
+  const grade = GAME_GRADES[game.result.grade] || (game.result.winner === 'US' ? 'Victory' : game.result.winner === null ? 'Draw' : 'Defeat');
+  const captures = heldCaptures(game, 'US', scenario.crates, (c) => `Captured: ${c.name}`);
+  const cards = awardCards({ awardId, seed, grade, captures });
+  return frozen({ winner: game.result.winner, grade, units, captures, cards });
 }
 
 /** Terminal, as-of prisoners and physical possession. This grants no loot or save authority. */

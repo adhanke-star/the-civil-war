@@ -1,4 +1,5 @@
-// One progress-store seam. P1 stores only a completed reward, never a live battle.
+// One progress-store seam. Stores a completed reward (v1) or a campaign position between phases (v2),
+// never a live battle. Three slots: slot 1 keeps the original key, so existing saves become slot 1.
 import { ARMS, PRACTICE_ARMS, UNIQUES, VETERANCY, GRADES, CONDITIONS, itemDef } from '../reward/data.js';
 import { ratings, canCarry, equip } from '../reward/model.js';
 
@@ -6,6 +7,14 @@ export const SAVE_KEY = 'cw.progress';
 export const PROGRESS_DB = 'cw.progress';
 export const PROGRESS_OBJECT_STORE = 'progress';
 export const MAX_SAVE_BYTES = 1024 * 1024;
+export const SAVE_SLOTS = Object.freeze([1, 2, 3]);
+/** Storage key of a slot: slot 1 is the original `cw.progress`; slots 2 and 3 are `cw.progress.N`. */
+export function slotKey(slot) {
+  if (!SAVE_SLOTS.includes(slot)) bad('unknown save slot.');
+  return slot === 1 ? SAVE_KEY : `${SAVE_KEY}.${slot}`;
+}
+const CAMPAIGN_LIMITS = Object.freeze({ phases: 500, carry: 2000 });
+const winners = new Set(['US', 'CS', null]);
 const knownGear = new Set([...ARMS, ...PRACTICE_ARMS, ...UNIQUES].map((x) => x.id));
 const vets = new Set(VETERANCY.map((x) => x.id));
 const conditions = new Set(CONDITIONS.map((x) => x.id));
@@ -52,13 +61,50 @@ function item(v) {
   return out;
 }
 
+/** The v2 campaign position: next ladder index, append-only history and per-unit carried strength. */
+function campaignRecord(c) {
+  shape(c, ['id', 'index', 'status', 'history', 'carry']);
+  const cid = id(c.id, 'campaign identity');
+  const index = number(c.index, 'campaign position', 0, CAMPAIGN_LIMITS.phases);
+  if (!['in-progress', 'complete'].includes(c.status)) bad('unknown campaign status.');
+  const awards = new Set();
+  const history = list(c.history, 'campaign history', 0, CAMPAIGN_LIMITS.phases * 4).map((r) => {
+    shape(r, ['packId', 'phaseId', 'awardId', 'winner', 'grade', 'lossesUS', 'lossesCS', 'replay']);
+    const row = { packId: id(r.packId, 'pack identity'), phaseId: id(r.phaseId, 'phase identity'), awardId: id(r.awardId, 'phase award identity') };
+    if (awards.has(row.awardId)) bad('duplicate phase award identity.');
+    awards.add(row.awardId);
+    if (!winners.has(r.winner) || !GRADES.includes(r.grade) || typeof r.replay !== 'boolean') bad('invalid campaign history row.');
+    return { ...row, winner: r.winner, grade: r.grade, lossesUS: number(r.lossesUS, 'losses', 0, 10000000),
+      lossesCS: number(r.lossesCS, 'losses', 0, 10000000), replay: r.replay };
+  });
+  // Every first play advances the ladder by one; replays never do.
+  if (history.filter((r) => !r.replay).length !== index) bad('campaign position does not match its history.');
+  if (!c.carry || typeof c.carry !== 'object' || Array.isArray(c.carry) || ![Object.prototype, null].includes(Object.getPrototypeOf(c.carry))) bad('invalid carried strengths.');
+  const keys = Object.keys(c.carry);
+  if (keys.length > CAMPAIGN_LIMITS.carry) bad('incomplete or oversized carried strengths.');
+  const carry = {};
+  for (const key of keys.sort()) {
+    const e = c.carry[key];
+    shape(e, ['men'], ['guns']);
+    carry[id(key, 'carried unit identity')] = { men: number(e.men, 'carried men', 0, 100000), ...(has(e, 'guns') ? { guns: number(e.guns, 'carried guns', 0, 200) } : {}) };
+  }
+  return { id: cid, index, status: c.status, history, carry };
+}
+
 /** Strict canonical copy. Imported derived OVR is never trusted; it is recomputed. */
 export function validateSnapshot(v) {
-  shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade']);
-  if (v.format !== 'the-civil-war' || v.version !== 1 || v.kind !== 'completed-reward') bad('unsupported save format or version.');
+  // Version 2 is only the campaign kind; any other version-2 record is an unsupported version.
+  const v2 = !!v && typeof v === 'object' && v.version === 2 && v.kind === 'campaign';
+  if (v2) shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade', 'slot', 'campaign'], ['updated']);
+  else shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade']);
+  if (v.format !== 'the-civil-war' || (!v2 && (v.version !== 1 || v.kind !== 'completed-reward'))) bad('unsupported save format or version.');
   const awardId = id(v.awardId, 'completed award identity');
   const seed = typeof v.seed === 'string' ? word(v.seed, 'seed', 100) : number(v.seed, 'seed', 0, 0xffffffff);
-  if (!GRADES.includes(v.grade)) bad('unknown grade.');
+  const campaign = v2 ? campaignRecord(v.campaign) : null;
+  // A fresh campaign has no grade yet; afterwards the grade is the last recorded phase's.
+  const fresh = v2 && campaign.history.length === 0;
+  if (fresh ? v.grade !== null : !GRADES.includes(v.grade)) bad('unknown grade.');
+  const unitIds = new Set();
   const brigadeIds = new Set();
   const owners = new Map();
   const add = (it, owner) => {
@@ -67,8 +113,12 @@ export function validateSnapshot(v) {
     return it;
   };
   const army = list(v.army, 'army', 1, 200).map((b) => {
-    shape(b, ['id', 'label', 'kind', 'men', 'vet', 'weapon', 'base'], ['guns', 'ovr']);
+    shape(b, ['id', 'label', 'kind', 'men', 'vet', 'weapon', 'base'], v2 ? ['guns', 'ovr', 'unitId'] : ['guns', 'ovr']);
     const bid = id(b.id, 'brigade identity');
+    if (has(b, 'unitId')) {
+      if (unitIds.has(id(b.unitId, 'field unit identity'))) bad('duplicate field unit identity.');
+      unitIds.add(b.unitId);
+    }
     if (brigadeIds.has(bid)) bad('duplicate brigade identity.');
     brigadeIds.add(bid);
     if (!['infantry', 'battery'].includes(b.kind) || !vets.has(b.vet)) bad('unknown brigade kind or veterancy.');
@@ -81,6 +131,7 @@ export function validateSnapshot(v) {
     else if (has(b, 'guns')) bad('infantry cannot own guns.');
     if (out.weapon.depot || !canCarry(out, out.weapon)) bad('incompatible equipped gear.');
     out.ovr = ratings(out).ovr;
+    if (has(b, 'unitId')) out.unitId = b.unitId;
     return out;
   });
   const depot = list(v.depot, 'depot', 0, 2000).map((it) => add(item(it), null));
@@ -98,7 +149,14 @@ export function validateSnapshot(v) {
     owners.set(r.item, null);
     owners.set(r.displaced, r.brigade);
   }
-  const out = { format: 'the-civil-war', version: 1, kind: 'completed-reward', awardId, army, depot, issued, seed, grade: v.grade };
+  const out = v2
+    ? { format: 'the-civil-war', version: 2, kind: 'campaign', awardId, army, depot, issued, seed, grade: v.grade,
+      slot: number(v.slot, 'save slot', 1, SAVE_SLOTS.length), campaign }
+    : { format: 'the-civil-war', version: 1, kind: 'completed-reward', awardId, army, depot, issued, seed, grade: v.grade };
+  if (v2 && has(v, 'updated')) {
+    if (typeof v.updated !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(v.updated)) bad('invalid update time.');
+    out.updated = v.updated;
+  }
   if (new TextEncoder().encode(JSON.stringify(out)).length > MAX_SAVE_BYTES) bad('save exceeds the 1 MB limit.');
   return out;
 }
@@ -156,7 +214,7 @@ function openProgressDatabase() {
     };
   });
 }
-async function databaseTransaction(operation, mode) {
+async function databaseTransaction(operation, mode, key = SAVE_KEY) {
   const db = await openProgressDatabase();
   return new Promise((resolve, reject) => {
     let transaction, answer, failure;
@@ -165,7 +223,7 @@ async function databaseTransaction(operation, mode) {
       transaction = db.transaction(PROGRESS_OBJECT_STORE, mode);
       transaction.oncomplete = () => { db.close(); resolve(answer); };
       transaction.onabort = () => { db.close(); reject(failure || fail('could not save; the progress transaction was aborted.')); };
-      const table = transaction.objectStore(PROGRESS_OBJECT_STORE), request = table.get(SAVE_KEY), presence = table.count(SAVE_KEY);
+      const table = transaction.objectStore(PROGRESS_OBJECT_STORE), request = table.get(key), presence = table.count(key);
       request.onerror = () => { failure = fail('cannot read browser progress.'); };
       presence.onerror = () => { failure = fail('cannot read browser progress.'); };
       presence.onsuccess = () => {
@@ -174,14 +232,14 @@ async function databaseTransaction(operation, mode) {
           // after a committed database record exists. Failed first writes leave bootstrap intact.
           let raw = request.result;
           if (presence.result === 0) {
-            try { raw = globalThis.localStorage.getItem(SAVE_KEY); }
+            try { raw = globalThis.localStorage.getItem(key); }
             catch { bad('cannot read browser storage. Retry; existing progress has not been replaced.'); }
           } else if (typeof raw !== 'string') bad('unsupported browser progress record.');
           if (raw !== null && typeof raw !== 'string') bad('unsupported browser progress record.');
           answer = operation({
             getItem() { return raw; },
             setItem(key, value) {
-              const write = table.put(value, SAVE_KEY);
+              const write = table.put(value, key);
               write.onerror = () => { failure = fail('could not save.'); };
               raw = value;
             },
@@ -196,7 +254,13 @@ async function databaseTransaction(operation, mode) {
 }
 
 /** One authority. Explicit memory storage + serial locks are a Node-only test adapter. */
-export function createProgressStore(storage, { locks } = {}) {
+export function createProgressStore(storage, { locks, slot = 1 } = {}) {
+  const key = slotKey(slot);
+  // A campaign save names its slot (award identities include it); it is never written into another slot.
+  const owned = (snapshot) => {
+    if (snapshot.version === 2 && snapshot.slot !== slot) bad(`this campaign belongs to save slot ${snapshot.slot}, not slot ${slot}.`);
+    return snapshot;
+  };
   function access() {
     try {
       const s = typeof storage === 'function' ? storage() : storage;
@@ -205,35 +269,37 @@ export function createProgressStore(storage, { locks } = {}) {
     } catch { bad('browser storage is unavailable. Retry or export your completed army.'); }
   }
   function read(s) {
-    try { return s.getItem(SAVE_KEY); }
+    try { return s.getItem(key); }
     catch { bad('cannot read browser storage. Retry; existing progress has not been replaced.'); }
   }
   function write(s, snapshot) {
-    try { s.setItem(SAVE_KEY, JSON.stringify(snapshot)); }
+    try { s.setItem(key, JSON.stringify(snapshot)); }
     catch { bad('could not save. Keep this page open, retry, or export your completed army.'); }
     return snapshot;
   }
   async function locked(operation) {
-    if (storage === undefined) return databaseTransaction(operation, 'readwrite');
+    if (storage === undefined) return databaseTransaction(operation, 'readwrite', key);
     let manager;
     try { manager = typeof locks === 'function' ? locks() : locks; }
     catch { bad('coordinated saving is unavailable. Retry or export your army.'); }
     if (!manager || typeof manager.request !== 'function') bad('coordinated saving is unavailable. Retry or export your army.');
-    try { return await manager.request(SAVE_KEY, { mode: 'exclusive' }, () => operation(access())); }
+    try { return await manager.request(key, { mode: 'exclusive' }, () => operation(access())); }
     catch (err) {
       if (err?.message?.startsWith('Progress:')) throw err;
       bad('could not coordinate saving. Retry or export your army.');
     }
   }
-  const reading = (operation) => storage === undefined ? databaseTransaction(operation, 'readonly') : Promise.resolve().then(() => operation(access()));
+  const reading = (operation) => storage === undefined ? databaseTransaction(operation, 'readonly', key) : Promise.resolve().then(() => operation(access()));
   return {
+    slot,
+    key,
     async readRawBaseline() { return reading((s) => read(s)); },
     async load() {
       return reading((s) => { const raw = read(s); return raw === null ? null : parseSnapshot(raw); });
     },
     async complete(result, { previous = null } = {}) {
       // Canonical copies are made before waiting; caller mutation cannot change a queued command.
-      const snapshot = result && has(result, 'format') ? validateSnapshot(result) : completedSnapshot(result);
+      const snapshot = owned(result && has(result, 'format') ? validateSnapshot(result) : completedSnapshot(result));
       const baseline = previous === null ? null : validateSnapshot(previous);
       return locked((s) => {
         const raw = read(s), current = raw === null ? null : parseSnapshot(raw);
@@ -243,7 +309,7 @@ export function createProgressStore(storage, { locks } = {}) {
       });
     },
     async import(text, { previousRaw } = {}) {
-      const snapshot = parseSnapshot(text);
+      const snapshot = owned(parseSnapshot(text));
       if (previousRaw !== null && typeof previousRaw !== 'string') bad('import requires an observed storage baseline.');
       return locked((s) => {
         // No parsing of old bytes: explicit imports can repair unchanged corrupt progress.
@@ -252,7 +318,7 @@ export function createProgressStore(storage, { locks } = {}) {
       });
     },
     async issue(command, { previous } = {}) {
-      const baseline = validateSnapshot(previous), draft = exchangeDepot(baseline, command);
+      const baseline = owned(validateSnapshot(previous)), draft = exchangeDepot(baseline, command);
       return locked((s) => {
         const raw = read(s), current = raw === null ? null : parseSnapshot(raw);
         if (JSON.stringify(current) !== JSON.stringify(baseline)) bad('progress changed since this equipment was reviewed. Export the pending army or reload saved progress.');
@@ -260,4 +326,28 @@ export function createProgressStore(storage, { locks } = {}) {
       });
     },
   };
+}
+
+/**
+ * One row per slot for a slot picker. Never throws for one bad slot: unreadable bytes are 'corrupt', a
+ * storage failure is 'unavailable'. A matching campaign definition names the campaign and its next phase.
+ */
+export async function listSlots(storage, { campaign = null } = {}) {
+  const rows = [];
+  for (const slot of SAVE_SLOTS) {
+    const row = { slot, empty: true, kind: null, label: 'Empty slot', nextPhase: null, updated: null };
+    let raw;
+    try { raw = await createProgressStore(storage, { slot }).readRawBaseline(); }
+    catch { rows.push({ ...row, empty: false, kind: 'unavailable', label: 'Slot cannot be read' }); continue; }
+    if (raw === null) { rows.push(row); continue; }
+    let save;
+    try { save = parseSnapshot(raw); }
+    catch { rows.push({ ...row, empty: false, kind: 'corrupt', label: 'Unreadable save' }); continue; }
+    if (save.version === 1) { rows.push({ ...row, empty: false, kind: save.kind, label: 'Practice army' }); continue; }
+    const known = campaign && campaign.id === save.campaign.id && Array.isArray(campaign.phases);
+    const next = known && save.campaign.status !== 'complete' ? campaign.phases[save.campaign.index] : null;
+    rows.push({ ...row, empty: false, kind: save.kind, label: known && typeof campaign.title === 'string' ? campaign.title : save.campaign.id,
+      nextPhase: next ? { packId: next.packId, phaseId: next.phaseId, index: save.campaign.index } : null, updated: save.updated ?? null });
+  }
+  return rows;
 }
