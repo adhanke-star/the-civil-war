@@ -1,6 +1,7 @@
 // src/units/mounts.js: horses: a low-poly saddle horse (about 110 triangles) for officers, generals and limber
 // teams. One InstancedMesh (HorsePool) holds the officers' and generals' mounts; limber teams are merged into the
-// limber geometry in battery.js with horseGeometry(). RallyRings draws a general's rally radius (src/game.js) as a
+// limber geometry in battery.js with horseGeometry(). MountPool (the same horse, refilled every frame) carries the
+// cavalry: one horse per trooper figure in the saddle, and a horse-holder's three led horses. RallyRings draws a general's rally radius (src/game.js) as a
 // faint ring laid on the ground, shown while he or one of his brigades is selected.
 
 import * as THREE from 'three';
@@ -92,6 +93,37 @@ export class HorsePool {
     this.mesh.count = this.used;
     this.mesh.instanceMatrix.needsUpdate = true;
   }
+}
+
+const COAT_COLORS = HORSE_COATS.map((c) => new THREE.Color(c));
+
+/** Cavalry horses: the officers' horse, refilled every frame (begin, push per horse, flush). Only made when cavalry is on the field. */
+export class MountPool extends HorsePool {
+  constructor(capacity) {
+    super(capacity);
+    this.mesh.name = 'cavalry-horses';
+    this.n = 0;
+  }
+
+  begin() { this.n = 0; }
+
+  /** One horse at (x, y, z) facing yaw, scale s, coat index into HORSE_COATS; false once the pool is full. */
+  push(x, y, z, yaw, s, coat = 0) {
+    if (this.n >= this.capacity) return false;
+    const i = this.n++;
+    this.set(i, x, y, z, yaw, s);
+    this.mesh.setColorAt(i, COAT_COLORS[((coat % COAT_COLORS.length) + COAT_COLORS.length) % COAT_COLORS.length]);
+    return true;
+  }
+
+  flush() {
+    this.mesh.count = this.n;
+    this.mesh.instanceMatrix.needsUpdate = true;
+    if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+  }
+
+  /** Horses drawn this frame. */
+  get drawn() { return this.n; }
 }
 
 const RING_SEGMENTS = 96;

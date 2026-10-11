@@ -3,7 +3,7 @@ import { equipmentProfile } from './equipment.js';
 import { DEPLOYMENT_LIMITS } from '../franchise/practice.js';
 import { FieldCaptures } from '../franchise/captures.js';
 import { VETERANCY } from '../reward/data.js';
-import { CLOCK_RATIO } from './combat.js';
+import { CLOCK_RATIO, CAVALRY_WEAPONS } from './combat.js';
 
 export const PHASE_LIMITS = Object.freeze({ bytes: 1024 * 1024, depth: 32 });
 const fail = message => { throw new Error('Phase: ' + message); };
@@ -126,6 +126,9 @@ function commanders(value) {
       || c.units.some(id => !roster.has(id) || roster.get(id).side !== c.side)) fail('commander units must be 1 to 48 distinct brigades of his side in the roster.');
   }
 }
+// Unit types the runtime draws and fights, and the generic weapons each may carry (absent: smooth, or carbine for cavalry).
+export const UNIT_TYPES = Object.freeze(['infantry', 'artillery', 'cavalry']);
+const WEAPONS = Object.freeze({ infantry: ['smooth', 'rifled'], artillery: ['parrott', 'napoleon', 'smbart'], cavalry: CAVALRY_WEAPONS });
 function scenario(value) {
   if (!record(value) || !['id', 'title', 'battle', 'date'].every(key => text(value[key]))) fail('scenario needs its identity, title, battle and date.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value.date)) fail('date needs YYYY-MM-DD.');
@@ -142,8 +145,10 @@ function scenario(value) {
   for (const unit of value.units) {
     if (!record(unit) || !text(unit.id) || !text(unit.name) || ids.has(unit.id)) fail('unit identities must be nonempty and unique within the phase.');
     ids.add(unit.id);
-    if (!['US', 'CS'].includes(unit.side) || (own(unit, 'type') && !['infantry', 'artillery'].includes(unit.type))) fail('unit side or current runtime type is unsupported.');
-    if (own(unit, 'weapon') && !(unit.type === 'artillery' ? ['parrott', 'napoleon', 'smbart'] : ['smooth', 'rifled']).includes(unit.weapon)) fail('generic weapon is unsupported for this unit type.');
+    if (!['US', 'CS'].includes(unit.side) || (own(unit, 'type') && !UNIT_TYPES.includes(unit.type))) fail('unit side or current runtime type is unsupported.');
+    if (own(unit, 'weapon') && !(WEAPONS[unit.type] || WEAPONS.infantry).includes(unit.weapon)) fail('generic weapon is unsupported for this unit type.');
+    // cavalry (src/sim/combat.js CAVALRY): carbines (default) or revolvers and sabres; no guns, no issued equipment yet
+    if (unit.type === 'cavalry' && own(unit, 'guns') && unit.guns !== 0) fail('cavalry carries no guns.');
     if (!['x', 'z', 'facing', 'men'].every(key => finite(unit[key])) || unit.men <= 0) fail('unit geometry and positive strength must be finite.');
     if (own(unit, 'guns') && (!Number.isInteger(unit.guns) || unit.guns < 0)) fail('gun count must be a nonnegative integer.');
     if (own(unit, 'ai')) unitAi(unit.ai, value);

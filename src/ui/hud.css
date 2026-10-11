@@ -186,6 +186,19 @@ body dialog.field-loot-preview .rw { left: 0; right: 0; top: 60px; bottom: 0; }
 #orders button[aria-pressed="true"] { background: #4a6a2a; border-color: #b9ff7a; }
 #orders button[data-order="holdfire"][aria-pressed="true"] { background: #6a3a22; border-color: #ffb15c; }
 
+/* Cavalry: the card's Mounted / Dismounted line and the Dismount toggle (pressed = on foot). */
+.uccav { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.uccav[hidden] { display: none; }
+#uc-mount { flex: 1 1 auto; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+#dismount-btn { position: relative; min-width: 48px; min-height: 44px; padding: 10px 22px 4px 10px; background: rgba(40, 37, 46, 0.95);
+  border: 1px solid #958da1; border-radius: 8px; cursor: pointer; font-size: 14px; }
+#dismount-btn:hover:not(:disabled) { background: rgba(70, 64, 82, 0.98); }
+#dismount-btn:disabled { color: #c9c2b4; cursor: default; }
+#dismount-btn[aria-pressed="true"] { background: #4a6a2a; border-color: #b9ff7a; }
+#dismount-btn .key { position: absolute; right: 4px; top: 1px; font-size: 12px; line-height: 1; color: var(--dim); }
+#dismount-btn[aria-pressed="true"] .key { color: var(--text); }
+#dismount-btn:focus-visible { outline-offset: -4px; }
+
 /* Delegation: the card's Delegate / Undo row (in the general's ochre) and the Attack / Defend / Support chooser. */
 .ucdelegate { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
 #delegate-text { flex: 1 1 auto; min-width: 0; font-size: 13px; color: #f0c870; overflow-wrap: anywhere; }

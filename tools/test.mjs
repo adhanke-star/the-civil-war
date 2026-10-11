@@ -50,6 +50,8 @@
 // `node tools/test.mjs --command` runs the commanders and regiments UI only (tools/test-command-ui.mjs, also in shard 3):
 // a fictional general's mounted figure and marker, his rally ring on selection, the regiment tooltip on hover and
 // on the card's list, "Commander down" after a forced kill, axe and screenshots.
+// `node tools/test.mjs --cavalry` runs the cavalry UI only (tools/test-cavalry-ui.mjs, also in shard 4): a sandbox cavalry
+// regiment drawn mounted, the card's Dismount button and the N key switching it on and off its horses, axe and screenshots.
 // Full smoke includes real equip/reload/export/import, duplicate/conflict/quota/read failure recovery,
 // keyboard/focus, scoped compare/resume/import/launcher axe and 1024/320px target/layout checks.
 // SETTINGS_MODULE=<path> points the settings checks at another copy (used to prove the checks fail).
@@ -1761,6 +1763,7 @@ async function browserChecks(server, url) {
     if (process.argv.includes('--packs-ui')) { result.mode = 'battle packs only'; const { packsUIControls } = await import('./test-packs-ui.mjs'); await packsUIControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--delegation')) { result.mode = 'delegation UI only'; const { delegationControls } = await import('./test-delegation-ui.mjs'); await delegationControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--command')) { result.mode = 'commanders and regiments UI only'; const { commandControls } = await import('./test-command-ui.mjs'); await commandControls({ browser, url, check, shot, result, watchErrors }); return; }
+    if (process.argv.includes('--cavalry')) { result.mode = 'cavalry UI only'; const { cavalryControls } = await import('./test-cavalry-ui.mjs'); await cavalryControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--camp')) { result.mode = 'camp equipment only'; await campEquipment({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--intro')) { result.mode = 'unforced introductory play'; await introPlay({ browser, url, check, shot, result, watchErrors, native }); return; }
     if (process.argv.includes('--practice')) { result.mode = 'practice result bridge only'; await practiceProgress({ browser, url, check, shot, result, watchErrors }); return; }
@@ -1808,10 +1811,12 @@ async function browserChecks(server, url) {
       const { delegationControls } = await import('./test-delegation-ui.mjs');
       await delegationControls({ browser, url, check, shot, result, watchErrors });
     }
-    // Shard 4: commanders and regiments, then every shipped battle-pack phase on its own terrain.
+    // Shard 4: commanders and regiments, cavalry, then every shipped battle-pack phase on its own terrain.
     if (runs(4)) {
       const { commandControls } = await import('./test-command-ui.mjs');
       await commandControls({ browser, url, check, shot, result, watchErrors });
+      const { cavalryControls } = await import('./test-cavalry-ui.mjs');
+      await cavalryControls({ browser, url, check, shot, result, watchErrors });
       const { packsUIControls } = await import('./test-packs-ui.mjs');
       await packsUIControls({ browser, url, check, shot, result, watchErrors });
     }

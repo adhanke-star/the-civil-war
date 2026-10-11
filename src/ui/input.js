@@ -640,7 +640,7 @@ export class Input {
     if (k === 'm') { this.hud.toggleMinimap(); return; }
     if (k === 'l') { this.hud.toggleArmy(); return; }
     if (k === '1' || k === '2' || k === '3') { this.game.setSpeed({ 1: 1, 2: 2, 3: 4 }[k]); return; }
-    const orderKeys = { h: 'hold', c: 'charge', r: 'run', f: 'fallback', x: 'halt', v: 'holdfire' };
+    const orderKeys = { h: 'hold', c: 'charge', r: 'run', f: 'fallback', x: 'halt', v: 'holdfire', n: 'dismount' }; // N: cavalry dismount / remount
     if (orderKeys[k]) { this.cancelTargeting(); this.game.orderSelected(orderKeys[k]); return; }
     if (!onButton && this.rts.onKey(e, true)) e.preventDefault();
   }

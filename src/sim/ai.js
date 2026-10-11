@@ -37,6 +37,17 @@
 //            (it follows again once masked or out of range). If that friend routs or falls, it marches to the
 //            friend's last place and holds it. With no friend near, it waits at the place.
 // The charge rule (attack and defend) and the fallback rule (every role) are the same as above.
+//
+// Cavalry (type 'cavalry', src/sim/combat.js): an AI regiment, twice a second, before its role (cavalryStep):
+//   pursue   in the saddle and steady, it charges (rides down) the nearest routing enemy within PURSUE_REACH with no
+//            fresh (not routing, not wavering) enemy within PURSUE_CLEAR of that fugitive; a reserve so commits.
+//   shock    in the saddle and steady, it charges an enemy within CAV_CHARGE_REACH that a mounted charge breaks
+//            (combat.js cavalryShock above 1: shaken, wavering, guns not on it, a line taken in flank).
+//   attack   active, it rides (remounting first) to a flank of its prey (the nearest enemy within PREY_REACH, guns and
+//            shaken men first): FLANK_GAP beyond the end of the prey's line, then charges from there. No prey: the
+//            role's march on its target, as for infantry (horsemen do not halt to fire on the way, combat.js).
+//   hold     carbine-armed and standing, it dismounts to fight on foot when an enemy comes within DISMOUNT_REACH.
+// The fallback rule and everything else are as for infantry. Delegated cavalry follows the delegation rules.
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 export const AI_ROLES = Object.freeze(['hold', 'attack', 'reserve']);
@@ -55,6 +66,13 @@ const SUPPORT_BACK = 150; // m behind the friend it supports
 const SUPPORT_SLACK = 30; // m: this close to its trailing point a support stands
 const SUPPORT_NEAR = 450; // m from the place: friends this close may be supported
 const SUPPORT_REISSUE_S = 3; // sim s between march orders that follow a moving friend
+const PURSUE_REACH = 300; // m: horsemen pursue a routing enemy this close
+const PURSUE_CLEAR = 200; // m: ... when no fresh enemy stands this close to the fugitive
+const CAV_CHARGE_REACH = 260; // m: horsemen charge a breakable enemy this close
+const PREY_REACH = 900; // m: an attacking cavalry regiment looks for prey this far
+const FLANK_GAP = 90; // m beyond the end of the prey's line where the horsemen form to charge
+const FLANK_ARRIVE = 45; // m: this close to its flank point it charges
+const DISMOUNT_REACH = 450; // m: a holding carbine regiment dismounts with an enemy this close
 
 const clockSec = (hhmm) => { const [h, m] = hhmm.split(':').map(Number); return h * 3600 + m * 60; };
 /** The unit's AI role: 'hold' unless its definition names attack or reserve. */
@@ -89,6 +107,7 @@ export class Ai {
         if (d < nd) { nd = d; near = e; }
       }
       const role = roleOf(u);
+      if (u.type === 'cavalry' && this.cavalryStep(u, role, near, nd)) continue;
       if (role !== 'hold') { this.press(u, role, near, nd); continue; }
       if (!near) continue;
       const ahead = Math.abs(wrap(Math.atan2(near.x - u.x, near.z - u.z) - u.facing)) < 1.1;
@@ -117,6 +136,77 @@ export class Ai {
       const [near, nd] = this.nearestFoe(u);
       this.delegated(u, near, nd);
     }
+  }
+
+  // ---------------------------------------------------------------------------------------------------
+  // Cavalry (see the header): pursuit, shock charges, flank attacks, dismounting to hold
+
+  /** One AI cavalry regiment; true when it acted (the role's own step is skipped). */
+  cavalryStep(u, role, near, nd) {
+    if (u.order.type === 'charge' || u.switching) return true; // charging (the game steers the pursuit) or switching
+    let s = null;
+    if (role !== 'hold') {
+      s = this.memo.get(u);
+      if (!s) { s = { active: false, issued: -Infinity, via: 0 }; this.memo.set(u, s); }
+      if (!s.active) s.active = this.activates(u, role, nd);
+    }
+    const horse = u.mounted && !u.switching;
+    if (horse && u.state === 'steady') {
+      const prey = this.fugitive(u);
+      if (prey && u.orderCharge(prey)) { if (s) s.active = true; return true; }
+      if (near && nd < CAV_CHARGE_REACH && (role !== 'hold' || near.state !== 'steady' || near.type === 'artillery')
+        && this.game.combat.cavalryShock(u, near) > 1 && u.orderCharge(near)) { if (s) s.active = true; return true; }
+    }
+    if (role === 'hold' || !s.active) {
+      if (role === 'hold' && horse && u.weapon !== 'pistol' && near && nd < DISMOUNT_REACH && !u.follow.active && u.state !== 'wavering') {
+        u.toggleMount();
+        return true;
+      }
+      return false;
+    }
+    return this.flankAttack(u, s);
+  }
+
+  /** The routing enemy this regiment may ride down: within PURSUE_REACH, no fresh enemy within PURSUE_CLEAR of it. */
+  fugitive(u) {
+    let best = null, bd = PURSUE_REACH;
+    for (const e of this.game.units) {
+      if (e.side === u.side || !e.alive || e.state !== 'routing') continue;
+      const d = Math.hypot(e.x - u.x, e.z - u.z);
+      if (d >= bd) continue;
+      const covered = this.game.units.some((f) => f.side === e.side && f !== e && f.alive && f.state !== 'routing' && f.state !== 'wavering'
+        && f.state !== 'captured' && Math.hypot(f.x - e.x, f.z - e.z) < PURSUE_CLEAR);
+      if (!covered) { bd = d; best = e; }
+    }
+    return best;
+  }
+
+  /** An attacking regiment rides to a flank of its prey and charges from there; false with no prey in reach. */
+  flankAttack(u, s) {
+    const g = this.game, lim = g.terrain.half - EDGE;
+    let prey = null, best = Infinity;
+    for (const e of g.units) {
+      if (e.side === u.side || !e.alive || e.state === 'routing' || e.state === 'captured') continue;
+      const d = Math.hypot(e.x - u.x, e.z - u.z);
+      if (d > PREY_REACH) continue;
+      const score = d * (e.type === 'artillery' ? 0.5 : e.state !== 'steady' ? 0.7 : 1);
+      if (score < best) { best = score; prey = e; }
+    }
+    if (!prey) return false;
+    if (!u.mounted) { if (u.state !== 'wavering') u.toggleMount(); return true; } // to the horses first
+    if (u.follow.active || u.engaged) return true;
+    const fs = Math.sin(prey.facing), fc = Math.cos(prey.facing);
+    const side = (u.x - prey.x) * fc - (u.z - prey.z) * fs >= 0 ? 1 : -1; // the end of the prey's line nearer the horsemen
+    const off = (prey.halfFront + FLANK_GAP) * side;
+    const p = [Math.max(-lim, Math.min(lim, prey.x + fc * off - fs * 30)), Math.max(-lim, Math.min(lim, prey.z - fs * off - fc * 30))];
+    if (Math.hypot(u.x - p[0], u.z - p[1]) < FLANK_ARRIVE) {
+      if (u.state === 'steady' && u.orderCharge(prey)) return true;
+      this.holdFace(u, prey, Math.hypot(prey.x - u.x, prey.z - u.z));
+      return true;
+    }
+    if (u.state === 'wavering' || g.simTime - s.issued < REISSUE_S || g.simTime - (u.lastFallback ?? -Infinity) < FALLBACK_COOL_S) return false;
+    if (u.orderMove([[u.x, u.z], p], { endFacing: Math.atan2(prey.x - p[0], prey.z - p[1]) })) s.issued = g.simTime;
+    return true;
   }
 
   /** The nearest enemy that is not routing, and its distance. */

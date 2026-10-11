@@ -9,6 +9,8 @@
 // radius covers the brigade and lists its regiments (focus or hover one: a tooltip names it; not orderable).
 // Hovering a regiment block on the field shows the same tooltip. Each general has a small star marker; selecting
 // it shows his rally radius (Game.selectCommander) and describes him in the empty card.
+// Cavalry: the marker's staff stands on a horseshoe; the card's cavalry row says Mounted, Dismounted, Dismounting or
+// Remounting with the reach of its arms, and its Dismount toggle (N; pressed = on foot) orders orderSelected('dismount').
 
 import * as THREE from 'three';
 import { LOOK } from './look.js';
@@ -67,7 +69,9 @@ function markerSvg(side, type) {
   const flag = side === 'US' ? usFlag() : csFlag();
   const foot = type === 'artillery'
     ? '<circle cx="5" cy="31" r="3.2" fill="none" stroke="#e8dcc0" stroke-width="1.3"/>'
-    : '<path d="M5 26 l-2 6 h4z" fill="#e8dcc0"/>';
+    : type === 'cavalry'
+      ? '<path d="M2.2 33 v-3.4 a2.8 2.8 0 0 1 5.6 0 v3.4" fill="none" stroke="#e8dcc0" stroke-width="1.4"/>' // a horseshoe
+      : '<path d="M5 26 l-2 6 h4z" fill="#e8dcc0"/>';
   return `<svg viewBox="0 0 40 34" aria-hidden="true"><line x1="5" y1="1" x2="5" y2="33" stroke="#e8dcc0" stroke-width="1.6"/><circle cx="5" cy="1.6" r="1.6" fill="#e8c96a"/>
     <g transform="translate(6 3) scale(0.86)">${flag}</g>${foot}</svg>`;
 }
@@ -88,6 +92,7 @@ export function compass(f) {
 export function activity(u) {
   if (u.state === 'routing') return ['Routing', 'bad'];
   if (u.melee) return ['Hand to hand', 'bad'];
+  if (u.switching) return [u.switching.to === 'mounted' ? 'Remounting' : 'Dismounting', 'warn'];
   const o = u.order.type;
   if (u.engaged) return [u.firing ? 'Halted, firing' : 'Halted to fight', 'hot'];
   if (u.follow.active) {
@@ -130,7 +135,18 @@ export function intention(u) {
   } else if (u.state !== 'routing') {
     next = `; facing ${compass(u.facing)}`;
   }
-  return `${u.name}: ${Math.round(u.men)} men, ${u.state}${u.holdFire ? ', holding fire' : ''}. ${now}${next}.`;
+  return `${u.name}: ${Math.round(u.men)} men, ${u.state}${u.type === 'cavalry' ? (u.mounted ? ', mounted' : ', dismounted') : ''}${u.holdFire ? ', holding fire' : ''}. ${now}${next}.`;
+}
+
+/** The card's cavalry line: in the saddle or on foot, the switch in progress, and the reach of its arms. */
+export function mountText(u) {
+  if (u.type !== 'cavalry') return '';
+  if (u.switching) {
+    const left = Math.max(0, Math.ceil(u.switching.dur - u.switching.t));
+    return u.switching.to === 'mounted' ? `Remounting: ${left} s to the saddle.` : `Dismounting: ${left} s until the line can fire.`;
+  }
+  if (u.weapon === 'pistol') return 'Mounted: revolvers and sabres, 40 m.';
+  return u.mounted ? 'Mounted: carbines from the saddle, 150 m.' : 'Dismounted: carbines, 300 m; every fourth man holds the horses.';
 }
 
 /** Plain words for a cover value from Game.coverAt. */
@@ -383,6 +399,7 @@ export class Hud {
   buildDelegate() {
     this.delegateState = null;
     $('delegate-btn')?.addEventListener('click', () => { this.onDirectOrder?.(); this.onDelegate?.(); });
+    $('dismount-btn')?.addEventListener('click', () => { this.onDirectOrder?.(); this.onOrder('dismount'); this.updateOrders(); if (this.selected) this.updateCard(this.selected); });
     $('delegate-undo')?.addEventListener('click', () => {
       if (this.game) this.game.undelegate(this.game.selection);
       this.updateOrders();
@@ -569,6 +586,16 @@ export class Hud {
       if (btn.dataset.order === 'run') btn.setAttribute('aria-pressed', String(!!(mine && u.run)));
       if (btn.dataset.order === 'holdfire') btn.setAttribute('aria-pressed', String(!!(mine && u.holdFire)));
     }
+    const cav = $('uc-cav');
+    if (cav) {
+      const horse = !!u && u.type === 'cavalry';
+      if (cav.hidden === horse) cav.hidden = !horse;
+      const btn = $('dismount-btn');
+      const can = horse && mine && !u.switching && !(u.mounted && u.weapon === 'pistol');
+      if (btn.disabled === can) btn.disabled = !can;
+      const pressed = String(horse && (!u.mounted || u.switching?.to === 'dismounted'));
+      if (btn.getAttribute('aria-pressed') !== pressed) btn.setAttribute('aria-pressed', pressed);
+    }
     const del = $('delegate-btn');
     if (del) {
       const own = mine && (!this.game || u.side === this.game.playerSide);
@@ -600,6 +627,8 @@ export class Hud {
       line.hidden = !text;
       line.classList.toggle('down', !!u.commandDown);
     }
+    const mount = $('uc-mount');
+    if (mount) { const text = mountText(u); if (mount.textContent !== text) mount.textContent = text; }
     $('uc-state').textContent = `${intention(u).replace(/^[^:]*: /, '')}${u.coverKind && u.coverKind !== 'open' ? ` In ${u.coverKind}.` : ''}`;
   }
 

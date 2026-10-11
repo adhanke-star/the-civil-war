@@ -31,6 +31,12 @@
 // it is compared); the atlas loads the first time baked is wanted and the rigged figures draw until it is in.
 // look.menPerFigure re-forms the infantry at 1:10 or 1:5, never denser than the phase's scenario.menPerFigure
 // (sim/phase.js phaseMenPerFigure, default 5); pools are sized at that phase minimum from the start.
+// Cavalry (DESIGN.md §2; rules in sim/combat.js, units/unit.js and sim/ai.js): horses are drawn by one MountPool, made only
+// when the roster (or a sandbox spawn) has cavalry and kept in a WeakMap (no own Game keys). Dismount (orderSelected
+// 'dismount', the card's button and N) toggles a regiment on and off its horses. A mounted regiment's charge pursues its
+// target (pursueStep re-aims it twice a second, a little ahead of a fleeing one); the Attack order on a routing unit is a
+// charge for horsemen, and their Charge also takes routing targets. With surrender enabled, a routing unit ridden down
+// for RIDE_SURRENDER_S surrenders to the horsemen through the same capture accounting as a blocked rout or an overrun.
 
 import { EntityManager } from 'yuka';
 import { Unit, MEN_PER_FIGURE_OPTIONS, MEN_PER_CREW_FIGURE, SPEED, setMenPerFigure } from './units/unit.js';
@@ -42,8 +48,8 @@ import { LOOK } from './ui/look.js';
 import { on as onSetting } from './settings.js';
 import { compareState } from './sandbox/compare.js';
 import { HaloPool } from './units/halos.js';
-import { HorsePool, HORSE_COATS, RallyRings } from './units/mounts.js';
-import { Combat, CLOCK_RATIO } from './sim/combat.js';
+import { HorsePool, HORSE_COATS, RallyRings, MountPool } from './units/mounts.js';
+import { Combat, CLOCK_RATIO, CAVALRY, CAVALRY_WEAPONS, defaultWeapon, horsed } from './sim/combat.js';
 import { Ai, DELEGATE_ROLES } from './sim/ai.js';
 import { RULES } from './sim/rules.js';
 import { mulberry32, inWoods, PLAN } from './world/landscape.js';
@@ -77,6 +83,19 @@ const freezeCapture = value => {
   return value;
 };
 const captureState = game => reinforcementState.get(game)?.capture;
+// Cavalry horses: { mounts } only once cavalry is on the field (no own Game keys; legacy scenes allocate nothing).
+const cavalryState = new WeakMap();
+const RIDE_SURRENDER_S = 3; // sim s of being ridden down after which a routing unit surrenders (surrender enabled)
+/** The game's MountPool, made on first need with room for `figures` horses. */
+function ensureMounts(game, figures) {
+  let st = cavalryState.get(game);
+  if (!st) {
+    st = { mounts: new MountPool(Math.max(1, figures)) };
+    game.scene.add(st.mounts.mesh);
+    cavalryState.set(game, st);
+  }
+  return st.mounts;
+}
 
 function captureSources(plan) {
   return [...plan.scenario.units, ...(plan.scenario.reinforcements || [])].map((def, index) => ({
@@ -127,7 +146,7 @@ function validateCaptureRoster(game, state) {
     const u = s.unit, d = s.def;
     if (!u || !game.units.includes(u) || u.def !== s.actualDef || u.id !== d.id || u.side !== d.side
       || u.type !== (d.type || 'infantry') || u.name !== d.name || u.menMax !== d.men
-      || u.guns !== (d.guns || 0) || u.weapon !== (d.weapon || 'smooth')
+      || u.guns !== (d.guns || 0) || u.weapon !== (d.weapon || defaultWeapon(d.type))
       || !Number.isFinite(u.men) || u.men < 0 || u.men > d.men) captureFail('source formation identity or strength changed.');
     for (const key of ['id', 'side', 'type', 'name', 'men', 'guns', 'weapon', 'equipment']) {
       if (JSON.stringify(captureProperty(u.def, key)) !== JSON.stringify(d[key])) captureFail('source definition changed.');
@@ -209,11 +228,17 @@ function commitSurrenders(game, state, before, h, contacts = null) {
         && battery.side !== attacker.side && !overruns.has(battery)) overruns.set(battery, attacker);
     }
   }
+  // routing units ridden down by horsemen (combat.js rideDown): long enough, and the horsemen still fit to take them
+  const rides = capture.rides;
+  for (const [u] of rides) if (!u.alive || u.state !== 'routing' || capture.records.has(u.id)) rides.delete(u);
   for (const s of capture.sources) {
     const u = s.unit;
     if (!u || capture.records.has(s.def.id)) continue;
     const elapsed = before.has(u) && after.has(u) ? (capture.timers.get(u) || 0) + h : 0;
-    const overrunCaptor = overruns.get(u);
+    const ride = rides.get(u);
+    const rider = ride && ride.t >= RIDE_SURRENDER_S && ride.captor.alive && ride.captor.state !== 'routing'
+      && ride.captor.state !== 'captured' && ride.captor.side !== u.side ? ride.captor : null;
+    const overrunCaptor = overruns.get(u) || rider;
     timers.set(u, overrunCaptor ? 0 : elapsed);
     if ((overrunCaptor || elapsed >= 6) && u.alive && u.state === 'routing') {
       const captor = overrunCaptor || after.get(u);
@@ -474,7 +499,7 @@ export class Game {
     if (timeline?.events.length || surrender) reinforcementState.set(this, { plan: timeline, cursor: null,
       initialized: false, initialCount: scenario.units.length, ...(surrender ? { capture: { sources: captureSources(timeline),
         records: new Map(), timers: new Map(), pre: new Map(), dispatching: false,
-        overrun, contacts: null, tickActive: false } } : {}) });
+        overrun, contacts: null, tickActive: false, rides: new Map() } } : {}) });
     this.scene = scene;
     this.terrain = terrain;
     this.scenario = scenario;
@@ -518,6 +543,9 @@ export class Game {
     };
     this.baked = { state: 'idle', atlas: null, error: null }; // idle | loading | ready | failed
     scene.add(this.impostors.US.mesh, this.impostors.CS.mesh);
+    // cavalry horses (one per trooper figure; a horse-holder leads three) plus room for sandbox spawns
+    const cavalryFigs = poolDefs.filter((d) => d.type === 'cavalry').reduce((s, d) => s + Math.round(d.men / minRatio) + 6, 0);
+    if (cavalryFigs) ensureMounts(this, cavalryFigs + 2 * reserve);
     const commanders = Array.isArray(scenario.commanders) ? scenario.commanders : [];
     this.horses = new HorsePool(poolDefs.length + 2 + (commanders.length ? commanders.length + 4 : 0));
     // two colours per regiment block (unit.js pushColours)
@@ -548,6 +576,10 @@ export class Game {
     this.combat = new Combat({ units: this.units, terrain, coverAt: this.coverAt, fallen: this.fallen, fx: effects, rnd: this.rnd,
       onBatteryContact: state?.capture?.overrun ? (attacker, battery) => {
         if (state.capture.contacts) state.capture.contacts.push([attacker, battery]);
+      } : null,
+      onRideDown: state?.capture ? (rider, router, dt) => {
+        const r = state.capture.rides.get(router);
+        if (r && r.captor === rider) r.t += dt; else state.capture.rides.set(router, { captor: rider, t: dt });
       } : null });
     if (state?.capture) this.combat.rallyBlocked = u => state.capture.pre.has(u);
     this.combat.setCommand((u) => commandFactor(this, u));
@@ -652,6 +684,7 @@ export class Game {
     u.fallenPool = this.fallen[d.side];
     if (u.officer) u.officer.coat = HORSE_COATS[seed % HORSE_COATS.length];
     if (u.bearers) u.flags = commandState.get(this)?.flags ?? null;
+    if (u.type === 'cavalry') u.mounts = cavalryState.get(this)?.mounts ?? null;
     this.entities.add(u.vehicle);
     return u;
   }
@@ -730,7 +763,9 @@ export class Game {
     if (!u.canTakeOrders()) { this.emit('log', `${u.short} is routing and will not take orders.`); return false; }
     this.reclaim(u); // a direct order takes a delegated brigade back
     let ok;
-    if (type === 'attack') {
+    if (type === 'attack' && horsed(u) && target && target.state === 'routing') {
+      ok = u.orderCharge(target); // horsemen pursue a fleeing enemy: ride it down
+    } else if (type === 'attack') {
       ok = u.orderAttack(target, endFacing);
       if (ok) this.attackStep(u);
     } else if (type === 'charge') {
@@ -785,6 +820,7 @@ export class Game {
       if (u && this.controls(u) && !u.canTakeOrders()) this.emit('log', `${u.short} is routing and will not take orders.`);
       return false;
     }
+    if (kind === 'dismount' && !group.some((u) => u.type === 'cavalry')) { this.emit('log', 'Only cavalry can dismount.'); return false; }
     let ok = false;
     for (const u of group) this.reclaim(u); // a direct order takes delegated brigades back
     if (kind === 'holdfire') {
@@ -798,6 +834,18 @@ export class Game {
       else if (kind === 'halt') ok = u.orderHalt() || ok;
       else if (kind === 'run') ok = u.toggleRun() || ok;
       else if (kind === 'fallback') ok = u.orderFallback() || ok;
+      else if (kind === 'dismount') {
+        if (u.type !== 'cavalry') continue;
+        const was = u.mounted;
+        if (u.toggleMount()) {
+          ok = true;
+          this.emit('log', was ? `${u.short} dismounts: every fourth man holds the horses; carbines ready in ${CAVALRY.dismountS} s.`
+            : `${u.short} remounts: in the saddle in ${CAVALRY.remountS} s.`);
+        } else {
+          this.emit('log', u.switching ? `${u.short} is already ${u.switching.to === 'mounted' ? 'remounting' : 'dismounting'}.`
+            : `${u.short} carries revolvers and sabres: it fights mounted.`);
+        }
+      }
       else if (kind === 'charge') {
         const target = u.order.type === 'attack' && u.order.target && u.order.target.alive ? u.order.target : this.chargeTarget(u);
         if (!target) { this.emit('log', `No enemy close enough for ${u.short} to charge.`); continue; }
@@ -846,15 +894,16 @@ export class Game {
     return list.length;
   }
 
-  /** Nearest enemy within 320 m, preferring those ahead of the line. */
+  /** Nearest enemy within 320 m, preferring those ahead of the line (horsemen also take, and prefer, a routing one). */
   chargeTarget(u) {
     let best = null, bestScore = Infinity;
+    const rider = horsed(u);
     for (const e of this.units) {
-      if (e.side === u.side || !e.alive || e.state === 'routing') continue;
+      if (e.side === u.side || !e.alive || e.state === 'captured' || e.state === 'routing' && !rider) continue;
       const d = Math.hypot(e.x - u.x, e.z - u.z);
       if (d > 320) continue;
       const off = Math.abs(wrap(Math.atan2(e.x - u.x, e.z - u.z) - u.facing));
-      const score = d * (off < 1.2 ? 1 : 2.2);
+      const score = d * (off < 1.2 ? 1 : 2.2) * (rider && e.state === 'routing' ? 0.8 : 1);
       if (score < bestScore) { bestScore = score; best = e; }
     }
     return best;
@@ -917,6 +966,21 @@ export class Game {
       u.setPath([[u.x, u.z], [gx, gz]]);
       o.goal = [gx, gz];
     }
+  }
+
+  /**
+   * A mounted charge follows its target (twice a second): the path is re-aimed at it, two seconds ahead of a fleeing
+   * unit so the horsemen ride through it; a target that is gone or taken ends the charge.
+   */
+  pursueStep(u) {
+    const t = u.order.target;
+    if (!t) return;
+    if (!t.alive || t.state === 'captured' || !this.units.includes(t)) { u.stop(); u.order = { type: 'hold' }; return; }
+    if (!horsed(u) || u.melee || !u.follow.active) return;
+    const lead = t.state === 'routing' ? 2 : 0, v = t.vehicle.velocity;
+    const gx = t.x + v.x * lead, gz = t.z + v.z * lead;
+    const end = u.path && u.path[u.path.length - 1];
+    if (!end || Math.hypot(end[0] - gx, end[1] - gz) > 12) { u.setPath([[u.x, u.z], [gx, gz]]); u.order.dest = [gx, gz]; }
   }
 
   /** Brigade initiative: a unit without orders turns toward fire from beyond its arc when nothing is ahead. */
@@ -1010,6 +1074,7 @@ export class Game {
       this.slowT = 0.5;
       for (const u of this.units) {
         if (!u.alive) continue;
+        if (u.type === 'cavalry' && u.order.type === 'charge') this.pursueStep(u);
         if (!this.controls(u)) { if (u.order.type === 'attack') this.attackStep(u); continue; } // an AI attacker (ai.js) closing on a foe
         if (u.order.type === 'attack') this.attackStep(u);
         else this.initiativeStep(u);
@@ -1095,10 +1160,15 @@ export class Game {
    * A generic infantry brigade (never a real commander or regiment): "Union brigade 3". Same construction
    * path as the scenario's units. Returns the unit, or null when the side's figure reserve is used up.
    */
-  spawnUnit({ side, men = 1000, weapon = 'smooth', xp = 1, x, z, facing }) {
+  spawnUnit({ side, men = 1000, weapon, xp = 1, x, z, facing, type = 'infantry' }) {
     if (captureState(this)) captureFail('the prepared source roster is closed to sandbox spawns.');
     if (!Number.isInteger(xp) || xp < 1 || xp > 4) {
       this.emit('log', 'Choose Green, Trained, Veteran or Elite before placing a brigade.');
+      return null;
+    }
+    if (weapon === undefined) weapon = defaultWeapon(type);
+    if (!['infantry', 'cavalry'].includes(type) || (type === 'cavalry' && !CAVALRY_WEAPONS.includes(weapon))) {
+      this.emit('log', 'Place infantry, or cavalry with carbines or revolvers.');
       return null;
     }
     const nFig = Math.round(men / minMenPerFigureOf(this)) + 6; // counted at the phase minimum, so look.menPerFigure never overfills the pools
@@ -1108,18 +1178,19 @@ export class Game {
     }
     this.reserve[side] -= nFig;
     const n = ++this.spawned[side];
-    const name = `${side === 'US' ? 'Union' : 'Confederate'} brigade ${n}`;
+    const name = `${side === 'US' ? 'Union' : 'Confederate'} ${type === 'cavalry' ? 'cavalry' : 'brigade'} ${n}`;
     const face = Number.isFinite(facing) ? facing : this.ghostFacing(x, z, side, side === 'US' ? Math.PI / 2 : -Math.PI / 2);
     const def = {
-      id: `sandbox-${side.toLowerCase()}-${n}`, side, type: 'infantry', name, short: name, commander: null, parent: 'Sandbox',
+      id: `sandbox-${side.toLowerCase()}-${n}`, side, type, name, short: name, commander: null, parent: 'Sandbox',
       regiments: [], men, weapon, xp, x, z, facing: face, sources: [], notes: 'Placed in the sandbox; not a historical unit.',
     };
+    if (type === 'cavalry') ensureMounts(this, 2 * spawnReserve(minMenPerFigureOf(this)));
     const u = this.makeUnit(def, 500 + n * 13 + (side === 'CS' ? 7 : 0));
     u.reserveFigs = nFig;
     u.order = side === this.playerSide ? { type: 'hold' } : { type: 'hold', firm: true };
     this.units.push(u);
     this.emit('spawn', u);
-    this.emit('log', `${name} placed: ${men} men with ${weapon === 'rifled' ? 'rifled' : 'smoothbore'} muskets.`);
+    this.emit('log', `${name} placed: ${men} men with ${type === 'cavalry' ? (weapon === 'pistol' ? 'revolvers and sabres' : 'carbines') : `${weapon === 'rifled' ? 'rifled' : 'smoothbore'} muskets`}.`);
     return u;
   }
 
@@ -1191,6 +1262,7 @@ export class Game {
     this.impostors.CS.begin();
     this.halos.begin();
     commandState.get(this)?.flags.begin();
+    cavalryState.get(this)?.mounts.begin();
     for (const u of this.units) u.animate(simDt, this.simTime);
     animateCommand(this, simDt);
     this.flushAll();
@@ -1205,6 +1277,7 @@ export class Game {
     this.fallen.CS.flush();
     this.halos.flush();
     this.horses.flush();
+    cavalryState.get(this)?.mounts.flush();
     this.gunPool.flush();
     commandState.get(this)?.flags.flush();
   }
@@ -1258,6 +1331,9 @@ export class Game {
   figureTriangles() {
     return this.pools.US.trianglesDrawn() + this.pools.CS.trianglesDrawn();
   }
+
+  /** Cavalry horses drawn this frame (0 with no cavalry on the field). */
+  mountsDrawn() { return cavalryState.get(this)?.mounts.drawn ?? 0; }
 
   figureCount() {
     return this.units.reduce((s, u) => s + u.figures.filter((f) => f.alive).length, 0);

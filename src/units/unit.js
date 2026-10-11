@@ -31,6 +31,15 @@
 // Orders (set by game.js): move (march to the mark; may halt on the way to fight, see pauseMarch), attack
 // (close on a target to effective range and fire; the game steers it), charge, fallback, hold. holdFire is a
 // standing flag on the unit, not an order: it survives new orders until toggled off.
+//
+// Cavalry (DESIGN.md §2 "Cavalry", type 'cavalry', weapon 'carbine' or 'pistol'; game values in combat.js CAVALRY, not sourced):
+// mounted, a regiment of horsemen moves CAVALRY.speed times the infantry pace (CAVALRY.woods of that in woods), in a
+// two-rank line, or a column of fours on a long march with no enemy near (the infantry column rule). Each figure is a
+// rider on an instanced horse (the officers' horse, mounts.js MountPool). toggleMount() dismounts (CAVALRY.dismountS)
+// or remounts (CAVALRY.remountS): the regiment halts, does not fire and has no cover until it is done (combat.js). On
+// foot every fourth figure is a horse-holder: mounted CAVALRY.holdersBack behind the line with three led horses, out
+// of the firing line and spared while any trooper stands in it; the rest form a single-rank skirmish line drawn and
+// animated like infantry. The fire, charge, pursuit and screening rules are in combat.js, the AI's in ai.js.
 
 import { Vehicle, FollowPathBehavior, Path, Vector3 as YV } from 'yuka';
 import { FIGURE_SCALE, FIGURE_VIEW } from './soldier-mesh.js';
@@ -38,6 +47,7 @@ import { framePos } from './figure.js';
 import { BAKE_CLIP } from './impostor.js';
 import { mulberry32 } from '../world/landscape.js';
 import { RULES } from '../sim/rules.js';
+import { CAVALRY, SCREENED, defaultWeapon } from '../sim/combat.js';
 import { LOOK } from '../ui/look.js';
 import { equipmentProfile } from '../sim/equipment.js';
 import { define, on as onSetting } from '../settings.js';
@@ -156,7 +166,7 @@ export class Unit {
       commander: def.commander || null,
       parent: def.parent || '',
       regiments: def.regiments || [],
-      weapon: def.weapon || 'smooth',
+      weapon: def.weapon || defaultWeapon(def.type),
       xp: def.xp || 1,
       guns: def.guns || 0,
       sources: def.sources || [],
@@ -204,6 +214,11 @@ export class Unit {
     this.lastShotT = -99;
     this.formation = 'line';
     this.rnd = mulberry32(seed);
+    if (this.type === 'cavalry') {
+      this.mounted = true;
+      this.switching = null; // { to: 'mounted'|'dismounted', t, dur } while dismounting or remounting
+      this.mounts = null; // set by the game (MountPool)
+    }
 
     this.vehicle = new Vehicle();
     this.vehicle.position.set(def.x, 0, def.z);
@@ -226,8 +241,8 @@ export class Unit {
     // figures
     this.menPerFigure = this.type === 'artillery' ? MEN_PER_CREW_FIGURE : MEN_PER_FIGURE;
     this.figures = this.makeFigures(Math.max(1, Math.round(this.men / this.menPerFigure)), def.x, def.z, def.facing);
-    // the brigade commander rides behind the centre of the line (only infantry brigades with a sourced commander)
-    this.officer = this.type === 'infantry' && this.commander && this.commander.name
+    // the brigade commander rides behind the centre of the line (only infantry and cavalry with a sourced commander)
+    this.officer = (this.type === 'infantry' || this.type === 'cavalry') && this.commander && this.commander.name
       ? { x: def.x, z: def.z, yaw: def.facing, horse: -1, phase: this.rnd(), coatVar: this.rnd(), trouserVar: this.rnd() }
       : null;
     // trail of breadcrumbs behind the anchor (for the column); starts as a straight line to the rear
@@ -268,6 +283,7 @@ export class Unit {
       const pick = [...figures].sort(() => this.rnd() - 0.5).slice(0, k);
       for (const f of pick) f.skirmisher = true;
     }
+    if (this.type === 'cavalry') for (const f of figures) f.holder = f.i % CAVALRY.holderEvery === CAVALRY.holderEvery - 1;
     if (this.regCount) {
       // contiguous runs of figures per regiment, in proportion to its men (no random draws)
       const counts = apportion(n, this.regWeights);
@@ -282,7 +298,7 @@ export class Unit {
    * the men left, in their formation slots; men still falling finish their fall. Batteries keep their crews.
    */
   rebuildFigures() {
-    if (this.type !== 'infantry' || this.menPerFigure === MEN_PER_FIGURE) return false;
+    if (this.type === 'artillery' || this.menPerFigure === MEN_PER_FIGURE) return false;
     this.menPerFigure = MEN_PER_FIGURE;
     const falling = this.figures.filter((f) => !f.alive && !f.gone);
     const n = this.alive ? Math.max(1, Math.round(this.men / this.menPerFigure)) : 0;
@@ -297,9 +313,12 @@ export class Unit {
   get alive() { return this.men >= 1; }
   get aliveFigures() { return this.figures.filter((f) => f.alive); }
   get spacing() { return this.type === 'infantry' ? LOOK.formationSpacing : 1; }
+  /** On foot or getting there: a dismounted regiment, or one dismounting or remounting (cavalry only). */
+  get afoot() { return this.type === 'cavalry' && (!this.mounted || !!this.switching); }
 
   /** Assign line slots (two dense ranks plus the skirmish screen) to living figures, keeping neighbours. */
   layout() {
+    if (this.type === 'cavalry') { this.layoutCavalry(); return; }
     if (this.regCount > 1 && regimentGaps) { this.layoutBlocks(); this.pickBearers(); return; }
     const spacing = this.spacing;
     const live = this.figures.filter((f) => f.alive);
@@ -328,6 +347,48 @@ export class Unit {
     this.files = files;
     if (this.blockGaps) this.blockGaps = 0;
     if (this.regCount) this.pickBearers();
+  }
+
+  /**
+   * Cavalry slots. Mounted: two ranks of horses. On foot: one skirmish rank of troopers with the horse-holders in a row
+   * CAVALRY.holdersBack behind it; remounting, the troopers walk back to the horses.
+   */
+  layoutCavalry() {
+    const live = this.figures.filter((f) => f.alive);
+    if (!this.afoot) {
+      const ranks = live.length > 8 ? 2 : 1, files = Math.ceil(live.length / ranks);
+      live.sort((a, b) => a.lx - b.lx || a.rank - b.rank);
+      for (let k = 0; k < live.length; k++) {
+        const f = live[k], file = Math.floor(k / ranks), rank = k % ranks;
+        f.lx = (file - (files - 1) / 2) * CAVALRY.fileSpacing;
+        f.lz = ((ranks - 1) / 2 - rank) * CAVALRY.rankSpacing;
+        f.rank = rank;
+      }
+      this.halfFront = Math.max(4, ((files - 1) / 2) * CAVALRY.fileSpacing);
+      this.depth = ranks * CAVALRY.rankSpacing;
+      this.files = files;
+      return;
+    }
+    const holders = live.filter((f) => f.holder), line = holders.length < live.length ? live.filter((f) => !f.holder) : [];
+    const back = -CAVALRY.holdersBack;
+    holders.sort((a, b) => a.lx - b.lx);
+    for (let k = 0; k < holders.length; k++) {
+      const f = holders[k];
+      f.lx = (k - (holders.length - 1) / 2) * CAVALRY.holderSpacing; f.lz = back; f.rank = 1;
+    }
+    line.sort((a, b) => a.lx - b.lx);
+    const remount = this.switching?.to === 'mounted';
+    for (let k = 0; k < line.length; k++) {
+      const f = line[k];
+      if (remount && holders.length) { // to the horses: beside the holder of their four
+        const h = holders[Math.min(holders.length - 1, Math.floor((k * holders.length) / line.length))];
+        f.lx = h.lx + ((k % CAVALRY.ledHorses) - 1) * CAVALRY.fileSpacing; f.lz = back + 6;
+      } else { f.lx = (k - (line.length - 1) / 2) * CAVALRY.skirmishSpacing; f.lz = 0; }
+      f.rank = 0;
+    }
+    this.halfFront = Math.max(4, ((Math.max(1, line.length) - 1) / 2) * CAVALRY.skirmishSpacing);
+    this.depth = CAVALRY.holdersBack + 6;
+    this.files = line.length;
   }
 
   /** The line as regiment blocks side by side (regiment order, left to right), REGIMENT_GAP between blocks. */
@@ -416,6 +477,7 @@ export class Unit {
   /** Half the width of the brigade's front once it stands in line (also while it marches in column). */
   lineHalfFront() {
     if (this.formation !== 'column' || !this.files) return this.halfFront;
+    if (this.type === 'cavalry') return Math.max(4, ((this.files - 1) / 2) * CAVALRY.fileSpacing);
     if (this.blockGaps) return Math.max(4, (((this.files - 1) * FILE_SPACING + this.blockGaps * REGIMENT_GAP) / 2) * this.spacing);
     return Math.max(4, ((this.files - 1) / 2) * FILE_SPACING * this.spacing);
   }
@@ -423,7 +485,8 @@ export class Unit {
   /** Column of fours along the trail: slot k = rank k/4 at COLUMN_RANK_SPACING back along the trail. */
   layoutColumn() {
     if (this.regCount > 1 && regimentGaps) { this.layoutColumnBlocks(); this.pickBearers(); return; }
-    const rankSpacing = COLUMN_RANK_SPACING * this.spacing;
+    const cav = this.type === 'cavalry';
+    const rankSpacing = (cav ? CAVALRY.rankSpacing : COLUMN_RANK_SPACING) * this.spacing;
     const live = this.figures.filter((f) => f.alive).sort((a, b) => a.order - b.order);
     const ranks = Math.ceil(live.length / COLUMN_FILES);
     // resample the trail from the head backwards at COLUMN_RANK_SPACING
@@ -461,7 +524,7 @@ export class Unit {
       f.cfile = (i % COLUMN_FILES) - (COLUMN_FILES - 1) / 2;
       f.rank = f.crank === 0 ? 0 : 1;
     }
-    this.halfFront = COLUMN_FILES * COLUMN_FILE_SPACING * this.spacing * 0.5 + 6;
+    this.halfFront = COLUMN_FILES * (cav ? CAVALRY.fileSpacing : COLUMN_FILE_SPACING) * this.spacing * 0.5 + 6;
     this.depth = Math.max(10, ranks * rankSpacing);
     if (this.regCount) this.pickBearers();
   }
@@ -515,7 +578,7 @@ export class Unit {
     if (this.formation === 'column' && f.crank !== undefined && this.columnSlots[f.crank]) {
       const [sx, sz, yaw] = this.columnSlots[f.crank];
       const c = Math.cos(yaw), s = Math.sin(yaw);
-      const lx = f.cfile * COLUMN_FILE_SPACING * this.spacing + f.jx * 0.6;
+      const lx = f.cfile * (this.type === 'cavalry' ? CAVALRY.fileSpacing : COLUMN_FILE_SPACING) * this.spacing + f.jx * 0.6;
       return [sx + c * lx, sz - s * lx, yaw];
     }
     const s = Math.sin(this.facing), c = Math.cos(this.facing);
@@ -626,6 +689,34 @@ export class Unit {
     return true;
   }
 
+  /**
+   * Cavalry: dismount (or remount). The regiment halts and switches over CAVALRY.dismountS (CAVALRY.remountS); a
+   * second toggle while it switches, a routing regiment or a pistol-armed one asked to dismount is refused (false).
+   */
+  toggleMount() {
+    if (this.type !== 'cavalry' || !this.canTakeOrders() || this.switching) return false;
+    if (this.mounted && this.weapon === 'pistol') return false;
+    this.stop();
+    this.run = false;
+    this.order = { type: 'hold' };
+    this.switching = this.mounted ? { to: 'dismounted', t: 0, dur: CAVALRY.dismountS } : { to: 'mounted', t: 0, dur: CAVALRY.remountS };
+    this.layout();
+    return true;
+  }
+
+  /** Advance a dismount or remount by dt; a routing regiment stays as it was. */
+  mountStep(dt) {
+    const sw = this.switching;
+    if (!sw) return;
+    if (this.state === 'routing') { this.switching = null; this.layout(); return; }
+    sw.t += dt;
+    if (sw.t < sw.dur) return;
+    this.mounted = sw.to === 'mounted';
+    this.switching = null;
+    this.formation = 'line';
+    this.layout();
+  }
+
   stop() {
     this.follow.active = false;
     this.vehicle.velocity.set(0, 0, 0);
@@ -648,20 +739,25 @@ export class Unit {
   // Per-frame movement (Yuka EntityManager updates the vehicle before this).
   /** homeZ: the friendly map edge a rout runs to; home ([x, z], a scenario retreat point) overrides it. */
   move(dt, homeZ, home = null) {
+    if (this.switching) this.mountStep(dt);
     const o = this.order;
     const v = this.vehicle;
+    const horse = this.type === 'cavalry' && this.mounted && !this.switching;
     let speed = SPEED.walk;
     if (this.state === 'routing') speed = SPEED.rout;
     else if (o.type === 'charge') speed = SPEED.charge;
     else if (o.type === 'fallback') speed = SPEED.fallback;
     else if (this.run) speed = SPEED.run;
+    if (horse) speed *= CAVALRY.speed;
+    else if (this.switching) speed = 0; // dismounting or remounting: the regiment stands
     if (this.state === 'wavering' && o.type !== 'fallback') speed *= 0.5;
     speed *= 1 - 0.4 * (this.fatigue / 100);
     // ground: woods slow the line, slopes too
     const slope = this.terrain.slopeAt(this.x, this.z);
     speed *= Math.max(0.55, 1 - slope * 0.8);
-    if (this.inWoods) speed *= 0.7;
+    if (this.inWoods) speed *= horse ? CAVALRY.woods : 0.7;
     if (this.formation === 'column') speed *= 1.1; // a road column keeps a better pace than a line over fields
+    if (SCREENED.has(this)) speed *= CAVALRY.screenSlow; // skirmishing enemy horsemen slow the march
     speed *= RULES.marchSpeed;
     v.maxSpeed = speed;
 
@@ -690,7 +786,7 @@ export class Unit {
       const last = this.follow.path._waypoints[this.follow.path._waypoints.length - 1];
       const remain = Math.hypot(last.x - this.x, last.z - this.z);
       // column for a long march with no enemy near; deploy into line before the end
-      const wantColumn = o.type === 'move' && this.type === 'infantry' && (this.pathLength || 0) > COLUMN_MIN_PATH
+      const wantColumn = o.type === 'move' && (this.type === 'infantry' || this.type === 'cavalry' && !this.afoot) && (this.pathLength || 0) > COLUMN_MIN_PATH
         && remain > COLUMN_DEPLOY && this.nearestEnemy > COLUMN_ENEMY && this.state !== 'wavering' && !this.melee;
       this.setFormation(wantColumn ? 'column' : 'line');
       if (!o.keepFacing && sp > 0.4 && remain > 25) this.goalFacing = Math.atan2(v.velocity.x, v.velocity.z);
@@ -752,20 +848,22 @@ export class Unit {
     const want = Math.ceil(this.men / this.menPerFigure - 0.25);
     let live = this.figures.filter((f) => f.alive);
     let killed = 0;
+    const spare = this.type === 'cavalry' && this.afoot; // on foot the horse-holders stand out of the firing line
     while (live.length > want && live.length > 0) {
+      const from = spare && live.some((f) => !f.holder) ? live.filter((f) => !f.holder) : live;
       // front rank and the middle of the line suffer most
-      let pick = Math.floor(this.rnd() * live.length);
+      let pick = Math.floor(this.rnd() * from.length);
       if (this.rnd() < 0.6) {
-        const front = live.filter((f) => f.rank === 0);
-        if (front.length) pick = live.indexOf(front[Math.floor(this.rnd() * front.length)]);
+        const front = from.filter((f) => f.rank === 0);
+        if (front.length) pick = from.indexOf(front[Math.floor(this.rnd() * front.length)]);
       }
-      const f = live[pick];
+      const f = from[pick];
       f.alive = false;
       f.dying = now > 0 ? now : 1e-6;
       f.front = this.rnd() < 0.45;
       f.dieYaw = f.yaw + (this.rnd() - 0.5) * 1.6;
       killed++;
-      live.splice(pick, 1);
+      live.splice(from === live ? pick : live.indexOf(f), 1);
     }
     if (killed) {
       if (this.formation === 'line') this.layout(); else this.layoutColumn();
@@ -805,6 +903,8 @@ export class Unit {
     const maxSp = Math.max(SPEED.walk, unitSpeed) * 1.35;
     if (this.formation === 'column') this.layoutColumn();
     const infantry = this.type === 'infantry';
+    const cav = this.type === 'cavalry', afoot = cav && this.afoot;
+    const foot = infantry || afoot; // men on foot: the infantry clips and the long arm
     const halos = this.halos;
     const haloKind = this.momentGlow ? 3 : this.selected ? 1 : this.underFire > 0 ? 2 : 0;
     const haloStr = Math.min(1, this.underFire / 0.9);
@@ -845,6 +945,7 @@ export class Unit {
         pool.push(f.x, my + (f.mountY || 0), f.z, f.yaw, s, framePos('ride', f.clipT), f.prevPos, f.blend, 0, f.coatVar, f.trouserVar, 0, 0);
         continue;
       }
+      if (cav && (!afoot || f.holder)) { this.animateRider(f, dt, s, unitSpeed, maxSp, rc, haloKind, haloStr); continue; }
       const [tx, tz, slotYaw] = this.slotWorld(f);
       const dx = tx - f.x, dz = tz - f.z;
       const d = Math.hypot(dx, dz);
@@ -865,11 +966,11 @@ export class Unit {
       // clip
       if (moving) {
         const running = routing || charging || this.run || v > SPEED.walk * 1.35;
-        const clip = charging && infantry ? 'charge' : running ? 'run' : 'walk';
+        const clip = charging && foot ? 'charge' : running ? 'run' : 'walk';
         this.setClip(f, clip);
         f.clipT += step / (s * (running ? RUN_CYCLE : WALK_CYCLE)) * f.pace;
         f.stride += step * f.pace;
-      } else if (infantry && this.firing && !routing) {
+      } else if (foot && this.firing && !routing) {
         if (f.fireAt >= 0 && time >= f.fireAt) { f.flash = 1; f.fireT = time; f.fireAt = -1; }
         const ready = 0.5 + (f.phase - 0.5) * 0.3; // the reload at which this man has loaded
         if (f.fireT >= 0 && time - f.fireT < 0.35) {
@@ -886,7 +987,7 @@ export class Unit {
           this.setClip(f, 'aim');
           f.clipT = 0;
         }
-      } else if (!infantry) {
+      } else if (!foot) {
         this.setClip(f, f.crewClip || 'crew');
         f.clipT = 0;
       } else {
@@ -896,7 +997,7 @@ export class Unit {
       f.blend = Math.max(0, f.blend - dt * BLEND_RATE);
       f.flash = Math.max(0, f.flash - dt * 9);
       const y = T.heightAt(f.x, f.z);
-      if (rigged) pool.push(f.x, y, f.z, f.yaw, s, framePos(f.clip, f.clipT), f.prevPos, f.blend, f.flash, f.coatVar, f.trouserVar, f.prop ?? (infantry ? 1 : 0), 0, rc);
+      if (rigged) pool.push(f.x, y, f.z, f.yaw, s, framePos(f.clip, f.clipT), f.prevPos, f.blend, f.flash, f.coatVar, f.trouserVar, f.prop ?? (foot ? 1 : 0), 0, rc);
       if (baked) imp.push(f.x, y, f.z, f.yaw, s, bakedClip(f), bakedPhase(f, s, walkM), f.coatVar, bc, f.i);
       // one ellipse per man (files are 2.35 m apart); a sprite carries its own baked shadow, so no blob for it
       if (halos && (haloKind || rigged)) halos.push(f.x, y, f.z, f.yaw, (haloKind ? 1.45 : 1.7) * V.scale, (haloKind ? 1.2 : 1.1) * V.scale, haloKind, haloStr, haloKind ? 0 : rc);
@@ -905,11 +1006,50 @@ export class Unit {
     if (this.flags && this.bearers && this.alive && this.state !== 'captured') this.pushColours(this.flags, s);
   }
 
+  /**
+   * A cavalryman in the saddle (render only): his horse from the MountPool (a horse-holder on foot duty leads three
+   * more beside him) and the rider in the side's SoldierPool at saddle height, as the officers ride.
+   */
+  animateRider(f, dt, s, unitSpeed, maxSp, rc, haloKind, haloStr) {
+    const T = this.terrain;
+    const [tx, tz, slotYaw] = this.slotWorld(f);
+    const dx = tx - f.x, dz = tz - f.z, d = Math.hypot(dx, dz);
+    let step = 0;
+    if (d > 0.05) {
+      step = Math.min(d, Math.min(maxSp * f.pace, d * 2.2 + unitSpeed * 0.3) * dt);
+      f.x += (dx / d) * step; f.z += (dz / d) * step;
+    }
+    const moving = step / Math.max(dt, 1e-6) > 0.35;
+    const goal = moving && (d > 3 || this.state === 'routing') ? Math.atan2(dx, dz) : slotYaw;
+    f.yaw += wrap((this.order.keepFacing && this.state !== 'routing' ? this.facing : goal) - f.yaw) * Math.min(1, dt * 5);
+    this.setClip(f, 'ride');
+    f.clipT += moving ? step / (s * RUN_CYCLE) * f.pace : dt * 0.5;
+    f.stride += step * f.pace;
+    f.blend = Math.max(0, f.blend - dt * BLEND_RATE);
+    f.flash = 0;
+    const y = T.heightAt(f.x, f.z), hs = s * 0.92;
+    const mounts = this.mounts, coat = Math.floor(f.coatVar * 6);
+    if (mounts) {
+      mounts.push(f.x, y, f.z, f.yaw, hs, coat);
+      if (f.holder && this.afoot) {
+        const c = Math.cos(f.yaw), sn = Math.sin(f.yaw);
+        for (let k = 1; k <= CAVALRY.ledHorses; k++) {
+          const off = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * CAVALRY.fileSpacing;
+          const lx = f.x + c * off, lz = f.z - sn * off;
+          mounts.push(lx, T.heightAt(lx, lz), lz, f.yaw, hs, (coat + k) % 6);
+        }
+      }
+    }
+    // cavalry always draws rigged (no baked horsemen yet)
+    this.pool.push(f.x, y + (1.52 - 0.98) * hs, f.z, f.yaw, s, framePos('ride', f.clipT), f.prevPos, f.blend, 0, f.coatVar, f.trouserVar, 0, 0, rc);
+    if (this.halos) this.halos.push(f.x, y, f.z, f.yaw, 1.6 * FIGURE_VIEW.scale, 2.6 * FIGURE_VIEW.scale, haloKind, haloStr, haloKind ? 0 : rc);
+  }
+
   /** Where the brigade commander rides (sim state only, no render state): [x, z]. Behind the line's centre, ahead of a column. */
   officerSlot() {
     const fs = Math.sin(this.facing), fc = Math.cos(this.facing);
     if (this.formation === 'column' && this.columnSlots.length) return [this.x + fs * 9 + fc * 5, this.z + fc * 9 - fs * 5];
-    const back = this.state === 'routing' ? 4 : RANK_SPACING * this.spacing + 7;
+    const back = this.state === 'routing' ? 4 : this.type === 'cavalry' ? this.depth / 2 + 12 : RANK_SPACING * this.spacing + 7;
     return [this.x - fs * back + fc * 3, this.z - fc * back - fs * 3];
   }
 

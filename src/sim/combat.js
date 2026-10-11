@@ -25,6 +25,18 @@
 //     and a routing unit's rally clock and the out-of-contact recovery by `rally` (a general's 300 m radius or the
 //     brigade's own commander: loss 0.8, rally 1.5). With a command set, every point that takes fire this step
 //     (each volley's target centre, both sides of a melee) is kept for takeHits(); without one nothing is kept.
+//   - cavalry (type 'cavalry', DESIGN.md §2; game values in CAV below and CAVALRY, not sourced): mounted it fires
+//     short (carbine CAV.mountedRange.carbine, pistol .pistol) and weak (CAV.mountedMen of the men, each as a smoothbore man);
+//     on foot (unit.afoot) its carbines reach CAV.dismountedRange, reload CAV.dismountedRate times faster (breech-loaders)
+//     with CAV.dismountedMen of the men in the line (the horse-holders are out of it). While it dismounts or remounts it
+//     does not fire and has no cover (cover 1). AI horsemen ride on through fire instead of halting to fire.
+//   - a mounted charge (cavalryShock) is strong against shaken, wavering and routing men, against a battery whose guns
+//     are not on it (limbered, aimed elsewhere, or taken from a flank) and against a line taken in flank or rear; it is
+//     weak against steady infantry formed in line facing it (CAV.formedLine: the horsemen lose heavily). Horsemen that
+//     catch a routing unit ride it down (rideDown: extra losses, almost none of their own, and onRideDown for the game's
+//     surrender accounting) without halting; no other unit fights a routing one.
+//   - screening: an infantry brigade within CAVALRY.screen of an enemy cavalry regiment that is not routing
+//     marches CAVALRY.screenSlow as fast (SCREENED, refreshed with the targets; unit.js move reads it).
 // FIRE_BASE and the drains are tuned for a few minutes of fighting per brigade, not sourced (as in the old
 // model, where FIRE_BASE was "tuned so the loop runs ~90 s"). The sandbox multipliers rules.fireEffect and
 // rules.moraleLoss scale them at the point of use; the constants here stay as they are.
@@ -44,6 +56,32 @@ const FIRE_BASE = 1.5;
 const ARC = (65 * Math.PI) / 180;
 const MELEE_RANGE = 34;
 const MASK_PAD = 8; // m added to each side of a friend's front when it masks the line of fire
+/** Cavalry game values (contract P3 cavalry; not sourced). Spacings are in figure metres (figures are drawn ~4x life). */
+export const CAVALRY = Object.freeze({
+  speed: 2.2, // mounted pace = infantry pace x this, every order (walk, run, charge, fall back, rout)
+  woods: 0.6, // mounted in woods (infantry: 0.7)
+  holderEvery: 4, // on foot, every fourth figure holds the horses (his own and three led)
+  dismountS: 15, remountS: 20, // sim s to dismount or remount: halted, no fire, cover x1
+  fileSpacing: 3.4, rankSpacing: 11, // a mounted line: two ranks of horses
+  skirmishSpacing: 4.5, // a dismounted skirmish line, one rank
+  holderSpacing: 14, holdersBack: 50, // the horse-holders' row behind the skirmish line
+  ledHorses: 3,
+  screen: 250, screenSlow: 0.8, // enemy infantry within this of a cavalry regiment (not routing) marches x screenSlow
+});
+export const CAVALRY_WEAPONS = Object.freeze(['carbine', 'pistol']);
+/** The weapon a definition without one carries: carbines for cavalry, smoothbores otherwise. */
+export const defaultWeapon = (type) => (type === 'cavalry' ? 'carbine' : 'smooth');
+/** Infantry marching inside an enemy cavalry screen (screenStep keeps it; never an own key on the unit). */
+export const SCREENED = new WeakSet();
+/** Cavalry fire and charge (game values, not sourced; see the header). */
+export const CAV = Object.freeze({
+  mountedRange: { carbine: 150, pistol: 40 }, dismountedRange: 300, // m
+  mountedMen: 0.35, dismountedMen: 0.8, dismountedRate: 1.2,
+  shock: { shaken: 1.8, wavering: 2.5, guns: 2.5, flank: 1.6 }, formedLine: 0.45,
+  rideDown: { rate: 0.025, cap: 0.05, own: 0.4 }, // fugitives lost per rider per s, at most this share of their strength per s; riders lost per s
+});
+/** A cavalry regiment in the saddle and not switching: it charges, rides down and fires as horsemen. */
+export const horsed = (u) => u.type === 'cavalry' && !u.afoot;
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -53,9 +91,12 @@ export class Combat {
   #stepDepth = 0;
   #command = null; // (unit) => { loss, rally } | null (game.js commandFactor)
   #hits = null; // flat [x, z, ...] of points that took fire since the last takeHits(); null: not kept
-  constructor({ units, terrain, coverAt, fallen, fx, rnd, autoHaltSides = ['CS'], onBatteryContact = null }) {
+  #rideDown = null; // (cavalry, router, dt) => void: the game's surrender accounting (only with surrender enabled)
+  constructor({ units, terrain, coverAt, fallen, fx, rnd, autoHaltSides = ['CS'], onBatteryContact = null, onRideDown = null }) {
     if (onBatteryContact !== null && typeof onBatteryContact !== 'function') throw new Error('Combat: battery contact callback must be a function or null.');
+    if (onRideDown !== null && typeof onRideDown !== 'function') throw new Error('Combat: ride-down callback must be a function or null.');
     this.#batteryContact = onBatteryContact;
+    this.#rideDown = onRideDown;
     // `units` is the game's own array: spawns and removals change it in place, so this sees them.
     this.autoHalt = new Set(autoHaltSides);
     this.units = units;
@@ -109,6 +150,7 @@ export class Combat {
   }
 
   range(u) {
+    if (u.type === 'cavalry') return u.afoot && u.weapon !== 'pistol' ? CAV.dismountedRange : CAV.mountedRange[u.weapon] || CAV.mountedRange.carbine;
     if (u.equipmentProfile) return u.equipmentProfile.rangeMetres;
     return u.type === 'artillery' ? RANGE.artillery : RANGE[u.weapon] || RANGE.smooth;
   }
@@ -177,10 +219,11 @@ export class Combat {
       this.pickTargets();
       for (const u of this.units) {
         const c = this.coverAt(u.x, u.z);
-        u.cover = c.value;
+        u.cover = u.switching ? 1 : c.value; // a regiment dismounting or remounting has no cover
         u.coverKind = c.kind;
         u.inWoods = c.kind === 'woods';
       }
+      this.screenStep();
     }
     for (const u of this.units) {
       if (!u.alive) continue;
@@ -195,6 +238,29 @@ export class Combat {
     } finally { this.#stepDepth--; }
   }
 
+  /** Which infantry brigades march inside an enemy cavalry screen (SCREENED). Nothing to do without cavalry. */
+  screenStep() {
+    let any = false;
+    for (const c of this.units) if (c.type === 'cavalry') { any = true; break; }
+    if (!any) return;
+    const R2 = CAVALRY.screen * CAVALRY.screen;
+    for (const u of this.units) {
+      if (u.type !== 'infantry') continue;
+      let near = false;
+      for (const c of this.units) {
+        if (c.type !== 'cavalry' || c.side === u.side || !c.alive || c.state === 'routing' || c.state === 'captured') continue;
+        if ((c.x - u.x) ** 2 + (c.z - u.z) ** 2 <= R2) { near = true; break; }
+      }
+      if (near) SCREENED.add(u); else SCREENED.delete(u);
+    }
+  }
+
+  /** Sim seconds per round for u at full fatigue factor 1 (cavalry on foot: breech-loading carbines, faster). */
+  basePeriod(u) {
+    if (u.type === 'artillery') return RELOAD.gun;
+    return u.type === 'cavalry' && u.afoot ? RELOAD.musket / CAV.dismountedRate : RELOAD.musket;
+  }
+
   fireStep(u, dt, time) {
     const t = u.target;
     const moving = u.follow.active && Math.hypot(u.vehicle.velocity.x, u.vehicle.velocity.z) > 0.5;
@@ -203,7 +269,9 @@ export class Combat {
     if (t && moving && !u.run && u.order.type === 'move' && u.state !== 'routing' && t.state !== 'routing') {
       const d = Math.hypot(t.x - u.x, t.z - u.z);
       if (d < this.effRange(u)) {
-        if (this.autoHalt.has(u.side) && !u.manual) {
+        if (u.type === 'cavalry' && !u.afoot && this.autoHalt.has(u.side) && !u.manual) {
+          // AI horsemen ride on, firing on the move (their charges and pursuit are ai.js's)
+        } else if (this.autoHalt.has(u.side) && !u.manual) {
           // the AI halts for good
           u.stop();
           u.order = { type: 'hold' };
@@ -225,9 +293,9 @@ export class Combat {
       const want = Math.atan2(t.x - u.x, t.z - u.z);
       if (Math.abs(wrap(want - u.facing)) > 0.12) u.goalFacing = want;
     }
-    const canFire = t && !u.holdFire && !u.melee && u.state !== 'routing' && u.order.type !== 'charge' && !(moving && (u.run || isArt)) && (!isArt || u.unlimbered);
+    const canFire = t && !u.holdFire && !u.melee && u.state !== 'routing' && u.order.type !== 'charge' && !(moving && (u.run || isArt)) && (!isArt || u.unlimbered) && !u.switching;
     u.firing = !!canFire && !moving;
-    const period = (u.equipmentProfile ? u.equipmentProfile.reloadSeconds : (isArt ? RELOAD.gun : RELOAD.musket)) * (1 + 0.5 * (u.fatigue / 100)) * (moving ? 1.5 : 1);
+    const period = (u.equipmentProfile ? u.equipmentProfile.reloadSeconds : this.basePeriod(u)) * (1 + 0.5 * (u.fatigue / 100)) * (moving ? 1.5 : 1);
     if (u.reload < 1) u.reload = Math.min(1, u.reload + dt / period);
     if (!canFire || u.reload < 1) return;
     // A friend that stepped across the line since the last target pick masks this volley; re-pick next time.
@@ -241,8 +309,9 @@ export class Combat {
     // Named damage is per round at the nominal musket/gun calibration, independent of faster
     // reload or an explicit direct-volley period. Preserve legacy fatigue/moving semantics:
     // default direct calls have fatigue only; fireStep supplies the moving-period factor.
-    if (u.equipmentProfile) period = (isArt ? RELOAD.gun : RELOAD.musket) * (1 + 0.5 * (u.fatigue / 100)) * (moving && period !== undefined ? 1.5 : 1);
-    if (period === undefined) period = (isArt ? RELOAD.gun : RELOAD.musket) * (1 + 0.5 * (u.fatigue / 100));
+    // Cavalry likewise: its carbines' faster reload on foot means more rounds, not smaller ones.
+    if (u.equipmentProfile || u.type === 'cavalry') period = (isArt ? RELOAD.gun : RELOAD.musket) * (1 + 0.5 * (u.fatigue / 100)) * (moving && period !== undefined ? 1.5 : 1);
+    if (period === undefined) period = this.basePeriod(u) * (1 + 0.5 * (u.fatigue / 100));
     u.reload = this.rnd() * 0.15;
     const d = Math.hypot(t.x - u.x, t.z - u.z);
     const rng = this.range(u);
@@ -255,6 +324,7 @@ export class Combat {
     let fireMen = u.men;
     let pow = POW[u.weapon] || 1;
     if (u.equipmentProfile) pow = u.equipmentProfile.powerMultiplier;
+    if (u.type === 'cavalry') fireMen = u.men * (u.afoot ? CAV.dismountedMen : CAV.mountedMen); // per man as smoothbore infantry (POW 1)
     let art = 1;
     if (isArt) {
       fireMen = u.guns * 27 * clamp(u.men / u.menMax, 0, 1); // old GUN_FIRE_WEIGHT (T5:54)
@@ -288,8 +358,9 @@ export class Combat {
     const done = new Set();
     for (const a of this.units) {
       if (!a.alive || a.order.type !== 'charge' || a.state === 'routing') continue;
+      const rider = horsed(a);
       for (const b of this.enemiesOf(a)) {
-        if (b.state === 'routing') continue;
+        if (b.state === 'routing' && !rider) continue;
         const key = a.id < b.id ? `${a.id}|${b.id}` : `${b.id}|${a.id}`;
         if (done.has(key)) continue;
         const dx = b.x - a.x, dz = b.z - a.z;
@@ -298,14 +369,16 @@ export class Combat {
         const lat = Math.abs(dx * c - dz * s);
         if (fwd > MELEE_RANGE + b.depth || fwd < -MELEE_RANGE || lat > a.halfFront + b.halfFront) continue;
         done.add(key);
+        if (b.state === 'routing') { this.rideDown(a, b, dt, time); continue; }
         a.melee = b.melee = true;
         if (this.#hits) this.#hits.push(a.x, a.z, b.x, b.z);
-        if (a.type === 'infantry' && b.type === 'artillery') onBatteryContact?.(a, b);
+        if ((a.type === 'infantry' || a.type === 'cavalry') && b.type === 'artillery') onBatteryContact?.(a, b);
         a.stop();
         const armA = a.type === 'artillery' ? 0.35 : 1;
         const armB = b.type === 'artillery' ? 0.35 : 1;
         const bCharging = b.order.type === 'charge';
-        const atk = a.men * armA * (0.6 + 0.4 * a.morale / a.moraleMax) * (0.9 + 0.06 * a.xp) * (bCharging ? 1 : 1.15);
+        const shock = rider ? this.cavalryShock(a, b) : 1;
+        const atk = a.men * armA * (0.6 + 0.4 * a.morale / a.moraleMax) * (0.9 + 0.06 * a.xp) * (bCharging ? 1 : 1.15) * shock;
         const def = b.men * armB * (0.6 + 0.4 * b.morale / b.moraleMax) * (0.9 + 0.06 * b.xp) * (bCharging ? 1 : b.cover);
         const r = atk / Math.max(1, def);
         // old: 9 x 12 men/s x ratio (108/s) with a 20% per second cap; that bled ~450 men a side in 20 s
@@ -325,6 +398,42 @@ export class Combat {
     for (const u of this.units) {
       if (u.order.type === 'charge' && !u.melee && !u.follow.active && u.alive) u.order = { type: 'hold' };
     }
+  }
+
+  /**
+   * The weight of a mounted charge on b: shaken or wavering men, a battery whose guns are not on the horsemen (limbered,
+   * aimed elsewhere, or taken outside its front) and a line taken in flank or rear give way; steady infantry (or
+   * dismounted troopers) formed in line facing the charge stand and the horsemen suffer.
+   */
+  cavalryShock(a, b) {
+    const flank = this.arcMult(a, b) > 1;
+    if (b.type === 'artillery') return b.unlimbered && b.target === a && !flank && b.ammo > 0 ? 1 : CAV.shock.guns;
+    if (b.state === 'wavering') return CAV.shock.wavering;
+    if (b.state === 'shaken') return CAV.shock.shaken;
+    if (flank) return CAV.shock.flank;
+    const formed = (b.type === 'infantry' || b.type === 'cavalry' && b.afoot) && b.formation === 'line' && !b.follow.active;
+    return formed ? CAV.formedLine : 1;
+  }
+
+  /**
+   * Horsemen catch a routing unit: it loses men fast (they cut down and take the fugitives), the riders almost none,
+   * and they ride on with it. The game counts the contact toward a surrender where surrender is enabled.
+   */
+  rideDown(a, b, dt, time) {
+    const R = CAV.rideDown;
+    const bCas = Math.min(b.men, b.menMax * R.cap * dt, R.rate * a.men * dt * RULES.chargeEffect * (0.7 + this.rnd() * 0.6));
+    const aCas = Math.min(a.men, R.own * dt * RULES.chargeEffect);
+    b.takeLosses(bCas, this.fallen[b.side], time);
+    a.takeLosses(aCas, this.fallen[a.side], time);
+    b.casTick = (b.casTick || 0) + bCas;
+    a.casTick = (a.casTick || 0) + aCas;
+    b.underFire = 1.4;
+    b.rallyT = 0;
+    a.ridingDown = time;
+    a.kills = (a.kills || 0) + bCas;
+    a.fatigue = Math.min(100, a.fatigue + 2.4 * dt * RULES.fatigueGain);
+    if (this.#hits) this.#hits.push(a.x, a.z, b.x, b.z);
+    this.#rideDown?.(a, b, dt);
   }
 
   moraleStep(u, dt) {
