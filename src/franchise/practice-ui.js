@@ -24,7 +24,8 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null,
   launchExport.textContent = 'Export army at launch'; launchExport.hidden = true; exportButton.after(launchExport);
   const unsavedButton = document.getElementById('result-unsaved');
   const replayButton = document.createElement('button'); replayButton.type = 'button'; replayButton.id = 'result-replay';
-  replayButton.textContent = 'Replay this phase'; replayButton.hidden = true; action.after(replayButton);
+  replayButton.textContent = 'Replay this phase'; replayButton.hidden = true;
+  if (campaign) action.after(replayButton); // campaign routes only: other result dialogs keep their exact actions
   const campHref = campaign ? `./?camp=${campaign.slot}` : './?camp';
   let phase = null, phaseFailure = null, issueNote = '';
   const after = document.getElementById('after-action');
