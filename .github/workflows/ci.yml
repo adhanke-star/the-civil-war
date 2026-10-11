@@ -1,4 +1,4 @@
-name: Reward focus warning observation (private, pending approval)
+name: Reward focus warning causal trace (private)
 on:
   push:
     branches: [reward-focus-inputs-private]
@@ -15,7 +15,7 @@ jobs:
       GIT_CONFIG_COUNT: '1'
       GIT_CONFIG_KEY_0: safe.directory
       GIT_CONFIG_VALUE_0: /__w/the-civil-war/the-civil-war
-      REWARD_FOCUS_WARNING_DIAGNOSTIC_AUTHORIZATION: one-observational-run
+      REWARD_FOCUS_WARNING_DIAGNOSTIC_AUTHORIZATION: autonomous-v1-causal-diagnostic
     defaults:
       run:
         shell: bash
@@ -42,33 +42,33 @@ jobs:
         run: |
           set -euo pipefail
           mkdir .out
-          node tools/test-reward-focus-private.mjs --warning-diagnostic-capture setup
-      - name: Observe four isolated processes in pointer keyboard keyboard pointer order once
+          node tools/test-reward-focus-private.mjs --warning-causal-capture setup
+      - name: Trace four isolated pointer processes in control trace trace control order
         id: observe
         run: |
           set -euo pipefail
-          node tools/test-reward-focus-private.mjs --warning-diagnostic-capture collect
-      - name: Bind complete observational forensic envelope
+          node tools/test-reward-focus-private.mjs --warning-causal-capture collect
+      - name: Bind complete causal forensic envelope
         if: always()
         id: pack
-        run: node tools/test-reward-focus-private.mjs --warning-diagnostic-pack
-      - name: Retain bounded observational proof
+        run: node tools/test-reward-focus-private.mjs --warning-causal-pack
+      - name: Retain bounded causal proof
         if: always() && steps.pack.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: reward-focus-warning-diagnostic
+          name: reward-focus-warning-causal
           path: |
-            .out/warning-diagnostic-envelope.cwproof
-            .out/warning-diagnostic-metadata.json
-            .out/warning-diagnostic-source.json
+            .out/warning-causal-envelope.cwproof
+            .out/warning-causal-metadata.json
+            .out/warning-causal-source.json
           include-hidden-files: true
           retention-days: 7
           compression-level: 6
-      - name: Preserve failed diagnostic forensic evidence
+      - name: Preserve failed causal forensic evidence
         if: always() && steps.pack.outcome != 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: reward-focus-warning-diagnostic-failure
+          name: reward-focus-warning-causal-failure
           path: .out/
           include-hidden-files: true
           retention-days: 7
