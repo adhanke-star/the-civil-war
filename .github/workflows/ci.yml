@@ -1,18 +1,17 @@
-name: Reward focus corrected whole inputs (private only)
+name: Reward focus GPU path benchmark (private only)
 on:
   push:
     branches: [reward-focus-inputs-private]
 permissions:
   contents: read
 jobs:
-  inputs:
+  diagnostic:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host --init
     env:
-      REWARD_FOCUS_WHOLE_INPUT_AUTHORIZATION: autonomous-v1-whole-input
       GIT_CONFIG_COUNT: '1'
       GIT_CONFIG_KEY_0: safe.directory
       GIT_CONFIG_VALUE_0: /__w/the-civil-war/the-civil-war
@@ -21,65 +20,36 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
-      - name: Bind exact private and virtual source parents
+      - name: Bind diagnostic and immutable product source
         run: |
           test "$GITHUB_REF" = "refs/heads/reward-focus-inputs-private"
           test "$GITHUB_WORKSPACE" = "/__w/the-civil-war/the-civil-war"
           test "$(realpath "$GITHUB_WORKSPACE")" = "$GITHUB_WORKSPACE"
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
-          for task_parent in 002f0242079021a4341d701b4129ca4d7b8400e2 e65bab6d8b86e1dee06dec201ba051e85130f54b 7287296ae3b1c90f3a43642f33e3e886e8b889e2; do
-            git fetch --no-tags --depth=1 origin "$task_parent"
-            test "$(git rev-parse FETCH_HEAD)" = "$task_parent"
-            git cat-file -e "$task_parent:src/reward/sequence.js"
-          done
-          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test ! -e .out
+          mkdir .out
+          cp tools/test-reward-focus-private.mjs .out/gpu-path-private-runner.mjs
+          git fetch --no-tags --depth=1 origin 2bac1ccd575c400629dec23df2f37fefb09f8b6e
+          test "$(git rev-parse FETCH_HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
+          git checkout --detach 2bac1ccd575c400629dec23df2f37fefb09f8b6e
+          test "$(git rev-parse HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
+          test -z "$(git status --porcelain=v1 --untracked-files=no)"
       - uses: actions/setup-node@v4
         with:
           node-version: 24.21.0
           cache: npm
-      - name: Retain complete runtime setup streams
-        run: |
-          mkdir .out
-          node tools/test-reward-focus-private.mjs --whole-input-capture setup
-      - name: Collect missing raw focus inputs once
-        run: |
-          node tools/test-reward-focus-private.mjs --whole-input-capture collect
-      - name: Bind complete private input envelope
-        run: |
-          node tools/test-reward-focus-private.mjs --whole-input-capture pack
-      - name: Admit complete final upload selection
-        run: node tools/test-reward-focus-private.mjs --whole-input-capture upload
-      - name: Verify the complete final upload selection
-        run: node tools/test-reward-focus-private.mjs --whole-input-verify-upload
-      - name: Retain bounded complete private proof
+      - run: npm ci
+      - name: Four serial real-field rendering measurements
+        run: node .out/gpu-path-private-runner.mjs
+      - name: Preserve complete private diagnostic output
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: reward-focus-private-inputs
+          name: gpu-path-private-diagnostic
           path: |
-            .out/reward-focus-private-envelope.cwproof
-            .out/reward-focus-private-envelope-metadata.json
-            .out/reward-focus-private-upload-admission.json
-            .out/reward-focus-private-pack.stdout
-            .out/reward-focus-private-pack.stderr
-            .out/reward-focus-private-setup-capture.json
-            .out/reward-focus-private-capture.json
-            .out/reward-focus-private-pack-capture.json
-            .out/reward-focus-private-upload-capture.json
-            .out/reward-focus-private-run-capacity.json
-            .out/reward-focus-virtual/.out/*.png
+            .out/gpu-path-private-runner.mjs
+            .out/gpu-path-private-actual.json
           include-hidden-files: true
           retention-days: 7
           compression-level: 6
-      - name: Preserve raw private failure evidence
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: reward-focus-private-inputs-failure
-          path: |
-            .out/reward-focus-private-*.json
-            .out/reward-focus-private*.stdout
-            .out/reward-focus-private*.stderr
-            .out/reward-focus-virtual/.out/*.png
-          include-hidden-files: true
-          retention-days: 7
-          compression-level: 6
+          if-no-files-found: error
