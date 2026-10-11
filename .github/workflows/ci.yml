@@ -1,4 +1,4 @@
-name: Original suite CPU profile (private only)
+name: Paused idle redraw (private only)
 on:
   push:
     branches: [reward-focus-inputs-private]
@@ -28,7 +28,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
           test ! -e .out
           mkdir .out
-          cp tools/test-reward-focus-private.mjs .out/cpu-profile-private-runner.mjs
+          cp tools/test-reward-focus-private.mjs .out/idle-redraw-private-runner.mjs
           git fetch --no-tags --depth=1 origin 2bac1ccd575c400629dec23df2f37fefb09f8b6e
           test "$(git rev-parse FETCH_HEAD)" = "2bac1ccd575c400629dec23df2f37fefb09f8b6e"
           git checkout --detach 2bac1ccd575c400629dec23df2f37fefb09f8b6e
@@ -98,45 +98,19 @@ jobs:
           git cat-file -e 7287296ae3b1c90f3a43642f33e3e886e8b889e2:src/reward/reward.css
           git cat-file -e 7287296ae3b1c90f3a43642f33e3e886e8b889e2:tools/test-captured-loadouts.mjs
 
-      - name: Observe unchanged original suite CPU and processes
+      - name: Measure paused baseline and draft with identical GPU arguments
         id: profile
-        run: node .out/cpu-profile-private-runner.mjs
+        run: node .out/idle-redraw-private-runner.mjs
       - name: Preserve complete private diagnostic output
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: cpu-profile-private-diagnostic
+          name: idle-redraw-private-diagnostic
           path: |
-            .out/cpu-profile-private-runner.mjs
-            .out/cpu-profile-private-actual.json
+            .out/idle-redraw-private-runner.mjs
+            .out/idle-redraw-private-actual.json
+            .out/idle-redraw-*.png
           include-hidden-files: true
           retention-days: 7
           compression-level: 6
           if-no-files-found: error
-      - name: Preserve all original producer files with native proof
-        if: always() && steps.profile.outcome == 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: cpu-profile-original-output
-          path: |
-            .out/
-            !.out/last-result.json
-            !.out/cpu-profile-private-runner.mjs
-            !.out/cpu-profile-private-actual.json
-          include-hidden-files: true
-          retention-days: 7
-          compression-level: 6
-          if-no-files-found: warn
-      - name: Preserve all original producer failure files
-        if: always() && steps.profile.outcome != 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: cpu-profile-original-failure-output
-          path: |
-            .out/
-            !.out/cpu-profile-private-runner.mjs
-            !.out/cpu-profile-private-actual.json
-          include-hidden-files: true
-          retention-days: 7
-          compression-level: 6
-          if-no-files-found: warn
