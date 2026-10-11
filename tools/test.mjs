@@ -1791,6 +1791,7 @@ async function main() {
     await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native });
     finalizeActivationUI({ result, check });
     await soldierViewControls({ browser, url, check, shot, result, watchErrors, native });
+    { const { rewardFocusControls } = await import('./test-reward-focus-ui.mjs'); await rewardFocusControls({ browser, url, check, result }); }
   } finally {
     if (browser) await browser.close().catch(() => {});
     await new Promise((resolve) => server.close(resolve));
@@ -1836,7 +1837,8 @@ result.ok = exitCode === 0;
 result.durationMs = Date.now() - started;
 try {
   await fs.mkdir(OUT_DIR, { recursive: true });
-  await fs.writeFile(path.join(OUT_DIR, 'last-result.json'), JSON.stringify(result) + '\n');
+  const {nativeResult}=await import('./test-reward-focus-ui.mjs');const stored=nativeResult.serialize(result);
+  await fs.writeFile(path.join(OUT_DIR, 'last-result.json'),stored.raw);
 } catch (err) {
   console.error(`FAIL write-result: ${err.message}`);
   exitCode = 1;

@@ -8,6 +8,11 @@ export async function practiceProgress({ browser, url, check, shot, result, watc
   await probeProgress(ctx, { prefix: '__practice', readFlag: '__practiceBlocked', quotaFlag: '__practiceQuota' });
   const page = await ctx.newPage(), errors = [];
   watchErrors(page, url, errors);
+  const pointerOuter={scope:'ORIGINAL_PRACTICE_PAGE_THROUGH_ORDINARY_OBSERVATION_NO_CAUSAL_CLAIM',started:new Date().toISOString(),errors:[],warnings:[],dialogs:[],terminal:null,originalRealArmyWitness:null,cleanup:{},finished:null};
+  result.ordinaryPointerWitness={keyOrder:Object.keys(pointerOuter),outer:pointerOuter};
+  const pointerWarning=m=>{if(m.type()==='warning')pointerOuter.warnings.push(m.text());},pointerDialog=d=>pointerOuter.dialogs.push({type:d.type(),message:d.message()});
+  page.on('console',pointerWarning);page.on('dialog',pointerDialog);
+  const releasePointerWitness=()=>{page.off('console',pointerWarning);page.off('dialog',pointerDialog);};
   const raw = () => progressRaw(page);
   async function load(query = '?practice&quality=low') {
     await page.goto(url + query, { waitUntil: 'load' });
@@ -86,6 +91,8 @@ export async function practiceProgress({ browser, url, check, shot, result, watc
     });
     check('practice-reward-real-army', opened.focus && opened.inert && opened.captured === 0 && opened.sources.every((s) => s === 'issue')
       && opened.army.length === 5 && opened.army.every((b) => b.weapon.itemId.startsWith('practice-')), 'reward uses real five-unit roster, explicit practice gear and zero invented field captures; focus inside loot');
+    pointerOuter.terminal=end;pointerOuter.originalRealArmyWitness=opened;pointerOuter.errors=errors.slice();
+    { const { ordinaryRewardFocus } = await import('./test-reward-focus-ui.mjs'); try{await ordinaryRewardFocus({ page, browser, url, check, result });}finally{pointerOuter.errors=errors.slice();pointerOuter.finished=new Date().toISOString();releasePointerWitness();} }
     await page.keyboard.press('c'); await page.keyboard.press('g');
     check('practice-loot-input', await page.evaluate((t) => window.__game.game.paused && window.__game.game.simTime === t, opened.time), 'loot keeps simulation stopped and battlefield input inert');
     for (const viewport of [{ width: 320, height: 480 }, { width: 1024, height: 768 }]) {
@@ -256,5 +263,5 @@ export async function practiceProgress({ browser, url, check, shot, result, watc
     check('practice-historical-no-rewards', await raw() === beforeHistorical && await page.locator('#result-action').isHidden()
       && await page.evaluate(() => window.__game.practice.outcome === null && window.__practiceWrites === 0), 'historical result grants no loot or franchise writes');
     check('practice-no-console-errors', errors.length === 0, errors.join(' | ') || '0 errors');
-  } finally { await ctx.close(); }
+  } finally { releasePointerWitness(); await ctx.close(); pointerOuter.cleanup.contextClosed=true; }
 }
