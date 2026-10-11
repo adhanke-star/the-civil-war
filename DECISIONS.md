@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0102 — Bind complete private evidence with the producer runtime (2026-10-11)
+
+Private whole-input380b9ddd/run38138980441 attempt1/job114468692634 succeeds with14checks/14genuinecontrols/zero warnings; all15artifactmembers/fulljoblogs/70sources/all69parentinverses independently clear. Retain all5originalPNG/direct root+helper views; no visual approval. Matching existingNode24.21.0/zlib preserves exactcompression checks; originalNode25 HOLD remains. Newcollector846741 plus closed2216994 equals cumulative3063735; offline added0. SourceR6 CPU independently clears209/11owned198 and69/65/66/67actualGit inverses; only nativefocus completed-mutation JSON canonicalization changes. Full582model/32roles/versioned29wrappers/literalgates remain pending; PhaseA/product/v1 remain unfinished. Broad execution authority continues in this thread without routine popups or giant handoffs.
+
 ## 0101 — Align the private launch with the tested compositor configuration (2026-10-11)
 
 Four fresh default/explicit SwiftShader/explicit SwiftShader/default Chromium sessions yielded 4/0/0/4 warnings and disabled/enabled/enabled/disabled GPU compositing. Complete original ordinary checks pass all four; errors/dialogs empty. Corrected private afcd7faf/run38134610608 and full once-only readback independently clear the configuration effect, supporting --use-angle=swiftshader in the private whole-input harness (already used by the production headless suite). Internal C++ call path remains unobserved; no filtering, timing/oracle waiver or product adoption. Preserve failed metadata run38133755187 and all earlier evidence. SAME cumulative283856 transfer/462336 output; full-input and complete PhaseA/product582 remain UNRUN. Broad existing-v1 authority continues without routine popups; root stays active through automatic compaction.
