@@ -272,8 +272,11 @@ export async function observeObjectiveReservation(page,{images=false,stem='objec
               return Reflect.apply(original,this,[caption,...args.slice(1)]);
             }});
             Reflect.apply(original,hud,[caption]);
-            return (0,eval)('('+readSource+')')();
           },{caption,readSource:read.toString()});
+          // The bounded feedback reader re-lays out each frame: measure only after three identical frame reads.
+          await page.waitForFunction(readSource=>{const r=JSON.stringify((0,eval)('('+readSource+')')()),w=window.__objectiveStable||{r:null,n:0};
+            window.__objectiveStable=w.r===r?{r,n:w.n+1}:{r,n:0};return window.__objectiveStable.n>=3;},read.toString(),{polling:'raf',timeout:15000});
+          captureBefore=await page.evaluate(readSource=>{delete window.__objectiveStable;return (0,eval)('('+readSource+')')();},read.toString());
           assert.equal(captureBefore.caption,caption);assert.equal(captureBefore.cssHeight,captureBefore.objective.height);
           assert(captureBefore.objective.y>=0&&captureBefore.banner.bottom+4<=768,'Complete objective and banner fit the viewport');
           assert(captureBefore.banner.y>=captureBefore.objective.bottom);
