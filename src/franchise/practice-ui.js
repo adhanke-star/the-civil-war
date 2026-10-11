@@ -2,12 +2,17 @@
 import { createProgressStore, completedSnapshot, exportSnapshot } from './save.js';
 import { practiceOutcome, savedOutcome, assertSavedLaunch, surrenderOutcome } from './practice.js';
 import { mountReward, configureRewardReplay, surrenderReportText } from '../reward/sequence.js';
+import { phaseResult, recordPhase } from './campaign.js';
+import { rewardArmy, applyRewardIssues } from '../ui/briefing.js';
 
 const GRADE_TEXT = { decisive: 'Decisive victory', victory: 'Victory', draw: 'Draw', defeat: 'Defeat' };
 
-export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null }) {
+// campaign: main.js's launch { slot, store, save, raw, phase } for a ?campaign=<slot> phase; the result records the
+// phase (losses, loot, history) into that slot through the same pending/save/recover panels.
+export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null, campaign = null }) {
   if (manifest) assertSavedLaunch(manifest);
-  const store = createProgressStore();
+  if (campaign && (manifest || mode !== 'campaign')) throw new Error('Campaign: a campaign phase needs its own field route.');
+  const store = campaign ? campaign.store : createProgressStore();
   const field = document.querySelector('main');
   const dialog = document.getElementById('result');
   const title = document.getElementById('result-title');
@@ -18,12 +23,18 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
   const launchExport = document.createElement('button'); launchExport.type = 'button'; launchExport.id = 'result-export-launch';
   launchExport.textContent = 'Export army at launch'; launchExport.hidden = true; exportButton.after(launchExport);
   const unsavedButton = document.getElementById('result-unsaved');
+  const replayButton = document.createElement('button'); replayButton.type = 'button'; replayButton.id = 'result-replay';
+  replayButton.textContent = 'Replay this phase'; replayButton.hidden = true; action.after(replayButton);
+  const campHref = campaign ? `./?camp=${campaign.slot}` : './?camp';
+  let phase = null, phaseFailure = null, issueNote = '';
   const after = document.getElementById('after-action');
   let captured = false, outcome = null, pending = null, saved = null, previous = null, failure = null, reward = null, baselineKnown = false;
   let saving = false, reviewing = false, rewardActive = false;
   let reading = false, readCancelled = false;
   let surrenderResult = null, surrenderUnavailable = false;
   if (manifest) { previous = manifest.baseline; baselineKnown = true; }
+  if (campaign) { previous = campaign.save; baselineKnown = true; }
+  replayButton.addEventListener('click', () => location.assign(`./?campaign=${campaign.slot}&replay`));
 
   configureRewardReplay(() => hud.toast('Open the separate reward demo from the menu. Practice rewards use the completed battlefield.'));
   dialog.addEventListener('close', () => {
@@ -64,8 +75,9 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
     field.inert = false;
     title.textContent = heading; text.textContent = message;
     action.textContent = label || ''; action.hidden = !label; action.onclick = run || null;
+    replayButton.hidden = true;
     back.textContent = cancel; exportButton.hidden = !exportable;
-    exportButton.textContent = manifest ? (saved ? 'Export result army' : 'Export pending army') : 'Export army';
+    exportButton.textContent = manifest || campaign ? (saved ? 'Export result army' : 'Export pending army') : 'Export army';
     launchExport.hidden = !manifest || !exportable;
     unsavedButton.hidden = true;
     const menu = document.getElementById('menu');
@@ -76,11 +88,18 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
     else (focusCancel || !label ? back : action).focus({ preventScroll: true });
   }
   function showSaved() {
+    if (campaign) {
+      const done = saved.campaign.status === 'complete', defeat = phase.record.grade === 'Defeat';
+      panel('Campaign saved', `${scenario.title}: ${phase.record.grade}${campaign.phase.replay ? ' (replay, marked on your record)' : ''}. ${saved.depot.length} cards are in your depot.${issueNote} ${done ? 'The campaign is complete; your camp shows the record.' : 'Return to camp for the next phase.'}${defeat ? ' You may replay this phase; the replay is marked on your record.' : ''}`,
+        'Return to camp', () => location.assign(campHref), { exportable: true });
+      replayButton.hidden = !defeat;
+      return;
+    }
     panel('Army saved', `${saved.army.reduce((n, b) => n + b.men, 0).toLocaleString()} surviving men and ${saved.depot.length} depot cards are saved. Continue opens your saved army in camp.${manifest ? ' Compare and issue new gear there.' : ' Fresh practice starts with its original troops and gear.'}`,
       'Continue', () => location.assign('./?camp'), { exportable: !!manifest });
   }
   function recover() {
-    panel(pending ? 'Army not saved' : 'Progress unavailable', failure || 'Your completed army is waiting to be saved. Retry loading to review saved progress, or export this army.',
+    panel(pending ? (campaign ? 'Campaign not saved' : 'Army not saved') : 'Progress unavailable', failure || 'Your completed army is waiting to be saved. Retry loading to review saved progress, or export this army.',
       pending && baselineKnown ? 'Retry saving' : 'Retry loading', pending ? (baselineKnown ? savePending : reviewForSave) : openLoot, { exportable: !!pending });
     unsavedButton.hidden = !!pending || baselineKnown;
   }
@@ -124,7 +143,37 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
     if (dialog.open) { if (failure) recover(); else showSaved(); }
     else hud.toast(failure ? 'Army not saved. Open After action to retry or export.' : 'Army saved. Open After action to continue.');
   }
+  function startCampaignLoot() {
+    if (saving || reading || rewardActive || !phase || pending || saved) return;
+    rewardActive = true; sync();
+    game.paused = true; hud.setPaused(true);
+    dialog.close(); field.inert = true; failure = null;
+    const us = phase.outcome.units.filter((u) => u.side === 'US');
+    const starting = us.reduce((n, u) => n + u.menStart, 0), surviving = us.reduce((n, u) => n + u.men, 0);
+    try {
+      reward = mountReward(document.body, { army: rewardArmy(phase.next.army), depot: [], awardId: campaign.phase.awardId,
+        seed: campaign.phase.seed, grade: phase.record.grade, captures: phase.outcome.captures, rememberReplay: false,
+        afterAction: { title: scenario.title, why: game.result.why, starting, surviving, losses: starting - surviving,
+          guns: us.reduce((n, u) => n + (u.guns || 0), 0), eyebrow: `Campaign · ${scenario.title}${campaign.phase.replay ? ' · replay' : ''}`,
+          note: campaign.phase.loan ? "Grant's army was on loan: these numbers are its own and your franchise brigades are unchanged. Loot joins your depot."
+            : 'Losses carry to your brigades. Loot joins your depot; issue it here or in camp. Ratings and loot are game values.' },
+        onDone: (result) => {
+          if (saving || !rewardActive || saved || pending) return;
+          rewardActive = false;
+          const applied = applyRewardIssues(phase.next, phase.record.loot, result);
+          issueNote = applied.issued ? '' : ' Issues made in the loot screen were not kept; the new cards wait in your depot.';
+          pending = applied.save; baselineKnown = true; previous = campaign.save;
+          savePending();
+        } });
+    } catch (err) {
+      // The recorded phase never depends on the loot screen: save it with the new cards in the depot.
+      rewardActive = false; issueNote = ` The loot screen could not open (${err.message}); the new cards wait in your depot.`;
+      pending = phase.next; baselineKnown = true; previous = campaign.save;
+      savePending();
+    }
+  }
   function startLoot(authorized = true) {
+    if (campaign) { startCampaignLoot(); return; }
     if (saving || reading || rewardActive || !outcome) return;
     reviewing = false; rewardActive = true; sync();
     game.paused = true; hud.setPaused(true); baselineKnown = authorized;
@@ -150,6 +199,7 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
       } });
   }
   async function openLoot() {
+    if (campaign) { if (pending) recover(); else startCampaignLoot(); return; }
     if (saving || reading || reviewing || rewardActive) return;
     if (!outcome) return;
     if (pending) { recover(); return; }
@@ -170,7 +220,8 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
   function openResult() {
     if (reviewing || rewardActive) return;
     if (surrenderUnavailable) {
-      panel('Result unavailable', 'The encounter report could not be verified. Inspect the field before continuing.', null, null);
+      panel('Result unavailable', `The encounter report could not be verified. ${campaign ? 'This phase was not recorded; your campaign save is unchanged.' : 'Inspect the field before continuing.'}`,
+        campaign ? 'Return to camp' : null, campaign ? () => location.assign(campHref) : null);
       return;
     }
     if (reading) {
@@ -183,6 +234,7 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
     }
     if (saved) { showSaved(); return; }
     if (failure || pending) { recover(); return; }
+    if (campaign) { openCampaignResult(); return; }
     const grade = GRADE_TEXT[game.result.grade] || '';
     const message = outcome
       ? `${manifest ? savedResultWhy() : game.result.why} ${outcome.summary.surviving.toLocaleString()} surviving men; ${outcome.summary.losses.toLocaleString()} lost. ${outcome.captures.length} held field crates. ${manifest ? 'Open only the new loot, save these survivors, then return to camp.' : 'Open the practice quartermaster issue.'}`
@@ -191,6 +243,18 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
     // Battle-pack results may be a draw (winner null) and carry the player's grade.
     const heading = game.result.winner === 'US' ? 'Union victory' : game.result.winner === 'CS' ? 'Confederate victory' : 'Drawn battle';
     panel(heading, report ? `${message} ${report}` : message, outcome ? 'Open the loot' : null, openLoot, { exportable: !!manifest && !!outcome });
+  }
+  function openCampaignResult() {
+    const heading = game.result.winner === 'US' ? 'Union victory' : game.result.winner === 'CS' ? 'Confederate victory' : 'Drawn battle';
+    if (!phase) {
+      panel(heading, `${game.result.why} This phase result could not be recorded: ${phaseFailure} Your campaign save is unchanged.`,
+        'Return to camp', () => location.assign(campHref));
+      return;
+    }
+    const us = phase.outcome.units.filter((u) => u.side === 'US');
+    const starting = us.reduce((n, u) => n + u.menStart, 0), surviving = us.reduce((n, u) => n + u.men, 0);
+    panel(heading, `${game.result.why} Grade: ${phase.record.grade}. ${surviving.toLocaleString()} of ${starting.toLocaleString()} Union men remain; ${phase.outcome.captures.length} field crates held. ${campaign.phase.loan ? "Grant's army was on loan, so your franchise brigades are unchanged." : 'Losses carry to your brigades.'} ${phase.record.grade === 'Defeat' ? 'The campaign continues after a defeat; you can replay this phase once it is saved.' : 'Open the after-action and loot to save this phase.'}`,
+      'After-action & loot', startCampaignLoot);
   }
   function finishResult() {
     if (captured) return;
@@ -203,6 +267,14 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
       openResult();
       return;
     }
+    if (campaign) {
+      try {
+        const { outcome: result, record } = phaseResult({ phase: campaign.phase, game, scenario });
+        phase = { outcome: result, record, next: recordPhase(campaign.save, campaign.raw, { ...record, at: new Date().toISOString() }) };
+      } catch (err) { phaseFailure = err.message; hud.toast(err.message); }
+      openResult();
+      return;
+    }
     if (mode === 'practice') {
       const awardId = manifest?.awardId ?? `practice-${globalThis.crypto?.randomUUID?.() || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`}`;
       try { outcome = manifest ? savedOutcome({ manifest, game }) : practiceOutcome({ game, scenario, mode, awardId, seed: awardId }); }
@@ -211,5 +283,6 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null 
     openResult();
   }
   return { finishResult, openResult, get outcome() { return outcome; }, get pending() { return pending; },
+    get phase() { return phase; }, get phaseFailure() { return phaseFailure; },
     get saved() { return saved; }, get reward() { return reward; }, get saving() { return saving; }, get reading() { return reading; } };
 }

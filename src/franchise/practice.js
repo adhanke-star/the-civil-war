@@ -92,6 +92,8 @@ export function savedDeployment(input) {
   const surrender = surrenderOption(input);
   const { baseline, ground, awardId, seed } = input;
   const before = validateSnapshot(baseline);
+  // Campaign route guard: a campaign army fights only in its own ladder phases (save v2 keeps its slot and award ids).
+  if (before.version !== 1) fail('campaign armies fight only in their campaign phases. Deploy saved army is for practice armies.');
   // Validate new metadata through the existing schema, without replacing any inventory identity.
   validateSnapshot({ ...before, awardId, seed });
   if (awardId === before.awardId || awardId.length > 80) fail('deployment needs a fresh bounded award identity.');
@@ -182,7 +184,7 @@ export function savedOutcome({ manifest, game }) {
 
 export function playMode(search) {
   const q = new URLSearchParams(search);
-  return q.has('sandbox') ? 'sandbox' : q.has('battle') ? 'historical' : 'practice';
+  return q.has('sandbox') ? 'sandbox' : q.has('battle') ? 'historical' : q.has('campaign') ? 'campaign' : 'practice';
 }
 
 export function practiceOutcome({ game, scenario, mode, awardId, seed }) {

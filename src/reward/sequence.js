@@ -10,6 +10,7 @@
 //     d. Ratings: changed brigades count up to their new OVR and bars; Continue calls onDone(result).
 //   mode: 'one' deals a single card (the sandbox's "Deal one loot card") and closes after it.
 //   onDone(result): { awardId, army, depot, issued, seed, grade }
+//   afterAction: { title, why, surviving, losses, guns, eyebrow?, note? }; a campaign phase sets its own eyebrow and note.
 //
 // State lives in one plain object (S). Settings come from src/settings.js (defineRewardSettings below);
 // the 'screens.cardStyle' choice can be split-screened through src/sandbox/compare.js.
@@ -427,10 +428,10 @@ export function mountReward(root, opts = {}) {
     const nIssue = S.cards.filter((c) => c.source === 'issue').length;
     const btn = primary('Open the loot', () => { sfx.play('whoosh'); go('b'); });
     const sec = el('section', { class: 'rw-step rw-aar', 'aria-labelledby': 'rw-aar-grade' },
-      el('p', { class: 'rw-eyebrow', text: opts.afterAction ? `Practice · ${opts.afterAction.title}` : 'After action · placeholder phase' }),
+      el('p', { class: 'rw-eyebrow', text: opts.afterAction ? opts.afterAction.eyebrow ?? `Practice · ${opts.afterAction.title}` : 'After action · placeholder phase' }),
       el('h1', { class: 'rw-grade', id: 'rw-aar-grade', tabindex: '-1', 'data-grade': S.grade, text: S.grade }),
       el('p', { class: 'rw-grade-note', text: opts.afterAction?.why ?? GRADE_NOTES[S.grade] }),
-      opts.afterAction ? el('p', { class: 'rw-hint', text: `${opts.afterAction.surviving.toLocaleString()} surviving men · ${opts.afterAction.losses.toLocaleString()} lost · ${opts.afterAction.guns} crewed guns. Practice rewards and ratings are game values; this does not record the historical outcome.` }) : null,
+      opts.afterAction ? el('p', { class: 'rw-hint', text: `${opts.afterAction.surviving.toLocaleString()} surviving men · ${opts.afterAction.losses.toLocaleString()} lost · ${opts.afterAction.guns} crewed guns. ${opts.afterAction.note ?? 'Practice rewards and ratings are game values; this does not record the historical outcome.'}` }) : null,
       opts.afterAction?.surrenderResult ? el('p', { class: 'rw-hint', text: surrenderReportText(opts.afterAction.surrenderResult) }) : null,
       el('div', { class: 'rw-aar-stats' },
         el('p', { class: 'rw-aar-stat' }, el('b', { text: String(S.captures.length) }), el('span', { text: 'Captures' })),

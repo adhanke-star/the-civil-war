@@ -42,6 +42,8 @@
 // `node tools/test.mjs --s1` runs the settings, sandbox and device checks only (skips the battle page).
 // `node tools/test.mjs --field` runs the settings and battle-page checks only (skips the sandbox and device pages).
 // `node tools/test.mjs --reward` runs Node foundations and completed reward persistence UI only.
+// `node tools/test.mjs --campaign` runs the campaign title, slots, camp strip, Briefing, result and replay flow only
+// (tools/test-campaign-ui.mjs, also in shard 2).
 // Full smoke includes real equip/reload/export/import, duplicate/conflict/quota/read failure recovery,
 // keyboard/focus, scoped compare/resume/import/launcher axe and 1024/320px target/layout checks.
 // SETTINGS_MODULE=<path> points the settings checks at another copy (used to prove the checks fail).
@@ -1748,6 +1750,8 @@ async function browserChecks(server, url) {
     if (process.argv.includes('--sandbox')) { result.mode = 'sandbox controls only'; await sandboxAndDevice(browser, url); return; }
     if (process.argv.includes('--deployment')) { result.mode = 'saved deployment route'; await deploymentProgress({ browser, url, check, shot, result, watchErrors, native }); return; }
     if (process.argv.includes('--entry')) { result.mode = 'title and camp only'; await entryProgress({ browser, url, check, shot, result, watchErrors }); return; }
+    // Imported on demand: its CPU half imports game modules that define settings, which would skew settingsUnit.
+    if (process.argv.includes('--campaign')) { result.mode = 'campaign screens and flow'; const { campaignControls } = await import('./test-campaign-ui.mjs'); await campaignControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--camp')) { result.mode = 'camp equipment only'; await campEquipment({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--intro')) { result.mode = 'unforced introductory play'; await introPlay({ browser, url, check, shot, result, watchErrors, native }); return; }
     if (process.argv.includes('--practice')) { result.mode = 'practice result bridge only'; await practiceProgress({ browser, url, check, shot, result, watchErrors }); return; }
@@ -1780,6 +1784,8 @@ async function browserChecks(server, url) {
       await campEquipment({ browser, url, check, shot, result, watchErrors });
       await saveCoordination({ browser, url, check, shot, result, watchErrors });
       await deploymentProgress({ browser, url, check, shot, result, watchErrors, native });
+      const { campaignControls } = await import('./test-campaign-ui.mjs');
+      await campaignControls({ browser, url, check, shot, result, watchErrors });
       const { rewardFocusControls } = await import('./test-reward-focus-ui.mjs');
       await rewardFocusControls({ browser, url, check, result });
     }

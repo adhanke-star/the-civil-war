@@ -23,11 +23,18 @@ import { attachPracticeFlow } from './franchise/practice-ui.js';
 import { introScenario, fictionalSurrenderRoute } from './franchise/intro.js';
 import { attachPracticeField } from './ui/practice-field.js';
 import { prepareFieldScenario, loadFieldScenario, loadBattlePack } from './sim/phase.js';
+import { campaignPhase, applyCampaign } from './franchise/campaign.js';
+import { loadCampaign, mountBriefing } from './ui/briefing.js';
 
 let fieldClaimed = false;
 // Importing this module has no field side effects. The owner commits navigation only after recheck.
-export async function startField({ manifest = null, isCurrent = () => true, onAdmitted = () => {} } = {}) {
+// A campaign launch ({ campaign: { slot, replay } }, from ?campaign=<slot>[&replay]) loads that slot's next phase.
+export async function startField({ manifest = null, campaign = null, isCurrent = () => true, onAdmitted = () => {} } = {}) {
   if (!isCurrent()) throw new Error('Practice: deployment review was cancelled.');
+  if (campaign && (manifest || ![1, 2, 3].includes(campaign.slot)
+    || ['intro', 'practice', 'battle', 'sandbox', 'tune'].some((key) => new URLSearchParams(location.search).has(key)))) {
+    throw new Error('Campaign: a campaign phase cannot share its launch with another field mode.');
+  }
   if (fieldClaimed) throw new Error('Practice: this page already owns a field. Return to camp before another deployment.');
   if (manifest) {
     assertSavedLaunch(manifest);
@@ -43,14 +50,27 @@ export async function startField({ manifest = null, isCurrent = () => true, onAd
     const currentOwner = () => { if (!isCurrent()) throw new Error('Practice: deployment review was cancelled.'); };
     const mode = playMode(location.search);
     // ?battle=<packId>[&phase=<phaseId>]: any battle pack but Henry Hill, which keeps its own route.
-    const query = new URLSearchParams(location.search), packId = manifest ? null : query.get('battle');
-    const pack = packId && packId !== 'henry-hill'
+    const query = new URLSearchParams(location.search), packId = manifest || campaign ? null : query.get('battle');
+    // Campaign: the slot's save and the shipped ladder name the phase; the pack is loaded, then carry and franchise apply.
+    let launch = null;
+    if (campaign) {
+      const ladder = await loadCampaign();
+      if (!ladder) throw new Error('Campaign: no campaign ships yet.');
+      const store = createProgressStore(undefined, { slot: campaign.slot }), save = await store.load();
+      if (!save || save.version !== 2) throw new Error(`Campaign: save slot ${campaign.slot} holds no campaign.`);
+      const phase = campaignPhase(save, ladder.raw, { replay: campaign.replay === true });
+      if (!phase) throw new Error('Campaign: this campaign is complete. Return to camp to see the record.');
+      const loaded = await loadBattlePack({ packId: phase.packId, phaseId: phase.phaseId, isCurrent });
+      launch = { slot: campaign.slot, store, save, raw: ladder.raw, def: ladder.def, phase, loaded,
+        scenario: prepareFieldScenario(applyCampaign(loaded.scenario, save, phase), 'pack') };
+    }
+    const pack = launch ? launch.loaded : packId && packId !== 'henry-hill'
       ? await loadBattlePack({ packId, phaseId: query.get('phase') ?? undefined, isCurrent }) : null;
     const ground = manifest || pack ? null : await loadFieldScenario({ isCurrent });
     currentOwner();
     const routeId = manifest ? 'saved-practice' : pack ? 'pack' : mode === 'practice' && !new URLSearchParams(location.search).has('practice') ? 'first-command' : 'henry-hill';
     // A saved manifest's scenario reference is the authoritative outcome identity.
-    const scenario = manifest ? (prepareFieldScenario(manifest.scenario, routeId), manifest.scenario) : pack ? pack.scenario
+    const scenario = manifest ? (prepareFieldScenario(manifest.scenario, routeId), manifest.scenario) : launch ? launch.scenario : pack ? pack.scenario
       : prepareFieldScenario(routeId === 'first-command' ? introScenario(ground, { surrender: fictionalSurrenderRoute(location.search) }) : ground, routeId);
     document.getElementById('status').textContent = 'Loading the ground…';
     const terrain = await loadTerrainData('./assets/terrain', scenario.terrain ?? 'henry-hill');
@@ -189,9 +209,11 @@ const input = new Input({
 });
 const readout = new Readout({ scene, terrain, camera, game, layer: document.getElementById('ticks') });
 defineSandboxTools({ game, rts, effects, hud });
-practiceFlow = attachPracticeFlow({ game, scenario, hud, mode, manifest });
+practiceFlow = attachPracticeFlow({ game, scenario, hud, mode, manifest, campaign: launch });
 const practiceField = attachPracticeField({ game, scenario, hud, camera, terrain, rts, effects, manifest });
-document.getElementById('play-mode').textContent = pack || mode === 'historical' ? 'Historical battle · no franchise rewards'
+document.getElementById('play-mode').textContent = launch ? launch.phase.loan
+    ? "Campaign · Grant's army on loan; your brigades are unchanged" : 'Campaign · losses and loot carry to your army'
+  : pack || mode === 'historical' ? 'Historical battle · no franchise rewards'
   : mode === 'practice' ? 'Practice · rewards enabled' : 'Sandbox · no progress rewards';
 // keep the pause/speed buttons in step with keyboard changes
 const togglePause = game.togglePause.bind(game);
@@ -201,6 +223,14 @@ game.setSpeed = (s) => { setSpeed(s); hud.setSpeed(s); };
 
 const tip = document.getElementById('tip');
 game.on('select', () => { if (game.orders) tip.hidden = true; });
+
+// Campaign: the menu's camp link returns to this slot, and the Briefing holds the field paused until Begin.
+let briefing = null;
+if (launch) {
+  const campLink = document.querySelector('#menu a[href="?camp"]');
+  if (campLink) { campLink.href = `?camp=${launch.slot}`; campLink.textContent = 'Campaign camp'; }
+  briefing = mountBriefing({ scenario, phase: launch.phase, game, hud, effects });
+}
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -339,6 +369,7 @@ function frame(now) {
   if (!window.__ready) {
     window.__ready = true;
     statusEl.textContent = manifest ? 'Your saved army is ready. Continue begins the fictional exercise; losses return to camp.' : scenario.practiceIntro ? 'Your first command is ready. Continue begins the fictional practice fight.'
+      : launch ? `${scenario.title}: campaign briefing. Begin starts the phase.`
       : pack ? scenario.statusText ?? `${scenario.title} is ready. Select a brigade, then drag to give it orders.`
       : 'Henry House Hill, 21 July 1861. Union brigades are below the hill; Jackson holds the crest.';
   }
@@ -347,7 +378,9 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, readout, soldierView, gpuTier, practice: practiceFlow, practiceField, manifest,
-  pack: pack ? { packId: pack.packId, phaseId: pack.phaseId, nextId: pack.nextId } : null };
+  pack: pack ? { packId: pack.packId, phaseId: pack.phaseId, nextId: pack.nextId } : null,
+  // Campaign phase launch (tests force a result through window.__game.game, then drive the real result dialog).
+  campaign: launch ? { slot: launch.slot, phase: launch.phase, briefing } : null };
 
 // Developer tuning panel (lil-gui), only with ?tune in the URL; players never load it.
 if (new URLSearchParams(location.search).has('tune')) {

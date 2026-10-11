@@ -1,5 +1,7 @@
 // Completed-army camp. Explicit imports and depot exchanges share the authoritative save seam.
-import { createProgressStore, parseSnapshot, exportSnapshot, exchangeDepot, MAX_SAVE_BYTES } from '../franchise/save.js';
+import { createProgressStore, parseSnapshot, exportSnapshot, exchangeDepot, listSlots, MAX_SAVE_BYTES } from '../franchise/save.js';
+import { newCampaign } from '../franchise/campaign.js';
+import { loadCampaign, loadPackSummary, ladderPosition, formatDate } from './briefing.js';
 import { get } from '../settings.js';
 import { brigCard, staticCard, itemLabel, defineRewardSettings } from '../reward/sequence.js';
 import { compare, bestFit } from '../reward/model.js';
@@ -8,7 +10,7 @@ import { loadFieldScenario } from '../sim/phase.js';
 
 const PAGE_SIZE = 12;
 const STYLE = { 'clean modern': 'modern', 'period desk': 'desk', hybrid: 'hybrid' };
-export function showFieldFailure() {
+export function showFieldFailure({ href = './?camp', message = 'Your saved army is unchanged. Return to camp and try again.' } = {}) {
   document.getElementById('battle').hidden = true;
   const root = document.createElement('main'); root.id = 'front'; root.className = 'rw rw-counts';
   root.dataset.uiStyle = STYLE[get('screens.cardStyle')] || 'modern';
@@ -17,15 +19,35 @@ export function showFieldFailure() {
   const heading = document.createElement('h1'); heading.id = 'field-failure-heading'; heading.tabIndex = -1;
   heading.textContent = 'The battlefield could not be loaded';
   const note = document.createElement('p'); note.id = 'entry-note';
-  note.textContent = 'Your saved army is unchanged. Return to camp and try again.';
+  note.textContent = message;
   const link = document.createElement('a'); link.id = 'field-return'; link.className = 'entry-primary';
-  link.href = './?camp'; link.textContent = 'Return to camp';
+  link.href = href; link.textContent = 'Return to camp';
   section.append(heading, note, link); wrap.append(section); root.append(wrap); document.body.append(root);
   document.title = 'The Civil War — Return to camp'; heading.focus();
 }
+/** ?campaign=<slot>[&replay]: the field loads that slot's next phase (src/entry.js routes every non-field query here). */
+function launchCampaign(route, onDeploy) {
+  const slot = Number(route.get('campaign'));
+  const fail = (error) => {
+    console.warn('campaign phase not loaded:', error?.message ?? error);
+    showFieldFailure({ href: [1, 2, 3].includes(slot) ? `./?camp=${slot}` : './',
+      message: `${error?.message ?? 'The campaign phase could not be loaded.'} Your campaign save is unchanged. Return to camp and try again.` });
+  };
+  if (![1, 2, 3].includes(slot) || typeof onDeploy !== 'function') { fail(new Error('Campaign: choose a save slot from the title.')); return; }
+  document.getElementById('battle').hidden = false;
+  Promise.resolve().then(() => onDeploy({ campaign: { slot, replay: route.has('replay') }, isCurrent: () => true })).catch(fail);
+}
 export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
+  const route = new URLSearchParams(location.search);
+  if (route.has('campaign')) { launchCampaign(route, onDeploy); return; }
   defineRewardSettings();
-  const store = createProgressStore();
+  // ?camp=<2|3> opens that save slot's camp; ?camp (and ?saved) keep slot 1, today's key.
+  const slot = !deploy && ['2', '3'].includes(route.get('camp')) ? Number(route.get('camp')) : 1;
+  const store = createProgressStore(undefined, { slot });
+  // The shipped campaign; null keeps today's title while assets/campaign.json ships empty (or cannot be read).
+  const ladderPromise = loadCampaign().catch((err) => { console.warn('campaign unavailable:', err?.message ?? err); return null; });
+  let ladder = null, slots = null, battlesLoaded = false;
+  const titles = new Map();
   let saved = null, failed = false, pendingImport = null, pendingName = null, importing = false;
   let pendingBaseline, baselineKnown = false, phase = 'idle';
   let pendingExchange = null, activeReview = null;
@@ -38,15 +60,27 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       <header class="entry-head"><a href="./" class="entry-brand">The Civil War</a><p>One army. One war.</p></header>
       <section id="entry-title" aria-labelledby="entry-title-heading">
         <p class="rw-eyebrow">Take the field</p><h1 id="entry-title-heading">Your first command</h1>
-        <p id="entry-note"></p><button id="entry-continue" class="entry-primary" type="button">Continue</button>
+        <p id="entry-note"></p>
+        <div class="entry-title-actions"><button id="entry-campaign-continue" class="entry-primary" type="button" aria-describedby="entry-campaign-slot" hidden>Continue</button><button id="entry-new-campaign" type="button" hidden>New campaign</button><button id="entry-battles" type="button" aria-expanded="false" aria-controls="entry-battle-list" hidden>Battles</button><button id="entry-continue" class="entry-primary" type="button">Continue</button></div>
+        <p id="entry-campaign-slot" hidden></p>
+        <section id="entry-battle-list" aria-labelledby="entry-battles-heading" hidden><h2 id="entry-battles-heading" tabindex="-1">Battles</h2><p class="entry-note">Every built phase with its historical armies. No loot, and your campaign army is not changed.</p><p id="entry-battles-status" role="status"></p><div id="entry-battle-rows"></div></section>
       </section>
       <section id="entry-camp" aria-labelledby="entry-camp-heading" hidden>
         <header class="entry-camp-head"><div><p class="rw-eyebrow">Between battles</p><h1 id="entry-camp-heading">Your army</h1><p id="entry-summary"></p></div>
-          <div class="entry-field-actions"><button id="camp-deploy" class="entry-primary" type="button">Deploy saved army</button><a id="camp-practice" class="entry-secondary" href="./?intro">Practice again</a></div></header>
-        <p class="entry-note">Deploy fights with your saved formations and equipment; actual losses return here. Practice again starts the original teaching formations and asks before replacing your army.</p>
+          <div class="entry-field-actions"><button id="camp-deploy" class="entry-primary" type="button" aria-describedby="camp-deploy-note">Deploy saved army</button><a id="camp-practice" class="entry-secondary" href="./?intro">Practice again</a></div></header>
+        <p class="entry-note" id="camp-deploy-note" hidden>Deploy saved army is for practice armies. Campaign brigades fight only in their own campaign phases, so their losses and loot stay on the record.</p>
+        <p class="entry-note" id="camp-field-note">Deploy fights with your saved formations and equipment; actual losses return here. Practice again starts the original teaching formations and asks before replacing your army.</p>
+        <section id="camp-campaign" aria-labelledby="camp-campaign-heading" hidden>
+          <p class="rw-eyebrow" id="camp-campaign-position"></p><h2 id="camp-campaign-heading" tabindex="-1"></h2>
+          <p id="camp-complete" hidden></p><p id="camp-campaign-note"></p>
+          <div class="entry-field-actions"><a id="camp-next" class="entry-primary" href="./">Next</a><a id="camp-replay" class="entry-secondary" href="./" hidden>Replay</a></div>
+          <h3 id="camp-record-heading">Record so far</h3><p id="camp-record-empty">No phase fought yet.</p><ol id="camp-record" aria-labelledby="camp-record-heading"></ol>
+        </section>
         <section aria-labelledby="camp-army-heading"><h2 id="camp-army-heading">Brigades</h2><div id="camp-army" class="rw-brigs is-static" role="list" aria-label="Saved brigades"></div><div id="army-pages" class="entry-pages"></div></section>
         <section aria-labelledby="camp-depot-heading"><h2 id="camp-depot-heading" tabindex="-1">Depot</h2><p id="depot-note"></p><div id="camp-depot" role="list" aria-label="Saved depot"></div><div id="depot-pages" class="entry-pages"></div></section>
       </section>
+      <dialog id="slot-picker" aria-labelledby="slot-picker-heading" aria-describedby="slot-picker-note"><h2 id="slot-picker-heading" tabindex="-1">New campaign: choose a save slot</h2><p id="slot-picker-note">Each slot keeps one army. The campaign autosaves between phases and in camp.</p><div id="slot-rows" role="group" aria-label="Save slots"></div><p id="slot-picker-status" role="status"></p><div class="camp-compare-actions"><button id="slot-picker-cancel" type="button">Cancel</button></div></dialog>
+      <dialog id="slot-overwrite" role="alertdialog" aria-labelledby="slot-overwrite-heading" aria-describedby="slot-overwrite-note"><h2 id="slot-overwrite-heading">Overwrite this slot?</h2><p id="slot-overwrite-note"></p><div class="camp-compare-actions"><button id="slot-overwrite-cancel" type="button">Cancel</button><button id="slot-overwrite-confirm" type="button">Overwrite</button></div></dialog>
       <section class="entry-transfer" aria-label="Army transfer"><p id="entry-status" role="status"></p><button id="entry-export" type="button" disabled>Export army</button><button id="entry-export-saved" type="button" hidden>Export displayed saved army</button><button id="entry-import" type="button">Import army</button><button id="entry-retry" type="button" hidden>Retry loading</button><button id="entry-discard-exchange" type="button" hidden>Discard pending exchange and reload</button><input id="entry-file" type="file" accept=".json,application/json" hidden></section>
       <nav class="entry-modes" aria-label="Other ways to play"><a href="./?practice">Henry Hill practice</a><a href="./?battle=henry-hill">Historical battle</a><a href="./?sandbox">Sandbox</a><a href="./reward.html">Reward workbench</a></nav>
       <p class="entry-note">Practice formations, rewards and ratings are game values. The historical battle is available separately.</p>
@@ -75,7 +109,8 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     node('entry-retry').hidden = !failed && !pendingImport && !pendingExchange;
     node('entry-retry').textContent = pendingExchange ? 'Retry reviewed exchange' : pendingImport ? 'Retry importing' : 'Retry loading';
     node('entry-import').disabled = importing || !!pendingExchange;
-    node('camp-deploy').disabled = importing || !!pendingImport || !!pendingExchange || !saved || failed;
+    node('camp-deploy').disabled = importing || !!pendingImport || !!pendingExchange || !saved || failed || saved.version === 2;
+    for (const id of ['entry-campaign-continue', 'entry-new-campaign', 'entry-battles']) node(id).disabled = importing || !!pendingExchange;
     node('entry-retry').disabled = importing;
     node('entry-discard-exchange').hidden = !pendingExchange;
     node('entry-discard-exchange').disabled = importing;
@@ -101,6 +136,57 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     }
     draw();
   }
+  const titleOf = (packId, phaseId) => {
+    const p = titles.get(packId)?.phases.find((x) => x.id === phaseId);
+    return p ? p.title : `${packId} · ${phaseId}`;
+  };
+  // Campaign slots of this campaign, most recently updated first (a save with no time sorts last).
+  const campaignSlots = () => (ladder && slots ? slots.filter((r) => r.kind === 'campaign' && r.label === ladder.def.title)
+    .sort((a, b) => (b.updated ?? '').localeCompare(a.updated ?? '')) : []);
+  function renderTitleCampaign() {
+    const on = !!ladder, recent = campaignSlots()[0] || null;
+    node('entry-campaign-continue').hidden = !recent; node('entry-new-campaign').hidden = !on; node('entry-battles').hidden = !on;
+    node('entry-campaign-slot').hidden = !recent;
+    node('entry-new-campaign').className = recent ? 'entry-secondary' : 'entry-primary';
+    node('entry-continue').className = on ? 'entry-secondary' : 'entry-primary';
+    node('entry-continue').textContent = on ? 'Practice: Henry House Hill' : 'Continue';
+    if (!on) return;
+    const packs = new Set(ladder.def.phases.map((p) => p.packId)).size;
+    node('entry-title-heading').textContent = ladder.def.title;
+    node('entry-note').textContent = failed ? 'Save slot 1 could not be read. Your campaign slots are listed under New campaign; retry loading or import an army export to recover slot 1.'
+      : `One army through ${packs} battle${packs === 1 ? '' : 's'} and ${ladder.def.phases.length} phases. Losses, veterancy and loot carry from phase to phase; a defeat never ends the campaign.`;
+    if (recent) node('entry-campaign-slot').textContent = `Slot ${recent.slot} · ${recent.nextPhase ? `Next: ${titleOf(recent.nextPhase.packId, recent.nextPhase.phaseId)}` : 'Campaign complete'}${recent.updated ? ` · saved ${new Date(recent.updated).toLocaleString()}` : ''}`;
+  }
+  function renderCampaignStrip() {
+    const v2 = saved.version === 2, c = v2 ? saved.campaign : null, known = v2 && !!ladder && ladder.def.id === c.id;
+    node('camp-campaign').hidden = !v2; node('camp-deploy-note').hidden = !v2; node('camp-practice').hidden = v2;
+    node('camp-field-note').hidden = v2;
+    if (!v2) return;
+    const complete = c.status === 'complete', last = c.history[c.history.length - 1];
+    node('camp-campaign-heading').textContent = known ? ladder.def.title : c.id;
+    node('camp-next').hidden = !known || complete; node('camp-replay').hidden = !known || last?.grade !== 'Defeat';
+    node('camp-complete').hidden = !(known && complete);
+    if (!known) {
+      node('camp-campaign-position').textContent = 'Campaign';
+      node('camp-campaign-note').textContent = 'This campaign ladder is not available in this version of the game. Your army and depot are safe; export them to keep a copy.';
+    } else {
+      const pos = ladderPosition(ladder.def, c.index);
+      node('camp-campaign-position').textContent = complete ? 'Campaign complete' : `Battle ${pos.battle} of ${pos.battles} · Phase ${pos.phase} of ${pos.phases}`;
+      const next = complete ? null : ladder.def.phases[c.index];
+      node('camp-campaign-note').textContent = complete ? 'Your army fought every phase of the campaign. The depot and compare-and-issue stay open.'
+        : `Slot ${slot}. ${next.loan ? "Next phase: Grant's Army of the Tennessee is on loan; its results do not change your franchise brigades." : 'Your brigades take the field with their current men, veterancy and arms.'}`;
+      if (next) { node('camp-next').textContent = `Next: ${titleOf(next.packId, next.phaseId)}`; node('camp-next').href = `./?campaign=${slot}`; }
+      if (last) { node('camp-replay').textContent = `Replay this phase: ${titleOf(last.packId, last.phaseId)}`; node('camp-replay').href = `./?campaign=${slot}&replay`; }
+      const replays = c.history.filter((r) => r.replay).length;
+      node('camp-complete').textContent = `Campaign complete. ${c.history.length - replays} phases fought${replays ? `, ${replays} replay${replays === 1 ? '' : 's'} marked` : ''}. Final grade: ${saved.grade}.`;
+    }
+    node('camp-record-empty').hidden = c.history.length > 0; node('camp-record').hidden = !c.history.length;
+    node('camp-record').replaceChildren(...c.history.map((r) => {
+      const li = document.createElement('li'); li.dataset.grade = r.grade; if (r.replay) li.dataset.replay = 'true';
+      li.textContent = `${titleOf(r.packId, r.phaseId)}: ${r.grade}${r.replay ? ' (replay)' : ''} · Union losses ${r.lossesUS.toLocaleString()} · Confederate losses ${r.lossesCS.toLocaleString()}`;
+      return li;
+    }));
+  }
   function render() {
     const showCamp = camp && !!saved && !failed;
     node('entry-title').hidden = showCamp; node('entry-camp').hidden = !showCamp;
@@ -108,8 +194,10 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     node('entry-note').textContent = saved ? `${saved.army.reduce((n, b) => n + b.men, 0).toLocaleString()} men return to camp. Continue opens your saved army and depot.`
       : failed ? 'Progress could not be read. Retry loading or import an army export to recover.'
         : 'Two brigades. One approaching enemy. Hold the ground, capture the stores, then open your first loot.';
+    if (!showCamp) renderTitleCampaign();
     if (showCamp) {
-      node('entry-summary').textContent = `${saved.army.length} formations · ${saved.army.reduce((n, b) => n + b.men, 0).toLocaleString()} men · ${saved.grade}`;
+      renderCampaignStrip();
+      node('entry-summary').textContent = `${saved.army.length} formations · ${saved.army.reduce((n, b) => n + b.men, 0).toLocaleString()} men · ${saved.grade ?? 'no phase fought yet'}`;
       paged(saved.army, node('camp-army'), node('army-pages'), (b, i) => {
         const card = brigCard(b, i, { interactive: false }); card.dataset.brigadeId = b.id; return card;
       }, 'brigades', 'army');
@@ -124,7 +212,8 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       }, 'depot cards', 'depot');
     }
     controls();
-    window.__entry = { mode: showCamp ? 'camp' : 'title', saved, failed, pending: pendingImport,
+    window.__entry = { mode: showCamp ? 'camp' : 'title', slot, saved, failed, pending: pendingImport,
+      campaign: ladder ? { id: ladder.def.id, slots, continueSlot: campaignSlots()[0]?.slot ?? null } : null,
       get exchange() { return pendingExchange; }, get importing() { return importing; }, get deployment() { return activeDeployment; } };
     document.title = `The Civil War — ${showCamp ? 'Your army' : 'Take the field'}`;
   }
@@ -230,13 +319,35 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   });
   root.querySelectorAll('a[href]').forEach((a) => a.addEventListener('click', (e) => { if (importing || pendingExchange) e.preventDefault(); }));
+  // Campaign state for the title (slots, next-phase titles) or a campaign camp (record titles). Never throws.
+  async function refreshCampaign() {
+    ladder = await ladderPromise;
+    if (!ladder) return;
+    const showCamp = camp && !!saved && !failed, packs = new Set();
+    if (showCamp && saved.version === 2) {
+      for (const r of saved.campaign.history) packs.add(r.packId);
+      const next = ladder.def.phases[saved.campaign.index]; if (next) packs.add(next.packId);
+    } else if (!showCamp) {
+      try { slots = await listSlots(undefined, { campaign: ladder.def }); } catch { slots = null; }
+      for (const r of slots || []) if (r.nextPhase) packs.add(r.nextPhase.packId);
+    }
+    await Promise.allSettled([...packs].filter((id) => !titles.has(id)).map((id) => loadPackSummary(id).then((sum) => titles.set(id, sum))));
+  }
+  function focusAfterLoad() {
+    const showCamp = camp && !!saved && !failed;
+    const target = failed && !(ladder && !camp) ? node('entry-retry')
+      : showCamp ? saved.version === 2 ? (node('camp-next').hidden ? node('camp-campaign-heading') : node('camp-next')) : node('camp-practice')
+        : ladder ? (node('entry-campaign-continue').hidden ? node('entry-new-campaign') : node('entry-campaign-continue')) : node('entry-continue');
+    target.focus(); target.scrollIntoView?.({ block: 'nearest' });
+  }
   async function load() {
     if (importing) return;
     importing = true; controls(); loading();
     try { saved = await store.load(); failed = false; status.textContent = saved ? 'Saved army ready.' : 'No completed army saved yet.'; }
     catch (err) { failed = true; status.textContent = err.message; }
-    finally { importing = false; phase = 'idle'; }
-    render(); (failed ? node('entry-retry') : camp && saved ? node('camp-practice') : node('entry-continue')).focus();
+    await refreshCampaign();
+    importing = false; phase = 'idle';
+    render(); focusAfterLoad();
   }
   async function confirm(returnTo = node('entry-import')) {
     phase = 'reviewing';
@@ -264,9 +375,111 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     importing = true; controls();
     loading();
     // Re-read at navigation: another tab may have saved or invalidated progress.
-    try { saved = await store.load(); failed = false; location.assign(saved ? './?camp' : './?intro'); }
+    // With a campaign on the title this is Practice: a slot-1 campaign is not a practice army, so it starts the intro.
+    try { saved = await store.load(); failed = false; location.assign(saved && !(ladder && saved.version === 2) ? './?camp' : './?intro'); }
     catch (err) { failed = true; status.textContent = err.message; render(); }
     finally { importing = false; phase = 'idle'; controls(); if (failed) node('entry-retry').focus(); }
+  });
+  // ---- campaign title: Continue, New campaign (slot picker + overwrite warning), Battles ----
+  node('entry-campaign-continue').addEventListener('click', () => {
+    const recent = campaignSlots()[0];
+    if (!importing && !pendingExchange && recent) location.assign(`./?camp=${recent.slot}`);
+  });
+  const picker = node('slot-picker'), overwrite = node('slot-overwrite');
+  function slotText(row) {
+    if (row.empty) return 'Empty slot';
+    if (row.kind !== 'campaign') return row.label;
+    const next = row.nextPhase ? `next: ${titleOf(row.nextPhase.packId, row.nextPhase.phaseId)}` : 'complete';
+    return `${row.label} · ${next}${row.updated ? ` · saved ${new Date(row.updated).toLocaleString()}` : ''}`;
+  }
+  async function openSlotPicker() {
+    if (importing || pendingExchange || !ladder) return;
+    importing = true; controls(); node('slot-rows').replaceChildren(); node('slot-picker-status').textContent = 'Reading your save slots…';
+    picker.showModal(); node('slot-picker-heading').focus();
+    try { slots = await listSlots(undefined, { campaign: ladder.def }); }
+    catch (err) { node('slot-picker-status').textContent = `${err.message} No slot was changed.`; slots = null; }
+    for (const r of slots || []) if (r.nextPhase && !titles.has(r.nextPhase.packId)) {
+      try { titles.set(r.nextPhase.packId, await loadPackSummary(r.nextPhase.packId)); } catch { /* the phase id stands in for its title */ }
+    }
+    importing = false; controls();
+    if (!slots) return;
+    node('slot-picker-status').textContent = '';
+    for (const row of slots) {
+      const b = document.createElement('button'); b.type = 'button'; b.id = `slot-choice-${row.slot}`; b.className = 'slot-choice';
+      b.dataset.slot = String(row.slot); b.dataset.empty = String(row.empty);
+      const name = document.createElement('b'); name.textContent = `Slot ${row.slot}`;
+      const detail = document.createElement('span'); detail.textContent = slotText(row);
+      b.append(name, detail); b.addEventListener('click', () => chooseSlot(row, b));
+      node('slot-rows').append(b);
+    }
+    (node('slot-rows').querySelector('[data-empty="true"]') || node('slot-rows').querySelector('button'))?.focus();
+  }
+  function confirmOverwrite(row) {
+    node('slot-overwrite-heading').textContent = `Overwrite slot ${row.slot}?`;
+    node('slot-overwrite-note').textContent = `Slot ${row.slot} holds ${slotText(row)}. A new campaign here replaces it for good. Cancel keeps it; export it from its camp first to keep a copy.`;
+    node('slot-overwrite-confirm').textContent = `Overwrite slot ${row.slot}`;
+    overwrite.returnValue = 'cancel'; overwrite.showModal(); node('slot-overwrite-cancel').focus();
+    return new Promise((resolve) => overwrite.addEventListener('close', () => resolve(overwrite.returnValue === 'overwrite'), { once: true }));
+  }
+  async function chooseSlot(row, trigger) {
+    if (importing || !ladder) return;
+    if (!row.empty && !await confirmOverwrite(row)) { trigger.focus(); return; }
+    importing = true; controls(); node('slot-rows').querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    node('slot-picker-status').textContent = `Starting the campaign in slot ${row.slot}…`;
+    let started = false;
+    try {
+      const target = createProgressStore(undefined, { slot: row.slot }), previousRaw = await target.readRawBaseline();
+      if (row.empty && previousRaw !== null) throw new Error(`Progress: slot ${row.slot} was filled elsewhere. Choose it again to review overwriting it.`);
+      const fresh = newCampaign({ campaign: ladder.raw, slot: row.slot, seed: globalThis.crypto.getRandomValues(new Uint32Array(1))[0], at: new Date().toISOString() });
+      await target.import(exportSnapshot(fresh), { previousRaw });
+      started = true; location.assign(`./?camp=${row.slot}`);
+    } catch (err) { node('slot-picker-status').textContent = `${err.message} No slot was changed.`; }
+    finally {
+      importing = false; controls();
+      if (!started) { node('slot-rows').querySelectorAll('button').forEach((b) => { b.disabled = false; }); trigger.focus(); }
+    }
+  }
+  node('entry-new-campaign').addEventListener('click', openSlotPicker);
+  node('slot-picker-cancel').addEventListener('click', () => picker.close('cancel'));
+  picker.addEventListener('close', () => { if (!overwrite.open && !node('entry-new-campaign').hidden) node('entry-new-campaign').focus(); });
+  node('slot-overwrite-cancel').addEventListener('click', () => overwrite.close('cancel'));
+  node('slot-overwrite-confirm').addEventListener('click', () => overwrite.close('overwrite'));
+  for (const d of [picker, overwrite]) d.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const stops = [...d.querySelectorAll('button')].filter((b) => !b.disabled && b.getClientRects().length), first = stops[0], last = stops[stops.length - 1];
+    if (!first) { e.preventDefault(); return; }
+    if (e.shiftKey && [first, node('slot-picker-heading')].includes(document.activeElement)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  node('entry-battles').addEventListener('click', async () => {
+    const button = node('entry-battles'), list = node('entry-battle-list'), open = button.getAttribute('aria-expanded') !== 'true';
+    button.setAttribute('aria-expanded', String(open)); list.hidden = !open;
+    if (!open || !ladder) return;
+    if (!battlesLoaded) {
+      battlesLoaded = true; node('entry-battles-status').textContent = 'Loading the battles…';
+      const rows = node('entry-battle-rows'); rows.replaceChildren();
+      for (const packId of new Set(ladder.def.phases.map((p) => p.packId))) {
+        const group = document.createElement('section'); group.className = 'entry-battle';
+        const heading = document.createElement('h3'), items = document.createElement('ul');
+        try {
+          const sum = titles.get(packId) || await loadPackSummary(packId); titles.set(packId, sum);
+          heading.textContent = sum.title;
+          for (const p of sum.phases) {
+            const li = document.createElement('li'), a = document.createElement('a'), note = document.createElement('p');
+            a.href = `./?battle=${encodeURIComponent(packId)}&phase=${encodeURIComponent(p.id)}`; a.textContent = p.title;
+            a.addEventListener('click', (e) => { if (importing || pendingExchange) e.preventDefault(); });
+            note.textContent = [formatDate(p.date), p.start, p.line].filter(Boolean).join(' · ');
+            li.append(a, note); items.append(li);
+          }
+        } catch (err) {
+          heading.textContent = packId;
+          const li = document.createElement('li'); li.textContent = `This battle could not be loaded: ${err.message}`; items.append(li);
+        }
+        group.append(heading, items); rows.append(group);
+      }
+      node('entry-battles-status').textContent = '';
+    }
+    (node('entry-battle-rows').querySelector('a') || node('entry-battles-heading')).focus();
   });
   node('entry-retry').addEventListener('click', async () => {
     if (importing) return;
@@ -342,7 +555,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     if (disposed || activeDeployment !== task || task.busy || task.admitted) return;
     activeDeployment = null; importing = false; phase = 'idle'; render();
     const target = task.trigger?.isConnected && !task.trigger.disabled && task.trigger.getClientRects().length
-      ? task.trigger : saved && !failed ? node('camp-deploy') : node('entry-retry').hidden ? node('entry-continue') : node('entry-retry');
+      ? task.trigger : saved && !failed ? node(saved.version === 2 ? 'camp-campaign-heading' : 'camp-deploy') : node('entry-retry').hidden ? node('entry-continue') : node('entry-retry');
     target.focus(); target.scrollIntoView({ block: 'nearest' });
   }
   function cancelDeployment() {
@@ -358,6 +571,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
   }
   async function openDeployment(trigger = node('camp-deploy')) {
     if (disposed || importing || pendingExchange || pendingImport) return;
+    if (saved?.version === 2) { status.textContent = node('camp-deploy-note').textContent; return; }
     importing = true; phase = 'reading'; controls();
     const awardId = `saved-${globalThis.crypto.randomUUID()}`;
     const task = { awardId, seed: awardId, trigger, cancelled: false, admitted: false, busy: true,
