@@ -107,7 +107,7 @@
               "polygon": [[1337,987],[1317,1048],[1253,1081],[1185,1093],[1109,1092],[1062,1044],[1021,987],[1061,930],[1106,877],[1185,872],[1254,891],[1313,928]]
             }
           ],
-          "treeSpacing": 18
+          "treeSpacing": 24
         },
         "woods": [],
         "woodsNote": "The 1862 battlefield was mostly forest and thicket with farm clearings (Handbook; Daniel). The ground is forest by default; the named fields with sourced points are cleared as irregular ovals (sizes not sourced, Inferred). Wicker, Jones, Woolf, Barnes, Cloud and the Davis wheat field have no coordinates in the research and are not drawn.",
@@ -1111,7 +1111,7 @@
               "polygon": [[1337,987],[1317,1048],[1253,1081],[1185,1093],[1109,1092],[1062,1044],[1021,987],[1061,930],[1106,877],[1185,872],[1254,891],[1313,928]]
             }
           ],
-          "treeSpacing": 18
+          "treeSpacing": 24
         },
         "woods": [],
         "woodsNote": "The 1862 battlefield was mostly forest and thicket with farm clearings (Handbook; Daniel). The ground is forest by default; the named fields with sourced points are cleared as irregular ovals (sizes not sourced, Inferred). Wicker, Jones, Woolf, Barnes, Cloud and the Davis wheat field have no coordinates in the research and are not drawn.",
@@ -2127,7 +2127,7 @@
               "polygon": [[1337,987],[1317,1048],[1253,1081],[1185,1093],[1109,1092],[1062,1044],[1021,987],[1061,930],[1106,877],[1185,872],[1254,891],[1313,928]]
             }
           ],
-          "treeSpacing": 18
+          "treeSpacing": 24
         },
         "woods": [],
         "woodsNote": "The 1862 battlefield was mostly forest and thicket with farm clearings (Handbook; Daniel). The ground is forest by default; the named fields with sourced points are cleared as irregular ovals (sizes not sourced, Inferred). Wicker, Jones, Woolf, Barnes, Cloud and the Davis wheat field have no coordinates in the research and are not drawn.",
@@ -2787,7 +2787,7 @@
               "polygon": [[1337,987],[1317,1048],[1253,1081],[1185,1093],[1109,1092],[1062,1044],[1021,987],[1061,930],[1106,877],[1185,872],[1254,891],[1313,928]]
             }
           ],
-          "treeSpacing": 18
+          "treeSpacing": 24
         },
         "woods": [],
         "woodsNote": "The 1862 battlefield was mostly forest and thicket with farm clearings (Handbook; Daniel). The ground is forest by default; the named fields with sourced points are cleared as irregular ovals (sizes not sourced, Inferred). Wicker, Jones, Woolf, Barnes, Cloud and the Davis wheat field have no coordinates in the research and are not drawn.",

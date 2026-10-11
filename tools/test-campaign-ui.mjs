@@ -195,8 +195,8 @@ export async function campaignControls({ browser, url, check, shot, result, watc
       newVisible: !document.getElementById('entry-new-campaign').hidden, continueHidden: document.getElementById('entry-campaign-continue').hidden,
       battles: !document.getElementById('entry-battles').hidden, practice: document.getElementById('entry-continue').textContent,
       sandbox: [...document.querySelectorAll('.entry-modes a')].some((a) => a.textContent === 'Sandbox' && a.getClientRects().length) }));
-    check('campaign-title', title.campaign?.id === 'test-west' && title.newVisible && title.continueHidden && title.battles && title.focus === 'entry-new-campaign'
-      && title.practice === 'Practice: Henry House Hill' && title.sandbox, `focus ${title.focus}; New campaign primary, Battles, Practice: Henry House Hill and Sandbox kept`);
+    check('campaign-title', title.campaign?.id === 'test-west' && title.newVisible && title.continueHidden && title.battles && title.focus === 'entry-continue'
+      && title.practice === 'Continue' && title.sandbox, `focus ${title.focus}; one Continue primary (no campaign yet), New campaign, Battles and Sandbox kept`);
     await axe('#front', 'titleAxe'); await shot(page, 'campaign-title');
     await narrow('title'); await shot(page, 'campaign-title-320'); await wide();
     // ---- Battles menu lists every phase ----
@@ -305,15 +305,17 @@ export async function campaignControls({ browser, url, check, shot, result, watc
     const real = errors.filter((e) => !/ERR_ABORTED|NS_BINDING_ABORTED/.test(e));
     check('campaign-console', real.length === 0, real.length ? real.slice(0, 4).join(' | ') : `no page errors or failed requests (${errors.length - real.length} navigation aborts)`);
   } finally { await ctx.close().catch(() => {}); }
-  // ---- the empty shipped campaign keeps today's title ----
+  // ---- the shipped campaign: a fresh title still has one obvious Continue (the first fight), New campaign secondary ----
   const plain = await browser.newContext({ viewport: { width: 1024, height: 768 }, reducedMotion: 'reduce' });
   try {
     const p = await plain.newPage();
     await p.goto(url); await p.waitForFunction(() => window.__entry && !window.__entry.importing);
     const t = await p.evaluate(() => ({ campaign: window.__entry.campaign, focus: document.activeElement.id, text: document.getElementById('entry-continue').textContent,
-      cls: document.getElementById('entry-continue').className, hidden: ['entry-new-campaign', 'entry-campaign-continue', 'entry-battles'].every((id) => document.getElementById(id).hidden),
+      cls: document.getElementById('entry-continue').className, newCls: document.getElementById('entry-new-campaign').className,
+      shown: ['entry-new-campaign', 'entry-battles'].every((id) => !document.getElementById(id).hidden), campaignContinueHidden: document.getElementById('entry-campaign-continue').hidden,
       heading: document.getElementById('entry-title-heading').textContent }));
-    check('campaign-empty-title', t.campaign === null && t.focus === 'entry-continue' && t.text === 'Continue' && t.cls === 'entry-primary' && t.hidden && t.heading === 'Your first command', JSON.stringify(t));
+    check('campaign-shipped-title', t.campaign?.id === 'west' && t.focus === 'entry-continue' && t.text === 'Continue' && t.cls === 'entry-primary'
+      && t.newCls === 'entry-secondary' && t.shown && t.campaignContinueHidden && t.heading === 'The Western Campaign 1862–63', JSON.stringify(t));
   } finally { await plain.close().catch(() => {}); }
 }
 

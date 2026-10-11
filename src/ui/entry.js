@@ -67,7 +67,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       </section>
       <section id="entry-camp" aria-labelledby="entry-camp-heading" hidden>
         <header class="entry-camp-head"><div><p class="rw-eyebrow">Between battles</p><h1 id="entry-camp-heading">Your army</h1><p id="entry-summary"></p></div>
-          <div class="entry-field-actions"><button id="camp-deploy" class="entry-primary" type="button" aria-describedby="camp-deploy-note">Deploy saved army</button><a id="camp-practice" class="entry-secondary" href="./?intro">Practice again</a></div></header>
+          <div class="entry-field-actions"><button id="camp-begin-campaign" class="entry-primary" type="button" hidden>Begin the campaign</button><button id="camp-deploy" class="entry-primary" type="button" aria-describedby="camp-deploy-note">Deploy saved army</button><a id="camp-practice" class="entry-secondary" href="./?intro">Practice again</a></div></header>
         <p class="entry-note" id="camp-deploy-note" hidden>Deploy saved army is for practice armies. Campaign brigades fight only in their own campaign phases, so their losses and loot stay on the record.</p>
         <p class="entry-note" id="camp-field-note">Deploy fights with your saved formations and equipment; actual losses return here. Practice again starts the original teaching formations and asks before replacing your army.</p>
         <section id="camp-campaign" aria-labelledby="camp-campaign-heading" hidden>
@@ -147,9 +147,10 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     const on = !!ladder, recent = campaignSlots()[0] || null;
     node('entry-campaign-continue').hidden = !recent; node('entry-new-campaign').hidden = !on; node('entry-battles').hidden = !on;
     node('entry-campaign-slot').hidden = !recent;
-    node('entry-new-campaign').className = recent ? 'entry-secondary' : 'entry-primary';
-    node('entry-continue').className = on ? 'entry-secondary' : 'entry-primary';
-    node('entry-continue').textContent = on ? 'Practice: Henry House Hill' : 'Continue';
+    // One obvious Continue (DESIGN 4b): the latest campaign, else the first fight/practice camp; New campaign stays secondary.
+    node('entry-new-campaign').className = 'entry-secondary';
+    node('entry-continue').className = recent ? 'entry-secondary' : 'entry-primary';
+    node('entry-continue').textContent = recent ? 'Practice: Henry House Hill' : 'Continue';
     if (!on) return;
     const packs = new Set(ladder.def.phases.map((p) => p.packId)).size;
     node('entry-title-heading').textContent = ladder.def.title;
@@ -161,6 +162,9 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     const v2 = saved.version === 2, c = v2 ? saved.campaign : null, known = v2 && !!ladder && ladder.def.id === c.id;
     node('camp-campaign').hidden = !v2; node('camp-deploy-note').hidden = !v2; node('camp-practice').hidden = v2;
     node('camp-field-note').hidden = v2;
+    // A practice army's camp leads on into the campaign (DESIGN 4b First minute: camp, then the battles).
+    node('camp-begin-campaign').hidden = v2 || !ladder;
+    node('camp-deploy').className = !v2 && ladder ? 'entry-secondary' : 'entry-primary';
     if (!v2) return;
     const complete = c.status === 'complete', last = c.history[c.history.length - 1];
     node('camp-campaign-heading').textContent = known ? ladder.def.title : c.id;
@@ -336,8 +340,8 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
   function focusAfterLoad() {
     const showCamp = camp && !!saved && !failed;
     const target = failed && !(ladder && !camp) ? node('entry-retry')
-      : showCamp ? saved.version === 2 ? (node('camp-next').hidden ? node('camp-campaign-heading') : node('camp-next')) : node('camp-practice')
-        : ladder ? (node('entry-campaign-continue').hidden ? node('entry-new-campaign') : node('entry-campaign-continue')) : node('entry-continue');
+      : showCamp ? saved.version === 2 ? (node('camp-next').hidden ? node('camp-campaign-heading') : node('camp-next')) : node(ladder ? 'camp-begin-campaign' : 'camp-practice')
+        : ladder && !node('entry-campaign-continue').hidden ? node('entry-campaign-continue') : node('entry-continue');
     target.focus(); target.scrollIntoView?.({ block: 'nearest' });
   }
   async function load() {
@@ -441,7 +445,12 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
   }
   node('entry-new-campaign').addEventListener('click', openSlotPicker);
   node('slot-picker-cancel').addEventListener('click', () => picker.close('cancel'));
-  picker.addEventListener('close', () => { if (!overwrite.open && !node('entry-new-campaign').hidden) node('entry-new-campaign').focus(); });
+  picker.addEventListener('close', () => {
+    if (overwrite.open) return;
+    const back = !node('camp-begin-campaign').hidden && node('camp-begin-campaign').getClientRects().length ? node('camp-begin-campaign') : node('entry-new-campaign');
+    if (!back.hidden) back.focus();
+  });
+  node('camp-begin-campaign').addEventListener('click', openSlotPicker);
   node('slot-overwrite-cancel').addEventListener('click', () => overwrite.close('cancel'));
   node('slot-overwrite-confirm').addEventListener('click', () => overwrite.close('overwrite'));
   for (const d of [picker, overwrite]) d.addEventListener('keydown', (e) => {

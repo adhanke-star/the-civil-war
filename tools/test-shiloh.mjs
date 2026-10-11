@@ -244,8 +244,8 @@ export const SHILOH_CHECKS = [
     const raw = api.campaign(), pack = api.shipped();
     const def = await run('campaign', () => validateCampaign(raw));
     assert.deepEqual([def.id, def.title], ['west', 'The Western Campaign 1862–63'], 'campaign: identity');
-    assert.deepEqual(def.phases.map((p) => [p.packId, p.phaseId, p.loan === true]),
-      [['shiloh', 'camps-at-dawn', true], ['shiloh', 'hornets-nest', true], ['shiloh', 'grants-last-line', true], ['shiloh', 'buell-attacks', false]], 'campaign: the Shiloh ladder, first three phases on loan');
+    assert.deepEqual(def.phases.slice(0, 4).map((p) => [p.packId, p.phaseId, p.loan === true]),
+      [['shiloh', 'camps-at-dawn', true], ['shiloh', 'hornets-nest', true], ['shiloh', 'grants-last-line', true], ['shiloh', 'buell-attacks', false]], 'campaign: the ladder opens with the four Shiloh phases, first three on loan');
     assert.deepEqual(def.franchise.map((r) => r.unitId).sort(), [...FRANCHISE_IDS].sort(), 'campaign: the franchise is the Army of the Ohio fielded in buell-attacks');
     const p4 = roster(phaseOf(pack, 'buell-attacks').scenario);
     for (const r of def.franchise) {

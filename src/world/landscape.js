@@ -392,6 +392,8 @@ function forestTrees(terrain, streams, roadField, streamField, parcels, seed, sp
   // Woods: a jittered grid of open stands (crowns 5-7.5 m, 13 m apart by default, so grass shows between
   // them), with conifers grouped where the noise is high and mixed in singly elsewhere.
   const W = spacing;
+  // Woods-base maps (forest with clearings) are open stands of smaller crowns, so brigades stay visible between trees.
+  const crown = PLAN.ground.base === 'woods' ? 0.72 : 1;
   for (let z = -half; z < half; z += W) {
     for (let x = -half; x < half; x += W) {
       const px = x + (rnd() - 0.5) * W * 0.9;
@@ -400,7 +402,7 @@ function forestTrees(terrain, streams, roadField, streamField, parcels, seed, sp
       if (nearRoad(px, pz, 9) || nearStream(px, pz, 3) || nearSite(px, pz, 45)) continue;
       const pn = valueNoise(px * 0.012, pz * 0.012);
       const pine = pn > 0.74 || (pn > 0.5 && rnd() < 0.12);
-      trees.push([px, pz, pine ? 4.5 + rnd() * 2 : 5 + rnd() * 2.5, pine ? 1 : 0]);
+      trees.push([px, pz, (pine ? 4.5 + rnd() * 2 : 5 + rnd() * 2.5) * crown, pine ? 1 : 0]);
     }
   }
   const forest = trees.length;

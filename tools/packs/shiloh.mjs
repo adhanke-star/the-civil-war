@@ -785,7 +785,7 @@ export const PACK = {
   battle: 'Shiloh (Pittsburg Landing)',
   terrain: 'shiloh',
   season: 'spring',
-  treeSpacing: 18,
+  treeSpacing: 24,
   woodsNote: 'The 1862 battlefield was mostly forest and thicket with farm clearings (Handbook; Daniel). The ground is forest by default; the named fields with sourced points are cleared as irregular ovals (sizes not sourced, Inferred). Wicker, Jones, Woolf, Barnes, Cloud and the Davis wheat field have no coordinates in the research and are not drawn.',
   labelsNote: 'Field and place labels sit at OSM points (Inferred); water labels sit on the USGS stream lines in the terrain asset.',
   landmarks: LANDMARKS,
