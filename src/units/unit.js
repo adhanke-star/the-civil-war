@@ -8,7 +8,8 @@
 //   column  a column of fours along the unit's own trail (breadcrumbs behind the anchor), taken for long
 //           marches with no enemy near, deploying back into line near the end of the path.
 // A charge or rout spreads the men into a running swarm. One figure stands for MEN_PER_FIGURE men
-// (look.menPerFigure: 10 or 5, live; setMenPerFigure + rebuildFigures) and 4 for a battery crew, so each gun
+// (look.menPerFigure: 10 or 5, live, but never denser than the phase's scenario.menPerFigure; setMenPerFigure +
+// rebuildFigures) and 4 for a battery crew, so each gun
 // has a crew of 4-5 figures.
 //
 // Drawing (FIGURE_VIEW in soldier-mesh.js, written by the game each frame): infantrymen go to the rigged
@@ -30,12 +31,18 @@ import { RULES } from '../sim/rules.js';
 import { LOOK } from '../ui/look.js';
 import { equipmentProfile } from '../sim/equipment.js';
 
-export let MEN_PER_FIGURE = 10; // live binding: look.menPerFigure (the game calls setMenPerFigure)
+export let MEN_PER_FIGURE = 10; // live binding: max(look.menPerFigure, the phase minimum) (the game calls setMenPerFigure)
 export const MEN_PER_FIGURE_OPTIONS = [10, 5];
 export const MEN_PER_CREW_FIGURE = 4;
-/** Infantry density for figures made from now on (existing units: rebuildFigures). */
-export function setMenPerFigure(n) {
-  if (MEN_PER_FIGURE_OPTIONS.includes(n)) MEN_PER_FIGURE = n;
+let lookMenPerFigure = MEN_PER_FIGURE, phaseMinimum = 5; // phaseMinimum: scenario.menPerFigure (5..40, sim/phase.js)
+/**
+ * Infantry density for figures made from now on (existing units: rebuildFigures): the look choice `n`, never
+ * denser than the phase's `minimum` men per figure (omitted: keep the last one). Battery crews stay at 4.
+ */
+export function setMenPerFigure(n, minimum = phaseMinimum) {
+  if (MEN_PER_FIGURE_OPTIONS.includes(n)) lookMenPerFigure = n;
+  if (Number.isInteger(minimum) && minimum >= 5 && minimum <= 40) phaseMinimum = minimum;
+  MEN_PER_FIGURE = Math.max(lookMenPerFigure, phaseMinimum);
   return MEN_PER_FIGURE;
 }
 export const SPEED = { walk: 4.4, run: 7.4, charge: 8.4, fallback: 3.0, rout: 8.6 };

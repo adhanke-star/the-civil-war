@@ -14,7 +14,8 @@
 // { text, x, z }), 'spawn' / 'remove' (a unit added or taken off the field in the sandbox).
 // Figures (src/ui/look.js): look.figureStyle picks rigged 3D figures or baked sprites (both, split-screen, while
 // it is compared); the atlas loads the first time baked is wanted and the rigged figures draw until it is in.
-// look.menPerFigure re-forms the infantry at 1:10 or 1:5; pools are sized for 1:5 from the start.
+// look.menPerFigure re-forms the infantry at 1:10 or 1:5, never denser than the phase's scenario.menPerFigure
+// (sim/phase.js phaseMenPerFigure, default 5); pools are sized at that phase minimum from the start.
 
 import { EntityManager } from 'yuka';
 import { Unit, MEN_PER_FIGURE_OPTIONS, MEN_PER_CREW_FIGURE, SPEED, setMenPerFigure } from './units/unit.js';
@@ -31,12 +32,17 @@ import { Ai } from './sim/ai.js';
 import { RULES } from './sim/rules.js';
 import { mulberry32, inWoods, PLAN } from './world/landscape.js';
 import { FieldCaptures } from './franchise/captures.js';
-import { prepareReinforcementTimeline, reinforcementWindow, captureAccounting } from './sim/phase.js';
+import { prepareReinforcementTimeline, reinforcementWindow, captureAccounting, phaseMenPerFigure } from './sim/phase.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const MONTH = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const MIN_MEN_PER_FIGURE = Math.min(...MEN_PER_FIGURE_OPTIONS); // pools are sized for the densest choice
+const MIN_MEN_PER_FIGURE = Math.min(...MEN_PER_FIGURE_OPTIONS); // the densest look choice
 const SPAWN_RESERVE = 2100; // figures per side kept free for sandbox spawns (four 2,500-man brigades at 1:5)
+// The densest infantry ratio this battle can draw: the phase minimum, never below the densest look choice.
+// Read from the scenario, not an own field (pinned Game key lists).
+const minMenPerFigureOf = (game) => Math.max(MIN_MEN_PER_FIGURE, phaseMenPerFigure(game.scenario));
+// The same four brigades at the phase minimum (exactly SPAWN_RESERVE at 1:5).
+const spawnReserve = (ratio) => Math.ceil(SPAWN_RESERVE * MIN_MEN_PER_FIGURE / ratio);
 const ARC = (65 * Math.PI) / 180; // the firing arc each side of the facing (combat.js)
 // Ephemeral state belongs to a real scheduled Game; borrowed legacy methods have no entry.
 const reinforcementState = new WeakMap();
@@ -276,7 +282,7 @@ export class Game {
   constructor({ scene, terrain, scenario, world, effects, playerSide = 'US' }) {
     // This validates structure, not hardware admission: routed definitions pass the field guard upstream.
     const timeline = 'reinforcements' in scenario || 'surrender' in scenario || 'batteryOverrun' in scenario ? prepareReinforcementTimeline({ version: 1,
-      id: 'game', title: 'Battle runtime', phases: [{ id: 'battle', scenario }] }, 'battle') : null;
+      id: 'game', title: 'Battle runtime', phases: [{ id: 'battle', scenario }] }, 'battle', scenario) : null;
     const surrender = timeline?.scenario.surrender === true;
     const overrun = timeline?.scenario.batteryOverrun === true;
     if (surrender) captureAccounting(timeline, { through: 0, events: [] });
@@ -302,13 +308,15 @@ export class Game {
 
     const defs = scenario.units;
     const poolDefs = timeline?.events.length ? [...defs, ...timeline.events.map(e => e.unit)] : defs;
-    // figures per side at the densest look.menPerFigure (5 men; 4 per crew figure in a battery), plus an
-    // officer and slack
-    setMenPerFigure(LOOK.menPerFigure);
-    const figs = (side) => poolDefs.filter((d) => d.side === side).reduce((s, d) => s + Math.round(d.men / (d.type === 'artillery' ? MEN_PER_CREW_FIGURE : MIN_MEN_PER_FIGURE)) + 6, 0);
+    // figures per side at the densest ratio this phase can draw (the phase minimum, 5 men by default; 4 per crew
+    // figure in a battery), plus an officer and slack
+    const minRatio = minMenPerFigureOf(this);
+    setMenPerFigure(LOOK.menPerFigure, minRatio);
+    const figs = (side) => poolDefs.filter((d) => d.side === side).reduce((s, d) => s + Math.round(d.men / (d.type === 'artillery' ? MEN_PER_CREW_FIGURE : minRatio)) + 6, 0);
     const outline = !/\boutline=0\b/.test(globalThis.location ? location.search : '');
-    this.reserve = { US: SPAWN_RESERVE, CS: SPAWN_RESERVE };
-    const cap = (side) => figs(side) + SPAWN_RESERVE;
+    const reserve = spawnReserve(minRatio);
+    this.reserve = { US: reserve, CS: reserve };
+    const cap = (side) => figs(side) + reserve;
     this.pools = {
       US: new SoldierPool(cap('US'), UNIFORMS.US, { kit: 'US', outline }),
       CS: new SoldierPool(cap('CS'), UNIFORMS.CS, { kit: 'CS', outline }),
@@ -373,7 +381,7 @@ export class Game {
 
   /** Re-form every infantry brigade at `n` men per figure (look.menPerFigure). */
   applyMenPerFigure(n) {
-    setMenPerFigure(n);
+    setMenPerFigure(n, minMenPerFigureOf(this));
     let changed = 0;
     for (const u of this.units) if (u.rebuildFigures()) changed++;
     return changed;
@@ -440,6 +448,7 @@ export class Game {
 
   /** One construction path for scenario units and sandbox spawns. */
   makeUnit(d, seed) {
+    setMenPerFigure(null, minMenPerFigureOf(this)); // keep the look choice; this battle's minimum, even if another Game was made since
     const u = d.type === 'artillery'
       ? new Battery(d, this.pools[d.side], this.gunPool, this.terrain, seed)
       : new Unit(d, this.pools[d.side], this.terrain, seed);
@@ -853,7 +862,7 @@ export class Game {
       this.emit('log', 'Choose Green, Trained, Veteran or Elite before placing a brigade.');
       return null;
     }
-    const nFig = Math.round(men / MIN_MEN_PER_FIGURE) + 6; // counted at 1:5, so look.menPerFigure never overfills the pools
+    const nFig = Math.round(men / minMenPerFigureOf(this)) + 6; // counted at the phase minimum, so look.menPerFigure never overfills the pools
     if (this.reserve[side] < nFig) {
       this.emit('log', `No room for another ${side === 'US' ? 'Union' : 'Confederate'} brigade of ${men} (the figure reserve is used up); remove one first.`);
       return null;

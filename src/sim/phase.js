@@ -76,6 +76,16 @@ function battleFields(value) {
   if (own(value, 'victory') && (!record(value.victory) || Object.keys(value.victory).some(key => !VICTORY_TEXTS.includes(key) || typeof value.victory[key] !== 'string'))) fail('victory texts are invalid.');
   if (own(value, 'retreat') && (!record(value.retreat) || Object.keys(value.retreat).some(key => !['US', 'CS'].includes(key) || !point(value.retreat[key])))) fail('retreat points are invalid.');
   if (own(value, 'season') && !['summer', 'spring', 'autumn', 'winter'].includes(value.season)) fail('season is unsupported.');
+  if (own(value, 'menPerFigure')) phaseMenPerFigure(value);
+}
+// The phase's minimum men per infantry figure. The drawn ratio is the larger of this and look.menPerFigure;
+// battery crews keep their fixed MEN_PER_CREW_FIGURE (4) whatever the phase says.
+export const PHASE_MEN_PER_FIGURE = Object.freeze({ min: 5, max: 40 });
+export function phaseMenPerFigure(value) {
+  if (!record(value) || !own(value, 'menPerFigure')) return PHASE_MEN_PER_FIGURE.min;
+  const n = value.menPerFigure;
+  if (!Number.isInteger(n) || n < PHASE_MEN_PER_FIGURE.min || n > PHASE_MEN_PER_FIGURE.max) fail('men per figure must be an integer from 5 to 40.');
+  return n;
 }
 // Optional per-unit AI role (src/sim/ai.js): { role: hold|attack|reserve, at?: 'HH:MM', target?: [x, z], via?: up to 6 [x, z] }.
 const AI_KEYS = ['role', 'at', 'target', 'via'];
@@ -152,6 +162,17 @@ export const FIELD_LIMITS = Object.freeze({ formations: DEPLOYMENT_LIMITS.format
   men: DEPLOYMENT_LIMITS.men * 2, guns: DEPLOYMENT_LIMITS.guns * 2, figures: DEPLOYMENT_LIMITS.figures * 2,
   sites: 64, buildings: 256, trees: 4096, woods: 128, vertices: 4096, polygon: 1024, labels: 64,
   labelText: 160, coordinate: 10000, dimension: 1000 });
+// Battle-pack phases only (routeId 'pack'): a whole Shiloh-size phase. Figures are counted at the phase's
+// minimum infantry ratio (phaseMenPerFigure), so the drawn budget stays near Henry Hill's at 1:5.
+export const PACK_FIELD_LIMITS = Object.freeze({ ...FIELD_LIMITS, formations: 48, men: 80000, guns: 160, figures: 4000 });
+/** Per-route input bounds and the infantry ratio figures are counted at. Every other route keeps today's 1:5. */
+function fieldBounds(routeId, scenario) {
+  return routeId === 'pack' ? { limits: PACK_FIELD_LIMITS, ratio: phaseMenPerFigure(scenario) } : { limits: FIELD_LIMITS, ratio: PHASE_MEN_PER_FIGURE.min };
+}
+// Infantry at `ratio`, crews at 4 men per figure, plus an officer and slack per formation.
+const unitFigures = (unit, ratio) => Math.max(1, Math.round(unit.men / (unit.type === 'artillery' ? 4 : ratio))) + 6;
+// Ephemeral provenance: the route each returned field snapshot was validated under (never persisted).
+const fieldRoutes = new WeakMap();
 const fieldFail = message => { throw new Error('Field: ' + message); };
 const coordinate = value => finite(value) && Math.abs(value) <= FIELD_LIMITS.coordinate;
 const integer = value => Number.isSafeInteger(value) && value >= 0;
@@ -206,6 +227,7 @@ export function prepareFieldScenario(input, routeId) {
   // Validate the initial-only opening before checking the complete future roster.
   if ('reinforcements' in value) timelineRows(value);
   const roster = [...value.units, ...(value.reinforcements || [])];
+  const { limits, ratio } = fieldBounds(routeId, value);
   let men = 0, guns = 0, figures = 0;
   for (const unit of roster) {
     if (!Number.isSafeInteger(unit.men) || unit.men <= 0 || (own(unit, 'guns') && !integer(unit.guns))
@@ -217,12 +239,13 @@ export function prepareFieldScenario(input, routeId) {
       || (own(unit, 'commander') && unit.commander !== null && (!record(unit.commander) || !text(unit.commander.name)
         || ['rank', 'portrait', 'portraitNote'].some(key => own(unit.commander, key) && typeof unit.commander[key] !== 'string')))) fieldFail('formation numbers or metadata are invalid.');
     men += unit.men; guns += unit.guns || 0;
-    figures += Math.max(1, Math.round(unit.men / (unit.type === 'artillery' ? 4 : 5))) + 6;
+    figures += unitFigures(unit, ratio);
   }
-  if (roster.length > FIELD_LIMITS.formations || men > FIELD_LIMITS.men || guns > FIELD_LIMITS.guns || figures > FIELD_LIMITS.figures) fieldFail('the whole current field exceeds its input bounds.');
+  if (roster.length > limits.formations || men > limits.men || guns > limits.guns || figures > limits.figures) fieldFail('the whole current field exceeds its input bounds.');
   if (!coordinate(value.objective.x) || !coordinate(value.objective.z) || value.objective.r > FIELD_LIMITS.coordinate
     || value.opening?.some(o => o.points.some(p => !p.every(coordinate)))) fieldFail('objective or opening is outside current ground bounds.');
   if (roster.some(unit => own(unit, 'ai') && [...(unit.ai.target ? [unit.ai.target] : []), ...(unit.ai.via || [])].some(p => !p.every(coordinate)))) fieldFail('unit AI route is outside current ground bounds.');
+  fieldRoutes.set(value, routeId);
   return value;
 }
 
@@ -278,8 +301,8 @@ async function boundedJson(url, { isCurrent, fetcher }, finish) {
   } finally { reader?.releaseLock(); }
 }
 
-// Ephemeral validation provenance, never a persisted cursor or strong-reference store.
-const reinforcementPlans = new WeakSet();
+// Ephemeral validation provenance, never a persisted cursor or strong-reference store: plan -> field bounds.
+const reinforcementPlans = new WeakMap();
 function timelineUnit(unit) {
   if (!Number.isSafeInteger(unit.men) || unit.men <= 0
     || (unit.type === 'artillery' ? !Number.isSafeInteger(unit.guns) || unit.guns <= 0
@@ -318,14 +341,19 @@ function timelineRows(value) {
   return { horizon, events: Object.freeze(arrival), notices: Object.freeze(notices), budget: Object.freeze(budget) };
 }
 
-/** Detached whole-pack timeline. Simulation offsets are game data, not verified historical hours. */
-export function prepareReinforcementTimeline(input, phaseId) {
+/**
+ * Detached whole-pack timeline. Simulation offsets are game data, not verified historical hours. `field` may be
+ * the snapshot prepareFieldScenario returned for the selected phase: its route's bounds then apply to capture
+ * accounting, but only when its content is identical to that phase. Anything else keeps the default bounds.
+ */
+export function prepareReinforcementTimeline(input, phaseId, field = null) {
   const pack = snapshot(input), selected = preparePhase(pack, phaseId);
   const timelines = pack.phases.map(phase => timelineRows(phase.scenario));
   const plan = Object.freeze({ packId: selected.packId, phaseId: selected.phaseId,
     index: selected.index, previousId: selected.previousId, nextId: selected.nextId,
     scenario: pack.phases[selected.index].scenario, ...timelines[selected.index] });
-  reinforcementPlans.add(plan);
+  const route = record(field) && fieldRoutes.has(field) && JSON.stringify(field) === JSON.stringify(plan.scenario) ? fieldRoutes.get(field) : null;
+  reinforcementPlans.set(plan, fieldBounds(route, plan.scenario));
   return plan;
 }
 
@@ -350,11 +378,11 @@ export function captureAccounting(plan, input) {
   if (!reinforcementPlans.has(plan)) fail('capture accounting needs a prepared reinforcement timeline.');
   const trace = snapshot(input); shape(trace, ['through', 'events'], 'capture accounting trace');
   if (!finite(trace.through) || trace.through < 0 || trace.through > plan.horizon || !Array.isArray(trace.events)) fail('capture accounting interval or events are invalid.');
-  const budget = plan.budget.total;
-  if (budget.formations > FIELD_LIMITS.formations || budget.men > FIELD_LIMITS.men || budget.guns > FIELD_LIMITS.guns) fail('capture accounting exceeds current software applicability bounds.');
+  const budget = plan.budget.total, { limits, ratio } = reinforcementPlans.get(plan);
+  if (budget.formations > limits.formations || budget.men > limits.men || budget.guns > limits.guns) fail('capture accounting exceeds current software applicability bounds.');
   const roster = [...plan.scenario.units, ...(plan.scenario.reinforcements || [])];
-  const figures = roster.reduce((sum, unit) => sum + Math.max(1, Math.round(unit.men / (unit.type === 'artillery' ? 4 : 5))) + 6, 0);
-  if (figures > FIELD_LIMITS.figures) fail('capture accounting exceeds current software figure bounds.');
+  const figures = roster.reduce((sum, unit) => sum + unitFigures(unit, ratio), 0);
+  if (figures > limits.figures) fail('capture accounting exceeds current software figure bounds.');
   const units = roster.map((unit, index) => {
     const arrivalAtSec = index < plan.scenario.units.length ? 0 : unit.atSec;
     const arrived = arrivalAtSec <= trace.through;
