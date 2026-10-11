@@ -1,29 +1,28 @@
-name: Reward focus warning causal trace (private)
+name: Reward focus corrected whole inputs (private only)
 on:
   push:
     branches: [reward-focus-inputs-private]
 permissions:
   contents: read
 jobs:
-  diagnostic:
+  inputs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host --init
     env:
+      REWARD_FOCUS_WHOLE_INPUT_AUTHORIZATION: autonomous-v1-whole-input
       GIT_CONFIG_COUNT: '1'
       GIT_CONFIG_KEY_0: safe.directory
       GIT_CONFIG_VALUE_0: /__w/the-civil-war/the-civil-war
-      REWARD_FOCUS_WARNING_DIAGNOSTIC_AUTHORIZATION: autonomous-v1-causal-diagnostic
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v4
-      - name: Bind exact retained source parents
+      - name: Bind exact private and virtual source parents
         run: |
-          set -euo pipefail
           test "$GITHUB_REF" = "refs/heads/reward-focus-inputs-private"
           test "$GITHUB_WORKSPACE" = "/__w/the-civil-war/the-civil-war"
           test "$(realpath "$GITHUB_WORKSPACE")" = "$GITHUB_WORKSPACE"
@@ -40,37 +39,47 @@ jobs:
           cache: npm
       - name: Retain complete runtime setup streams
         run: |
-          set -euo pipefail
           mkdir .out
-          node tools/test-reward-focus-private.mjs --warning-causal-capture setup
-      - name: Trace four isolated pointer processes in control trace trace control order
-        id: observe
+          node tools/test-reward-focus-private.mjs --whole-input-capture setup
+      - name: Collect missing raw focus inputs once
         run: |
-          set -euo pipefail
-          node tools/test-reward-focus-private.mjs --warning-causal-capture collect
-      - name: Bind complete causal forensic envelope
-        if: always()
-        id: pack
-        run: node tools/test-reward-focus-private.mjs --warning-causal-pack
-      - name: Retain bounded causal proof
-        if: always() && steps.pack.outcome == 'success'
+          node tools/test-reward-focus-private.mjs --whole-input-capture collect
+      - name: Bind complete private input envelope
+        run: |
+          node tools/test-reward-focus-private.mjs --whole-input-capture pack
+      - name: Admit complete final upload selection
+        run: node tools/test-reward-focus-private.mjs --whole-input-capture upload
+      - name: Verify the complete final upload selection
+        run: node tools/test-reward-focus-private.mjs --whole-input-verify-upload
+      - name: Retain bounded complete private proof
         uses: actions/upload-artifact@v4
         with:
-          name: reward-focus-warning-causal
+          name: reward-focus-private-inputs
           path: |
-            .out/warning-causal-envelope.cwproof
-            .out/warning-causal-metadata.json
-            .out/warning-causal-source.json
+            .out/reward-focus-private-envelope.cwproof
+            .out/reward-focus-private-envelope-metadata.json
+            .out/reward-focus-private-upload-admission.json
+            .out/reward-focus-private-pack.stdout
+            .out/reward-focus-private-pack.stderr
+            .out/reward-focus-private-setup-capture.json
+            .out/reward-focus-private-capture.json
+            .out/reward-focus-private-pack-capture.json
+            .out/reward-focus-private-upload-capture.json
+            .out/reward-focus-private-run-capacity.json
+            .out/reward-focus-virtual/.out/*.png
           include-hidden-files: true
           retention-days: 7
           compression-level: 6
-      - name: Preserve failed causal forensic evidence
-        if: always() && steps.pack.outcome != 'success'
+      - name: Preserve raw private failure evidence
+        if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: reward-focus-warning-causal-failure
-          path: .out/
+          name: reward-focus-private-inputs-failure
+          path: |
+            .out/reward-focus-private-*.json
+            .out/reward-focus-private*.stdout
+            .out/reward-focus-private*.stderr
+            .out/reward-focus-virtual/.out/*.png
           include-hidden-files: true
           retention-days: 7
           compression-level: 6
-          if-no-files-found: warn
