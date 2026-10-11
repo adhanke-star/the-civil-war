@@ -19,6 +19,46 @@
     { "packId": "shiloh", "phaseId": "camps-at-dawn", "loan": true },
     { "packId": "shiloh", "phaseId": "hornets-nest", "loan": true },
     { "packId": "shiloh", "phaseId": "grants-last-line", "loan": true },
-    { "packId": "shiloh", "phaseId": "buell-attacks" }
+    { "packId": "shiloh", "phaseId": "buell-attacks" },
+    { "packId": "stones-river", "phaseId": "dawn-on-the-right", "joins": [
+      { "unitId": "us-post-brigade", "label": "Post's Brigade (1st Brigade, 1st Division, Right Wing, Army of the Cumberland)", "kind": "infantry", "men": 1771, "weapon": "springfield", "vet": "trained" },
+      { "unitId": "us-carlin-brigade", "label": "Carlin's Brigade (2nd Brigade, 1st Division, Right Wing, Army of the Cumberland)", "kind": "infantry", "men": 1771, "weapon": "springfield", "vet": "trained" },
+      { "unitId": "us-woodruff-brigade", "label": "Woodruff's Brigade (3rd Brigade, 1st Division, Right Wing, Army of the Cumberland)", "kind": "infantry", "men": 1329, "weapon": "springfield", "vet": "trained" },
+      { "unitId": "us-edgarton-battery", "label": "Battery E, 1st Ohio Light Artillery (Edgarton), 2nd Division, Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "parrott10", "vet": "trained" },
+      { "unitId": "us-goodspeed-battery", "label": "Battery A, 1st Ohio Light Artillery (Goodspeed), 2nd Division, Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "parrott10", "vet": "trained" },
+      { "unitId": "us-simonson-battery", "label": "5th Indiana Battery (Simonson), 2nd Division, Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "napoleon", "vet": "trained" },
+      { "unitId": "us-pinney-battery", "label": "5th Wisconsin Battery (Pinney), 1st Division, Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "parrott10", "vet": "trained" }
+    ] },
+    { "packId": "stones-river", "phaseId": "slaughter-pen", "joins": [
+      { "unitId": "us-roberts-brigade", "label": "Roberts's Brigade (3rd Brigade, 3rd Division, Right Wing, Army of the Cumberland)", "kind": "infantry", "men": 1520, "weapon": "enfield", "vet": "trained" },
+      { "unitId": "us-houghtaling-battery", "label": "Battery C, 1st Illinois Light Artillery (Houghtaling), 3rd Division, Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "napoleon", "vet": "trained" },
+      { "unitId": "us-greusel-brigade", "label": "Sill's Brigade (Greusel) (1st Brigade, 3rd Division, Right Wing, Army of the Cumberland)", "kind": "infantry", "men": 1839, "weapon": "lorenz", "vet": "trained" },
+      { "unitId": "us-bush-battery", "label": "4th Indiana Battery (Bush), 3rd Division, Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "sixPdr", "vet": "trained" },
+      { "unitId": "us-schaefer-brigade", "label": "Schaefer's Brigade (2nd Brigade, 3rd Division, Right Wing, Army of the Cumberland)", "kind": "infantry", "men": 1680, "weapon": "belgian", "vet": "trained" },
+      { "unitId": "us-hescock-battery", "label": "Battery G, 1st Missouri Light Artillery (Hescock), 3rd Division, Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "sixPdr", "vet": "trained" },
+      { "unitId": "us-stanley-brigade", "label": "Stanley's Brigade (29th Brigade, 2nd Division, Center, Army of the Cumberland)", "kind": "infantry", "men": 1812, "weapon": "springfield", "vet": "trained" },
+      { "unitId": "us-miller-brigade", "label": "Miller's Brigade (7th Brigade, 2nd Division, Center, Army of the Cumberland)", "kind": "infantry", "men": 2019, "weapon": "springfield", "vet": "trained" },
+      { "unitId": "us-shepherd-brigade", "label": "The Regular Brigade (Shepherd) (4th Brigade, 1st Division, Center, Army of the Cumberland)", "kind": "infantry", "men": 1443, "weapon": "springfield", "vet": "trained" },
+      { "unitId": "us-j-beatty-brigade", "label": "John Beatty's Brigade (17th Brigade, 1st Division, Center, Army of the Cumberland)", "kind": "infantry", "men": 1534, "weapon": "springfield", "vet": "trained" }
+    ] },
+    { "packId": "stones-river", "phaseId": "round-forest", "joins": [
+      { "unitId": "us-cockerill-battery", "label": "Battery F, 1st Ohio Light Artillery (Cockerill), 2nd Division, Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "parrott10", "vet": "trained" },
+      { "unitId": "us-estep-battery", "label": "8th Indiana Battery (Estep), 1st Division, Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "sixPdr", "vet": "trained" },
+      { "unitId": "us-wagner-brigade", "label": "Wagner's Brigade (2nd Brigade, 1st Division, Left Wing, Army of the Cumberland)", "kind": "infantry", "men": 1475, "weapon": "springfield", "vet": "trained" },
+      { "unitId": "us-cox-battery", "label": "10th Indiana Battery (Cox), 1st Division, Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "parrott10", "vet": "trained" },
+      { "unitId": "us-hascall-brigade", "label": "Hascall's Brigade (1st Brigade, 1st Division, Left Wing, Army of the Cumberland)", "kind": "infantry", "men": 1525, "weapon": "springfield", "vet": "trained" }
+    ] },
+    { "packId": "stones-river", "phaseId": "mcfaddens-ford", "joins": [
+      { "unitId": "us-price-brigade", "label": "Price's Brigade (3rd Brigade, 3rd Division, Left Wing, Army of the Cumberland)", "kind": "infantry", "men": 1603, "weapon": "springfield", "vet": "trained" },
+      { "unitId": "us-fyffe-brigade", "label": "Fyffe's Brigade (2nd Brigade, 3rd Division, Left Wing, Army of the Cumberland)", "kind": "infantry", "men": 1282, "weapon": "springfield", "vet": "trained" },
+      { "unitId": "us-3wis-battery", "label": "3rd Wisconsin Battery (Livingston), 3rd Division, Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "sixPdr", "vet": "trained" },
+      { "unitId": "us-schultz-battery", "label": "Battery M, 1st Ohio Light Artillery (Schultz), 2nd Division, Army of the Cumberland", "kind": "battery", "men": 60, "guns": 3, "weapon": "sixPdr", "vet": "trained" },
+      { "unitId": "us-ellsworth-battery", "label": "Battery B, Kentucky Light Artillery (Ellsworth), 2nd Division, Army of the Cumberland", "kind": "battery", "men": 20, "guns": 1, "weapon": "parrott10", "vet": "trained" },
+      { "unitId": "us-swallow-battery", "label": "7th Indiana Battery (Swallow), Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "parrott10", "vet": "trained" },
+      { "unitId": "us-bradley-battery", "label": "6th Ohio Battery (Bradley), 1st Division, Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "parrott10", "vet": "trained" },
+      { "unitId": "us-stevens-battery", "label": "26th Pennsylvania Battery (Stevens), Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "sixPdr", "vet": "trained" },
+      { "unitId": "us-board-of-trade-battery", "label": "Chicago Board of Trade Battery (Stokes), Army of the Cumberland", "kind": "battery", "men": 120, "guns": 6, "weapon": "sixPdr", "vet": "trained" },
+      { "unitId": "us-standart-battery", "label": "Battery B, 1st Ohio Light Artillery (Standart), 2nd Division, Army of the Cumberland", "kind": "battery", "men": 60, "guns": 3, "weapon": "sixPdr", "vet": "trained" }
+    ] }
   ]
 }

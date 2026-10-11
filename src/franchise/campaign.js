@@ -4,6 +4,7 @@
 //
 //   validateCampaign(json)                      -> frozen canonical campaign definition
 //   newCampaign({ campaign, slot, seed, at? })  -> v2 save at index 0 with the franchise roster as its army
+//                                                  (plus any formations that join at the first phase)
 //   campaignPhase(save, campaign, { replay? })  -> the next phase (or the last one again) with its award identity
 //   applyCampaign(scenario, save, phase)        -> a NEW scenario with carried strength and franchise state applied
 //   recordPhase(save, campaign, result)         -> the next validated save (history, carry, losses, veterancy, loot)
@@ -11,6 +12,11 @@
 //
 // Game rules here (game choices, not history): a franchise formation that loses half its men in a phase drops one
 // veterancy tier; one that ends a battle's last phase in Victory or better, with at least half its men, rises one.
+//
+// Joins: a ladder phase may carry `joins` (rows in the franchise schema): formations that enter the franchise army
+// when a save first reaches that phase (a new campaign reaching its first phase, or recordPhase advancing to it; never
+// a replay). Appending is idempotent by unitId, so a formation already in the army (alive or destroyed) is never added
+// twice. unitIds are unique across the franchise and every phase's joins; a loan phase cannot carry joins.
 import { validateSnapshot } from './save.js';
 import { phaseOutcome, vetBase } from './practice.js';
 import { ARMS, UNIQUES, VETERANCY, GRADES, itemDef } from '../reward/data.js';
@@ -23,6 +29,7 @@ export const CAMPAIGN_LIMITS = Object.freeze({ franchise: 200, phases: 100, atte
 const catalogue = new Set([...ARMS, ...UNIQUES].map((x) => x.id));
 const vetIds = VETERANCY.map((v) => v.id);
 const MUSTER = 'In service at the start of the campaign';
+const JOINED = 'Joined the army during the campaign';
 
 function frozen(v) {
   if (v === null || typeof v !== 'object') return v;
@@ -49,9 +56,10 @@ export function validateCampaign(json) {
   if (json.version !== 1 || typeof json.id !== 'string' || !PACK.test(json.id)) fail('unsupported campaign version or identity.');
   const title = words(json.title, 'campaign title');
   if (!Array.isArray(json.franchise) || json.franchise.length > CAMPAIGN_LIMITS.franchise) fail('incomplete or oversized franchise roster.');
+  // One row schema for the franchise and for every phase's joins; unitIds are unique across all of them.
   const unitIds = new Set();
-  const franchise = json.franchise.map((r) => {
-    shape(r, ['unitId', 'label', 'kind', 'men', 'weapon', 'vet'], ['guns'], 'franchise formation');
+  const formation = (r, what) => {
+    shape(r, ['unitId', 'label', 'kind', 'men', 'weapon', 'vet'], ['guns'], what);
     if (typeof r.unitId !== 'string' || !UNIT.test(r.unitId) || unitIds.has(r.unitId)) fail('franchise unit identities must be unique simple ids.');
     unitIds.add(r.unitId);
     if (!['infantry', 'battery'].includes(r.kind) || !vetIds.includes(r.vet)) fail('unknown franchise kind or veterancy.');
@@ -62,21 +70,26 @@ export function validateCampaign(json) {
     else if (has(r, 'guns')) fail('infantry cannot own guns.');
     if (`${json.id}.3.muster.${r.unitId}`.length > 100) fail('franchise unit identity is too long.');
     return { ...row, weapon: r.weapon, vet: r.vet };
-  });
+  };
+  const franchise = json.franchise.map((r) => formation(r, 'franchise formation'));
   if (!Array.isArray(json.phases) || json.phases.length > CAMPAIGN_LIMITS.phases) fail('incomplete or oversized phase ladder.');
   const finished = new Set(), seen = new Set();
   const phases = json.phases.map((p, i) => {
-    shape(p, ['packId', 'phaseId'], ['loan'], 'campaign phase');
+    shape(p, ['packId', 'phaseId'], ['loan', 'joins'], 'campaign phase');
     if (typeof p.packId !== 'string' || !PACK.test(p.packId) || typeof p.phaseId !== 'string' || !PACK.test(p.phaseId)) fail('invalid pack or phase identity.');
     if (has(p, 'loan') && p.loan !== true) fail('loan must be true when present.');
+    if (has(p, 'joins') && p.loan === true) fail('a loan phase cannot add formations to the franchise army.');
+    if (has(p, 'joins') && (!Array.isArray(p.joins) || !p.joins.length || p.joins.length > CAMPAIGN_LIMITS.franchise)) fail('joins must be a nonempty list of formations.');
+    const joins = has(p, 'joins') ? p.joins.map((r) => formation(r, 'joining formation')) : null;
     if (seen.has(`${p.packId}/${p.phaseId}`)) fail('a phase appears twice on the ladder.');
     seen.add(`${p.packId}/${p.phaseId}`);
     const previous = json.phases[i - 1];
     if (previous && previous.packId !== p.packId) finished.add(previous.packId);
     if (finished.has(p.packId)) fail('a battle\'s phases must be contiguous on the ladder.');
     if (awardFor(json.id, 3, p.packId, p.phaseId, CAMPAIGN_LIMITS.attempts).length > CAMPAIGN_LIMITS.awardId) fail('phase award identity would be too long.');
-    return { packId: p.packId, phaseId: p.phaseId, ...(p.loan ? { loan: true } : {}) };
+    return { packId: p.packId, phaseId: p.phaseId, ...(p.loan ? { loan: true } : {}), ...(joins ? { joins } : {}) };
   });
+  if (unitIds.size > CAMPAIGN_LIMITS.franchise) fail('the franchise and its joining formations exceed the army limit.');
   return frozen({ version: 1, id: json.id, title, franchise, phases });
 }
 
@@ -85,19 +98,38 @@ function campaignSave(save, campaign) {
   if (s.version !== 2 || s.kind !== 'campaign') fail('expected a campaign save.');
   if (campaign) {
     if (s.campaign.id !== campaign.id) fail('the save belongs to another campaign.');
+    if (s.campaign.status === 'complete' && s.campaign.index < campaign.phases.length) {
+      // The ladder grew after this campaign finished (a new battle shipped): reopen it at the first new phase,
+      // with every formation that joins up to that phase.
+      return validateSnapshot({ ...s, campaign: { ...s.campaign, status: 'in-progress' }, army: withJoins(s.army, campaign, s.slot, s.campaign.index) });
+    }
     const end = s.campaign.index >= campaign.phases.length;
     if (s.campaign.index > campaign.phases.length || end !== (s.campaign.status === 'complete')) fail('the save does not match this campaign ladder.');
   }
   return s;
 }
 
-/** A fresh v2 save: index 0, the franchise roster as its army, nothing in the depot. */
+/** One army brigade for a franchise or joining row; its equipped item identity is `<campaign>.<slot>.<tag>.<unitId>`. */
+const enlist = (c, slot, r, tag, from) => ({ id: r.unitId, unitId: r.unitId, label: r.label, kind: r.kind, men: r.men, vet: r.vet,
+  weapon: { uid: `${c.id}.${slot}.${tag}.${r.unitId}`, itemId: r.weapon, tier: itemDef(r.weapon).tier, conditionId: 'serviceable', from },
+  base: vetBase(vetIds.indexOf(r.vet) + 1), ...(r.kind === 'battery' ? { guns: r.guns } : {}) });
+/** The army plus every formation that joins at a ladder phase up to `through` and is not in it yet (idempotent). */
+function withJoins(army, c, slot, through) {
+  const present = new Set(army.flatMap((b) => [b.id, ...(has(b, 'unitId') ? [b.unitId] : [])]));
+  const added = [];
+  for (const p of c.phases.slice(0, Math.max(0, through + 1))) for (const r of p.joins || []) {
+    if (present.has(r.unitId)) continue;
+    present.add(r.unitId);
+    added.push(enlist(c, slot, r, 'join', JOINED));
+  }
+  return added.length ? [...army, ...added] : army;
+}
+
+/** A fresh v2 save: index 0, the franchise roster (and the first phase's joins) as its army, nothing in the depot. */
 export function newCampaign({ campaign, slot, seed, at } = {}) {
   const c = validateCampaign(campaign);
   if (!c.franchise.length || !c.phases.length) fail('this campaign has no franchise roster or phases yet.');
-  const army = c.franchise.map((r) => ({ id: r.unitId, unitId: r.unitId, label: r.label, kind: r.kind, men: r.men, vet: r.vet,
-    weapon: { uid: `${c.id}.${slot}.muster.${r.unitId}`, itemId: r.weapon, tier: itemDef(r.weapon).tier, conditionId: 'serviceable', from: MUSTER },
-    base: vetBase(vetIds.indexOf(r.vet) + 1), ...(r.kind === 'battery' ? { guns: r.guns } : {}) }));
+  const army = withJoins(c.franchise.map((r) => enlist(c, slot, r, 'muster', MUSTER)), c, slot, 0);
   return validateSnapshot({ format: 'the-civil-war', version: 2, kind: 'campaign', awardId: `${c.id}.${slot}.start`, army, depot: [], issued: [],
     seed, grade: null, slot, campaign: { id: c.id, index: 0, status: 'in-progress', history: [], carry: {} }, ...(at === undefined ? {} : { updated: at }) });
 }
@@ -210,8 +242,10 @@ export function recordPhase(save, campaign, result) {
     carry[u.id] = kept;
   }
   const nextIndex = replay ? index : index + 1;
+  // A first play that reaches a new phase enlists that phase's joins (and any earlier ones the save lacks); a replay never does.
+  const fought = s.army.map((b) => changed.get(b.id) || b);
   return validateSnapshot({ ...s, awardId, grade: result.grade,
-    army: s.army.map((b) => changed.get(b.id) || b), depot: [...s.depot, ...result.loot],
+    army: replay ? fought : withJoins(fought, c, s.slot, Math.min(nextIndex, c.phases.length - 1)), depot: [...s.depot, ...result.loot],
     campaign: { id: c.id, index: nextIndex, status: nextIndex >= c.phases.length ? 'complete' : 'in-progress',
       history: [...history, { packId: entry.packId, phaseId: entry.phaseId, awardId, winner: result.winner, grade: result.grade,
         lossesUS: losses.US, lossesCS: losses.CS, replay }], carry },

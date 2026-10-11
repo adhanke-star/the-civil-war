@@ -65,6 +65,17 @@ function play(api, before, { replay = false, outcome } = {}) {
   const { outcome: result, record } = api.phaseResult({ phase, game, scenario });
   return { phase, scenario, result, record, after: api.recordPhase(before, CAMPAIGN, record) };
 }
+// Joins (fictional): Franklin's brigade enters the franchise army when the ladder first reaches a2.
+const JOIN = { unitId: 'franklin', label: 'Joining test brigade (fictional)', kind: 'infantry', men: 1800, weapon: 'enfield', vet: 'green' };
+const CAMPAIGN_J = { ...CAMPAIGN, phases: [CAMPAIGN.phases[0], { ...CAMPAIGN.phases[1], joins: [JOIN] }, CAMPAIGN.phases[2]] };
+const PLAYS_J = { a1: PLAYS.a1, a2: { ...PLAYS.a2, men: { ...PLAYS.a2.men, franklin: 1500 } }, b1: { ...PLAYS.b1, men: { ...PLAYS.b1.men, franklin: 1400 } } };
+function playJ(api, before, { replay = false, outcome } = {}) {
+  const phase = api.campaignPhase(before, CAMPAIGN_J, { replay });
+  const scenario = api.applyCampaign(PACKS[phase.packId][phase.phaseId], before, phase);
+  const { record } = api.phaseResult({ phase, game: fakeGame(scenario, outcome || PLAYS_J[phase.phaseId]), scenario });
+  return { phase, scenario, record, after: api.recordPhase(before, CAMPAIGN_J, record) };
+}
+const joined = (s) => s.army.filter((b) => b.unitId === JOIN.unitId || b.label === JOIN.label);
 function ladder(api) {
   const s0 = api.newCampaign({ campaign: CAMPAIGN, slot: 1, seed: 1862, at: '2026-10-11T12:00:00Z' });
   const p1 = play(api, s0), p2 = play(api, p1.after), p3 = play(api, p2.after);
@@ -274,6 +285,50 @@ export const CAMPAIGN_CHECKS = [
   }],
 ];
 
+CAMPAIGN_CHECKS.push(
+  ['joins-strict', (api) => {
+    const c = api.validateCampaign(CAMPAIGN_J);
+    assert.deepEqual(c.phases[1].joins?.map((r) => [r.unitId, r.label, r.kind, r.men, r.weapon, r.vet]),
+      [['franklin', JOIN.label, 'infantry', 1800, 'enfield', 'green']], 'joins-strict: joins kept on their phase');
+    assert.ok(!('joins' in c.phases[0]) && !('joins' in c.phases[2]), 'joins-strict: joins appear only where declared');
+    const at = (joins, i = 1, extra = {}) => ({ ...CAMPAIGN_J, phases: CAMPAIGN_J.phases.map((p, k) => (k === i ? { ...p, joins, ...extra } : p)) });
+    const bad = [at([{ ...JOIN, extra: 1 }]), at([{ ...JOIN, unitId: 'sherman' }]), at([JOIN, JOIN]), at([{ ...JOIN, weapon: 'napoleon' }]),
+      at([{ ...JOIN, guns: 2 }]), at([{ ...JOIN, unitId: 'has.dot' }]), at([{ ...JOIN, vet: 'raw' }]), at([]), at({ ...JOIN }), at([JOIN], 0),
+      { ...CAMPAIGN_J, phases: [CAMPAIGN_J.phases[0], CAMPAIGN_J.phases[1], { ...CAMPAIGN_J.phases[2], joins: [JOIN] }] },
+      { ...CAMPAIGN_J, phases: [CAMPAIGN_J.phases[0], { ...CAMPAIGN_J.phases[1], join: [JOIN] }, CAMPAIGN_J.phases[2]] }];
+    for (const json of bad) refuses('joins-strict', () => api.validateCampaign(json), /^Campaign: /);
+  }],
+  ['joins-append', (api) => {
+    const s0 = api.newCampaign({ campaign: CAMPAIGN_J, slot: 1, seed: 1862, at: '2026-10-11T12:00:00Z' });
+    assert.equal(joined(s0).length, 0, 'joins-append: a formation joined before the ladder reached its phase');
+    const p1 = playJ(api, s0), rows = joined(p1.after);
+    assert.deepEqual(rows.map((b) => [b.id, b.unitId, b.kind, b.men, b.guns, b.vet, b.weapon.itemId, b.weapon.uid]),
+      [['franklin', 'franklin', 'infantry', 1800, undefined, 'green', 'enfield', 'test-west.1.join.franklin']], 'joins-append: the joining formation is appended once on reaching its phase');
+    assert.deepEqual(p1.after.army.slice(0, s0.army.length), s0.army, 'joins-append: joining changed the existing army');
+    assert.deepEqual(api.parseSnapshot(api.exportSnapshot(p1.after)), p1.after, 'joins-append: a save with a joined formation does not round-trip');
+    const p2 = playJ(api, p1.after), f = unit(p2.scenario, 'franklin');
+    assert.deepEqual([f.men, f.xp, f.weapon, f.equipment?.itemId, f.equipment?.uid], [1800, 1, 'smooth', 'enfield', 'test-west.1.join.franklin'], 'joins-append: the joined formation takes the field with its army state');
+    assert.deepEqual([brigade(p2.after, 'franklin').men, joined(p2.after).length], [1500, 1], 'joins-append: the joined formation keeps its losses');
+    const head = { ...CAMPAIGN_J, phases: [CAMPAIGN_J.phases[1], CAMPAIGN_J.phases[2]] };
+    assert.equal(joined(api.newCampaign({ campaign: head, slot: 2, seed: 3 })).length, 1, 'joins-append: a first phase\'s joins are not in the new army');
+  }],
+  ['ladder-grows', (api) => {
+    // A finished campaign reopens when a later release adds a battle: next phase is the first new one.
+    const { p3 } = ladder(api);
+    const grown = { ...CAMPAIGN, phases: [...CAMPAIGN.phases, { packId: 'charlie', phaseId: 'c1', joins: [JOIN] }] };
+    assert.equal(api.campaignPhase(p3.after, CAMPAIGN), null, 'ladder-grows: the original ladder stays complete');
+    assert.equal(api.campaignPhase(p3.after, grown)?.phaseId, 'c1', 'ladder-grows: a grown ladder reopens at its first new phase');
+  }],
+  ['joins-replay', (api) => {
+    const s0 = api.newCampaign({ campaign: CAMPAIGN_J, slot: 1, seed: 1862 }), p1 = playJ(api, s0), p2 = playJ(api, p1.after);
+    const r = playJ(api, p2.after, { replay: true });
+    assert.deepEqual([r.phase.replay, r.after.campaign.index, joined(r.after).length, r.after.army.length], [true, 2, 1, p2.after.army.length], 'joins-replay: a replay duplicated a joined formation');
+    assert.deepEqual(api.recordPhase(p2.after, CAMPAIGN_J, p2.record), p2.after, 'joins-replay: re-recording the award changed the army');
+    const p3 = playJ(api, r.after);
+    assert.deepEqual([p3.after.campaign.status, joined(p3.after).length, brigade(p3.after, 'franklin').men], ['complete', 1, 1400], 'joins-replay: the next battle duplicated or lost a joined formation');
+  }],
+);
+
 const MUTANTS = {
   'shipped-campaign': { validateCampaign: (json) => ({ ...json }) },
   'new-campaign': { newCampaign: (o) => { const s = campaign.newCampaign(o); return { ...s, army: s.army.map(({ unitId, ...b }) => b) }; } },
@@ -289,6 +344,7 @@ const MUTANTS = {
   'new-battle-clears-carry': { applyCampaign: (s, v, p) => campaign.applyCampaign(s, v, { ...p, packId: v.campaign.history.at(-1)?.packId ?? p.packId }) },
   'replay-marked': { campaignPhase: (s, c) => campaign.campaignPhase(s, c) },
   'idempotent-award': { recordPhase: (s, c, { awardId, ...r }) => campaign.recordPhase(s, c, r) },
+  'ladder-grows': { campaignPhase: (s, c, o) => (s.campaign.status === 'complete' ? null : campaign.campaignPhase(s, c, o)) },
   'last-phase-complete': { recordPhase: (s, c, r) => { const n = campaign.recordPhase(s, c, r); return save.validateSnapshot({ ...n, campaign: { ...n.campaign, status: 'in-progress' } }); } },
   'slot-isolation': { createProgressStore: (mem, o = {}) => save.createProgressStore(mem, { ...o, slot: 1 }) },
   'v1-unchanged': { validateSnapshot: (v) => (v.version === 1 ? copy(v) : save.validateSnapshot(v)) },
@@ -298,6 +354,16 @@ const MUTANTS = {
   } },
   'strict-validator': { validateSnapshot: (v) => v, parseSnapshot: (t) => JSON.parse(t) },
   'phase-bridge': { phaseOutcome: (o) => phaseOutcome({ ...o, seed: `${o.seed}x` }) },
+  // joins silently dropped by the validator
+  'joins-strict': { validateCampaign: (json) => campaign.validateCampaign({ ...json, phases: json.phases.map(({ joins, ...p }) => p) }) },
+  // a recordPhase that never enlists anyone
+  'joins-append': { recordPhase: (s, c, r) => { const n = campaign.recordPhase(s, c, r); return save.validateSnapshot({ ...n, army: n.army.filter((b) => s.army.some((a) => a.id === b.id)) }); } },
+  // a replay that enlists the joining row again under a fresh identity
+  'joins-replay': { recordPhase: (s, c, r) => {
+    const n = campaign.recordPhase(s, c, r), f = n.army.find((b) => b.unitId === 'franklin');
+    if (!f || !n.campaign.history.at(-1).replay) return n;
+    return save.validateSnapshot({ ...n, army: [...n.army, { ...f, id: 'franklin-2', unitId: 'franklin-2', weapon: { ...f.weapon, uid: `${f.weapon.uid}-2` } }] });
+  } },
   'real-game-bridge': { applyCampaign: (s, v, p) => {
     const out = campaign.applyCampaign(s, v, p);
     out.units.find((u) => u.id === 'ricketts').equipment = { ...v.army.find((b) => b.id === 'sherman').weapon };

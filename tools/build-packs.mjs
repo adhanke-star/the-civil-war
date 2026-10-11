@@ -12,7 +12,8 @@
 //   - turns reinforcement clock times into phase offsets: atSec = (clock - start) * 60 / clockRatio;
 //   - picks each phase's men per figure: the smallest whole ratio (5..40) that keeps the phase's drawn figures
 //     (src/sim/phase.js unitFigures: infantry men / ratio, crews men / 4, plus 6 per formation) within FIGURE_BUDGET;
-//   - draws each 1862 field clearing as a deterministic irregular oval around its landmark;
+//   - draws each 1862 field clearing (a woods-based pack) or wood (a fields-based pack, src.groundBase 'fields') as a
+//     deterministic irregular oval around its landmark;
 //   - lays every label to read left to right from the phase's opening camera (label angle = -camera yaw);
 //   - validates every phase with preparePhase and prepareFieldScenario(..., 'pack') before writing.
 // Output is deterministic (no clock, no randomness) with a fixed key order, so tools/test-shiloh.mjs can rebuild
@@ -46,13 +47,17 @@ const round3 = v => Math.round(v * 1000) / 1000 + 0;
 const round1 = v => Math.round(v * 10) / 10 + 0;
 const clockMin = hhmm => { const [h, m] = hhmm.split(':').map(Number); return h * 60 + m; };
 
-/** Resolve a position descriptor to [x, z] metres: { lat, lon } | { near, bearing?, m? } | { mid: [a, b], bearing?, m? } | { onStream, frac }. */
+/**
+ * Resolve a position descriptor to [x, z] metres: { lat, lon } | { near, bearing?, m? } | { mid: [a, b], bearing?, m? }
+ * | { onStream, frac } | { onRoad, frac } (a terrain stream or road by name, the first with that name; frac of its
+ * length inside the map), each optionally offset by { bearing, m }.
+ */
 export function resolver(frame, landmarks) {
   const at = {};
   for (const [key, l] of Object.entries(landmarks)) at[key] = frame.project(l.lat, l.lon);
-  const streamPoint = (name, frac) => {
-    const s = frame.meta.streams.find(v => v.name === name);
-    if (!s) throw new Error(`build-packs: no terrain stream "${name}"`);
+  const linePoint = (kind, name, frac) => {
+    const s = frame.meta[kind].find(v => v.name === name);
+    if (!s) throw new Error(`build-packs: no terrain ${kind === 'roads' ? 'road' : 'stream'} "${name}"`);
     const lim = frame.half - 150, pts = s.points.filter(([x, z]) => Math.abs(x) <= lim && Math.abs(z) <= lim);
     const seg = []; let len = 0;
     for (let i = 1; i < pts.length; i++) { const d = Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]); seg.push(d); len += d; }
@@ -68,7 +73,8 @@ export function resolver(frame, landmarks) {
     if (p && 'lat' in p) base = frame.project(p.lat, p.lon);
     else if (p && p.near) base = at[p.near];
     else if (p && p.mid) base = p.mid.every(k => at[k]) ? [(at[p.mid[0]][0] + at[p.mid[1]][0]) / 2, (at[p.mid[0]][1] + at[p.mid[1]][1]) / 2] : undefined;
-    else if (p && p.onStream) base = streamPoint(p.onStream, p.frac ?? 0.5);
+    else if (p && p.onStream) base = linePoint('streams', p.onStream, p.frac ?? 0.5);
+    else if (p && p.onRoad) base = linePoint('roads', p.onRoad, p.frac ?? 0.5);
     if (!base) throw new Error(`build-packs: ${label}: unresolvable position ${JSON.stringify(p)}`);
     const m = p.m || 0, b = (p.bearing || 0) * DEG;
     return [round(base[0] + m * Math.sin(b)), round(base[1] - m * Math.cos(b))];
@@ -151,8 +157,10 @@ export function buildPackFrom(src) {
       camera,
       victory: { ...phase.victory },
       briefing: { text: [...phase.briefing.text], ...(phase.briefing.quote ? { quote: { ...phase.briefing.quote } } : {}), sources: [...phase.briefing.sources] },
-      ground: { base: 'woods', clearings: src.clearings.map((c, i) => ({ name: c.name, polygon: oval(resolve(c.at, c.name), { ...c.shape, seed: i + 1 }) })), treeSpacing: src.treeSpacing },
-      woods: [],
+      // A woods-based pack clears its named fields; a fields-based pack plants its named woods (src.woods).
+      ground: src.groundBase === 'fields' ? { base: 'fields', treeSpacing: src.treeSpacing }
+        : { base: 'woods', clearings: src.clearings.map((c, i) => ({ name: c.name, polygon: oval(resolve(c.at, c.name), { ...c.shape, seed: i + 1 }) })), treeSpacing: src.treeSpacing },
+      woods: (src.woods || []).map((w, i) => ({ name: w.name, polygon: oval(resolve(w.at, w.name), { ...w.shape, seed: i + 1 }) })),
       woodsNote: src.woodsNote,
       sites: src.sites.map(s => { const [x, z] = resolve(s.at, s.name); return { id: s.id, name: s.name, x, z, rot: s.rot, yard: s.yard,
         ...(s.fenceRadius ? { fenceRadius: s.fenceRadius } : {}), source: s.source, buildings: s.buildings.map(b => [...b]), ...(s.orchard ? { orchard: [...s.orchard] } : {}) }; }),
