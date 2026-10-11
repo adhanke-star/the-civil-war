@@ -1,11 +1,11 @@
-name: Reward focus raw input probe (private only)
+name: Reward focus warning observation (private, pending approval)
 on:
   push:
     branches: [reward-focus-inputs-private]
 permissions:
   contents: read
 jobs:
-  inputs:
+  diagnostic:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     container:
@@ -15,13 +15,15 @@ jobs:
       GIT_CONFIG_COUNT: '1'
       GIT_CONFIG_KEY_0: safe.directory
       GIT_CONFIG_VALUE_0: /__w/the-civil-war/the-civil-war
+      REWARD_FOCUS_WARNING_DIAGNOSTIC_AUTHORIZATION: one-observational-run
     defaults:
       run:
         shell: bash
     steps:
       - uses: actions/checkout@v4
-      - name: Bind exact private and virtual source parents
+      - name: Bind exact retained source parents
         run: |
+          set -euo pipefail
           test "$GITHUB_REF" = "refs/heads/reward-focus-inputs-private"
           test "$GITHUB_WORKSPACE" = "/__w/the-civil-war/the-civil-war"
           test "$(realpath "$GITHUB_WORKSPACE")" = "$GITHUB_WORKSPACE"
@@ -38,44 +40,37 @@ jobs:
           cache: npm
       - name: Retain complete runtime setup streams
         run: |
+          set -euo pipefail
           mkdir .out
-          {
-            node --version
-            npm ci
-            node -e 'const fs=require("node:fs"); const p=JSON.parse(fs.readFileSync("node_modules/playwright/package.json")); if(p.version!=="1.63.0")throw Error("Playwright version mismatch"); console.log("PLAYWRIGHT "+p.version)'
-          } > .out/reward-focus-private-setup.stdout 2> .out/reward-focus-private-setup.stderr
-      - name: Collect missing raw focus inputs once
+          node tools/test-reward-focus-private.mjs --warning-diagnostic-capture setup
+      - name: Observe four isolated processes in pointer keyboard keyboard pointer order once
+        id: observe
         run: |
-          timeout --signal=TERM --kill-after=5s 1200s node tools/test-reward-focus-private.mjs --collect > .out/reward-focus-private.stdout 2> .out/reward-focus-private.stderr
-      - name: Bind complete private input envelope
-        run: |
-          node tools/test-reward-focus-private.mjs --pack > .out/reward-focus-private-pack.stdout 2> .out/reward-focus-private-pack.stderr
-      - name: Admit complete final upload selection
-        run: node tools/test-reward-focus-private.mjs --upload-admit
-      - name: Retain bounded complete private proof
+          set -euo pipefail
+          node tools/test-reward-focus-private.mjs --warning-diagnostic-capture collect
+      - name: Bind complete observational forensic envelope
+        if: always()
+        id: pack
+        run: node tools/test-reward-focus-private.mjs --warning-diagnostic-pack
+      - name: Retain bounded observational proof
+        if: always() && steps.pack.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: reward-focus-private-inputs
+          name: reward-focus-warning-diagnostic
           path: |
-            .out/reward-focus-private-envelope.cwproof
-            .out/reward-focus-private-envelope-metadata.json
-            .out/reward-focus-private-upload-admission.json
-            .out/reward-focus-private-pack.stdout
-            .out/reward-focus-private-pack.stderr
-            .out/reward-focus-virtual/.out/*.png
+            .out/warning-diagnostic-envelope.cwproof
+            .out/warning-diagnostic-metadata.json
+            .out/warning-diagnostic-source.json
           include-hidden-files: true
           retention-days: 7
           compression-level: 6
-      - name: Preserve raw private failure evidence
-        if: failure()
+      - name: Preserve failed diagnostic forensic evidence
+        if: always() && steps.pack.outcome != 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: reward-focus-private-inputs-failure
-          path: |
-            .out/reward-focus-private-*.json
-            .out/reward-focus-private*.stdout
-            .out/reward-focus-private*.stderr
-            .out/reward-focus-virtual/.out/*.png
+          name: reward-focus-warning-diagnostic-failure
+          path: .out/
           include-hidden-files: true
           retention-days: 7
           compression-level: 6
+          if-no-files-found: warn
