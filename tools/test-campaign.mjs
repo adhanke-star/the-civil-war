@@ -92,8 +92,10 @@ function refuses(name, run, pattern) {
 export const CAMPAIGN_CHECKS = [
   ['shipped-campaign', (api) => {
     const c = api.validateCampaign(SHIPPED);
-    assert.ok(c.id === 'west' && c.version === 1 && c.franchise.length === 0 && c.phases.length === 0, 'shipped-campaign: shipped ladder is not the empty v1 shell');
-    refuses('shipped-campaign', () => api.newCampaign({ campaign: SHIPPED, slot: 1, seed: 1 }), /^Campaign: this campaign has no franchise roster or phases yet/);
+    assert.ok(c.id === 'west' && c.version === 1 && c.franchise.length > 0 && c.phases.length > 0, 'shipped-campaign: shipped ladder validates with a roster and phases');
+    const started = api.newCampaign({ campaign: SHIPPED, slot: 1, seed: 1 });
+    assert.ok(started.campaign.index === 0 && started.army.length === c.franchise.length, 'shipped-campaign: shipped ladder starts at its first phase with the whole roster');
+    assert.equal(api.campaignPhase(started, SHIPPED).phaseId, c.phases[0].phaseId, 'shipped-campaign: first phase is the ladder head');
     const bad = [{ ...CAMPAIGN, extra: 1 }, { ...CAMPAIGN, version: 2 },
       { ...CAMPAIGN, phases: [...CAMPAIGN.phases, { packId: 'alpha', phaseId: 'a3' }] },
       { ...CAMPAIGN, phases: [{ packId: 'alpha', phaseId: 'a1', loan: false }] },

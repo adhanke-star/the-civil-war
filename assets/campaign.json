@@ -1,7 +1,24 @@
 {
   "version": 1,
   "id": "west",
-  "title": "The War in the West: Shiloh to Chattanooga",
-  "franchise": [],
-  "phases": []
+  "title": "The Western Campaign 1862–63",
+  "franchise": [
+    { "unitId": "us-hazen-brigade", "label": "Hazen's Brigade (19th Brigade, Nelson's Division, Army of the Ohio)", "kind": "infantry", "men": 1415, "weapon": "m1842", "vet": "green" },
+    { "unitId": "us-ammen-brigade", "label": "Ammen's Brigade (10th Brigade, Nelson's Division, Army of the Ohio)", "kind": "infantry", "men": 1563, "weapon": "m1842", "vet": "green" },
+    { "unitId": "us-bruce-brigade", "label": "Bruce's Brigade (22nd Brigade, Nelson's Division, Army of the Ohio)", "kind": "infantry", "men": 1563, "weapon": "m1842", "vet": "green" },
+    { "unitId": "us-wsmith-brigade", "label": "W. S. Smith's Brigade (14th Brigade, Crittenden's Division, Army of the Ohio)", "kind": "infantry", "men": 1639, "weapon": "m1842", "vet": "green" },
+    { "unitId": "us-boyle-brigade", "label": "Boyle's Brigade (11th Brigade, Crittenden's Division, Army of the Ohio)", "kind": "infantry", "men": 2186, "weapon": "m1842", "vet": "green" },
+    { "unitId": "us-rousseau-brigade", "label": "Rousseau's Brigade (4th Brigade, McCook's Division, Army of the Ohio)", "kind": "infantry", "men": 2517, "weapon": "m1842", "vet": "green" },
+    { "unitId": "us-kirk-brigade", "label": "Kirk's Brigade (5th Brigade, McCook's Division, Army of the Ohio)", "kind": "infantry", "men": 2517, "weapon": "m1842", "vet": "green" },
+    { "unitId": "us-gibson-brigade", "label": "W. H. Gibson's Brigade (6th Brigade, McCook's Division, Army of the Ohio)", "kind": "infantry", "men": 2518, "weapon": "m1842", "vet": "green" },
+    { "unitId": "us-terrill-battery", "label": "Battery H, 5th U.S. Artillery (Terrill)", "kind": "battery", "men": 120, "guns": 6, "weapon": "napoleon", "vet": "trained" },
+    { "unitId": "us-mendenhall-batteries", "label": "Batteries H and M, 4th U.S. Artillery (Mendenhall)", "kind": "battery", "men": 160, "guns": 8, "weapon": "howitzer12", "vet": "trained" },
+    { "unitId": "us-bartlett-battery", "label": "Battery G, 1st Ohio Light Artillery (Bartlett)", "kind": "battery", "men": 120, "guns": 6, "weapon": "sixPdr", "vet": "green" }
+  ],
+  "phases": [
+    { "packId": "shiloh", "phaseId": "camps-at-dawn", "loan": true },
+    { "packId": "shiloh", "phaseId": "hornets-nest", "loan": true },
+    { "packId": "shiloh", "phaseId": "grants-last-line", "loan": true },
+    { "packId": "shiloh", "phaseId": "buell-attacks" }
+  ]
 }
