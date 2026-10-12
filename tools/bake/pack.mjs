@@ -347,19 +347,40 @@ function measureColours(render) {
   return out;
 }
 
-// A variant's composition: head preset (with its CC0 assets), hat, blanket roll.
+// SIDE (environment, default 'us') must match the side render.json was baked as (render.py writes
+// `side` only for 'cs'), so a Confederate pack can never be labelled Union or the reverse.
+function resolveSide(envSide, renderSide) {
+  const e = String(envSide || 'us').trim().toLowerCase();
+  if (e !== 'us' && e !== 'cs') throw new Error(`SIDE must be "us" or "cs", got "${envSide}"`);
+  const r = renderSide || 'us';
+  if (r !== e) throw new Error(`SIDE mismatch: pack.mjs runs with SIDE=${e} but render.json was baked as ${r}; refusing to label a ${r} pack as ${e}`);
+  return e;
+}
+
+// A variant's composition: head preset (with its CC0 assets), hat, blanket roll; SIDE=cs adds
+// `cloth` (jacket, trousers, felt colour keys; tools/bake/README.md "Confederate bake").
 function variantComposition(name, render, probe) {
-  let c = render?.field_variants?.[name]?.composition;
+  let c = render?.field_variants?.[name]?.composition || render?.close_variants?.[name]?.composition ||
+    (name === 'base' ? render?.base_composition : null);
   if (!c) {
     const m = /^(h\d+)_(cap|slouch)_(roll|noroll)$/.exec(name);
     c = m ? { head: m[1], hat: m[2], roll: m[3] === 'roll' } : { head: probe?.heads_default || 'h1', hat: 'cap', roll: true };
   }
   const h = probe?.heads?.[c.head] || {};
-  return {
+  const out = {
     head: c.head, headLabel: h.label ?? null, use: h.use ?? null, hat: c.hat === 'slouch' ? 'slouch hat' : 'forage cap',
     blanketRoll: !!c.roll,
     assets: { skin: h.skin ?? null, hair: h.hair ?? null, eyebrows: h.brows ?? null, eyelashes: h.lashes ?? null, eyes: h.eyes ?? null, beard: h.beard ?? null },
   };
+  if (c.cloth) out.cloth = { jacket: c.cloth.coat ?? null, trousers: c.cloth.trousers ?? null, felt: c.hat === 'slouch' ? (c.cloth.felt ?? null) : null };
+  return out;
+}
+
+// Confederate packs refuse any composition whose head is not use:"any" (h7 is USCT only).
+function checkSideHeads(side, comps) {
+  if (side !== 'cs') return;
+  const bad = Object.entries(comps).filter(([, c]) => c.use !== 'any').map(([n, c]) => `${n} (head ${c.head}, use ${c.use})`);
+  if (bad.length) throw new Error(`SIDE=cs pack has looks with a head that is not use:"any": ${bad.join(', ')}`);
 }
 
 function pack() {
@@ -368,6 +389,7 @@ function pack() {
   const render = readJSON(path.join(OUT, 'report', 'render.json'));
   const poses = readJSON(path.join(OUT, 'report', 'poses.json'));
   const probe = readJSON(path.join(OUT, 'report', 'probe.json'));
+  const side = resolveSide(process.env.SIDE, render.side);
   const clips = render.clips || poses.clips || {};
   const tiers = {};
   for (const tier of ['close', 'field']) {
@@ -398,10 +420,18 @@ function pack() {
   const fieldVariants = tierVariants.field;
   if (tiers.field) tiers.field.baseComposition = variantComposition('base', render, probe);
   if (tiers.close) tiers.close.baseComposition = variantComposition('base', render, probe);
+  checkSideHeads(side, {
+    base: variantComposition('base', render, probe),
+    ...Object.fromEntries(['field', 'close'].flatMap((t) => Object.entries(tierVariants[t]).map(([n, v]) => [`${t}:${n}`, v.composition]))),
+  });
   const measuredColours = measureColours(render);
+  const cs = side === 'cs';
   const manifest = {
     version: 1,
-    subject: 'Union infantry private, Western theater, 1862 (third-pass bake; uniform and kit are placeholder/Inferred)',
+    side,
+    subject: cs
+      ? 'Confederate infantry private, Western theater, 1862-63 (SIDE=cs bake; shell jacket, jean cloth and kit are placeholder/Inferred, colours estimates; see tools/bake/README.md)'
+      : 'Union infantry private, Western theater, 1862 (third-pass bake; uniform and kit are placeholder/Inferred)',
     generated: new Date().toISOString(),
     frameKey: '<clip>_<index>_d<direction, 2 digits>',
     rectRule: 'draw atlas rect (x,y,w,h) at (screenAnchor - (ax,ay) + (ox,oy)) where (ax,ay) and ppm are the frame record\'s own fields (feet anchor in the untrimmed frame, px per metre); scale the rect by (game px per metre) / ppm. One ppm per clip; one anchor per clip and direction. tiers.<tier>.anchor/pxPerMetre are the stand clip at direction 0, kept for older readers',
@@ -410,14 +440,16 @@ function pack() {
     // added (second pass)
     lights: render.lights, quick: render.quick, variantsFraming: render.variants_framing,
     measuredColours,
-    readability: 'field tier only: musket cross-section thickened x' + (render.params?.field_musket_scale ?? '?') + ' (length unchanged) so it survives at 96 px; field tier only (third pass): the slouch hat is a twin with a wider brim (0.105 m vs 0.075 m) in a lighter felt (#5a5045 vs #151413)',
+    readability: 'field tier only: musket cross-section thickened x' + (render.params?.field_musket_scale ?? '?') + ' (length unchanged) so it survives at 96 px; field tier only (third pass): the slouch hat is a twin with a wider brim (0.105 m vs 0.075 m) in a lighter felt ' +
+      (cs ? '(per look: the field twin of its felt colour)' : '(#5a5045 vs #151413)'),
     // added (third pass)
-    heads: Object.fromEntries(Object.entries(probe.heads || {}).map(([k, h]) => [k, {
+    heads: Object.fromEntries(Object.entries(probe.heads || {}).filter(([, h]) => !cs || h.use === 'any').map(([k, h]) => [k, {
       label: h.label, use: h.use, skin: h.skin ?? null, hair: h.hair ?? null, eyebrows: h.brows ?? null,
       eyelashes: h.lashes ?? null, eyes: h.eyes ?? null, beard: h.beard ?? null, targets: h.targets_applied ?? {},
       missing: h.missing ?? [],
     }])),
-    headsNote: 'every head preset is built only from CC0 assets (MakeHuman system assets; bodyparts05 beards) and MPFB2 CC0 targets; use "usct" heads only for United States Colored Troops regiments',
+    headsNote: 'every head preset is built only from CC0 assets (MakeHuman system assets; bodyparts05 beards) and MPFB2 CC0 targets; use "usct" heads only for United States Colored Troops regiments' +
+      (cs ? '; this Confederate pack lists and uses only use:"any" heads' : ''),
     grips: poses.grip_mesh || {},
     gripsNote: 'per clip frame and hand: finger segments (of 15) whose real skinned mesh is within ' + (poses.constants?.contact_mm ?? 3) + ' mm of the held surface, and the deepest penetration (mm) into the musket, rammer or cartridge',
     shards: render.shards || null,
@@ -474,6 +506,7 @@ function summary() {
     }
   }
   lines.push(`| **timed total (CPU-job seconds, summed over parallel jobs)** | **${total.toFixed(1)}** (${(total / 60).toFixed(1)} min) | |`, '');
+  lines.push(`Side: **${readJSON(path.join(OUT, 'report', 'render.json')).side || 'us'}** (SIDE=${process.env.SIDE || 'us'})`, '');
   const probe = readJSON(path.join(OUT, 'report', 'probe.json'));
   lines.push('## Body route', '');
   if (probe.route === 'mpfb2-headless') {
@@ -542,5 +575,38 @@ function summary() {
   console.log(lines.join('\n'));
 }
 
-if (argv.includes('--summary')) summary();
+// node tools/bake/pack.mjs --self-test : the side guards, with their failure text (no files read
+// or written). Exits non-zero on the first failed expectation.
+function selfTest() {
+  const fails = [];
+  const expectThrow = (label, fn, text) => {
+    try { fn(); fails.push(`${label}: did not throw`); } catch (e) {
+      if (!String(e.message).includes(text)) fails.push(`${label}: threw "${e.message}", expected text "${text}"`);
+    }
+  };
+  const expectEq = (label, got, want) => { if (JSON.stringify(got) !== JSON.stringify(want)) fails.push(`${label}: got ${JSON.stringify(got)}, want ${JSON.stringify(want)}`); };
+  expectEq('unset SIDE is us', resolveSide(undefined, undefined), 'us');
+  expectEq('cs matches cs', resolveSide('cs', 'cs'), 'cs');
+  expectThrow('cs env, union render', () => resolveSide('cs', undefined), 'SIDE mismatch: pack.mjs runs with SIDE=cs but render.json was baked as us');
+  expectThrow('us env, cs render', () => resolveSide('us', 'cs'), 'refusing to label a cs pack as us');
+  expectThrow('bad SIDE', () => resolveSide('csa', 'cs'), 'SIDE must be "us" or "cs", got "csa"');
+  const probe = { heads: { h1: { label: 'a', use: 'any' }, h7: { label: 'b', use: 'usct' } } };
+  const render = {
+    base_composition: { head: 'h1', hat: 'slouch', roll: true, cloth: { coat: 'greyjean', trousers: 'brownjean', felt: 'brown' } },
+    field_variants: { h1_cap_roll_cadet: { composition: { head: 'h1', hat: 'cap', roll: true, cloth: { coat: 'cadet', trousers: 'greyjean', felt: 'black' } } } },
+  };
+  expectEq('cs base cloth', variantComposition('base', render, probe).cloth, { jacket: 'greyjean', trousers: 'brownjean', felt: 'brown' });
+  expectEq('cs cap look has no felt', variantComposition('h1_cap_roll_cadet', render, probe).cloth, { jacket: 'cadet', trousers: 'greyjean', felt: null });
+  expectEq('union base unchanged', variantComposition('base', {}, probe), {
+    head: 'h1', headLabel: 'a', use: 'any', hat: 'forage cap', blanketRoll: true,
+    assets: { skin: null, hair: null, eyebrows: null, eyelashes: null, eyes: null, beard: null } });
+  const h7 = variantComposition('h7_cap_roll', {}, probe);
+  expectThrow('cs refuses a usct head', () => checkSideHeads('cs', { 'field:h7_cap_roll': h7 }), 'SIDE=cs pack has looks with a head that is not use:"any": field:h7_cap_roll (head h7, use usct)');
+  checkSideHeads('us', { 'field:h7_cap_roll': h7 });   // the Union pack keeps its USCT look
+  if (fails.length) { console.error('pack.mjs self-test FAILED\n' + fails.join('\n')); process.exit(1); }
+  console.log('pack.mjs self-test ok (side guards, cloth composition, usct refusal)');
+}
+
+if (argv.includes('--self-test')) selfTest();
+else if (argv.includes('--summary')) summary();
 else pack();

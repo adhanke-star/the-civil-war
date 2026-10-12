@@ -4,6 +4,12 @@
 # Stage 2 of the bake: dress the MPFB body (work/body.blend) as a first-pass Union infantry
 # private, Western theater, 1862, and save work/soldier.blend.
 #
+# SIDE (environment, default "us"): "cs" dresses a Western Confederate private instead (shell
+# jacket, jean cloth, frame buckle, grey kepi / felt slouch hats; CS_D, CS_COL, CS_CLOTH below).
+# With SIDE unset or "us" every table and code path is the Union one, unchanged. In "cs" the
+# jacket, trouser and felt colours are one material per colour (tcw_<role>_<key>, fake user,
+# custom property tcw_cloth_role); render.py swaps them per look (render.py CS_LOOKS).
+#
 # Garments are shells offset from the body and skinned with the body's own bone weights;
 # kit is built from primitives; every number lives in the table below.
 #
@@ -27,6 +33,10 @@ from mathutils.bvhtree import BVHTree
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C  # noqa: E402
+
+SIDE = (os.environ.get("SIDE") or "us").strip().lower()
+if SIDE not in ("us", "cs"):
+    raise SystemExit("uniform.py: SIDE must be 'us' or 'cs', got %r" % os.environ.get("SIDE"))
 
 # =====================================================================================
 # THE TABLE. Metres and sRGB hex. basis: "Inferred" = commonly stated, needs 2 sources;
@@ -172,6 +182,66 @@ COL = {
 }
 
 # =====================================================================================
+# CONFEDERATE (SIDE=cs). Western theatre infantry, Shiloh (Apr 1862) to Chattanooga (Nov 1863).
+# Dress reference: README "Confederate bake (SIDE=cs)". Verified in that summary: half-uniformed
+# mixed dress, jean cloth, plant-dyed greys fading to brown/tan, slouch hats dominant, brogans,
+# plain frame/roller buckles. Every HEX below is an ESTIMATE (Inferred at best); every cut number
+# is a placeholder judged by eye. No Columbus-depot trim (the pack must serve Shiloh 1862), no
+# CS-marked buttons, no "US" or "CS" plate, no federal-blue trousers, no knapsack.
+# =====================================================================================
+CS_D = {
+    # shell jacket: short, ends at the hip, no skirt flare
+    "coat_hem_below_hip":  -0.02,   # hem 2 cm ABOVE the hip joints            placeholder
+    "coat_hem_flare":      0.0,     # no flare (a jacket, not a coat)          placeholder
+    "fold_skirt":          0.004,   # the short hem barely folds               placeholder
+    "button_count":        7,       # 7 plain buttons (6-9 seen at Shiloh)     Inferred
+    # plain frame buckle replaces the oval plate: (along the belt, across it)
+    "belt_plate":          (0.050, 0.062),  # frame/roller buckle w x h       placeholder
+    "collar_style":        "standing",      # plain standing collar, no trim  Inferred
+    "collar_gap_deg":      30.0,    # closes higher at the throat than the sack coat placeholder
+}
+CS_COL = dict(COL)
+for _k in ("coat", "trousers", "felt", "felt_field"):
+    del CS_COL[_k]   # one material per colour instead: CS_CLOTH
+CS_COL.update({
+    "cap":         ("#6f7275", 0.90),   # grey jean kepi / forage cap (estimate)
+    "haversack":   ("#9c9178", 0.80),   # plain (unpainted) cotton haversack (estimate)
+})
+# role -> colour key -> (sRGB hex albedo, roughness, faded hex). Estimates from the dress reference:
+# grey jean #7B7F80 fading to #A39A82; butternut/brown jean #6E5A3E fading to #9A8560; cadet grey
+# #8A949B. Felt colours (light grey, brown, tan, black) and the field-tier felts are estimates
+# judged by eye (field felts lighter so the brim reads at 96 px, as the Union field twin).
+CS_CLOTH = {
+    "coat": {
+        "greyjean":  ("#7b7f80", 0.92, "#a39a82"),
+        "butternut": ("#6e5a3e", 0.92, "#9a8560"),
+        "fadedtan":  ("#a39a82", 0.92, "#b2a88f"),   # grey jean already faded to tan-grey
+        "cadet":     ("#8a949b", 0.90, "#a2a6a3"),   # cadet grey: one look only (minor in the West)
+    },
+    "trousers": {
+        "greyjean":  ("#7b7f80", 0.92, "#a39a82"),
+        "brownjean": ("#6e5a3e", 0.92, "#9a8560"),
+    },
+    "felt": {
+        "lightgrey": ("#8c8a84", 0.85, "#a29e94"),
+        "brown":     ("#4a3b2c", 0.85, "#655443"),
+        "tan":       ("#8a7656", 0.85, "#a08c6c"),
+        "black":     ("#151413", 0.85, "#3a3631"),
+    },
+    "felt_field": {   # FIELD TIER ONLY twins (readability choice)
+        "lightgrey": ("#a29f98", 0.90, "#b3aea3"),
+        "brown":     ("#6a5844", 0.90, "#7d6c58"),
+        "tan":       ("#a08a68", 0.90, "#b09c7c"),
+        "black":     ("#5a5045", 0.90, "#7a6e5e"),
+    },
+}
+# the materials the garments are built with (render.py CS_LOOKS["base"] sets the same keys)
+CS_BASE_CLOTH = {"coat": "greyjean", "trousers": "brownjean", "felt": "brown", "felt_field": "brown"}
+if SIDE == "cs":
+    D.update(CS_D)
+    COL = CS_COL
+
+# =====================================================================================
 # HEAD PRESETS (third pass). probe_mpfb.py reads this literal (ast) to build the heads; uniform.py
 # shades them; render.py picks one per variant. Every asset is CC0: skins, hair, eyebrows,
 # eyelashes and eyes from the MakeHuman system assets pack; beards and the moustache from the
@@ -250,6 +320,11 @@ REP = {"table": {k: v for k, v in D.items()}, "colours": COL, "objects": {}}
 # a light tan; mud a dark brown.
 FADE = {"coat": "#2e3a66", "cap": "#2c3658", "trousers": "#8ea6cc", "blanket": "#8a8272",
         "canteen": "#857c6c", "felt": "#3a3631", "webbing": "#958a72", "haversack": "#3a3832"}
+if SIDE == "cs":
+    REP["side"] = SIDE
+    REP["cs_cloth"] = CS_CLOTH
+    REP["cs_base_cloth"] = CS_BASE_CLOTH
+    FADE = dict(FADE, cap="#8f8e86", haversack="#b3a98e")   # cloth roles fade per colour (CS_CLOTH)
 
 
 def add_attr_tint(mat, attr, hex_colour, amount):
@@ -295,6 +370,18 @@ def mats():
         else:  # steel, brass, pewter
             m[k] = C.weathered_material(name, hexc, rough, kind="metal", mottle=0.06, metallic=1.0,
                                         bump=0.05, dust_hex="#7a6e58")
+    if SIDE == "cs":
+        # one wool (jean twill) material per colour; unused ones survive the save as fake users
+        # so render.py can swap them in per look (tcw_cloth_role marks the slots it may swap)
+        for role, entries in CS_CLOTH.items():
+            for key, (hexc, rough, fade_hex) in entries.items():
+                mat = C.weathered_material("tcw_%s_%s" % (role, key), hexc, rough, kind="wool",
+                                           fade_hex=fade_hex, fade=0.3, mottle=0.10, sheen=0.12,
+                                           weave_scale=330.0, bump=0.35)
+                mat["tcw_cloth_role"] = role
+                mat["tcw_cloth_key"] = key
+                mat.use_fake_user = True
+            m[role] = bpy.data.materials["tcw_%s_%s" % (role, CS_BASE_CLOTH[role])]
     return m
 
 
@@ -2129,6 +2216,8 @@ def main():
     ca = [gap / 2 + (2 * math.pi - gap) * j / 47 for j in range(48)]
     prof = [(-0.012, 0.010), (D["collar_stand"] - 0.008, 0.008), (D["collar_stand"], 0.015),
             (D["collar_stand"] - D["collar_fall"], 0.028)]
+    if D.get("collar_style") == "standing":   # CS shell jacket: plain standing collar, no fall
+        prof = [(-0.012, 0.010), (D["collar_stand"] * 0.5, 0.008), (D["collar_stand"], 0.009)]
     crings = []
     for dz, pad in prof:
         crings.append([Vector((*no.point(a, pad), collar_z + dz)) for a in ca])
@@ -2177,9 +2266,13 @@ def main():
     fi = max(range(len(wpts)), key=lambda i: wouts[i].dot(F))
     pc = wpts[fi] + wouts[fi] * 0.004
     bw, bh = D["belt_plate"]
-    plate = C.mesh_object("tcw_belt_plate", *plate_profile(pc, Lv, U, wouts[fi], bw, bh, OVAL_PROFILE, n=32))
-    C.assign(plate, m["brass"])
-    sk_torso.apply(plate, 6)
+    if SIDE == "cs":
+        # plain frame/roller buckle (no oval plate): bw along the belt, bh across it
+        buckle("tcw_belt_buckle", m["brass"], pc, Lv, U, wouts[fi], bh, bw, sk_torso)
+    else:
+        plate = C.mesh_object("tcw_belt_plate", *plate_profile(pc, Lv, U, wouts[fi], bw, bh, OVAL_PROFILE, n=32))
+        C.assign(plate, m["brass"])
+        sk_torso.apply(plate, 6)
     # belt keeper: a brass loop beside the plate (wearer's left)
     kp = pc + Lv * (bw / 2 + 0.02)
     kv, kf = C.box(kp + wouts[fi] * 0.002, (Lv, U, wouts[fi]), (0.004, D["waist_belt_width"] / 2 + 0.002, 0.002))
@@ -2362,6 +2455,8 @@ def main():
     REP["landmark_heights"] = {"hip_z": hip_z, "waist_z": waist_z, "hem_z": hem_z, "brow_z": brow_z}
     bpy.context.scene["tcw_obstacles"] = C.json.dumps(OBST)
     bpy.context.scene["tcw_hang"] = C.json.dumps(HANG)
+    if SIDE == "cs":
+        bpy.context.scene["tcw_side"] = SIDE   # render.py refuses a blend dressed for the other side
     bpy.context.scene["tcw_uniform_consts"] = C.json.dumps({k: D[k] for k in (
         "cartridge_len", "cartridge_r", "hang_plumb", "hang_swing_deg", "hang_lag")})
     REP["hang"] = HANG

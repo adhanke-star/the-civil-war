@@ -1,6 +1,7 @@
 # tools/bake: the art bake probe
 
-Builds one Union infantryman in headless Blender on GitHub Actions. It renders him as sprite frames
+Builds one Union infantryman in headless Blender on GitHub Actions. With `SIDE=cs`, it builds a
+Western Confederate one instead (see "Confederate bake"). It renders him as sprite frames
 with the lighting and shadow baked in, then packs the frames into atlases the browser can draw as
 camera-facing sprites. **Nothing here runs on the Mac.** Blender and the 280 MB asset pack only
 ever exist on the runner.
@@ -42,6 +43,85 @@ get approval before fielding. A quick bake is incomplete coverage and cannot shi
   (contact sheet, hero/close-up/portrait/hands/kit previews, reports, drill views). Check its size, then fetch
   one with `gh run download <id> -n preview-<n> -D .out/<folder>`. Download only into `.out/`.
   `reports-<n>` (prep reports) is uploaded even when a prep stage fails.
+
+## Confederate bake (SIDE=cs)
+
+Until this bake, Confederates in game were the Union atlas with a shader tint marked PLACEHOLDER,
+which DESIGN/PLAN forbid shipping. `SIDE=cs` builds a Western Confederate private on the same
+pipeline. With `SIDE` unset or `us`, every table and code path is the Union one, unchanged.
+
+- **Run:** `gh workflow run bake.yml --ref bake -f side=cs` (add `-f quick=1` for the check set).
+  Push runs are always `us`. The input sets `SIDE` for every job (`prep`: uniform.py; `render`:
+  render.py; `pack`: pack.mjs). Every artifact of a cs run is named `<kind>-cs-<run number>`:
+  `bake-cs-N`, `preview-cs-N`, `reports-cs-N`, `work-cs-N`, `shard-cs-N-*`. The concurrency group
+  includes the side, so a cs dispatch never cancels a Union run.
+- **Guards:** render.py refuses a `posed.blend` that was dressed for the other side (scene
+  `tcw_side`). It also refuses a CS look list with a head that is not `use: "any"`, an unknown
+  cloth key, cadet grey on more than one look, or a count other than base + 8. pack.mjs refuses
+  a `SIDE` that differs from `render.json`'s side, and any CS composition with a non-`any` head.
+  `node tools/bake/pack.mjs --self-test` proves those guards and their failure text, and runs in
+  the pack job. The manifest records `side` (`us` or `cs`). A cs manifest lists only the
+  `use: "any"` heads, and the cs head rows skip h7.
+- **Cut (uniform.py `CS_D`):** shell jacket. The hem is 2 cm above the hip joints with no flare
+  and almost no fold. 7 plain brass buttons, no marks. Plain standing collar with no Columbus-depot
+  trim (the pack must also serve Shiloh 1862). Trousers in jean. Brogans. The waist belt has a
+  plain brass frame buckle with a centre bar instead of the oval plate. Kit: blanket roll across
+  the shoulder on 7 of 9 looks; no knapsack; haversack (plain cotton, `#9c9178`) and canteen kept;
+  musket unchanged. The kepi/forage cap keeps the Union cap's shape in grey (`#6f7275`).
+- **Cloth (uniform.py `CS_CLOTH`):** one wool (jean twill) material per colour,
+  `tcw_<role>_<key>`. Each is a fake user carrying the custom property `tcw_cloth_role`.
+  render.py `apply_cloth` swaps them per look. Each look's `composition.cloth` in the manifest
+  gives `jacket`, `trousers` and `felt` (the felt is null for a cap look).
+
+  | role | key | albedo | faded toward |
+  |---|---|---|---|
+  | jacket | greyjean | #7b7f80 | #a39a82 |
+  | jacket | butternut | #6e5a3e | #9a8560 |
+  | jacket | fadedtan | #a39a82 | #b2a88f |
+  | jacket | cadet (one look) | #8a949b | #a2a6a3 |
+  | trousers | greyjean / brownjean | #7b7f80 / #6e5a3e | #a39a82 / #9a8560 |
+  | slouch felt | lightgrey / brown / tan / black | #8c8a84 / #4a3b2c / #8a7656 / #151413 | field-tier twins lighter: #a29f98 / #6a5844 / #a08a68 / #5a5045 |
+
+- **Looks (render.py `CS_LOOKS`; base + 8, the same count as the Union pack).** 7 of 9 wear slouch
+  hats (about 3 in 4). Heads h1-h6 only, never h7 (USCT only).
+
+  | look | head | hat | roll | jacket | trousers |
+  |---|---|---|---|---|---|
+  | base | h1 | slouch, brown | yes | greyjean | brownjean |
+  | h2_slouch_roll_butternut | h2 | slouch, black | yes | butternut | greyjean |
+  | h3_cap_roll_greyjean | h3 | grey kepi | yes | greyjean | greyjean |
+  | h4_slouch_noroll_fadedtan | h4 | slouch, tan | no | fadedtan | brownjean |
+  | h5_slouch_roll_butternut | h5 | slouch, light grey | yes | butternut | brownjean |
+  | h6_slouch_roll_cadet | h6 | slouch, brown | yes | cadet | greyjean |
+  | h2_cap_noroll_fadedtan | h2 | grey kepi | no | fadedtan | greyjean |
+  | h4_slouch_roll_greyjean | h4 | slouch, black | yes | greyjean | brownjean |
+  | h3_slouch_roll_butternut | h3 | slouch, tan | yes | butternut | greyjean |
+
+  The legacy close-tier check images (`variants/slouch|bayonet|noroll|face2|mixed.png`) and the
+  head rows wear the base look's cloth.
+- **Provenance.** This comes from a research summary for this bake (2026-10-11), drawn from:
+  authentic-campaigner.com threads 28234, 19312, 25893 and 2021; adolphusconfederateuniforms.com
+  (lower South, part V; Department of Alabama and Mississippi depot uniforms); the civilwartalk
+  thread on Columbus Depot jackets; NPS Vicksburg museum item vick572_jacket; warhistory.org
+  "Confederate soldier's dress"; Wikipedia "Uniforms of the Confederate States Armed Forces";
+  civilwarcollector.ca on CS buckles; and the acws.co.uk equipment archive. The summary marks
+  these **Verified**:
+  - Shiloh dress was half-uniformed and mixed, with walnut-dyed jean and 6-9 button jackets or
+    blouses.
+  - There were no Columbus-type jackets before 1863.
+  - Plant-dyed greys faded to brown and tan.
+  - Trousers were grey or brown jean.
+  - The slouch hat was dominant.
+  - Belts mostly had plain frame/roller buckles or captured U.S. plates.
+  - Men wore brogans.
+
+  These are **Inferred**: about 75% slouch to 25% kepi; the blanket roll for most men and the
+  knapsack for a minority. **Every hex value is an estimate (Inferred)**, not matched to a
+  swatch. The cut numbers, felt colours and look mix are placeholders judged by eye. Not shown,
+  by design: whole units in matching grey, Richmond Depot (Eastern) jackets, CS-marked buttons,
+  kepis as the majority, and federal-blue trousers. Known gaps (v1): the cartridge-box flap and
+  shoulder-belt plates stay as plain brass discs/ovals (a captured-plate reading; many CS boxes
+  had none). The cap is the Union forage-cap shape. Canteen covers are the Union colour.
 
 **Jobs (third pass).** `prep` builds the soldier once (stages 1-3b) and hands `work/posed.blend` to
 the `render` matrix as a 1-day artifact; `render` runs one job per shard (`SHARDS_FULL` in

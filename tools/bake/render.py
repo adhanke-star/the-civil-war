@@ -28,6 +28,10 @@
 # Every frame of every clip is rendered in all N directions; there is no time-budget reduction.
 # Each shard writes report/render-<shard>.json; pack.mjs merges them into render.json.
 #
+# SIDE=cs (environment): the variant list is CS_LOOKS (base + 8 Confederate looks); each look's
+# composition carries a `cloth` field (jacket, trousers, felt) and set_variant swaps those
+# materials in (apply_cloth). The blend must have been dressed with the same SIDE.
+#
 # Outputs (under --out):
 #   frames/<tier>/<clip>_<i>_d<dd>.png    tier = close (256 px) | field (96 px)
 #   frames/field_<variant>/...            field-tier variants (head x hat x blanket roll)
@@ -54,6 +58,66 @@ from mathutils import Vector
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import common as C  # noqa: E402
+
+# SIDE (environment, default "us"). "cs" renders the Confederate looks below from a posed.blend
+# that uniform.py dressed with SIDE=cs; "us" is the Union bake, every path unchanged.
+SIDE = (os.environ.get("SIDE") or "us").strip().lower()
+if SIDE not in ("us", "cs"):
+    raise SystemExit("render.py: SIDE must be 'us' or 'cs', got %r" % os.environ.get("SIDE"))
+
+# Confederate looks (SIDE=cs): base + 8, as many as the Union pack so memory stays comparable.
+# Name = <head>_<cap|slouch>_<roll|noroll>_<jacket>. cloth keys are uniform.py CS_CLOTH keys:
+# coat (jacket) and trousers independent; felt = the slouch hat's felt (the field-tier twin uses
+# the same key). 7 of 9 slouch (about 3 in 4, Inferred), the rest the grey kepi; 7 of 9 carry
+# the blanket roll; cadet grey on one look only. Heads only use:"any" (h1-h6), never usct.
+CS_LOOKS = {
+    "base":                     dict(head="h1", hat="slouch", roll=True, bayonet=False,
+                                     cloth=dict(coat="greyjean", trousers="brownjean", felt="brown")),
+    "h2_slouch_roll_butternut": dict(head="h2", hat="slouch", roll=True, bayonet=False,
+                                     cloth=dict(coat="butternut", trousers="greyjean", felt="black")),
+    "h3_cap_roll_greyjean":     dict(head="h3", hat="cap", roll=True, bayonet=False,
+                                     cloth=dict(coat="greyjean", trousers="greyjean", felt="brown")),
+    "h4_slouch_noroll_fadedtan": dict(head="h4", hat="slouch", roll=False, bayonet=False,
+                                      cloth=dict(coat="fadedtan", trousers="brownjean", felt="tan")),
+    "h5_slouch_roll_butternut": dict(head="h5", hat="slouch", roll=True, bayonet=False,
+                                     cloth=dict(coat="butternut", trousers="brownjean", felt="lightgrey")),
+    "h6_slouch_roll_cadet":     dict(head="h6", hat="slouch", roll=True, bayonet=False,
+                                     cloth=dict(coat="cadet", trousers="greyjean", felt="brown")),
+    "h2_cap_noroll_fadedtan":   dict(head="h2", hat="cap", roll=False, bayonet=False,
+                                     cloth=dict(coat="fadedtan", trousers="greyjean", felt="black")),
+    "h4_slouch_roll_greyjean":  dict(head="h4", hat="slouch", roll=True, bayonet=False,
+                                     cloth=dict(coat="greyjean", trousers="brownjean", felt="black")),
+    "h3_slouch_roll_butternut": dict(head="h3", hat="slouch", roll=True, bayonet=False,
+                                     cloth=dict(coat="butternut", trousers="greyjean", felt="tan")),
+}
+CS_HEADS_FALLBACK = ("h1", "h2", "h3", "h4", "h5", "h6")   # if probe.json has no "use" per head
+CS_CLOTH_KEYS = {"coat": ("greyjean", "butternut", "fadedtan", "cadet"),
+                 "trousers": ("greyjean", "brownjean"),
+                 "felt": ("lightgrey", "brown", "tan", "black")}
+
+
+def validate_cs_looks(looks, allowed_heads, variant_names):
+    """Refuse a Confederate look list that breaks the contract: a head that is not use:"any", an
+    unknown cloth key, a missing cloth role, cadet grey on more than one look, or a variant
+    list longer or shorter than the Union pack (base + 8)."""
+    errs = []
+    for name, c in looks.items():
+        if c.get("head") not in allowed_heads:
+            errs.append("CS look %s uses head %s, which is not a use:\"any\" head (%s)"
+                        % (name, c.get("head"), ",".join(sorted(allowed_heads))))
+        cl = c.get("cloth") or {}
+        for role, keys in CS_CLOTH_KEYS.items():
+            if cl.get(role) not in keys:
+                errs.append("CS look %s has %s=%r; expected one of %s" % (name, role, cl.get(role), ",".join(keys)))
+    cadet = [n for n, c in looks.items() if (c.get("cloth") or {}).get("coat") == "cadet"]
+    if len(cadet) > 1:
+        errs.append("cadet grey on %d looks (%s); the contract allows one" % (len(cadet), ",".join(cadet)))
+    if len(variant_names) != 8:
+        errs.append("CS variant list has %d looks besides base; the Union pack has 8" % len(variant_names))
+    if errs:
+        raise ValueError("render.py SIDE=cs: " + "; ".join(errs))
+    return True
+
 
 P = {
     "elevation": C.arg("elevation", 35.0),        # camera degrees above horizontal
@@ -90,8 +154,10 @@ P = {
     # field tier only: thicken the musket's cross-section so it survives at 96 px (readability choice)
     "field_musket_scale": C.arg("field-musket-scale", 1.7),
     # variants in BOTH tiers (same names): <head>_<cap|slouch>_<roll|noroll> (see variant_comp)
+    # SIDE=cs: the CS_LOOKS names (all but base) instead
     "variants": C.arg("variants", "h2_cap_roll,h3_slouch_roll,h4_cap_noroll,h5_slouch_noroll,"
-                                   "h6_cap_roll,h1_slouch_noroll,h4_slouch_roll,h7_cap_roll"),
+                                   "h6_cap_roll,h1_slouch_noroll,h4_slouch_roll,h7_cap_roll"
+                      if SIDE == "us" else ",".join(k for k in CS_LOOKS if k != "base")),
     "sun_rgb": (1.0, 0.94, 0.86),                 # warm key
     "sky_strength": C.arg("sky-strength", 0.45),
     "sky_hex": "#a9bdd6",                         # cool sky fill (world)
@@ -132,6 +198,16 @@ def variant_comp(name):
         "face2": dict(head="h2", hat="cap", roll=True, bayonet=False),
         "mixed": dict(head="h3", hat="slouch", roll=False, bayonet=False),
     }
+    if SIDE == "cs":
+        # a CS look, or a legacy close-tier check variant (slouch, bayonet, noroll, face2, mixed)
+        # dressed in the base look's cloth; anything else is refused
+        if name in CS_LOOKS:
+            c = dict(CS_LOOKS[name])
+            c["cloth"] = dict(c["cloth"])
+            return c
+        if name in legacy and name != "base":
+            return dict(legacy[name], cloth=dict(CS_LOOKS["base"]["cloth"]))
+        raise ValueError("unknown CS variant %s (use a render.py CS_LOOKS name)" % name)
     if name in legacy:
         return dict(legacy[name])
     parts = name.split("_")
@@ -379,11 +455,46 @@ def turntable(rig):
 HEADS_INFO = {}
 
 
+def apply_cloth(cloth):
+    """SIDE=cs: put this look's jacket, trouser and felt materials (uniform.py CS_CLOTH, named
+    tcw_<role>_<key>) on every slot whose material carries that tcw_cloth_role, settled-cloth
+    copies included. A missing material or a role no slot carries is an error, never a silent
+    look in the wrong colour."""
+    want = {"coat": cloth.get("coat"), "trousers": cloth.get("trousers"),
+            "felt": cloth.get("felt"), "felt_field": cloth.get("felt")}
+    mats = {}
+    for role, key in want.items():
+        mat = bpy.data.materials.get("tcw_%s_%s" % (role, key))
+        if mat is None:
+            raise RuntimeError("CS cloth material tcw_%s_%s is missing from posed.blend (uniform.py CS_CLOTH "
+                               "and render.py CS_LOOKS disagree, or the blend was not dressed with SIDE=cs)"
+                               % (role, key))
+        mats[role] = mat
+    seen = {r: 0 for r in mats}
+    for o in bpy.data.objects:
+        if o.type != "MESH":
+            continue
+        for s in o.material_slots:
+            r = s.material.get("tcw_cloth_role") if s.material is not None else None
+            if r in mats:
+                seen[r] += 1
+                if s.material != mats[r]:
+                    s.material = mats[r]
+    missing = [r for r, n in seen.items() if n == 0]
+    if missing:
+        raise RuntimeError("CS cloth roles %s are on no material slot in posed.blend" % ",".join(missing))
+    return seen
+
+
 def set_variant(v, tier="close"):
     """Show one composition: head preset (shape key, skin per slot, its eyes/brows/lashes/hair/
     beard), hat, blanket roll, bayonet. In the field tier the slouch hat is its wider, lighter
     twin (readability choice)."""
     c = v if isinstance(v, dict) else variant_comp(v)
+    if SIDE == "cs" and not c.get("cloth"):
+        c = dict(c, cloth=dict(CS_LOOKS["base"]["cloth"]))   # head and hand shots wear the base cloth
+    if c.get("cloth"):
+        apply_cloth(c["cloth"])
     feats = {"slouch_field" if (c["hat"] == "slouch" and tier == "field") else c["hat"]}
     if c.get("roll"):
         feats.add("roll")
@@ -603,6 +714,19 @@ def main():
     bpy.ops.wm.open_mainfile(filepath=os.path.join(C.WORK, "posed.blend"))
     T.mark("open posed.blend")
     clips = C.read_report("poses")["clips"]
+    blend_side = bpy.context.scene.get("tcw_side", "us")
+    if blend_side != SIDE:
+        raise RuntimeError("SIDE mismatch: render.py runs with SIDE=%s but posed.blend was dressed with SIDE=%s"
+                           % (SIDE, blend_side))
+    cs_heads = None
+    if SIDE == "cs":
+        probe_heads = C.read_report("probe").get("heads", {})
+        cs_heads = {h for h, r in probe_heads.items() if r.get("use") == "any"} or set(CS_HEADS_FALLBACK)
+        cs_list = [v for v in str(P["variants"]).split(",") if v]
+        validate_cs_looks(dict(CS_LOOKS, **{v: variant_comp(v) for v in cs_list}), cs_heads, cs_list)
+        REP["side"] = SIDE
+        REP["base_composition"] = variant_comp("base")
+        REP["cs_heads"] = sorted(cs_heads)
     sc, to_sun = setup_scene()
     cam = ortho_camera()
     rig = C.find_rig()
@@ -672,6 +796,8 @@ def main():
         T.mark("portrait")
         # ---- every head preset: 256 px head-and-shoulders with the same camera
         heads = list(HEADS_INFO.keys()) or ["h1"]
+        if cs_heads is not None:   # SIDE=cs: never dress a usct head in a Confederate uniform
+            heads = [h for h in heads if h in cs_heads]
         sc.render.resolution_x = sc.render.resolution_y = P["close_px"]
         sc.cycles.samples = P["samples_shot"]
         REP["heads"] = {}
@@ -858,7 +984,7 @@ def main():
                      "directions": N,
                      "direction_rule": "d faces d*360/N deg CCW (from above) from toward-camera; d=N/4 faces screen-right"}
     REP["clips"] = clips
-    REP["heads_info"] = HEADS_INFO
+    REP["heads_info"] = HEADS_INFO if cs_heads is None else {h: r for h, r in HEADS_INFO.items() if h in cs_heads}
     REP["wall_seconds"] = round(time.time() - t_start, 1)
     REP["timing"] = T.marks
     C.write_report("render" if kind == "all" else "render-" + P["shard"], REP)
