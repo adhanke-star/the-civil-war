@@ -174,13 +174,18 @@ export async function historyControls({ browser, url, check, shot, result, watch
       && backFocus === 'campaign-ending-book', `record book over the ending (${book.rows} row); Esc returns focus to ${backFocus}; Esc again back to the saved panel`);
     // ---- 2. the record book from the camp page, as src/ui/entry.js opens it ----
     await camp();
+    // opened from a real click, as the camp button does: Chrome ignores Esc on a modal opened without a user gesture
     await page.evaluate(async () => {
       const { createProgressStore } = await import('./src/franchise/save.js');
       const save = await createProgressStore(undefined, { slot: 1 }).load();
       const m = await import('./src/ui/records.js');
-      window.__rb = m.openRecordBook(document.body, save);
-      await window.__rb.ready;
+      const b = document.createElement('button');
+      b.id = 'test-open-book'; b.type = 'button'; b.textContent = 'Open the record book (test)';
+      b.addEventListener('click', () => { b.remove(); window.__rb = m.openRecordBook(document.body, save); }, { once: true });
+      document.body.append(b);
     });
+    await page.locator('#test-open-book').click();
+    await page.evaluate(() => window.__rb.ready);
     const camped = await page.evaluate(() => ({ open: document.getElementById('record-book')?.open, focus: document.activeElement?.id,
       grade: document.querySelector('#record-book .rb-grade-v')?.dataset.grade, brigades: document.querySelectorAll('#record-book .rb-brigade').length,
       label: document.getElementById('record-book')?.getAttribute('aria-labelledby') }));
@@ -202,7 +207,8 @@ export async function historyControls({ browser, url, check, shot, result, watch
   try {
     await p2.goto(url + `?battle=${PACK_ID}&phase=p1&nosw`);
     await p2.waitForFunction(() => window.__ready && window.__game, null, { timeout: 180000 });
-    await p2.evaluate(() => { const g = window.__game.game; for (let i = 0; i < 200 && !g.over; i++) g.tick(0.05); });
+    // 30 s of battle (8 samples at 4 s): sample 1 arrives about 4 s into the 30 s replay, well inside the wait below
+    await p2.evaluate(() => { const g = window.__game.game; for (let i = 0; i < 600 && !g.over; i++) g.tick(0.05); });
     await forceWin(p2);
     await p2.waitForFunction(() => document.getElementById('result').open && !document.getElementById('result-action').hidden, null, { timeout: 30000 });
     const panel = await p2.evaluate(() => document.getElementById('result-action').textContent);
@@ -212,7 +218,7 @@ export async function historyControls({ browser, url, check, shot, result, watch
     await p2.keyboard.press('Enter'); await p2.waitForFunction(() => document.querySelector('.rw[data-step="h"]'));
     await p2.keyboard.press('Enter'); await p2.waitForFunction(() => document.querySelector('.rw[data-step="r"] .rp'));
     const playing = await p2.evaluate(() => document.querySelector('.rp').dataset.playing);
-    await p2.waitForFunction(() => Number(document.querySelector('.rp').dataset.sample) > 0, null, { timeout: 15000 });
+    await p2.waitForFunction(() => Number(document.querySelector('.rp').dataset.sample) > 0, null, { timeout: 25000 });
     await p2.keyboard.press('Space'); // focus is on the page heading (not a button): Space pauses the replay
     const paused = await p2.evaluate(() => document.querySelector('.rp').dataset.playing);
     await shot(p2, 'history-battles-replay');

@@ -131,7 +131,15 @@ jobs:
         # Firefox refuses to start when $HOME is not owned by the container user
         env:
           HOME: /root
-        run: node tools/test-browsers.mjs --browser=${{ matrix.browser }}
+          LIBGL_ALWAYS_SOFTWARE: '1'
+        run: |
+          if [ "${{ matrix.browser }}" = firefox ]; then
+            # headless Firefox has no GL driver in this container: Mesa's software GL under xvfb instead
+            apt-get update -qq && apt-get install -y -qq libgl1-mesa-dri libegl1 libegl-mesa0 xvfb >/dev/null
+            xvfb-run -a -s "-screen 0 1280x720x24" node tools/test-browsers.mjs --browser=firefox --headed
+          else
+            node tools/test-browsers.mjs --browser=${{ matrix.browser }}
+          fi
 
       - name: Upload browser output
         if: always()

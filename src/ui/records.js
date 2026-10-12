@@ -195,7 +195,9 @@ function shell(host, { id, eyebrow, title, extraClass = '' }) {
   const opener = document.activeElement;
   const heading = el('h2', { class: 'rb-title', id: `${id}-title`, tabindex: '-1', text: title });
   const close = el('button', { type: 'button', class: 'rb-close', 'aria-label': 'Close' }, el('span', { 'aria-hidden': 'true', text: '×' }), el('span', { class: 'rb-close-text', text: 'Close' }));
-  const body = el('div', { class: 'rb-body', 'aria-busy': 'true' }, el('p', { class: 'rb-dim', text: 'Loading the record…' }));
+  // the body scrolls: focusable so keyboard users can scroll it (axe scrollable-region-focusable)
+  const body = el('div', { class: 'rb-body', 'aria-busy': 'true', tabindex: '0', role: 'region', 'aria-label': title },
+    el('p', { class: 'rb-dim', text: 'Loading the record…' }));
   const dialog = el('dialog', { class: `rb ${extraClass}`.trim(), id, 'aria-labelledby': `${id}-title` },
     el('header', { class: 'rb-head' }, el('div', {}, el('p', { class: 'rb-eyebrow', text: eyebrow }), heading), close), body);
   host.append(dialog);
