@@ -8,6 +8,7 @@
 //   compare(brigade, item) -> { ok, reason?, before, after, delta }   (before/after are ratings())
 //   bestFit(brigades, item) -> the brigade with the largest OVR gain (null if none can carry it)
 //   equip(brigade, item) -> { brigade: newBrigade, displaced }   (pure: the input is not changed)
+//   rollCondition(rng) -> a condition id (shared with the economy's reward cards and shop lots)
 //
 // All numbers are placeholders for feel (see DESIGN.md flag (a): gear-led OVR lets a green brigade
 // with repeaters outrate veterans; it is this one TUNING object to change after Aaron plays).
@@ -95,7 +96,8 @@ function pickItem(rng, tierId) {
   return rng.pick(arms).id;
 }
 
-function rollCondition(rng) {
+/** A condition id rolled from CONDITIONS weights (loot, level-up reward cards and shop lots all roll it). */
+export function rollCondition(rng) {
   return rng.weighted(CONDITIONS, (c) => c.weight).id;
 }
 

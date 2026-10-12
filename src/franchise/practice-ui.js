@@ -4,8 +4,14 @@ import { practiceOutcome, savedOutcome, assertSavedLaunch, surrenderOutcome } fr
 import { mountReward, configureRewardReplay, surrenderReportText } from '../reward/sequence.js';
 import { phaseResult, recordPhase } from './campaign.js';
 import { rewardArmy, applyRewardIssues } from '../ui/briefing.js';
+import { phaseSummary } from './economy.js';
 
 const GRADE_TEXT = { decisive: 'Decisive victory', victory: 'Victory', draw: 'Draw', defeat: 'Defeat' };
+// The recorded phase's requisition points (economy.js phaseSummary) for the result wording and the after-action; never throws.
+function pointsOf(campaign, phase) {
+  try { return phase ? phaseSummary(campaign.save, phase.next) : null; } catch { return null; }
+}
+const pointsWords = (p) => !p ? '' : ` Requisition points: +${p.points}${p.levelUp ? `; reputation level ${p.levelUp.to} reached` : ''} (game rule).`;
 
 // campaign: main.js's launch { slot, store, save, raw, phase } for a ?campaign=<slot> phase; the result records the
 // phase (losses, loot, history) into that slot through the same pending/save/recover panels.
@@ -91,7 +97,7 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null,
   function showSaved() {
     if (campaign) {
       const done = saved.campaign.status === 'complete', defeat = phase.record.grade === 'Defeat';
-      panel('Campaign saved', `${scenario.title}: ${phase.record.grade}${campaign.phase.replay ? ' (replay, marked on your record)' : ''}. ${saved.depot.length} cards are in your depot.${issueNote} ${done ? 'The campaign is complete; your camp shows the record.' : 'Return to camp for the next phase.'}${defeat ? ' You may replay this phase; the replay is marked on your record.' : ''}`,
+      panel('Campaign saved', `${scenario.title}: ${phase.record.grade}${campaign.phase.replay ? ' (replay, marked on your record)' : ''}. ${saved.depot.length} cards are in your depot${saved.rp === undefined ? '' : ` and ${saved.rp.toLocaleString()} requisition points to spend in camp`}.${issueNote} ${done ? 'The campaign is complete; your camp shows the record.' : 'Return to camp for the next phase.'}${defeat ? ' You may replay this phase; the replay is marked on your record.' : ''}`,
         'Return to camp', () => location.assign(campHref), { exportable: true });
       replayButton.hidden = !defeat;
       return;
@@ -157,7 +163,8 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null,
         afterAction: { title: scenario.title, why: game.result.why, starting, surviving, losses: starting - surviving,
           guns: us.reduce((n, u) => n + (u.guns || 0), 0), eyebrow: `Campaign · ${scenario.title}${campaign.phase.replay ? ' · replay' : ''}`,
           note: campaign.phase.loan ? "Grant's army was on loan: these numbers are its own and your franchise brigades are unchanged. Loot joins your depot."
-            : 'Losses carry to your brigades. Loot joins your depot; issue it here or in camp. Ratings and loot are game values.' },
+            : 'Losses carry to your brigades. Loot joins your depot; issue it here or in camp. Ratings and loot are game values.',
+          points: pointsOf(campaign, phase) },
         onDone: (result) => {
           if (saving || !rewardActive || saved || pending) return;
           rewardActive = false;
@@ -254,7 +261,7 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null,
     }
     const us = phase.outcome.units.filter((u) => u.side === 'US');
     const starting = us.reduce((n, u) => n + u.menStart, 0), surviving = us.reduce((n, u) => n + u.men, 0);
-    panel(heading, `${game.result.why} Grade: ${phase.record.grade}. ${surviving.toLocaleString()} of ${starting.toLocaleString()} Union men remain; ${phase.outcome.captures.length} field crates held. ${campaign.phase.loan ? "Grant's army was on loan, so your franchise brigades are unchanged." : 'Losses carry to your brigades.'} ${phase.record.grade === 'Defeat' ? 'The campaign continues after a defeat; you can replay this phase once it is saved.' : 'Open the after-action and loot to save this phase.'}`,
+    panel(heading, `${game.result.why} Grade: ${phase.record.grade}. ${surviving.toLocaleString()} of ${starting.toLocaleString()} Union men remain; ${phase.outcome.captures.length} field crates held. ${campaign.phase.loan ? "Grant's army was on loan, so your franchise brigades are unchanged." : 'Losses carry to your brigades.'}${pointsWords(pointsOf(campaign, phase))} ${phase.record.grade === 'Defeat' ? 'The campaign continues after a defeat; you can replay this phase once it is saved.' : 'Open the after-action and loot to save this phase.'}`,
       'After-action & loot', startCampaignLoot);
   }
   function finishResult() {

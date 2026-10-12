@@ -232,8 +232,9 @@ const GAME_GRADES = { decisive: 'Decisive', victory: 'Victory', draw: 'Draw', de
 
 /**
  * One finished battle-pack phase: end strength of every formation (both sides, unarrived reinforcements at
- * their authored strength), the grade, held captures and the deterministic loot of `awardId`. Rejects an
- * altered roster exactly like practiceOutcome. Grants nothing by itself; the campaign records it.
+ * their authored strength), the grade, held captures, whether the Union held the objective at the end (`held`, for
+ * requisition points) and the deterministic loot of `awardId`. Rejects an altered roster exactly like practiceOutcome.
+ * Grants nothing by itself; the campaign records it.
  */
 export function phaseOutcome({ game, scenario, awardId, seed }) {
   if (!game || !scenario || game.scenario !== scenario || game.playerSide !== 'US' || game.over !== true
@@ -260,7 +261,7 @@ export function phaseOutcome({ game, scenario, awardId, seed }) {
   const grade = GAME_GRADES[game.result.grade] || (game.result.winner === 'US' ? 'Victory' : game.result.winner === null ? 'Draw' : 'Defeat');
   const captures = heldCaptures(game, 'US', scenario.crates, (c) => `Captured: ${c.name}`);
   const cards = awardCards({ awardId, seed, grade, captures });
-  return frozen({ winner: game.result.winner, grade, units, captures, cards });
+  return frozen({ winner: game.result.winner, grade, held: game.holder === 'US', units, captures, cards });
 }
 
 /** Terminal, as-of prisoners and physical possession. This grants no loot or save authority. */

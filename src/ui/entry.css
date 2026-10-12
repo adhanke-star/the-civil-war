@@ -82,3 +82,24 @@
   #front #entry-note { font-size: 17px; }
   #front .rw-brigs, #front #camp-depot { grid-template-columns: minmax(0, 1fr); }
 }
+/* Requisition drawer (src/ui/entry.js renderShop; economy rules in src/franchise/economy.js and tuning.js). */
+#front #camp-shop { margin-top: 24px; padding: 18px 20px; border: 1px solid var(--rw-rule); border-radius: 12px; background: var(--rw-faint); }
+#front .camp-shop-head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 16px; }
+#front .camp-shop-head > div { flex: 1 1 260px; min-width: 0; }
+#front #camp-shop h2 { margin: 0 0 6px; font-size: 26px; }
+#front #camp-reputation, #front #camp-shop-new { margin: 0 0 8px; overflow-wrap: anywhere; }
+#front #camp-shop-new { color: var(--rw-accent); font-weight: 700; }
+#front #camp-rep-track { max-width: 420px; margin-bottom: 8px; }
+#front #camp-shop-toggle { flex: none; max-width: 100%; }
+#front #camp-shop-note, #front #camp-shop-status { overflow-wrap: anywhere; }
+#front #camp-shop-stock { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 12px; }
+#front #camp-shop-stock .rw-card { width: 100%; height: auto; min-height: 320px; aspect-ratio: auto; }
+#front #camp-shop-stock .rw-front { position: relative; min-height: 320px; }
+#front #camp-shop-stock .rw-name, #front #camp-shop-stock .rw-where, #front #camp-shop-stock .rw-affix-fx { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+#front .camp-lot-cite { margin: 8px 0; font-size: 13px; line-height: 1.5; color: var(--rw-dim); overflow-wrap: anywhere; }
+#front .camp-lot-cite a { color: var(--rw-ink); }
+#front .camp-buy-button, #front .camp-turnin-button { width: 100%; margin-top: 8px; border-color: #9b93a5; white-space: normal; }
+#front #camp-confirm { box-sizing: border-box; width: min(480px, calc(100vw - 32px)); max-width: none; padding: 20px; }
+#front #camp-confirm h2 { margin: 0 0 10px; overflow-wrap: anywhere; }
+@media (max-width: 850px) { #front #camp-shop-stock { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { #front #camp-shop { padding: 14px 12px; } #front #camp-shop-stock { grid-template-columns: minmax(0, 1fr); } #front #camp-shop-toggle { width: 100%; } }

@@ -419,6 +419,44 @@ body.sb-open-left .rw { left: var(--sb-w, 0px); }
 .rw-brig.is-counting .rw-ovr { box-shadow: 0 0 0 2px var(--rw-accent), 0 0 18px var(--rw-accent); }
 .rw-brig.is-counted.went-up .rw-ovr { animation: rw-pop 0.45s cubic-bezier(0.2, 1.5, 0.4, 1) both; }
 
+/* ---- requisition points and the level-up moment (campaign after-action and camp; game rules) ---------------- */
+.rw-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.rw-points { width: min(560px, 100%); margin: 22px auto 0; padding: 16px 18px; text-align: left; border: 1px solid var(--rw-rule); border-radius: 12px; background: var(--rw-faint); animation: rw-fade-up 0.4s ease-out both 0.4s; }
+.rw-points-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 10px; font-size: 16px; font-weight: 800; letter-spacing: 0.02em; }
+.rw-rule-tag { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--rw-rule); font-size: 11.5px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--rw-dim); }
+.rw-points-lines { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-variant-numeric: tabular-nums; }
+.rw-points-line { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; padding: 4px 0; border-bottom: 1px solid var(--rw-rule); animation: rw-fade-up 0.3s ease-out both; animation-delay: calc(0.5s + var(--i, 0) * 0.12s); }
+.rw-points-label { min-width: 0; overflow-wrap: anywhere; }
+.rw-points-line b { flex: none; color: var(--rw-up); }
+.rw-points-line.is-cut b { color: var(--rw-dim); }
+.rw-points-total { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px; margin: 12px 0 0; font-weight: 700; }
+.rw-points-v { font-size: 34px; line-height: 1; font-weight: 800; color: var(--rw-accent); font-variant-numeric: tabular-nums; }
+.rw-points[data-counted="true"] .rw-points-v { animation: rw-pop 0.45s cubic-bezier(0.2, 1.5, 0.4, 1) both; }
+.rw-points-rep { margin: 10px 0 6px; font-size: 13.5px; color: var(--rw-dim); overflow-wrap: anywhere; }
+.rw-rep-track { height: 8px; border-radius: 4px; background: var(--rw-track); overflow: hidden; }
+.rw-rep-track i { display: block; height: 100%; border-radius: 4px; background: var(--rw-accent); }
+.rw-levelup { margin-top: 16px; padding: 14px 14px 12px; border-radius: 10px; border: 1px solid var(--rw-accent); background: linear-gradient(180deg, rgba(240,199,94,0.14), rgba(240,199,94,0.03)); animation: rw-rise 0.5s ease-out both 1.2s; }
+.rw-levelup-title { margin: 0; font-size: 22px; font-weight: 800; color: var(--rw-accent); }
+.rw-levelup-cards { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 12px; }
+.rw-levelup-cards { --cw: 176px; }
+.rw-levelup-cards .rw-card { cursor: default; }
+/* the full-screen moment: never takes focus or a click; leaves on its own (src/reward/sequence.js levelUpMoment) */
+.rw-levelup-moment { position: fixed; inset: 0; z-index: 60; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  color: var(--rw-ink, #eef1f6); text-align: center; background: radial-gradient(60% 50% at 50% 50%, rgba(10,12,17,0.82) 0%, rgba(10,12,17,0.55) 60%, rgba(10,12,17,0) 100%);
+  animation: rw-levelup-life 2.8s ease-out both; }
+.rw-levelup-glow { position: absolute; left: 50%; top: 50%; width: 120vmin; height: 120vmin; transform: translate(-50%, -50%); border-radius: 50%;
+  background: radial-gradient(circle, rgba(240,199,94,0.38) 0%, rgba(240,199,94,0.10) 38%, rgba(240,199,94,0) 62%); animation: rw-levelup-glow 2.8s ease-out both; }
+.rw-levelup-moment p { position: relative; margin: 0; }
+.rw-levelup-moment-kicker { font-size: 14px; font-weight: 800; letter-spacing: 0.3em; text-transform: uppercase; color: var(--rw-accent, #f0c75e); }
+.rw-levelup-moment-level { display: flex; align-items: baseline; gap: 14px; animation: rw-stamp 0.55s cubic-bezier(0.2, 1.4, 0.4, 1) both 0.15s; }
+.rw-levelup-moment-level small { font-size: clamp(24px, 6vw, 44px); font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.rw-levelup-moment-level b { font-size: clamp(90px, 26vw, 200px); line-height: 0.9; font-weight: 900; color: var(--rw-accent, #f0c75e); text-shadow: 0 0 40px rgba(240,199,94,0.45); }
+.rw-levelup-moment-note { display: inline-flex; align-items: center; gap: 10px; max-width: calc(100vw - 32px); font-size: clamp(16px, 3.2vw, 22px); font-weight: 700; overflow-wrap: anywhere; }
+.rw-levelup-moment-note .rw-shape { width: 1.2em; height: 1.2em; }
+.rw-levelup-moment[data-motion="reduced"], .rw-levelup-moment[data-motion="reduced"] * { animation: none !important; transition: none !important; }
+@keyframes rw-levelup-life { 0% { opacity: 0; } 10% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes rw-levelup-glow { from { transform: translate(-50%, -50%) scale(0.4); opacity: 0; } 25% { opacity: 1; } to { transform: translate(-50%, -50%) scale(1.15); opacity: 0.6; } }
+
 /* ---- small screens ------------------------------------------------------------------------------------------ */
 @media (max-height: 760px) {
   .rw-stage { padding-top: max(14px, env(safe-area-inset-top)); padding-bottom: max(12px, env(safe-area-inset-bottom)); }

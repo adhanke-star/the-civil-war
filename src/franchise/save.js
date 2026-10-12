@@ -51,7 +51,7 @@ function item(v) {
   if (v.tier !== itemDef(v.itemId).tier || !conditions.has(v.conditionId)) bad('unknown rarity or condition.');
   const out = { uid, itemId: v.itemId, tier: v.tier, conditionId: v.conditionId, from: word(v.from, 'item origin') };
   if (has(v, 'source')) {
-    if (!['issue', 'capture'].includes(v.source)) bad('invalid item source.');
+    if (!['issue', 'capture', 'reward', 'requisition'].includes(v.source)) bad('invalid item source.');
     out.source = v.source;
   }
   if (has(v, 'depot')) {
@@ -91,11 +91,80 @@ function campaignRecord(c) {
   return { id: cid, index, status: c.status, history, carry };
 }
 
+/**
+ * The v2 requisition economy (src/franchise/economy.js writes it): rp (spendable requisition points), reputation
+ * (cumulative points earned, never reduced by spending), level (1-10), shopSeen (the highest level whose shop the player
+ * has opened) and an append-only ledger. A save written before the economy has none of these fields and loads as
+ * 0/0/1/1/[]; partial fields are refused. The sums are checked here; the tunable amounts are not (tuning may change).
+ *   { kind: 'phase', awardId, score, points, held, loan }  points paid for one recorded phase (once per award)
+ *   { kind: 'level', level, uid }                          the reward card dealt on reaching a level (2-10, once each)
+ *   { kind: 'turnIn', item, points, at }                   a depot card exchanged for points after `at` issue records
+ *   { kind: 'buy', uid, itemId, tier, price, phase }       one shop lot bought at ladder position `phase`
+ */
+export const ECONOMY_FIELDS = Object.freeze(['rp', 'reputation', 'level', 'shopSeen', 'ledger']);
+export const ECONOMY_LIMITS = Object.freeze({ ledger: 5000, points: 100000, levels: 10 });
+function economyRecord(v, campaign, issuedCount) {
+  const present = ECONOMY_FIELDS.filter((k) => has(v, k));
+  if (!present.length) return { rp: 0, reputation: 0, level: 1, shopSeen: 1, ledger: [] };
+  if (present.length !== ECONOMY_FIELDS.length) bad('missing or unsupported fields.');
+  const awards = new Set(campaign.history.map((r) => r.awardId)), paid = new Set(), levels = new Set(), bought = new Set(), returned = new Set();
+  let earned = 0, spent = 0, lastAt = 0;
+  const ledger = list(v.ledger, 'requisition ledger', 0, ECONOMY_LIMITS.ledger).map((r) => {
+    if (!r || typeof r !== 'object' || Array.isArray(r)) bad('invalid requisition ledger entry.');
+    if (r.kind === 'phase') {
+      shape(r, ['kind', 'awardId', 'score', 'points', 'held', 'loan']);
+      if (!awards.has(r.awardId) || paid.has(r.awardId)) bad('requisition points must belong to one recorded phase.');
+      paid.add(r.awardId);
+      if (typeof r.held !== 'boolean' || typeof r.loan !== 'boolean') bad('invalid requisition ledger entry.');
+      const out = { kind: 'phase', awardId: r.awardId, score: number(r.score, 'phase score', 0, ECONOMY_LIMITS.points),
+        points: number(r.points, 'phase points', 0, ECONOMY_LIMITS.points), held: r.held, loan: r.loan };
+      earned += out.points;
+      return out;
+    }
+    if (r.kind === 'level') {
+      shape(r, ['kind', 'level', 'uid']);
+      const level = number(r.level, 'reputation level', 2, ECONOMY_LIMITS.levels);
+      if (levels.has(level)) bad('a reputation level was rewarded twice.');
+      levels.add(level);
+      return { kind: 'level', level, uid: id(r.uid, 'reward card identity') };
+    }
+    if (r.kind === 'turnIn') {
+      shape(r, ['kind', 'item', 'points', 'at']);
+      const it = item(r.item);
+      if (returned.has(it.uid)) bad('a card was turned in twice.');
+      returned.add(it.uid);
+      const at = number(r.at, 'turn-in position', 0, issuedCount);
+      if (at < lastAt) bad('turn-ins are out of order.');
+      lastAt = at;
+      const out = { kind: 'turnIn', item: it, points: number(r.points, 'turn-in points', 0, ECONOMY_LIMITS.points), at };
+      earned += out.points;
+      return out;
+    }
+    if (r.kind === 'buy') {
+      shape(r, ['kind', 'uid', 'itemId', 'tier', 'price', 'phase']);
+      const uid = id(r.uid, 'requisition identity');
+      if (bought.has(uid)) bad('a shop lot was bought twice.');
+      bought.add(uid);
+      if (!knownGear.has(r.itemId) || r.tier !== itemDef(r.itemId).tier) bad('unknown requisitioned gear.');
+      const out = { kind: 'buy', uid, itemId: r.itemId, tier: r.tier, price: number(r.price, 'price', 0, ECONOMY_LIMITS.points),
+        phase: number(r.phase, 'shop position', 0, CAMPAIGN_LIMITS.phases) };
+      spent += out.price;
+      return out;
+    }
+    bad('invalid requisition ledger entry.');
+  });
+  const reputation = number(v.reputation, 'reputation', 0, 10000000), rp = number(v.rp, 'requisition points', 0, 10000000);
+  if (reputation !== earned || rp !== earned - spent) bad('requisition points do not match the ledger.');
+  const level = number(v.level, 'reputation level', 1, ECONOMY_LIMITS.levels);
+  if (levels.size !== level - 1 || [...levels].some((n) => n > level)) bad('reputation level does not match its reward cards.');
+  return { rp, reputation, level, shopSeen: number(v.shopSeen, 'shop level seen', 1, level), ledger };
+}
+
 /** Strict canonical copy. Imported derived OVR is never trusted; it is recomputed. */
 export function validateSnapshot(v) {
   // Version 2 is only the campaign kind; any other version-2 record is an unsupported version.
   const v2 = !!v && typeof v === 'object' && v.version === 2 && v.kind === 'campaign';
-  if (v2) shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade', 'slot', 'campaign'], ['updated']);
+  if (v2) shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade', 'slot', 'campaign'], ['updated', ...ECONOMY_FIELDS]);
   else shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade']);
   if (v.format !== 'the-civil-war' || (!v2 && (v.version !== 1 || v.kind !== 'completed-reward'))) bad('unsupported save format or version.');
   const awardId = id(v.awardId, 'completed award identity');
@@ -135,23 +204,33 @@ export function validateSnapshot(v) {
     return out;
   });
   const depot = list(v.depot, 'depot', 0, 2000).map((it) => add(item(it), null));
-  const items = new Map([...army.map((b) => b.weapon), ...depot].map((it) => [it.uid, it]));
-  const issued = list(v.issued, 'issued records', 0, 5000).map((r) => {
+  const issuedRaw = list(v.issued, 'issued records', 0, 5000);
+  const economy = v2 ? economyRecord(v, campaign, issuedRaw.length) : null;
+  // Turned-in cards left the inventory; the issue audit below still sees them where they were.
+  const gone = economy ? economy.ledger.filter((r) => r.kind === 'turnIn') : [];
+  for (const r of gone) if (owners.has(r.item.uid)) bad('a turned-in card is still in the inventory.');
+  const items = new Map([...army.map((b) => b.weapon), ...depot, ...gone.map((r) => r.item)].map((it) => [it.uid, it]));
+  const issued = issuedRaw.map((r) => {
     shape(r, ['brigade', 'item', 'displaced']);
-    if (!brigadeIds.has(r.brigade) || !owners.has(r.item) || !owners.has(r.displaced) || r.item === r.displaced) bad('invalid issued reference.');
+    if (!brigadeIds.has(r.brigade) || !items.has(r.item) || !items.has(r.displaced) || r.item === r.displaced) bad('invalid issued reference.');
     const brigade = army.find((b) => b.id === r.brigade);
     if (!canCarry(brigade, items.get(r.item)) || !canCarry(brigade, items.get(r.displaced))) bad('incompatible issued gear.');
     return { brigade: r.brigade, item: r.item, displaced: r.displaced };
   });
-  // Walk the transfers backwards: records must describe this inventory, not reissue it.
-  for (const r of [...issued].reverse()) {
+  // Walk the transfers backwards: records must describe this inventory, not reissue it. A card turned in after
+  // issue record i (its ledger `at` > i) returns to the depot before record i is checked.
+  let back = gone.length - 1;
+  for (let i = issued.length - 1; i >= 0; i--) {
+    const r = issued[i];
+    for (; back >= 0 && gone[back].at > i; back--) owners.set(gone[back].item.uid, null);
     if (owners.get(r.item) !== r.brigade || owners.get(r.displaced) !== null) bad('inconsistent issued records.');
     owners.set(r.item, null);
     owners.set(r.displaced, r.brigade);
   }
   const out = v2
     ? { format: 'the-civil-war', version: 2, kind: 'campaign', awardId, army, depot, issued, seed, grade: v.grade,
-      slot: number(v.slot, 'save slot', 1, SAVE_SLOTS.length), campaign }
+      slot: number(v.slot, 'save slot', 1, SAVE_SLOTS.length), campaign,
+      rp: economy.rp, reputation: economy.reputation, level: economy.level, shopSeen: economy.shopSeen, ledger: economy.ledger }
     : { format: 'the-civil-war', version: 1, kind: 'completed-reward', awardId, army, depot, issued, seed, grade: v.grade };
   if (v2 && has(v, 'updated')) {
     if (typeof v.updated !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(v.updated)) bad('invalid update time.');
@@ -315,6 +394,19 @@ export function createProgressStore(storage, { locks, slot = 1 } = {}) {
         // No parsing of old bytes: explicit imports can repair unchanged corrupt progress.
         if (read(s) !== previousRaw) bad('progress changed since this import was reviewed. Export the pending file or choose it again.');
         return write(s, snapshot);
+      });
+    },
+    /**
+     * One reviewed exchange computed by a pure `transform(baseline, command)` (buy, turn in, shop seen; see economy.js),
+     * written only if stored progress still equals the reviewed baseline (the depot exchange's compare-and-set).
+     */
+    async exchange(transform, command, { previous } = {}) {
+      if (typeof transform !== 'function') bad('an exchange needs its rule.');
+      const baseline = owned(validateSnapshot(previous)), draft = owned(validateSnapshot(transform(baseline, command)));
+      return locked((s) => {
+        const raw = read(s), current = raw === null ? null : parseSnapshot(raw);
+        if (JSON.stringify(current) !== JSON.stringify(baseline)) bad('progress changed since this exchange was reviewed. Export the pending army or reload saved progress.');
+        return write(s, draft);
       });
     },
     async issue(command, { previous } = {}) {

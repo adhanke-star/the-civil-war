@@ -36,9 +36,48 @@ export const TIER_BY_ID = Object.fromEntries(TIERS.map((t) => [t.id, t]));
 const old = (v) => ({ v, src: 'old-data' });
 const ph = (v) => ({ v, src: 'placeholder' });
 
+/** When each arm could first be issued to a Union army in the West (YYYY-MM), with the basis and its sources.
+ *  The shop stocks an arm only from this month on (src/franchise/economy.js); capturedOnly arms are never stocked.
+ *  fromProvenance follows AGENTS.md: Verified needs two independent sources, otherwise Inferred. Research packet
+ *  2026-10-11 (P5b); every month here is a first-issue estimate for the shop, not a claim about a named unit. */
+const dated = (from, fromProvenance, capturedOnly, fromBasis, sources) => Object.freeze({ from, fromProvenance, capturedOnly, fromBasis, sources: Object.freeze(sources) });
+export const ARM_DATES = Object.freeze({
+  m1842: dated('1861-04', 'Inferred', false, "Standard US smoothbore musket in 1861 state and federal stocks; the Shiloh arms mix still included M1842s.",
+    ['https://authentic-campaigner.com/forum/military-forums/authenticity-forums/18460-what-weapons-did-these-regts-use-at-shiloh']),
+  sixPdr: dated('1861-04', 'Inferred', false, "M1841 6-pdr smoothbore was the standard US field gun; Stones River western batteries still had many (forum report).",
+    ['https://civilwartalk.com/threads/artillery-at-stones-river.215466/']),
+  lorenz: dated('1861-12', 'Verified', false, "Austrian Lorenz rifle-muskets imported from late 1861; present in Grant's army by Shiloh.",
+    ['https://historynet.com/austrias-deadly-emissary-lorenz-rifle-muskets-in-the-civil-war/','https://authentic-campaigner.com/forum/military-forums/authenticity-forums/18460-what-weapons-did-these-regts-use-at-shiloh']),
+  belgian: dated('1861-10', 'Verified', false, "Belgian .70 rifle-muskets bought in the West in 1861 (Fremont and the states).",
+    ['https://www.horsesoldier.com/products/identified-items/firearms/39022','https://authentic-campaigner.com/forum/military-forums/authenticity-forums/18460-what-weapons-did-these-regts-use-at-shiloh']),
+  howitzer12: dated('1861-04', 'Inferred', false, "M1841 12-pdr field howitzer, a standard pre-war piece used by many western batteries through 1862.",
+    ['https://civilwartalk.com/threads/artillery-at-stones-river.215466/']),
+  springfield: dated('1861-09', 'Inferred', false, "M1861 production from Jan 1861; western issue plausible from autumn 1861, a minority arm at Shiloh.",
+    ['https://authentic-campaigner.com/forum/military-forums/authenticity-forums/18460-what-weapons-did-these-regts-use-at-shiloh']),
+  enfield: dated('1861-11', 'Inferred', false, "P53 Enfields imported from late 1861; some western units had them by Shiloh.",
+    ['https://authentic-campaigner.com/forum/military-forums/authenticity-forums/18460-what-weapons-did-these-regts-use-at-shiloh','https://authentic-campaigner.com/forum/military-forums/authenticity-forums/history-books-culture/5698-arms-in-the-hornets-nest']),
+  napoleon: dated('1862-01', 'Inferred', false, "Production from 1861 in small numbers; few in the West before 1862; about a dozen in the Union inventory at Stones River.",
+    ['https://civilwartalk.com/threads/artillery-at-stones-river.215466/','https://en.wikipedia.org/wiki/12-pounder_Napoleon']),
+  sharps: dated('1861-09', 'Inferred', false, "Sharps rifles and carbines issued from 1861; western first-issue date is an estimate.",
+    ['https://www.americanrifleman.org/articles/2021/2/12/colts-model-1855-revolving-rifle-in-the-civil-war']),
+  colt: dated('1861-10', 'Verified', false, "Colt M1855 revolving rifles bought by the Ordnance Department; western units had them by 1861-62.",
+    ['https://www.americanrifleman.org/articles/2021/2/12/colts-model-1855-revolving-rifle-in-the-civil-war','https://civilwartalk.com/threads/revolving-rifles.209087/']),
+  ordnance3: dated('1862-06', 'Verified', false, "Model 1861 ordered from July 1861; rare in the West before 1863 (about 6 at Stones River).",
+    ['https://en.wikipedia.org/wiki/3-inch_ordnance_rifle','https://civilwartalk.com/threads/artillery-at-stones-river.215466/']),
+  parrott10: dated('1861-09', 'Verified', false, "First accepted May 1861; the majority rifled gun in Union western batteries by Stones River.",
+    ['https://en.wikipedia.org/wiki/10-pounder_Parrott_rifle','https://civilwartalk.com/threads/artillery-at-stones-river.215466/']),
+  spencer: dated('1863-05', 'Verified', false, "Wilder's brigade bought Spencers in spring 1863 and used them at Hoover's Gap, 24 June 1863.",
+    ['https://en.wikipedia.org/wiki/Lightning_Brigade','https://www.civilwarprofiles.com/john-t-wilder-and-the-spencer-repeating-rifle/','https://www.battlefields.org/learn/articles/wilders-lightning-brigade-winter-1862-winter-1863']),
+  henry: dated('1863-05', 'Inferred', false, "Private purchase only; the 66th Illinois bought them (sources split between May 1863 and early 1864); absent at Shiloh and Stones River.",
+    ['https://en.wikipedia.org/wiki/66th_Illinois_Infantry_Regiment','https://www.rockislandauction.com/detail/54/1137/new-haven-arms-co-henry-rifle-44-henry-rf']),
+  whitworth: dated('1863-01', 'Inferred', true, "Confederate import; no Union western use found. Captured item only.",
+    ['https://en.wikipedia.org/wiki/12-pounder_Whitworth_rifle','https://emergingcivilwar.com/2014/06/16/the-road-to-atlanta-sharp-shooting/']),
+});
+
 /** Weapon and gun types. arm: 'infantry' (small arms, for brigades) or 'artillery' (guns, for batteries).
  *  range in yards, rate in rounds per minute, accuracy 0-100 (old project's scale), power 0-99 (game).
- *  mods: small game adjustments to Melee and Drill (placeholder). */
+ *  mods: small game adjustments to Melee and Drill (placeholder). Each arm also carries its ARM_DATES row
+ *  (from, fromProvenance, capturedOnly, fromBasis, sources). */
 export const ARMS = [
   // Common
   { id: 'm1842', tier: 'common', arm: 'infantry', name: 'M1842 musket', kind: 'smoothbore musket', caliber: '.69',
@@ -90,7 +129,7 @@ export const ARMS = [
   { id: 'whitworth', tier: 'legendary', arm: 'artillery', name: 'Whitworth 12-pdr', kind: 'rifled breech-loader', caliber: '2.75 in hex',
     range: old(2800), rate: old(1), accuracy: old(98), power: ph(86), mods: { melee: 0, drill: -1 },
     effect: { text: 'Pinpoint past a mile; slow, special ammunition', src: 'old-data' } },
-];
+].map((a) => ({ ...a, ...ARM_DATES[a.id] }));
 
 /** Named uniques: real weapon types, invented game names. gameItem: true always. Never history. */
 export const UNIQUES = [

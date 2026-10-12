@@ -10,7 +10,11 @@
 //     d. Ratings: changed brigades count up to their new OVR and bars; Continue calls onDone(result).
 //   mode: 'one' deals a single card (the sandbox's "Deal one loot card") and closes after it.
 //   onDone(result): { awardId, army, depot, issued, seed, grade }
-//   afterAction: { title, why, surviving, losses, guns, eyebrow?, note? }; a campaign phase sets its own eyebrow and note.
+//   afterAction: { title, why, surviving, losses, guns, eyebrow?, note?, points? }; a campaign phase sets its own eyebrow and
+//     note, and `points` (economy.js phaseSummary): the requisition points lines, a count-up of the total, the reputation
+//     track and, when a level was reached, an inline level-up panel with its reward card plus levelUpMoment below.
+//   levelUpMoment(host, { to, opened, shopTier, reduced }) -> the full-screen level-up moment: a non-blocking layer
+//     (pointer-events none, aria-hidden; the caller announces it) that leaves on its own; static under reduced motion.
 //
 // State lives in one plain object (S). Settings come from src/settings.js (defineRewardSettings below);
 // the 'screens.cardStyle' choice can be split-screened through src/sandbox/compare.js.
@@ -285,6 +289,27 @@ function trayTile(inst, t) {
   return tint(tile, tier.id);
 }
 
+// ---- level-up moment ------------------------------------------------------------------------------------
+/**
+ * The full-screen level-up moment (DESIGN §4b Reward feel). It never takes focus or blocks a click, so it can play
+ * over the after-action or the camp; screen readers get the caller's announcement instead. window.__levelUps lists
+ * every level shown on this page (the economy UI test checks each level appears once).
+ */
+export function levelUpMoment(host, { to, opened = false, shopTier = 'common', reduced = false, speed = 1 } = {}) {
+  const tier = TIER_BY_ID[shopTier] || TIER_BY_ID.common;
+  const node = tint(el('div', { class: 'rw-levelup-moment', 'aria-hidden': 'true', 'data-level': String(to), 'data-motion': reduced ? 'reduced' : 'full' },
+    el('div', { class: 'rw-levelup-glow' }),
+    el('p', { class: 'rw-levelup-moment-kicker', text: 'Army reputation' }),
+    el('p', { class: 'rw-levelup-moment-level' }, el('small', { text: 'Level' }), el('b', { text: String(to) })),
+    el('p', { class: 'rw-levelup-moment-note' }, opened ? shapeIcon(tier.id) : null,
+      opened ? `${tier.name} arms now in the Requisition shop` : 'A reward card goes to your depot')), tier.id);
+  host.append(node);
+  (globalThis.__levelUps ||= []).push(to);
+  if (!reduced) sfx.play('sting', { level: 'subtle' });
+  const timer = setTimeout(() => node.remove(), reduced ? 1800 : Math.round(2800 / (Number(speed) || 1)));
+  return { node, remove() { clearTimeout(timer); node.remove(); } };
+}
+
 // ---- the sequence -----------------------------------------------------------------------------------------
 export function mountReward(root, opts = {}) {
   const prepared = Object.hasOwn(opts, 'preparedOutcome') ? assertSavedReward(opts.preparedOutcome) : null;
@@ -433,6 +458,7 @@ export function mountReward(root, opts = {}) {
       el('p', { class: 'rw-grade-note', text: opts.afterAction?.why ?? GRADE_NOTES[S.grade] }),
       opts.afterAction ? el('p', { class: 'rw-hint', text: `${opts.afterAction.surviving.toLocaleString()} surviving men · ${opts.afterAction.losses.toLocaleString()} lost · ${opts.afterAction.guns} crewed guns. ${opts.afterAction.note ?? 'Practice rewards and ratings are game values; this does not record the historical outcome.'}` }) : null,
       opts.afterAction?.surrenderResult ? el('p', { class: 'rw-hint', text: surrenderReportText(opts.afterAction.surrenderResult) }) : null,
+      pointsBlock(opts.afterAction?.points),
       el('div', { class: 'rw-aar-stats' },
         el('p', { class: 'rw-aar-stat' }, el('b', { text: String(S.captures.length) }), el('span', { text: 'Captures' })),
         el('p', { class: 'rw-aar-stat' }, el('b', { text: String(nIssue) }), el('span', { text: 'Quartermaster issue' })),
@@ -441,7 +467,59 @@ export function mountReward(root, opts = {}) {
       el('div', { class: 'rw-foot' }, btn));
     stage.append(sec);
     sec.querySelector('.rw-grade').focus({ preventScroll: true });
-    announce(`${S.grade}. ${S.captures.length} captures. ${S.cards.length} cards to open.`);
+    const p = opts.afterAction?.points;
+    announce(`${S.grade}. ${p ? `${p.points} requisition points; reputation ${p.reputation.to}, level ${p.level}.${p.levelUp ? ` Reputation level ${p.levelUp.to} reached; a reward card goes to your depot.` : ''} ` : ''}${S.captures.length} captures. ${S.cards.length} cards to open.`);
+    if (p) later(() => countPoints(sec, p), ms(450));
+  }
+
+  // ---- requisition points (campaign phases; game rules) ----
+  const signedPoints = (n) => (n > 0 ? `+${n}` : n < 0 ? `${MINUS}${Math.abs(n)}` : '0');
+  function pointsBlock(p) {
+    if (!p) return null;
+    const lines = el('ol', { class: 'rw-points-lines' });
+    p.lines.forEach((l, i) => lines.append(el('li', { class: `rw-points-line${l.points < 0 ? ' is-cut' : ''}`, style: `--i:${i}`, 'data-line': l.id },
+      el('span', { class: 'rw-points-label', text: l.label }), el('b', { text: signedPoints(l.points) }))));
+    const next = p.nextAt === null ? 'top level reached' : `next level at ${fmtInt(p.nextAt)}`;
+    const track = p.nextAt === null ? null : el('div', { class: 'rw-rep-track', role: 'progressbar', 'aria-label': `Reputation toward level ${p.level + 1}`,
+      'aria-valuemin': String(p.levelAt), 'aria-valuemax': String(p.nextAt), 'aria-valuenow': String(p.reputation.to) },
+    el('i', { style: `width:${Math.max(0, Math.min(100, Math.round(100 * (p.reputation.to - p.levelAt) / Math.max(1, p.nextAt - p.levelAt))))}%` }));
+    const up = p.levelUp;
+    const level = up ? el('section', { class: 'rw-levelup', 'aria-labelledby': 'rw-levelup-title', 'data-level': String(up.to) },
+      el('h2', { class: 'rw-levelup-title', id: 'rw-levelup-title', text: `Reputation level ${up.to} reached` }),
+      el('p', { class: 'rw-hint', text: `${up.opened ? `The Requisition shop now stocks ${TIER_BY_ID[up.shopTier].name} arms. ` : ''}${up.cards.length === 1 ? 'Your reward card waits in the depot; issue it in camp.' : `Your ${up.cards.length} reward cards wait in the depot; issue them in camp.`} Game rule, not history.` }),
+      up.cards.length ? el('div', { class: 'rw-levelup-cards', role: 'list', 'aria-label': 'Reward cards' }, ...up.cards.map((c) => el('div', { role: 'listitem' }, staticCard(c)))) : null) : null;
+    return el('section', { class: 'rw-points', 'aria-labelledby': 'rw-points-title', 'data-points': String(p.points) },
+      el('h2', { class: 'rw-points-title', id: 'rw-points-title' }, 'Requisition points', el('span', { class: 'rw-rule-tag', text: 'Game rule' })),
+      lines,
+      el('p', { class: 'rw-points-total' }, el('span', { text: p.replay ? 'Earned by this replay' : 'Earned this phase' }),
+        el('b', { class: 'rw-points-v', 'aria-hidden': 'true', 'data-final': String(p.points), text: '0' }),
+        el('span', { class: 'rw-sr', text: `${p.points} points` })),
+      el('p', { class: 'rw-points-rep', text: `Reputation ${fmtInt(p.reputation.from)} → ${fmtInt(p.reputation.to)} · Level ${p.level} of 10 · ${next} · ${fmtInt(p.rp)} points to spend in camp` }),
+      track, level);
+  }
+  function countPoints(sec, p) {
+    const v = sec.querySelector('.rw-points-v'), box = sec.querySelector('.rw-points');
+    if (!v || !box) return;
+    const to = Number(v.dataset.final), D = S.fast ? 0 : ms(900);
+    const done = () => {
+      v.textContent = signedPoints(to); box.dataset.counted = 'true';
+      if (p.levelUp && !S.levelShown) {
+        S.levelShown = true;
+        levelUpMoment(rootEl, { to: p.levelUp.to, opened: p.levelUp.opened, shopTier: p.levelUp.shopTier, reduced: S.reduced, speed: speed() });
+      }
+    };
+    if (!D || to <= 0) { done(); return; }
+    const t0 = performance.now();
+    let shown = 0, step = 0;
+    const frame = (now) => {
+      S.rafs.delete(id);
+      if (S.dead) return;
+      const k = Math.min(1, (now - t0) / D), n = Math.round(to * (1 - Math.pow(1 - k, 3)));
+      if (n !== shown) { shown = n; v.textContent = signedPoints(n); if (step++ % 3 === 0) sfx.play('tick', { step }); }
+      if (k < 1) { id = requestAnimationFrame(frame); S.rafs.add(id); } else done();
+    };
+    let id = requestAnimationFrame(frame);
+    S.rafs.add(id);
   }
 
   // ---- b. loot reveal --------------------------------------------------------------------------------------

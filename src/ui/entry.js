@@ -1,9 +1,13 @@
-// Completed-army camp. Explicit imports and depot exchanges share the authoritative save seam.
+// Completed-army camp. Explicit imports and depot exchanges share the authoritative save seam. A campaign camp also has
+// the Requisition drawer (src/franchise/economy.js: reputation track, this phase's stock, buy and turn-in with a confirm,
+// each written through the store's compare-and-set exchange) and plays the level-up moment when a turn-in reaches a level.
 import { createProgressStore, parseSnapshot, exportSnapshot, exchangeDepot, listSlots, MAX_SAVE_BYTES } from '../franchise/save.js';
 import { newCampaign } from '../franchise/campaign.js';
 import { loadCampaign, loadPackSummary, ladderPosition, formatDate } from './briefing.js';
 import { get } from '../settings.js';
-import { brigCard, staticCard, itemLabel, defineRewardSettings } from '../reward/sequence.js';
+import { brigCard, staticCard, itemLabel, defineRewardSettings, levelUpMoment } from '../reward/sequence.js';
+import { shopStock, buyLot, turnInCard, markShopSeen, levelUps, turnInPoints, nextLevelAt, shopTierFor, ECONOMY, RULES_NOTE } from '../franchise/economy.js';
+import { TIER_BY_ID, itemDef } from '../reward/data.js';
 import { compare, bestFit } from '../reward/model.js';
 import { savedDeployment } from '../franchise/practice.js';
 import { loadFieldScenario } from '../sim/phase.js';
@@ -51,7 +55,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
   let saved = null, failed = false, pendingImport = null, pendingName = null, importing = false;
   let pendingBaseline, baselineKnown = false, phase = 'idle';
   let pendingExchange = null, activeReview = null;
-  let activeDeployment = null, disposed = false;
+  let activeDeployment = null, disposed = false, shopOpen = false;
   const pages = { army: 0, depot: 0 };
   const root = document.createElement('main'); root.id = 'front'; root.className = 'rw rw-counts';
   root.dataset.uiStyle = STYLE[get('screens.cardStyle')] || 'modern';
@@ -76,11 +80,19 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
           <div class="entry-field-actions"><a id="camp-next" class="entry-primary" href="./">Next</a><a id="camp-replay" class="entry-secondary" href="./" hidden>Replay</a></div>
           <h3 id="camp-record-heading">Record so far</h3><p id="camp-record-empty">No phase fought yet.</p><ol id="camp-record" aria-labelledby="camp-record-heading"></ol>
         </section>
+        <section id="camp-shop" aria-labelledby="camp-shop-heading" hidden>
+          <div class="camp-shop-head"><div><h2 id="camp-shop-heading" tabindex="-1">Requisition</h2><p id="camp-reputation"></p>
+            <div id="camp-rep-track" class="rw-rep-track" role="progressbar"><i></i></div><p id="camp-shop-new" hidden></p></div>
+            <button id="camp-shop-toggle" type="button" aria-expanded="false" aria-controls="camp-shop-drawer">Open Requisition</button></div>
+          <div id="camp-shop-drawer" hidden><p class="entry-note" id="camp-shop-note"></p><p id="camp-shop-status" role="status" tabindex="-1"></p>
+            <div id="camp-shop-stock" role="list" aria-label="Requisition stock"></div></div>
+        </section>
         <section aria-labelledby="camp-army-heading"><h2 id="camp-army-heading">Brigades</h2><div id="camp-army" class="rw-brigs is-static" role="list" aria-label="Saved brigades"></div><div id="army-pages" class="entry-pages"></div></section>
         <section aria-labelledby="camp-depot-heading"><h2 id="camp-depot-heading" tabindex="-1">Depot</h2><p id="depot-note"></p><div id="camp-depot" role="list" aria-label="Saved depot"></div><div id="depot-pages" class="entry-pages"></div></section>
       </section>
       <dialog id="slot-picker" aria-labelledby="slot-picker-heading" aria-describedby="slot-picker-note"><h2 id="slot-picker-heading" tabindex="-1">New campaign: choose a save slot</h2><p id="slot-picker-note">Each slot keeps one army. The campaign autosaves between phases and in camp.</p><div id="slot-rows" role="group" aria-label="Save slots"></div><p id="slot-picker-status" role="status"></p><div class="camp-compare-actions"><button id="slot-picker-cancel" type="button">Cancel</button></div></dialog>
       <dialog id="slot-overwrite" role="alertdialog" aria-labelledby="slot-overwrite-heading" aria-describedby="slot-overwrite-note"><h2 id="slot-overwrite-heading">Overwrite this slot?</h2><p id="slot-overwrite-note"></p><div class="camp-compare-actions"><button id="slot-overwrite-cancel" type="button">Cancel</button><button id="slot-overwrite-confirm" type="button">Overwrite</button></div></dialog>
+      <dialog id="camp-confirm" role="alertdialog" aria-labelledby="camp-confirm-heading" aria-describedby="camp-confirm-note"><h2 id="camp-confirm-heading" tabindex="-1"></h2><p id="camp-confirm-note"></p><div class="camp-compare-actions"><button id="camp-confirm-cancel" type="button">Cancel</button><button id="camp-confirm-ok" type="button"></button></div></dialog>
       <section class="entry-transfer" aria-label="Army transfer"><p id="entry-status" role="status"></p><button id="entry-export" type="button" disabled>Export army</button><button id="entry-export-saved" type="button" hidden>Export displayed saved army</button><button id="entry-import" type="button">Import army</button><button id="entry-retry" type="button" hidden>Retry loading</button><button id="entry-discard-exchange" type="button" hidden>Discard pending exchange and reload</button><input id="entry-file" type="file" accept=".json,application/json" hidden></section>
       <nav class="entry-modes" aria-label="Other ways to play"><a href="./?practice">Henry Hill practice</a><a href="./?battle=henry-hill">Historical battle</a><a href="./?sandbox">Sandbox</a><a href="./reward.html">Reward workbench</a></nav>
       <p class="entry-note">Practice formations, rewards and ratings are game values. The historical battle is available separately.</p>
@@ -115,6 +127,8 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     node('entry-discard-exchange').hidden = !pendingExchange;
     node('entry-discard-exchange').disabled = importing;
     root.querySelectorAll('.camp-compare-button').forEach((b) => { b.disabled = importing || !!pendingImport || !!pendingExchange; });
+    root.querySelectorAll('.camp-turnin-button, .camp-buy-button').forEach((b) => { b.disabled = importing || !!pendingImport || !!pendingExchange || b.dataset.blocked === 'true'; });
+    node('camp-shop-toggle').disabled = importing || !!pendingImport || !!pendingExchange;
     root.querySelectorAll('a[href]').forEach((a) => a.setAttribute('aria-disabled', String(importing || !!pendingExchange)));
   };
   function paged(items, container, controlsNode, build, noun, key) {
@@ -191,6 +205,133 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       return li;
     }));
   }
+  // ---- Requisition (campaign saves; amounts are game rules in src/franchise/tuning.js) ----
+  const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const monthName = (ym) => (/^\d{4}-\d{2}/.test(ym || '') ? `${MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(0, 4)}` : '');
+  /** The shop's date: the next phase's (the last phase's once the campaign is complete); null until its pack is loaded. */
+  function shopDate() {
+    if (!saved || saved.version !== 2 || !ladder || ladder.def.id !== saved.campaign.id) return null;
+    const phases = ladder.def.phases, entry = phases[Math.min(saved.campaign.index, phases.length - 1)];
+    return titles.get(entry.packId)?.phases.find((p) => p.id === entry.phaseId)?.date ?? null;
+  }
+  const shopStatus = (text) => { node('camp-shop-status').textContent = text; };
+  function renderShop() {
+    const v2 = saved.version === 2;
+    node('camp-shop').hidden = !v2;
+    if (!v2) { shopOpen = false; return; }
+    const next = nextLevelAt(saved.level), from = ECONOMY.levels[saved.level - 1], track = node('camp-rep-track');
+    node('camp-reputation').textContent = `Reputation ${saved.reputation.toLocaleString()} · Level ${saved.level} of ${ECONOMY.levels.length} · ${next === null ? 'top level' : `next level at ${next.toLocaleString()}`} · ${saved.rp.toLocaleString()} points to spend`;
+    track.hidden = next === null;
+    if (next !== null) {
+      track.setAttribute('aria-label', `Reputation toward level ${saved.level + 1}`);
+      track.setAttribute('aria-valuemin', String(from)); track.setAttribute('aria-valuemax', String(next)); track.setAttribute('aria-valuenow', String(saved.reputation));
+      track.firstElementChild.style.width = `${Math.max(0, Math.min(100, Math.round(100 * (saved.reputation - from) / (next - from))))}%`;
+    }
+    node('camp-shop-new').hidden = saved.shopSeen >= saved.level;
+    node('camp-shop-new').textContent = `New: reputation level ${saved.level}. The shop stocks up to ${TIER_BY_ID[shopTierFor(saved.level)].name} arms.`;
+    const toggle = node('camp-shop-toggle'); toggle.setAttribute('aria-expanded', String(shopOpen));
+    toggle.textContent = shopOpen ? 'Close Requisition' : 'Open Requisition';
+    node('camp-shop-drawer').hidden = !shopOpen;
+    const grid = node('camp-shop-stock'); grid.replaceChildren();
+    if (!shopOpen) return;
+    const date = shopDate();
+    let stock = null;
+    if (!date) node('camp-shop-note').textContent = 'The shop needs the next phase\'s date, which could not be loaded. Reload the camp to try again. Your army is unchanged.';
+    else {
+      try { stock = shopStock(saved, { date }); } catch (err) { node('camp-shop-note').textContent = `${err.message} Your army is unchanged.`; }
+    }
+    if (!stock) return;
+    node('camp-shop-note').textContent = `Stock for the phase of ${monthName(date)}: up to ${ECONOMY.shopSize} arms that were in service by the next phase, up to ${TIER_BY_ID[shopTierFor(saved.level)].name} rarity at your level. Purchases go to the depot. ${RULES_NOTE} First-issue months are cited on each lot; captured-only arms are never stocked.`;
+    if (!stock.length) { const p = document.createElement('p'); p.textContent = 'Nothing is in stock for this phase.'; grid.append(p); return; }
+    for (const lot of stock) {
+      const def = itemDef(lot.itemId), cell = document.createElement('div'); cell.setAttribute('role', 'listitem'); cell.className = 'camp-lot'; cell.dataset.lot = lot.itemId;
+      const card = staticCard({ ...lot, from: `In service from ${monthName(def.from)} (${def.fromProvenance})` }); card.setAttribute('role', 'group');
+      const cite = document.createElement('p'); cite.className = 'camp-lot-cite'; cite.append(`${def.fromBasis} Sources: `);
+      def.sources.forEach((href, i) => {
+        const a = document.createElement('a'); a.href = href; a.target = '_blank'; a.rel = 'noopener'; a.textContent = new URL(href).hostname.replace(/^www\./, '');
+        cite.append(...(i ? ['; ', a] : [a]));
+      });
+      const buy = document.createElement('button'); buy.type = 'button'; buy.className = 'camp-buy-button';
+      const short = saved.rp < lot.price;
+      buy.dataset.blocked = String(lot.sold || short);
+      buy.textContent = lot.sold ? 'Bought' : short ? `Needs ${lot.price} points` : `Buy for ${lot.price} points`;
+      buy.setAttribute('aria-label', `${lot.sold ? 'Bought' : `Buy ${itemLabel(lot)} for ${lot.price} requisition points`}${!lot.sold && short ? `; you have ${saved.rp}` : ''}`);
+      buy.disabled = importing || !!pendingImport || !!pendingExchange || lot.sold || short;
+      buy.addEventListener('click', () => openBuy(lot, buy));
+      cell.append(card, cite, buy); grid.append(cell);
+    }
+  }
+  const confirmDialog = node('camp-confirm');
+  function confirmAction({ heading, note, ok }) {
+    node('camp-confirm-heading').textContent = heading; node('camp-confirm-note').textContent = note; node('camp-confirm-ok').textContent = ok;
+    confirmDialog.returnValue = 'cancel'; confirmDialog.showModal(); node('camp-confirm-cancel').focus();
+    return new Promise((resolve) => confirmDialog.addEventListener('close', () => resolve(confirmDialog.returnValue === 'ok'), { once: true }));
+  }
+  node('camp-confirm-cancel').addEventListener('click', () => confirmDialog.close('cancel'));
+  node('camp-confirm-ok').addEventListener('click', () => confirmDialog.close('ok'));
+  confirmDialog.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const first = node('camp-confirm-cancel'), last = node('camp-confirm-ok');
+    if (e.shiftKey && [first, node('camp-confirm-heading')].includes(document.activeElement)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  /** One economy exchange through the store's compare-and-set; plays the level-up moment if it reached a level. */
+  async function runEconomy(rule, command, done) {
+    const baseline = saved;
+    importing = true; controls(); shopStatus('Saving…');
+    try {
+      const next = await store.exchange(rule, command, { previous: baseline });
+      const ups = levelUps(baseline, next);
+      saved = next; failed = false;
+      let text = done(next);
+      if (ups) {
+        text += ` Reputation level ${ups.to} reached: ${ups.cards.length === 1 ? 'a reward card is' : `${ups.cards.length} reward cards are`} in your depot${ups.opened ? `, and the shop now stocks ${TIER_BY_ID[ups.shopTier].name} arms` : ''}.`;
+        levelUpMoment(root, { to: ups.to, opened: ups.opened, shopTier: ups.shopTier, reduced: !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches });
+      }
+      importing = false; render(); shopStatus(text); status.textContent = text;
+      return true;
+    } catch (err) {
+      importing = false; render();
+      const text = `${err.message} Your saved army is unchanged; reload the camp if progress changed elsewhere.`;
+      shopStatus(text); status.textContent = text;
+      return false;
+    } finally { importing = false; phase = 'idle'; controls(); }
+  }
+  async function openBuy(lot, trigger) {
+    if (importing || pendingImport || pendingExchange || !saved || saved.version !== 2) return;
+    const date = shopDate();
+    phase = 'reviewing';
+    const ok = await confirmAction({ heading: 'Requisition this lot?', ok: `Buy for ${lot.price} points`,
+      note: `${itemLabel(lot)}. It costs ${lot.price} requisition points (you have ${saved.rp}; ${saved.rp - lot.price} left) and goes to your depot. Prices are a game rule.` });
+    phase = 'idle';
+    if (!ok) { trigger.focus(); return; }
+    const saved1 = await runEconomy(buyLot, { itemId: lot.itemId, date }, (next) => `Bought ${itemLabel(lot)} for ${lot.price} points. It is in your depot; ${next.rp} points left.`);
+    const again = node('camp-shop-stock').querySelector(`[data-lot="${lot.itemId}"] button:not(:disabled)`);
+    (saved1 || !again ? node('camp-shop-status') : again).focus();
+  }
+  async function openTurnIn(item, trigger) {
+    if (importing || pendingImport || pendingExchange || !saved || saved.version !== 2) return;
+    const points = turnInPoints(item), index = saved.depot.findIndex((it) => it.uid === item.uid);
+    phase = 'reviewing';
+    const ok = await confirmAction({ heading: 'Turn in this card?', ok: `Turn in for ${points} points`,
+      note: `${itemLabel(item)} leaves your depot for good and pays ${points} requisition points. Reputation rises by the same amount. Game rule, not history.` });
+    phase = 'idle';
+    if (!ok) { trigger.focus(); return; }
+    await runEconomy(turnInCard, { itemUid: item.uid }, (next) => `Turned in ${itemLabel(item)} for ${points} points; ${next.rp} points to spend.`);
+    if (saved.depot.some((it) => it.uid === item.uid) && trigger.isConnected) trigger.focus();
+    else focusDepot(item.uid, index);
+  }
+  node('camp-shop-toggle').addEventListener('click', async () => {
+    if (importing || pendingImport || pendingExchange || !saved || saved.version !== 2) return;
+    shopOpen = !shopOpen; render(); node('camp-shop-toggle').focus();
+    // Opening the shop at a new level clears its "new" marker (a small compare-and-set write; failure keeps the marker).
+    if (shopOpen && saved.shopSeen < saved.level) {
+      importing = true; controls();
+      try { saved = await store.exchange(markShopSeen, null, { previous: saved }); }
+      catch (err) { shopStatus(`${err.message} The shop still marks this level as new.`); }
+      finally { importing = false; render(); node('camp-shop-toggle').focus(); }
+    }
+  });
   function render() {
     const showCamp = camp && !!saved && !failed;
     node('entry-title').hidden = showCamp; node('entry-camp').hidden = !showCamp;
@@ -201,22 +342,30 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     if (!showCamp) renderTitleCampaign();
     if (showCamp) {
       renderCampaignStrip();
+      renderShop();
       node('entry-summary').textContent = `${saved.army.length} formations · ${saved.army.reduce((n, b) => n + b.men, 0).toLocaleString()} men · ${saved.grade ?? 'no phase fought yet'}`;
       paged(saved.army, node('camp-army'), node('army-pages'), (b, i) => {
         const card = brigCard(b, i, { interactive: false }); card.dataset.brigadeId = b.id; return card;
       }, 'brigades', 'army');
-      node('depot-note').textContent = saved.depot.length ? `${saved.depot.length} cards kept in the depot. Compare a card to issue it; your current weapon returns here.` : 'No spare arms in the depot.';
+      node('depot-note').textContent = saved.depot.length ? `${saved.depot.length} cards kept in the depot. Compare a card to issue it; your current weapon returns here.${saved.version === 2 ? ' A card you do not need can be turned in for requisition points.' : ''}` : 'No spare arms in the depot.';
       paged(saved.depot, node('camp-depot'), node('depot-pages'), (item) => {
         const cell = document.createElement('div'); cell.setAttribute('role', 'listitem'); cell.dataset.itemUid = item.uid;
         const card = staticCard(item); card.setAttribute('role', 'group');
         const button = document.createElement('button'); button.type = 'button'; button.className = 'camp-compare-button';
         button.disabled = importing || !!pendingImport || !!pendingExchange;
         button.textContent = 'Compare and issue'; button.setAttribute('aria-label', `Compare and issue ${itemLabel(item)}`);
-        button.addEventListener('click', () => openExchange(item.uid, button)); cell.append(card, button); return cell;
+        button.addEventListener('click', () => openExchange(item.uid, button)); cell.append(card, button);
+        if (saved.version === 2) {
+          const points = turnInPoints(item), turn = document.createElement('button'); turn.type = 'button'; turn.className = 'camp-turnin-button';
+          turn.textContent = `Turn in for ${points} points`; turn.setAttribute('aria-label', `Turn in ${itemLabel(item)} for ${points} requisition points`);
+          turn.disabled = importing || !!pendingImport || !!pendingExchange;
+          turn.addEventListener('click', () => openTurnIn(item, turn)); cell.append(turn);
+        }
+        return cell;
       }, 'depot cards', 'depot');
     }
     controls();
-    window.__entry = { mode: showCamp ? 'camp' : 'title', slot, saved, failed, pending: pendingImport,
+    window.__entry = { mode: showCamp ? 'camp' : 'title', slot, saved, failed, pending: pendingImport, shop: { open: shopOpen, date: shopDate() },
       campaign: ladder ? { id: ladder.def.id, slots, continueSlot: campaignSlots()[0]?.slot ?? null } : null,
       get exchange() { return pendingExchange; }, get importing() { return importing; }, get deployment() { return activeDeployment; } };
     document.title = `The Civil War — ${showCamp ? 'Your army' : 'Take the field'}`;

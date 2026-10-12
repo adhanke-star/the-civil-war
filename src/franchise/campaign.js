@@ -12,6 +12,7 @@
 //
 // Game rules here (game choices, not history): a franchise formation that loses half its men in a phase drops one
 // veterancy tier; one that ends a battle's last phase in Victory or better, with at least half its men, rises one.
+// Every recorded phase also pays requisition points once (src/franchise/economy.js awardPhase; amounts in tuning.js).
 //
 // Joins: a ladder phase may carry `joins` (rows in the franchise schema): formations that enter the franchise army
 // when a save first reaches that phase (a new campaign reaching its first phase, or recordPhase advancing to it; never
@@ -20,6 +21,7 @@
 import { validateSnapshot } from './save.js';
 import { phaseOutcome, vetBase } from './practice.js';
 import { ARMS, UNIQUES, VETERANCY, GRADES, itemDef } from '../reward/data.js';
+import { awardPhase } from './economy.js';
 
 const fail = (message) => { throw new Error(`Campaign: ${message}`); };
 const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -190,7 +192,8 @@ export function applyCampaign(scenario, save, phase) {
  */
 export function recordPhase(save, campaign, result) {
   const c = validateCampaign(campaign), s = campaignSave(save, c);
-  shape(result, ['packId', 'phaseId', 'winner', 'grade', 'units', 'loot'], ['awardId', 'at'], 'phase result');
+  shape(result, ['packId', 'phaseId', 'winner', 'grade', 'units', 'loot'], ['awardId', 'at', 'held'], 'phase result');
+  if (has(result, 'held') && typeof result.held !== 'boolean') fail('held must be true or false when present.');
   const history = s.campaign.history, last = history[history.length - 1];
   if (has(result, 'awardId') && last && result.awardId === s.awardId && last.awardId === s.awardId && same(last, result.packId, result.phaseId)) return s;
   const index = s.campaign.index;
@@ -244,12 +247,14 @@ export function recordPhase(save, campaign, result) {
   const nextIndex = replay ? index : index + 1;
   // A first play that reaches a new phase enlists that phase's joins (and any earlier ones the save lacks); a replay never does.
   const fought = s.army.map((b) => changed.get(b.id) || b);
-  return validateSnapshot({ ...s, awardId, grade: result.grade,
+  const next = validateSnapshot({ ...s, awardId, grade: result.grade,
     army: replay ? fought : withJoins(fought, c, s.slot, Math.min(nextIndex, c.phases.length - 1)), depot: [...s.depot, ...result.loot],
     campaign: { id: c.id, index: nextIndex, status: nextIndex >= c.phases.length ? 'complete' : 'in-progress',
       history: [...history, { packId: entry.packId, phaseId: entry.phaseId, awardId, winner: result.winner, grade: result.grade,
         lossesUS: losses.US, lossesCS: losses.CS, replay }], carry },
     ...(has(result, 'at') ? { updated: result.at } : {}) });
+  // Requisition points for this award (paid once; a loan phase pays half; a replay pays only its improvement).
+  return awardPhase(next, { awardId, grade: result.grade, held: result.held === true, lossesUS: losses.US, lossesCS: losses.CS, loan });
 }
 
 /** The reward bridge for one campaign phase: phaseOutcome's survivors, grade and loot as recordPhase input. */
@@ -257,5 +262,5 @@ export function phaseResult({ phase, game, scenario }) {
   if (!phase || typeof phase.awardId !== 'string') fail('a phase result needs the launched phase.');
   const outcome = phaseOutcome({ game, scenario, awardId: phase.awardId, seed: phase.seed });
   return { outcome, record: { packId: phase.packId, phaseId: phase.phaseId, awardId: phase.awardId, winner: outcome.winner,
-    grade: outcome.grade, units: outcome.units.map((u) => ({ ...u })), loot: outcome.cards.map((c) => ({ ...c })) } };
+    grade: outcome.grade, held: outcome.held === true, units: outcome.units.map((u) => ({ ...u })), loot: outcome.cards.map((c) => ({ ...c })) } };
 }
