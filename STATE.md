@@ -12,7 +12,7 @@ Full ASTC38261826032 fails short page4s; 8ASTC/2PNG qualification authorized, no
 Scene38266404188 observed11 scenes but final DOM-error rejection check failed; report/log retained.
 Corrected synchronizedGPU/CPU/resize/request/buffer ownership observer12/12+12 mutants (0129), adoption pending.
 Foragers actual3/4 caches/Silver CI38267168225; native Run fourth-leg tactic authorized (0131), Gold pending.
-Progression diagnostic6/6+6 mutants; actual receipts export added; thresholds remain unchanged (0130).
+Progression6/6+6 mutants and difficulty matrix4/4+4; actual CI pending; thresholds unchanged (0130/0132).
 Native UHD 617/iPad frame rates and device sound remain unmeasured; no requested device runs.
 MAIN checkout keeps 11 protected uncommitted P2o files untouched; P2o is parked (DECISIONS 0109).
 After completed v1.1/tag/release: Astra-approved v2 plan, officers, Confederate franchise, Eastern campaign,

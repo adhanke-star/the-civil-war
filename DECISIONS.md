@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0132 — Observe complete Buell/dawn difficulty runs under identical player orders (Astra, 2026-10-12)
+
+Six fresh Actions contexts run the unchanged authored Buell/dawn seeds/rosters with identical accepted time-zero infantry march tuples for Recruit/Veteran/General, through natural termination within the authored clock window; resume genuine auto-pauses without additional orders or continuing a finished phase. Trace successful native AI orders once across nested methods/reinforcements, reserve transitions at actual passes and holder changes; preserve native arguments/results/errors. All three pairwise semantic order/timing comparisons are reported; at least one must differ per phase, cadence alone is insufficient. Outcomes/losses/grades are observations, no ordering quota. CPU4/4+4mutants preserves existing hooks/AI/traits goldens. Shard4's45minute cap stays; move to a dedicated job if runtime exceeds40minute margin, not shorten observations. No balance numbers adopted.
+
 ## 0131 — Use the native Run order for the fourth supply-cache leg (Astra, 2026-10-12)
 
 Preserve CI38267168225 shard4's actual failure: Rousseau captured three caches, halted to fight before the fourth (sim630,2407men,wavering), and saved Silver; UI/axe/320px/provenance passed. Admit one native Run toggle before the fourth march, unchanged supporting orders/positions/AI/combat, then Run off and Hold after capture. Record engagement, follow, target, morale/fatigue. No repeated reissue or forced win; if this bounded tactic fails, return the evidence before changing placement/tactics.

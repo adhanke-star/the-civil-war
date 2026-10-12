@@ -1795,6 +1795,7 @@ async function browserChecks(server, url) {
     if (process.argv.includes('--badges')) { result.mode = 'badges and X-Factor'; const { badgesControls } = await import('./test-badges-ui.mjs'); await badgesControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--traits')) { result.mode = 'commander traits'; const { traitsControls } = await import('./test-traits-ui.mjs'); await traitsControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--command-chain')) { result.mode = 'corps command influence'; const { commandChainControls } = await import('./test-command-chain-ui.mjs'); await commandChainControls({ browser, url, check, shot, result, watchErrors }); return; }
+    if (process.argv.includes('--difficulty-matrix')) { result.mode = 'six actual difficulty observations'; const { difficultyControls } = await import('./test-difficulty-ui.mjs'); await difficultyControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--foragers')) { result.mode = 'four distinct campaign supplies'; const { foragersControls } = await import('./test-foragers-ui.mjs'); await foragersControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--hooks')) { result.mode = 'difficulty, camp effects in battle and captured colours'; const { hooksControls } = await import('./test-hooks-ui.mjs'); await hooksControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--art')) { result.mode = 'card art, portraits and backdrops'; const { artControls } = await import('./test-art-ui.mjs'); await artControls({ browser, url, check, shot, result, watchErrors }); return; }
@@ -1881,6 +1882,8 @@ async function browserChecks(server, url) {
       await commandChainControls({ browser, url, check, shot, result, watchErrors });
       const { foragersControls } = await import('./test-foragers-ui.mjs');
       await foragersControls({ browser, url, check, shot, result, watchErrors });
+      const { difficultyControls } = await import('./test-difficulty-ui.mjs');
+      await difficultyControls({ browser, url, check, shot, result, watchErrors });
     }
     finalizeActivationUI({ result, check });
   } finally {

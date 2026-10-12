@@ -1,5 +1,12 @@
 # Handoff — existing v1 (2026-10-11, Claude Opus 5.5)
 
+0132 adds --difficulty-matrix/shard4: six fresh unchanged Buell/dawn battles, same authored seeds/rosters,
+identical accepted time-zero player infantry marches, genuine auto-pause resumes, natural termination.
+Successful native AI orders (nested once), reserve activation/redirection at passes, holder/loss/grade
+observations and all three pairwise semantic comparisons. CPU4/4+4mutants green; actual browser UNRUN.
+At least one real order/timing difference per phase; cadence alone insufficient, no desired winner/loss
+ranking. Keep45minute cap; >40minute practical shardmargin calls for dedicated job, not shorter tests.
+
 Latest bounded branch work (0130–0131): diagnostic-only progression CPU6/6+6mutants and real playthrough
 economy/final-save export; no thresholds adopted. Mastery model1076/currentL8, documented surplus1476/L9,
 not combat-play evidence. Observer12/12+12mutants corrects DOM-event rejection, actualresize, synchronized
