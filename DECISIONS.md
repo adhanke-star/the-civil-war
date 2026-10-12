@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0149 — Mixed qualification passes; exported assets remain diagnostic (Sol, 2026-10-12)
+
+9d60c12 cs-hybrid38282452947 succeeds. Independent RAM report readback binds exact SHA/complete/qualified/fieldablefalse,10pages/76sheets/all576shown frames, every control/sourcehash/quality true and GL0; runner output236,654,809B. Review artifact11762905334(79,493,756B ZIP) and optimized11762770795(41,324,044B ZIP). Standalone CPU RAM export readback validates all8 real containers,2 unchanged PNG hashes, all576frames/anchors/directions and original field metadata;11exportfiles, exact48,996,984GPUclose bytes. NodeREPL cross-realm Buffer failed instanceof validation, so container readback ran in ordinary Node; no parser/product change, no local browser/assets/download directory. All76actual images and atomic runtime loader/cleanup/capability/fallback/full-scene adoption remain UNRUN; no compressed asset is on Pages. Currentmaincb82a67 Pages38282924776 green.
+
 ## 0148 — Accept observed difficulty distinctions without imposing a grade ordering (Astra, 2026-10-12)
 
 Independent actual4f334b5 shard4 artifact11761242799 and source review: all9 authored runs have identical accepted time-zero commands/seed/roster per phase, natural ends/errors0/no overflow, all9 pairwise order traces differ. Moore native memo/order[-85,202] transitions follow preceding refusal: Recruit716.75s crosses adjustedclock46,360 (previous46,346.5); Veteran698.50s distance455.30→454.75 below455; General507.95s682.84→682.48 below682.5. Early threat observed V/G, unobserved R; toObjective staysfalse, so no objective-redirection/universal grade-order/all-branches claim. Keep difficulty settings; bounded cadence/order/reserve gap closed. Failed aggregate4f CI remains failed for separate0147 sale race.

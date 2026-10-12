@@ -1,5 +1,20 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0149 CLEAN TRANSFER — sourcec328ca8 remains pending CI38282610211; docs-only skipCI relay follows.
+Remote maincb82a67 all9green + actualcampaign600/L8/201checks/actualdifficulty159checks;
+Pages38282924776 now green; automatic mainCI38282924735 running. ProtectedMAIN11 unchanged.
+Mixed qualification38282452947/9d60c12 now SUCCESS (do not rerun): review11762905334ZIP79,493,756B;
+optimized11762770795ZIP41,324,044B. Root independently RAM-read reports: complete/qualified/fieldablefalse,
+10pages/76sheets/all576frames/controlshashesqualitytrue/GL0; runner.out236,654,809B. Ordinary Node RAM
+export readback passes11files/eight real ASTC containers/two originalPNG SHA256/all576frames+anchors+dirs/
+fieldunchanged/exact48,996,984GPUclosebytes. NodeREPL reset on a30s ZIP read and its local-module realm
+rejects external Buffer instanceof; use normalNode for pure-container check. No runtimeparserchange needed.
+No local assets were downloaded, no local browser launched, no artifact or failure deleted.
+All76actual image review stillUNRUN before product adoption. Immediate next bounded task: read pending
+sourceCI, independently review qualification+optimizedexport in RAM; then the approved diagnostic atomic
+BakedAtlas loader/capability/cleanup/baseline-layout fallback CPU+browser tests. Existing imported parser
+is unused by product. No compressed assets, inactive wrappers, partitions or resource policy adopted.
+
 TRANSFER0148 — Fresh ChatGPT/Codex Sol sole writer; this session releases writing after this commit.
 Owned branch clean; sourcec328ca86c5a7671903a1f9e7c161bead2e9996da pushed; docs transfer follows it.
 Remote maincb82a67265c6eef7b6f8ac0496bcef9dbac113b6 fully accepted all9 CI38279658545.
