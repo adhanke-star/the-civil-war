@@ -1,5 +1,34 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+TRANSFER0157 — context transfer before full qualified-both matrix implementation. Sol releases sole
+writing at this docs-only relay; fresh ChatGPT/Codex Sol retains Aaron's selected main model/effort.
+Astra gpt-6-astra/high read-only uncertainty judge, at most ONE helper; helper is idle. Capacity/weekly
+usage unknown; no fabricated quota claim. No simultaneous provider edits. COORDINATION absent.
+Owned source a9b54f662eeeb021a0f2091e254ace674ec94f15 CI38306674087 running. Read that exact source;
+this following docs-only skipCI relay does not get a source acceptance claim from its parent's run.
+Main/source ef17689446e1200f0771bd5b1e5e8222a13a9f1e accepted branchCI38302772299 all9green;
+canonical251/365/144/159 alltrue/console clean, actualcampaign201/201/errors0/failure null; smoke6each.
+Pages38305892091 success/live cw-v67. Automatic mainCI38305892063 running; await/read it, do not rerun.
+New preparation local scene28+28/terrain10+10/inactive10+10/loader18+18/adapter10+10/export23+23,
+unit/syntax/diff pass. Astra finally approves after correcting reproduced callback ownership bug.
+The reversible terrain owner rejects foreign root/chunk replacements, disposes captured geometry only,
+continues owned cleanup despite callbacks, validates final ownership and remembers failure. Current
+scene runner does not opt in yet; native restored render/detached buffer labels/no-finish fault overlap
+and all max smoke/pools/22route completeness remain UNRUN. No workflow input/scene dispatch/adoption.
+Remote main remains ef17689. MAIN13a7b136 exact protected11 unchanged; owned branch clean at relay.
+Resume: cd /private/tmp/cw-v1-1-20261012; git fetch origin; git status --short;
+git rev-parse HEAD origin/main origin/v1-1-gaps-20261012; gh run view 38306674087;
+gh run view 38305892063; gh run view 38305892091. Read AGENTS/optionalCOORDINATION/STATE/HANDOFF0157,
+release-v1/DECISIONS0155..0141/DESIGN/PLAN. Read new source canonical artifacts before integration;
+repair actual reds, then only accepted exact source main fast-forward/Pages/newmainCI/readback.
+Next source phase remains full qualified-both matrix, carried in prior0155 packet and details below.
+Astra route applicability: all22 ordinary/stress/transition rows; candidate fault families only where
+capability is genuine; unsupported rows zero candidateIO/exact fivePNG fallback plus baseline failure.
+No fake positive capability. Use synchronous stress/upload/restore/render transactions, warm all legal
+lazy owners before stress baseline, and measure normal-motion200systems/800particles/native1000batch.
+Retain all historic failures/caps/digests/images; complete fixedfloor>=250M ends ceiling acceptance.
+No v1.1tag/release/v2plan/code yet. Final fresh-session packet must carry the full remaining contract.
+
 LATEST0156 ACTIVE — Sol sole writer in /private/tmp/cw-v1-1-20261012; no simultaneous provider edits.
 Latest accepted source/main ef17689446e1200f0771bd5b1e5e8222a13a9f1e: CI38302772299 all9green;
 canonical shards251/365/144/159/console clean, actualcampaign201/201/errors0/failure null, smoke6each.
