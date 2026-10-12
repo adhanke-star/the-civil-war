@@ -478,5 +478,9 @@ body:has(.sb-toggle.sb-closed:not(.sb-left)) #soldier-view-hint { right: calc(va
 #toasts p { padding: 4px 10px; background: rgba(14, 12, 18, 0.62); border-radius: 4px; text-shadow: 0 1px 2px #000, 0 0 4px rgba(0, 0, 0, 0.85);
   overflow-wrap: anywhere; }
 @media (max-width: 600px) {
-  #feed { max-height: min(46px, calc(100dvh - var(--top-h) - var(--objective-h) - var(--dock-h) - 40px - env(safe-area-inset-top) - env(safe-area-inset-bottom))); }
+  /* narrow: the unit card stands above the dock, so a bottom-anchored feed rose into the objective line; hang the one
+     visible row under the objective instead, and the toasts under it */
+  #feed { top: calc(var(--edge) + var(--top-h) + var(--objective-h) + 8px + env(safe-area-inset-top)); bottom: auto;
+    max-height: min(46px, calc(100dvh - var(--top-h) - var(--objective-h) - var(--dock-h) - 40px - env(safe-area-inset-top) - env(safe-area-inset-bottom))); }
+  #toasts { top: calc(var(--edge) + var(--top-h) + var(--objective-h) + 60px + env(safe-area-inset-top)); }
 }
