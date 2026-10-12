@@ -24,7 +24,9 @@ const IGNORED = /GL Driver Message|GPU stall|WebGL warning|texImage|Failed to cr
 function watch(page, url, into) {
   page.on('pageerror', (err) => into.push(`pageerror: ${err.message}`));
   page.on('console', (msg) => { if (msg.type() === 'error' && !IGNORED.test(msg.text())) into.push(`console.error: ${msg.text()}`); });
-  page.on('requestfailed', (req) => { if (req.url().startsWith(url)) into.push(`request failed: ${req.url().replace(url, '/')} (${req.failure()?.errorText ?? '?'})`); });
+  // a request the page's own navigation cancels (title music streaming when Continue leaves the page) is not a failure
+  page.on('requestfailed', (req) => { const why = req.failure()?.errorText ?? '?';
+    if (req.url().startsWith(url) && !/cancel|abort/i.test(why)) into.push(`request failed: ${req.url().replace(url, '/')} (${why})`); });
   page.on('response', (res) => { if (res.status() >= 400) into.push(`HTTP ${res.status()} for ${res.url().replace(url, '/')}`); });
 }
 
