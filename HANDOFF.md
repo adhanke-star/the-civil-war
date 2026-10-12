@@ -1,5 +1,22 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0156 ACTIVE — Sol sole writer in /private/tmp/cw-v1-1-20261012; no simultaneous provider edits.
+Latest accepted source/main ef17689446e1200f0771bd5b1e5e8222a13a9f1e: CI38302772299 all9green;
+canonical shards251/365/144/159/console clean, actualcampaign201/201/errors0/failure null, smoke6each.
+Pages38305892091 success/live cw-v67; automatic mainCI38305892063 pending. Previous c328 mainCI
+failure38298643624 retained; current test-only native-refresh repair has actual passing readback.
+MAIN13a7b136 protected11 unchanged; COORDINATION absent; owned branch's preparation source pending.
+0155 diagnostics preparation: plural live/pending buffer ownership, failure-inclusive current11phase
+strict reducerCPU28+28, opt-in reversible terrain owner with foreign-child guards/continued cleanup.
+No scene_routes input/matrix/dispatch, product art/resource policy/SW edit. Exact native restoration,
+detached-geometry labels/no-finish overlap, max native pools/normal-motion smoke and full22route reducer
+remain UNRUN. Scene runner does not yet opt into reversible terrain owner; native restore render required.
+Astra approves separate preparation fullCI; candidate faults apply to genuine-capable route; unsupported
+must prove zero candidate IO/exact single-base PNG and baseline failure, never fake positive capability.
+After new preparation source fullCI/canonical readback, resume full qualified-both matrix below. Keep
+both×11 unique rows, every GPU peak incl faults/restoration, fixedfloor>=250M HALT ceiling, all retained
+76 images/export/run+SHA+ZIP bindings and machine caps. No v1.1release/v2plan/code yet.
+
 TRANSFER0155 — context transfer before the whole-scene matrix phase. Root releases sole writing at
 this relay; next fresh ChatGPT/Codex Sol session retains Aaron's selected main model/effort. Astra
 gpt-6-astra/high is read-only/uncertainty judge, max ONE active helper; prior helper idle. No provider

@@ -1,8 +1,8 @@
 // Pure CPU controls: fake native GL records unchanged calls; no browser or renderer is launched.
 import assert from 'node:assert/strict';
-import {AllocationLedger,mipSizes,installAllocationObserver,ReservationPeak,rejectionObservation} from './bake/scene-allocation.mjs';
+import {AllocationLedger,mipSizes,installAllocationObserver,ReservationPeak,rejectionObservation,reduceSceneObservations} from './bake/scene-allocation.mjs';
 
-function observed(skipRestore=false,dropSamplePeak=false) {
+function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false) {
   const saved={window:globalThis.window,WebGLRenderingContext:globalThis.WebGLRenderingContext,WebGL2RenderingContext:globalThis.WebGL2RenderingContext};
   class GL {
     constructor(){this.bindings=new Map();this.native=[];this.drawingBufferWidth=100;this.drawingBufferHeight=50;}
@@ -23,8 +23,9 @@ function observed(skipRestore=false,dropSamplePeak=false) {
     globalThis.window={};globalThis.WebGLRenderingContext=undefined;globalThis.WebGL2RenderingContext=GL;
     Object.defineProperty(window,'__allocation',{value:{prior:true},writable:false,enumerable:false,configurable:true});
     const priorObserver=Object.getOwnPropertyDescriptor(window,'__allocation');
+    const historyInstall=forgetOldBuffer?(0,eval)('('+installAllocationObserver.toString().replace('ids.add(id);','ids.clear();ids.add(id);')+')'):installAllocationObserver;
     const install=dropSamplePeak?(0,eval)('('+installAllocationObserver.toString().replace(
-      's.defaultPeak=Math.max(s.defaultPeak,s.gpu.framebuffer+s.gpu.pendingFramebuffer);return current;','return current;')+')'):installAllocationObserver;
+      's.defaultPeak=Math.max(s.defaultPeak,s.gpu.framebuffer+s.gpu.pendingFramebuffer);return current;','return current;')+')'):historyInstall;
     install({ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString()});
     const gl=new GL(),snap=()=>window.__allocation.snapshot(gl),bind=(kind)=>{const o={};gl.bindings.set(gl[kind],o);return o;};
     const t=bind('TEXTURE_BINDING_2D');
@@ -50,16 +51,26 @@ function observed(skipRestore=false,dropSamplePeak=false) {
     const fresh=new GL();window.__allocation.snapshot(fresh);fresh.drawingBufferWidth=200;fresh.drawingBufferHeight=100;
     fresh.finish();const resizedAfterFinish=window.__allocation.snapshot(fresh); // No resize snapshot before native finish.
     bind('TEXTURE_BINDING_2D');gl.compressedTexImage2D(gl.TEXTURE_2D,0,99999,4,4,0,new Uint8Array(16));const unknown=snap();
+    const old=bind('ARRAY_BUFFER_BINDING');gl.bufferData(gl.ARRAY_BUFFER,bufferArray,gl.STATIC_DRAW);gl.deleteBuffer(old);
+    const replacement=bind('ARRAY_BUFFER_BINDING');gl.bufferData(gl.ARRAY_BUFFER,bufferArray,gl.STATIC_DRAW);
+    const pendingBuffers=window.__allocation.bufferReservations(gl,bufferArray);gl.finish();
+    const settledBuffers=window.__allocation.bufferReservations(gl,bufferArray);
     const observer=window.__allocation;if(!skipRestore){observer.restore();observer.restore();}
     const after=Object.getOwnPropertyDescriptors(GL.prototype);
     const exactRestore=Object.keys(after).length===Object.keys(descriptors).length&&Object.entries(descriptors).every(([key,d])=>
       after[key]?.value===d.value&&after[key]?.get===d.get&&after[key]?.set===d.set&&after[key]?.writable===d.writable&&after[key]?.enumerable===d.enumerable&&after[key]?.configurable===d.configurable);
     const windowRestore=Object.entries(priorObserver).every(([key,value])=>Object.getOwnPropertyDescriptor(window,'__allocation')?.[key]===value);
     const inheritedRestore=!Object.hasOwn(GL.prototype,'compressedTexSubImage3D')&&GL.prototype.compressedTexSubImage3D===nativeInherited;
-    return {rgba,beforeFinish,afterFinish,floating,bufferReservation,cubeAdded,immutableAdded,npotAdded,compressedAdded,astcAdded,afterAstcSubimage,bc7Added,compressedImmutableUnknown,exactRestore,windowRestore,inheritedRestore,small,resized,resizedAfterFinish,unknown,native:gl.native};
+    return {pendingBuffers,settledBuffers,rgba,beforeFinish,afterFinish,floating,bufferReservation,cubeAdded,immutableAdded,npotAdded,compressedAdded,astcAdded,afterAstcSubimage,bc7Added,compressedImmutableUnknown,exactRestore,windowRestore,inheritedRestore,small,resized,resizedAfterFinish,unknown,native:gl.native};
   } finally {for(const [key,value]of Object.entries(saved)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}}
 }
-const api={Ledger:AllocationLedger,mips:mipSizes,observe:observed,Peak:ReservationPeak,rejection:rejectionObservation};
+const api={Ledger:AllocationLedger,mips:mipSizes,observe:observed,Peak:ReservationPeak,rejection:rejectionObservation,reduce:reduceSceneObservations};
+const phases=Array.from({length:11},(_,i)=>({packId:'pack',phaseId:String(i)}));
+function observations(){
+ const sample=(label,gpuReservation=100)=>({label,gpuReservation,conservativeReservation:gpuReservation+10,glError:0,allocation:{unknown:[]},unmappedBufferBytes:0});
+ return {cases:phases.map(p=>({...p,complete:true,restoration:{ok:true},errors:[],states:['field','both-close-tiers','lens-depth','lens-resize','lens-retired','narrow-resize'].map(l=>sample(l))})),
+  failure:{...sample('failure',260000000),rejected:true,published:false,restoration:{ok:true}}};
+}
 const checks=[
   ['npot-mips',a=>assert.deepEqual(a.mips(7,5,4).map(m=>m.bytes),[140,24,4],'npot-mips: complete NPOT tail')],
   ['replacement-peak',a=>{const l=new a.Ledger(),id={};l.reserve(id,'texture',0,100);l.reserve(id,'texture',0,60);assert.equal(l.bytes,60,'replacement-peak: current bytes');assert.equal(l.peak,160,'replacement-peak: old and new storage overlap');}],
@@ -80,6 +91,17 @@ const checks=[
     assert.equal(p.current,1660000,'resize-pending-fence: multiple old surfaces accumulate until native finish');p.finish();p.sample(1000000,300,100,attrs);
     assert.equal(p.current,1360000,'resize-pending-fence: finish retires old surfaces');assert.equal(p.peak,1660000,'resize-pending-fence: historical peak remains');}],
   ['buffer-ownership',a=>assert.deepEqual(a.observe().bufferReservation,{id:1,bytes:12,pendingDelete:false},'buffer-ownership: native upload array resolves one actual buffer')],
+  ['buffer-history',a=>{const o=a.observe();assert.equal(o.pendingBuffers.length,3,'buffer-history: all live and pending native identities retained');assert.equal(o.pendingBuffers.filter(r=>r.pendingDelete).length,1,'buffer-history: pending old reservation remains mapped');assert.equal(o.settledBuffers.length,2,'buffer-history: only retired native identity removed');assert.equal(o.settledBuffers.at(-1).bytes,40,'buffer-history: replacement uses full actual array');}],
+  ['malformed-verdict',a=>{for(const r of [null,{cases:{}},{cases:[null]},{...observations(),cases:[{...observations().cases[0],states:[null]}]}])assert.equal(a.reduce(r,phases).complete,false,'malformed-verdict: malformed containers retained as incomplete');}],
+  ['finite-verdict',a=>{const r=observations();r.failure.gpuReservation=Infinity;assert.equal(a.reduce(r,phases).complete,false,'finite-verdict: nonfinite failure rejected');}],
+  ['missing-state',a=>{const r=observations();r.cases[0].states.pop();assert.equal(a.reduce(r,phases).complete,false,'missing-state: required state cannot be omitted');}],
+  ['prototype-state',a=>{const p=phases.map((p,i)=>({...p,phaseId:i===0?'lookout-mountain':p.phaseId})),r=observations();r.cases[0].phaseId='lookout-mountain';r.inactivePrototype=true;for(const row of r.cases)row.states.push({...row.states[0],label:'inactive-field'});assert.equal(a.reduce(r,p).complete,false,'prototype-state: inactive transition states cannot be omitted');}],
+  ['failure-maximum',a=>{const r=a.reduce(observations(),phases);assert.equal(r.complete,true,'failure-maximum: complete observation retained');assert.equal(r.maxGpuReservation,260000000,'failure-maximum: oversized failure participates');assert.equal(r.withinLimit,false,'failure-maximum: failure cannot fit budget');}],
+  ['missing-phase',a=>{const r=observations();r.cases.pop();assert.equal(a.reduce(r,phases).complete,false,'missing-phase: omitted phase rejected');}],
+  ['duplicate-phase',a=>{const r=observations();r.cases[10]={...r.cases[0]};assert.equal(a.reduce(r,phases).complete,false,'duplicate-phase: duplicate cannot replace omitted phase');}],
+  ['unmapped-verdict',a=>{const r=observations();r.failure.unmappedBufferBytes=4;assert.equal(a.reduce(r,phases).complete,false,'unmapped-verdict: failure buffers require actual owner');}],
+  ['unknown-verdict',a=>{const r=observations();r.cases[0].states[0].allocation.unknown=['unobserved'];assert.equal(a.reduce(r,phases).complete,false,'unknown-verdict: unknown reservation rejected');}],
+  ['restoration-verdict',a=>{const r=observations();r.failure.gpuReservation=100;r.failure.conservativeReservation=110;r.failure.restoration.ok=false;const v=a.reduce(r,phases);assert.equal(v.complete,false,'restoration-verdict: failure restoration required');assert.equal(v.withinLimit,false,'restoration-verdict: incomplete cannot meet limit');}],
   ['descriptor-restoration',a=>{const o=a.observe();assert.ok(o.exactRestore&&o.windowRestore&&o.inheritedRestore,'descriptor-restoration: every native descriptor and prior observer restored; inherited shadow deleted');}],
 ];
 const changed=(key,value)=>({observe:()=>({...observed(),[key]:value})});
@@ -97,6 +119,9 @@ const mutants={
   'synchronized-peak':{Peak:class extends ReservationPeak {sample(...args){super.sample(...args);this.peak=1240000;}}},
   'resize-pending-fence':{Peak:class extends ReservationPeak {sample(...args){super.sample(...args);this.pendingFramebuffer=0;this.peak=this.current-this.framebuffer;}}},
   'buffer-ownership':changed('bufferReservation',null),
+  'buffer-history':{observe:()=>observed(false,false,true)},
+  'failure-maximum':{reduce:(r,p)=>{const v=reduceSceneObservations(r,p);return {...v,maxGpuReservation:100,withinLimit:true};}},
+  ...Object.fromEntries(['missing-phase','duplicate-phase','unmapped-verdict','unknown-verdict','restoration-verdict','malformed-verdict','finite-verdict','missing-state','prototype-state'].map(k=>[k,{reduce:()=>({complete:true,withinLimit:true})}])),
   'descriptor-restoration':{observe:()=>observed(true)},
 };
 for(const [,check]of checks)await check(api);

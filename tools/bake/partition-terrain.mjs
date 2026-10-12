@@ -16,16 +16,43 @@ export function partitionTerrain({position,uv,index},limit=65535) {
   const bytes=chunks.reduce((n,c)=>n+c.position.byteLength+c.uv.byteLength+c.index.byteLength,0);
   return {chunks,triangles:index.length/3,sourceBytes:position.byteLength+uv.byteLength+index.byteLength,bytes};
 }
-export function installTerrainPartition(world,THREE,partition) {
+export function installTerrainPartition(world,THREE,partition,{reversible=false}={}) {
   const root=world.terrainMesh,source=root.geometry;
   if(root.children.length||Object.keys(source.attributes).sort().join(',')!=='position,uv'||!source.index)throw new Error('terrain partition: unexpected root geometry');
   const result=partition({position:source.attributes.position.array,uv:source.attributes.uv.array,index:source.index.array});
   const empty=new THREE.BufferGeometry();empty.boundingBox=source.boundingBox.clone();empty.boundingSphere=source.boundingSphere.clone();
+  const children=[],geometries=[],material=root.material,attributes={...source.attributes},index=source.index,
+    box=source.boundingBox,sphere=source.boundingSphere;
   for(const [i,chunk]of result.chunks.entries()){
     const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(chunk.position,3));geo.setAttribute('uv',new THREE.BufferAttribute(chunk.uv,2));geo.setIndex(new THREE.BufferAttribute(chunk.index,1));geo.computeBoundingBox();geo.computeBoundingSphere();
-    const mesh=new THREE.Mesh(geo,root.material);mesh.name=`terrain-chunk-${i+1}`;root.add(mesh);
+    const mesh=new THREE.Mesh(geo,root.material);mesh.name=`terrain-chunk-${i+1}`;root.add(mesh);children.push(mesh);geometries.push(geo);
   }
   root.geometry=empty;source.dispose();
-  return {triangles:result.triangles,chunks:result.chunks.length,sourceBytes:result.sourceBytes,bytes:result.bytes,savedBytes:result.sourceBytes-result.bytes,
+  const receipt={triangles:result.triangles,chunks:result.chunks.length,sourceBytes:result.sourceBytes,bytes:result.bytes,savedBytes:result.sourceBytes-result.bytes,
     materialShared:root.children.every(c=>c.material===root.material),rootName:root.name,statTriangles:root.userData.triangles};
+  if(reversible){
+    let restored=false,failure;
+    Object.defineProperty(receipt,'restore',{value:()=>{
+      if(restored){if(failure)throw failure;return;}
+      if(world.terrainMesh!==root||root.geometry!==empty||root.material!==material
+        ||root.children.length!==children.length||children.some((child,i)=>root.children[i]!==child||child.parent!==root||child.material!==material||child.geometry!==geometries[i]))
+        throw new Error('terrain partition: restoration ownership changed');
+      root.geometry=source;
+      const errors=[];
+      for(const [i,child]of children.entries()){
+        try{root.remove(child);}catch(error){errors.push(`remove: ${error.message}`);}
+        try{geometries[i].dispose();}catch(error){errors.push(`dispose: ${error.message}`);}
+      }
+      try{empty.dispose();}catch(error){errors.push(`empty: ${error.message}`);}
+      for(const attribute of Object.values(attributes))attribute.needsUpdate=true;
+      index.needsUpdate=true;restored=true;
+      if(world.terrainMesh!==root||root.geometry!==source||root.material!==material||root.children.length
+        ||children.some((child,i)=>child.parent!==null||child.geometry!==geometries[i]||child.material!==material)
+        ||source.index!==index||source.boundingBox!==box||source.boundingSphere!==sphere
+        ||Object.keys(source.attributes).length!==Object.keys(attributes).length
+        ||Object.entries(attributes).some(([key,value])=>source.attributes[key]!==value))errors.push('restoration callback changed ownership');
+      if(errors.length){failure=new Error(`terrain partition: restoration failed: ${errors.join(', ')}`);throw failure;}
+    }});
+  }
+  return receipt;
 }

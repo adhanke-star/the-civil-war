@@ -58,7 +58,7 @@ export function installInactiveFigures(game) {
 /** Continue restoring independent owners even when one owner rejects restoration. */
 export function restoreSceneDiagnostics(scope=globalThis.window){
   const calls=[],errors=[];
-  for(const [name,owner]of [['render',scope.__sceneRenderGate],['inactive',scope.__game?.game?.__inactiveStats],['allocation',scope.__allocation]]){
+  for(const [name,owner]of [['render',scope.__sceneRenderGate],['inactive',scope.__game?.game?.__inactiveStats],['terrain',scope.__sceneTerrainPartition],['allocation',scope.__allocation]]){
     if(!owner)continue;
     if(typeof owner.restore!=='function'){errors.push(`${name}: missing restore API`);continue;}
     try{owner.restore();calls.push(name);}catch(error){errors.push(`${name}: ${error.message}`);}

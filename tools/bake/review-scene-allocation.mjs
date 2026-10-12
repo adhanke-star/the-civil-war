@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startServer, ROOT } from '../serve.mjs';
-import { AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation } from './scene-allocation.mjs';
+import { AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation, reduceSceneObservations } from './scene-allocation.mjs';
 import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDiagnostics} from './inactive-figures.mjs';
 import {PNG} from 'pngjs';
 import {partitionTerrain,installTerrainPartition} from './partition-terrain.mjs';
@@ -28,7 +28,7 @@ function inventory() {
   renderer.getContext().finish();
   const gl=renderer.getContext(),allocation=window.__allocation.snapshot(gl),error=gl.getError();
   const buffers=new Map(),unuploaded=[];
-  for(const [array,labels]of arrays){const record=window.__allocation.bufferReservation(gl,array);if(record){if(!buffers.has(record.id))buffers.set(record.id,{...record,owners:new Set()});for(const label of labels)buffers.get(record.id).owners.add(label);}else unuploaded.push({bytes:array.byteLength,owners:[...labels]});}
+  for(const [array,labels]of arrays){const records=window.__allocation.bufferReservations(gl,array);if(records.length){for(const record of records){if(!buffers.has(record.id))buffers.set(record.id,{...record,owners:new Set()});for(const label of labels)buffers.get(record.id).owners.add(label);}}else unuploaded.push({bytes:array.byteLength,owners:[...labels]});}
   const bufferOwnership=[...buffers.values()].map(r=>({...r,owners:[...r.owners]}));
   const mappedBufferBytes=bufferOwnership.reduce((n,r)=>n+r.bytes,0);
   return {allocation,declaredArrayBytes,textureObjects:textures.size,glError:error,
@@ -76,7 +76,7 @@ async function main(){
         const capture=async label=>{
           const drawing=await page.evaluate(()=>{const {post,scene,camera}=window.__game,r=post.renderer,prior=r.info.autoReset;r.info.autoReset=false;r.info.reset();try{if(window.__sceneRenderGate)window.__sceneRenderGate.renderOnce(scene,camera);else post.render(scene,camera);r.getContext().finish();return {drawCalls:r.info.render.calls,nativeRenders:window.__sceneRenderGate?.count??null};}finally{r.info.autoReset=prior;}});
           const data=await page.evaluate(inventory);row.states.push({label,...drawing,...data});save();
-          if(data.glError||data.allocation.unknown.length||errors.length)throw new Error(`scene allocation: ${entry.phaseId}/${label} incomplete: GL${data.glError}, ${data.allocation.unknown.join(',')}, ${errors.join(',')}`);
+          if(data.glError||data.allocation.unknown.length||data.unmappedBufferBytes!==0||errors.length)throw new Error(`scene allocation: ${entry.phaseId}/${label} incomplete: GL${data.glError}, unmapped ${data.unmappedBufferBytes}, ${data.allocation.unknown.join(',')}, ${errors.join(',')}`);
           console.log(entry.phaseId,label,JSON.stringify({reservation:data.conservativeReservation,...data.allocation.byKind,arrays:data.declaredArrayBytes,pages:data.atlasPages}));
         };
         const canvasShot=async filename=>{
@@ -194,10 +194,8 @@ async function main(){
       catch(error){report.failure.restoration={ok:false,errors:[error.message]};}
       await ctx.close();save();
     }
-    report.complete=report.cases.length===11&&report.cases.every(c=>c.complete&&c.restoration.ok)&&report.failure.rejected&&report.failure.restoration.ok;
-    report.maxReservation=Math.max(...report.cases.flatMap(c=>c.states.map(s=>s.conservativeReservation)));
-    report.maxGpuReservation=Math.max(...report.cases.flatMap(c=>c.states.map(s=>s.gpuReservation)));
-    report.withinLimit=report.maxGpuReservation<=report.limits.gpuBytes;
+    const verdict=reduceSceneObservations(report,campaign.phases);
+    Object.assign(report,verdict);
     save();console.log('SCENE-ALLOCATION COMPLETE',JSON.stringify({complete:report.complete,maxReservation:report.maxReservation,maxGpuReservation:report.maxGpuReservation,withinLimit:report.withinLimit,fieldable:false}));
     if(!report.complete)process.exitCode=1; // Budget failures are results, not a reason to discard the observation.
   }finally{save();if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
