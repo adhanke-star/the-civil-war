@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 205 256" role="img" aria-label="Generic officer silhouette">
+<title>Generic silhouette: no sourced portrait (drawn for this game, CC0)</title>
+<defs><radialGradient id="g" cx="50%" cy="40%" r="70%"><stop offset="0" stop-color="#4a3c2a"/><stop offset="1" stop-color="#1c160f"/></radialGradient></defs>
+<rect width="205" height="256" fill="url(#g)"/>
+<g fill="#a08a66" fill-opacity="0.85">
+<path d="M66 70 c0 -16 16 -26 38 -26 c20 0 34 8 36 22 l2 10 l10 4 c2 4 -2 6 -8 6 h-80 c-6 0 -6 -4 -2 -6 z"/>
+<ellipse cx="102" cy="112" rx="32" ry="38"/>
+<path d="M90 146 h24 l2 16 h-28 z"/>
+<path d="M24 256 c2 -56 26 -86 62 -94 l16 14 l16 -14 c36 8 60 38 62 94 z"/>
+</g>
+<g fill="#1c160f" fill-opacity="0.55"><circle cx="102" cy="196" r="3"/><circle cx="102" cy="216" r="3"/><circle cx="102" cy="236" r="3"/></g>
+</svg>

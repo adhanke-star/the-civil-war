@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 170" width="900" height="170" role="img" aria-label="Generic rifle-musket silhouette">
+<title>Generic rifle-musket silhouette (drawn for this game, CC0)</title>
+<g fill="#c9bb9c">
+<rect x="20" y="70" width="600" height="9" rx="2"/>
+<path d="M110 79 H640 C676 80 700 86 728 94 L878 66 L888 68 V150 L878 152 L756 128 C720 120 690 110 650 106 L606 101 H110 Z" fill="#a8916b"/>
+<rect x="160" y="66" width="9" height="30" rx="1"/><rect x="330" y="66" width="9" height="30" rx="1"/><rect x="470" y="66" width="9" height="30" rx="1"/>
+<rect x="60" y="99" width="510" height="3" rx="1.5" fill-opacity="0.8"/>
+<rect x="566" y="78" width="72" height="20" rx="8" fill="#8d8470"/>
+<path d="M606 79 L612 58 C616 52 626 52 628 58 L624 62 L620 60 L618 80 Z"/>
+<path d="M604 102 C606 122 636 126 662 108 L656 104 C638 116 616 116 612 102 Z"/>
+</g>
+</svg>

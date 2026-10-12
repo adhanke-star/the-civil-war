@@ -22,6 +22,11 @@
 //     static banner and no sting, 'off' shows none. badgeChip(entry, { button }) is the shared badge emblem (shape by
 //     category, tier letter and name: colour is never the only cue); brigCard shows the kept badges, the X-Factor and any
 //     badges waiting for the camp's choice.
+//   Card art (P6b, src/ui/art.js): every loot, compare and depot card shows the real arm's museum or period photograph on dark
+//     felt with a soft light in the rarity colour (the rarity band and shape stay: colour is never the only cue) and a small
+//     "Pictured:" line naming the object and its credit; the Belgian rifle-musket has a labelled generic silhouette. A game
+//     item shows its base type ("Pictured (type only)"). Tray tiles carry the same picture faintly. brigCard's `who`
+//     ({ name, rank }) adds the commander's period portrait, or the generic silhouette, with its dating note and credit.
 //   History (battle-pack phases): `afterAction.history` (src/franchise/practice.js historyComparison) adds "You vs history" to
 //     the after-action (between the grade and the points and badges) and, when it carries the phase's sourced `story`, a
 //     "What really happened" page (outcome, the closing quotation with its source, the sources with links);
@@ -35,13 +40,14 @@
 
 import { define, get, on } from '../settings.js';
 import { compareState, onCompare } from '../sandbox/compare.js';
-import { TIER_BY_ID, CONDITION_BY_ID, conditionEffect, VETERANCY, GRADES, GRADE_NOTES, SAMPLE_ARMY, itemDef } from './data.js';
+import { TIER_BY_ID, CONDITION_BY_ID, conditionEffect, VETERANCY, GRADES, GRADE_NOTES, SAMPLE_ARMY, itemDef, UNIQUES } from './data.js';
 import { rollLoot, ratings, compare, bestFit, equip, armsRating, canCarry, makeRng } from './model.js';
 import * as sfx from './sfx.js';
 import { validateSnapshot, completedSnapshot } from '../franchise/save.js';
 import { assertSavedReward } from '../franchise/practice.js';
 import { BADGE_BY_ID, TIER_NAMES, featText, effectText, badgeAward, BADGE_RULES_NOTE } from '../franchise/badges.js';
 import { mountReplay } from '../ui/replay.js';
+import { armArt, armIdOf, whenArt, loadArt, portraitArt, genericPortrait, portraitLine } from '../ui/art.js';
 
 const STYLE_SLUG = { 'clean modern': 'modern', 'period desk': 'desk', hybrid: 'hybrid' };
 const BARS = [['fire', 'Fire'], ['melee', 'Melee'], ['morale', 'Morale'], ['drill', 'Drill']];
@@ -204,6 +210,43 @@ function tierId(inst) {
 }
 const vetName = (id) => (VETERANCY.find((v) => v.id === id) || { name: id }).name;
 
+// ---- card art (src/ui/art.js) ---------------------------------------------------------------------------
+/** The arm's picture on felt; filled once the art manifest is loaded (empty, never broken, when it is not). */
+function artPanel(itemId, { small = false } = {}) {
+  const armId = armIdOf(itemId, UNIQUES);
+  const panel = el('span', { class: `rw-art${small ? ' is-small' : ''}`, 'data-arm': armId, 'aria-hidden': small ? 'true' : null });
+  whenArt((m) => {
+    const a = m && armArt(armId, m);
+    if (!a) { panel.classList.add('is-empty'); return; }
+    panel.dataset.kind = a.kind;
+    const line = armId !== itemId ? a.caption.replace(/^Pictured: /, 'Pictured (type only): ') : a.caption;
+    const img = el('img', { class: 'rw-art-img', src: a.src, alt: small ? '' : line, decoding: 'async', draggable: 'false' });
+    img.addEventListener('error', () => panel.classList.add('is-empty'), { once: true });
+    panel.title = `${line}. ${a.credit}; ${a.licence}.`;
+    panel.prepend(img);
+    if (!small) panel.append(el('span', { class: 'rw-pictured', text: `${line}. ${a.credit}.` }));
+  });
+  return panel;
+}
+/** The commander row of a brigade card: the period portrait for exactly this name, else the generic silhouette. */
+function whoRow(who) {
+  const name = who && typeof who.name === 'string' ? who.name : '';
+  const fig = el('span', { class: 'rw-bportrait is-generic' });
+  const label = el('span', { class: 'rw-bwho-name', text: name ? `${who.rank ? `${who.rank} ` : ''}${name}` : 'Commander not recorded' });
+  const note = el('span', { class: 'rw-bwho-note' });
+  const row = el('span', { class: 'rw-bwho', 'data-commander': name || null }, fig, el('span', { class: 'rw-bwho-text' }, label, note));
+  whenArt((m) => {
+    const p = (name && portraitArt(name, m)) || genericPortrait(m);
+    if (!p) return;
+    fig.classList.toggle('is-generic', p.generic);
+    row.dataset.portrait = p.generic ? 'generic' : 'sourced';
+    fig.replaceChildren(el('img', { src: p.src, alt: p.generic ? '' : `Portrait of ${name}`, decoding: 'async', draggable: 'false' }));
+    fig.title = portraitLine(p);
+    note.textContent = p.generic ? 'No sourced portrait' : `${p.note ? `${p.note} · ` : ''}${p.credit}`;
+  });
+  return row;
+}
+
 // ---- card builders ------------------------------------------------------------------------------------
 /** The face of a loot card (shared by the reveal, the compare view and nothing else). */
 function cardFront(inst) {
@@ -229,7 +272,7 @@ function cardFront(inst) {
     el('span', { class: 'rw-type', text: `${def.gameItem ? def.baseName : cap(def.kind)} · ${def.caliber}` }),
     stats, affix, effect,
     el('span', { class: 'rw-where', text: inst.from || '' }));
-  const front = el('span', { class: 'rw-face rw-front' }, band, body);
+  const front = el('span', { class: 'rw-face rw-front has-art' }, band, artPanel(inst.itemId), body);
   if (def.gameItem) front.title = def.flavour;
   return front;
 }
@@ -255,7 +298,7 @@ export function staticCard(inst) {
 }
 
 /** A brigade card (rating-first front). interactive: a role=button target in the issue step. */
-export function brigCard(b, i, { interactive = true, show = ratings(b), onBadge = null } = {}) {
+export function brigCard(b, i, { interactive = true, show = ratings(b), onBadge = null, who = undefined } = {}) {
   const def = itemDef(b.weapon.itemId);
   const cond = CONDITION_BY_ID[b.weapon.conditionId];
   const r = ratings(b);
@@ -285,9 +328,11 @@ export function brigCard(b, i, { interactive = true, show = ratings(b), onBadge 
     el('span', { class: 'rw-preview', 'aria-hidden': 'true' }),
     el('span', { class: 'rw-star', hidden: true }, el('span', { 'aria-hidden': 'true', text: '★ ' }), 'Best fit'),
     el('span', { class: 'rw-delta', 'aria-hidden': 'true' })),
+  who !== undefined ? whoRow(who) : null,
   weap, bars,
   el('span', { class: 'rw-blocked', hidden: true }),
   badgeRow(b, onBadge));
+  if (who !== undefined) card.classList.add('has-who');
   const kept = Array.isArray(b.badges) ? b.badges.filter((x) => BADGE_BY_ID[x.id]) : [];
   if (kept.length || b.xfactor || b.offer?.length) {
     card.setAttribute('aria-label', `${card.getAttribute('aria-label')}. Badges: ${kept.length ? kept.map((x) => `${BADGE_BY_ID[x.id].name} ${TIER_NAMES[x.tier]}`).join(', ') : 'none kept'}`
@@ -357,7 +402,8 @@ function trayTile(inst, t) {
     el('span', { class: 'rw-tile-main' },
       el('span', { class: 'rw-tile-name', text: def.name }),
       el('span', { class: 'rw-tile-sub', text: `${inst.depot ? 'Depot' : tier.name} · ${cond.name}` })),
-    el('span', { class: 'rw-tile-arms' }, el('b', { text: String(armsRating(inst)) }), el('small', { text: 'Arms' })));
+    el('span', { class: 'rw-tile-arms' }, el('b', { text: String(armsRating(inst)) }), el('small', { text: 'Arms' })),
+    artPanel(inst.itemId, { small: true }));
   if (def.gameItem) tile.querySelector('.rw-tile-main').append(el('span', { class: 'rw-tag rw-tile-tag', text: 'Game item' }));
   return tint(tile, tier.id);
 }
@@ -391,6 +437,7 @@ export function mountReward(root, opts = {}) {
   }
   if (active) active.unmount();
   defineRewardSettings();
+  loadArt(); // the loot cards' pictures (src/ui/art.js); the battle HUD has usually loaded the manifest already
   sfx.armAudio();
   const host = root || document.body;
   if (opts.rememberReplay !== false) {

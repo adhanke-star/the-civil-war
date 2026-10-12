@@ -49,6 +49,8 @@
 // `node tools/test.mjs --badges` runs the badges and X-Factor screens only (tools/test-badges-ui.mjs, also in shard 2): the badge
 // stamped in the after-action, the X-Factor moment once, the camp card emblem and its real example with sources, the keep
 // choice by keyboard, axe and 320 px.
+// `node tools/test.mjs --art` runs the card art, portraits and living title/camp checks only (tools/test-art-ui.mjs, also
+// in shard 2).
 // `node tools/test.mjs --audio` runs the sound, Settings panel, gore and feed-readability checks only
 // (tools/test-audio-ui.mjs, also in shard 1).
 // `node tools/test.mjs --history` runs the after-action you-vs-history pages, the map replay, the record book and the
@@ -1787,6 +1789,7 @@ async function browserChecks(server, url) {
     // Imported on demand: its CPU half imports game modules that define settings, which would skew settingsUnit.
     if (process.argv.includes('--campaign')) { result.mode = 'campaign screens and flow'; const { campaignControls } = await import('./test-campaign-ui.mjs'); await campaignControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--badges')) { result.mode = 'badges and X-Factor'; const { badgesControls } = await import('./test-badges-ui.mjs'); await badgesControls({ browser, url, check, shot, result, watchErrors }); return; }
+    if (process.argv.includes('--art')) { result.mode = 'card art, portraits and backdrops'; const { artControls } = await import('./test-art-ui.mjs'); await artControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--audio')) { result.mode = 'sound, settings, gore and feed'; const { audioControls } = await import('./test-audio-ui.mjs'); await audioControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--history')) { result.mode = 'after-action history, replay, record book and ending'; const { historyControls } = await import('./test-history-ui.mjs'); await historyControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--orders')) { result.mode = 'decision cards and camp orders'; const { ordersControls } = await import('./test-orders-ui.mjs'); await ordersControls({ browser, url, check, shot, result, watchErrors }); return; }
@@ -1837,6 +1840,8 @@ async function browserChecks(server, url) {
       await economyControls({ browser, url, check, shot, result, watchErrors });
       const { badgesControls } = await import('./test-badges-ui.mjs');
       await badgesControls({ browser, url, check, shot, result, watchErrors });
+      const { artControls } = await import('./test-art-ui.mjs');
+      await artControls({ browser, url, check, shot, result, watchErrors });
     }
     // Shard 3: surrender result, reinforcements, field admission, the soldier-eye view and delegation.
     if (runs(3)) {

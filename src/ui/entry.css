@@ -154,3 +154,60 @@
   #front #camp-orders { padding: 14px 12px; }
   #front .camp-order-row { grid-template-columns: minmax(0, 1fr); }
 }
+/* Living title and camp backdrop (P6b; src/ui/entry.js renderBackdrop, art in assets/art). Composited transforms and opacity
+   only (no filters or repaints per frame); paused while the tab is hidden; static under reduced motion. */
+#front .entry-backdrop { position: fixed; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; background: #0b0d0c; }
+#front .entry-backdrop[hidden] { display: none; }
+#front .entry-backdrop:not([hidden]) { animation: entry-fade 1.4s ease-out both; }
+@keyframes entry-fade { from { opacity: 0; } to { opacity: 1; } }
+#front .entry-wrap { position: relative; z-index: 1; }
+#front .entry-backdrop-img { position: absolute; inset: -5%; background: center 62% / cover no-repeat; transform-origin: 50% 60%; }
+#front .entry-backdrop[data-mode="title"][data-motion="full"] .entry-backdrop-img { will-change: transform; animation: entry-pan 140s ease-in-out infinite alternate; }
+@keyframes entry-pan { from { transform: scale(1.02) translate3d(-1.5%, 1.5%, 0); } to { transform: scale(1.1) translate3d(1.5%, -2.5%, 0); } }
+#front .entry-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(8,9,11,0.62) 0%, rgba(8,9,11,0.30) 38%, rgba(8,9,11,0.55) 70%, rgba(8,9,11,0.88) 100%); }
+#front .entry-backdrop[data-mode="camp"] .entry-backdrop-img { opacity: 0.6; }
+#front .entry-backdrop[data-mode="camp"] .entry-scrim { background: linear-gradient(180deg, rgba(8,9,11,0.72) 0%, rgba(8,9,11,0.84) 45%, rgba(8,9,11,0.92) 100%); }
+#front .entry-smoke { position: absolute; left: 0; bottom: 0; width: 55%; height: 80%; }
+#front .entry-smoke i {
+  position: absolute; bottom: -12%; left: 14%; width: 38vmin; height: 38vmin; border-radius: 50%; opacity: 0;
+  background: radial-gradient(closest-side, rgba(228,222,208,0.22), rgba(228,222,208,0.08) 55%, rgba(228,222,208,0) 100%);
+  will-change: transform, opacity; animation: entry-smoke 26s linear infinite;
+}
+#front .entry-smoke i:nth-child(2) { left: 20%; animation-delay: -5.2s; animation-duration: 29s; }
+#front .entry-smoke i:nth-child(3) { left: 10%; animation-delay: -10.4s; }
+#front .entry-smoke i:nth-child(4) { left: 24%; animation-delay: -15.6s; animation-duration: 31s; }
+#front .entry-smoke i:nth-child(5) { left: 16%; animation-delay: -20.8s; animation-duration: 24s; }
+@keyframes entry-smoke {
+  0% { transform: translate3d(0, 0, 0) scale(0.45); opacity: 0; }
+  14% { opacity: 1; }
+  70% { opacity: 0.6; }
+  100% { transform: translate3d(22vmin, -64vmin, 0) scale(2); opacity: 0; }
+}
+#front .entry-backdrop[data-motion="reduced"] .entry-smoke i { animation: none; opacity: 0.55; }
+#front .entry-backdrop[data-motion="reduced"] .entry-smoke i:nth-child(n+3) { display: none; }
+#front .entry-backdrop[data-motion="reduced"] .entry-smoke i:nth-child(2) { transform: translate3d(9vmin, -26vmin, 0) scale(1.3); opacity: 0.35; }
+#front .entry-backdrop.is-paused .entry-backdrop-img, #front .entry-backdrop.is-paused .entry-smoke i { animation-play-state: paused; }
+/* the title type sits on its own dark panel, so contrast never depends on the painting */
+#front #entry-title { box-sizing: border-box; padding: 26px 30px 28px; border-radius: 14px; background: rgba(12,13,16,0.80); box-shadow: 0 18px 50px rgba(0,0,0,0.45); }
+/* over the picture, the other text gets a dark backing drawn with a box-shadow spread, so nothing moves when it fades in */
+#front .entry-backdrop:not([hidden]) ~ .entry-wrap .entry-head,
+#front .entry-backdrop:not([hidden]) ~ .entry-wrap .entry-transfer, #front .entry-backdrop:not([hidden]) ~ .entry-wrap .entry-modes,
+#front .entry-backdrop:not([hidden]) ~ .entry-wrap > .entry-note { background: rgba(12,13,16,0.78); border-radius: 8px; box-shadow: 0 0 0 10px rgba(12,13,16,0.78); }
+#front .entry-backdrop-caption { margin: 22px 0 0 auto; max-width: 520px; padding: 6px 10px; border-radius: 6px; background: rgba(12,13,16,0.82); color: #cfc6b4; font-size: 12.5px; line-height: 1.45; text-align: right; overflow-wrap: anywhere; }
+#front .entry-backdrop-caption[hidden] { display: none; }
+/* Trophy shelf: captured guns and arms, the wagon train and the reputation level from the save. */
+#front #camp-trophies { margin-top: 24px; padding: 14px 20px 16px; border: 1px solid var(--rw-rule); border-radius: 12px; background: linear-gradient(180deg, rgba(70,48,28,0.55), rgba(40,28,18,0.7)); }
+#front #camp-trophies h2 { margin: 0 0 8px; font-size: 22px; }
+#front #camp-shelf { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 18px; }
+#front .camp-trophy { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 8px 10px; border-radius: 8px; background: rgba(0,0,0,0.28); box-shadow: inset 0 -3px 0 rgba(0,0,0,0.25); }
+#front .camp-trophy-icons { display: flex; flex-wrap: wrap; align-items: center; gap: 3px; min-height: 22px; color: #e3cf9c; }
+#front .camp-trophy-icon { width: 28px; height: 18px; flex: none; }
+#front .camp-trophy-more { margin-left: 6px; font-size: 15px; }
+#front .camp-trophy-level { display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #e3cf9c; color: #1b1408; font-size: 16px; box-shadow: 0 0 0 3px rgba(227,207,156,0.3); }
+#front .camp-trophy-label { color: var(--rw-ink); font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+#front .camp-trophy[data-count="0"] .camp-trophy-label { color: var(--rw-dim); }
+@media (max-width: 520px) {
+  #front #camp-trophies { padding: 12px; }
+  #front #camp-shelf { grid-template-columns: minmax(0, 1fr); }
+  #front #entry-title { padding: 18px 16px 20px; }
+}

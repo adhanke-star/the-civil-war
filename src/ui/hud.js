@@ -16,6 +16,8 @@
 // and flag carry a warm glow (has-xfactor); its moment in battle arrives through showMoment (src/fx/effects.js).
 // Settings (src/ui/settings-panel.js): the strip's Settings button, "All settings" in the menu and the O key
 // (src/ui/input.js) open the panel (quality, volumes, gore, X-Factor effects); the help sheet lists the key.
+// Portraits (P6b, src/ui/art.js): the unit card shows the commander's period portrait when one is sourced for exactly his
+// name (assets/art/manifest.json), the generic silhouette otherwise; a scenario's own commander.portrait still comes first.
 // Feedback readability (DECISIONS 0109): the event feed and toasts sit on the field without a box (a translucent backing
 // behind each row's text only, a text shadow); the feed shows its 3 newest rows and scrolls to the newest (older ones
 // scroll up out of view, still reachable by keyboard, wheel and touch); toasts keep at most 3, below the objective line.
@@ -26,6 +28,7 @@ import { on as onSetting } from '../settings.js';
 import { Minimap } from './minimap.js';
 import { BADGE_BY_ID, TIER_NAMES } from '../franchise/badges.js';
 import { openSettings } from './settings-panel.js';
+import { loadArt, portraitArt, genericPortrait, portraitLine } from './art.js';
 
 const $ = (id) => document.getElementById(id);
 const _v = new THREE.Vector3();
@@ -197,6 +200,8 @@ export class Hud {
   constructor({ camera, canvas, terrain, units, playerSide, rts, game, onSelect, onOrder, onPause, onSpeed, onQuality, onSound }) {
     Object.assign(this, { camera, canvas, terrain, units, playerSide, rts, game, onSelect, onOrder });
     this.selected = null;
+    // Card art loads beside the battle (about 25 KB, plus one small portrait per selected brigade); the card refreshes when it lands.
+    loadArt().then(() => { if (this.selected) this.fillPortrait(this.selected); });
     // One bounded observer publishes overlay heights; none sizes its own observed element.
     const dock = $('dock');
     let layoutFrame = 0;
@@ -626,22 +631,34 @@ export class Hud {
       this.updateOrders();
       return;
     }
-    const p = $('uc-portrait');
-    p.className = `portrait ${u.side.toLowerCase()}`;
-    const c = u.commander;
-    if (c && c.portrait) {
-      p.style.backgroundImage = `url("${c.portrait}")`;
-      p.textContent = '';
-    } else {
-      p.style.backgroundImage = '';
-      p.textContent = c && c.name ? c.name.split(' ').map((w) => w[0]).filter((ch) => /[A-Z]/.test(ch)).slice(-2).join('') : u.short[0];
-    }
+    this.fillPortrait(u);
     const n = this.game ? this.game.selection.length : 1;
     this.cardMore = n > 1 ? ` (+${n - 1} more selected)` : '';
     $('uc-name').textContent = `${cardWho(u)} — ${u.parent || u.name}${this.cardMore}`;
     this.cardTimer = 0;
     this.updateCard(u);
     this.updateOrders();
+  }
+
+  /** The card portrait: the scenario's own, else the sourced period portrait for exactly this name, else the silhouette. */
+  fillPortrait(u) {
+    const p = $('uc-portrait');
+    if (!p || !u) return;
+    p.className = `portrait ${u.side.toLowerCase()}`;
+    const c = u.commander;
+    const art = c && c.name && !c.portrait ? portraitArt(c.name) : null;
+    const generic = !(c && c.portrait) && !art ? genericPortrait() : null;
+    const url = c && c.portrait ? c.portrait : art ? art.src : generic ? generic.src : '';
+    p.dataset.portrait = c && c.portrait ? 'scenario' : art ? 'sourced' : generic ? 'generic' : 'initials';
+    p.title = art ? portraitLine(art) : generic ? `${c && c.name ? `${c.name}: ` : ''}${generic.caption}` : (c && c.portraitNote) || '';
+    if (url) {
+      p.style.backgroundImage = `url("${url}")`;
+      p.textContent = '';
+    } else {
+      p.style.backgroundImage = '';
+      p.textContent = c && c.name ? c.name.split(' ').map((w) => w[0]).filter((ch) => /[A-Z]/.test(ch)).slice(-2).join('') : u.short[0];
+    }
+    p.classList.toggle('down', !!u.commandDown);
   }
 
   updateOrders() {

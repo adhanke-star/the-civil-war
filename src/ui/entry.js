@@ -12,10 +12,16 @@
 // happened after the choice is saved, then march the army out of camp (breakCamp, once per phase attempt) and load the
 // field. Record book and Settings open modules other screens own (src/ui/records.js, src/ui/settings-panel.js); a
 // missing module only disables its button.
+// Art (P6b, src/ui/art.js): the title stands on a living backdrop (Homer's "Home, Sweet Home", 1863: a very slow pan and a
+// drifting campfire smoke layer, both CSS-composited, paused while the tab is hidden and static under reduced motion); the
+// camp shows a period view of the campaign's current battle with its caption and source, and a trophy shelf drawn from the
+// save: captured guns and arms (items whose source is capture), the wagons in the stores (one icon each up to a cap, then
+// ×N) and the reputation level. Campaign brigade cards carry their commander's period portrait or the generic silhouette.
 import { createProgressStore, parseSnapshot, exportSnapshot, exchangeDepot, listSlots, MAX_SAVE_BYTES } from '../franchise/save.js';
 import { newCampaign, chooseBadges, campaignPhase } from '../franchise/campaign.js';
 import { BADGE_BY_ID, TIER_NAMES, BADGE_RULES_NOTE, featText, effectText, threshold, categoryName, slotsOf } from '../franchise/badges.js';
-import { loadCampaign, loadPackSummary, ladderPosition, formatDate, loadDecisions } from './briefing.js';
+import { loadCampaign, loadPackSummary, ladderPosition, formatDate, loadDecisions, rankShort } from './briefing.js';
+import { loadArt, backdropArt, whenArt } from './art.js';
 import { ORDERS, orderName, orderText, setOrder, breakCamp, campReport, supplyNeed, CAMP_RULES_NOTE } from '../franchise/camp-orders.js';
 import { cardsFor, recorded, optionOpen, chooseDecision, historyOf, effectText as decisionEffect, DECISIONS_NOTE } from '../franchise/decisions.js';
 import { get } from '../settings.js';
@@ -28,6 +34,7 @@ import { savedDeployment } from '../franchise/practice.js';
 import { loadFieldScenario } from '../sim/phase.js';
 
 const PAGE_SIZE = 12;
+const ART_DELAY_MS = 900; // backdrop, portraits and card pictures follow the first render (P6b)
 const STYLE = { 'clean modern': 'modern', 'period desk': 'desk', hybrid: 'hybrid' };
 export function showFieldFailure({ href = './?camp', message = 'Your saved army is unchanged. Return to camp and try again.' } = {}) {
   document.getElementById('battle').hidden = true;
@@ -76,6 +83,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
   const root = document.createElement('main'); root.id = 'front'; root.className = 'rw rw-counts';
   root.dataset.uiStyle = STYLE[get('screens.cardStyle')] || 'modern';
   root.innerHTML = `
+    <div id="entry-backdrop" class="entry-backdrop" aria-hidden="true" hidden><div class="entry-backdrop-img"></div><div class="entry-smoke"><i></i><i></i><i></i><i></i><i></i></div><div class="entry-scrim"></div></div>
     <div class="entry-wrap">
       <header class="entry-head"><a href="./" class="entry-brand">The Civil War</a><p>One army. One war.</p><button id="entry-settings" type="button">Settings</button></header>
       <section id="entry-title" aria-labelledby="entry-title-heading">
@@ -111,6 +119,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
           <div id="camp-shop-drawer" hidden><p class="entry-note" id="camp-shop-note"></p><p id="camp-shop-status" role="status" tabindex="-1"></p>
             <div id="camp-shop-stock" role="list" aria-label="Requisition stock"></div><div id="camp-shop-more"></div></div>
         </section>
+        <section id="camp-trophies" aria-labelledby="camp-trophies-heading"><h2 id="camp-trophies-heading">Trophy shelf</h2><div id="camp-shelf" role="list" aria-label="Trophies and train"></div></section>
         <section aria-labelledby="camp-army-heading"><h2 id="camp-army-heading">Brigades</h2><div id="camp-army" class="rw-brigs is-static" role="list" aria-label="Saved brigades"></div><div id="army-pages" class="entry-pages"></div></section>
         <section aria-labelledby="camp-depot-heading"><h2 id="camp-depot-heading" tabindex="-1">Depot</h2><p id="depot-note"></p><div id="camp-depot" role="list" aria-label="Saved depot"></div><div id="depot-pages" class="entry-pages"></div></section>
       </section>
@@ -120,6 +129,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       <section class="entry-transfer" aria-label="Army transfer"><p id="entry-status" role="status"></p><button id="entry-export" type="button" disabled>Export army</button><button id="entry-export-saved" type="button" hidden>Export displayed saved army</button><button id="entry-import" type="button">Import army</button><button id="entry-retry" type="button" hidden>Retry loading</button><button id="entry-discard-exchange" type="button" hidden>Discard pending exchange and reload</button><input id="entry-file" type="file" accept=".json,application/json" hidden></section>
       <nav class="entry-modes" aria-label="Other ways to play"><a href="./?practice">Henry Hill practice</a><a href="./?battle=henry-hill">Historical battle</a><a href="./?sandbox">Sandbox</a><a href="./reward.html">Reward workbench</a></nav>
       <p class="entry-note">Practice formations, rewards and ratings are game values. The historical battle is available separately.</p>
+      <p id="entry-backdrop-caption" class="entry-backdrop-caption" hidden></p>
     </div>
     <dialog id="entry-replace" aria-labelledby="entry-replace-heading" aria-describedby="entry-replace-note"><h2 id="entry-replace-heading">Replace saved army?</h2><p id="entry-replace-note">Import replaces your army and depot with this completed export. Export first to keep your current army.</p><button id="entry-cancel" type="button">Cancel</button><button id="entry-confirm" type="button">Import and replace</button></dialog>
     <dialog id="camp-compare" aria-labelledby="camp-compare-heading" aria-describedby="camp-compare-item">
@@ -747,6 +757,82 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       finally { importing = false; render(); node('camp-shop-toggle').focus(); }
     }
   });
+  // ---- art (P6b): backdrops, the trophy shelf and commander portraits (src/ui/art.js) ----
+  const reducedMotion = () => !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  /** The battle region the camp looks at: the next phase's pack (the last fought once complete); practice camps use the title view. */
+  function backdropKey(showCamp) {
+    if (!showCamp || saved?.version !== 2 || !ladder || ladder.def.id !== saved.campaign.id) return 'title';
+    const c = saved.campaign, p = ladder.def.phases[c.index] || c.history[c.history.length - 1];
+    return p?.packId || 'title';
+  }
+  function renderBackdrop(showCamp) {
+    const box = node('entry-backdrop'), caption = node('entry-backdrop-caption'), key = backdropKey(showCamp);
+    box.dataset.mode = showCamp ? 'camp' : 'title';
+    box.dataset.motion = reducedMotion() ? 'reduced' : 'full';
+    whenArt((m) => {
+      if (disposed) return;
+      const art = backdropArt(key, m) || backdropArt('title', m);
+      if (!art) { box.hidden = true; caption.hidden = true; return; }
+      if (box.dataset.key !== art.key) {
+        box.querySelector('.entry-backdrop-img').style.backgroundImage = `url("${art.src}")`;
+        box.dataset.key = art.key;
+      }
+      box.hidden = false;
+      caption.textContent = `${showCamp ? 'Camp view' : 'Title painting'}: ${art.caption}. ${art.licence}.`;
+      caption.hidden = false;
+    });
+  }
+  const pauseBackdrop = () => node('entry-backdrop').classList.toggle('is-paused', document.hidden);
+  document.addEventListener('visibilitychange', pauseBackdrop);
+  globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').addEventListener?.('change', () => { node('entry-backdrop').dataset.motion = reducedMotion() ? 'reduced' : 'full'; });
+  // The art loads a moment after the screen renders (src/ui/art.js whenArt): the title and camp are usable at once.
+  setTimeout(() => { if (!disposed) loadArt(); }, ART_DELAY_MS);
+  /** The brigade's commander for the camp card: from the next phase on that names him (the loaded packs), else the latest
+   *  phase before it; null when no loaded phase names one (the card shows the generic silhouette). */
+  function commanderOf(b) {
+    if (!b.unitId || !ladder || saved?.version !== 2 || ladder.def.id !== saved.campaign.id) return undefined;
+    const all = ladder.def.phases, at = Math.min(saved.campaign.index, all.length - 1);
+    const order = [...all.slice(at), ...all.slice(0, at).reverse()];
+    for (const p of order) {
+      const who = titles.get(p.packId)?.phases.find((x) => x.id === p.phaseId)?.commanders?.[b.unitId];
+      if (who) return { name: who.name, rank: rankShort(who.rank) };
+    }
+    return null;
+  }
+  const SHELF_CAP = 12;
+  const ICONS = {
+    gun: '<svg viewBox="0 0 32 20" class="camp-trophy-icon"><circle cx="11" cy="13" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 9 L30 4 L31 7 L10 12 Z M2 18 L11 13" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg>',
+    arm: '<svg viewBox="0 0 32 20" class="camp-trophy-icon"><path d="M1 8 H22 L24 7 H27 L31 13 L30 16 L22 12 H1 Z" fill="currentColor"/></svg>',
+    wagon: '<svg viewBox="0 0 32 20" class="camp-trophy-icon"><path d="M3 4 C8 -1 24 -1 29 4 V12 H3 Z" fill="currentColor" opacity="0.75"/><circle cx="8" cy="15" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="24" cy="15" r="4" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
+  };
+  const plural = (n, one, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+  function trophy(kind, count, label, icon) {
+    const row = document.createElement('div'); row.setAttribute('role', 'listitem'); row.className = 'camp-trophy';
+    row.dataset.trophy = kind; row.dataset.count = String(count);
+    const icons = document.createElement('span'); icons.className = 'camp-trophy-icons'; icons.setAttribute('aria-hidden', 'true');
+    if (icon) {
+      icons.innerHTML = icon.repeat(Math.min(count, SHELF_CAP));
+      if (count > SHELF_CAP) { const more = document.createElement('b'); more.className = 'camp-trophy-more'; more.textContent = `×${count}`; icons.append(more); }
+    }
+    const text = document.createElement('span'); text.className = 'camp-trophy-label'; text.textContent = label;
+    row.append(icons, text);
+    return row;
+  }
+  function renderShelf() {
+    const v2 = saved.version === 2, rows = [];
+    const captured = [...saved.army.map((b) => b.weapon), ...saved.depot].filter((it) => it && it.source === 'capture');
+    const guns = captured.filter((it) => itemDef(it.itemId).arm === 'artillery'), arms = captured.filter((it) => itemDef(it.itemId).arm !== 'artillery');
+    const names = (list) => [...new Set(list.map((it) => itemDef(it.itemId).name))].slice(0, 4).join(', ');
+    if (v2) {
+      const r = trophy('reputation', saved.level, `Army reputation level ${saved.level} of 10`, null);
+      const badge = document.createElement('b'); badge.className = 'camp-trophy-level'; badge.textContent = String(saved.level);
+      r.querySelector('.camp-trophy-icons').append(badge); rows.push(r);
+    }
+    rows.push(trophy('guns', guns.length, guns.length ? `Captured guns: ${plural(guns.length, 'gun')} (${names(guns)})` : 'Captured guns: none yet', ICONS.gun));
+    rows.push(trophy('arms', arms.length, arms.length ? `Captured arms: ${plural(arms.length, 'card')} (${names(arms)})` : 'Captured arms: none yet', ICONS.arm));
+    if (v2) { const w = storesOf(saved).wagons; rows.push(trophy('wagons', w, `Wagons in the train: ${plural(w, 'wagon')}`, ICONS.wagon)); }
+    node('camp-shelf').replaceChildren(...rows);
+  }
   function render() {
     const showCamp = camp && !!saved && !failed;
     node('entry-title').hidden = showCamp; node('entry-camp').hidden = !showCamp;
@@ -755,14 +841,18 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       : failed ? 'Progress could not be read. Retry loading or import an army export to recover.'
         : 'Two brigades. One approaching enemy. Hold the ground, capture the stores, then open your first loot.';
     if (!showCamp) renderTitleCampaign();
+    renderBackdrop(showCamp);
+    node('camp-trophies').hidden = !showCamp;
     if (showCamp) {
+      renderShelf();
       renderCampaignStrip();
       renderOrders();
       renderShop();
       node('entry-summary').textContent = `${saved.army.length} formations · ${saved.army.reduce((n, b) => n + b.men, 0).toLocaleString()} men · ${saved.grade ?? 'no phase fought yet'}`;
       paged(saved.army, node('camp-army'), node('army-pages'), (b, i) => {
         const v2 = saved.version === 2;
-        const card = brigCard(b, i, { interactive: false, onBadge: v2 ? (x, br, chip) => openBadge(x, br, chip) : null }); card.dataset.brigadeId = b.id;
+        const who = v2 ? commanderOf(b) : undefined;
+        const card = brigCard(b, i, { interactive: false, onBadge: v2 ? (x, br, chip) => openBadge(x, br, chip) : null, ...(who !== undefined ? { who } : {}) }); card.dataset.brigadeId = b.id;
         if (v2 && b.offer?.length) {
           const choose = document.createElement('button'); choose.type = 'button'; choose.className = 'camp-choose-button';
           choose.textContent = 'Choose badges to keep'; choose.setAttribute('aria-label', `Choose which badges ${b.label} keeps`);

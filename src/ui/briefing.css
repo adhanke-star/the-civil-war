@@ -22,3 +22,11 @@
 }
 #briefing .briefing-decisions { margin: 0 0 10px; padding-left: 18px; line-height: 1.5; }
 #briefing .briefing-decisions li { margin: 4px 0; overflow-wrap: anywhere; }
+/* Commanders with their period portraits or the generic silhouette (P6b; src/ui/art.js). Not focusable: tab order unchanged. */
+#briefing .briefing-commanders h3 { margin: 14px 0 8px; }
+#briefing .briefing-commander-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 12px 10px; }
+#briefing .briefing-commander { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; text-align: center; }
+#briefing .briefing-portrait { display: block; width: 64px; height: 80px; overflow: hidden; border-radius: 4px; background: #2a2218; box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 3px 8px rgba(0,0,0,0.45); }
+#briefing .briefing-portrait img { display: block; width: 100%; height: 100%; object-fit: cover; }
+#briefing .briefing-commander-name { font-size: 13px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+#briefing .briefing-commander-note { font-size: 11.5px; line-height: 1.3; color: var(--dim); overflow-wrap: anywhere; }

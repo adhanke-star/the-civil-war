@@ -484,3 +484,5 @@ body:has(.sb-toggle.sb-closed:not(.sb-left)) #soldier-view-hint { right: calc(va
     max-height: min(46px, calc(100dvh - var(--top-h) - var(--objective-h) - var(--dock-h) - 40px - env(safe-area-inset-top) - env(safe-area-inset-bottom))); }
   #toasts { top: calc(var(--edge) + var(--top-h) + var(--objective-h) + 60px + env(safe-area-inset-top)); }
 }
+/* Unit card portrait (P6b, src/ui/art.js): period portraits and the silhouette are 4:5, so keep the head in the square. */
+.portrait[data-portrait="sourced"], .portrait[data-portrait="generic"] { background-position: center 18%; background-color: #2a2218; }

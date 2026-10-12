@@ -642,3 +642,46 @@ button.cw-badge:focus-visible { outline: 3px solid var(--rw-focus, #ffd27a); out
   .rw-vs { padding: 12px 10px; } .rw-vs-table { font-size: 13px; } .rw-vs-table th, .rw-vs-table td { padding: 6px 4px; }
   .rp-btn-text { display: none; } .rp-time { font-size: 18px; }
 }
+
+/* ---- card art (P6b; src/ui/art.js): the real arm on dark felt under a soft light in the rarity colour ------------------- */
+.rw-art {
+  position: relative; flex: none; display: block; height: 3.7em; overflow: hidden; isolation: isolate;
+  background: repeating-linear-gradient(45deg, rgba(255,255,255,0.022) 0 1px, transparent 1px 3px),
+              repeating-linear-gradient(-45deg, rgba(0,0,0,0.10) 0 1px, transparent 1px 3px),
+              radial-gradient(120% 110% at 50% 40%, #29322b 0%, #171d18 70%, #101411 100%);
+  box-shadow: inset 0 6px 9px -6px rgba(0,0,0,0.75), inset 0 -6px 9px -6px rgba(0,0,0,0.75);
+}
+.rw-art::before { content: ''; position: absolute; inset: -30% 6%; z-index: -1; background: radial-gradient(closest-side, var(--tier, #e4e4e4), transparent); opacity: 0.32; }
+.rw-art.is-empty { display: none; }
+.rw-art-img { position: absolute; left: 4%; top: 6%; width: 92%; height: 68%; object-fit: contain; filter: drop-shadow(0 0.18em 0.22em rgba(0,0,0,0.75)); }
+.rw-art[data-kind="mount"] .rw-art-img { top: 4%; height: 74%; filter: none;
+  -webkit-mask-image: radial-gradient(closest-side, #000 72%, transparent 100%); mask-image: radial-gradient(closest-side, #000 72%, transparent 100%); }
+.rw-art[data-kind="generic"] .rw-art-img { opacity: 0.8; filter: none; }
+.rw-pictured {
+  position: absolute; left: 0; right: 0; bottom: 0; padding: 0.1em 0.75em 0.18em; font-size: 0.56em; line-height: 1.3;
+  color: #e6dfcd; background: linear-gradient(180deg, rgba(10,12,10,0), rgba(10,12,10,0.82) 45%);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* the fixed-size reveal and compare cards make room for the picture */
+.rw-front.has-art .rw-body { gap: 0.34em; padding-top: 0.5em; padding-bottom: 0.45em; }
+.rw-front.has-art .rw-stats { padding: 0.3em 0; }
+.rw-deal .rw-front.has-art .rw-effect, .rw-cmp .rw-front.has-art .rw-effect { -webkit-line-clamp: 1; line-clamp: 1; }
+/* larger cards (camp depot, shop, saved results) show the whole caption */
+#front .rw-art, .rw[data-saved-deployment] .rw-art { height: auto; min-height: 7.5em; padding-bottom: 0; }
+#front .rw-art-img, .rw[data-saved-deployment] .rw-art-img { position: relative; display: block; left: auto; top: auto; width: 92%; height: 6.2em; margin: 0.5em auto 0; }
+#front .rw-pictured, .rw[data-saved-deployment] .rw-pictured { position: relative; white-space: normal; overflow-wrap: anywhere; font-size: 0.66em; padding: 0.3em 0.9em 0.5em; background: rgba(10,12,10,0.55); }
+/* tray tiles: the same picture, faint, behind the right of the tile */
+.rw-tile .rw-art.is-small { position: absolute; inset: 0 0 0 46%; height: auto; z-index: 0; pointer-events: none; background: none; box-shadow: none; opacity: 0.26;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 40%); mask-image: linear-gradient(90deg, transparent, #000 40%); }
+.rw-tile .rw-art.is-small::before { display: none; }
+.rw-tile .rw-art.is-small .rw-art-img { left: 0; top: 8%; width: 100%; height: 84%; -webkit-mask-image: none; mask-image: none; filter: none; }
+.rw-tile > :not(.rw-art) { position: relative; z-index: 1; }
+
+/* ---- brigade card commander row: period portrait or the generic silhouette (DESIGN §3 Brigade card) ---------------------- */
+.rw-brig.has-who { grid-template-areas: "ovr head flags" "who who who" "weap weap weap" "bars bars bars"; }
+.rw-bwho { grid-area: who; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.rw-bportrait { flex: none; width: 44px; height: 55px; overflow: hidden; border-radius: 4px; background: #2a2218; box-shadow: 0 0 0 1px rgba(0,0,0,0.35), 0 2px 5px rgba(0,0,0,0.35); }
+.rw-bportrait img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.rw-bwho-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rw-bwho-name { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.rw-bwho-note { font-size: 11.5px; line-height: 1.3; color: var(--rw-card-dim); overflow-wrap: anywhere; }

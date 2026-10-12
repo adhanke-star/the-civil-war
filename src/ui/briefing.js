@@ -2,8 +2,9 @@
 // the ladder position text, the reward-issue bridge, and the field Briefing overlay shown before a campaign phase.
 //
 //   loadCampaign()                        -> { raw, def } (def validated by validateCampaign) or null when it ships empty
-//   loadPackSummary(packId)               -> { packId, title, phases: [{ id, title, date, start, line, us }] } (cached per page;
-//                                            `us` lists the phase's Union field unit ids, reinforcements included)
+//   loadPackSummary(packId)               -> { packId, title, phases: [{ id, title, date, start, line, us, commanders }] } (cached per
+//                                            page; `us` lists the phase's Union field unit ids, reinforcements included;
+//                                            `commanders` maps each unit id to its sourced { name, rank } for the camp's cards)
 //   loadDecisions()                       -> the validated decision deck (assets/decisions.json; src/franchise/decisions.js)
 //   decisionLines(save, phase, deck?)     -> plain lines for the decisions and camp morale recorded for this phase attempt
 //   ladderPosition(def, index)            -> { battle, battles, phase, phases } for "Battle N of B · Phase k of n"
@@ -13,12 +14,16 @@
 //   briefingSources(list)                 -> [{ label, href }] with only http(s) links kept
 //   mountBriefing({ scenario, phase, game, hud, effects, onBegin, save?, deck? }) -> the paused, focused Briefing dialog
 //                                            (with `save`, it also lists the decision cards chosen for this attempt)
+//   briefingCommanders(scenario, side?, max?) -> [{ name, rank, side, named }]: the phase's commanders named in the briefing
+//                                            first, then the player's side; the dialog shows each with his period portrait
+//                                            (src/ui/art.js; exact name only) or the generic silhouette (P6b)
 // Decision cards are chosen in camp before the field and this briefing load (src/ui/entry.js, the camp's Next and Replay).
 // Pure helpers do no DOM work at import time, so tools/test-campaign-ui.mjs can import this file in Node.
 import { validateCampaign } from '../franchise/campaign.js';
 import { exchangeDepot, validateSnapshot } from '../franchise/save.js';
 import { preparePhase } from '../sim/phase.js';
 import { validateDeck, effectText } from '../franchise/decisions.js';
+import { whenArt, loadArt, portraitArt, genericPortrait, portraitLine } from './art.js';
 
 const MAX_BYTES = 1024 * 1024;
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -55,7 +60,10 @@ export function loadPackSummary(packId, { fetcher } = {}) {
       return Object.freeze({ packId, title: pack.title, phases: Object.freeze(pack.phases.map((p) => Object.freeze({
         id: p.id, title: p.scenario.title, date: p.scenario.date, start: p.scenario.start,
         line: shortLine(p.scenario), us: Object.freeze([...p.scenario.units, ...(Array.isArray(p.scenario.reinforcements) ? p.scenario.reinforcements : [])]
-          .filter((u) => u && u.side === 'US' && typeof u.id === 'string').map((u) => u.id)) }))) });
+          .filter((u) => u && u.side === 'US' && typeof u.id === 'string').map((u) => u.id)),
+        commanders: Object.freeze(Object.fromEntries([...p.scenario.units, ...(Array.isArray(p.scenario.reinforcements) ? p.scenario.reinforcements : [])]
+          .filter((u) => u && typeof u.id === 'string' && words(u.commander?.name))
+          .map((u) => [u.id, Object.freeze({ name: words(u.commander.name), rank: words(u.commander.rank) })]))) }))) });
     });
     pending.catch(() => summaries.delete(packId));
     summaries.set(packId, pending);
@@ -148,6 +156,28 @@ export function briefingSources(list) {
   return out;
 }
 
+const RANK_SHORT = { 'Major General': 'Maj. Gen.', 'Brigadier General': 'Brig. Gen.', Colonel: 'Col.', 'Lieutenant Colonel': 'Lt. Col.', Major: 'Maj.', Captain: 'Capt.',
+  Lieutenant: 'Lt.', 'First Lieutenant': '1st Lt.', 'Second Lieutenant': '2nd Lt.' };
+/** "Col." from "Colonel" (unknown ranks pass through). */
+export const rankShort = (rank) => RANK_SHORT[rank] || rank || '';
+/** "Col. Everett Peabody" from a { name, rank } commander. */
+export const commanderTitle = (c) => `${rankShort(c.rank)} ${c.name}`.trim();
+/** The phase's commanders for the briefing: those its text names first (exact full name), then the player's side, de-duplicated. */
+export function briefingCommanders(scenario, side = 'US', max = 6) {
+  const b = scenario && typeof scenario.briefing === 'object' && scenario.briefing ? scenario.briefing : {};
+  const prose = [...(Array.isArray(b.text) ? b.text : [b.text]), b.quote?.text].map(words).join(' ');
+  const units = [...(Array.isArray(scenario?.units) ? scenario.units : []), ...(Array.isArray(scenario?.reinforcements) ? scenario.reinforcements : [])];
+  const seen = new Set(), named = [], own = [];
+  for (const u of units) {
+    const name = words(u?.commander?.name);
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    const c = { name, rank: words(u.commander.rank), side: u.side, named: prose.includes(name) };
+    if (c.named) named.push(c); else if (u.side === side) own.push(c);
+  }
+  return [...named, ...own].slice(0, max);
+}
+
 const DEFAULT_LOAN = "Grant's Army of the Tennessee is on loan for this phase. Its results do not change your franchise brigades; losses here carry only inside this battle.";
 
 /** The paused Briefing overlay. Begin (or Escape) closes it, unpauses and focuses the battlefield. */
@@ -174,6 +204,26 @@ export function mountBriefing({ scenario, phase, game, hud, effects, onBegin = (
     const cite = [words(b.quote.who), words(b.quote.source)].filter(Boolean);
     body.append(el('figure', { class: 'briefing-quote' }, el('blockquote', {}, el('p', { text: words(b.quote.text) })),
       cite.length ? el('figcaption', { text: `— ${cite.join(', ')}` }) : null));
+  }
+  const commanders = briefingCommanders(scenario, game?.playerSide || hud?.playerSide || 'US');
+  if (commanders.length) {
+    const slot = el('section', { class: 'briefing-commanders', 'aria-labelledby': 'briefing-commanders-heading', hidden: '' });
+    body.append(slot);
+    loadArt(); // usually loaded already by the battle HUD
+    whenArt((m) => {
+      if (!m || !slot.isConnected) return;
+      const list = el('ul', { class: 'briefing-commander-list' });
+      for (const c of commanders) {
+        const p = portraitArt(c.name, m), g = p ? null : genericPortrait(m);
+        const img = el('img', { src: (p || g).src, alt: p ? `Portrait of ${c.name}` : '', decoding: 'async', title: p ? portraitLine(p) : g.caption });
+        list.append(el('li', { class: `briefing-commander ${p ? 'is-sourced' : 'is-generic'}`, 'data-commander': c.name },
+          el('span', { class: 'briefing-portrait' }, img),
+          el('span', { class: 'briefing-commander-name', text: commanderTitle(c) }),
+          el('span', { class: 'briefing-commander-note', text: p ? (p.note || (c.side === 'CS' ? 'Confederate' : 'Union')) : 'No sourced portrait' })));
+      }
+      slot.append(el('h3', { id: 'briefing-commanders-heading', text: 'Commanders' }), list);
+      slot.hidden = false;
+    });
   }
   const decided = decisionLines(save, phase, deck);
   if (decided.length) {

@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0113 — Card art from museum photographs; period portraits by exact name (2026-10-12)
+
+v1 loot cards show the real object's museum or period photograph (Smithsonian NMAH staff photographs, public domain as US government works per Wikimedia Commons, not CC0 on si.edu; CC0 battlefield cannon photos; a Library of Congress Whitworth), cut out on CSS felt with a rarity-coloured glow, instead of a baked 3D render; the Belgian rifle-musket has no free image and gets a labelled generic. Commanders get a period portrait only when the source names that exact man (66 of the packs' commanders; three withheld for doubtful identity; postwar images dated). The title backdrop is Homer's "Home, Sweet Home" (NGA, CC0) with a slow pan and drifting smoke; each battle region's camp has a period view and a trophy shelf (captured guns and arms, wagons, reputation).
+
 ## 0112 — A dominated objective is held at the day's end (2026-10-12)
 
 The first full agent playthrough (CI, 201/201 checks) ended 10 of 12 phases in a Draw, attacks included: any defender left inside the objective made it "contested". Game rule now: at the end of the day a contested objective goes to a side with at least three times the other's formed (not routing) men on it (`OBJECTIVE_DOMINANCE` in src/game.js); otherwise it is still a draw. A few stragglers no longer hold ground against a brigade. Henry Hill and the practice keep their own rules; every oracle is unchanged.

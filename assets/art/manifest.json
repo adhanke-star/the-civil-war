@@ -1,0 +1,594 @@
+{
+ "version": 1,
+ "note": "P6b card art. Every file is public domain or CC0; sources and licences per entry; see ATTRIBUTION.md \"Art\".",
+ "generic": {
+  "arm": {
+   "file": "arms/generic-rifle-musket.svg",
+   "caption": "Generic rifle-musket silhouette (no public-domain photograph found)",
+   "credit": "Drawn for this game",
+   "licence": "CC0 (this project)"
+  },
+  "portrait": {
+   "file": "portraits/generic-officer.svg",
+   "caption": "Generic silhouette (no sourced portrait)",
+   "credit": "Drawn for this game",
+   "licence": "CC0 (this project)"
+  }
+ },
+ "arms": {
+  "m1842": {
+   "file": "arms/m1842.webp",
+   "caption": "Pictured: Springfield Model 1842 percussion musket (AF*20400), National Museum of American History",
+   "credit": "Smithsonian Institution, National Museum of American History",
+   "licence": "Public domain (PD-USGov-SI)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Springfield_Model_1842_Percussion_Musket-NMAH-AHB2015q027141.jpg",
+   "kind": "cutout"
+  },
+  "lorenz": {
+   "file": "arms/lorenz.webp",
+   "caption": "Pictured: Lorenz Model 1854 rifle-musket, National Museum of American History",
+   "credit": "Smithsonian Institution, National Museum of American History",
+   "licence": "Public domain (PD-USGov-SI)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Lorenz_Smithsonian.jpg",
+   "kind": "cutout"
+  },
+  "springfield": {
+   "file": "arms/springfield.webp",
+   "caption": "Pictured: Model 1861 U.S. rifle-musket (AF*20402), National Museum of American History",
+   "credit": "Smithsonian Institution, National Museum of American History",
+   "licence": "Public domain (PD-USGov-SI)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Springfield_Model_1861_Rifle_Musket-NMAH-AHB2015q028583.jpg",
+   "kind": "cutout"
+  },
+  "enfield": {
+   "file": "arms/enfield.webp",
+   "caption": "Pictured: British Pattern 1853 rifle-musket made by the London Armoury Company, National Museum of American History",
+   "credit": "Smithsonian Institution, National Museum of American History",
+   "licence": "Public domain (PD-USGov-SI)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:NMAH-ET2012-13936.jpg",
+   "kind": "cutout"
+  },
+  "colt": {
+   "file": "arms/colt.webp",
+   "caption": "Pictured: Colt Model 1855 revolving rifle (AF*32763), National Museum of American History",
+   "credit": "Smithsonian Institution, National Museum of American History",
+   "licence": "Public domain (PD-USGov-SI)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Colt_Model_1855_Revolving_Rifle-NMAH-AHB2015q026777.jpg",
+   "kind": "cutout"
+  },
+  "sharps": {
+   "file": "arms/sharps.webp",
+   "caption": "Pictured: Sharps rifle, Model 1859, .52 calibre, National Museum of American History",
+   "credit": "Smithsonian Institution, National Museum of American History",
+   "licence": "Public domain (PD-USGov)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:United_States_Sharps_rifle_Model_1859%2C_.52_caliber.png",
+   "kind": "cutout"
+  },
+  "spencer": {
+   "file": "arms/spencer.webp",
+   "caption": "Pictured: Spencer repeating rifle used by Abraham Lincoln for target practice, National Museum of American History",
+   "credit": "Smithsonian Institution, National Museum of American History",
+   "licence": "Public domain (PD-USGov-SI)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:NMAH-ET2012-13926.jpg",
+   "kind": "cutout"
+  },
+  "henry": {
+   "file": "arms/henry.webp",
+   "caption": "Pictured: Henry rifle, Model 1860, made by the New Haven Arms Company, National Museum of American History",
+   "credit": "Smithsonian Institution, National Museum of American History",
+   "licence": "Public domain (PD-USGov-SI)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:NMAH-2004-26295-12.jpg",
+   "kind": "cutout"
+  },
+  "whitworth": {
+   "file": "arms/whitworth.webp",
+   "caption": "Pictured: Modified 12-pounder breech-loading Whitworth guarded by a Federal soldier, Richmond, Virginia, 1865 (Library of Congress)",
+   "credit": "Civil War glass negatives, Library of Congress",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Richmond%2C_Virginia._Federal_soldier_guarding_cannon._(Modified_12-pdr._breech-loading_Whitworth)_LOC_cwpb.02499.jpg",
+   "kind": "mount"
+  },
+  "sixPdr": {
+   "file": "arms/sixPdr.webp",
+   "caption": "Pictured: 6-pounder smoothbore gun made by N. P. Ames in 1841 (park sign), Chickamauga Battlefield Visitor Center",
+   "credit": "Gary Todd (WorldHistoryPics)",
+   "licence": "CC0 (cc-zero)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:6-Pounder_Smoothbore_Gun_(10483784704).jpg",
+   "kind": "mount"
+  },
+  "howitzer12": {
+   "file": "arms/howitzer12.webp",
+   "caption": "Pictured: 12-pounder howitzer, tube made for the Confederacy at the Tredegar Iron Works in 1862 (park sign), Chickamauga Battlefield Visitor Center",
+   "credit": "Gary Todd (WorldHistoryPics)",
+   "licence": "CC0 (cc-zero)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:12-Pounder_Howitzer_(10483786586).jpg",
+   "kind": "mount"
+  },
+  "napoleon": {
+   "file": "arms/napoleon.webp",
+   "caption": "Pictured: M1857 12-pounder Napoleon cast by the Hooper Foundry, Boston; served with the 13th New York Independent Battery in 1864; National Civil War Naval Museum",
+   "credit": "Dsdugan",
+   "licence": "CC0",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:21-18-122-m1857.jpg",
+   "kind": "mount"
+  },
+  "ordnance3": {
+   "file": "arms/ordnance3.webp",
+   "caption": "Pictured: 3-inch Ordnance rifle, Gettysburg National Military Park",
+   "credit": "Hal Jespersen",
+   "licence": "Public domain (PD-user-en, PD-self)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:CW_Arty_3in_Ordnance_front.jpg",
+   "kind": "mount"
+  },
+  "parrott10": {
+   "file": "arms/parrott10.webp",
+   "caption": "Pictured: Parrott rifle, Chickamauga Battlefield Visitor Center",
+   "credit": "Gary Todd (WorldHistoryPics)",
+   "licence": "CC0 (cc-zero)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:10-Pounder_Parrott_Rifle_(10483763166).jpg",
+   "kind": "mount"
+  },
+  "belgian": {
+   "file": "arms/generic-rifle-musket.svg",
+   "caption": "Generic rifle-musket silhouette: no public-domain photograph of a Belgian rifle-musket was found",
+   "credit": "Drawn for this game",
+   "licence": "CC0 (this project)",
+   "pageUrl": "",
+   "kind": "generic",
+   "generic": true
+  }
+ },
+ "portraits": {
+  "Everett Peabody": {
+   "file": "portraits/everett-peabody.webp",
+   "credit": "Unknown photographer; Wilson's Creek National Battlefield (WICR 30677)",
+   "licence": "Public domain (PD-old-70-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Col-Everett_Peabody.jpg"
+  },
+  "Ralph P. Buckland": {
+   "file": "portraits/ralph-p-buckland.webp",
+   "credit": "Mathew Benjamin Brady, U.S. National Archives and Records Administration",
+   "licence": "Public domain (NARA-image-full, NARA-Author, NARA-cooperation)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Gen._Ralph_P._Buckland_-_NARA_-_529051.jpg",
+   "note": "Out of uniform; date unknown"
+  },
+  "Sterling A. M. Wood": {
+   "file": "portraits/sterling-a-m-wood.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:CSA_Brigadier_General_Sterling_Alexander_Martin_Wood.jpg"
+  },
+  "Robert G. Shaver": {
+   "file": "portraits/robert-g-shaver.webp",
+   "credit": "Confederate Veteran (S. A. Cunningham, Nashville), 1915",
+   "licence": "Public domain (PD-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Col._Robert_Glenn_Shaver%2C_Sr.jpg",
+   "note": "Old age: published 1915 (Confederate Veteran)"
+  },
+  "Patrick R. Cleburne": {
+   "file": "portraits/patrick-r-cleburne.webp",
+   "credit": "Library of Congress",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Patrick_Cleburne.jpg"
+  },
+  "Adley H. Gladden": {
+   "file": "portraits/adley-h-gladden.webp",
+   "credit": "Library of Congress, Civil War glass negatives",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Adley_H._Gladden%2C_d._1862_LCCN2002711371.jpg",
+   "note": "Out of uniform; date unknown"
+  },
+  "James M. Tuttle": {
+   "file": "portraits/james-m-tuttle.webp",
+   "credit": "Library of Congress, Civil War glass negatives",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Gen._James_M._Tuttle_LOC_cwpb.07218.jpg"
+  },
+  "Thomas W. Sweeny": {
+   "file": "portraits/thomas-w-sweeny.webp",
+   "credit": "Charles D. Fredericks & Co. \"Specialite,\" 587 Broadway, New York",
+   "licence": "Public domain (PD-USGov, PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Thomas_William_Sweeny%2C_circa_1865.jpg"
+  },
+  "Benjamin M. Prentiss": {
+   "file": "portraits/benjamin-m-prentiss.webp",
+   "credit": "Library of Congress, Civil War glass negatives",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Gen._Benjamin_M._Prentiss_LOC_cwpb.06380.jpg"
+  },
+  "Jacob G. Lauman": {
+   "file": "portraits/jacob-g-lauman.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-old)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Jacob_Gartner_Lauman_1.JPG"
+  },
+  "Stephen A. Hurlbut": {
+   "file": "portraits/stephen-a-hurlbut.webp",
+   "credit": "Library of Congress, Civil War glass negatives",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Gen._S.A._Hurlbut_LOC_cwpb.05689.jpg"
+  },
+  "John A. McClernand": {
+   "file": "portraits/john-a-mcclernand.webp",
+   "credit": "Brady National Photographic Art Gallery; Library of Congress",
+   "licence": "Public domain (PD-old)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:John_Alexander_McClernand.jpg"
+  },
+  "James R. Chalmers": {
+   "file": "portraits/james-r-chalmers.webp",
+   "credit": "Library of Congress, Civil War glass negatives",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Gen._James_R._Chalmers%2C_Col._9th_Miss._Inf._LOC_cwpb.07597.jpg"
+  },
+  "John K. Jackson": {
+   "file": "portraits/john-k-jackson.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:J_K_Jackson_CSA_ACW.jpg"
+  },
+  "Jacob Ammen": {
+   "file": "portraits/jacob-ammen.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-old)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:JAmmen.jpg"
+  },
+  "Sanders D. Bruce": {
+   "file": "portraits/sanders-d-bruce.webp",
+   "credit": "The National Cyclopaedia of American Biography, vol. 6 (1896)",
+   "licence": "Public domain (PD-US-expired)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Sanders_Dewees_Bruce.png",
+   "note": "Engraving published 1896"
+  },
+  "William B. Hazen": {
+   "file": "portraits/william-b-hazen.webp",
+   "credit": "Mathew Benjamin Brady",
+   "licence": "Public domain (PD-old-100)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:William_Babcock_Hazen_-_Brady-Handy.jpg"
+  },
+  "William Sooy Smith": {
+   "file": "portraits/william-sooy-smith.webp",
+   "credit": "Library of Congress",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:William_Sooy_Smith-Chicago%2C_Ill._-_Baker's_Art_Gallery%2C_Columbus%2C_O(hio)._LCCN2002716948.jpg",
+   "note": "Out of uniform; date unknown"
+  },
+  "Jeremiah T. Boyle": {
+   "file": "portraits/jeremiah-t-boyle.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Jeremiah-T.-Boyle.jpg"
+  },
+  "Lovell H. Rousseau": {
+   "file": "portraits/lovell-h-rousseau.webp",
+   "credit": "Library of Congress, Civil War glass negatives",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Maj._Gen._Lovell_Harrison_Rousseau_LOC_cwpb.07108_(1).jpg"
+  },
+  "Edward N. Kirk": {
+   "file": "portraits/edward-n-kirk.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-old-100)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Edward_N_Kirk.jpg"
+  },
+  "Lew Wallace": {
+   "file": "portraits/lew-wallace.webp",
+   "credit": "Mathew Benjamin Brady",
+   "licence": "Public domain (PD-old-100)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Lew_Wallace_-_Brady-Handy.jpg"
+  },
+  "Randall L. Gibson": {
+   "file": "portraits/randall-l-gibson.webp",
+   "credit": "Hinton & Oppenheimer, Mobile",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Cartes-de-visite_of_General_Randall_Gibson%2C_C.S.A.jpg"
+  },
+  "August Willich": {
+   "file": "portraits/august-willich.webp",
+   "credit": "Library of Congress",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Colonel_August_Willich%2C_head-and-shoulders_portrait%2C_facing_front.jpg"
+  },
+  "P. Sidney Post": {
+   "file": "portraits/p-sidney-post.webp",
+   "credit": "The Graphic (Chicago), 1893; Collection of the U.S. House of Representatives",
+   "licence": "Public domain (PD-USGov-Congress)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:PhilipSPost.jpg",
+   "note": "Postwar congressional portrait"
+  },
+  "William P. Carlin": {
+   "file": "portraits/william-p-carlin.webp",
+   "credit": "Civil War glass negative collection (Library of Congress)",
+   "licence": "Public domain (PD-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:William_P_Carlin.jpg"
+  },
+  "James E. Rains": {
+   "file": "portraits/james-e-rains.webp",
+   "credit": "The Illustrator Co.",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Portrait_of_James_Edwards_Rains.jpg",
+   "note": "Published 1896"
+  },
+  "Matthew D. Ector": {
+   "file": "portraits/matthew-d-ector.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Mathew_Duncan_Ector.jpg",
+   "note": "Out of uniform; date unknown"
+  },
+  "Evander McNair": {
+   "file": "portraits/evander-mcnair.webp",
+   "credit": "Library of Congress",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Evander_McNair%2C_of_Arkansas%2C_Brigadier_General%2C_C.S.A.%2C_head-and-shoulders_portrait%2C_facing_left_LCCN2004680079.jpg"
+  },
+  "George W. Roberts": {
+   "file": "portraits/george-w-roberts.webp",
+   "credit": "John Carbutt",
+   "licence": "Public domain (PD-old-70-expired)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Union_Army_Colonel_George_Washington_Roberts_(1833%E2%80%931862)_in_1861_(cropped).tif"
+  },
+  "Nicholas Greusel": {
+   "file": "portraits/nicholas-greusel.webp",
+   "credit": "Portrait and Biographical Album of Henry County, Iowa (1888)",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Nicholas_Greusel.PNG",
+   "note": "Postwar: 1888 lithograph"
+  },
+  "John F. Miller": {
+   "file": "portraits/john-f-miller.webp",
+   "credit": "Library of Congress, Civil War glass negatives",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Gen._John_F._Miller%2C_Col_of_29th_Ind._Inf._Wounded_at_Stone_River_LOC_cwpb.07056.jpg"
+  },
+  "Arthur M. Manigault": {
+   "file": "portraits/arthur-m-manigault.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Arthur_Middleton_Manigault.jpg",
+   "note": "Postwar portrait; date unknown"
+  },
+  "George Maney": {
+   "file": "portraits/george-maney.webp",
+   "credit": "Confederate Memorial Literary Society",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Carte-de-Visite_of_a_bust_portrait_of_Brigadier_General_George_Earl_Maney_in_uniform.jpg"
+  },
+  "J. Patton Anderson": {
+   "file": "portraits/j-patton-anderson.webp",
+   "credit": "Brady collection",
+   "licence": "Public domain (PD-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:James_Patton_Anderson.jpg",
+   "aliases": [
+    "Patton Anderson"
+   ]
+  },
+  "John G. Coltart": {
+   "file": "portraits/john-g-coltart.webp",
+   "credit": "T.J. Robinson & Co. of Huntsville, Ala",
+   "licence": "Public domain (PD-old-70-expired)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Colonel_John_G._Coltart_carte-de-visite.jpg"
+  },
+  "Alfred J. Vaughan Jr.": {
+   "file": "portraits/alfred-j-vaughan-jr.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:A_J_Vaughan%2C_Jr._CSA_ACW.jpg"
+  },
+  "Alexander P. Stewart": {
+   "file": "portraits/alexander-p-stewart.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:General_Alexander_P._Stewart.jpg"
+  },
+  "Lucius E. Polk": {
+   "file": "portraits/lucius-e-polk.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Portrait_of_Lucius_Eugene_Polk.jpg",
+   "note": "Postwar portrait; date unknown"
+  },
+  "Bushrod R. Johnson": {
+   "file": "portraits/bushrod-r-johnson.webp",
+   "credit": "Library of Congress, Civil War glass negatives",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Bushrod_Rust_Johnson%2C_1817-1880_LCCN2003662200.jpg"
+  },
+  "William Grose": {
+   "file": "portraits/william-grose.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-old-100)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:WGrose.jpg"
+  },
+  "George D. Wagner": {
+   "file": "portraits/george-d-wagner.webp",
+   "credit": "Library of Congress, Civil War glass negatives",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:G.D._Wagner%2C_Brig._General_LCCN90712440.jpg"
+  },
+  "Milo S. Hascall": {
+   "file": "portraits/milo-s-hascall.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:MiloSHascall.jpg"
+  },
+  "Daniel S. Donelson": {
+   "file": "portraits/daniel-s-donelson.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:DSDonelson.jpg",
+   "note": "Tennessee militia uniform; date unknown"
+  },
+  "Samuel W. Price": {
+   "file": "portraits/samuel-w-price.webp",
+   "credit": "Phipps, W. R. (William R.), photographer, Library of Congress",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Brigadier_General_Samuel_Woodson_Price_of_21st_Kentucky_Infantry_Regiment_in_uniform)_-_W.R._Phipps%2C_photographer%2C_Lexington%2C_Ky_LCCN2016652210.jpg"
+  },
+  "Charles Cruft": {
+   "file": "portraits/charles-cruft.webp",
+   "credit": "Library of Congress, Civil War glass negatives",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Bv't.-Maj._Gen._Chas._Cruft_LCCN93513605.jpg"
+  },
+  "Roger W. Hanson": {
+   "file": "portraits/roger-w-hanson.webp",
+   "credit": "Bendann Bros., photographer, Library of Congress",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Brigadier-General_Roger_W._Hanson_of_2nd_Kentucky_Infantry_Regiment_in_uniform)_-_Bendann_Brothers'_Galleries_of_Photography%2C_205_Balto._St_LCCN2016647909.jpg"
+  },
+  "Gideon J. Pillow": {
+   "file": "portraits/gideon-j-pillow.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Portrait_of_General_Gideon_Johnson_Pillow.jpg"
+  },
+  "William Preston": {
+   "file": "portraits/william-preston.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Brigadier_General_William_Preston.jpg"
+  },
+  "Samuel Beatty": {
+   "file": "portraits/samuel-beatty.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:SamuelBeatty.jpg"
+  },
+  "Charles G. Harker": {
+   "file": "portraits/charles-g-harker.webp",
+   "credit": "Mathew Benjamin Brady, U.S. National Archives and Records Administration",
+   "licence": "Public domain (NARA-image-full, NARA-Author, NARA-cooperation)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Col._Charles_G._Harker_-_NARA_-_530361.jpg"
+  },
+  "George A. Cobham Jr.": {
+   "file": "portraits/george-a-cobham-jr.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:George_Ashworth_Cobham.jpg"
+  },
+  "David Ireland": {
+   "file": "portraits/david-ireland.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-old-70-expired)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:David_Ireland.jpg"
+  },
+  "Charles Candy": {
+   "file": "portraits/charles-candy.webp",
+   "credit": "Unknown photographer, Library of Congress",
+   "licence": "Public domain (PD-old-70-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Colonel_Charles_Candy_LOC_(cropped).jpg"
+  },
+  "Walter C. Whitaker": {
+   "file": "portraits/walter-c-whitaker.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:WCWhitakerACWstanding.jpg"
+  },
+  "Edward C. Walthall": {
+   "file": "portraits/edward-c-walthall.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Brig._Genl._Edward_Cary_Walthall.jpg"
+  },
+  "John C. Moore": {
+   "file": "portraits/john-c-moore.webp",
+   "credit": "Ben Oppenheimer, Photograph Gallery, 56 Dauphin Street, Mobile",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Brigadier_General_John_Creed_Moore%2C_C.S.A.jpg"
+  },
+  "Ferdinand Van Derveer": {
+   "file": "portraits/ferdinand-van-derveer.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-old-assumed-expired)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Ferdinand_Van_Derveer_(brigadier_general%2C_born_1823).jpg"
+  },
+  "John B. Turchin": {
+   "file": "portraits/john-b-turchin.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Turchin.jpg",
+   "note": "Out of uniform; date unknown"
+  },
+  "Francis T. Sherman": {
+   "file": "portraits/francis-t-sherman.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-old)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Brig._General_Francis_T._Sherman.jpg"
+  },
+  "Zachariah C. Deas": {
+   "file": "portraits/zachariah-c-deas.webp",
+   "credit": "E. & H. T. Anthony; Library of Congress",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Zachariah_C._Deas%2C_Brig._Gen._CSA.jpg",
+   "note": "Out of uniform; date unknown"
+  },
+  "William F. Tucker": {
+   "file": "portraits/william-f-tucker.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:William_Feimster_Tucker.png"
+  },
+  "Robert C. Tyler": {
+   "file": "portraits/robert-c-tyler.webp",
+   "credit": "Bingham Brothers, Nashville",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Brig._Gen._Robert_Charles_Tyler.jpg"
+  },
+  "Jesse J. Finley": {
+   "file": "portraits/jesse-j-finley.webp",
+   "credit": "Unknown photographer",
+   "licence": "Public domain",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Brigadier_General_Jesse_J._Finley.jpg"
+  },
+  "Otho F. Strahl": {
+   "file": "portraits/otho-f-strahl.webp",
+   "credit": "Bingham Brothers",
+   "licence": "Public domain (PD-US)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Carte-de-Visite_of_Otho_French_Strahl.jpg"
+  },
+  "Marcellus A. Stovall": {
+   "file": "portraits/marcellus-a-stovall.webp",
+   "credit": "Library of Congress, Civil War glass negatives",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Brig._Gen._M.A._Stovall%2C_head-and-shoulders_portrait%2C_facing_right_LCCN97508382.jpg"
+  }
+ },
+ "backdrops": {
+  "title": {
+   "file": "backdrops/title-home-sweet-home.webp",
+   "caption": "Winslow Homer, Home, Sweet Home, about 1863. National Gallery of Art, Washington",
+   "credit": "Winslow Homer; National Gallery of Art, Washington",
+   "licence": "CC0 (NGA Open Access)",
+   "pageUrl": "https://www.nga.gov/artworks/79933"
+  },
+  "shiloh": {
+   "file": "backdrops/camp-shiloh.webp",
+   "caption": "Adolph Metzner, Shiloh Battlefield, April 9, 1862, pencil drawing. Library of Congress",
+   "credit": "Adolph Metzner; Library of Congress",
+   "licence": "Public domain (PD-Art)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Shiloh_Battlefield%2C_April_9%2C_1862_LCCN2017646904.jpg",
+   "pack": "shiloh"
+  },
+  "stones-river": {
+   "file": "backdrops/camp-stones-river.webp",
+   "caption": "The Hazen Brigade monument on the Stones River battlefield, raised in 1863; wartime photograph. Library of Congress",
+   "credit": "Library of Congress, Civil War glass negatives",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Murfreesboro%2C_Tennessee_(vicinity)._Monument_erected_on_the_battlefield_at_Stones_River_in_1863_LOC_cwpb.02109.jpg",
+   "pack": "stones-river"
+  },
+  "chattanooga": {
+   "file": "backdrops/camp-chattanooga.webp",
+   "caption": "George N. Barnard, Lookout Mountain from near the rolling mill, camp of the Engineer Brigade, Army of the Cumberland, Chattanooga, 1864. Library of Congress",
+   "credit": "Library of Congress, Civil War glass negatives",
+   "licence": "Public domain (PD-old-100-1923)",
+   "pageUrl": "https://commons.wikimedia.org/wiki/File:Chattanooga%2C_Tenn._1864._Lookout_Mountain%2C_from_near_the_rolling_mill%2C_looking_southwest%2C_camp_of_the_Engineer's_Brigade%2C_Army_of_the_Cumberland_LCCN2012648046.jpg",
+   "pack": "chattanooga"
+  }
+ },
+ "withheld": {
+  "John A. McDowell": "Only Commons image is John A. McDowell (Ohio congressman, b. 1853), a different man from the Shiloh colonel. Left out.",
+  "William E. Woodruff": "LOC glass-negative caption says \"Col. W.E. Woodruff, 2d Kentucky Infantry\" and Commons categorises it under William E. Woodruff; Wikipedia says the Stones River Woodruff colonelled the 25th Illinois. Regiment mismatch, so left out.",
+  "Edward H. Phelps": "Wikipedia calls him a Lieutenant-Colonel (killed Missionary Ridge 25 Nov 1863); the names list says Colonel. Image from Find a Grave via Commons. Confirm same man before use."
+ }
+}
