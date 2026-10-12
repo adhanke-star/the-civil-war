@@ -403,7 +403,38 @@
         ],
         "positionsNote": "Wood's division forms on the open slope south and east of Fort Wood (Willich left, Hazen right, Beatty in double column behind Willich's left) and Sheridan's Wagner and Harker on the north and south slopes of Bushy Knob, now the National Cemetery (Wood, Sheridan). The 28th Alabama holds log-and-stone barricades on the rocky rise just south of the knob and the 24th the knob and its rifle pits (Hazen, Wood; NPS). The knob is drawn at the HMDB monuments and the 3DEP summit, not the OSM point 390 m west. Sheridan's reserve brigade (not engaged) and Bridges's battery (placed on the knob only that night) are not fielded. All positions Inferred.",
         "strengthNote": "Hazen's 2,256 effective is his own report (Inferred). Willich and Beatty split Wood's 5,200 \"effective at Mission Ridge\" (a February 1864 dispatch) plus the 23 November losses, less Hazen, by regiment after fixing four sourced regiments (Estimated). Wagner's 1,800 is Disputed (about 2,000 in another report, both for 25 November); Harker's 2,100 is Sheridan's 6,000 less Wagner, halved (Estimated). The two Alabama regiments are NPS's \"about 634\" split by the 14 December return plus the 146 captured (Estimated). Fort Wood's six heavy guns rest on one OR sentence (Inferred); crews are a game value of 20 per gun.",
-        "historyNote": "Wood's division took Orchard Knob and the rocky ridge south of it by about 15:00, capturing the 28th Alabama almost whole with its colours for about 190 killed and wounded; Grant and Thomas chose to hold and entrench the knob, a mile from Missionary Ridge, rather than recall Wood."
+        "historyNote": "Wood's division took Orchard Knob and the rocky ridge south of it by about 15:00, capturing the 28th Alabama almost whole with its colours for about 190 killed and wounded; Grant and Thomas chose to hold and entrench the knob, a mile from Missionary Ridge, rather than recall Wood.",
+        "history": {
+          "outcome": [
+            "The Union took Orchard Knob, the rocky ridge south of it and the first line of Confederate rifle pits by about 15:00, in an attack ordered as a demonstration. The 28th Alabama was captured almost whole with its colours; the XI Corps could not clear the pits left of the knob that day, and Confederate shelling from Missionary Ridge did almost no harm.",
+            "Grant and Thomas chose to hold and fortify the knob rather than recall Wood. It became their forward observation post a mile from Missionary Ridge, and Bragg, who called it a driven-in picket line, pulled Cleburne and other troops back toward the ridge and began fortifying the crest: the first step toward the assault of 25 November."
+          ],
+          "casualties": {
+            "US": [125,190],
+            "CS": null,
+            "basis": "Union, the advance of 23 November: Granger says 125 killed and wounded; Wood's summary of 24 November says 29 killed and 161 wounded (190); the brigade reports come to about 195. Confederate killed and wounded are unknown; prisoners were counted as 146 (Hazen), 174 including 8 officers (Wood) and \"something over 200\" (Thomas).",
+            "provenance": "Disputed"
+          },
+          "closingQuote": {
+            "text": "Intrench them and send up support",
+            "who": "Ulysses S. Grant, deciding to keep Orchard Knob rather than recall Wood's division",
+            "source": "as quoted in Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec4"
+          },
+          "sources": [
+            {
+              "label": "Cozzens, The Battles for Chattanooga (NPS Civil War Series 9), sec4",
+              "url": "https://npshistory.com/publications/civil_war_series/9/sec4.htm"
+            },
+            {
+              "label": "NPS Chickamauga and Chattanooga NMP, Orchard Knob",
+              "url": "https://www.nps.gov/chch/learn/historyculture/orchard-knob.htm"
+            },
+            {
+              "label": "Official Records Ser. I Vol. XXXI Pt. 2 (Granger, Wood, Hazen and Thomas reports; OCR text)",
+              "url": "https://archive.org/details/warofrebellion312unit"
+            }
+          ]
+        }
       }
     },
     {
@@ -996,7 +1027,46 @@
         ],
         "positionsNote": "Geary crossed Lookout Creek at the old mill near Wauhatchie, about 2.5 miles up the creek and off the drawn map, so his three brigades open on the lower west slope at the map's south-west edge (about 1.5 km north-east of the crossing), Cobham on the right under the palisades, Ireland in the centre and Candy on the left toward the creek, with Whitaker's brigade about 300 yards behind (Geary, Cobham, Ireland). Walthall's main line and camp are on the plateau west of the Cravens house, Moore's brigade in the trenches about 400 yards south of the house and Gibson's two guns in its yard (Walthall, Moore, Jackson, Gibson). Woods and Grose cross at Woods's pole bridge at 11:00; part of Williamson's brigade follows; Pettus's three regiments come down the Summertown road at 13:15 (Disputed: 13:00 to after 14:00). Sahm's and Wiedrich's guns fire from the hills west of the creek. The peach orchard, stone wall and road junction are not located. All positions Inferred.",
         "strengthNote": "Cobham, Ireland and Candy are Geary's own table of the force engaged (OCR-garbled, Inferred); Whitaker's 1,465 is in both Cruft's and Geary's reports (Verified); Grose's 1,624 is Disputed against his own 1,693. Woods and Williamson are Osterhaus's regimental figures less the regiments he says stayed with the batteries until evening (Estimated). Walthall's 1,489 and Moore's 1,205 are 20 November effective totals quoted by Jackson (Inferred); Pettus's 1,158 is the 14 December return plus his losses (Estimated). Crews are a game value of 20 per gun.",
-        "historyNote": "Geary's, Cruft's and Osterhaus's brigades took the Cravens House bench by about 13:00-14:00 and held a line 400-500 yards beyond it in the fog; Walthall's brigade lost 845 men captured, Moore and Pettus held a second line until Bragg ordered the mountain abandoned, and the Confederates were gone by the early hours of 25 November."
+        "historyNote": "Geary's, Cruft's and Osterhaus's brigades took the Cravens House bench by about 13:00-14:00 and held a line 400-500 yards beyond it in the fog; Walthall's brigade lost 845 men captured, Moore and Pettus held a second line until Bragg ordered the mountain abandoned, and the Confederates were gone by the early hours of 25 November.",
+        "history": {
+          "outcome": [
+            "Union victory on the bench. By about 13:00-14:00 the Cravens House and its works were in Union hands, and Hooker's line stood 400-500 yards beyond it, its right on the palisades and its left near the mouth of Chattanooga Creek, held through the night in fog and cold.",
+            "Walthall's brigade lost most of its men as prisoners. Moore's and Pettus's brigades held a second line south of the house until Bragg's 14:30 order to withdraw, and the Confederates were off the mountain by about 02:00 on 25 November, under fog and a lunar eclipse. The 8th Kentucky planted the first flag on Lookout Point at sunrise."
+          ],
+          "casualties": {
+            "US": [362,710],
+            "CS": 1251,
+            "basis": "Union losses are Disputed, 362 to 710 by source; Wikipedia gives 671 (89 killed, 471 wounded, 111 captured or missing, citing OR p.83). Confederate losses were mostly prisoners: 1,251, of them 1,064 captured or missing (Wikipedia); Jackson's own report counts 1,044 captured (845 from Walthall, 199 from Moore) of 2,694 effective men on the bench, plus Pettus's 56.",
+            "provenance": "Disputed"
+          },
+          "closingQuote": {
+            "text": "The movements of the enemy were very rapid. An impenetrable fog hung around the mountain all day.",
+            "who": "Brig. Gen. John K. Jackson, C.S.A., commanding Cheatham's division, closing his report on \"the unfortunate disaster on Lookout Mountain\"",
+            "source": "report of 21 December 1863, Official Records Ser. I Vol. XXXI Pt. 2, p. 691"
+          },
+          "sources": [
+            {
+              "label": "Cozzens, The Battles for Chattanooga (NPS Civil War Series 9), sec5",
+              "url": "https://npshistory.com/publications/civil_war_series/9/sec5.htm"
+            },
+            {
+              "label": "Official Records Ser. I Vol. XXXI Pt. 2 (Hooker, Geary, Cruft, Walthall and Jackson reports; OCR text)",
+              "url": "https://archive.org/details/warofrebellion312unit"
+            },
+            {
+              "label": "American Battlefield Trust, Lookout Mountain map (24 November 1863)",
+              "url": "https://www.battlefields.org/learn/maps/chattanooga-lookout-mountain-nov-24-1863"
+            },
+            {
+              "label": "NPS Historical Handbook 25, Chickamauga and Chattanooga",
+              "url": "https://www.npshistory.com/handbooks/historical/25/hh25j3.htm"
+            },
+            {
+              "label": "Wikipedia, Battle of Lookout Mountain",
+              "url": "https://en.wikipedia.org/wiki/Battle_of_Lookout_Mountain"
+            }
+          ]
+        }
       }
     },
     {
@@ -1814,7 +1884,42 @@
         ],
         "positionsNote": "The Union line runs from Baird's division on the left (Phelps, Van Derveer, Turchin) through Wood's (Beatty, Willich, Hazen) in front of Orchard Knob and Sheridan's (Wagner, Harker, F. T. Sherman) to Carlin on the right, about 1,200 yards from the ridge (NPS; Van Derveer). On the ridge from north to south: Vaughan, Deas (in the base pits) with Waters's battery, Manigault, Tucker at the Bird's Mill Road, Bate's brigade under Tyler and the Florida brigade at the base south of the break, Cobb's battery beside Bragg's headquarters, then Strahl and Stovall (NPS; Wikipedia). The terrain ends about 150 m south of the Bragg Reservation, so Strahl and Stovall (south of headquarters) are drawn at the south edge beside it and Carlin (toward Rossville Gap) at the south-west edge, all compressed; the Bird's Mill Road is the terrain's modern alignment, about 1.2 km north of Bragg's headquarters. All positions Inferred.",
         "strengthNote": "Van Derveer's 1,679 is his table of the force engaged (Inferred); Wagner's about 2,000 is Disputed against about 1,800. Hazen is his 2,256 less his 23 November losses; Willich and Beatty split Wood's 5,200 by regiment; Harker and Sherman halve Sheridan's 6,000 less Wagner; Turchin, Phelps and Carlin use a pooled 244.8 men per regiment (all Estimated). No Confederate brigade strength for 25 November was found: all eight are a flat 1,260 (Estimated, likely high for the consolidated Tennessee and Florida brigades; NPS gives about 16,000 Confederates on the ridge, Wikipedia about 20,000, Disputed). Crews are a game value of 20 per gun. No Union battery is named in the sources for this sector, so none is fielded.",
-        "historyNote": "The Union centre took the base rifle pits and then the crest in about an hour; the line first broke at the Bird's Mill Road a few minutes before 17:00, Harker's brigade took Cobb's battery beside Bragg's headquarters, and Bragg's army retreated toward Dalton, its centre broken."
+        "historyNote": "The Union centre took the base rifle pits and then the crest in about an hour; the line first broke at the Bird's Mill Road a few minutes before 17:00, Harker's brigade took Cobb's battery beside Bragg's headquarters, and Bragg's army retreated toward Dalton, its centre broken.",
+        "history": {
+          "outcome": [
+            "The Union centre took the rifle pits at the foot of the ridge and then the crest in about an hour. The Confederate line first broke at the Bird's Mill Road breastworks about 17:00 and the centre collapsed by about 17:30-18:00; Cobb's battery near Bragg's headquarters was captured.",
+            "Bragg's army retreated toward Dalton. Cleburne's stands at Tunnel Hill and Ringgold Gap kept it from complete ruin but did not change the collapse of the centre. In the three days about 40 Confederate guns were lost."
+          ],
+          "casualties": {
+            "US": null,
+            "CS": null,
+            "basis": "No figure covers the assault alone. Wagner's brigade lost 730, the most of any brigade (NPS Series); Sheridan's division 1,346 (NPS Series) or 1,256 (American Battlefield Trust); Wood's division 1,001 (ABT). Campaign totals for 23-25 November: Union 686 killed, 4,329 wounded and 322 missing (NPS Series); Confederate 6,667, of them 4,146 missing or captured.",
+            "provenance": "Disputed"
+          },
+          "closingQuote": {
+            "text": "By whose orders are those troops going up the hill?",
+            "who": "Ulysses S. Grant, to Thomas, as the Union lines climbed past the rifle pits",
+            "source": "American Battlefield Trust, Chattanooga (wording as quoted there; Wikipedia and the NPS Series paraphrase the same exchange)"
+          },
+          "sources": [
+            {
+              "label": "Cozzens, The Battles for Chattanooga (NPS Civil War Series 9), sec7",
+              "url": "https://npshistory.com/publications/civil_war_series/9/sec7.htm"
+            },
+            {
+              "label": "American Battlefield Trust, Chattanooga",
+              "url": "https://www.battlefields.org/learn/civil-war/battles/chattanooga"
+            },
+            {
+              "label": "Wikipedia, Battle of Missionary Ridge",
+              "url": "https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge"
+            },
+            {
+              "label": "War Department / NPS, The Campaign for Chattanooga",
+              "url": "https://npshistory.com/publications/chch/wardept/cc2.htm"
+            }
+          ]
+        }
       }
     }
   ]

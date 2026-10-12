@@ -251,6 +251,24 @@ const PHASE1 = {
   positionsNote: 'Drawn about 600-800 m north of the sourced ground: the terrain asset ends at 35.8496 N, about 400 m short of the Gresham Lane - Franklin Road junction where NPS places the start of the attack. Johnson\'s brigades stand along Gresham Lane with Willich refused on the right and Baldwin in reserve, Davis\'s three brigades between them and the Wilkinson Pike (Johnson and Davis reports; NPS). McCown\'s three brigades start south-west of the Union right and step off at 06:15; Cleburne\'s four arrive behind them from 06:30 (he was 500-600 yards back at dawn). All positions Inferred.',
   strengthNote: 'Only Willich (2,458, Gibson) and Cleburne\'s brigades (Hardee\'s present-for-duty return) have sourced strengths. Kirk and Baldwin split NPS\'s 6,200 for Johnson\'s division by regiment count; Davis\'s brigades use Johnson\'s per-regiment average; McCown\'s brigades split 3,921 (Hardee\'s 10,045 less Cleburne\'s 6,124) over 13 regiments and battalions. Battery guns are estimates from Barnett\'s division totals except Simonson\'s and Humphreys\'s; crews are a game value of 20 per gun. Wharton\'s 2,000 cavalry are not fielded (the engine has no cavalry).',
   historyNote: 'McCown\'s and Cleburne\'s divisions broke Kirk\'s and Willich\'s brigades within minutes of 06:22 (Willich was captured and Kirk badly wounded) and drove the Union right back nearly a mile by 08:00, but the wing re-formed on the Nashville Pike and railroad and did not collapse.',
+  // After-action "what really happened" and "you vs history" (SR1 research: historicalOutcome, casualtiesNote, quote).
+  history: {
+    outcome: [
+      'The Union right wing was broken. Kirk was mortally wounded and Willich captured; Edgarton\'s battery was taken outright, and Goodspeed\'s and Simonson\'s each lost guns. Five brigades were in retreat within about an hour, and the line was pushed back nearly a mile by about 08:00 (NPS) and to the railroad and the Nashville Pike by about 10:00.',
+      'The wing did not collapse. Sheridan\'s stand in the cedars and the defence of the Round Forest kept the Nashville Pike, and Bragg withdrew from Murfreesboro on the night of 3 January.',
+    ],
+    casualties: { US: null, CS: null, provenance: 'Disputed',
+      basis: 'No clean split exists for this window. Johnson\'s division reported 260 killed, 1,005 wounded and 1,280 missing for 31 December (OR XX/1 p.297, which points to a revised statement); Davis\'s division lost 1,414 over the whole campaign. Prisoners: about 1,000 and 8 guns in McCown\'s first sweep (NPS) against over 3,000 and 28 guns across the whole right by 10:00 (Wikipedia); not reconciled. The Confederate tables (Hardee, OR pp.779-780) are unreadable in the OCR.' },
+    closingQuote: { text: 'These troops seemed not to have been fully prepared for the assault, and, with little or no resistance, retreated from their position, leaving their artillery in the hands of the enemy.',
+      who: 'Brig. Gen. Jefferson C. Davis, commanding the neighbouring division, on Willich\'s and Kirk\'s brigades (a partisan view of Johnson\'s men)',
+      source: 'report, OR Ser. I Vol. XX Pt. 1, p. 264 (OCR transcription; wording not checked against the page image)' },
+    sources: [
+      { label: 'Cozzens, The Battle of Stones River (NPS Civil War Series 23), "Dawn Attack on the Union Right"', url: 'https://npshistory.com/publications/civil_war_series/23/sec4.htm' },
+      { label: 'Official Records Ser. I Vol. XX Pt. 1 (Johnson, Davis and Hardee reports; OCR scan)', url: OR_URL },
+      { label: 'American Battlefield Trust, "I Will Die Right Here"', url: 'https://www.battlefields.org/learn/articles/i-will-die-right-here' },
+      { label: 'Wikipedia, Battle of Stones River', url: 'https://en.wikipedia.org/wiki/Battle_of_Stones_River' },
+    ],
+  },
   units: [
     { id: 'us-kirk-brigade', men: 2079, weapon: 'rifled', xp: 2, at: { near: 'greshamLane', bearing: 345, m: 360 }, bearing: 190,
       sources: [OR('pp. 295-296 (Johnson: Kirk placed with left on Davis\'s right, right refused)'), OR('p. 264 (Davis)'), OR('pp. 304-307 (Gibson)'), CWS(4, '6,200 infantry in Johnson\'s division; Kirk struck in the thigh'), OR('pp. 331, 342, 343 (34th Illinois 354; 30th Indiana 487; 77th Pennsylvania 288; cross-check only)'), WIKI_US],
@@ -377,6 +395,24 @@ const PHASE2 = {
   positionsNote: 'Sheridan\'s third position about 09:00 is the opening line: Roberts astride the Wilkinson Pike with Houghtaling at the angle, Sill\'s brigade (Greusel) by the Harding farm, Schaefer behind facing west, Hescock and Bush on the knoll before Negley\'s right, Negley\'s brigades on the left facing south (Sheridan, Negley, Miller; Cozzens). Rousseau\'s Regulars and John Beatty enter the cedars at 09:30 with Guenther\'s battery sent to the open ground by the Nashville Pike. Withers\'s and Cheatham\'s brigades start south of the cotton field and Harding farm; Cleburne\'s three come from the west. The Harding house, brick kiln, Smith\'s house and the "log house" are not located. All positions Inferred.',
   strengthNote: 'Sheridan\'s, Rousseau\'s and Negley\'s brigades are Rosecrans\'s and Negley\'s own tables read on the page images (single sources, Inferred or Disputed by a few men); the Regulars are 1,566 less Guenther\'s 123 gunners. Withers\'s three brigades split his division\'s 7,774 over 21 organizations (Estimated); Cheatham\'s are his engaged table less each attached battery. Clock times between reports differ by up to 30 minutes (Disputed).',
   historyNote: 'Sheridan\'s, Negley\'s and Rousseau\'s brigades held the cedars for about two hours against piecemeal attacks, then, out of ammunition, fell back to the Nashville Pike about 11:00, leaving Houghtaling\'s six guns behind; Sill, Roberts and Schaefer were killed.',
+  // After-action history (SR2 research).
+  history: {
+    outcome: [
+      'The stand in the cedars lost its ground but did its job. Between about 10:45 and noon Sheridan\'s, Negley\'s and Rousseau\'s brigades, their ammunition gone, were driven through the cedar brake to the Nashville Pike, leaving Houghtaling\'s six guns, two of Bush\'s and about six of Negley\'s behind.',
+      'The NPS judges that the delay held nearly half of Bragg\'s army for two hours, and Sheridan wrote that it "gave time for a rearrangement of our lines". Rosecrans formed a new line along the pike that held through the afternoon; the Confederates never reached the pike or the railroad in strength.',
+    ],
+    casualties: { US: null, CS: null, provenance: 'Inferred',
+      basis: 'No clean figures exist for this phase; these are whole-day totals for 31 December. Union: Sheridan\'s division 1,630 by his report (Sill, Roberts and Schaefer all killed); Shepherd\'s Regulars 22 officers and 508 men killed and wounded. Confederate: Vaughan\'s brigade 705 of 1,813; Lucius Polk\'s 346 of 1,343. Whole battle (American Battlefield Trust): Union 12,906, Confederate 11,739.' },
+    closingQuote: { text: 'There was no sign of faltering with the men, the only cry being for more ammunition, which unfortunately could not be supplied, on account of the discomfiture of the troops on the right of our wing, which allowed the enemy to come in and capture our ammunition train.',
+      who: 'Brig. Gen. Philip H. Sheridan', source: 'report of 9 January 1863, OR Ser. I Vol. XX Pt. 1, No. 50, p. 349' },
+    sources: [
+      { label: 'Cozzens, The Battle of Stones River (NPS Civil War Series 23), "Sheridan\'s Stand"', url: 'https://npshistory.com/publications/civil_war_series/23/sec5.htm' },
+      { label: 'Cozzens, The Battle of Stones River (NPS Civil War Series 23), "The Right Redeemed"', url: 'https://npshistory.com/publications/civil_war_series/23/sec6.htm' },
+      { label: 'NPS Stones River Tour Stop 2, The Slaughter Pen', url: 'https://www.nps.gov/stri/learn/photosmultimedia/battle_stop2.htm' },
+      { label: 'Official Records Ser. I Vol. XX Pt. 1 (Sheridan, Bradley, Thomas and Negley reports; OCR scan)', url: OR_URL },
+      { label: 'American Battlefield Trust, Stones River', url: 'https://www.battlefields.org/learn/civil-war/battles/stones-river' },
+    ],
+  },
   units: [
     { id: 'us-roberts-brigade', men: 1520, weapon: 'rifled', xp: 2, at: { near: 'slaughterPen', bearing: 200, m: 360 }, bearing: 200,
       sources: [OR('No. 50 (Sheridan); No. 61 (Bradley)'), OR('p. 200 (Rosecrans\'s effective-force table, page image: 1,520)'), MASTERS, CWS(5, 'Sheridan\'s Stand'), NPS_STOP2, WIKI_US],
@@ -515,6 +551,22 @@ const PHASE3 = {
   positionsNote: 'Hazen holds the copse at the Hazen Brigade Monument between the Nashville Pike and the railroad, with Parsons\'s, Cockerill\'s and Estep\'s guns beside him, Grose in reserve behind, Wagner and Cox between the railroad and the river, and Hascall coming up from the river crossing (Hazen, Grose, Wagner, Hascall, Race reports). Cruft\'s remnant reaches the pike at noon. Chalmers starts behind his rifle pit in the open field south-east of the copse with Donelson behind; Jackson and Adams cross from the east bank about 13:00 and Preston and Palmer about 15:30. The burnt Cowan house is placed at North Thompson Lane (Disputed). All positions Inferred.',
   strengthNote: 'Union strengths are single commanders\' figures (Hazen, Grose and Cruft from leaving camp on 26 December; Wagner and Hascall engaged). Chalmers\'s 2,000 is Cozzens\'s round figure; Donelson\'s about 1,400 is his own; Breckinridge\'s four brigades are Bragg\'s Inclosure C. Battery guns rest on Bearss and one NPS wayside; crews are a game value of 20 per gun. First-assault clock times differ between 09:00, 10:00 and 11:00 (Disputed).',
   historyNote: 'Hazen\'s brigade, with Hascall, Grose, Wagner and the massed batteries, threw back four Confederate attacks between about 10:00 and 16:00 and ended the day "not a stone\'s throw" from where it began: the one part of the original Union line never given up.',
+  // After-action history (SR3 research).
+  history: {
+    outcome: [
+      'The Union held. Four Confederate attacks (Chalmers; Donelson; Adams and Jackson; Preston and Palmer) were driven off by Hazen, Hascall, Grose, Wagner and the batteries in the angle of the pike and the railroad, and Hazen\'s brigade ended the day "not a stone\'s throw from where it was posted in the morning".',
+      'The Confederates took the Cowan house and held the cedars to the west but never carried the copse or the pike. Bragg did not renew the infantry attack on 1 January; Rosecrans stayed, and the armies held their lines until Breckinridge\'s attack at McFadden\'s Ford on 2 January.',
+    ],
+    casualties: { US: null, CS: null, provenance: 'Disputed',
+      basis: 'These are whole-day figures for 31 December; no Round Forest-only split exists. Union: Hascall 379 of 1,525; Wagner 375 of 1,475; Grose 659; Cruft 417 of 1,207. Confederate: Chalmers 672; Donelson 691 of about 1,400; Jackson 307 of 874; Adams 544 by Bragg\'s return (426 by Cozzens); Preston 163 or 155.' },
+    closingQuote: { text: 'We had sustained ourselves and held the only position of the original line of battle that was held throughout by any portion of the army.',
+      who: 'Brig. Gen. Milo S. Hascall', source: 'report, OR Ser. I Vol. XX Pt. 1, No. 97 (OCR text)' },
+    sources: [
+      { label: 'Cozzens, The Battle of Stones River (NPS Civil War Series 23), "Redundant Slaughter in the Round Forest"', url: 'https://npshistory.com/publications/civil_war_series/23/sec7.htm' },
+      { label: 'NPS Stones River, Hell\'s Half Acre', url: 'https://www.nps.gov/stri/learn/historyculture/hellshalfacre.htm' },
+      { label: 'Official Records Ser. I Vol. XX Pt. 1 (Hazen, Hascall, Blake, Polk and Hardee reports; OCR scan)', url: OR_URL },
+    ],
+  },
   units: [
     { id: 'us-hazen-brigade', men: 1391, weapon: 'rifled', xp: 2, at: { near: 'hazen', bearing: 315, m: 30 }, bearing: 150,
       sources: [OR('No. 129 (Hazen, pp. 543-546: an effective aggregate of 1,391 leaving Nashville)'), ABT_HAZEN, NPS_HHA, CWS(7), WIKI_US],
@@ -617,6 +669,23 @@ const PHASE4 = {
   positionsNote: 'Beatty\'s division holds the wooded crest about half a mile south-east of the ford across Stones River (Price on the river bluff, Fyffe on his left, Grider in reserve near the Hoover house, Grose covering the left) with the 3rd Wisconsin Battery by the Hoover house; Cruft\'s brigade lies among Mendenhall\'s guns on the hill west of the ford, which runs south-west from Negley\'s batteries by the ford through Swallow, Parsons and Osburn (Bearss). The 6th Ohio and 26th Pennsylvania batteries stand near the railroad about a mile south-west. Estep\'s, the Board of Trade and Standart\'s batteries come up after the attack starts; Negley\'s Miller and Stanley cross at 16:30. Breckinridge\'s two lines start at the edge of the woods about 1,600 yards south of the crest. The Hoover house and the cornfield edges are not located. All positions Inferred.',
   strengthNote: 'No Union brigade strength for 2 January was found. Price, Fyffe and Grider are Estimated from Price\'s two reported regiments; Grose is his own figures less his 31 December losses; Cruft is his "about 500"; Miller and Stanley are their 31 December strengths less Miller\'s "over 500" loss rate. Confederate strengths are 31 December present-for-duty less 31 December losses (Bragg\'s Inclosure C), so Disputed against Breckinridge\'s "some 4,500" and Bragg\'s "over 6,000". Gun counts are Bearss\'s 57 (45 on the ridge with the 3rd Wisconsin, 12 enfilading); crews are a game value of 20 per gun except Semple\'s.',
   historyNote: 'Breckinridge\'s division took the crest east of McFadden\'s Ford soon after 16:00 but was broken within the hour by about 57 Union guns and Negley\'s counterattack across the ford, losing 1,338 to about 1,800 men; Bragg withdrew from Murfreesboro on the night of 3-4 January.',
+  // After-action history (the SR4 packet carried inside the SR3 research file's gaps).
+  history: {
+    outcome: [
+      'Breckinridge\'s assault broke Price\'s and Grider\'s brigades, drove Beatty\'s division and Grose back to the river and the Hoover house, and took the crest. Then it collapsed under about 57 Union guns, Cruft\'s and Negley\'s musketry, and a counterattack by Miller\'s and Stanley\'s brigades with the rallied fragments of Grider\'s and Price\'s.',
+      'Breckinridge\'s division was thrown back to its starting woods in about an hour, losing three (or four) guns; Hanson was mortally wounded. On the night of 3-4 January Bragg withdrew from Murfreesboro.',
+    ],
+    casualties: { US: null, CS: [1338, 1800], provenance: 'Disputed',
+      basis: 'Breckinridge\'s division on 2 January: 1,338 by Bragg\'s return (Inclosure C: Pillow 402, Preston 376, Adams/Gibson 159, Hanson 401); about 1,700 by Breckinridge; about 1,800 by the American Battlefield Trust (36% of 5,000) and Wikipedia. No Union figure for 2 January was found.' },
+    closingQuote: { text: 'the ground we had won was commanded by the enemy\'s batteries, within easy range, on better ground, upon the other side of the river',
+      who: 'Maj. Gen. John C. Breckinridge, C.S. Army', source: 'report, OR Ser. I Vol. XX Pt. 1, No. 225, p. 786 (OCR text)' },
+    sources: [
+      { label: 'Cozzens, The Battle of Stones River (NPS Civil War Series 23), sec9', url: 'https://npshistory.com/publications/civil_war_series/23/sec9.htm' },
+      { label: 'Bearss, Union Artillery and Breckinridge\'s Attack (NPS 1959)', url: 'https://npshistory.com/publications/stri/union-artillery-breckinridge-attack.pdf' },
+      { label: 'Official Records Ser. I Vol. XX Pt. 1 (Breckinridge, Bragg\'s Inclosure C, Price, Negley and Mendenhall; OCR scan)', url: OR_URL },
+      { label: 'American Battlefield Trust, Stones River', url: 'https://www.battlefields.org/learn/civil-war/battles/stones-river' },
+    ],
+  },
   units: [
     { id: 'us-price-brigade', men: 1603, weapon: 'rifled', xp: 2, at: { near: 'artilleryMonument', bearing: 115, m: 850 }, bearing: 180,
       sources: [OR('No. 159 (Price)'), OR('No. 160 (Mullen, 35th Indiana: 272); No. 164 (Cummins, 99th Ohio: 369)'), OR('No. 144 (Beatty)'), BEARSS(), WIKI_US],

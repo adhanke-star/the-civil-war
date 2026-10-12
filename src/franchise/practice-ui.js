@@ -1,6 +1,7 @@
 // Same-page result -> reward -> single completed-progress store. The battlefield is inert during loot.
 import { createProgressStore, completedSnapshot, exportSnapshot } from './save.js';
-import { practiceOutcome, savedOutcome, assertSavedLaunch, surrenderOutcome } from './practice.js';
+import { practiceOutcome, savedOutcome, assertSavedLaunch, surrenderOutcome, historyComparison } from './practice.js';
+import { attachRecorder, validateReplay } from '../sim/recorder.js';
 import { mountReward, configureRewardReplay, surrenderReportText } from '../reward/sequence.js';
 import { phaseResult, recordPhase } from './campaign.js';
 import { rewardArmy, applyRewardIssues } from '../ui/briefing.js';
@@ -12,6 +13,7 @@ function pointsOf(campaign, phase) {
   try { return phase ? phaseSummary(campaign.save, phase.next) : null; } catch { return null; }
 }
 const pointsWords = (p) => !p ? '' : ` Requisition points: +${p.points}${p.levelUp ? `; reputation level ${p.levelUp.to} reached` : ''} (game rule).`;
+const REWARD_GRADES = { decisive: 'Decisive', victory: 'Victory', draw: 'Draw', defeat: 'Defeat' };
 
 // campaign: main.js's launch { slot, store, save, raw, phase } for a ?campaign=<slot> phase; the result records the
 // phase (losses, loot, history) into that slot through the same pending/save/recover panels.
@@ -33,6 +35,12 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null,
   replayButton.textContent = 'Replay this phase'; replayButton.hidden = true;
   if (campaign) action.after(replayButton); // campaign routes only: other result dialogs keep their exact actions
   const campHref = campaign ? `./?camp=${campaign.slot}` : './?camp';
+  // A battle-pack phase (campaign or Battles menu) records the 30-second map replay from its opening positions
+  // (src/sim/recorder.js; it reads the field and changes nothing) and offers "you vs history" after the result.
+  const packPhase = !!scenario.attacker && !manifest && (!!campaign || mode === 'historical');
+  if (packPhase) attachRecorder(game);
+  /** The replay page's data: the validated track, the field's terrain and woods (null when nothing was recorded). */
+  const replayFor = (track) => (track ? { track, terrain: game.terrain ?? null, woods: (scenario.woods || []).map((w) => w.polygon) } : null);
   let phase = null, phaseFailure = null, issueNote = '';
   const after = document.getElementById('after-action');
   let captured = false, outcome = null, pending = null, saved = null, previous = null, failure = null, reward = null, baselineKnown = false;
@@ -97,13 +105,21 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null,
   function showSaved() {
     if (campaign) {
       const done = saved.campaign.status === 'complete', defeat = phase.record.grade === 'Defeat';
+      // The ladder's last phase: the after-action ends with the campaign ending (grade, medals, epilogue; src/ui/records.js).
+      const ending = done && campaign.phase.isLast === true;
       panel('Campaign saved', `${scenario.title}: ${phase.record.grade}${campaign.phase.replay ? ' (replay, marked on your record)' : ''}. ${saved.depot.length} cards are in your depot${saved.rp === undefined ? '' : ` and ${saved.rp.toLocaleString()} requisition points to spend in camp`}.${issueNote} ${done ? 'The campaign is complete; your camp shows the record.' : 'Return to camp for the next phase.'}${defeat ? ' You may replay this phase; the replay is marked on your record.' : ''}`,
-        'Return to camp', () => location.assign(campHref), { exportable: true });
+        ending ? 'Campaign ending' : 'Return to camp', ending ? openEnding : () => location.assign(campHref), { exportable: true });
       replayButton.hidden = !defeat;
       return;
     }
     panel('Army saved', `${saved.army.reduce((n, b) => n + b.men, 0).toLocaleString()} surviving men and ${saved.depot.length} depot cards are saved. Continue opens your saved army in camp.${manifest ? ' Compare and issue new gear there.' : ' Fresh practice starts with its original troops and gear.'}`,
       'Continue', () => location.assign('./?camp'), { exportable: !!manifest });
+  }
+  function openEnding() {
+    if (!saved || saved.version !== 2) return;
+    dialog.close();
+    import('../ui/records.js').then((m) => m.openCampaignEnding(document.body, saved, { campHref, onClose: () => { if (!dialog.open) openResult(); } }))
+      .catch((err) => { hud.toast(err.message); openResult(); });
   }
   function recover() {
     panel(pending ? (campaign ? 'Campaign not saved' : 'Army not saved') : 'Progress unavailable', failure || 'Your completed army is waiting to be saved. Retry loading to review saved progress, or export this army.',
@@ -164,7 +180,7 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null,
           guns: us.reduce((n, u) => n + (u.guns || 0), 0), eyebrow: `Campaign · ${scenario.title}${campaign.phase.replay ? ' · replay' : ''}`,
           note: campaign.phase.loan ? "Grant's army was on loan: these numbers are its own and your franchise brigades are unchanged. Loot joins your depot."
             : 'Losses carry to your brigades. Loot joins your depot; issue it here or in camp. Ratings and loot are game values.',
-          points: pointsOf(campaign, phase) },
+          points: pointsOf(campaign, phase), history: phase.outcome.history ?? null, replay: replayFor(phase.outcome.replay) },
         onDone: (result) => {
           if (saving || !rewardActive || saved || pending) return;
           rewardActive = false;
@@ -205,6 +221,26 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null,
         try { pending = completedSnapshot(result); savePending(); }
         catch (err) { failure = err.message; recover(); }
       } });
+  }
+  /** Battles menu: the after-action pages (you vs history, what really happened, the replay) with no loot or save. */
+  function startHistoryAfterAction() {
+    if (rewardActive || !packPhase || campaign) return;
+    rewardActive = true; sync();
+    game.paused = true; hud.setPaused(true);
+    dialog.close(); field.inert = true;
+    const finish = () => { rewardActive = false; field.inert = false; sync(); openResult(); };
+    try {
+      const comparison = historyComparison({ game, scenario });
+      let track = null;
+      try { track = game.recorder ? validateReplay(game.recorder.track(game)) : null; } catch { track = null; } // no replay page then
+      reward = mountReward(document.body, { noLoot: true, grade: REWARD_GRADES[game.result.grade] || (game.result.winner === 'US' ? 'Victory' : game.result.winner === null ? 'Draw' : 'Defeat'),
+        rememberReplay: false, awardId: `battles-${scenario.id}`,
+        afterAction: { title: scenario.title, why: game.result.why, surviving: comparison.you.startUS - comparison.you.lossesUS, losses: comparison.you.lossesUS,
+          guns: game.units.filter((u) => u.side === 'US').reduce((n, u) => n + (u.alive && Array.isArray(u.gunSlots) ? u.gunSlots.filter((g) => g.alive).length : 0), 0),
+          eyebrow: `Battles · ${scenario.title}`, note: 'Historical battles grant no loot or franchise rewards.', badges: null,
+          history: comparison, replay: replayFor(track) },
+        onDone: finish });
+    } catch (err) { hud.toast(err.message); finish(); }
   }
   async function openLoot() {
     if (campaign) { if (pending) recover(); else startCampaignLoot(); return; }
@@ -250,7 +286,9 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null,
     const report = surrenderReportText(surrenderResult);
     // Battle-pack results may be a draw (winner null) and carry the player's grade.
     const heading = game.result.winner === 'US' ? 'Union victory' : game.result.winner === 'CS' ? 'Confederate victory' : 'Drawn battle';
-    panel(heading, report ? `${message} ${report}` : message, outcome ? 'Open the loot' : null, openLoot, { exportable: !!manifest && !!outcome });
+    const history = !outcome && packPhase && mode === 'historical';
+    panel(heading, report ? `${message} ${report}` : message, outcome ? 'Open the loot' : history ? 'After-action' : null, outcome ? openLoot : history ? startHistoryAfterAction : null,
+      { exportable: !!manifest && !!outcome });
   }
   function openCampaignResult() {
     const heading = game.result.winner === 'US' ? 'Union victory' : game.result.winner === 'CS' ? 'Confederate victory' : 'Drawn battle';

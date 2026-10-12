@@ -77,6 +77,30 @@ function battleFields(value) {
   if (own(value, 'retreat') && (!record(value.retreat) || Object.keys(value.retreat).some(key => !['US', 'CS'].includes(key) || !point(value.retreat[key])))) fail('retreat points are invalid.');
   if (own(value, 'season') && !['summer', 'spring', 'autumn', 'winter'].includes(value.season)) fail('season is unsupported.');
   if (own(value, 'menPerFigure')) phaseMenPerFigure(value);
+  if (own(value, 'history')) phaseHistory(value.history);
+}
+// Optional scenario.history (the after-action's "what really happened" and "you vs history"): 1-3 outcome paragraphs,
+// the historical casualties (null, a whole number or a [low, high] range per side, with the basis and a provenance word),
+// the closing quotation with its source, and 1-16 sources ({ label, url? }, http(s) links only). Display data only.
+export const HISTORY_LIMITS = Object.freeze({ paragraphs: 3, paragraph: 1200, basis: 1500, quote: 600, sources: 16, label: 300 });
+export const HISTORY_PROVENANCE = Object.freeze(['Verified', 'Inferred', 'Disputed', 'Estimated']);
+const bounded = (v, max) => text(v) && v.length <= max;
+const losses = v => v === null || (Number.isSafeInteger(v) && v > 0)
+  || (Array.isArray(v) && v.length === 2 && v.every(n => Number.isSafeInteger(n) && n > 0) && v[0] < v[1]);
+function phaseHistory(h) {
+  const keys = ['outcome', 'casualties', 'closingQuote', 'sources'];
+  if (!record(h) || Object.keys(h).length !== keys.length || keys.some(key => !own(h, key))) fail('history has unsupported fields.');
+  if (!Array.isArray(h.outcome) || !h.outcome.length || h.outcome.length > HISTORY_LIMITS.paragraphs
+    || !h.outcome.every(p => bounded(p, HISTORY_LIMITS.paragraph))) fail('history outcome needs 1 to 3 bounded paragraphs.');
+  const c = h.casualties;
+  if (!record(c) || Object.keys(c).length !== 4 || !['US', 'CS', 'basis', 'provenance'].every(key => own(c, key))) fail('history casualties have unsupported fields.');
+  if (!losses(c.US) || !losses(c.CS)) fail('history casualties must be null, a positive whole number or a [low, high] range.');
+  if (!bounded(c.basis, HISTORY_LIMITS.basis) || !HISTORY_PROVENANCE.includes(c.provenance)) fail('history casualties need a basis and a provenance word.');
+  const q = h.closingQuote;
+  if (!record(q) || Object.keys(q).length !== 3 || !['text', 'who', 'source'].every(key => bounded(q[key], HISTORY_LIMITS.quote))) fail('history closing quote needs its text, speaker and source.');
+  if (!Array.isArray(h.sources) || !h.sources.length || h.sources.length > HISTORY_LIMITS.sources
+    || !h.sources.every(s => record(s) && Object.keys(s).every(key => key === 'label' || key === 'url') && bounded(s.label, HISTORY_LIMITS.label)
+      && (!own(s, 'url') || (typeof s.url === 'string' && /^https?:\/\/[^\s]+$/.test(s.url) && s.url.length <= 400)))) fail('history sources need 1 to 16 labels with optional http(s) links.');
 }
 // The phase's minimum men per infantry figure. The drawn ratio is the larger of this and look.menPerFigure;
 // battery crews keep their fixed MEN_PER_CREW_FIGURE (4) whatever the phase says.

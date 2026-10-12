@@ -22,6 +22,13 @@
 //     static banner and no sting, 'off' shows none. badgeChip(entry, { button }) is the shared badge emblem (shape by
 //     category, tier letter and name: colour is never the only cue); brigCard shows the kept badges, the X-Factor and any
 //     badges waiting for the camp's choice.
+//   History (battle-pack phases): `afterAction.history` (src/franchise/practice.js historyComparison) adds "You vs history" to
+//     the after-action (between the grade and the points and badges) and, when it carries the phase's sourced `story`, a
+//     "What really happened" page (outcome, the closing quotation with its source, the sources with links);
+//     `afterAction.replay` ({ track, terrain?, woods? }; src/sim/recorder.js) adds the 30-second map replay page
+//     (src/ui/replay.js). Order: a (grade, you vs history, points, badges) -> h (what really happened) -> r (replay) -> loot.
+//     Each page's primary goes on; "Open the loot" (key S) skips straight to the loot from any of them. `noLoot: true`
+//     (the Battles menu) shows the same pages without loot: the last page's "Done" unmounts and calls onDone(null).
 //
 // State lives in one plain object (S). Settings come from src/settings.js (defineRewardSettings below);
 // the 'screens.cardStyle' choice can be split-screened through src/sandbox/compare.js.
@@ -34,6 +41,7 @@ import * as sfx from './sfx.js';
 import { validateSnapshot, completedSnapshot } from '../franchise/save.js';
 import { assertSavedReward } from '../franchise/practice.js';
 import { BADGE_BY_ID, TIER_NAMES, featText, effectText, badgeAward, BADGE_RULES_NOTE } from '../franchise/badges.js';
+import { mountReplay } from '../ui/replay.js';
 
 const STYLE_SLUG = { 'clean modern': 'modern', 'period desk': 'desk', hybrid: 'hybrid' };
 const BARS = [['fire', 'Fire'], ['melee', 'Melee'], ['morale', 'Morale'], ['drill', 'Drill']];
@@ -399,8 +407,9 @@ export function mountReward(root, opts = {}) {
   const grade = prepared?.snapshot.grade ?? completed?.grade ?? (GRADES.includes(opts.grade) ? opts.grade : 'Victory');
   const awardId = prepared?.snapshot.awardId ?? completed?.awardId ?? opts.awardId ?? `demo-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   const starting = opts.army ? completedSnapshot({ awardId, army: opts.army, depot: opts.depot ?? [], issued: [], seed, grade }) : null;
+  const noLoot = opts.noLoot === true && !prepared && !completed && opts.mode !== 'one';
   const loot = prepared ? { cards: prepared.cards, captures: prepared.captures.map((c) => c.tier) }
-    : completed ? { cards: [], captures: [] } : rollLoot({ seed, grade, captures: opts.captures, forceLegendary: !!opts.legendary });
+    : completed || noLoot ? { cards: [], captures: [] } : rollLoot({ seed, grade, captures: opts.captures, forceLegendary: !!opts.legendary });
   let cards = loot.cards;
   if (starting) cards = cards.map((c) => ({ ...c, uid: `${awardId}.${c.uid}` }));
   if (opts.mode === 'one') {
@@ -500,12 +509,39 @@ export function mountReward(root, opts = {}) {
     const k = btn.querySelector('kbd');
     if (k) k.textContent = kbd;
   }
+  // ---- after-action pages (a, then h and r when the phase has history and a replay) ----
+  const vsHistory = opts.afterAction?.history && typeof opts.afterAction.history === 'object' ? opts.afterAction.history : null;
+  const story = vsHistory?.story && Array.isArray(vsHistory.story.outcome) ? vsHistory.story : null;
+  const replayOpt = opts.afterAction?.replay?.track ? opts.afterAction.replay : null;
+  const PAGES = ['a', ...(story ? ['h'] : []), ...(replayOpt ? ['r'] : [])];
+  const PAGE_LABEL = { h: 'What really happened', r: 'Watch the replay', b: 'Open the loot', end: 'Done' };
+  const nextPage = (step) => { const i = PAGES.indexOf(step); return i >= 0 && i < PAGES.length - 1 ? PAGES[i + 1] : noLoot ? 'end' : 'b'; };
+  function advance(from) {
+    const next = nextPage(from);
+    if (next === 'end') { finishPages(); return; }
+    if (next === 'b') sfx.play('whoosh');
+    go(next);
+  }
+  function skipToLoot() { if (noLoot) finishPages(); else { sfx.play('whoosh'); go('b'); } }
+  function finishPages() { const cb = S.onDone; unmount(); if (typeof cb === 'function') cb(null); }
+  /** The page foot: the primary goes on to the next page; a secondary "Open the loot" skips the rest (never on the last page). */
+  function pageFoot(step) {
+    const next = nextPage(step);
+    const btn = primary(PAGE_LABEL[next], () => advance(step));
+    const skip = next !== 'b' && !noLoot ? el('button', { type: 'button', class: 'rw-secondary rw-skip' }, el('span', { text: 'Open the loot' }), el('kbd', { 'aria-hidden': 'true', text: 'S' })) : null;
+    if (skip) skip.addEventListener('click', skipToLoot);
+    return el('div', { class: `rw-foot${skip ? ' has-skip' : ''}` }, skip, btn);
+  }
+
   function go(step) {
     S.step = step;
     rootEl.dataset.step = step;
+    if (S.replayUi) { S.replayUi.destroy(); S.replayUi = null; }
     stage.replaceChildren();
     S.ui.deal = S.ui.grid = S.ui.tray = null;
     if (step === 'a') renderAfterAction();
+    else if (step === 'h') renderStory();
+    else if (step === 'r') renderReplay();
     else if (step === 'b') renderReveal();
     else if (step === 'c') renderIssue();
     else if (step === 'd') renderCounts();
@@ -521,27 +557,83 @@ export function mountReward(root, opts = {}) {
       crates.append(tint(el('li', { class: 'rw-crate', style: `--i:${i}` }, shapeIcon(tierId), el('span', { text: t.name })), tierId));
     });
     const nIssue = S.cards.filter((c) => c.source === 'issue').length;
-    const btn = primary('Open the loot', () => { sfx.play('whoosh'); go('b'); });
+    const foot = pageFoot('a');
     const sec = el('section', { class: 'rw-step rw-aar', 'aria-labelledby': 'rw-aar-grade' },
       el('p', { class: 'rw-eyebrow', text: opts.afterAction ? opts.afterAction.eyebrow ?? `Practice · ${opts.afterAction.title}` : 'After action · placeholder phase' }),
       el('h1', { class: 'rw-grade', id: 'rw-aar-grade', tabindex: '-1', 'data-grade': S.grade, text: S.grade }),
       el('p', { class: 'rw-grade-note', text: opts.afterAction?.why ?? GRADE_NOTES[S.grade] }),
       opts.afterAction ? el('p', { class: 'rw-hint', text: `${opts.afterAction.surviving.toLocaleString()} surviving men · ${opts.afterAction.losses.toLocaleString()} lost · ${opts.afterAction.guns} crewed guns. ${opts.afterAction.note ?? 'Practice rewards and ratings are game values; this does not record the historical outcome.'}` }) : null,
       opts.afterAction?.surrenderResult ? el('p', { class: 'rw-hint', text: surrenderReportText(opts.afterAction.surrenderResult) }) : null,
+      story ? vsBlock(vsHistory) : null,
       pointsBlock(opts.afterAction?.points),
       badgesBlock(award),
-      el('div', { class: 'rw-aar-stats' },
+      noLoot ? null : el('div', { class: 'rw-aar-stats' },
         el('p', { class: 'rw-aar-stat' }, el('b', { text: String(S.captures.length) }), el('span', { text: 'Captures' })),
         el('p', { class: 'rw-aar-stat' }, el('b', { text: String(nIssue) }), el('span', { text: 'Quartermaster issue' })),
         el('p', { class: 'rw-aar-stat' }, el('b', { text: String(S.cards.length) }), el('span', { text: 'Cards to open' }))),
-      S.captures.length ? crates : el('p', { class: 'rw-dim', text: 'No crates captured this phase.' }),
-      el('div', { class: 'rw-foot' }, btn));
+      noLoot ? null : S.captures.length ? crates : el('p', { class: 'rw-dim', text: 'No crates captured this phase.' }),
+      foot);
     stage.append(sec);
     sec.querySelector('.rw-grade').focus({ preventScroll: true });
     const p = opts.afterAction?.points;
-    announce(`${S.grade}. ${p ? `${p.points} requisition points; reputation ${p.reputation.to}, level ${p.level}.${p.levelUp ? ` Reputation level ${p.levelUp.to} reached; a reward card goes to your depot.` : ''} ` : ''}${S.captures.length} captures. ${S.cards.length} cards to open.`);
+    announce(`${S.grade}. ${p ? `${p.points} requisition points; reputation ${p.reputation.to}, level ${p.level}.${p.levelUp ? ` Reputation level ${p.levelUp.to} reached; a reward card goes to your depot.` : ''} ` : ''}${noLoot ? 'Historical battles grant no loot.' : `${S.captures.length} captures. ${S.cards.length} cards to open.`}`);
     if (p) later(() => countPoints(sec, p), ms(450));
     if (award) stampBadges(sec, award, !!p?.levelUp);
+  }
+
+  // ---- you vs history (battle-pack phases with a sourced history block) ----
+  const lossText = (v) => (v === null || v === undefined ? 'No sourced figure' : Array.isArray(v) ? `${fmtInt(v[0])}–${fmtInt(v[1])}` : fmtInt(v));
+  function vsBlock(c) {
+    const cas = c.history.casualties, mpf = c.scale.menPerFigure, ratio = c.scale.clockRatio;
+    const row = (label, you, past, key) => el('tr', { 'data-row': key }, el('th', { scope: 'row', text: label }), el('td', { text: you }), el('td', { text: past }));
+    const youLoss = (lost, start) => `${fmtInt(lost)} of ${fmtInt(start)}`;
+    const tag = cas ? ` (${cas.provenance})` : '';
+    return el('section', { class: 'rw-vs', 'aria-labelledby': 'rw-vs-title' },
+      el('h2', { class: 'rw-points-title', id: 'rw-vs-title', text: 'You vs history' }),
+      el('table', { class: 'rw-vs-table' },
+        el('thead', {}, el('tr', {}, el('td', {}), el('th', { scope: 'col', text: 'You' }), el('th', { scope: 'col', text: 'History' }))),
+        el('tbody', {},
+          row('Objective', c.result.why || (c.result.held ? `Union troops held ${c.objective}.` : `Union troops did not hold ${c.objective}.`), c.history.note || 'No sourced summary.', 'objective'),
+          row('Union losses', youLoss(c.you.lossesUS, c.you.startUS), cas ? lossText(cas.US) + (cas.US === null ? '' : tag) : 'No sourced figure', 'us'),
+          row('Confederate losses', youLoss(c.you.lossesCS, c.you.startCS), cas ? lossText(cas.CS) + (cas.CS === null ? '' : tag) : 'No sourced figure', 'cs'),
+          row('Clock', c.you.finishedAt ? `Ended at ${c.you.finishedAt}` : 'Ended', c.history.end ? `The day's window ends at ${c.history.end}` : 'No sourced time', 'clock'))),
+      cas ? el('p', { class: 'rw-dim rw-vs-basis' }, el('b', { text: `Historical losses (${cas.provenance}): ` }), cas.basis) : null,
+      el('p', { class: 'rw-dim rw-vs-scale', text: `The game is scaled: one figure stands for ${mpf} men, and the clock runs ${ratio} times faster than the day at 1x speed. Your losses are whole men in a compressed fight, so compare their size, not their hour.` }));
+  }
+
+  // ---- h. what really happened (sourced) ----
+  function renderStory() {
+    const q = story.closingQuote;
+    const links = el('ul', { class: 'rw-story-sources' }, ...story.sources.map((src) => el('li', {},
+      src.url && /^https?:\/\//.test(src.url) ? el('a', { href: src.url, target: '_blank', rel: 'noopener noreferrer', text: src.label }) : el('span', { text: src.label }))));
+    const sec = el('section', { class: 'rw-step rw-aar rw-story', 'aria-labelledby': 'rw-story-title' },
+      el('p', { class: 'rw-eyebrow', text: `What really happened · ${vsHistory.title}` }),
+      el('h2', { class: 'rw-title', id: 'rw-story-title', tabindex: '-1', text: 'What really happened' }),
+      el('div', { class: 'rw-story-text' }, ...story.outcome.map((p) => el('p', { text: p }))),
+      el('figure', { class: 'rw-quote' },
+        el('blockquote', {}, el('p', { text: q.text })),
+        el('figcaption', {}, el('span', { class: 'rw-quote-who', text: q.who }), el('cite', { text: q.source }))),
+      el('h3', { class: 'rw-story-h', text: 'Sources' }), links,
+      pageFoot('h'));
+    stage.append(sec);
+    sec.querySelector('#rw-story-title').focus({ preventScroll: true });
+    announce(`What really happened. ${story.outcome[0]}`);
+  }
+
+  // ---- r. the 30-second map replay ----
+  function renderReplay() {
+    const box = el('div', { class: 'rw-replay-box' });
+    const sec = el('section', { class: 'rw-step rw-aar rw-replay', 'aria-labelledby': 'rw-replay-title' },
+      el('p', { class: 'rw-eyebrow', text: `Replay · ${vsHistory?.title ?? opts.afterAction?.title ?? ''}` }),
+      el('h2', { class: 'rw-title', id: 'rw-replay-title', tabindex: '-1', text: 'The phase in 30 seconds' }),
+      el('p', { class: 'rw-hint', text: S.reduced ? 'Reduced motion: the replay starts paused. Step through it, or play it when you are ready.' : 'Space or the Play button pauses; Step moves one moment; the slider scrubs.' }),
+      box, pageFoot('r'));
+    stage.append(sec);
+    try {
+      S.replayUi = mountReplay(box, { track: replayOpt.track, terrain: replayOpt.terrain ?? null, woods: replayOpt.woods ?? [], reduced: S.reduced });
+    } catch (err) { box.append(el('p', { class: 'rw-dim', text: `The replay could not be drawn (${err.message}).` })); }
+    sec.querySelector('#rw-replay-title').focus({ preventScroll: true });
+    announce('Map replay of the phase.');
   }
 
   // ---- badges earned this phase (campaign phases; feats and effects are game rules) ----
@@ -1257,8 +1349,13 @@ export function mountReward(root, opts = {}) {
       return;
     }
 
-    if (S.step === 'a') {
-      if (key === 'Enter' && !native) { e.preventDefault(); sfx.play('whoosh'); go('b'); }
+    if (S.step === 'a' || S.step === 'h' || S.step === 'r') {
+      if (key === 'Enter' && !native) { e.preventDefault(); advance(S.step); return; }
+      if ((key === 's' || key === 'S') && !e.repeat && !noLoot && !(t && t.tagName === 'INPUT')) { e.preventDefault(); skipToLoot(); return; }
+      if (S.step === 'r' && S.replayUi && !native) {
+        if (key === ' ' || key === 'k' || key === 'K') { e.preventDefault(); if (!e.repeat) S.replayUi.toggle(); return; }
+        if (key === 'ArrowLeft' || key === 'ArrowRight') { e.preventDefault(); S.replayUi.step(key === 'ArrowLeft' ? -1 : 1); return; }
+      }
       return;
     }
 
@@ -1361,6 +1458,7 @@ export function mountReward(root, opts = {}) {
   function unmount() {
     if (S.dead) return;
     S.dead = true;
+    if (S.replayUi) { S.replayUi.destroy(); S.replayUi = null; }
     for (const id of S.timers) clearTimeout(id);
     for (const id of S.rafs) cancelAnimationFrame(id);
     cancelAnimationFrame(resizeRaf);

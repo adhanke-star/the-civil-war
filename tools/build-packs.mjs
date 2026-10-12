@@ -131,6 +131,17 @@ function unitRow(src, f, phase, resolve, extra) {
   return row;
 }
 
+/** A phase's history block in the engine's fixed key order (a copy; the curated source is never shared). */
+function historyBlock(h) {
+  const losses = (v) => (Array.isArray(v) ? [...v] : v ?? null);
+  return {
+    outcome: [...h.outcome],
+    casualties: { US: losses(h.casualties.US), CS: losses(h.casualties.CS), basis: h.casualties.basis, provenance: h.casualties.provenance },
+    closingQuote: { text: h.closingQuote.text, who: h.closingQuote.who, source: h.closingQuote.source },
+    sources: h.sources.map((s) => ({ label: s.label, ...(s.url ? { url: s.url } : {}) })),
+  };
+}
+
 /** Build one pack from its curated module (an object with id, title, terrain, landmarks, formations, phases). */
 export function buildPackFrom(src) {
   if (!PACK_ID.test(src.id)) throw new Error(`build-packs: invalid pack id "${src.id}"`);
@@ -185,6 +196,8 @@ export function buildPackFrom(src) {
       positionsNote: phase.positionsNote,
       strengthNote: phase.strengthNote,
       historyNote: phase.historyNote,
+      // the after-action's "what really happened" (src/sim/phase.js validates it); a phase without one shows none
+      ...(phase.history ? { history: historyBlock(phase.history) } : {}),
     };
     const sum = (rows, side, key) => rows.filter(u => !side || u.side === side).reduce((s, u) => s + (u[key] || 0), 0);
     report.push({ phase: phase.id, terrain, formations: roster.length, US: sum(roster, 'US', 'men'), CS: sum(roster, 'CS', 'men'), men: sum(roster, null, 'men'),

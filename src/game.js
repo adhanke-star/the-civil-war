@@ -1105,6 +1105,7 @@ export class Game {
     }
     this.xFactorStep();
     this.checkObjective(h, !!state && this.simTime === state.plan.horizon);
+    if (this.recorder) this.recorder.observe(this); // the after-action replay (src/sim/recorder.js): reads only
     } finally { if (guarded) state.capture.tickActive = false; }
   }
 

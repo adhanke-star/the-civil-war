@@ -49,6 +49,8 @@
 // `node tools/test.mjs --badges` runs the badges and X-Factor screens only (tools/test-badges-ui.mjs, also in shard 2): the badge
 // stamped in the after-action, the X-Factor moment once, the camp card emblem and its real example with sources, the keep
 // choice by keyboard, axe and 320 px.
+// `node tools/test.mjs --history` runs the after-action you-vs-history pages, the map replay, the record book and the
+// campaign ending only (tools/test-history-ui.mjs, also in shard 4).
 // `node tools/test.mjs --orders` runs the decision cards, camp orders, stores and upgrades UI only (tools/test-orders-ui.mjs,
 // also in shard 3).
 // `node tools/test.mjs --delegation` runs the delegation UI only (tools/test-delegation-ui.mjs, also in shard 3): select,
@@ -1783,6 +1785,7 @@ async function browserChecks(server, url) {
     // Imported on demand: its CPU half imports game modules that define settings, which would skew settingsUnit.
     if (process.argv.includes('--campaign')) { result.mode = 'campaign screens and flow'; const { campaignControls } = await import('./test-campaign-ui.mjs'); await campaignControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--badges')) { result.mode = 'badges and X-Factor'; const { badgesControls } = await import('./test-badges-ui.mjs'); await badgesControls({ browser, url, check, shot, result, watchErrors }); return; }
+    if (process.argv.includes('--history')) { result.mode = 'after-action history, replay, record book and ending'; const { historyControls } = await import('./test-history-ui.mjs'); await historyControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--orders')) { result.mode = 'decision cards and camp orders'; const { ordersControls } = await import('./test-orders-ui.mjs'); await ordersControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--economy')) { result.mode = 'requisition points and shop'; const { economyControls } = await import('./test-economy-ui.mjs'); await economyControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--packs-ui')) { result.mode = 'battle packs only'; const { packsUIControls } = await import('./test-packs-ui.mjs'); await packsUIControls({ browser, url, check, shot, result, watchErrors }); return; }
@@ -1850,6 +1853,8 @@ async function browserChecks(server, url) {
       await cavalryControls({ browser, url, check, shot, result, watchErrors });
       const { packsUIControls } = await import('./test-packs-ui.mjs');
       await packsUIControls({ browser, url, check, shot, result, watchErrors });
+      const { historyControls } = await import('./test-history-ui.mjs');
+      await historyControls({ browser, url, check, shot, result, watchErrors });
     }
     finalizeActivationUI({ result, check });
   } finally {

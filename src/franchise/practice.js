@@ -4,6 +4,7 @@ import { completedSnapshot, validateSnapshot, MAX_SAVE_BYTES } from './save.js';
 import { introScenario, surrenderOption } from './intro.js';
 import { ARMS, UNIQUES, CONDITIONS, VETERANCY, ISSUE_PLACE } from '../reward/data.js';
 import { gradeSpec, rollLoot, seedOf } from '../reward/model.js';
+import { validateReplay } from '../sim/recorder.js';
 
 const fail = (message) => { throw new Error(`Practice: ${message}`); };
 const WEAPONS = { infantry: new Set(['smooth', 'rifled']), artillery: new Set(['smbart', 'parrott']) };
@@ -234,7 +235,9 @@ const GAME_GRADES = { decisive: 'Decisive', victory: 'Victory', draw: 'Draw', de
  * One finished battle-pack phase: end strength of every formation (both sides, unarrived reinforcements at
  * their authored strength), the grade, held captures, whether the Union held the objective at the end (`held`, for
  * requisition points), the deterministic loot of `awardId` and each fielded formation's feat statistics (`feats`, for
- * badges). Rejects an altered roster exactly like practiceOutcome. Grants nothing by itself; the campaign records it.
+ * badges), the map replay track when a recorder was attached (`replay`, src/sim/recorder.js; null otherwise) and "you vs
+ * history" (`history`, historyComparison below). Rejects an altered roster exactly like practiceOutcome. Grants nothing by
+ * itself; the campaign records it.
  */
 export function phaseOutcome({ game, scenario, awardId, seed }) {
   if (!game || !scenario || game.scenario !== scenario || game.playerSide !== 'US' || game.over !== true
@@ -261,7 +264,42 @@ export function phaseOutcome({ game, scenario, awardId, seed }) {
   const grade = GAME_GRADES[game.result.grade] || (game.result.winner === 'US' ? 'Victory' : game.result.winner === null ? 'Draw' : 'Defeat');
   const captures = heldCaptures(game, 'US', scenario.crates, (c) => `Captured: ${c.name}`);
   const cards = awardCards({ awardId, seed, grade, captures });
-  return frozen({ winner: game.result.winner, grade, held: game.holder === 'US', units, captures, cards, feats: phaseFeats(game, live) });
+  // The after-action's map replay (src/sim/recorder.js; only when a recorder was attached) and "you vs history".
+  // a replay that cannot be recorded never blocks the phase result: the after-action then simply has no replay page
+  let replay = null;
+  try { replay = game.recorder ? validateReplay(game.recorder.track(game)) : null; } catch { replay = null; }
+  return frozen({ winner: game.result.winner, grade, held: game.holder === 'US', units, captures, cards, feats: phaseFeats(game, live),
+    replay, history: historyComparison({ game, scenario, units, grade }) });
+}
+
+const clockMinutes = (t) => (typeof t === 'string' && /^\d{2}:\d{2}$/.test(t) ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3)) : null);
+const hhmm = (minutes) => `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(Math.floor(minutes % 60)).padStart(2, '0')}`;
+/**
+ * "You vs history" for one finished battle-pack phase (campaign or Battles menu): the player's objective result, Union
+ * and Confederate losses against the phase's sourced historical casualties (scenario.history, or null where none), the
+ * clock the phase ended at against the historical window's end, and the game's scale (men per figure, clock ratio).
+ * `units` are phaseOutcome rows ({ side, menStart, men }); without them the live roster is read (unarrived formations
+ * lose nothing). Display data only: it grants and records nothing.
+ */
+export function historyComparison({ game, scenario, units = null, grade = null }) {
+  if (!game || !scenario) fail('a history comparison needs the finished phase.');
+  const rows = units || [...game.units.map((u) => ({ side: u.side, menStart: u.menMax, men: Math.floor(u.men) })),
+    ...(scenario.reinforcements || []).filter((d) => !game.units.some((u) => u.id === d.id)).map((d) => ({ side: d.side, menStart: d.men, men: d.men }))];
+  const sum = (side, key) => rows.filter((u) => u.side === side).reduce((n, u) => n + (u[key] || 0), 0);
+  const ratio = Number.isFinite(game.clockRatio) ? game.clockRatio : Number.isFinite(scenario.clockRatio) ? scenario.clockRatio : 1;
+  const startMin = clockMinutes(scenario.start), endMin = clockMinutes(scenario.end);
+  const finishedAt = startMin === null ? null : hhmm(startMin + (game.simTime || 0) * ratio / 60);
+  const h = scenario.history || null;
+  return {
+    title: scenario.title ?? '', objective: scenario.objective?.name ?? '',
+    result: { winner: game.result?.winner ?? null, grade: grade ?? GAME_GRADES[game.result?.grade] ?? null, why: game.result?.why ?? '', held: game.holder === 'US' },
+    you: { startUS: sum('US', 'menStart'), startCS: sum('CS', 'menStart'), lossesUS: sum('US', 'menStart') - sum('US', 'men'),
+      lossesCS: sum('CS', 'menStart') - sum('CS', 'men'), finishedAt,
+      ended: startMin !== null && endMin !== null && startMin + (game.simTime || 0) * ratio / 60 >= endMin - 0.5 },
+    history: { note: scenario.historyNote || '', start: scenario.start ?? null, end: scenario.end ?? null, casualties: h ? { ...h.casualties } : null },
+    scale: { menPerFigure: Number.isInteger(scenario.menPerFigure) ? scenario.menPerFigure : 5, clockRatio: ratio },
+    story: h,
+  };
 }
 
 /**
