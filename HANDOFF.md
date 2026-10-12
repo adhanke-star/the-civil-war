@@ -1,5 +1,34 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+TRANSFER0159 — context transfer before the large qualified-both matrix phase. Root releases sole
+writing at this docs-only skipCI relay. Fresh ChatGPT/Codex Sol retains Aaron's chosen model/effort;
+Astra gpt-6-astra/high is read-only uncertainty judge, at most ONE helper. Prior Astra is idle and
+must not be assumed to exist in a new session. Provider/weekly remaining usage unknown.
+Owned SOURCE68be65b8e90751467502a9279e37d325411bc712 CI38317432412 running. Firefox/WebKit/offline
+green; probe/four shards/campaign pending at last read. All required new source canonical readback,
+including four native scene-allocation rows, remains pending; no native restoration acceptance yet.
+New source has11 paths: diagnostics/test7 plus DECISIONS/HANDOFF/STATE/PLAN; no runtime/SW edit.
+CPU38+38 scene/12+12 cleanup/10+10 terrain/18+18 loader/10+10 adapter/23+23 export, unit/syntax/diff
+green; Astra read-only source submission approved after correcting its five concrete findings.
+Sampler performs no upload/draw/finish, independent buffer slots retain detached pending labels,
+same-ID storage replacement clears old evidence, native finish retires maps, snapshots preserve history.
+Ordinary uploads explicit; current runner restores terrain/native draw/pending+settled samples before
+removing observer, and reducer counts both peaks. Native fixture and whole-battle restoration UNRUN.
+Size-only+later subdata association remains unimplemented/fail-closed. No scene_routes/full matrix.
+Accepted source/main a9b54f662eeeb021a0f2091e254ace674ec94f15 branchCI38306674087 all9green and full
+fresh canonical251/365/144/159/201/6x3 clean. ef17689 autoCI38305892063 also independently green/read.
+Pages38316968306 success/live cw-v67 verified; automatic mainCI38316968182 pending (probes/smoke
+green; four shards/campaign pending). This docs-only relay is not accepted by its source parent's CI.
+MAIN13a7b136/indexEMPTY/exact11 protected paths unchanged; owned branch clean after relay push.
+COORDINATION absent; .out294,464,069B before packet, below300M; preserve every receipt.
+Resume: git fetch origin/status/rev-parse/worktrees, read existing38317432412 and38316968182;
+full exact source readback/repair actual red first. Never cancel/duplicate/rerun for luck.
+Only accepted exact SOURCE integrates main, then newmainCI/Pages/liveSW; protected localMAIN untouched.
+Next source work remains complete qualified-both acquisition/max/stress/fault/restoration matrix,
+22 normal rows plus88 fresh-context fault rows (seven capable families+unsupported baseline terminal,
+each across11 phases). No partial dispatch. Full contract carried in the fresh fenced continuation.
+No v1.1tag/release/v2plan/code yet; badge/level10 natural proof and native device claims remain open.
+
 LATEST0158 ACTIVE — Sol sole writer in /private/tmp/cw-v1-1-20261012; no simultaneous edits.
 Accepted source/main a9b54f662eeeb021a0f2091e254ace674ec94f15 branchCI38306674087 all9green,
 canonical251/365/144/159/console clean, campaign11773302368 201/201/errors0/failure null, smoke6each.
