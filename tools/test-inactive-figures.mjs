@@ -11,7 +11,12 @@ const push=p=>p.push(0,0,0,0,1,0,0,0,0,0,0,0,true);
 const checks=[
  ['restore-owners',a=>{const calls=[],owner=name=>({restore(){calls.push(name);if(name==='render')throw new Error('controlled restore failure');}});
    const r=a.restore({__sceneRenderGate:owner('render'),__game:{game:{__inactiveStats:owner('inactive')}},__sceneTerrainPartition:owner('terrain'),__allocation:owner('allocation')});
-   assert.equal(r.ok,false,'restore-owners: owner failure prevents completeness');assert.deepEqual(calls,['render','inactive','terrain','allocation'],'restore-owners: every independent owner still restored');assert.equal(r.errors.length,1,'restore-owners: exact failure retained');}],
+   assert.equal(r.ok,false,'restore-owners: owner failure prevents completeness');assert.deepEqual(calls,['inactive','terrain','render','allocation'],'restore-owners: every independent owner still restored');assert.equal(r.errors.length,1,'restore-owners: exact failure retained');}],
+ ['restoration-capture',a=>{const calls=[],owner=name=>({restore(){calls.push(name);}}),scope={__sceneRenderGate:owner('render'),__sceneTerrainPartition:owner('terrain'),__allocation:owner('allocation')};
+   const r=a.restore(scope,{sampleRestored(){calls.push('capture');return [{label:'pending'},{label:'settled'}];}});
+   assert.deepEqual(calls,['terrain','capture','render','allocation'],'restoration-capture: native sample precedes render gate and observer removal');assert.equal(r.samples.length,2,'restoration-capture: retain both native samples');assert.equal(r.ok,true,'restoration-capture: successful cleanup complete');}],
+ ['restoration-capture-failure',a=>{let allocation=false;const r=a.restore({__allocation:{restore(){allocation=true;}}},{sampleRestored(){throw new Error('controlled draw failure');}});
+   assert.equal(r.ok,false,'restoration-capture-failure: restored draw failure prevents completeness');assert.equal(allocation,true,'restoration-capture-failure: observer still removed');assert.equal(r.errors.length,1,'restoration-capture-failure: failure retained');}],
  ['synchronous-png',a=>{const events=[],scene={},camera={},gl={drawingBufferWidth:8,drawingBufferHeight:4,finish(){events.push('finish');},getError(){return 0;}},post={renderer:{getContext:()=>gl,domElement:{width:8,height:4,toDataURL(type){assert.equal(type,'image/png','synchronous-png: actual PNG requested');events.push('png');return 'data:image/png;base64,AAAA';}}},render(s,c){assert.equal(s,scene,'synchronous-png: native scene preserved');assert.equal(c,camera,'synchronous-png: native camera preserved');events.push('draw');}},gate=installRenderGate(post),r=a.png(post,scene,camera,gate);assert.deepEqual(events,['draw','finish','png'],'synchronous-png: no intervening frame or missing draw/finish');assert.deepEqual([r.width,r.height,r.drawingWidth,r.drawingHeight,r.nativeRenders,r.glError],[8,4,8,4,1,0],'synchronous-png: bind actual buffer and single native draw');}],
  ['render-gate',a=>{const nativeError=new Error('native render'),calls=[],post={render(...args){calls.push({receiver:this,args});if(args[0]===nativeError)throw nativeError;return args[0];}},native=post.render,arg={scene:true},gate=a.gate(post);
  assert.equal(post.render(arg),undefined,'render-gate: repeated automatic drawing held');assert.equal(calls.length,0,'render-gate: held callback did not draw');
@@ -29,6 +34,8 @@ const checks=[
 ];
 const mutants={
  'restore-owners':{restore:()=>({ok:true,calls:[],errors:[]})},
+ 'restoration-capture':{restore:(scope)=>restoreSceneDiagnostics(scope)},
+ 'restoration-capture-failure':{restore:(scope)=>restoreSceneDiagnostics(scope)},
  'synchronous-png':{png:(p,s,c,g)=>{const r=renderCanvasPng(p,s,c,g);return {...r,nativeRenders:0};}},
  'render-gate':{gate:p=>{const g=installRenderGate(p);g.restore();return g;}},
  'gate-descriptor':{gate:p=>{const g=installRenderGate(p);g.restore=()=>{p.render=Object.getPrototypeOf(p)?.render||p.render;};return g;}},

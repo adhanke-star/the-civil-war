@@ -1,13 +1,14 @@
 // Pure CPU controls: fake native GL records unchanged calls; no browser or renderer is launched.
 import assert from 'node:assert/strict';
-import {AllocationLedger,mipSizes,installAllocationObserver,ReservationPeak,rejectionObservation,reduceSceneObservations} from './bake/scene-allocation.mjs';
+import {AllocationLedger,mipSizes,installAllocationObserver,ReservationPeak,rejectionObservation,reduceSceneObservations,sampleSceneAllocations,initializeSceneTextures} from './bake/scene-allocation.mjs';
 
-function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false) {
+function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,sampler=sampleSceneAllocations,forgetOwners=false) {
   const saved={window:globalThis.window,WebGLRenderingContext:globalThis.WebGLRenderingContext,WebGL2RenderingContext:globalThis.WebGL2RenderingContext};
   class GL {
     constructor(){this.bindings=new Map();this.native=[];this.drawingBufferWidth=100;this.drawingBufferHeight=50;}
     getParameter(x){return this.bindings.get(x);}
     getContextAttributes(){return {depth:true,stencil:false,antialias:false};}
+    getError(){return 0;}
   }
   const constants=['TEXTURE_2D','TEXTURE_CUBE_MAP','TEXTURE_3D','TEXTURE_2D_ARRAY','TEXTURE_BINDING_2D','TEXTURE_BINDING_CUBE_MAP','TEXTURE_BINDING_3D','TEXTURE_BINDING_2D_ARRAY',
     'RGBA','RGB','FLOAT','HALF_FLOAT','RGBA8','RGBA16F','DEPTH_COMPONENT16','RENDERBUFFER_BINDING','ARRAY_BUFFER','ARRAY_BUFFER_BINDING'];
@@ -24,8 +25,9 @@ function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false) 
     Object.defineProperty(window,'__allocation',{value:{prior:true},writable:false,enumerable:false,configurable:true});
     const priorObserver=Object.getOwnPropertyDescriptor(window,'__allocation');
     const historyInstall=forgetOldBuffer?(0,eval)('('+installAllocationObserver.toString().replace('ids.add(id);','ids.clear();ids.add(id);')+')'):installAllocationObserver;
+    const ownerInstall=forgetOwners?(0,eval)('('+installAllocationObserver.toString().replace('for(const label of labels)owners.add(label);','void labels;')+')'):historyInstall;
     const install=dropSamplePeak?(0,eval)('('+installAllocationObserver.toString().replace(
-      's.defaultPeak=Math.max(s.defaultPeak,s.gpu.framebuffer+s.gpu.pendingFramebuffer);return current;','return current;')+')'):historyInstall;
+      's.defaultPeak=Math.max(s.defaultPeak,s.gpu.framebuffer+s.gpu.pendingFramebuffer);return current;','return current;')+')'):ownerInstall;
     install({ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString()});
     const gl=new GL(),snap=()=>window.__allocation.snapshot(gl),bind=(kind)=>{const o={};gl.bindings.set(gl[kind],o);return o;};
     const t=bind('TEXTURE_BINDING_2D');
@@ -53,15 +55,26 @@ function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false) 
     bind('TEXTURE_BINDING_2D');gl.compressedTexImage2D(gl.TEXTURE_2D,0,99999,4,4,0,new Uint8Array(16));const unknown=snap();
     const old=bind('ARRAY_BUFFER_BINDING');gl.bufferData(gl.ARRAY_BUFFER,bufferArray,gl.STATIC_DRAW);gl.deleteBuffer(old);
     const replacement=bind('ARRAY_BUFFER_BINDING');gl.bufferData(gl.ARRAY_BUFFER,bufferArray,gl.STATIC_DRAW);
+    const node={name:'known-native-array',type:'Mesh',visible:true,material:{map:{isTexture:true}},geometry:{attributes:{position:{array:bufferArray}},index:null,morphAttributes:{}}};
+    const scene={traverse(fn){fn(node);}},post={renderer:{getContext:()=>gl,initTexture(t){gl.native.push({name:'initTexture',args:[t]});}}};
+    window.__game={scene,post,game:{baked:{atlases:{}}}};
+    const beforeSample=gl.native.length,firstSample=sampler(window),samplingCalls=gl.native.slice(beforeSample).map(r=>r.name);
+    const knownId=window.__allocation.bufferReservation(gl,bufferArray).id;
+    gl.deleteBuffer(replacement);scene.traverse=()=>{};const detachedSample=sampler(window);
+    bind('ARRAY_BUFFER_BINDING');gl.bufferData(gl.ARRAY_BUFFER,32,gl.STATIC_DRAW);const unassociatedSample=sampler(window);
     const pendingBuffers=window.__allocation.bufferReservations(gl,bufferArray);gl.finish();
     const settledBuffers=window.__allocation.bufferReservations(gl,bufferArray);
+    const retiredSample=sampler(window);
+    bind('ARRAY_BUFFER_BINDING');gl.bufferData(gl.ARRAY_BUFFER,bufferArray,gl.STATIC_DRAW);
+    window.__allocation.labelBufferOwners(gl,bufferArray,['demonstrated']);gl.bufferData(gl.ARRAY_BUFFER,16,gl.STATIC_DRAW);
+    const reallocatedSample=sampler(window);
     const observer=window.__allocation;if(!skipRestore){observer.restore();observer.restore();}
     const after=Object.getOwnPropertyDescriptors(GL.prototype);
     const exactRestore=Object.keys(after).length===Object.keys(descriptors).length&&Object.entries(descriptors).every(([key,d])=>
       after[key]?.value===d.value&&after[key]?.get===d.get&&after[key]?.set===d.set&&after[key]?.writable===d.writable&&after[key]?.enumerable===d.enumerable&&after[key]?.configurable===d.configurable);
     const windowRestore=Object.entries(priorObserver).every(([key,value])=>Object.getOwnPropertyDescriptor(window,'__allocation')?.[key]===value);
     const inheritedRestore=!Object.hasOwn(GL.prototype,'compressedTexSubImage3D')&&GL.prototype.compressedTexSubImage3D===nativeInherited;
-    return {pendingBuffers,settledBuffers,rgba,beforeFinish,afterFinish,floating,bufferReservation,cubeAdded,immutableAdded,npotAdded,compressedAdded,astcAdded,afterAstcSubimage,bc7Added,compressedImmutableUnknown,exactRestore,windowRestore,inheritedRestore,small,resized,resizedAfterFinish,unknown,native:gl.native};
+    return {pendingBuffers,settledBuffers,firstSample,samplingCalls,detachedSample,unassociatedSample,retiredSample,reallocatedSample,knownId,rgba,beforeFinish,afterFinish,floating,bufferReservation,cubeAdded,immutableAdded,npotAdded,compressedAdded,astcAdded,afterAstcSubimage,bc7Added,compressedImmutableUnknown,exactRestore,windowRestore,inheritedRestore,small,resized,resizedAfterFinish,unknown,native:gl.native};
   } finally {for(const [key,value]of Object.entries(saved)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}}
 }
 const api={Ledger:AllocationLedger,mips:mipSizes,observe:observed,Peak:ReservationPeak,rejection:rejectionObservation,reduce:reduceSceneObservations};
@@ -91,7 +104,17 @@ const checks=[
     assert.equal(p.current,1660000,'resize-pending-fence: multiple old surfaces accumulate until native finish');p.finish();p.sample(1000000,300,100,attrs);
     assert.equal(p.current,1360000,'resize-pending-fence: finish retires old surfaces');assert.equal(p.peak,1660000,'resize-pending-fence: historical peak remains');}],
   ['buffer-ownership',a=>assert.deepEqual(a.observe().bufferReservation,{id:1,bytes:12,pendingDelete:false},'buffer-ownership: native upload array resolves one actual buffer')],
-  ['buffer-history',a=>{const o=a.observe();assert.equal(o.pendingBuffers.length,3,'buffer-history: all live and pending native identities retained');assert.equal(o.pendingBuffers.filter(r=>r.pendingDelete).length,1,'buffer-history: pending old reservation remains mapped');assert.equal(o.settledBuffers.length,2,'buffer-history: only retired native identity removed');assert.equal(o.settledBuffers.at(-1).bytes,40,'buffer-history: replacement uses full actual array');}],
+  ['buffer-history',a=>{const o=a.observe();assert.equal(o.pendingBuffers.length,3,'buffer-history: all live and pending native identities retained');assert.equal(o.pendingBuffers.filter(r=>r.pendingDelete).length,2,'buffer-history: pending old reservation remains mapped');assert.equal(o.settledBuffers.length,1,'buffer-history: only retired native identities removed');}],
+  ['observational-sample',a=>assert.deepEqual(a.observe().samplingCalls,[],'observational-sample: observation cannot upload or finish')],
+  ['observational-texture',a=>{const o=a.observe();assert.equal(o.firstSample.textureObjects,1,'observational-texture: real texture sentinel observed');assert.deepEqual(o.samplingCalls,[],'observational-texture: sampler cannot initialize texture sentinel');}],
+  ['detached-ownership',a=>{const o=a.observe(),r=o.detachedSample.bufferOwnership.find(r=>r.id===o.knownId);assert.ok(r?.pendingDelete&&r.owners.includes('scene/known-native-array'),'detached-ownership: detached pending reservation retains demonstrated native label');assert.equal(o.detachedSample.unmappedBufferBytes,0,'detached-ownership: all known bytes remain mapped');assert.ok(!o.retiredSample.bufferOwnership.some(r=>r.id===o.knownId),'detached-ownership: retired identity removed only after finish');}],
+  ['unassociated-buffer',a=>{const o=a.observe();assert.equal(o.unassociatedSample.unmappedBufferBytes,32,'unassociated-buffer: independently enumerated size-only reservation cannot acquire generic owner');assert.ok(o.unassociatedSample.bufferOwnership.some(r=>r.bytes===32&&!r.owners.length),'unassociated-buffer: unassociated ID remains visible');}],
+  ['reallocated-owner',a=>{const o=a.observe();assert.equal(o.reallocatedSample.unmappedBufferBytes,48,'reallocated-owner: numeric replacement cannot retain the prior array owner');}],
+  ['snapshot-history',a=>{const o=a.observe();assert.ok(!o.rgba.unknown.length,'snapshot-history: later unknowns cannot rewrite earlier samples');assert.ok(!o.rgba.calls.finish,'snapshot-history: later finish cannot rewrite earlier counters');assert.equal(o.rgba.signatures.length,2,'snapshot-history: later uploads cannot rewrite earlier signatures');}],
+  ['restoration-maximum',a=>{const r=observations();r.failure.gpuReservation=100;r.failure.conservativeReservation=110;r.cases[0].restoration.samples=[{...r.cases[0].states[0],gpuReservation:270000000,conservativeReservation:270000010}];const v=a.reduce(r,phases);assert.equal(v.maxGpuReservation,270000000,'restoration-maximum: native restored peak participates');assert.equal(v.withinLimit,false,'restoration-maximum: restoration cannot fit budget');}],
+  ['restoration-shape',a=>{const r=observations();r.cases[0].restoration.samples={};assert.equal(a.reduce(r,phases).complete,false,'restoration-shape: malformed samples reject without throwing');}],
+  ['native-restoration-required',a=>{const r=observations();r.terrainRestorationObserved=true;assert.equal(a.reduce(r,phases).complete,false,'native-restoration-required: absent restored samples cannot complete');}],
+  ['restoration-calls-shape',a=>{for(const calls of [{},3,'terrain capture']){const r=observations();r.terrainRestorationObserved=true;r.cases[0].restoration={ok:true,calls,samples:[{...r.cases[0].states[0],label:'restored-native-pending'},{...r.cases[0].states[0],label:'restored-native-settled'}]};assert.equal(a.reduce(r,phases).complete,false,'restoration-calls-shape: calls must be an array');}}],
   ['malformed-verdict',a=>{for(const r of [null,{cases:{}},{cases:[null]},{...observations(),cases:[{...observations().cases[0],states:[null]}]}])assert.equal(a.reduce(r,phases).complete,false,'malformed-verdict: malformed containers retained as incomplete');}],
   ['finite-verdict',a=>{const r=observations();r.failure.gpuReservation=Infinity;assert.equal(a.reduce(r,phases).complete,false,'finite-verdict: nonfinite failure rejected');}],
   ['missing-state',a=>{const r=observations();r.cases[0].states.pop();assert.equal(a.reduce(r,phases).complete,false,'missing-state: required state cannot be omitted');}],
@@ -120,6 +143,16 @@ const mutants={
   'resize-pending-fence':{Peak:class extends ReservationPeak {sample(...args){super.sample(...args);this.pendingFramebuffer=0;this.peak=this.current-this.framebuffer;}}},
   'buffer-ownership':changed('bufferReservation',null),
   'buffer-history':{observe:()=>observed(false,false,true)},
+  'observational-sample':{observe:()=>observed(false,false,false,scope=>{scope.__game.post.renderer.getContext().finish();return sampleSceneAllocations(scope);})},
+  'observational-texture':{observe:()=>observed(false,false,false,scope=>{initializeSceneTextures(scope);return sampleSceneAllocations(scope);})},
+  'detached-ownership':{observe:()=>observed(false,false,false,sampleSceneAllocations,true)},
+  'unassociated-buffer':{observe:()=>({...observed(),unassociatedSample:{unmappedBufferBytes:0,bufferOwnership:[]}})},
+  'reallocated-owner':{observe:()=>({...observed(),reallocatedSample:{unmappedBufferBytes:32}})},
+  'snapshot-history':{observe:()=>{const o=observed();o.rgba.unknown.push('later');return o;}},
+  'restoration-maximum':{reduce:(r,p)=>reduceSceneObservations({...r,cases:r.cases.map(c=>({...c,restoration:{ok:true}}))},p)},
+  'restoration-shape':{reduce:()=>({complete:true})},
+  'native-restoration-required':{reduce:()=>({complete:true})},
+  'restoration-calls-shape':{reduce:()=>({complete:true})},
   'failure-maximum':{reduce:(r,p)=>{const v=reduceSceneObservations(r,p);return {...v,maxGpuReservation:100,withinLimit:true};}},
   ...Object.fromEntries(['missing-phase','duplicate-phase','unmapped-verdict','unknown-verdict','restoration-verdict','malformed-verdict','finite-verdict','missing-state','prototype-state'].map(k=>[k,{reduce:()=>({complete:true,withinLimit:true})}])),
   'descriptor-restoration':{observe:()=>observed(true)},

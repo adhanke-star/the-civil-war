@@ -56,12 +56,14 @@ export function installInactiveFigures(game) {
 }
 
 /** Continue restoring independent owners even when one owner rejects restoration. */
-export function restoreSceneDiagnostics(scope=globalThis.window){
-  const calls=[],errors=[];
-  for(const [name,owner]of [['render',scope.__sceneRenderGate],['inactive',scope.__game?.game?.__inactiveStats],['terrain',scope.__sceneTerrainPartition],['allocation',scope.__allocation]]){
+export function restoreSceneDiagnostics(scope=globalThis.window,{sampleRestored=null}={}){
+  const calls=[],errors=[],samples=[];
+  for(const [name,owner]of [['inactive',scope.__game?.game?.__inactiveStats],['terrain',scope.__sceneTerrainPartition],['capture',sampleRestored&&{restore(){
+    const rows=sampleRestored();if(!Array.isArray(rows)||rows.length!==2)throw new Error('synchronous restoration samples required');samples.push(...rows);
+  }}],['render',scope.__sceneRenderGate],['allocation',scope.__allocation]]){
     if(!owner)continue;
     if(typeof owner.restore!=='function'){errors.push(`${name}: missing restore API`);continue;}
     try{owner.restore();calls.push(name);}catch(error){errors.push(`${name}: ${error.message}`);}
   }
-  return {ok:errors.length===0&&calls.includes('allocation'),calls,errors};
+  return {ok:errors.length===0&&calls.includes('allocation'),calls,errors,samples};
 }

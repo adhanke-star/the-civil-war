@@ -1,5 +1,27 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0158 ACTIVE — Sol sole writer in /private/tmp/cw-v1-1-20261012; no simultaneous edits.
+Accepted source/main a9b54f662eeeb021a0f2091e254ace674ec94f15 branchCI38306674087 all9green,
+canonical251/365/144/159/console clean, campaign11773302368 201/201/errors0/failure null, smoke6each.
+ef17689 automatic mainCI38305892063 independently all9green/full fresh canonical readback.
+Pages38316968306 success/cw-v67; automatic mainCI38316968182 pending; read existing run.
+Docs-only abe40be remains branch history and was not accepted from parent evidence or pushed to main.
+0156 next prerequisite: pure no-finish sampler, independent native buffer slots/detached pending labels,
+storage-replacement label invalidation, snapshot-history copies, caller-explicit ordinary texture uploads,
+registered reversible terrain/native restored draw+pending+settled samples before observer removal.
+Current11phase reducer includes restored peaks/strict containers. CPU38+38/cleanup12+12/unit pass;
+terrain10+10/loader18+18/adapter10+10/export23+23 unchanged green. Astra final source submission clear.
+New native terrain fixture --scene-allocation/shard3 binds real full-array reservations, exact original
+identities/bytes, fresh restored IDs/pending chunks/retirement/GL0/unknown0/unmapped0. Native UNRUN
+until full exact new source CI/canonical readback. Whole-battle restoration still requires scene runner.
+No scene_routes input/acquisition/max capacities/smoke/full22route reducer/matrix dispatch/adoption.
+Size-only+subdata association remains fail-closed/unimplemented. Full recommended matrix declaration:
+22 ordinary/stress/transitions and88 fresh-context fault rows (seven capable fault families plus
+unsupported terminal baseline failure across all11 phases). Original full remaining contract below.
+Resume accepted main run, then new exact source CI; only source green/full readback admits integration.
+MAIN13a7b136 exact protected11/indexEMPTY untouched; COORDINATION absent; .out receipts preserved.
+Root stays active through routine greens; final transfer updates ownership and exact git/run boundary.
+
 TRANSFER0157 — context transfer before full qualified-both matrix implementation. Sol releases sole
 writing at this docs-only relay; fresh ChatGPT/Codex Sol retains Aaron's selected main model/effort.
 Astra gpt-6-astra/high read-only uncertainty judge, at most ONE helper; helper is idle. Capacity/weekly

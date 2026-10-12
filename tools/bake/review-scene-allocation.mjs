@@ -3,42 +3,12 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { startServer, ROOT } from '../serve.mjs';
-import { AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation, reduceSceneObservations } from './scene-allocation.mjs';
+import { AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation, reduceSceneObservations, sampleSceneAllocations, initializeSceneTextures } from './scene-allocation.mjs';
 import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDiagnostics} from './inactive-figures.mjs';
 import {PNG} from 'pngjs';
 import {partitionTerrain,installTerrainPartition} from './partition-terrain.mjs';
 
-function inventory() {
-  const {scene,post,game}=window.__game,arrays=new Map(),textures=new Set();let declaredArrayBytes=0;
-  const owners=new Map();for(const key of ['pools','fallen','impostors'])for(const [side,pool]of Object.entries(game[key]||{}))owners.set(pool.mesh,`${key}.${side}`);
-  const array=(a,owner)=>{if(a){if(!arrays.has(a)){arrays.set(a,new Set());declaredArrayBytes+=a.byteLength;}arrays.get(a).add(owner);}};
-  const attribute=(a,owner)=>array(a?.isInterleavedBufferAttribute?a.data.array:a?.array,owner);
-  const texture=x=>{if(x?.isTexture)textures.add(x);else if(Array.isArray(x))x.forEach(texture);};
-  for(const root of [scene,post.qScene])root.traverse(o=>{
-    let ancestor=o,owner;while(ancestor&&!owner){owner=owners.get(ancestor);ancestor=ancestor.parent;}owner=`${owner||'scene'}/${o.name||o.type}${o.visible?'':'(hidden)'}`;
-    const g=o.geometry;if(g){Object.values(g.attributes).forEach(a=>attribute(a,owner));attribute(g.index,owner);Object.values(g.morphAttributes).flat().forEach(a=>attribute(a,owner));}
-    attribute(o.instanceMatrix,owner);attribute(o.instanceColor,owner);
-    for(const m of (Array.isArray(o.material)?o.material:[o.material]).filter(Boolean)){
-      Object.values(m).forEach(texture);Object.values(m.uniforms||{}).forEach(u=>texture(u.value));
-    }
-  });
-  for(const atlas of Object.values(game.baked.atlases||{}))for(const pages of Object.values(atlas.textures))pages.forEach(texture);
-  const renderer=post.renderer;
-  for(const t of textures)if(!t.isRenderTargetTexture&&!t.isDepthTexture)renderer.initTexture(t);
-  renderer.getContext().finish();
-  const gl=renderer.getContext(),allocation=window.__allocation.snapshot(gl),error=gl.getError();
-  const buffers=new Map(),unuploaded=[];
-  for(const [array,labels]of arrays){const records=window.__allocation.bufferReservations(gl,array);if(records.length){for(const record of records){if(!buffers.has(record.id))buffers.set(record.id,{...record,owners:new Set()});for(const label of labels)buffers.get(record.id).owners.add(label);}}else unuploaded.push({bytes:array.byteLength,owners:[...labels]});}
-  const bufferOwnership=[...buffers.values()].map(r=>({...r,owners:[...r.owners]}));
-  const mappedBufferBytes=bufferOwnership.reduce((n,r)=>n+r.bytes,0);
-  return {allocation,declaredArrayBytes,textureObjects:textures.size,glError:error,
-    bufferOwnership,mappedBufferBytes,unmappedBufferBytes:allocation.byKind.buffer-mappedBufferBytes,unuploadedArrays:unuploaded,
-    conservativeReservation:allocation.peak+allocation.defaultPeak+declaredArrayBytes,
-    gpuReservation:allocation.gpuPeak,cpuDeclaredArrayBytes:declaredArrayBytes,
-    accounting:'GPU: synchronized API reservations (including pending deletes, replacement overlap) + same-time default-framebuffer assumption. CPU declared arrays separate. Retained conservative upper bound adds independent maxima and deliberately double counts GL buffer arrays. Native driver pools/overhead unmeasured.',
-    atlasPages:Object.fromEntries(Object.entries(game.baked.atlases||{}).map(([side,a])=>[side,Object.fromEntries(Object.entries(a.textures).map(([tier,t])=>[tier,t.length]))])),
-    lens:!!post.soldierView,viewport:[innerWidth,innerHeight],dpr:devicePixelRatio};
-}
+const inventory=sampleSceneAllocations;
 async function main(){
   if(process.env.GITHUB_ACTIONS!=='true')throw new Error('scene allocation: Actions only');
   const outputRoot=path.join(ROOT,'.out');
@@ -50,7 +20,7 @@ async function main(){
   const inactive=process.env.SCENE_INACTIVE==='true',partition=process.env.SCENE_PARTITION==='true';
   const report={diagnosticOnly:true,fieldable:false,toolSha:process.env.GITHUB_SHA,route:'current PNG, both armies',cases:[],complete:false,
     inactivePrototype:inactive,
-    terrainPartitionPrototype:partition,
+    terrainPartitionPrototype:partition,terrainRestorationObserved:partition,
     limits:{gpuBytes:250000000},nativeDriverMemory:'UNRUN',cpuDecodePeak:'UNRUN',
     unverified:['native driver storage/pools and deferred releases after context destruction','whole-fight effect maximum beyond exercised frames','future sandbox spawns beyond declared pools','CPU image decode/upload-copy peaks']};
   const source={ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString()};
@@ -74,6 +44,7 @@ async function main(){
         });
         await page.waitForFunction(()=>window.__game.game.baked.state==='ready',null,{timeout:120000,polling:250});
         const capture=async label=>{
+          await page.evaluate(initializeSceneTextures);
           const drawing=await page.evaluate(()=>{const {post,scene,camera}=window.__game,r=post.renderer,prior=r.info.autoReset;r.info.autoReset=false;r.info.reset();try{if(window.__sceneRenderGate)window.__sceneRenderGate.renderOnce(scene,camera);else post.render(scene,camera);r.getContext().finish();return {drawCalls:r.info.render.calls,nativeRenders:window.__sceneRenderGate?.count??null};}finally{r.info.autoReset=prior;}});
           const data=await page.evaluate(inventory);row.states.push({label,...drawing,...data});save();
           if(data.glError||data.allocation.unknown.length||data.unmappedBufferBytes!==0||errors.length)throw new Error(`scene allocation: ${entry.phaseId}/${label} incomplete: GL${data.glError}, unmapped ${data.unmappedBufferBytes}, ${data.allocation.unknown.join(',')}, ${errors.join(',')}`);
@@ -100,7 +71,14 @@ async function main(){
         await capture('field');
         if(partition){
           if(entry.phaseId==='lookout-mountain')await canvasShot('terrain-partition-01-before.png');
-          row.partition=await page.evaluate(async source=>{const THREE=await import('three'),P=(0,eval)('('+source.partition+')'),install=(0,eval)('('+source.install+')');return install(window.__game.world,THREE,P);},{partition:partitionTerrain.toString(),install:installTerrainPartition.toString()});
+          row.partition=await page.evaluate(async source=>{const THREE=await import('three'),P=(0,eval)('('+source.partition+')'),install=(0,eval)('('+source.install+')');
+            if(Object.hasOwn(window,'__sceneTerrainPartition'))throw new Error('terrain partition: diagnostic scope already owned');
+            const owner=install(window.__game.world,THREE,P,{reversible:true}),registration={restore(){
+              let error;try{owner.restore();}catch(e){error=e;}
+              if(window.__sceneTerrainPartition!==registration)throw new Error('terrain partition: diagnostic registration changed');
+              delete window.__sceneTerrainPartition;if(error)throw error;
+            }};window.__sceneTerrainPartition=registration;return {...owner};
+          },{partition:partitionTerrain.toString(),install:installTerrainPartition.toString()});
           if(!row.partition.materialShared||row.partition.triangles!==row.partition.statTriangles)throw new Error('terrain partition: material/stat seam changed');
           await capture('partition-field');
           if(entry.phaseId==='lookout-mountain'){
@@ -167,7 +145,15 @@ async function main(){
         }
         row.complete=true;
       } finally {
-        try {row.restoration=await page.evaluate(source=>(0,eval)('('+source+')')(),restoreSceneDiagnostics.toString());}
+        try {row.restoration=await page.evaluate(source=>{
+          const restore=(0,eval)('('+source.restore+')'),sample=(0,eval)('('+source.sample+')');
+          return restore(window,{sampleRestored:()=>{
+            const {post,scene,camera}=window.__game;
+            if(window.__sceneRenderGate)window.__sceneRenderGate.renderOnce(scene,camera);else post.render(scene,camera);
+            const pending={label:'restored-native-pending',...sample()};post.renderer.getContext().finish();
+            return [pending,{label:'restored-native-settled',...sample()}];
+          }});
+        },{restore:restoreSceneDiagnostics.toString(),sample:inventory.toString()});}
         catch(error){row.restoration={ok:false,errors:[error.message]};}
         await ctx.close();save();
         if(!row.restoration.ok)throw new Error(`scene allocation: restoration failed: ${row.restoration.errors.join(', ')}`);
@@ -186,7 +172,7 @@ async function main(){
       await page.waitForFunction(()=>window.__game.game.baked.state==='ready',null,{timeout:120000,polling:250});
       const failure=await page.evaluate(async source=>{const a=window.__game.game.baked.atlases.CS,observe=(0,eval)('('+source+')');return {...await observe(()=>a.load('close')),published:!!a.textures.close,promiseCached:!!a.state.close};},rejectionObservation.toString());
       failure.missingHits=missingHits;
-      report.failure={...failure,...await page.evaluate(inventory),policy:'Observed existing PNG failure only. No compressed fallback or disposal claim.'};
+      report.failure={...failure,...await page.evaluate(inventory),policy:'Observed existing PNG failure without implicit upload or finish. No compressed fallback or disposal claim.'};
       if(!failure.rejected||failure.published||!missingHits)throw new Error('scene allocation: missing page control was accepted or not exercised');
     }finally{
       report.failure||={};

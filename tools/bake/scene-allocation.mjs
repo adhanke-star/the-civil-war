@@ -39,6 +39,51 @@ export class AllocationLedger {
   }
 }
 
+/** Observe existing native reservations only. Never upload, draw, flush or finish here. */
+export function sampleSceneAllocations(scope=globalThis.window) {
+  const {scene,post,game}=scope.__game,arrays=new Map(),textures=new Set();let declaredArrayBytes=0;
+  const owners=new Map();for(const key of ['pools','fallen','impostors'])for(const [side,pool]of Object.entries(game[key]||{}))owners.set(pool.mesh,`${key}.${side}`);
+  const array=(a,owner)=>{if(a){if(!arrays.has(a)){arrays.set(a,new Set());declaredArrayBytes+=a.byteLength;}arrays.get(a).add(owner);}};
+  const attribute=(a,owner)=>array(a?.isInterleavedBufferAttribute?a.data.array:a?.array,owner);
+  const texture=x=>{if(x?.isTexture)textures.add(x);else if(Array.isArray(x))x.forEach(texture);};
+  for(const root of [scene,post.qScene].filter(Boolean))root.traverse(o=>{
+    let ancestor=o,owner;while(ancestor&&!owner){owner=owners.get(ancestor);ancestor=ancestor.parent;}owner=`${owner||'scene'}/${o.name||o.type}${o.visible?'':'(hidden)'}`;
+    const g=o.geometry;if(g){Object.values(g.attributes).forEach(a=>attribute(a,owner));attribute(g.index,owner);Object.values(g.morphAttributes||{}).flat().forEach(a=>attribute(a,owner));}
+    attribute(o.instanceMatrix,owner);attribute(o.instanceColor,owner);
+    for(const m of (Array.isArray(o.material)?o.material:[o.material]).filter(Boolean)){
+      Object.values(m).forEach(texture);Object.values(m.uniforms||{}).forEach(u=>texture(u.value));
+    }
+  });
+  for(const atlas of Object.values(game.baked?.atlases||{}))for(const pages of Object.values(atlas.textures))pages.forEach(texture);
+  const renderer=post.renderer,gl=renderer.getContext(),unuploaded=[];
+  for(const [array,labels]of arrays){
+    const records=scope.__allocation.labelBufferOwners(gl,array,[...labels]);
+    if(!records.length)unuploaded.push({bytes:array.byteLength,owners:[...labels]});
+  }
+  const allocation=scope.__allocation.snapshot(gl),bufferOwnership=allocation.bufferSlots;
+  const mappedBufferBytes=bufferOwnership.filter(r=>r.owners.length).reduce((n,r)=>n+r.bytes,0);
+  return {allocation,declaredArrayBytes,textureObjects:textures.size,glError:gl.getError(),
+    bufferOwnership,mappedBufferBytes,unmappedBufferBytes:allocation.byKind.buffer-mappedBufferBytes,unuploadedArrays:unuploaded,
+    conservativeReservation:allocation.peak+allocation.defaultPeak+declaredArrayBytes,
+    gpuReservation:allocation.gpuPeak,cpuDeclaredArrayBytes:declaredArrayBytes,
+    accounting:'GPU: synchronized API reservations, pending deletes and same-time default surfaces. CPU arrays separate; conservative upper adds independent maxima. Native driver memory unmeasured.',
+    atlasPages:Object.fromEntries(Object.entries(game.baked?.atlases||{}).map(([side,a])=>[side,Object.fromEntries(Object.entries(a.textures).map(([tier,t])=>[tier,t.length]))])),
+    lens:!!post.soldierView,viewport:[scope.innerWidth,scope.innerHeight],dpr:scope.devicePixelRatio};
+}
+
+/** Explicit caller-side preparation, kept out of failure/overlap observation. */
+export function initializeSceneTextures(scope=globalThis.window) {
+  const {scene,post,game}=scope.__game,textures=new Set();
+  const texture=x=>{if(x?.isTexture)textures.add(x);else if(Array.isArray(x))x.forEach(texture);};
+  for(const root of [scene,post.qScene].filter(Boolean))root.traverse(o=>{
+    for(const m of (Array.isArray(o.material)?o.material:[o.material]).filter(Boolean)){
+      Object.values(m).forEach(texture);Object.values(m.uniforms||{}).forEach(u=>texture(u.value));
+    }
+  });
+  for(const atlas of Object.values(game.baked?.atlases||{}))for(const pages of Object.values(atlas.textures))pages.forEach(texture);
+  for(const t of textures)if(!t.isRenderTargetTexture&&!t.isDepthTexture)post.renderer.initTexture(t);
+}
+
 /** Pure diagnostic verdict. Failure observations contribute to the same lifetime maximum. */
 export function reduceSceneObservations(report, phases) {
   const errors=[], expected=(Array.isArray(phases)?phases:[]).map(p=>`${p?.packId}/${p?.phaseId}`), seen=new Set(), samples=[];
@@ -52,12 +97,22 @@ export function reduceSceneObservations(report, phases) {
     if(s?.glError!==0||!Array.isArray(s?.allocation?.unknown)||s.allocation.unknown.length)fail(`${label}: unknown/GL`);
     if(s?.unmappedBufferBytes!==0)fail(`${label}: unmapped buffers`);
   };
+  const restored=(restoration,label)=>{
+    if(restoration?.samples!==undefined&&!Array.isArray(restoration.samples))fail(`${label}: restoration samples shape`);
+    for(const s of Array.isArray(restoration?.samples)?restoration.samples:[])sample(s,`${label}/restoration`);
+  };
   if(!Array.isArray(report.cases))fail('cases shape');
   for(const row of Array.isArray(report.cases)?report.cases:[]){
     if(!row||typeof row!=='object'||Array.isArray(row)){fail('phase shape');continue;}
     const key=`${row.packId}/${row.phaseId}`;
     if(!expected.includes(key)||seen.has(key))fail(`${key}: extra/duplicate phase`);seen.add(key);
     if(row.complete!==true||row.restoration?.ok!==true||!Array.isArray(row.errors)||row.errors.length)fail(`${key}: completeness/restoration`);
+    restored(row.restoration,key);
+    if(report.terrainRestorationObserved){
+      const labels=Array.isArray(row.restoration?.samples)?row.restoration.samples.map(s=>s?.label):null;
+      if(!Array.isArray(labels)||labels.length!==2||labels[0]!=='restored-native-pending'||labels[1]!=='restored-native-settled'
+        ||!Array.isArray(row.restoration?.calls)||!row.restoration.calls.includes('terrain')||!row.restoration.calls.includes('capture'))fail(`${key}: native terrain restoration`);
+    }
     if(!Array.isArray(row.states))fail(`${key}: states shape`);
     const labels=new Set();for(const s of Array.isArray(row.states)?row.states:[]){
       if(!s||typeof s!=='object'||typeof s.label!=='string'){fail(`${key}: state shape`);sample(s,key);continue;}
@@ -78,6 +133,7 @@ export function reduceSceneObservations(report, phases) {
   if(seen.size!==expected.length||expected.some(key=>!seen.has(key)))fail('missing phase');
   if(report.failure?.rejected!==true||report.failure?.published!==false||report.failure?.restoration?.ok!==true)fail('failure completeness/restoration');
   sample(report.failure,'failure');
+  restored(report.failure?.restoration,'failure');
   const valid=samples.filter(s=>Number.isSafeInteger(s?.gpuReservation)&&Number.isSafeInteger(s?.conservativeReservation));
   const maxGpuReservation=valid.length?Math.max(...valid.map(s=>s.gpuReservation)):null;
   const maxReservation=valid.length?Math.max(...valid.map(s=>s.conservativeReservation)):null;
@@ -107,7 +163,7 @@ export function installAllocationObserver(source) {
     const current=s.gpu.sample(bytes,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.getContextAttributes());
     s.defaultPeak=Math.max(s.defaultPeak,s.gpu.framebuffer+s.gpu.pendingFramebuffer);return current;
   };
-  const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),gpu:new Peak(),bufferArrays:new WeakMap(),bufferIds:new Map(),textures:new Map(),textureIds:new Map(),signatures:[],unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};s.ledger.onReservation=bytes=>sample(gl,s,bytes);contexts.set(gl,s);}return s;};
+  const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),gpu:new Peak(),bufferArrays:new WeakMap(),bufferSources:new Map(),bufferIds:new Map(),bufferOwners:new Map(),nextBufferId:1,textures:new Map(),textureIds:new Map(),signatures:[],unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};s.ledger.onReservation=bytes=>sample(gl,s,bytes);contexts.set(gl,s);}return s;};
   const unknown=(s,value)=>{if(!s.unknown.includes(value))s.unknown.push(value);};
   const signature=(gl,s,id,call,raw,canonical)=>{
     if(!s.textureIds.has(id))s.textureIds.set(id,s.textureIds.size+1);
@@ -186,8 +242,11 @@ export function installAllocationObserver(source) {
       const binding=bindings.find(([t])=>t!==undefined&&t===target)?.[1],id=binding===undefined?null:gl.getParameter(binding);
       if(!id){unknown(s,`unknown buffer target:${target}`);return;}
       const data=a[1],element=data?.BYTES_PER_ELEMENT||1,bytes=typeof data==='number'?data:a[4]?a[4]*element:(data?.byteLength||0)-(a[3]||0)*element;
+      const oldSource=s.bufferSources.get(id);if(oldSource)s.bufferArrays.get(oldSource)?.delete(id);
+      s.bufferSources.delete(id);s.bufferOwners.delete(id);
       s.ledger.reserve(id,'buffer',0,bytes);
-      if(ArrayBuffer.isView(data)){let ids=s.bufferArrays.get(data);if(!ids){ids=new Set();s.bufferArrays.set(data,ids);}ids.add(id);if(!s.bufferIds.has(id))s.bufferIds.set(id,s.bufferIds.size+1);}
+      if(!s.bufferIds.has(id))s.bufferIds.set(id,s.nextBufferId++);
+      if(ArrayBuffer.isView(data)){let ids=s.bufferArrays.get(data);if(!ids){ids=new Set();s.bufferArrays.set(data,ids);}ids.add(id);s.bufferSources.set(id,data);}
     });
     for(const multisample of [false,true])wrap(proto,multisample?'renderbufferStorageMultisample':'renderbufferStorage',(gl,a)=>{
       const s=state(gl),offset=multisample?1:0,samples=multisample?Math.max(1,a[1]):1,id=gl.getParameter(gl.RENDERBUFFER_BINDING);
@@ -196,9 +255,16 @@ export function installAllocationObserver(source) {
     });
     for(const [name,kind]of [['deleteTexture','texture'],['deleteBuffer','buffer'],['deleteRenderbuffer','renderbuffer']])
       wrap(proto,name,(gl,a)=>{const s=state(gl);s.ledger.retire(a[0]);if(kind==='texture')s.textures.delete(a[0]);});
-    wrap(proto,'finish',gl=>{const s=state(gl);s.ledger.sync();s.gpu.finish();});
+    wrap(proto,'finish',gl=>{const s=state(gl);s.ledger.sync();s.gpu.finish();for(const id of s.bufferIds.keys())if(!s.ledger.objects.has(id)){
+      s.bufferArrays.get(s.bufferSources.get(id))?.delete(id);s.bufferSources.delete(id);s.bufferOwners.delete(id);s.bufferIds.delete(id);
+    }});
   }
-  observer={restore,bufferReservations(gl,array){const s=state(gl),ids=s.bufferArrays.get(array);if(!ids)return [];const rows=[];for(const id of ids){const r=s.ledger.objects.get(id);if(!r){ids.delete(id);continue;}rows.push({id:s.bufferIds.get(id),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(id)});}return rows;},bufferReservation(gl,array){return this.bufferReservations(gl,array).at(-1)||null;},snapshot(gl){const s=state(gl),attrs=gl.getContextAttributes(),pixels=gl.drawingBufferWidth*gl.drawingBufferHeight;
+  observer={restore,labelBufferOwners(gl,array,labels){
+    if(!ArrayBuffer.isView(array)||!Array.isArray(labels)||!labels.length||labels.some(l=>typeof l!=='string'||!l))throw new Error('allocation: invalid buffer owner evidence');
+    const s=state(gl),ids=s.bufferArrays.get(array);
+    for(const id of ids||[]){if(!s.ledger.objects.has(id))continue;let owners=s.bufferOwners.get(id);if(!owners){owners=new Set();s.bufferOwners.set(id,owners);}for(const label of labels)owners.add(label);}
+    return this.bufferReservations(gl,array);
+  },bufferReservations(gl,array){const s=state(gl),ids=s.bufferArrays.get(array);if(!ids)return [];const rows=[];for(const id of ids){const r=s.ledger.objects.get(id);if(!r){ids.delete(id);continue;}rows.push({id:s.bufferIds.get(id),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(id)});}return rows;},bufferReservation(gl,array){return this.bufferReservations(gl,array).at(-1)||null;},snapshot(gl){const s=state(gl),attrs=gl.getContextAttributes(),pixels=gl.drawingBufferWidth*gl.drawingBufferHeight;
     // Conservative two RGBA8 colour surfaces plus a 32-bit depth surface; browser/driver storage is unmeasured.
     const defaultFramebuffer=pixels*(8+(attrs.depth?4:0)+(attrs.stencil?4:0));
     const dimensions=`${gl.drawingBufferWidth}:${gl.drawingBufferHeight}`;
@@ -208,7 +274,8 @@ export function installAllocationObserver(source) {
     sample(gl,s);
     return {...s.ledger.snapshot(),defaultFramebuffer,defaultPeak:s.defaultPeak,framebufferAssumption:'two RGBA8 colour surfaces, 32-bit depth/stencil when enabled; no native measurement',
       gpuCurrent:s.gpu.current,gpuPeak:s.gpu.peak,
-      dimensions:[gl.drawingBufferWidth,gl.drawingBufferHeight],attributes:attrs,unknown:s.unknown,calls:s.calls,signatures:s.signatures,
+      dimensions:[gl.drawingBufferWidth,gl.drawingBufferHeight],attributes:attrs,unknown:[...s.unknown],calls:{...s.calls},signatures:structuredClone(s.signatures),
+      bufferSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='buffer').map(([id,r])=>({id:s.bufferIds.get(id),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(id),owners:[...s.bufferOwners.get(id)||[]]})),
       textureSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='texture').map(([id,r])=>({texture:s.textureIds.get(id),slots:Object.fromEntries(r.slots)}))};
   }};
   Object.defineProperty(window,'__allocation',{value:observer,writable:true,enumerable:prior?.enumerable??true,configurable:true});installed=true;

@@ -1803,6 +1803,7 @@ async function browserChecks(server, url) {
     if (process.argv.includes('--history')) { result.mode = 'after-action history, replay, record book and ending'; const { historyControls } = await import('./test-history-ui.mjs'); await historyControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--orders')) { result.mode = 'decision cards and camp orders'; const { ordersControls } = await import('./test-orders-ui.mjs'); await ordersControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--atlas-loader')) { result.mode = 'diagnostic atomic atlas loader'; const {atlasLoaderControls} = await import('./test-atlas-loader-ui.mjs'); await atlasLoaderControls({browser,url,check,result,watchErrors}); return; }
+    if (process.argv.includes('--scene-allocation')) { result.mode = 'native diagnostic terrain restoration'; const {sceneAllocationControls} = await import('./test-scene-allocation-ui.mjs'); await sceneAllocationControls({browser,url,check,result,watchErrors}); return; }
     if (process.argv.includes('--level-rewards')) { result.mode = 'deferred level rewards'; const {levelRewardsControls} = await import('./test-level-rewards-ui.mjs'); await levelRewardsControls({browser,url,check,shot,result,watchErrors}); return; }
     if (process.argv.includes('--economy')) { result.mode = 'requisition points and shop'; const { economyControls } = await import('./test-economy-ui.mjs'); await economyControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--packs-ui')) { result.mode = 'battle packs only'; const { packsUIControls } = await import('./test-packs-ui.mjs'); await packsUIControls({ browser, url, check, shot, result, watchErrors }); return; }
@@ -1858,6 +1859,8 @@ async function browserChecks(server, url) {
     }
     // Shard 3: surrender result, reinforcements, field admission, the soldier-eye view and delegation.
     if (runs(3)) {
+      const {sceneAllocationControls} = await import('./test-scene-allocation-ui.mjs');
+      await sceneAllocationControls({browser,url,check,result,watchErrors});
       const {atlasLoaderControls} = await import('./test-atlas-loader-ui.mjs');
       await atlasLoaderControls({browser,url,check,result,watchErrors});
       const { surrenderResultUIControls } = await import('./test-surrender-result-ui.mjs');
