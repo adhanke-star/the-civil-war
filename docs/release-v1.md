@@ -49,7 +49,9 @@ preserve slavery. Sources are listed in the game (briefings, after-action, cards
 - Corps commanders are not modelled, so Polk's, Hardee's and Cheatham's traits have no effect yet.
 - Badge, store and difficulty numbers are first guesses tuned by an automated playthrough, not by people.
 - Sound and music were chosen by measurement; nobody has listened to them on a device.
-- The Stones River dawn phase sits about 700 m north of the true ground (edge of the terrain tile).
+- The original release placed the Stones River dawn sketch about 700 m north of its approach.
+  The post-v1 fix expands the terrain and moves the inferred deployment and its associated woods together;
+  later phase placements and the Wilkinson Pike objective stay fixed. Exact unit positions remain Inferred.
 - Card art is museum photography rather than 3D renders; the Belgian rifle-musket has a labelled silhouette.
 - Original code is now MIT; original authored data/text are CC-BY 4.0 (Aaron, 12 October 2026).
   Third-party material retains its own licences and public-domain status; see LICENSE-data-text.md and ATTRIBUTION.md.

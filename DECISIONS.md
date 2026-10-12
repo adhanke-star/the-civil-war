@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0118 — Diagnose current Union/Confederate compression before codec selection (Astra, 2026-10-12)
+
+Astra chose an Actions-only representative-page diagnostic before full encoding or renderer adoption. Old UASTC and direct BC7/ASTC reconstruction failures remain meaningful; Decision 0108 retires source-lock/collector machinery, not image quality. The existing packager assumes the old nine-look Union bake and cannot label the current Confederate pack as that input. Compare current manifests' representative close/field pages, including an additional Confederate close look, against PNG/raw controls at mips 0/1/2; preserve RGB mean <=2, alpha mean <=1, edge RGB/alpha p95 <=8 and no severe clipping. Codec selection needs actual readback and comparison images; runtime/fallback accounting must keep the complete two-army battle within 250,000,000 bytes, including transitions. Native device performance stays unmeasured.
+
+## 0117 — Restore the inferred Stones River dawn deployment to its southern approach (Astra, 2026-10-12)
+
+Astra chose the existing terrain origin with halfSize 3,500 m / grid 1,025, regenerated from USGS 3DEP and public-domain Census TIGER/NHD. The full inferred dawn sketch moves about 154 m west / 755 m south from the old Gresham Lane anchor to the retained junction estimate: units, scheduled entries, tactical waypoints, camera, Confederate retreat and two unlocated associated woods. The Wilkinson objective, northern Union retreat and all later phase scenario bodies stay unchanged. Exact opening positions remain Inferred; NPS places the attack near Gresham Lane/Franklin Pike, not surveyed unit coordinates. Moving only Johnson's sketch would leave a kilometre gap beside Davis. Terrain spacing increases from 5.08 to 6.84 m; field geometry arrays grow with map area, so all four phase/browser/playthrough regressions remain required. CPU checks cover southern coverage, adjacent-brigade continuity, headquarters woods and actual figure extents, with rejecting controls.
+
 ## 0116 — Original code MIT; original data and text CC-BY 4.0 (Aaron, 2026-10-12)
 
 Aaron approved MIT for original code and CC-BY 4.0 for original authored data and text. LICENSE contains MIT; LICENSE-data-text.md grants CC-BY 4.0 with attribution to Aaron Hanke, The Civil War, and links the legal terms. Third-party code, quotations, images and recordings retain their own credits/licences; public-domain facts and sources remain public domain. This closes the missing project-licence gap without relicensing other people's material.

@@ -24,7 +24,9 @@ export const TERRAIN = {
   },
   'stones-river': {
     name: 'Stones River: the Nashville Pike to McFadden Ford (31 December 1862 - 2 January 1863)',
-    center: { lat: 35.873, lon: -86.437 }, halfSize: 2600, grid: 1025,
+    // Include the Gresham Lane / Franklin Road approach south of the dawn deployment.
+    // Keep the origin and grid allocation unchanged for the other three phases.
+    center: { lat: 35.873, lon: -86.437 }, halfSize: 3500, grid: 1025,
     roadSource: 'tiger',
     roadsNote: 'modern roads on the 1862 Nashville Pike, Wilkinson Pike, Manson Pike, McFadden Lane and Gresham Lane alignments, and the railroad (Inferred)',
     roads: [{ match: 'Old Nashville Hwy', name: 'Nashville Pike', kind: 'pike' }, { match: 'Wilkinson Pike', name: 'Wilkinson Pike', kind: 'pike' },

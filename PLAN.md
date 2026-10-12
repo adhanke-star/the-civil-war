@@ -1,3 +1,31 @@
+# Current execution — v1.1, then v2 (Aaron, 2026-10-12)
+
+v1 is released at 558456f (`v1`). Decision 0108's light loop governs new work; historical
+proof-envelope and source-lock contracts below are retained history, not new-work gates.
+Sol owns product code/integration in /private/tmp/cw-v1-1-20261012, branch v1-1-gaps-20261012.
+MAIN's eleven protected WIP files stay untouched. COORDINATION.md is absent; read it if it appears.
+
+| v1.1 item | Current boundary |
+|---|---|
+| Project licence | Aaron approved MIT code + CC-BY 4.0 original data/text; a79ec3a; same-SHA CI pending |
+| Stones River southern ground | Rebuilt tile + coherent dawn deployment; CPU15/15 and mutants15/15; CI/screenshots pending |
+| Compressed atlases and more CS looks | Astra chose representative-page Actions diagnostic; no renderer adoption yet (0118) |
+| Higher commanders | Read-only source/membership research; historical role and presence before traits |
+| Balance | v1 playthrough grades read; badge/reputation reachability and difficulty assessment pending; Astra signs numbers |
+
+Each slice: affected `node tools/test-<system>.mjs`, then `--prove-fail`, and `node tools/test.mjs --unit`
+locally; commit explicit paths, push branch, read all CI jobs for that exact SHA. Four browser shards,
+CPU probes, Firefox/WebKit/offline and the real campaign playthrough run on Actions. Look at relevant
+actual screenshots before integration. Preserve golden combat/history/traits oracles unless the change
+is demonstrated and recorded. Product edits bump sw.js VERSION. Push main only after all required CI
+is green; never pull/reset/stash the dirty MAIN checkout. v1.1 tag/Release only after all fixable gaps clear.
+
+Then write an Astra-approved weekly playable v2 plan before code: officers/cards/promotions, Confederate
+franchise, Eastern campaign, then 30–40 local achievements/challenge phases/New Game Plus and codex.
+Aaron's new scope authorizes v2; old existing-v1-only finish instructions below are superseded for this task.
+Native frame rates/sound remain unmeasured unless Aaron volunteers evidence. No spending/accounts or
+recurring hands-on device requests; visual changes require showing Aaron the actual images.
+
 **CURRENT — v1 COMPLETE (2026-10-12).** All P1–P7 rows built and proved in CI (four shards, probes, Firefox, WebKit, offline, full agent playthrough); release notes and known gaps in docs/release-v1.md; decisions 0108–0115. Post-v1 roadmap at the end of the release notes.
 
 **CURRENT — LIGHT PROCESS (2026-10-11, DECISIONS 0108).** Source locks retired; `npm test` sharded into three CI jobs. Next: green main, integrate P2o feedback WIP, then P3/P4 battle packs (Shiloh first). The phase table under "Build order and acceptance" is the plan of record; the CURRENT notes below are history.

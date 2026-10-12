@@ -25,6 +25,18 @@ export async function packsUIControls({ browser, url, check, shot, result, watch
           objective: document.getElementById('objective').textContent, trees: world.stats?.trees ?? null,
           treeSpacing: world.stats?.treeSpacing ?? null };
       });
+      if (packId === 'stones-river' && phaseId === 'dawn-on-the-right') {
+        const ground = await page.evaluate(() => {
+          const { game, terrain } = window.__game;
+          const post = game.units.find((u) => u.id === 'us-post-brigade');
+          const carlin = game.units.find((u) => u.id === 'us-carlin-brigade');
+          return { half: terrain.half, grid: terrain.meta.grid, south: terrain.meta.bbox.south,
+            postZ: post.z, gap: Math.hypot(post.x - carlin.x, post.z - carlin.z),
+            outside: game.units.flatMap((u) => u.figures).filter((f) => Math.abs(f.x) >= terrain.half - 60 || Math.abs(f.z) >= terrain.half - 60).length };
+        });
+        check(`${name}-true-ground`, ground.south < 35.843 && ground.grid === 1025 && ground.postZ > 2300 && ground.postZ < 2500
+          && ground.gap < 450 && ground.outside === 0, JSON.stringify(ground));
+      }
       await shot(page, `${name}-opening`);
       const run = await page.evaluate(() => {
         const { game } = window.__game, t0 = game.simTime;

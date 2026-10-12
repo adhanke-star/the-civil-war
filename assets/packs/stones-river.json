@@ -27,10 +27,10 @@
         },
         "retreat": {
           "US": [-563,-1650],
-          "CS": [299,2424]
+          "CS": [145,3179]
         },
         "camera": {
-          "target": [-1108,1749],
+          "target": [-1262,2503],
           "yaw": 2.618,
           "dist": 1800
         },
@@ -55,6 +55,7 @@
             "source": "letter of 31 August 1863, Collected Works of Abraham Lincoln vol. 6 (University of Michigan text); carried from the frozen old repo, which also cites the American Battlefield Trust"
           },
           "sources": [
+            "https://www.nps.gov/places/places_sp.htm",
             "https://npshistory.com/publications/civil_war_series/23/sec4.htm",
             "https://www.battlefields.org/learn/articles/i-will-die-right-here",
             "https://archive.org/details/in.ernet.dli.2015.171314",
@@ -77,11 +78,11 @@
           },
           {
             "name": "Cedar glades of Davis's front (the Widow Smith house area, not located)",
-            "polygon": [[-552,1125],[-487,1239],[-604,1389],[-759,1491],[-920,1552],[-1065,1544],[-1156,1473],[-1169,1359],[-1138,1220],[-989,1094],[-798,997],[-634,1030]]
+            "polygon": [[-706,1880],[-641,1994],[-758,2144],[-913,2246],[-1074,2307],[-1219,2299],[-1310,2228],[-1323,2114],[-1292,1975],[-1143,1849],[-952,1752],[-788,1785]]
           },
           {
             "name": "Timber at Johnson's headquarters, where Baldwin formed",
-            "polygon": [[-1328,1463],[-1305,1563],[-1429,1608],[-1545,1639],[-1661,1608],[-1746,1546],[-1774,1463],[-1742,1381],[-1668,1310],[-1545,1289],[-1434,1324],[-1342,1379]]
+            "polygon": [[-1481,2218],[-1458,2318],[-1582,2363],[-1698,2394],[-1814,2363],[-1899,2301],[-1927,2218],[-1895,2136],[-1821,2065],[-1698,2044],[-1587,2079],[-1495,2134]]
           },
           {
             "name": "Woods between the pike and the river (Wagner's ground)",
@@ -209,8 +210,8 @@
             "men": 2079,
             "weapon": "rifled",
             "xp": 2,
-            "x": -1249,
-            "z": 1949,
+            "x": -1403,
+            "z": 2704,
             "facing": -0.175,
             "sources": [
               "Official Records Ser. I Vol. XX Pt. 1, pp. 295-296 (Johnson: Kirk placed with left on Davis's right, right refused) (archive.org OCR scan; page numbers from OCR headers): https://archive.org/details/in.ernet.dli.2015.171314",
@@ -243,8 +244,8 @@
             "men": 2458,
             "weapon": "rifled",
             "xp": 2,
-            "x": -1654,
-            "z": 2064,
+            "x": -1808,
+            "z": 2819,
             "facing": -0.785,
             "sources": [
               "Official Records Ser. I Vol. XX Pt. 1, pp. 295-297 (Johnson) (archive.org OCR scan; page numbers from OCR headers): https://archive.org/details/in.ernet.dli.2015.171314",
@@ -253,7 +254,7 @@
               "Cozzens, The Battle of Stones River, NPS Civil War Series 23, sec4: https://npshistory.com/publications/civil_war_series/23/sec4.htm",
               "Wikipedia, Stones River Union order of battle (OR-derived; not independent of the OR): https://en.wikipedia.org/wiki/Stones_River_Union_order_of_battle"
             ],
-            "status": "Identity Verified; strength Inferred: Gibson, 2,458 men (one report; whether his 113 officers are inside the figure is unclear); weapon rifled: UNSOURCED low-confidence default (an uncited forum claim that about 40% of Rosecrans's infantry still carried smoothbores; no ordnance return for this brigade); xp 2 (trained): game rule for both armies at Stones River, which had fought at Shiloh or Perryville in 1862; brigade-level service history was not researched; position Inferred: the extreme right toward the Franklin road, refused, with four of five regiments facing west (NPS); drawn north of the real ground; commander: Willich was captured early; Col. William Wallace, then Col. William H. Gibson, took the brigade; franchise lineage: W. H. Gibson's 6th Brigade at Shiloh: the 15th and 49th Ohio and 32nd and 39th Indiana, four of its five regiments (Verified)."
+            "status": "Identity Verified; strength Inferred: Gibson, 2,458 men (one report; whether his 113 officers are inside the figure is unclear); weapon rifled: UNSOURCED low-confidence default (an uncited forum claim that about 40% of Rosecrans's infantry still carried smoothbores; no ordnance return for this brigade); xp 2 (trained): game rule for both armies at Stones River, which had fought at Shiloh or Perryville in 1862; brigade-level service history was not researched; position Inferred: the extreme right toward the Franklin road, refused, with four of five regiments facing west (NPS); approximate deployment near the Gresham Lane - Franklin Road approach; commander: Willich was captured early; Col. William Wallace, then Col. William H. Gibson, took the brigade; franchise lineage: W. H. Gibson's 6th Brigade at Shiloh: the 15th and 49th Ohio and 32nd and 39th Indiana, four of its five regiments (Verified)."
           },
           {
             "id": "us-rousseau-brigade",
@@ -275,8 +276,8 @@
             "men": 1663,
             "weapon": "rifled",
             "xp": 2,
-            "x": -1447,
-            "z": 1498,
+            "x": -1600,
+            "z": 2253,
             "facing": -0.349,
             "sources": [
               "Official Records Ser. I Vol. XX Pt. 1, pp. 336-338 (Baldwin) (archive.org OCR scan; page numbers from OCR headers): https://archive.org/details/in.ernet.dli.2015.171314",
@@ -307,8 +308,8 @@
             "men": 1771,
             "weapon": "rifled",
             "xp": 2,
-            "x": -983,
-            "z": 1650,
+            "x": -1136,
+            "z": 2404,
             "facing": -0.611,
             "sources": [
               "Official Records Ser. I Vol. XX Pt. 1, pp. 262-264 (Davis) (archive.org OCR scan; page numbers from OCR headers): https://archive.org/details/in.ernet.dli.2015.171314",
@@ -339,8 +340,8 @@
             "men": 1771,
             "weapon": "rifled",
             "xp": 2,
-            "x": -715,
-            "z": 1404,
+            "x": -868,
+            "z": 2159,
             "facing": 0,
             "sources": [
               "Official Records Ser. I Vol. XX Pt. 1, p. 264 (Davis) (archive.org OCR scan; page numbers from OCR headers): https://archive.org/details/in.ernet.dli.2015.171314",
@@ -370,8 +371,8 @@
             "men": 1329,
             "weapon": "rifled",
             "xp": 2,
-            "x": -350,
-            "z": 1145,
+            "x": -504,
+            "z": 1900,
             "facing": 0.175,
             "sources": [
               "Official Records Ser. I Vol. XX Pt. 1, pp. 287-289 (Woodruff) (archive.org OCR scan; page numbers from OCR headers): https://archive.org/details/in.ernet.dli.2015.171314",
@@ -400,8 +401,8 @@
             "guns": 6,
             "weapon": "parrott",
             "xp": 2,
-            "x": -1411,
-            "z": 1855,
+            "x": -1564,
+            "z": 2610,
             "facing": -0.349,
             "sources": [
               "Official Records Ser. I Vol. XX Pt. 1, p. 296 (Johnson: three rounds, horses killed, battery captured) (archive.org OCR scan; page numbers from OCR headers): https://archive.org/details/in.ernet.dli.2015.171314",
@@ -430,8 +431,8 @@
             "guns": 6,
             "weapon": "parrott",
             "xp": 2,
-            "x": -1585,
-            "z": 1937,
+            "x": -1738,
+            "z": 2691,
             "facing": -0.785,
             "sources": [
               "Official Records Ser. I Vol. XX Pt. 1, p. 297 (Johnson: three guns lost, Lieutenant Belding) (archive.org OCR scan; page numbers from OCR headers): https://archive.org/details/in.ernet.dli.2015.171314",
@@ -459,8 +460,8 @@
             "guns": 6,
             "weapon": "napoleon",
             "xp": 2,
-            "x": -1368,
-            "z": 1505,
+            "x": -1522,
+            "z": 2259,
             "facing": -0.349,
             "sources": [
               "Official Records Ser. I Vol. XX Pt. 1, pp. 297-299 (Simonson: two light 12-pdrs forward, four guns behind) (archive.org OCR scan; page numbers from OCR headers): https://archive.org/details/in.ernet.dli.2015.171314",
@@ -488,8 +489,8 @@
             "guns": 6,
             "weapon": "parrott",
             "xp": 2,
-            "x": -1093,
-            "z": 1580,
+            "x": -1247,
+            "z": 2334,
             "facing": -0.611,
             "sources": [
               "Official Records Ser. I Vol. XX Pt. 1, p. 264 (Davis) (archive.org OCR scan; page numbers from OCR headers): https://archive.org/details/in.ernet.dli.2015.171314",
@@ -520,13 +521,13 @@
             "men": 1206,
             "weapon": "smooth",
             "xp": 2,
-            "x": -2351,
-            "z": 2401,
+            "x": -2505,
+            "z": 3156,
             "facing": 2.618,
             "ai": {
               "role": "attack",
               "at": "06:15",
-              "via": [[-1976,1477]]
+              "via": [[-2130,2231]]
             },
             "sources": [
               "Official Records Ser. I Vol. XX Pt. 1, p. 774 (Hardee); p. 913 (McCown) (archive.org OCR scan; page numbers from OCR headers): https://archive.org/details/in.ernet.dli.2015.171314",
@@ -557,13 +558,13 @@
             "men": 1206,
             "weapon": "smooth",
             "xp": 2,
-            "x": -1845,
-            "z": 2418,
+            "x": -1999,
+            "z": 3173,
             "facing": 2.793,
             "ai": {
               "role": "attack",
               "at": "06:15",
-              "via": [[-1587,1784]]
+              "via": [[-1740,2538]]
             },
             "sources": [
               "Official Records Ser. I Vol. XX Pt. 1, pp. 773-775 (Hardee); pp. 911-913 (McCown) (archive.org OCR scan; page numbers from OCR headers): https://archive.org/details/in.ernet.dli.2015.171314",
@@ -594,13 +595,13 @@
             "men": 1508,
             "weapon": "smooth",
             "xp": 2,
-            "x": -1402,
-            "z": 2469,
+            "x": -1555,
+            "z": 3223,
             "facing": 2.88,
             "ai": {
               "role": "attack",
               "at": "06:20",
-              "via": [[-1245,1795]]
+              "via": [[-1398,2549]]
             },
             "sources": [
               "Official Records Ser. I Vol. XX Pt. 1, pp. 774-775 (Hardee); pp. 912-913 (McCown) (archive.org OCR scan; page numbers from OCR headers): https://archive.org/details/in.ernet.dli.2015.171314",
@@ -627,8 +628,8 @@
             "guns": 6,
             "weapon": "smbart",
             "xp": 2,
-            "x": -1502,
-            "z": 2497,
+            "x": -1656,
+            "z": 3251,
             "facing": 2.88,
             "ai": {
               "role": "attack",
@@ -664,12 +665,12 @@
             "men": 1709,
             "weapon": "smooth",
             "xp": 2,
-            "x": -1692,
-            "z": 2492,
+            "x": -1845,
+            "z": 3246,
             "facing": 2.793,
             "ai": {
               "role": "attack",
-              "via": [[-1501,1699]]
+              "via": [[-1654,2454]]
             },
             "atSec": 150,
             "noticeSec": 30,
@@ -700,8 +701,8 @@
             "guns": 4,
             "weapon": "napoleon",
             "xp": 2,
-            "x": -1803,
-            "z": 2470,
+            "x": -1957,
+            "z": 3225,
             "facing": 2.793,
             "ai": {
               "role": "attack"
@@ -738,12 +739,12 @@
             "men": 1922,
             "weapon": "smooth",
             "xp": 2,
-            "x": -1107,
-            "z": 2480,
+            "x": -1260,
+            "z": 3235,
             "facing": 2.88,
             "ai": {
               "role": "attack",
-              "via": [[-1104,1699]]
+              "via": [[-1257,2454]]
             },
             "atSec": 150,
             "noticeSec": 30,
@@ -776,12 +777,12 @@
             "men": 1343,
             "weapon": "smooth",
             "xp": 2,
-            "x": -596,
-            "z": 2447,
+            "x": -749,
+            "z": 3201,
             "facing": 2.967,
             "ai": {
               "role": "attack",
-              "via": [[-680,1617]]
+              "via": [[-833,2371]]
             },
             "atSec": 300,
             "noticeSec": 30,
@@ -815,12 +816,12 @@
             "men": 1150,
             "weapon": "smooth",
             "xp": 2,
-            "x": -201,
-            "z": 2465,
+            "x": -354,
+            "z": 3220,
             "facing": 3.142,
             "ai": {
               "role": "attack",
-              "via": [[-378,1519]]
+              "via": [[-532,2273]]
             },
             "atSec": 375,
             "noticeSec": 30,
@@ -851,7 +852,7 @@
             "stubborn"
           ]
         },
-        "positionsNote": "Drawn about 600-800 m north of the sourced ground: the terrain asset ends at 35.8496 N, about 400 m short of the Gresham Lane - Franklin Road junction where NPS places the start of the attack. Johnson's brigades stand along Gresham Lane with Willich refused on the right and Baldwin in reserve, Davis's three brigades between them and the Wilkinson Pike (Johnson and Davis reports; NPS). McCown's three brigades start south-west of the Union right and step off at 06:15; Cleburne's four arrive behind them from 06:30 (he was 500-600 yards back at dawn). All positions Inferred.",
+        "positionsNote": "The inferred deployment sketch is anchored at the Gresham Lane - Franklin Road approach, now inside the enlarged terrain. Exact formation locations and the unlocated headquarters/house woods remain Inferred; the northern Wilkinson Pike objective is geographic. The previous 600-800 m northward map-edge displacement is removed. Johnson's brigades stand along Gresham Lane with Willich refused on the right and Baldwin in reserve, Davis's three brigades between them and the Wilkinson Pike (Johnson and Davis reports; NPS). McCown's three brigades start south-west of the Union right and step off at 06:15; Cleburne's four arrive behind them from 06:30 (he was 500-600 yards back at dawn). All positions Inferred.",
         "strengthNote": "Only Willich (2,458, Gibson) and Cleburne's brigades (Hardee's present-for-duty return) have sourced strengths. Kirk and Baldwin split NPS's 6,200 for Johnson's division by regiment count; Davis's brigades use Johnson's per-regiment average; McCown's brigades split 3,921 (Hardee's 10,045 less Cleburne's 6,124) over 13 regiments and battalions. Battery guns are estimates from Barnett's division totals except Simonson's and Humphreys's; crews are a game value of 20 per gun. Wharton's 2,000 cavalry are not fielded (the engine has no cavalry).",
         "historyNote": "McCown's and Cleburne's divisions broke Kirk's and Willich's brigades within minutes of 06:22 (Willich was captured and Kirk badly wounded) and drove the Union right back nearly a mile by 08:00, but the wing re-formed on the Nashville Pike and railroad and did not collapse.",
         "history": {

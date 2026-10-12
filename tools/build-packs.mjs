@@ -208,7 +208,7 @@ export function buildPackFrom(src, traits = traitsTable()) {
       // A woods-based pack clears its named fields; a fields-based pack plants its named woods (src.woods).
       ground: groundBase === 'fields' ? { base: 'fields', treeSpacing: src.treeSpacing }
         : { base: 'woods', clearings: on(src.clearings, terrain).map(([c, i]) => ({ name: c.name, polygon: oval(resolve(c.at, c.name), { ...c.shape, seed: i + 1 }) })), treeSpacing: src.treeSpacing },
-      woods: on(src.woods, terrain).map(([w, i]) => ({ name: w.name, polygon: oval(resolve(w.at, w.name), { ...w.shape, seed: i + 1 }) })),
+      woods: on(phase.woods ?? src.woods, terrain).map(([w, i]) => ({ name: w.name, polygon: oval(resolve(w.at, w.name), { ...w.shape, seed: i + 1 }) })),
       woodsNote: src.woodsNote,
       sites: on(src.sites, terrain).map(([s]) => { const [x, z] = resolve(s.at, s.name); return { id: s.id, name: s.name, x, z, rot: s.rot, yard: s.yard,
         ...(s.fenceRadius ? { fenceRadius: s.fenceRadius } : {}), source: s.source, buildings: s.buildings.map(b => [...b]), ...(s.orchard ? { orchard: [...s.orchard] } : {}) }; }),

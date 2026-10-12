@@ -112,6 +112,34 @@ const ladderIndex = (def, phaseId) => def.phases.findIndex((p) => p.packId === P
 const RUN_STATS = [];
 
 export const STONES_RIVER_CHECKS = [
+  ['dawn-ground', async (api) => {
+    const s = phaseOf(api.shipped(), 'dawn-on-the-right').scenario;
+    const f = api.terrainFrame(PACK_ID), lm = api.source().landmarks;
+    const post = roster(s).find((u) => u.id === 'us-post-brigade');
+    const carlin = roster(s).find((u) => u.id === 'us-carlin-brigade');
+    const johnson = roster(s).find((u) => u.id === 'cs-bjohnson-brigade');
+    // Independent geographic bounds: the opening sketch reaches south of the old 2.6 km tile.
+    assert.ok(f.meta.bbox.south < 35.843 && f.meta.grid === 1025, 'dawn-ground: southern approach needs coverage without a larger height grid');
+    assert.ok(post.z > 2300 && post.z < 2500 && johnson.z > 3100, 'dawn-ground: opening brigades are still displaced north');
+    assert.ok(Math.hypot(post.x - carlin.x, post.z - carlin.z) < 450, 'dawn-ground: adjacent Post and Carlin deployment separated by a partial move');
+    const [gx, gz] = f.project(lm.gresham.lat, lm.gresham.lon);
+    assert.ok(f.half - gz > 350 && Math.abs(gx) < f.half - 350, 'dawn-ground: junction and southern approach are clipped');
+    const baldwin = roster(s).find((u) => u.id === 'us-rousseau-brigade');
+    const hq = s.woods.find((w) => w.name.startsWith('Timber at Johnson'));
+    const centroid = hq.polygon.reduce((p, v) => [p[0] + v[0] / hq.polygon.length, p[1] + v[1] / hq.polygon.length], [0, 0]);
+    assert.ok(Math.hypot(baldwin.x - centroid[0], baldwin.z - centroid[1]) < 200, 'dawn-ground: headquarters timber did not move with Baldwin');
+    assert.ok(/Inferred/.test(s.positionsNote) && !s.positionsNote.startsWith('Drawn about'), 'dawn-ground: deployment provenance must describe the corrected inferred ground');
+  }],
+  ['formation-extents', async (api) => {
+    for (const { id, scenario: s } of api.shipped().phases) {
+      // Draw every scheduled formation at its entry point in this CPU fixture; no simulation time advances.
+      const g = api.makeGame({ ...s, units: roster(s), reinforcements: [] });
+      const half = g.terrain.half - EDGE_MARGIN;
+      for (const u of g.units) for (const p of u.figures) {
+        assert.ok(Math.abs(p.x) < half && Math.abs(p.z) < half, `formation-extents: ${id}/${u.id} has a figure beyond the terrain margin`);
+      }
+    }
+  }],
   ['projection', async (api) => {
     const f = api.terrainFrame(PACK_ID), b = f.meta.bbox;
     // tools/fetch-terrain.mjs wrote the bbox from its own constants: the same constants must reproduce it
@@ -314,6 +342,8 @@ export const STONES_RIVER_CHECKS = [
 const edit = (fn) => () => { const p = API.shipped(); fn(p); return p; };
 const unit = (p, phase, id) => roster(phaseOf(p, phase).scenario).find((u) => u.id === id);
 const MUTANTS = {
+  'dawn-ground': { shipped: edit((p) => { for (const u of roster(p.phases[0].scenario)) u.z -= 755; }) },
+  'formation-extents': { shipped: edit((p) => { const u = unit(p, 'dawn-on-the-right', 'cs-rains-brigade'); u.x = 3500; }) },
   // the build reads compass bearings as engine facings
   projection: { facingOf: (b) => b * Math.PI / 180 },
   // a hand edit to the generated file: Kirk's strength changed without a rebuild

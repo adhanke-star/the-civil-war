@@ -1,5 +1,22 @@
 # Handoff — existing v1 (2026-10-11, Claude Opus 5.5)
 
+**Current owner/scope (Aaron, 2026-10-12): Codex/Sol is sole product writer**, with Astra deciding uncertain
+design/history/tuning choices. Worktree `/private/tmp/cw-v1-1-20261012`, branch `v1-1-gaps-20261012`, starts
+from released v1 `558456f447c984f8868c688bd3acbb6e8c6551bd`. Licence commit `a79ec3a` pushed; its CI pending.
+Stones River southern tile/deployment correction passes CPU15/15 plus15 mutants, traits18/18 and packs13/13
+with all mutants; same-SHA CI, actual screenshots and playthrough still required before integration.
+`node tools/test.mjs --unit` is the local smoke; browsers/heavy suites run only on Actions.
+
+Finish v1.1 gaps and tag/release, then write an Astra-approved v2 plan and build weekly playable milestones:
+officers, Confederate franchise, Eastern campaign, achievements/challenges/NG+ and codex. This new scope
+supersedes older existing-v1-only instructions. Aaron approved MIT code / CC-BY 4.0 original data/text once;
+do not ask again. Compression is diagnostic-first (0118), current source manifests and CS bake38186582847;
+old failed compression is not acceptance and old source-lock machinery stays retired. Corps/wing/division
+presence/membership needs opened historical sources before AI traits. Balance needs reachability and actual
+playthrough grade evidence, with Astra's decision on numbers. Native device performance/sound stay unmeasured.
+MAIN remains dirty with exactly the protected11 below; no pull/reset/stash/broad add there. COORDINATION absent;
+read it before choosing work if it appears. No simultaneous provider edits; research helpers are read-only.
+
 **2026-10-12: v1 is complete** — see STATE.md and docs/release-v1.md. Work happened on branch `packs` (worktree
 /private/tmp/the-civil-war-packs-20261011) and main fast-forwards to green packs commits. Every system has a CPU
 probe (`node tools/test-<name>.mjs`, plus `--prove-fail`) and a browser module wired into `tools/test.mjs` shards;
