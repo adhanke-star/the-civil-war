@@ -28,8 +28,10 @@ export async function levelRewardsControls({browser,url,check,shot,result,watchE
   await page.setViewportSize({width:1024,height:768});
   const sold=full.depot[0],turn=page.locator(`#camp-depot [data-item-uid="${sold.uid}"] .camp-turnin-button`),unchanged=await raw();await turn.focus();await page.keyboard.press('Enter');await page.waitForFunction(()=>document.getElementById('camp-confirm').open);
   await page.keyboard.press('Escape');check('level-rewards-sale-cancel',await raw()===unchanged,'Escape keeps full depot and pending rewards unchanged');
-  await turn.click();await page.waitForFunction(()=>document.getElementById('camp-confirm').open);await page.locator('#camp-confirm-ok').click();await ready();
-  const recovered=await shown(),written=JSON.parse(await raw());check('level-rewards-one-sale',recovered.level===6&&recovered.depot===2000&&recovered.rep===580&&recovered.text.includes('2 level rewards pending')&&!written.depot.some(c=>c.uid===sold.uid)&&written.depot.some(c=>c.uid.endsWith('.level.6')),JSON.stringify(recovered));
+  await turn.click();await page.waitForFunction(()=>document.getElementById('camp-confirm').open);
+  const priorStatus=await page.locator('#camp-shop-status').textContent();await page.locator('#camp-confirm-ok').click();
+  await page.waitForFunction(prior=>{const status=document.getElementById('camp-shop-status').textContent;return !document.getElementById('camp-confirm').open&&window.__entry.importing===false&&status!==prior&&status.trim().length>0&&status!=='Saving…';},priorStatus,{timeout:60000});
+  const recovered=await shown(),written=JSON.parse(await raw()),terminalStatus=await page.locator('#camp-shop-status').textContent();check('level-rewards-one-sale',recovered.level===6&&recovered.depot===2000&&recovered.rep===580&&recovered.text.includes('2 level rewards pending')&&!written.depot.some(c=>c.uid===sold.uid)&&written.depot.some(c=>c.uid.endsWith('.level.6')),JSON.stringify({...recovered,terminalStatus}));
   const finalRaw=await raw();await page.reload();await ready();check('level-rewards-sale-reload',await raw()===finalRaw&&(await shown()).writes===0,'full-depot reload does not redeliver a card');
   // A real failed IndexedDB write must preserve the legacy bytes and permit an explicit reload retry.
   await seedProgress(page,JSON.stringify(before));await page.evaluate(()=>{window.__levelRewardsQuota=true;});

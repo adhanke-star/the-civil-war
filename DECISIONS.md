@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0147 — Await the confirmed sale transaction completion rather than a pre-event idle flag (Astra, 2026-10-12)
+
+Retain4f334b5 CI38279417122/test2 failed level-rewards-one-sale: observed570/L5/writes0 immediately after confirm; subsequent reload saw completed native sale. Dialog.close queues its close event, so importing may still be false before runEconomy begins. Test captures pre-confirm shop status, then awaits closed dialog, changed/nonempty status other than Saving…, and importing strictly false, using existing60000ms timeout. Both success and error settle this wait; unchanged level/reputation/depot/persisted-byte assertions decide success and report terminal status. No delay, expected-level polling or product change. CPU14+14mutants and syntax pass; browser/fullCI pending.
+
 ## 0146 — Qualify the explicit mixed close route through the new parser and adapter (Astra, 2026-10-12)
 
 Fresh cs-hybrid uses retained source bake38186582847 and the same pinned KTX4.4.2/exhaustive ASTC4x4/box mips/linear/once-premultiplied bytes; encode eight pages, retain both short page4 originals byte-for-byte. Source SHA256 binds every copied PNG. Actual new parser/Three compressed texture upload at mips0/1/2, malformed/truncated/wrong-format/dimension/capability/alpha/decode controls, all576 frames/anchors/directions over light/dark backgrounds, unchanged quality limits precede export. CPU adapter10+10mutants and compression12+12mutants green. Always retain reports/all numbered comparisons; export only the qualified8ASTC+2PNG manifest/files on full mixed success. PNG stored bytes are straight display RGB; native upload premultiplies once; ASTC is already premultiplied/no automatic decode. Neither export nor cap detection authorizes runtime adoption.
