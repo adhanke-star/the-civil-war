@@ -4,7 +4,8 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { startServer, ROOT } from '../serve.mjs';
 import { AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation } from './scene-allocation.mjs';
-import {installInactiveFigures,installRenderGate} from './inactive-figures.mjs';
+import {installInactiveFigures,installRenderGate,renderCanvasPng} from './inactive-figures.mjs';
+import {PNG} from 'pngjs';
 import {partitionTerrain,installTerrainPartition} from './partition-terrain.mjs';
 
 function inventory() {
@@ -78,17 +79,31 @@ async function main(){
           if(data.glError||data.allocation.unknown.length||errors.length)throw new Error(`scene allocation: ${entry.phaseId}/${label} incomplete: GL${data.glError}, ${data.allocation.unknown.join(',')}, ${errors.join(',')}`);
           console.log(entry.phaseId,label,JSON.stringify({reservation:data.conservativeReservation,...data.allocation.byKind,arrays:data.declaredArrayBytes,pages:data.atlasPages}));
         };
+        const canvasShot=async filename=>{
+          const shot=await page.evaluate(async source=>{
+            const S=await import('./src/settings.js'),C=await import('./src/sandbox/compare.js'),{post,scene,camera,rts,game}=window.__game;
+            const png=(0,eval)('('+source+')')(post,scene,camera,window.__sceneRenderGate);
+            return {...png,style:S.get('look.figureStyle'),comparison:C.compareState(),simTime:game.simTime,
+              camera:{position:camera.position.toArray(),quaternion:camera.quaternion.toArray(),fov:camera.fov,near:camera.near,far:camera.far,goal:{...rts.goal}}};
+          },renderCanvasPng.toString());
+          if(!/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(shot.dataUrl)||shot.nativeRenders!==1||shot.glError||shot.width!==shot.drawingWidth||shot.height!==shot.drawingHeight||!shot.width||!shot.height)throw new Error('scene canvas: invalid actual draw/readback metadata');
+          const bytes=Buffer.from(shot.dataUrl.slice('data:image/png;base64,'.length),'base64'),png=PNG.sync.read(bytes);
+          let opaque=false,nonuniform=false;for(let i=0;i<png.data.length;i+=4){if(png.data[i+3])opaque=true;for(let c=0;c<4;c++)if(png.data[i+c]!==png.data[c])nonuniform=true;}
+          if(png.width!==shot.width||png.height!==shot.height||!opaque||!nonuniform)throw new Error('scene canvas: dimensions/visible/nonuniform content not proved');
+          fs.writeFileSync(path.join(out,filename),bytes);delete shot.dataUrl;
+          row.canvasCaptures||=[];row.canvasCaptures.push({filename,phase:entry.phaseId,toolSha:report.toolSha,...shot,bytes:bytes.length,kind:'battlefield-canvas capture; DOM HUD excluded'});save();
+        };
         if((inactive||partition)&&entry.phaseId==='lookout-mountain')await page.evaluate(source=>{window.__sceneRenderGate=(0,eval)('('+source+')')(window.__game.post);},installRenderGate.toString());
         await capture('field');
         if(partition){
-          if(entry.phaseId==='lookout-mountain')await page.screenshot({path:path.join(out,'terrain-partition-01-before.png')});
+          if(entry.phaseId==='lookout-mountain')await canvasShot('terrain-partition-01-before.png');
           row.partition=await page.evaluate(async source=>{const THREE=await import('three'),P=(0,eval)('('+source.partition+')'),install=(0,eval)('('+source.install+')');return install(window.__game.world,THREE,P);},{partition:partitionTerrain.toString(),install:installTerrainPartition.toString()});
           if(!row.partition.materialShared||row.partition.triangles!==row.partition.statTriangles)throw new Error('terrain partition: material/stat seam changed');
           await capture('partition-field');
           if(entry.phaseId==='lookout-mountain'){
-            await page.screenshot({path:path.join(out,'terrain-partition-02-after.png')});
+            await canvasShot('terrain-partition-02-after.png');
             await page.mouse.move(700,300);await page.mouse.wheel(0,-400);await page.waitForTimeout(1000);await capture('partition-native-zoom');
-            await page.screenshot({path:path.join(out,'terrain-partition-03-zoom.png')});
+            await canvasShot('terrain-partition-03-zoom.png');
           }
         }
         if(inactive){await page.evaluate(source=>{const g=window.__game.game;g.__inactiveStats=(0,eval)('('+source+')')(g);g.animate(0);},installInactiveFigures.toString());await capture('inactive-field');}
@@ -115,7 +130,7 @@ async function main(){
               g.setView(window.__game.camera,innerHeight*window.__game.post.scale);g.animate(0);return {combatUnchanged:combat()===before,stats:{...g.__inactiveStats},procedural:g.pools.US.pushed+g.pools.CS.pushed,baked:g.impostors.US.drawn+g.impostors.CS.drawn};
             },{style,compare});
             row.transitions||=[];row.transitions.push({label,...state});if(!state.combatUnchanged)throw new Error('inactive prototype: style changed combat state');
-            await capture(label);await page.screenshot({path:path.join(out,`${String(row.transitions.length).padStart(2,'0')}-${label}.png`)});
+            await capture(label);await canvasShot(`${String(row.transitions.length).padStart(2,'0')}-${label}.png`);
           };
           await transition('rigged-reactivation','rigged');
           row.lodReactivation=await page.evaluate(()=>{
@@ -128,7 +143,7 @@ async function main(){
           await capture('near-lod-reupload');
           row.lodReactivation.after=await page.evaluate(()=>{const b=window.__reactivationBucket,gl=window.__game.post.renderer.getContext();return window.__allocation.bufferReservation(gl,b.mesh.instanceMatrix.array);});
           if(!row.lodReactivation.visible||!row.lodReactivation.nearCount||row.lodReactivation.afterStats.reactivated<=row.lodReactivation.stats.reactivated||!row.lodReactivation.after||row.lodReactivation.before?.id===row.lodReactivation.after.id)throw new Error('inactive prototype: released bucket GPU reupload not proved');
-          await page.screenshot({path:path.join(out,'06-near-lod-reupload.png')});
+          await canvasShot('06-near-lod-reupload.png');
           await page.evaluate(goal=>{const {rts,game:g,camera,post}=window.__game;Object.assign(rts.goal,goal);rts.update(1);rts.update(1);g.setView(camera,innerHeight*post.scale);g.animate(0);},row.lodReactivation.goal);
           await transition('baked-reclamation','baked');
           await transition('compare-rigged-left','rigged',true);await transition('compare-baked-left','baked',true);

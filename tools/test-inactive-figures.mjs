@@ -1,14 +1,15 @@
 // CPU object/record lifecycle only. Actual GPU deletion/reupload/savings are Actions observations.
 import assert from 'node:assert/strict';
 import {SoldierPool,FallenPool,UNIFORMS,FALLEN} from '../src/units/soldier-mesh.js';
-import {installInactiveFigures,installRenderGate} from './bake/inactive-figures.mjs';
-const api={install:installInactiveFigures,gate:installRenderGate};
+import {installInactiveFigures,installRenderGate,renderCanvasPng} from './bake/inactive-figures.mjs';
+const api={install:installInactiveFigures,gate:installRenderGate,png:renderCanvasPng};
 function fixture(install){
   const standing=new SoldierPool(4,UNIFORMS.US,{kit:'US'}),fallen=new FallenPool(4,UNIFORMS.US,{kit:'US'}),game={pools:{US:standing},fallen:{US:fallen}},refs=standing.buckets.map(b=>({mesh:b.mesh,geo:b.mesh.geometry,matrix:b.mesh.instanceMatrix,anim:b.anim.array,tint:b.tint.array,clip:b.clip.array}));
   const stats=install(game);return {standing,fallen,game,refs,stats};
 }
 const push=p=>p.push(0,0,0,0,1,0,0,0,0,0,0,0,true);
 const checks=[
+ ['synchronous-png',a=>{const events=[],scene={},camera={},gl={drawingBufferWidth:8,drawingBufferHeight:4,finish(){events.push('finish');},getError(){return 0;}},post={renderer:{getContext:()=>gl,domElement:{width:8,height:4,toDataURL(type){assert.equal(type,'image/png','synchronous-png: actual PNG requested');events.push('png');return 'data:image/png;base64,AAAA';}}},render(s,c){assert.equal(s,scene,'synchronous-png: native scene preserved');assert.equal(c,camera,'synchronous-png: native camera preserved');events.push('draw');}},gate=installRenderGate(post),r=a.png(post,scene,camera,gate);assert.deepEqual(events,['draw','finish','png'],'synchronous-png: no intervening frame or missing draw/finish');assert.deepEqual([r.width,r.height,r.drawingWidth,r.drawingHeight,r.nativeRenders,r.glError],[8,4,8,4,1,0],'synchronous-png: bind actual buffer and single native draw');}],
  ['render-gate',a=>{const nativeError=new Error('native render'),calls=[],post={render(...args){calls.push({receiver:this,args});if(args[0]===nativeError)throw nativeError;return args[0];}},native=post.render,arg={scene:true},gate=a.gate(post);
  assert.equal(post.render(arg),undefined,'render-gate: repeated automatic drawing held');assert.equal(calls.length,0,'render-gate: held callback did not draw');
  assert.equal(gate.renderOnce(arg),arg,'render-gate: explicit native return/argument survives');assert.equal(calls[0].receiver,post,'render-gate: native receiver survives');assert.equal(gate.count,1,'render-gate: one actual draw counted');
@@ -20,6 +21,7 @@ const checks=[
  ['hidden-gore-restore',a=>{const saved={gore:FALLEN.gore,clock:FALLEN.clock};try{let now=0;FALLEN.gore=true;FALLEN.clock=()=>now;const f=fixture(a.install),p=f.fallen,i=p.alloc();p.set(i,1,2,3,0,1,false,0,0,true);p.setBakedClip(2);p.flush();assert.equal(p.mesh.visible,false,'hidden-gore-restore: entirely clipped casualties retired');FALLEN.gore=false;now=1000;p.setBakedClip(0);p.flush();assert.equal(p.hiddenTo,1,'hidden-gore-restore: CPU fade continues while hidden');FALLEN.gore=true;p.setBakedClip(0);p.flush();assert.ok(p.mesh.visible,'hidden-gore-restore: rigged casualty restores');assert.equal(p.hiddenTo,0,'hidden-gore-restore: gore restoration preserved');assert.equal(p.mesh.instanceMatrix.array[13],2,'hidden-gore-restore: original ground restored');}finally{Object.assign(FALLEN,saved);}}],
 ];
 const mutants={
+ 'synchronous-png':{png:(p,s,c,g)=>{const r=renderCanvasPng(p,s,c,g);return {...r,nativeRenders:0};}},
  'render-gate':{gate:p=>{const g=installRenderGate(p);g.restore();return g;}},
  'outline-control':{install:g=>{const s=installInactiveFigures(g);const p=g.pools.US;p.setOutline=()=>{};return s;}},
  'empty-buckets':{install:()=>({})},

@@ -4,6 +4,14 @@ export function installRenderGate(post) {
   post.render=function(...args){if(!held){count++;return native.apply(this,args);}};
   return {renderOnce(...args){count++;return native.apply(post,args);},get count(){return count;},restore(){held=false;post.render=native;}};
 }
+/** Synchronous default-framebuffer readback; excludes the DOM HUD. Never await between draw and export. */
+export function renderCanvasPng(post,scene,camera,gate=null){
+  const r=post.renderer,gl=r.getContext(),canvas=r.domElement,before=gate?.count;
+  if(gate)gate.renderOnce(scene,camera);else post.render(scene,camera);
+  gl.finish();const dataUrl=canvas.toDataURL('image/png');
+  return {dataUrl,width:canvas.width,height:canvas.height,drawingWidth:gl.drawingBufferWidth,drawingHeight:gl.drawingBufferHeight,
+    glError:gl.getError(),nativeRenders:gate?gate.count-before:1};
+}
 export function installInactiveFigures(game) {
   const released=new WeakSet(),stats={released:0,reactivated:0};
   const visibility=new WeakMap();
