@@ -146,6 +146,20 @@ async function fallbackOrder(page) {
   const ok = await page.evaluate(() => window.__game.game.orderSelected('fallback'));
   return { via: ok ? 'orderSelected (key F did not register)' : 'none taken', selected: before.selected };
 }
+/** Give up the field: every Union brigade marches 1.2 km straight away from the objective (a contested objective is a
+ *  draw, so a Defeat needs the ground left to the enemy). The same move order a drag gives. */
+async function abandonField(page) {
+  return page.evaluate(() => {
+    const { game, terrain } = window.__game, o = game.objective, lim = (terrain.half || 2500) - 150;
+    const clamp = (v) => Math.max(-lim, Math.min(lim, v));
+    let n = 0;
+    for (const u of game.units.filter((x) => x.alive && x.side === 'US')) {
+      const dx = u.x - o.x, dz = u.z - o.z, d = Math.hypot(dx, dz) || 1;
+      if (game.order(u, { type: 'move', points: [[u.x, u.z], [clamp(o.x + (dx / d) * (d + 1200)), clamp(o.z + (dz / d) * (d + 1200))]] })) n++;
+    }
+    return { abandoned: n };
+  });
+}
 /** Fast-forward to the phase's end; resume through arrival auto-pauses as a player pressing Resume would. */
 async function fight(page, row, plan, label) {
   const start = Date.now(), simEnd = row.simLength, notes = [];
@@ -153,7 +167,10 @@ async function fight(page, row, plan, label) {
   for (;;) {
     const sim = await page.evaluate(() => window.__game.game.simTime);
     if ((plan === 'attack' || (plan === 'defeat' && sim < 300)) && sim >= nextAttack) { notes.push({ at: Math.round(sim), attack: await attackOrder(page) }); nextAttack = sim + 240; }
-    if (plan === 'defeat' && sim >= 300 + 150 * fallbacks && fallbacks < 3) { notes.push({ at: Math.round(sim), fallback: await fallbackOrder(page) }); fallbacks++; }
+    if (plan === 'defeat' && sim >= 300 + 150 * fallbacks && fallbacks < 3) {
+      notes.push({ at: Math.round(sim), fallback: await fallbackOrder(page) }); fallbacks++;
+      if (fallbacks === 3) notes.push({ at: Math.round(sim), ...(await abandonField(page)) });
+    }
     const st = await page.evaluate((chunk) => {
       const { game } = window.__game, s0 = game.simTime;
       for (let guard = 0; guard < 400 && game.simTime - s0 < chunk && !game.over; guard++) {
@@ -201,7 +218,7 @@ async function playPhase(page, errors, { index, replay = false, plan }) {
   await sel.selectOption(want);
   await waitFn(page, `the order to save (${want})`, () => !window.__entry.importing && /Saved; carried out/.test(document.getElementById('camp-orders-status').textContent), null, 15_000);
   const ordered = await slotSave(page);
-  check(`${label}-camp-order`, ordered.army.find((b) => b.id === brigadeId)?.order === want, `${brigadeId}: ${current} -> ${want} saved`);
+  check(`${label}-camp-order`, (ordered.army.find((b) => b.id === brigadeId)?.order ?? 'rest') === want, `${brigadeId}: ${current} -> ${want} saved (unset = Rest, the default)`);
   row.campOrder = { brigadeId, from: current, to: want };
   const menBefore = menById(ordered);
   // ---- Next / Replay: decision cards, then the march ----
@@ -397,6 +414,14 @@ try {
   }
   for (const p of plans) {
     if (Date.now() - t0 > DEADLINE_MS) throw new Error(`run deadline (${DEADLINE_MS / 60000} min) passed before phase ${p.index + 1}`);
+    // camp offers Replay only after a Defeat: if the deliberate defeat did not come out as one, say so and go on
+    if (p.replay) {
+      await campReady(page);
+      if (await page.evaluate(() => document.getElementById('camp-replay')?.hidden !== false)) {
+        check(`p${String(p.index + 1).padStart(2, '0')}-replay-skipped`, false, 'camp offers Replay only after a Defeat, and the deliberate defeat was not one');
+        continue;
+      }
+    }
     // 5 and 6: after phase 2's camp, a reload and an export/import (once, before phase 3)
     if (p.index === 2 && !p.replay) {
       step = 'reload';
