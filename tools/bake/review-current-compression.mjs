@@ -159,7 +159,7 @@ async function main() {
     review.complete=review.pages.every(p=>p.integrity&&Object.values(p.controls).every(Boolean))&&(closeOnly?review.pages.every(p=>p.frames===p.shownFrames):review.sheets.length===5);
     review.qualified=closeOnly&&closeQualified(review);
     if(!review.complete)throw new Error('current compression: diagnostic integrity/control failure; inspect quality.json');
-    if(closeOnly&&!review.qualified)throw new Error('CS close qualification: a required page/route failed unchanged quality; inspect quality.json');
+    if(closeOnly&&!review.qualified){console.error('CS close qualification HALT: a required page/route failed unchanged quality; inspect quality.json');process.exitCode=1;}
   } finally {fs.writeFileSync(path.join(out,'quality.json'),JSON.stringify(review,null,2));if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(fs.realpathSync(process.argv[1])).href)await main();

@@ -1,5 +1,17 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0126 — Measure progression; admit four distinct fictional stores in one phase (Astra, 2026-10-12)
+
+Hold the proposed reputation thresholds pending an actual economy diagnostic: observed campaign outcomes, feasible decisions, replay improvement, documented surplus sales and existing-save level/card reconciliation. The phase-only maximum806 excludes decision/sale reputation. Admit four explicitly fictional game-rule supply objectives in one nonloan franchise phase first, with distinct store IDs per formation per phase, contested/retake and saved-award checks; no victory-objective or historical narrative change. Preserve badge/combat goldens. Exact phase/positions and numbers await the bounded review.
+
+## 0125 — Preserve failed full ASTC result; qualify an eight-ASTC/two-PNG candidate (Astra, 2026-10-12)
+
+Run38261826032/09a12f1 completed all ten CS close pages, 576 frames and76 numbered sheets with valid upload/rejecting controls. Each look's short page4 fails mip2 alpha-edge95 (base10, butternut9; limit8); the other eight pages pass. No all-ASTC adoption or quality waiver. Astra authorizes a new hybrid qualification retaining both original PNG page4s and all frame/anchor/direction metadata, ASTC on the eight passing pages: CS close GPU bytes48,996,984. Actual mixed loading/readback, fallback/partial disposal, visual review and whole-scene/transition budget<=250,000,000 remain necessary before adoption. Preserve the failed report and sheets; native performance unmeasured.
+
+## 0124 — Delegated visual acceptance; observe complete scene reservations first (Astra, 2026-10-12)
+
+The owner-only visual approval gate in0123 is withdrawn: DESIGN's completion delegation and the new takeover reserve Aaron's questions to irreversible/cost/account/licence/publication beyond the existing site/releases. Show actual numbered images; root/Astra visual review plus full CI accepts reversible visual work. Before choosing residency policy, run an Actions-only observer across all eleven campaign phases: both armies, field/close, lens depth, resize and failure states, complete mip/API buffer/target reservations and conservative overlap. Report API estimates separately from unmeasured native driver/CPU peaks; observation alone does not adopt compressed assets or prove the current fallback fits the budget.
+
 ## 0123 — Qualify both complete Confederate close ASTC looks before adoption (Astra, 2026-10-12)
 
 Current five-page diagnostic38258100565/d5c5191 passed upload/raw/rejecting controls; UASTC and direct BC7 failed at least one required mip on every representative page. Direct ASTC passed the sampled CS base/butternut close pages in software and actual SwiftShader GPU, but failed Union close and both field samples. Astra authorizes qualification only: all ten CS close pages, 288 unchanged frames per look, complete mip allocation and metadata, actual GPU/software mips0/1/2 under unchanged limits, numbered comparisons of every frame/direction over light/dark ground. No quality relaxation or codec redesign. Before adoption, both capability-selected ASTC and the existing small PNG fallback must account for the entire two-army scene and loading/transition overlap within250,000,000 GPU bytes, with CPU peaks separate. No PNG/ASTC double residency or leaked partial upload; fallback and look mapping need actual browser checks. Aaron must see and approve actual numbered images before the extra look is fielded. Qualification alone remains fieldable=false; native performance unmeasured.

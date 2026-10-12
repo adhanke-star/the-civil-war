@@ -3,7 +3,8 @@
 **Current owner/scope (Aaron, 2026-10-12): Codex/Sol is sole product writer**, with Astra deciding uncertain
 design/history/tuning choices. Worktree `/private/tmp/cw-v1-1-20261012`, branch `v1-1-gaps-20261012`, starts
 from released v1 `558456f447c984f8868c688bd3acbb6e8c6551bd`. Licence `a79ec3a` and terrain `21eb4a3`
-fully green; origin/main is21eb4a3, Pages38258206345 green. Actual dawn screenshot inspected.
+fully green; origin/main09a12f1 after CI38261729029 all9 jobs green and command/card/carry screenshots
+inspected. Pages38265159893 green; terrain Pages38258206345 green. Actual dawn screenshot inspected.
 Remote command (0119–0122) adds Hardee dawn/Slaughter Pen, Polk Round Forest, Cheatham/Maney alone,
 all Inferred explicit membership. CPU13/13 +13 mutants, existing campaign21/21 +21 mutants pass;
 no new mounted/rally/risk/RNG system. Authored source rosters remain strict; campaign carry projects
@@ -11,13 +12,17 @@ authority onto surviving initial and scheduled formations, dropping only empty r
 Generic Command labels, separate relationship sources, browser module --command-chain in shard4.
 Current five-page diagnostic38258100565/d5c5191 is complete with valid controls. UASTC/direct BC7 fail;
 ASTC passes sampled CS close base/butternut, fails the other samples. No compressed runtime adopted.
-Next pack-figures.yml mode=cs-close qualifies all ten CS close pages from bake38186582847 on Actions only:
-288 unchanged frames/look, actual GPU/software mips0/1/2, complete-chain metadata/allocations, every frame
-over light/dark ground in numbered sheets, unchanged quality thresholds. CPU current-compression10/10 +10
-mutants pass. Qualification is fieldable=false: full two-army scene/transition GPU budget<=250,000,000,
-separate CPU accounting, capability/failure fallback and Aaron's actual numbered-image approval required.
+Full cs-close38261826032/09a12f1 is a retained quality failure: all ten pages/576frames/76sheets complete,
+controls green; both short page4s fail mip2 alpha-edge95 (10/9 vs8). Astra authorizes a new 8ASTC/2originalPNG
+hybrid qualification only (0125), CS close48,996,984 GPU bytes, unchanged frames/anchors and quality limits.
+Next pack-figures.yml mode=scene observes all eleven current PNG scenes, both armies, field/close/lens/resize
+and failure, with conservative API reservations, complete mips and geometry. CPU8/8 +8 mutants pass.
+Qualification remains fieldable=false: whole two-army scene/transition<=250,000,000, separate CPU peaks,
+capability/failure fallback and delegated root/Astra actual numbered-image review required. Owner-only
+visual approval from0123 is withdrawn (0124); Aaron sees actual images, no new permission gate.
 No Vaughan/Donelson/Cheatham bind. CI38258851080/4d4cd38 passed all4 shards/probes/Firefox/WebKit/offline
-but playthrough failed dawn-to-Slaughter Pen carry (0122); failed receipt retained, fix needs fresh full CI.
+but playthrough failed dawn-to-Slaughter Pen carry (0122); failed receipt retained. Fixed09a12f1 full
+CI38261729029 all9 jobs green; actual command-chain carry/Records screenshots inspected, integrated09a12f1.
 `node tools/test.mjs --unit` is the local smoke; browsers/heavy suites run only on Actions.
 
 Finish v1.1 gaps and tag/release, then write an Astra-approved v2 plan and build weekly playable milestones:

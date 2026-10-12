@@ -9,6 +9,7 @@ on:
         options:
           - current
           - cs-close
+          - scene
           - diagnostic
           - candidate
           - full
@@ -35,6 +36,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
         if: inputs.mode != 'residency'
       - name: Fetch the approved existing bake on the runner only
+        if: inputs.mode != 'scene'
         run: |
           set -euo pipefail
           if [ '${{ inputs.mode }}' = current ] || [ '${{ inputs.mode }}' = cs-close ]; then
@@ -47,7 +49,7 @@ jobs:
             gh run download 37347072866 --repo adhanke-star/the-civil-war -n bake-33 -D "$RUNNER_TEMP/approved-bake"
           fi
       - name: Pinned Khronos encoder (Apache-2.0; build tool only)
-        if: inputs.mode != 'residency'
+        if: inputs.mode != 'residency' && inputs.mode != 'scene'
         run: |
           set -euo pipefail
           curl -fsSL --retry 3 -o "$RUNNER_TEMP/ktx.tar.bz2" https://github.com/KhronosGroup/KTX-Software/releases/download/v4.4.2/KTX-Software-4.4.2-Linux-x86_64.tar.bz2
@@ -73,7 +75,7 @@ jobs:
             echo "HISTORICAL_REVIEW=$RUNNER_TEMP/historical-uastc" >> "$GITHUB_ENV"
           fi
       - name: Preserve approved identities; encode only the selected mode
-        if: inputs.mode != 'residency'
+        if: inputs.mode != 'residency' && inputs.mode != 'scene'
         env:
           PACK_MODE: ${{ inputs.mode }}
         run: |
@@ -92,11 +94,25 @@ jobs:
             exit 1
           fi
       - name: GPU readback against every approved PNG and meaningful broken controls
-        if: inputs.mode != 'residency' && inputs.mode != 'current' && inputs.mode != 'cs-close'
+        if: inputs.mode != 'residency' && inputs.mode != 'current' && inputs.mode != 'cs-close' && inputs.mode != 'scene'
         run: node tools/bake/review-compression.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack
       - name: Current five-page actual GPU readback, mips 0/1/2, unchanged quality thresholds
         if: inputs.mode == 'current' || inputs.mode == 'cs-close'
         run: node tools/bake/review-current-compression.mjs
+      - name: Current whole-scene allocation observation, both armies and all campaign phases
+        if: inputs.mode == 'scene'
+        run: |
+          node tools/test-scene-allocation.mjs
+          node tools/test-scene-allocation.mjs --prove-fail
+          node tools/bake/review-scene-allocation.mjs
+      - name: Scene allocation report only, no assets or adoption
+        if: always() && inputs.mode == 'scene'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-allocation
+          path: .out/scene-allocation/report.json
+          retention-days: 7
+          if-no-files-found: warn
       - name: Current diagnostic reports and five numbered comparison images only
         if: always() && inputs.mode == 'current'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -161,7 +177,7 @@ jobs:
           if-no-files-found: error
           compression-level: 0
       - name: Small quality report and comparison sheets
-        if: always() && inputs.mode != 'residency' && inputs.mode != 'current' && inputs.mode != 'cs-close'
+        if: always() && inputs.mode != 'residency' && inputs.mode != 'current' && inputs.mode != 'cs-close' && inputs.mode != 'scene'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: compression-review

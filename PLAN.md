@@ -7,11 +7,11 @@ MAIN's eleven protected WIP files stay untouched. COORDINATION.md is absent; rea
 
 | v1.1 item | Current boundary |
 |---|---|
-| Project licence | Aaron approved MIT code + CC-BY 4.0 original data/text; a79ec3a; same-SHA CI pending |
-| Stones River southern ground | Rebuilt tile + coherent dawn deployment; CPU15/15 and mutants15/15; CI/screenshots pending |
-| Compressed atlases and more CS looks | Astra chose representative-page Actions diagnostic; no renderer adoption yet (0118) |
-| Higher commanders | Read-only source/membership research; historical role and presence before traits |
-| Balance | v1 playthrough grades read; badge/reputation reachability and difficulty assessment pending; Astra signs numbers |
+| Project licence | Aaron approved MIT code + CC-BY 4.0 original data/text; a79ec3a; full CI green, live |
+| Stones River southern ground | Rebuilt tile + coherent dawn deployment;21eb4a3 full CI/actual screenshots/Pages green |
+| Compressed atlases and more CS looks | Full ASTC38261826032 fails two short pages; new8ASTC/2PNG candidate authorized; whole-scene diagnostic next; no adoption |
+| Higher commanders | Four sourced Inferred rows across three Stones phases; carryfix09a12f1 full CI38261729029/actual image readback green, integrated |
+| Balance | Observed campaign570rep/L5; proposed numbers held; actual economy/badge/difficulty probes, first four distinct fictional stores in one nonloan phase (0126) |
 
 Each slice: affected `node tools/test-<system>.mjs`, then `--prove-fail`, and `node tools/test.mjs --unit`
 locally; commit explicit paths, push branch, read all CI jobs for that exact SHA. Four browser shards,
