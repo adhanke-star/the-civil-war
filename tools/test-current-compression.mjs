@@ -3,7 +3,9 @@ import assert from 'node:assert/strict';
 import { PNG } from 'pngjs';
 import { selectPages, EXTRA_LOOK } from './bake/current-compression.mjs';
 import { selectClosePages,selectHybridClosePages } from './bake/current-compression.mjs';
-import { colourComposite, closeQualified,hybridQualified } from './bake/review-current-compression.mjs';
+import { colourComposite, closeQualified,hybridQualified,validateHybridExport } from './bake/review-current-compression.mjs';
+import {loaderFixture} from './atlas-loader-fixture.mjs';
+import {createHash} from 'node:crypto';
 import fs from 'node:fs';
 import { mipBytes } from './bake/compress.mjs';
 import { comparePixels } from './bake/review-compression.mjs';
@@ -28,8 +30,44 @@ function hybridQualification(){return {...qualification(),mode:'cs-close-hybrid'
  const q=qualification().pages.find(q=>q.id===p.id),compressed=p.encoding==='astc4x4';return {...q,encoding:p.encoding,sourceSha256:'a'.repeat(64),sourceBound:true,
  controls:{...q.controls,...(compressed?{parser:true}:{})},quality:compressed?q.quality:{png:true},allocation:{block16:112},metadata:compressed?{astc:{adapterBytes:112}}:{}};
 })};}
-const api={select:selectPages,close:selectClosePages,hybrid:selectHybridClosePages,qualified:closeQualified,hybridQualified,composite:colourComposite,bytes:mipBytes,compare:comparePixels};
+const fixture=loaderFixture(),astcBytes=new Uint8Array(await (await fixture.io.fetch('candidate/base-0.ktx2')).arrayBuffer());fixture.cleanup();
+function exportInput(){
+ const current=closeManifest();delete current.tiers.close.variants;
+ for(const p of current.tiers.close.pages){p.w=8;p.h=8;}
+ for(const f of Object.values(current.tiers.close.frames))Object.assign(f,{x:0,y:0,w:4,h:4,ax:2,ay:4,ox:0,oy:0,ppm:4});
+ const source=structuredClone(current),extra=structuredClone(source.tiers.close);
+ extra.pages.forEach((p,i)=>p.file=`soldier_close_${EXTRA_LOOK}_${i}.png`);source.tiers.close.variants={[EXTRA_LOOK]:extra};
+ const manifest=structuredClone(source),files=new Map(),pages=selectHybridClosePages(source),quality=hybridQualification();
+ quality.complete=quality.qualified=true;quality.fieldable=false;
+ quality.toolSha='a'.repeat(40);quality.sources={US:'constructed Union source',CS:'constructed Confederate source'};
+ quality.sheets=Array.from({length:76},(_,i)=>`cs-close-${String(i+1).padStart(3,'0')}.png`);
+ const image=new PNG({width:8,height:8}),pngBytes=PNG.sync.write(image);
+ const compression={mode:'cs-close-hybrid',fieldable:false,toolSha:quality.toolSha,sources:structuredClone(quality.sources),pages:pages.map(p=>{
+  const file=p.id+(p.encoding==='png'?'-original.png':'-astc.ktx2'),input=p.encoding==='png'?pngBytes:astcBytes;
+  const sha=createHash('sha256').update(pngBytes).digest('hex');files.set(file,input);
+  const T=p.look==='base'?manifest.tiers.close:manifest.tiers.close.variants[p.look],index=Number(p.id.slice(-1));
+  Object.assign(T.pages[index],{file,encoding:p.encoding,alpha:p.encoding==='png'?'straight-gamma-bytes':'premultiplied-gamma-bytes',bytes:input.length,mipLevels:4});
+  const q=quality.pages.find(q=>q.id===p.id);Object.assign(q,{frames:p.frames.length,shownFrames:p.frames.length,sourceSha256:sha});
+  return {...p,sourceSha256:sha,original:p.id+'-original.png',files:{astc:p.id+'-astc.ktx2'}};
+ })};
+ files.set('soldier-hybrid.json',new TextEncoder().encode(JSON.stringify(manifest)));
+ return {current,source,manifest,compression,quality,files};
+}
+const api={select:selectPages,close:selectClosePages,hybrid:selectHybridClosePages,qualified:closeQualified,hybridQualified,composite:colourComposite,bytes:mipBytes,compare:comparePixels,export:validateHybridExport};
 const checks=[
+ ['export-coverage',a=>{assert.deepEqual(a.export(exportInput()),{files:11,astc:8,png:2,frames:576,closeGpuBytes:1576},'export-coverage: actual containers, original PNGs and every source frame');}],
+ ...Object.entries({
+  'export-evidence':r=>r.quality.qualified=false,
+  'export-frame':r=>Object.values(r.manifest.tiers.close.variants[EXTRA_LOOK].frames)[0].ax++,
+  'export-current':r=>r.current.tiers.close.pages[0].w=16,
+  'export-hash':r=>{const f=r.manifest.tiers.close.pages[4].file,b=new Uint8Array(r.files.get(f));b[b.length-1]^=1;r.files.set(f,b);},
+  'export-container':r=>{const f=r.manifest.tiers.close.pages[0].file;r.files.set(f,new Uint8Array(8));r.manifest.tiers.close.pages[0].bytes=8;},
+  'export-extra':r=>r.files.set('unexpected.ktx2',astcBytes),
+  'export-look':r=>{r.source.tiers.close.variants.third=structuredClone(r.source.tiers.close.variants[EXTRA_LOOK]);r.manifest.tiers.close.variants.third=structuredClone(r.manifest.tiers.close.variants[EXTRA_LOOK]);},
+  'export-reserved-look':r=>{r.source.tiers.close.variants.base=structuredClone(r.source.tiers.close.variants[EXTRA_LOOK]);r.manifest.tiers.close.variants.base=structuredClone(r.manifest.tiers.close.variants[EXTRA_LOOK]);},
+  'export-sheets':r=>r.quality.sheets[75]=r.quality.sheets[0],
+  'export-provenance':r=>r.quality.toolSha='b'.repeat(40),
+ }).map(([name,change])=>[name,a=>{const r=exportInput();change(r);r.files.set('soldier-hybrid.json',new TextEncoder().encode(JSON.stringify(r.manifest)));let error;try{a.export(r);}catch(e){error=e;}assert.ok(error,`${name}: corrupt or unbound export refused`);}]),
  ['hybrid-route',a=>{const pages=a.hybrid(closeManifest());assert.equal(pages.filter(p=>p.encoding==='astc4x4').length,8,'hybrid-route: eight compressed pages');assert.deepEqual(pages.filter(p=>p.encoding==='png').map(p=>p.id),[`cs-close-base-4`,`cs-close-${EXTRA_LOOK}-4`],'hybrid-route: both short originals retained');assert.deepEqual(pages.map(({encoding,...p})=>p),selectClosePages(closeManifest()),'hybrid-route: no metadata or frame changes');}],
  ['hybrid-evidence',a=>{assert.ok(a.hybridQualified(hybridQualification()),'hybrid-evidence: complete mixed qualification');for(const change of [r=>r.pages.pop(),r=>r.pages[0].encoding='png',r=>r.pages[0].sourceBound=false,r=>r.pages[0].sourceSha256='bad',r=>r.pages[0].controls.parser=false,r=>r.pages[0].metadata.astc.adapterBytes=0,r=>r.pages[0].astcGpu='UNRUN',r=>r.pages[0].quality.astc=false,r=>r.pages[4].quality.png=false,r=>r.pages[0].shownFrames--,r=>r.sheets=[]]){const r=hybridQualification();change(r);assert.ok(!a.hybridQualified(r),'hybrid-evidence: missing parser/GPU/hash/quality/frame evidence refused');}}],
   ['all-close-frames',a=>{
@@ -78,6 +116,7 @@ const mutants={'hybrid-route':{hybrid:selectClosePages},'hybrid-evidence':{hybri
   'all-close-frames':{close:m=>selectClosePages(m).map(p=>({...p,frames:p.frames.slice(0,3)}))},'close-rejects':{close:()=>[]},'qualification-evidence':{qualified:()=>true},
   'complete-mips':{bytes:()=>({block16:64,rgba8:256,levels:1})},thresholds:{compare:()=>({ok:true})},
   'once-premultiplied':{composite:()=>{const p=new PNG({width:1,height:1});p.data=Buffer.from([64,32,16,255]);return PNG.sync.write(p);}}};
+for(const [name]of checks.filter(([name])=>name.startsWith('export-')))mutants[name]={export:name==='export-coverage'?()=>({}):()=>({files:11})};
 for(const [,check]of checks)await check(api);
 console.log(`CURRENT-COMPRESSION OK (${checks.length}/${checks.length})`);
 if(process.argv.includes('--prove-fail')){

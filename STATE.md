@@ -8,12 +8,12 @@ Progression thresholds[0,30,75,135,210,300,405,525,660,800]; capacity-bounded as
 c328 actual201/201/errors0/530rep/L8/receipts2..8; shards251/365/132/159 all pass/console clean.
 Mixed38282452947/9d60c12 qualified; root+Astra viewed001–076, all576/export/PNGhashes pass.
 8ASTC+2originalPNG close48,996,984B; diagnostic only, no runtime asset adoption.
-0151 loaderdcbeb05 CI38299022067 pending; probes+Firefox/WebKit/offline green.
+0151 loaderdcbeb05 CI38299022067 all9green; shards251/365/144/159 and campaign201 pass.
 LoaderCPU18+18/adapter10+10/compression12+12/unit pass; UI144/144/campaign201/201; fullCI pending/SW67.
 Combined38279674390 complete11/GL0/404/actual split images accepted0146.
-0152 collectorCPU17+17/inactive10+10/partition5+5 pass; CI/scene restoration UNRUN.
+0152 collectorCPU17+17/inactive10+10/partition5+5 pass; CI pending/scene restoration UNRUN.
 GPU432,441,700>250M; both routes/max pools/latent/failure/pixel ceiling UNRUN.
 All20 badge natural B/S/G and level10 legal route open; six approved Veteran observations next.
-Owned.out294.5MB/300M; preserve receipts, review artifacts in RAM; no local browser/heavy suite.
+0154 export admission23+23/actualZIPdigests/11files/576frames pass; sourceCI required; .out294.5MB preserved.
 Native UHD617/iPad fps/sound UNMEASURED; no spending/accounts/device requests.
 After v1.1tag/release: Astra v2plan -> officers -> Confederate -> Eastern -> endgame/codex.

@@ -1,5 +1,38 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0154 ACTIVE — root sole writer until final transfer packet; no simultaneous provider edits.
+Existing export helper validateHybridExport/current-compression probe23+23 now admits exact two close
+looks/all576frames/76sheets/11files/8containers/2originalPNG hashes/fullmips/provenance. Final actual
+ordinaryNode RAM verification passes48,996,984 bytes AND both ZIP digests/API run+SHA bindings.
+Optimized11762770795 digest278f619d48f77a22ce9be20ea3f0461e0e5e933960fa14953a02a9664194b60b;
+review11762905334 digestb9b761a24435489cfe272c90cbe04b60f7b9eb62c8ffec5f1b0f1ae37454452b.
+Both belong to successful38282452947/source9d60c12. Future runner acquisition must verify them;
+parser alone does not prove ASTC payload identity. No scene_routes input/matrix/dispatch added yet.
+Loaderdcbeb05 CI38299022067 all9green; canonical shards251/365/144/159 true/console clean, actual
+campaign201/201/errors0. Collector38300634794 pending; repair839733d38301706060 pending.
+Main remainsc328/Pages38298643627 live sw66, protected MAIN11 unchanged. New export-source fullCI
+also required before main integration. Read existing runs; no cancelling/duplicating/rerunning for luck.
+
+NEXT resource work is a fresh bounded phase in existing owners/runner; contract below still applies.
+Additional concrete maximum contract: three procedural LOD buckets each100B×sidecapacity; fallen
+100B×capacity; baked eachpage48B×capacity; halos84B×US+CS; horses lazycolour76B×capacity;
+native guns/limbers matrices, flags68B×capacity, actual commander rings96vertices; lazy cavalry mounts
+via labelled legal same-roster sandbox spawn when absent. Capacity already includes initial+timeline,
+phase minimum density, six per definition and reserve. Do not repeatedly call unguarded gun alloc.
+Normal motion/full smoke: native Effects puff/update,200systems (40big×8 +160small×3)=800particles;
+pinned SpriteBatch starts1000capacity. Assert actual particles/active systems/native batch buffers.
+Label allocation stress: oneinstance proves full-array reservation, capacitycount only synthetic draw;
+neither is proof of simultaneous max casualties/living gameplay. Native submission must account every
+distinct buffer; CPU-only casualty/state records separate. Hold rendering AND perform stress/restore
+synchronously, since RAF game.animate can rewrite arrays even while post.render is gated.
+Finally restore array bytes/identity/counts/drawranges/visibility/frustum/settings/combat and native
+render the restored scene; allow real upload versions to advance, never falsify renderer caches.
+Pure completeness/max reducer must include normal/stress/transition/failure; require both×11 unique
+phase routes, all states, restoration, finite bytes/zero genuine unknown/unmapped. Oversized failure,
+missing/duplicate phase and restoration failure need rejecting controls. withinLimit requires complete.
+Retain known pending-buffer ownership through reallocation until retirement. Add reversible terrain
+owner only if same-context original-geometry restoration is required; destruction is not restoration.
+
 LATEST0153 ACTIVE — root sole writer. Automatic mainCI38298643624/c328 failed only delegation drag's
 stale card/Undo; native delegate/order/count/arrow correct, subsequent native refresh correct.
 Artifact11769522440 read independently,132 checks/one fail/errors+warnings empty. Test-only bounded

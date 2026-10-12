@@ -6,10 +6,10 @@ import { PNG } from 'pngjs';
 import { chromium } from 'playwright';
 import { startServer, ROOT } from '../serve.mjs';
 import { candidateKtx } from './compress.mjs';
-import { readSmall, outputBytes } from './current-compression.mjs';
+import { readSmall, outputBytes, selectClosePages } from './current-compression.mjs';
 import { comparePixels, candidateSupported } from './review-compression.mjs';
 import {createHash} from 'node:crypto';
-import {parseAtlasAstc} from '../../src/units/atlas-compression.js';
+import {parseAtlasAstc,pageMipBytes} from '../../src/units/atlas-compression.js';
 
 export async function gpuReadback({ png, premul, files, w, h, hybrid=false }) {
   const T=window.T, renderer=window.renderer, gl=renderer.getContext(), ext=gl.getExtension('WEBGL_compressed_texture_astc');
@@ -94,6 +94,50 @@ export function hybridQualified(review){
       &&Object.keys(p.controls).length===(p.encoding==='png'?8:9)&&Object.values(p.controls).every(v=>v===true)
       &&(p.encoding==='png'?p.quality.png===true:p.astcGpu==='RUN'&&p.quality.astc===true&&p.quality['astc-software']===true&&p.metadata.astc.adapterBytes===p.allocation.block16))
     &&review.sheets.length>0;
+}
+/** Admission of a retained qualified export before any scene request; no encoding or asset adoption. */
+export function validateHybridExport({current,source,manifest,compression,quality,files}){
+  const fail=message=>{throw new Error(`hybrid scene input: ${message}`);},same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  // ASTC payload identity additionally requires acquisition of the two immutable qualification artifacts
+  // with their run/SHA and ZIP digests verified by the Actions owner; the parser is not a payload hash.
+  if(!/^[a-f0-9]{40}$/.test(compression.toolSha||'')||quality.toolSha!==compression.toolSha
+    ||!compression.sources?.US||!compression.sources?.CS||!same(compression.sources,quality.sources))fail('report provenance');
+  if(!quality.complete||!quality.qualified||quality.fieldable!==false||!hybridQualified(quality)
+    ||compression.mode!=='cs-close-hybrid'||compression.fieldable!==false)fail('qualification');
+  const sheets=Array.from({length:76},(_,i)=>`cs-close-${String(i+1).padStart(3,'0')}.png`);
+  if(!same(quality.sheets,sheets))fail('sheet coverage');
+  if(!same(source.camera,current.camera)||!same(source.clips,current.clips)||!same(source.tiers.field,current.tiers.field)
+    ||!same(manifest.camera,source.camera)||!same(manifest.clips,source.clips)||!same(manifest.tiers.field,source.tiers.field))fail('source metadata');
+  const strip=T=>Object.fromEntries(Object.entries(T).filter(([k])=>k!=='pages'&&k!=='variants'));
+  if(!same(strip(source.tiers.close),strip(current.tiers.close))||!same(source.tiers.close.pages,current.tiers.close.pages)
+    ||Object.keys(current.tiers.close.variants||{}).length)fail('current single close binding');
+  if(!same(Object.keys(source.tiers.close.variants||{}),['h2_slouch_roll_butternut'])
+    ||!same(Object.keys(manifest.tiers.close.variants||{}),['h2_slouch_roll_butternut']))fail('variant coverage');
+  const selected=selectClosePages(source),sourceLooks={base:source.tiers.close,...source.tiers.close.variants},looks={base:manifest.tiers.close,...manifest.tiers.close.variants};
+  if(!same(Object.keys(sourceLooks),['base','h2_slouch_roll_butternut'])||!same(Object.keys(sourceLooks),Object.keys(looks)))fail('look coverage');
+  for(const [name,T]of Object.entries(looks))if(!same(strip(T),strip(sourceLooks[name]))||T.pages.length!==5)fail('frame metadata');
+  if(compression.pages.length!==10||new Set(compression.pages.map(p=>p.id)).size!==10)fail('compression coverage');
+  const expected=['soldier-hybrid.json'];let bytes=0,astc=0,png=0,frames=0;
+  for(const p of selected){
+    const c=compression.pages.find(c=>c.id===p.id),q=quality.pages.find(q=>q.id===p.id),index=Number(p.id.slice(-1)),page=looks[p.look].pages[index];
+    const encoding=index===4?'png':'astc4x4',file=encoding==='png'?c?.original:c?.files?.astc;
+    if(!c||!q||c.encoding!==encoding||q.encoding!==encoding||c.w!==p.w||c.h!==p.h||!same(c.frames,p.frames)
+      ||q.sourceSha256!==c.sourceSha256||q.frames!==p.frames.length||!same([page.w,page.h],[p.w,p.h])
+      ||page.encoding!==encoding||page.alpha!==(encoding==='png'?'straight-gamma-bytes':'premultiplied-gamma-bytes')
+      ||page.file!==file||!/^cs-close-[a-z0-9_-]+\.(png|ktx2)$/.test(file||''))fail('page binding');
+    const input=files.get(file);if(!(input instanceof Uint8Array)||page.bytes!==input.length)fail('file bytes');
+    const allocation=pageMipBytes(p.w,p.h,encoding==='astc4x4');
+    if(page.mipLevels!==allocation.levels.length)fail('mip count');
+    if(encoding==='astc4x4'){if(parseAtlasAstc(input,page).bytes!==allocation.bytes)fail('ASTC allocation');astc++;}
+    else{
+      if(createHash('sha256').update(input).digest('hex')!==c.sourceSha256)fail('original PNG hash');
+      const image=PNG.sync.read(input);if(image.width!==p.w||image.height!==p.h)fail('PNG dimensions');png++;
+    }
+    expected.push(file);bytes+=allocation.bytes;frames+=p.frames.length;
+  }
+  if(astc!==8||png!==2||frames!==576||new Set(expected).size!==11||files.size!==11||expected.some(f=>!files.has(f)))fail('export coverage');
+  if(!same(JSON.parse(new TextDecoder().decode(files.get('soldier-hybrid.json'))),manifest))fail('manifest bytes');
+  return {files:11,astc,png,frames,closeGpuBytes:bytes};
 }
 async function main() {
   if(process.env.GITHUB_ACTIONS!=='true') throw new Error('current compression review: Actions only');
