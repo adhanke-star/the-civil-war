@@ -42,7 +42,7 @@
 // slouch hats; bake run 38186582847, see its soldier.json `source`). Each side's pool attaches its own atlas.
 
 import * as THREE from 'three';
-import { FIGURE_VIEW, LOD_NEAR, splitHook, CLIP_FRAG } from './soldier-mesh.js';
+import { FIGURE_VIEW, LOD_NEAR, splitHook, CLIP_FRAG, FALLEN, fadeOf, SINK } from './soldier-mesh.js';
 
 export const BAKED_BASES = { US: './assets/figures/union-infantry/', CS: './assets/figures/confederate-infantry/' };
 export const BAKED_BASE = BAKED_BASES.US;
@@ -55,7 +55,7 @@ const BAKE_EXPOSURE = 0.66; // post.js finalMat uExposure: the sprite undoes it 
 const STRIDE = 12; // floats per instance: x y z s | rect x y w h | dx dy variation clip
 export const REC = 8; // floats per frame record: page u v w h dx dy ppm
 const DIR_RES = 8; // direction lookup bins per baked direction step (nearest available direction per clip)
-const FALLEN_REC = 7; // x y z yaw s variation man
+const FALLEN_REC = 8; // x y z yaw s variation man born (FALLEN.clock() when he fell; gore off fades him out)
 
 /**
  * Baked direction for a man facing `yaw` (forward = (sin yaw, cos yaw)) at (x, z), seen from a camera at
@@ -389,6 +389,7 @@ export class ImpostorPool {
     this.cam = new THREE.Vector3(0, 800, 0);
     this.fallen = new Float32Array(capacity * FALLEN_REC);
     this.nFallen = 0;
+    this.goneTo = 0; // gore off: casualties [0, goneTo) have faded out and are no longer drawn
     this.standing = 0; // men pushed this frame (not counting casualties)
     this.drawn = 0;
     this.poses = new Uint32Array(8); // men pushed this frame per pose code (BAKE_CLIP), casualties included
@@ -499,20 +500,22 @@ export class ImpostorPool {
     return true;
   }
 
-  /** A casualty lying where he fell (kept for the rest of the battle). */
+  /** A casualty lying where he fell (kept for the rest of the battle; with gore off he fades after a few seconds). */
   addFallen(x, y, z, yaw, s, variation, man = 0) {
     if (this.nFallen >= this.capacity) return;
     const f = this.fallen, o = this.nFallen++ * FALLEN_REC;
-    f[o] = x; f[o + 1] = y; f[o + 2] = z; f[o + 3] = yaw; f[o + 4] = s; f[o + 5] = variation; f[o + 6] = man;
+    f[o] = x; f[o + 1] = y; f[o + 2] = z; f[o + 3] = yaw; f[o + 4] = s; f[o + 5] = variation; f[o + 6] = man; f[o + 7] = FALLEN.clock();
   }
 
   flush() {
     const visible = this.group.visible = FIGURE_VIEW.baked && this.ready;
     if (visible) {
-      const f = this.fallen, clip = FIGURE_VIEW.clipBaked;
-      for (let j = 0; j < this.nFallen; j++) {
-        const o = j * FALLEN_REC;
-        this.push(f[o], f[o + 1], f[o + 2], f[o + 3], f[o + 4], BAKE_CLIP.FALLEN, 0, f[o + 5], clip, f[o + 6]);
+      const f = this.fallen, clip = FIGURE_VIEW.clipBaked, gore = FALLEN.gore, now = gore ? 0 : FALLEN.clock();
+      if (!gore) while (this.goneTo < this.nFallen && fadeOf(now - f[this.goneTo * FALLEN_REC + 7], false) >= 1) this.goneTo++;
+      for (let j = gore ? 0 : this.goneTo; j < this.nFallen; j++) {
+        const o = j * FALLEN_REC, k = gore ? 0 : fadeOf(now - f[o + 7], false);
+        // gore off: sink into the ground and shrink, then stop drawing (laid down in order: the rest are younger)
+        this.push(f[o], f[o + 1] - k * SINK * f[o + 4], f[o + 2], f[o + 3], f[o + 4] * (1 - 0.5 * k), BAKE_CLIP.FALLEN, 0, f[o + 5], clip, f[o + 6]);
       }
     }
     let drawn = 0;

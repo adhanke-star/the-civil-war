@@ -7,7 +7,11 @@
 //                         | 'up' | 'down' | 'equip' | 'select' | 'cancel' | 'whoosh' | 'stamp'
 //   level: 'full' | 'subtle' (the fanfare setting; 'off' is handled by the caller: flip sound only)
 // Every sound is a few oscillators or a noise burst with short envelopes: cheap on the UHD 617 and A10X.
+// They play through the page's one mixer (src/audio/mixer.js, its 'ui' bus): the Master and Effects volumes and Mute
+// apply, and the battle's recorded sound shares the same AudioContext. They stay synthesised: no recorded card, stamp,
+// chime or fanfare candidate was clearly better (none could be auditioned; the synthesised set is tuned to the cards).
 // Note: on iPad the hardware silent switch mutes Web Audio.
+import { mixer } from '../audio/mixer.js';
 
 let ctx = null;
 let out = null; // master gain
@@ -22,20 +26,14 @@ function unlock() {
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
     return;
   }
-  const AC = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext);
-  if (!AC) return;
-  try {
-    ctx = new AC();
-  } catch {
-    ctx = null;
-    return;
-  }
+  ctx = mixer.unlock(); // the shared context, created inside this gesture
+  if (!ctx) return;
   const comp = ctx.createDynamicsCompressor();
   comp.threshold.value = -14;
   comp.ratio.value = 4;
   out = ctx.createGain();
   out.gain.value = soundOn ? 0.8 : 0;
-  out.connect(comp).connect(ctx.destination);
+  out.connect(comp).connect(mixer.bus('ui'));
   // two seconds of white noise, reused (looped) by every noise sound
   noiseBuf = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
   const d = noiseBuf.getChannelData(0);

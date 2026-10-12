@@ -453,3 +453,30 @@ body:has(.sb-toggle.sb-closed:not(.sb-left)) #soldier-view-hint { right: calc(va
 .gmarker.down .gstar { color: #c9c2b4; }
 .gmarker.hidden { display: none; }
 .gmarker:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
+
+/* Settings (src/ui/settings-panel.js): the strip's button; the panel brings its own stylesheet. */
+#settings-btn { font-size: 20px; line-height: 1; }
+
+/* Feedback readability (DECISIONS 0109): the event feed and toasts read over the field without a box. Each row hugs its
+   text with a translucent backing and a text shadow; the feed shows its 3 newest rows (older ones scroll up out of view,
+   still reachable by keyboard, wheel and touch) and never reaches the objective line or the dock. */
+#feed.panel { background: none; border: 0; box-shadow: none; border-radius: 0; }
+#feed { padding: 0; gap: 3px; justify-items: end; scrollbar-width: none;
+  max-height: min(138px, calc(100dvh - var(--top-h) - var(--objective-h) - var(--dock-h) - 40px - env(safe-area-inset-top) - env(safe-area-inset-bottom))); }
+#feed::-webkit-scrollbar { display: none; }
+#feed li { display: flex; justify-content: flex-end; min-width: 0; max-width: 100%; }
+#feed button { width: auto; max-width: 100%; min-height: 44px; gap: 0; align-items: center; padding: 0; background: none;
+  text-shadow: 0 1px 2px #000, 0 0 4px rgba(0, 0, 0, 0.85); }
+#feed button:hover { background: none; }
+#feed button time, #feed button span { padding: 3px 7px; background: rgba(14, 12, 18, 0.62); line-height: 1.3; }
+#feed button time { border-radius: 4px 0 0 4px; padding-right: 3px; }
+#feed button span { border-radius: 0 4px 4px 0; }
+#feed button:hover time, #feed button:hover span { background: rgba(14, 12, 18, 0.8); }
+#feed button:disabled { cursor: default; }
+#toasts { top: calc(var(--edge) + var(--top-h) + var(--objective-h) + 10px + env(safe-area-inset-top)); justify-items: center; gap: 4px;
+  max-width: min(560px, calc(100vw - 24px)); }
+#toasts p { padding: 4px 10px; background: rgba(14, 12, 18, 0.62); border-radius: 4px; text-shadow: 0 1px 2px #000, 0 0 4px rgba(0, 0, 0, 0.85);
+  overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  #feed { max-height: min(46px, calc(100dvh - var(--top-h) - var(--objective-h) - var(--dock-h) - 40px - env(safe-area-inset-top) - env(safe-area-inset-bottom))); }
+}

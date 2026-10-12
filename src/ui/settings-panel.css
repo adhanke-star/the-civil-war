@@ -1,0 +1,42 @@
+/* src/ui/settings-panel.css: the Settings dialog (src/ui/settings-panel.js). Self-contained (cws- names) so it reads the
+   same over the title, the camp and the battlefield. Controls are at least 44 CSS px; text at least 14 px; fits 320 px. */
+dialog.cws {
+  box-sizing: border-box; width: min(520px, calc(100vw - 16px)); max-width: none; max-height: calc(100dvh - 16px); margin: auto; padding: 12px 14px 14px;
+  overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; color: #f1ece0; background: #18161d;
+  border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 10px; box-shadow: 0 8px 28px rgba(0, 0, 0, 0.6);
+  font: 15px/1.4 "Helvetica Neue", Arial, sans-serif; -webkit-user-select: text; user-select: text;
+}
+dialog.cws::backdrop { background: rgba(8, 7, 10, 0.55); }
+.cws :focus-visible { outline: 3px solid #ffd27a; outline-offset: 2px; }
+.cws-head { position: sticky; top: -12px; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  margin: -12px -14px 4px; padding: 8px 14px; background: #18161d; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+.cws h2 { margin: 0; font: normal 20px/1.3 Georgia, serif; }
+.cws-close { margin: 0; min-width: 88px; min-height: 44px; padding: 0 14px; color: #1d1a16; background: #f1ece0; border: 0; border-radius: 6px; cursor: pointer; font: 600 15px "Helvetica Neue", Arial, sans-serif; }
+.cws-group { display: block; margin: 10px 0 0; padding: 8px 10px 10px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 8px; min-width: 0; }
+.cws-group legend { padding: 0 4px; font: 600 15px "Helvetica Neue", Arial, sans-serif; }
+.cws-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.cws-choice, .cws-check { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; min-width: 44px; padding: 0 12px; box-sizing: border-box;
+  border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 6px; cursor: pointer; background: rgba(255, 255, 255, 0.05); }
+.cws-choice:has(input:checked) { border-color: #ffd27a; background: rgba(255, 210, 122, 0.14); }
+.cws-choice:has(input:disabled), .cws-check:has(input:disabled) { opacity: 0.6; cursor: not-allowed; }
+.cws input[type="radio"], .cws input[type="checkbox"] { width: 20px; height: 20px; margin: 0; accent-color: #ffd27a; }
+.cws-check { margin-top: 8px; }
+.cws-slider { display: grid; grid-template-columns: minmax(90px, 8.5em) minmax(0, 1fr) 3.4em; align-items: center; gap: 8px; min-height: 44px; }
+.cws-slider label { font-size: 15px; }
+.cws-slider input[type="range"] { width: 100%; min-width: 0; height: 44px; margin: 0; accent-color: #ffd27a; }
+.cws-pct { font-variant-numeric: tabular-nums; text-align: right; color: #c9c2b4; }
+.cws-note { margin: 8px 0 0; font-size: 14px; color: #c9c2b4; overflow-wrap: anywhere; }
+.cws-motion { margin-top: 12px; }
+.cws-details { margin-top: 8px; font-size: 14px; }
+.cws-details summary { display: flex; align-items: center; min-height: 44px; cursor: pointer; color: #f1ece0; }
+.cws-calls { margin: 0; padding-left: 18px; color: #c9c2b4; }
+.cws-calls li { margin: 2px 0; }
+.cws-calls b { color: #f1ece0; font-weight: 600; text-transform: capitalize; }
+@media (max-width: 400px) {
+  dialog.cws { padding: 10px 10px 12px; }
+  .cws-head { margin: -10px -10px 4px; padding: 6px 10px; top: -10px; }
+  .cws-slider { grid-template-columns: minmax(0, 1fr) 3.2em; }
+  .cws-slider label { grid-column: 1 / -1; }
+}
+@media (prefers-reduced-motion: no-preference) { dialog.cws[open] { animation: cws-in 0.14s ease-out; } }
+@keyframes cws-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }

@@ -233,6 +233,19 @@ export function deviceName(ua = typeof navigator !== 'undefined' ? navigator.use
   return browser ? `${os} (${browser})` : os;
 }
 
+/**
+ * Player settings shared by the title, the camp and the field (the Settings panel, src/ui/settings-panel.js, DESIGN §4):
+ * specs only, so importing this file still defines nothing. Each user calls define(key, spec) itself (idempotent), so
+ * the panel works without the field loaded and the field works without the panel.
+ */
+export const GORE_KEY = 'look.gore';
+export const GORE_SPEC = Object.freeze({
+  tab: 'Look', type: 'toggle', default: true, label: 'Gore',
+  note: 'On: the fallen remain where they fell. Off: no blood, and fallen men fade from the field after a few seconds; wrecked guns and dead horses stay (they are not gore). Looks only: the battle is the same.',
+});
+/** Fallen men lie this long (simulation seconds) before fading with gore off, and the fade itself. */
+export const GORE_FADE = Object.freeze({ delay: 6, fade: 2 });
+
 /** Text block Aaron pastes back: a header, one `key = value` line per setting that differs from its default, a `locked:` line. */
 export function exportText() {
   const date = new Date().toISOString().slice(0, 10);

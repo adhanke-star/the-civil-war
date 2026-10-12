@@ -1,0 +1,375 @@
+// CPU check: recorded sound and music (src/audio/bank.js, mixer.js, director.js, music.js), the gore toggle
+// (src/units/soldier-mesh.js FALLEN / FallenPool) and the player settings they persist (src/settings.js).
+//   bank-files        every file under assets/audio is in the bank manifest and every manifest entry exists, with an
+//                     allowed licence; effects are mono MP3, music stereo MP3
+//   attribution       ATTRIBUTION.md lists each file with an allowed licence; no craigsmith source is used
+//   budget            effects <= 4 MB, music <= 8 MB, each file <= 2.5 MB
+//   mixer-maths       bus level = master x its slider, 0 when muted; gain = level^2 x duck; clamped
+//   director-limits   per-type cooldowns, the simultaneous-voice cap and order-call rate limits on a fake clock
+//   director-bed      the rolling-fire bed follows the number of units firing; pause silences it; season ambience
+//   order-calls       one labelled call per order kind; the modern Retreat is never captioned as the 1862 signal
+//   gore-sim          gore off changes no simulation result (Henry Hill, with figures animated and the fade running)
+//   gore-fade         gore off: a casualty lies, sinks and is hidden on the fade clock; gore on puts every one back
+//   settings-persist  volumes and gore persist; settings saved by an older build still load; bad stored values refused
+//   music-moods       results vs lament after heavy losses; never over a battle
+//   lazy-load         nothing is created, fetched or streamed before the first gesture
+// `node tools/test-audio.mjs` prints AUDIO OK (n/n); `--prove-fail` also runs one mutant per check and requires each to
+// fail that check, with the check's own name in the failure text. No browser, no GPU, writes nothing.
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { Scene } from 'three';
+import { SOUNDS, AUDIO_BUDGET, ALLOWED_LICENCES, ORDER_CALLS, AUDIO_DIR, ambientFor } from '../src/audio/bank.js';
+import { busLevel, busGain, defineAudioSettings, AUDIO_SETTINGS, Mixer } from '../src/audio/mixer.js';
+import { Director, DIRECTOR } from '../src/audio/director.js';
+import * as music from '../src/audio/music.js';
+import { FallenPool, FALLEN, fadeOf, UNIFORMS } from '../src/units/soldier-mesh.js';
+import * as settings from '../src/settings.js';
+import { henryHillRun } from './test-packs.mjs'; // sets the same flat-ground rules the Henry Hill oracle uses
+import { Game } from '../src/game.js';
+import { setPlan } from '../src/world/landscape.js';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const AUDIO = path.join(ROOT, AUDIO_DIR);
+const HH = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/scenarios/henry-hill.json'), 'utf8'));
+const MB = 1024 * 1024;
+
+function audioFiles() {
+  const out = [];
+  const walk = (dir) => { for (const e of fs.readdirSync(dir, { withFileTypes: true })) { const p = path.join(dir, e.name); if (e.isDirectory()) walk(p); else out.push(path.relative(AUDIO, p).split(path.sep).join('/')); } };
+  walk(AUDIO);
+  return out.sort();
+}
+/** MPEG audio frame header of a file (after any ID3v2 tag): { mpeg1, layer3, mono } or null. */
+function mp3Header(file) {
+  const b = fs.readFileSync(file);
+  let i = 0;
+  if (b.toString('latin1', 0, 3) === 'ID3') i = 10 + ((b[6] & 0x7f) << 21 | (b[7] & 0x7f) << 14 | (b[8] & 0x7f) << 7 | (b[9] & 0x7f));
+  for (const end = Math.min(b.length - 4, i + 4096); i < end; i++) {
+    if (b[i] === 0xff && (b[i + 1] & 0xe0) === 0xe0) return { mpeg1: ((b[i + 1] >> 3) & 3) === 3, layer3: ((b[i + 1] >> 1) & 3) === 1, mono: (b[i + 3] >> 6) === 3 };
+  }
+  return null;
+}
+const attributionText = () => fs.readFileSync(path.join(ROOT, 'ATTRIBUTION.md'), 'utf8');
+/** The bullets of ATTRIBUTION.md's sound section (each with its continuation lines). */
+function soundBullets(text) {
+  const start = text.indexOf('## Sound and music');
+  if (start < 0) return [];
+  const rest = text.slice(start).split('\n').slice(1);
+  const end = rest.findIndex((l) => l.startsWith('## '));
+  const bullets = [];
+  for (const line of end < 0 ? rest : rest.slice(0, end)) {
+    if (line.startsWith('- ')) bullets.push(line);
+    else if (/^\s+\S/.test(line) && bullets.length) bullets[bullets.length - 1] += ' ' + line.trim();
+  }
+  return bullets;
+}
+
+/** A fake mixer: records plays; each one-shot lasts `dur` seconds. */
+function fakeMixer({ dur = 2, loaded = true } = {}) {
+  const m = { plays: [], stopped: [], ducks: [], dur };
+  m.has = () => loaded;
+  m.play = (id, opts = {}) => {
+    const h = { id, opts, duration: id.startsWith('call') ? 4 : m.dur, gains: [], stopped: false, pans: [] };
+    h.setGain = (v) => h.gains.push(v); h.setPan = (p) => h.pans.push(p); h.stop = () => { h.stopped = true; };
+    m.plays.push(h);
+    return h;
+  };
+  m.stopBus = (bus) => m.stopped.push(bus);
+  m.duck = (bus, f) => m.ducks.push([bus, f]);
+  return m;
+}
+function clockAt(t0 = 0) { const c = { t: t0 }; c.now = () => c.t; return c; }
+
+/** Henry Hill with every figure animated (so casualties reach the fallen pools and the gore fade runs). */
+function goreRun(api, goreOn) {
+  settings.set('look.gore', goreOn);
+  const s = structuredClone(HH); s.end = '14:03';
+  setPlan(s);
+  const terrain = { half: 2000, heightAt: () => 0, slopeAt: () => 0, inBounds: () => true };
+  const g = new Game({ scene: new Scene(), terrain, scenario: s, world: { fenceField: null }, effects: { volley() {}, boom() {} } });
+  const clock = FALLEN.clock;
+  FALLEN.clock = () => g.simTime;
+  try {
+    for (let i = 0; i < 160 && !g.over; i++) { for (let k = 0; k < 4; k++) { g.tick(0.05); api.goreHook(g, goreOn); } g.animate(0.2); }
+  } finally { FALLEN.clock = clock; }
+  const hidden = g.fallen.US.hiddenTo + g.fallen.CS.hiddenTo, laid = g.fallen.US.used + g.fallen.CS.used;
+  return { sim: { over: g.over, winner: g.result?.winner ?? null, simTime: g.simTime, holder: g.holder, men: g.units.map((u) => [u.id, u.men, u.state, u.x, u.z]), next: g.rnd() }, hidden, laid };
+}
+
+/** A fresh copy of src/settings.js on a fake localStorage holding `stored` (the caller restores window). */
+async function freshSettings(stored, tag) {
+  const store = new Map(Object.entries(stored));
+  globalThis.window = { localStorage: { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)), removeItem: (k) => store.delete(k) } };
+  const S = await import(`${pathToFileURL(path.join(ROOT, 'src/settings.js')).href}?${tag}`);
+  return { S, store };
+}
+
+const API = { SOUNDS, AUDIO_BUDGET, ALLOWED_LICENCES, ORDER_CALLS, busLevel, busGain, Director, FallenPool, fadeOf, Mixer,
+  defineAudio: defineAudioSettings, resultsMood: music.resultsMood, lossShareOf: music.lossShareOf, audioFiles, attributionText, goreHook: () => {} };
+
+export const AUDIO_CHECKS = [
+  ['bank-files', (api) => {
+    const files = api.audioFiles(), listed = Object.values(api.SOUNDS).map((s) => s.file).sort();
+    assert.ok(files.length > 0, 'bank-files: no files under assets/audio');
+    assert.deepEqual(files, [...new Set(listed)].sort(), 'bank-files: assets/audio and the bank manifest list different files');
+    for (const [id, s] of Object.entries(api.SOUNDS)) {
+      assert.ok(api.ALLOWED_LICENCES.some((l) => s.licence.startsWith(l)), `bank-files: ${id} has licence ${s.licence}`);
+      const h = mp3Header(path.join(AUDIO, s.file));
+      assert.ok(h && h.mpeg1 && h.layer3, `bank-files: ${s.file} is not an MPEG-1 Layer III (MP3) file`);
+      assert.equal(h.mono, s.bus !== 'music', `bank-files: ${s.file} must be ${s.bus === 'music' ? 'stereo music' : 'a mono effect'}`);
+    }
+  }],
+  ['attribution', (api) => {
+    const text = api.attributionText(), bullets = soundBullets(text);
+    assert.ok(bullets.length > 0, 'attribution: ATTRIBUTION.md has no "Sound and music" section');
+    for (const s of Object.values(api.SOUNDS)) {
+      const row = bullets.find((b) => b.includes(`assets/audio/${s.file}`));
+      assert.ok(row, `attribution: assets/audio/${s.file} is not listed in ATTRIBUTION.md`);
+      assert.ok(/ — (CC0 1\.0|Public domain|CC BY [\d.]+)/.test(row) && !/CC BY-(NC|ND|SA)/.test(row), `attribution: assets/audio/${s.file} has no allowed licence in ATTRIBUTION.md`);
+      assert.ok(/https:\/\/(freesound\.org|commons\.wikimedia\.org|archive\.org)\//.test(row), `attribution: assets/audio/${s.file} has no source page URL`);
+      if (/CC BY /.test(row)) assert.ok(/ — CC BY [\d.]+ — [^—]+/.test(row), `attribution: assets/audio/${s.file} is CC-BY without its author`);
+    }
+    assert.ok(!bullets.some((b) => /freesound\.org\/people\/craigsmith\//.test(b)), 'attribution: a craigsmith recording is used');
+  }],
+  ['budget', (api) => {
+    let effects = 0, tunes = 0;
+    for (const s of Object.values(api.SOUNDS)) {
+      const n = fs.statSync(path.join(AUDIO, s.file)).size;
+      assert.ok(n <= api.AUDIO_BUDGET.file, `budget: ${s.file} is ${(n / MB).toFixed(2)} MB (over ${(api.AUDIO_BUDGET.file / MB).toFixed(1)} MB)`);
+      if (s.bus === 'music') tunes += n; else effects += n;
+    }
+    assert.ok(effects <= api.AUDIO_BUDGET.effects && effects <= 4 * MB, `budget: effects, calls, voices and ambience are ${(effects / MB).toFixed(2)} MB (over ${(Math.min(api.AUDIO_BUDGET.effects, 4 * MB) / MB).toFixed(1)} MB)`);
+    assert.ok(tunes <= api.AUDIO_BUDGET.music && tunes <= 8 * MB, `budget: music is ${(tunes / MB).toFixed(2)} MB (over ${(Math.min(api.AUDIO_BUDGET.music, 8 * MB) / MB).toFixed(1)} MB)`);
+  }],
+  ['mixer-maths', (api) => {
+    const v = { master: 0.5, effects: 0.8, music: 0.4, voices: 1, mute: false };
+    const near = (a, b, what) => assert.ok(Math.abs(a - b) < 1e-9, `mixer-maths: ${what} is ${a}, expected ${b}`);
+    near(api.busLevel('effects', v), 0.4, 'effects level');
+    near(api.busLevel('ambient', v), 0.4, 'ambient level (follows Effects)');
+    near(api.busLevel('ui', v), 0.4, 'reward sounds level (follow Effects)');
+    near(api.busLevel('music', v), 0.2, 'music level');
+    near(api.busLevel('voices', v), 0.5, 'voices level');
+    near(api.busGain('effects', v), 0.16, 'effects gain (level squared)');
+    near(api.busGain('ambient', v, 0.5), 0.08, 'ducked ambient gain');
+    near(api.busLevel('effects', { ...v, mute: true }), 0, 'muted level');
+    near(api.busLevel('music', { ...v, master: 0 }), 0, 'master 0');
+    near(api.busLevel('effects', { ...v, master: 7, effects: -2 }), 0, 'clamped level');
+    near(api.busLevel('voices', { ...v, master: NaN }), 0, 'NaN master');
+    near(api.busLevel('effects', null), 0, 'no levels');
+  }],
+  ['director-limits', (api) => {
+    const c = clockAt(100), m = fakeMixer({ dur: 10 }); // long sounds: none ends during the burst
+    const d = new api.Director({ mixer: m, now: c.now, rnd: () => 0.5 });
+    for (let i = 0; i < 20; i++) d.volley(0, 0, 400); // twenty units firing in one frame
+    assert.equal(m.plays.length, 1, 'director-limits: a burst of volleys in one instant must play once (volley cooldown)');
+    for (let i = 0; i < 30; i++) { c.t += DIRECTOR.cooldown.volley + 0.001; d.volley(0, 0, 400); }
+    assert.equal(m.plays.length, DIRECTOR.maxVoices, `director-limits: ${m.plays.length} volleys live at once; the cap is ${DIRECTOR.maxVoices}`);
+    assert.equal(d.voices(), DIRECTOR.maxVoices, 'director-limits: the voice count must stand at the cap');
+    c.t += 10.1; // every one-shot has ended
+    assert.ok(d.volley(0, 0, 400), 'director-limits: a volley must play again once voices have ended');
+    const before = m.plays.length;
+    d.cannon(0, 0); d.cannon(0, 0); c.t += DIRECTOR.cooldown.cannon / 2; d.cannon(0, 0);
+    assert.equal(m.plays.length - before, 1, 'director-limits: cannon reports inside the cannon cooldown must not stack');
+    assert.equal(m.plays.at(-1).id, 'cannon', 'director-limits: the cannon sound is "cannon"');
+    assert.match(d.volley(0, 0, 40)?.id ?? 'none', /^shot-\d$/, 'director-limits: a unit under 80 men fires a single shot');
+    // order calls: one per callGap, one per kind per callRepeat; labels come back
+    c.t += 10;
+    assert.equal(d.order('charge'), ORDER_CALLS.charge.label, 'director-limits: the first Charge call plays and names its call');
+    assert.equal(d.order('move'), null, 'director-limits: a second call inside the call gap must not play');
+    c.t += DIRECTOR.callGap + 0.01;
+    assert.equal(d.order('charge'), null, 'director-limits: the same kind again inside callRepeat must not play');
+    assert.equal(d.order('move'), ORDER_CALLS.move.label, 'director-limits: another kind after the call gap plays');
+    assert.equal(d.order('dance'), null, 'director-limits: an unknown order kind has no call');
+    // paused: one-shots stop and no new ones play
+    d.update(0.016, { paused: true });
+    c.t += 5;
+    assert.equal(d.volley(0, 0, 400), null, 'director-limits: no volley may play while paused');
+    assert.ok(m.stopped.includes('effects') && m.ducks.some(([b, f]) => b === 'ambient' && f < 1), 'director-limits: pause must stop the effects and duck the ambience');
+    d.update(0.016, { paused: false });
+    assert.ok(m.ducks.some(([b, f]) => b === 'ambient' && f === 1), 'director-limits: resuming must restore the ambience');
+    // far away: too quiet to play at all; panned and duller with distance through locate()
+    const far = new api.Director({ mixer: fakeMixer(), now: c.now, locate: () => ({ pan: -0.6, gain: 0.01, lowpass: 1400 }) });
+    assert.equal(far.volley(0, 0, 400), null, 'director-limits: a volley too far to hear must not take a voice');
+    const near = new api.Director({ mixer: fakeMixer(), now: c.now, locate: () => ({ pan: -0.6, gain: 0.8, lowpass: 2800 }) });
+    const h = near.volley(0, 0, 500);
+    assert.ok(h && h.opts.pan === -0.6 && h.opts.lowpass === 2800 && Math.abs(h.opts.gain - 0.8) < 1e-9, 'director-limits: a volley takes its pan, distance gain and low-pass from locate()');
+  }],
+  ['director-bed', (api) => {
+    const c = clockAt(0), m = fakeMixer();
+    const d = new api.Director({ mixer: m, now: c.now, rnd: () => 0.99 });
+    const level = (firing, paused = false) => d.update(0.016, { firing, paused, season: 'winter' });
+    assert.equal(level(0), 0, 'director-bed: nobody firing must leave the rolling-fire bed silent');
+    const some = level(4), full = level(10), many = level(40);
+    assert.ok(some > 0 && some < full, `director-bed: 4 units firing gave ${some}, 10 gave ${full}; the bed must swell with the fighting`);
+    assert.equal(full, DIRECTOR.bedMax, 'director-bed: 10 or more firing is the full bed');
+    assert.equal(many, DIRECTOR.bedMax, 'director-bed: the bed is capped');
+    assert.equal(level(40, true), 0, 'director-bed: pause silences the bed');
+    const bed = m.plays.find((p) => p.id === 'fire-bed');
+    assert.ok(bed && bed.opts.loop && bed.gains.at(-1) === 0, 'director-bed: the bed is one looping sound whose gain follows the fighting');
+    assert.ok(m.plays.some((p) => p.id === 'amb-winter' && p.opts.loop), 'director-bed: a winter field plays the winter ambience');
+    assert.equal(ambientFor('spring'), 'amb-spring', 'director-bed: spring ambience');
+    assert.equal(ambientFor('autumn'), 'amb-autumn', 'director-bed: autumn ambience');
+    assert.equal(ambientFor(undefined), 'amb-spring', 'director-bed: a field with no season uses the summer meadow');
+    d.update(0.016, { firing: 0, season: 'spring', cavalry: { x: 0, z: 0 } });
+    assert.ok(m.plays.some((p) => p.id === 'amb-spring') && m.plays.some((p) => p.id === 'horse-gallop' && p.opts.loop), 'director-bed: a season change swaps the ambience; moving cavalry brings the gallop');
+  }],
+  ['order-calls', (api) => {
+    for (const kind of ['move', 'run', 'attack', 'charge', 'hold', 'halt', 'holdfire', 'fallback']) {
+      const c = api.ORDER_CALLS[kind];
+      assert.ok(c && api.SOUNDS[c.id] && api.SOUNDS[c.id].role === 'call', `order-calls: the ${kind} order has no call in the bank`);
+      assert.ok(typeof c.label === 'string' && c.label.length > 8, `order-calls: the ${kind} call has no label`);
+    }
+    for (const [kind, c] of Object.entries(api.ORDER_CALLS)) {
+      if (c.id === 'call-retreat') assert.ok(/not the 1862/.test(c.label) && /modern/.test(c.label), `order-calls: the ${kind} call (modern Retreat) must say it is not the 1862 signal`);
+      assert.ok(!/\b1862\b/.test(c.label) || /not the 1862/.test(c.label), `order-calls: the ${kind} call is captioned as an 1862 signal`);
+    }
+  }],
+  ['gore-sim', (api) => {
+    const a = henryHillRun(), b = (() => { settings.set('look.gore', false); try { return henryHillRun(); } finally { settings.set('look.gore', true); } })();
+    assert.deepEqual(b, a, 'gore-sim: gore off changed the Henry Hill oracle run');
+    const on = goreRun(api, true), off = goreRun(api, false);
+    settings.set('look.gore', true);
+    assert.ok(on.laid > 0, 'gore-sim: the run laid down no casualties (the check would prove nothing)');
+    assert.ok(off.hidden > 0 && on.hidden === 0, `gore-sim: gore off must fade some fallen (${off.hidden} of ${off.laid}) and gore on none (${on.hidden})`);
+    assert.deepEqual(off.sim, on.sim, 'gore-sim: gore off changed the simulation (men, positions, states, result or random stream)');
+  }],
+  ['gore-fade', (api) => {
+    const c = clockAt(0), clock = FALLEN.clock;
+    FALLEN.clock = c.now;
+    settings.set('look.gore', false);
+    try {
+      const p = new api.FallenPool(8, UNIFORMS.US);
+      const lay = (t, y) => { c.t = t; const i = p.alloc(); p.set(i, 0, y, 0, 0, 4.4, false, 0, 0, false); return i; };
+      const a = lay(0, 10), b = lay(1, 20), d = lay(7, 30);
+      const y = (i) => p.mesh.instanceMatrix.array[i * 16 + 13], clipOf = (i) => p.clip.array[i];
+      c.t = 3; p.flush();
+      assert.ok(y(a) === 10 && clipOf(a) === 0, 'gore-fade: a casualty must lie unchanged before the fade delay');
+      c.t = 7; p.flush();
+      assert.ok(y(a) < 10 && y(a) > 10 - 4.4 && clipOf(a) === 0, `gore-fade: halfway through the fade the casualty must be sinking (y ${y(a)})`);
+      c.t = 9.01; p.flush();
+      assert.ok(clipOf(a) === 2 && clipOf(b) === 2 && clipOf(d) === 0 && y(d) === 30, 'gore-fade: after delay + fade the casualty must be hidden and a younger one still lying');
+      assert.equal(api.fadeOf(100, true), 0, 'gore-fade: with gore on nothing fades');
+      settings.set('look.gore', true); p.flush();
+      assert.ok(clipOf(a) === 0 && clipOf(b) === 0 && y(a) === 10 && y(b) === 20, 'gore-fade: gore on must put every faded casualty back where he fell');
+    } finally { FALLEN.clock = clock; settings.set('look.gore', true); }
+  }],
+  ['settings-persist', async (api) => {
+    const prev = globalThis.window;
+    try {
+      // An older build saved only its own keys (and a lock); this build adds the audio and gore settings.
+      const old = { 'cw.settings': JSON.stringify({ 'screens.cardStyle': 'hybrid', 'look.smoke': false, 'audio.voices': 7, 'audio.mute': 'maybe' }), 'cw.locks': '["screens.cardStyle"]' };
+      const { S, store } = await freshSettings(old, 'persist-a');
+      api.defineAudio(S); S.define(settings.GORE_KEY, settings.GORE_SPEC);
+      assert.equal(S.get('audio.master'), 0.8, 'settings-persist: a new setting must start at its default under an old save');
+      assert.equal(S.get('audio.voices'), 1, 'settings-persist: an out-of-range stored volume must clamp to 1');
+      assert.equal(S.get('audio.mute'), false, 'settings-persist: a garbage stored mute must fall back to off');
+      assert.equal(S.get('look.gore'), true, 'settings-persist: gore starts on');
+      S.set('audio.master', 0.45); S.set('audio.music', 0); S.set('look.gore', false); S.set('audio.mute', true);
+      const saved = JSON.parse(store.get('cw.settings'));
+      assert.ok(saved['screens.cardStyle'] === 'hybrid' && saved['look.smoke'] === false, 'settings-persist: saving must keep the older build\'s values');
+      assert.ok(saved['audio.master'] === 0.45 && saved['audio.music'] === 0 && saved['look.gore'] === false && saved['audio.mute'] === true, `settings-persist: the new values were not saved: ${store.get('cw.settings')}`);
+      assert.equal(store.get('cw.locks'), '["screens.cardStyle"]', 'settings-persist: locks must be untouched');
+      const again = await freshSettings(Object.fromEntries(store), 'persist-b');
+      api.defineAudio(again.S); again.S.define(settings.GORE_KEY, settings.GORE_SPEC);
+      assert.ok(again.S.get('audio.master') === 0.45 && again.S.get('audio.music') === 0 && again.S.get('look.gore') === false && again.S.get('audio.mute') === true,
+        'settings-persist: a reload must read the saved volumes, mute and gore');
+      for (const [key, spec] of AUDIO_SETTINGS) assert.ok(again.S.all().some((e) => e.key === key && e.spec.tab === spec.tab), `settings-persist: ${key} is not defined`);
+    } finally { if (prev === undefined) delete globalThis.window; else globalThis.window = prev; }
+  }],
+  ['music-moods', (api) => {
+    assert.equal(api.resultsMood({ lossShare: 0.29 }), 'results', 'music-moods: light losses play the results tune');
+    assert.equal(api.resultsMood({ lossShare: music.HEAVY_LOSSES }), 'lament', 'music-moods: heavy losses play the lament');
+    const game = { playerSide: 'US', units: [{ side: 'US', men: 700, casualties: 300 }, { side: 'US', men: 900, casualties: 100 }, { side: 'CS', men: 10, casualties: 990 }] };
+    assert.ok(Math.abs(api.lossShareOf(game) - 0.2) < 1e-9, `music-moods: the player's loss share is ${api.lossShareOf(game)}, expected 0.2 (enemy losses do not count)`);
+    for (const mood of ['title', 'camp', 'results', 'lament']) assert.ok(api.SOUNDS[`music-${mood}`]?.stream, `music-moods: ${mood} has no streamed tune`);
+    music.setBattle(true);
+    try { assert.equal(music.playMusic('camp'), false, 'music-moods: music must be refused during a battle'); }
+    finally { music.setBattle(false); }
+    assert.equal(music.playMusic('anthem'), false, 'music-moods: an unknown mood is refused');
+    music.stopMusic(0);
+  }],
+  ['lazy-load', async (api) => {
+    const made = [], fetched = [], listeners = [];
+    class FakeAC {
+      constructor() { made.push(this); this.state = 'running'; this.currentTime = 0; this.destination = {}; }
+      createDynamicsCompressor() { return { threshold: {}, ratio: {}, attack: {}, release: {}, connect() {} }; }
+      createGain() { return { gain: { value: 0, setTargetAtTime() {} }, connect() {} }; }
+      decodeAudioData() { return Promise.resolve({ duration: 1 }); }
+      resume() { return Promise.resolve(); }
+    }
+    const prev = { window: globalThis.window, fetch: globalThis.fetch };
+    globalThis.window = { AudioContext: FakeAC, addEventListener: (type) => listeners.push(type), removeEventListener() {} };
+    globalThis.fetch = async (url) => { fetched.push(String(url)); return { ok: true, arrayBuffer: async () => new ArrayBuffer(8) }; };
+    try {
+      const m = new api.Mixer();
+      m.arm();
+      const loading = m.loadBank('battle');
+      await Promise.resolve(); await new Promise((r) => setTimeout(r, 5));
+      assert.equal(made.length, 0, 'lazy-load: an AudioContext was created before the first gesture');
+      assert.equal(fetched.length, 0, `lazy-load: fetched before the first gesture: ${fetched.slice(0, 3).join(', ')}`);
+      assert.ok(['pointerdown', 'keydown', 'touchend'].every((g) => listeners.includes(g)), 'lazy-load: arm() must listen for the first tap, click or key');
+      assert.equal(m.play('cannon'), null, 'lazy-load: nothing may play before the first gesture');
+      m.unlock(); // the gesture
+      await loading;
+      assert.equal(made.length, 1, 'lazy-load: the gesture must create one AudioContext');
+      assert.ok(fetched.some((u) => u.endsWith('/assets/audio/sfx/cannon.mp3')) && !fetched.some((u) => /music\//.test(u) || /amb-/.test(u)),
+        'lazy-load: the battle bank must load after the gesture, without music or ambience');
+    } finally {
+      if (prev.window === undefined) delete globalThis.window; else globalThis.window = prev.window;
+      if (prev.fetch === undefined) delete globalThis.fetch; else globalThis.fetch = prev.fetch;
+    }
+  }],
+];
+
+// One semantic mutant per check: each must fail that check's own assertion.
+const MUTANTS = {
+  'bank-files': { audioFiles: () => [...audioFiles(), 'sfx/stray.mp3'] },
+  attribution: { attributionText: () => attributionText().replace('`assets/audio/sfx/cannon.mp3` — CC0 1.0', '`assets/audio/sfx/cannon.mp3` — CC BY-NC 4.0') },
+  budget: { AUDIO_BUDGET: { ...AUDIO_BUDGET, effects: 1 * MB } },
+  'mixer-maths': { busLevel: (bus, v) => (v ? v.master * v.effects : 0) },
+  'director-limits': { Director: class extends Director { allow() { return !this.paused; } } },
+  'director-bed': { Director: class extends Director { update(dt, state = {}) { return super.update(dt, { ...state, firing: 99 }); } } },
+  'order-calls': { ORDER_CALLS: { ...ORDER_CALLS, fallback: { id: 'call-retreat', label: 'Bugle: Retreat, the 1862 tactical signal' } } },
+  'gore-sim': { goreHook: (g, goreOn) => { if (!goreOn) g.rnd(); } },
+  'gore-fade': { FallenPool: class extends FallenPool { fade() { return null; } } },
+  'settings-persist': { defineAudio: (S) => { for (const [key, spec] of AUDIO_SETTINGS) S.define(`${key}Volume`, spec); } },
+  'music-moods': { resultsMood: () => 'results' },
+  'lazy-load': { Mixer: class extends Mixer { arm() { super.arm(); this.unlock(); } } },
+};
+
+async function runCheck(name, check, api) {
+  try { await check(api); }
+  catch (e) {
+    if (e?.code === 'ERR_ASSERTION' && String(e.message).startsWith(name)) throw e;
+    throw new assert.AssertionError({ message: `${name}: unexpected error: ${e?.message ?? e}` });
+  }
+}
+export async function audioUnit(api = API) {
+  for (const [name, check] of AUDIO_CHECKS) await runCheck(name, check, api);
+  return AUDIO_CHECKS.length;
+}
+
+if (process.argv[1] && import.meta.url === new URL(`file://${fs.realpathSync(process.argv[1])}`).href) {
+  let failed = 0;
+  for (const [name, check] of AUDIO_CHECKS) {
+    try { await runCheck(name, check, API); console.log(`PASS ${name}`); }
+    catch (e) { failed++; console.log(`FAIL ${e.message.split('\n')[0]}`); }
+  }
+  const n = AUDIO_CHECKS.length;
+  if (failed) { console.log(`AUDIO FAILED (${n - failed}/${n})`); process.exit(1); }
+  console.log(`AUDIO OK (${n}/${n})`);
+  if (process.argv.includes('--prove-fail')) {
+    let caught = 0;
+    for (const [name, check] of AUDIO_CHECKS) {
+      let error = null;
+      try { await runCheck(name, check, { ...API, ...MUTANTS[name] }); } catch (e) { error = e; }
+      if (error && error.message.startsWith(`${name}:`) && !/unexpected error/.test(error.message)) { caught++; console.log(`CAUGHT ${error.message.split('\n')[0]}`); }
+      else console.log(`NOT-CAUGHT ${name}${error ? `: ${error.message.split('\n')[0]}` : ''}`);
+    }
+    if (caught !== n) { console.log(`AUDIO CONTROLS FAILED (${caught}/${n})`); process.exit(1); }
+    console.log(`AUDIO CONTROLS OK (${caught}/${n})`);
+  }
+  process.exit(0);
+}

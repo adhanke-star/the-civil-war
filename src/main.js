@@ -2,6 +2,11 @@
 //
 // Boot: renderer + post chain, terrain data, scenario, world, battle, effects, HUD, input; then the loop.
 // Test hooks: window.__ready (first frame drawn), window.__stats, window.__game (see the bottom).
+// Sound (src/audio/): the field arms the mixer (nothing loads or plays before the first gesture), loads the battle bank
+// and the season's ambience, stops the music for the battle, and once a frame tells the director who fires, who
+// charges, whether mounted cavalry moves, and which order the player just gave (read from the units, not by wrapping
+// Game methods). The result brings the results tune, or a lament after heavy losses. Gore (look.gore): the fallen fade
+// on the game's simulation clock.
 
 import * as THREE from 'three';
 import { loadTerrainData } from './world/terrain.js';
@@ -25,6 +30,12 @@ import { attachPracticeField } from './ui/practice-field.js';
 import { prepareFieldScenario, loadFieldScenario, loadBattlePack } from './sim/phase.js';
 import { campaignPhase, applyCampaign } from './franchise/campaign.js';
 import { loadCampaign, mountBriefing } from './ui/briefing.js';
+import { get as getSetting, set as setSetting, on as onSetting } from './settings.js';
+import { mixer } from './audio/mixer.js';
+import { Director } from './audio/director.js';
+import { setBattle, playMusic, resultsMood, lossShareOf } from './audio/music.js';
+import { setQualityHandler } from './ui/settings-panel.js';
+import { FALLEN } from './units/soldier-mesh.js';
 
 let fieldClaimed = false;
 // Importing this module has no field side effects. The owner commits navigation only after recheck.
@@ -135,6 +146,22 @@ const rts = new RtsCamera(camera, terrain, scenario.camera
   : { target: [-60, 200], yaw: -Math.PI / 2 - 0.12, dist: 1150 });
 const effects = new Effects(scene, terrain, rts);
 await effects.init();
+// Sound: no music over a battle; banks load after the first gesture (the mixer waits for it).
+setBattle(true);
+mixer.arm();
+mixer.loadBank('battle');
+mixer.loadBank('ambient', { season: scenario.season });
+const _snd = new THREE.Vector3();
+/** Where a field point sits for the ear: pan by screen x, quieter and duller with distance from the camera. */
+const locate = (x, z) => {
+  _snd.set(x, terrain.heightAt(x, z) + 2, z);
+  const d = _snd.distanceTo(camera.position);
+  _snd.project(camera);
+  const pan = _snd.z > 1 ? 0 : Math.max(-1, Math.min(1, _snd.x)) * 0.8;
+  return { pan, gain: Math.min(1, 700 / (d + 200)), lowpass: d > 1600 ? 1400 : d > 900 ? 2800 : 0 };
+};
+const director = new Director({ mixer, locate });
+effects.director = director;
 const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
 effects.reducedMotion = motion.matches;
 motion.addEventListener('change', (e) => { effects.reducedMotion = e.matches; });
@@ -147,6 +174,7 @@ motion.addEventListener('change', (e) => { effects.reducedMotion = e.matches; })
   if (['5', '10'].includes(q.get('mpf'))) LOOK.menPerFigure = Number(q.get('mpf'));
 }
 const game = new Game({ scene, terrain, scenario, world, effects, playerSide: 'US' });
+FALLEN.clock = () => game.simTime; // gore off: the fallen fade on battle time (a pause holds them)
 {
   // profiling switches for the baked sprites: ?bakesoft=0 skips the soft edge/shadow pass, ?bakeclose=0 the close
   // tier, ?bakesoftfar=<m> draws the soft pass (edges and baked shadow) only for men within m metres of the camera
@@ -168,8 +196,15 @@ const hud = new Hud({
   onPause: () => game.togglePause(),
   onSpeed: (s) => game.setSpeed(s),
   onQuality: (q) => setQuality(q),
-  onSound: (on) => effects.setSound(on),
+  onSound: (on) => { effects.setSound(on); setSetting('audio.mute', !on); },
 });
+// The menu's Sound box is the Settings panel's Mute, inverted; ZzFX (the fallback before the banks load) follows it.
+{
+  const box = document.getElementById('sound-toggle');
+  const sync = (muted) => { box.checked = muted !== true; effects.setSound(muted !== true); };
+  sync(getSetting('audio.mute'));
+  onSetting('audio.mute', sync);
+}
 hud.onFocus = (u) => rts.flyTo(u.x, u.z);
 hud.onFly = (x, z) => rts.flyTo(x, z);
 hud.onResume = () => { if (game.paused) game.togglePause(); };
@@ -181,6 +216,7 @@ function setQuality(mode) {
   savePref('cw.quality', post.mode);
   hud.setQuality(post.mode);
 }
+setQualityHandler((mode) => setQuality(mode), () => post.mode);
 
 document.getElementById('history-note').textContent = pack ? scenario.historyNote ?? '' : scenario.historyNote;
 document.getElementById('menu-title').textContent = scenario.title;
@@ -301,6 +337,48 @@ for (const event of ['select', 'remove']) game.on(event, () => {
 game.initializeReinforcements();
 
 // ---------------------------------------------------------------------------------------------------
+// Sound, once a frame: firing count, charges (a cheer as one goes in), mounted cavalry on the move, and the player's
+// order calls. game.orders counts accepted player orders; the kind is read from what changed on the player's units.
+const ORDER_KIND = { move: 'move', attack: 'attack', charge: 'charge', hold: 'hold', fallback: 'fallback' };
+const orderSeen = new Map(); // unit -> { order, type, run, holdFire }
+const charging = new Set();
+let ordersSeen = game.orders || 0;
+function orderKind() {
+  let kind = null;
+  for (const u of game.units) {
+    const s = orderSeen.get(u);
+    if (!s || !u.alive || kind) continue;
+    if (!!u.holdFire !== s.holdFire) kind = 'holdfire';
+    else if (u.order !== s.order) kind = u.order?.type === 'hold' && !u.order.firm ? 'halt' : ORDER_KIND[u.order?.type] ?? null;
+    else if (!!u.run !== s.run) kind = 'run';
+  }
+  return kind;
+}
+function soundFrame(dt) {
+  let firing = 0, cavalry = null, near = Infinity;
+  for (const u of game.units) {
+    if (!u.alive) { charging.delete(u); continue; }
+    if (u.firing) firing++;
+    const charge = u.order?.type === 'charge' && u.follow?.active && u.state !== 'routing';
+    if (charge && !charging.has(u)) { charging.add(u); director.cheer(u.x, u.z); }
+    else if (!charge) charging.delete(u);
+    if (u.type === 'cavalry' && u.mounted && u.follow?.active) {
+      const d = Math.hypot(u.x - rts.target.x, u.z - rts.target.z);
+      if (d < near) { near = d; cavalry = u; }
+    }
+  }
+  const n = game.orders || 0;
+  if (n !== ordersSeen) { ordersSeen = n; const kind = orderKind(); if (kind) director.order(kind); }
+  for (const u of game.units) {
+    if (!u.alive || !game.controls(u)) { orderSeen.delete(u); continue; }
+    let s = orderSeen.get(u);
+    if (!s) orderSeen.set(u, s = {});
+    s.order = u.order; s.run = !!u.run; s.holdFire = !!u.holdFire;
+  }
+  director.update(dt, { paused: game.paused || game.over, firing, season: scenario.season, cavalry });
+}
+
+// ---------------------------------------------------------------------------------------------------
 // Loop
 let last = performance.now();
 let fpsFrames = 0;
@@ -317,6 +395,7 @@ function frame(now) {
   game.animate(simDt);
   soldierView.updatePose();
   effects.update(game.paused ? 0 : dt * game.speed);
+  soundFrame(dt);
   const mpp = metresPerPixel();
   if (!soldierView.active) arrows.setScale(mpp);
   input.refreshTargeting();
@@ -365,6 +444,8 @@ function frame(now) {
   }
   if (game.over && !resultShown) {
     resultShown = true;
+    setBattle(false);
+    playMusic(resultsMood({ lossShare: lossShareOf(game) })); // a lament after heavy losses
     practiceFlow.finishResult();
   }
   if (!window.__ready) {
@@ -379,6 +460,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, readout, soldierView, gpuTier, practice: practiceFlow, practiceField, manifest,
+  audio: { mixer, director }, // the UI test spies on mixer.log; nothing plays without a gesture
   pack: pack ? { packId: pack.packId, phaseId: pack.phaseId, nextId: pack.nextId } : null,
   // Campaign phase launch (tests force a result through window.__game.game, then drive the real result dialog).
   campaign: launch ? { slot: launch.slot, phase: launch.phase, briefing } : null };

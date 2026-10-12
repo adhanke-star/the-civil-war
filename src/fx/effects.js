@@ -2,8 +2,11 @@
 //
 // Smoke: a ring of short-burst particle systems sharing one material, so three.quarks batches them into a
 // single draw call. Each puff takes the next system, moves its emitter to the muzzle and restarts it.
-// Sound: ZzFX loads on the first user gesture (browser autoplay rules); volume falls off with distance
-// from the camera target and simultaneous sounds are capped.
+// Sound: recorded volleys, cannon and shell bursts go to the battle sound director (src/audio/director.js, set as
+// effects.director by main.js) once its bank has loaded; until then (or without it) the synthesised ZzFX sounds play.
+// ZzFX loads on the first user gesture (browser autoplay rules); volume falls off with distance from the camera target
+// and simultaneous sounds are capped. Gore (look.gore): no blood decals or sprays are drawn here in either setting
+// today; the fallen fade in src/units/soldier-mesh.js and impostor.js.
 
 import * as THREE from 'three';
 import { LOOK } from '../ui/look.js';
@@ -50,8 +53,12 @@ export class Effects {
     this.onMoment = null;
     this.momentAudioEpoch = 0;
     this.momentVoice = null;
+    this.director = null; // src/audio/director.js (main.js); recorded sound once its bank is loaded
     on('look.xFactorStyle', () => this.syncMoments());
   }
+
+  /** The director, when its recorded sound `id` is ready to play. */
+  recorded(id) { const d = this.director; return d && d.mixer.has(id) ? d : null; }
 
   async init() {
     try {
@@ -143,7 +150,8 @@ export class Effects {
 
   volley(unit, muzzles) {
     for (const [x, z, delay] of muzzles) this.puff(x, z, false, delay);
-    this.playVolley(unit);
+    const d = this.recorded('volley-1');
+    if (d) d.volley(unit.x, unit.z, unit.men); else this.playVolley(unit);
   }
 
   boom(unit, target, canister) {
@@ -153,7 +161,10 @@ export class Effects {
       // shell bursts over the target line
       for (let i = 0; i < 2; i++) this.puff(target.x + (Math.random() - 0.5) * target.halfFront, target.z + (Math.random() - 0.5) * 20, false, 0.8 + Math.random() * 0.6);
     }
-    this.playBoom(unit);
+    const d = this.recorded('cannon');
+    if (!d) { this.playBoom(unit); return; }
+    d.cannon(unit.x, unit.z);
+    if (!canister && target) { const x = target.x, z = target.z; setTimeout(() => d.burst(x, z), 900 + Math.random() * 400); }
   }
 
   /** A shell bursting at (x, z): a ring of cannon-sized clouds, a few small ones and a bang (sandbox moment). */
@@ -163,7 +174,8 @@ export class Effects {
       this.puff(x + Math.cos(a) * 5, z + Math.sin(a) * 5, true, i * 0.04);
     }
     for (let i = 0; i < 4; i++) this.puff(x + (Math.random() - 0.5) * 18, z + (Math.random() - 0.5) * 18, false, 0.1 + Math.random() * 0.3);
-    this.playBoom({ x, z });
+    const d = this.recorded('shell-burst');
+    if (d) d.burst(x, z); else this.playBoom({ x, z });
   }
 
   update(dt) {

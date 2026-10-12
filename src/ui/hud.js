@@ -14,12 +14,18 @@
 // Badges (src/franchise/badges.js): the card shows the selected formation's badges from its definition (shape, tier
 // letter and name in each emblem's label; the camp's emblems, styled in src/reward/reward.css). An X-Factor brigade's card
 // and flag carry a warm glow (has-xfactor); its moment in battle arrives through showMoment (src/fx/effects.js).
+// Settings (src/ui/settings-panel.js): the strip's Settings button, "All settings" in the menu and the O key
+// (src/ui/input.js) open the panel (quality, volumes, gore, X-Factor effects); the help sheet lists the key.
+// Feedback readability (DECISIONS 0109): the event feed and toasts sit on the field without a box (a translucent backing
+// behind each row's text only, a text shadow); the feed shows its 3 newest rows and scrolls to the newest (older ones
+// scroll up out of view, still reachable by keyboard, wheel and touch); toasts keep at most 3, below the objective line.
 
 import * as THREE from 'three';
 import { LOOK } from './look.js';
 import { on as onSetting } from '../settings.js';
 import { Minimap } from './minimap.js';
 import { BADGE_BY_ID, TIER_NAMES } from '../franchise/badges.js';
+import { openSettings } from './settings-panel.js';
 
 const $ = (id) => document.getElementById(id);
 const _v = new THREE.Vector3();
@@ -270,6 +276,7 @@ export class Hud {
     $('army-btn').addEventListener('click', (e) => this.toggleArmy(undefined, e.currentTarget));
     this.buildDelegate();
     $('army-close').addEventListener('click', () => this.toggleArmy(false));
+    this.buildSettings(menu);
     this.alertAt = null;
     this.momentBanner = document.createElement('p'); this.momentBanner.id = 'moment-banner';
     this.momentBanner.className = 'panel'; this.momentBanner.setAttribute('role', 'status');
@@ -295,6 +302,35 @@ export class Hud {
     this.applyMarkerScale(LOOK.markerScale);
     onSetting('look.markerScale', (v) => this.applyMarkerScale(v));
     this.buildCommand();
+  }
+
+  /** The Settings button in the strip, "All settings" in the menu, and the O key in the help sheet. */
+  buildSettings(menu) {
+    const gear = document.createElement('button');
+    gear.type = 'button'; gear.id = 'settings-btn'; gear.textContent = '\u2699\uFE0E';
+    gear.setAttribute('aria-haspopup', 'dialog'); gear.setAttribute('aria-label', 'Settings');
+    gear.title = 'Settings: quality, sound volumes, gore, X-Factor effects (O)';
+    gear.addEventListener('click', (e) => this.openSettings(e.currentTarget));
+    $('army-btn')?.after(gear);
+    const all = document.createElement('button');
+    all.type = 'button'; all.id = 'menu-settings'; all.textContent = 'All settings (O)';
+    all.addEventListener('click', (e) => this.openSettings(e.currentTarget));
+    const row = document.createElement('p'); row.className = 'row'; row.append(all);
+    ($('sound-toggle')?.closest('label') ?? menu.querySelector('fieldset'))?.after(row);
+    const keys = menu.querySelector('ul.keys');
+    if (keys) {
+      const li = document.createElement('li');
+      li.innerHTML = '<b>Settings</b>: O or the \u2699\uFE0E button opens quality, sound volumes and mute, gore and X-Factor effects';
+      keys.append(li);
+    }
+  }
+
+  /** Open the Settings panel; focus returns to `trigger` when it closes. */
+  openSettings(trigger = document.activeElement) {
+    this.closeDelegate(null, false);
+    this.rts?.keys.clear();
+    if (this.rts) this.rts.inertia = null;
+    return openSettings(document.body, { returnFocus: trigger });
   }
 
   /** The card's command line and regiment list, the regiment tooltip, field hover, and the generals' markers. */
@@ -909,8 +945,10 @@ export class Hud {
     else b.disabled = true;
     b.title = Number.isFinite(ev.x) ? 'Fly there' : '';
     li.appendChild(b);
+    const reading = list.contains(document.activeElement);
     list.appendChild(li);
     while (list.children.length > 6) list.firstChild.remove();
+    if (!reading) list.scrollTop = list.scrollHeight; // the newest row in view (not while someone reads with focus inside)
   }
 
   toggleMinimap() { if (this.minimap) this.minimap.toggleLarge(); }
@@ -926,7 +964,7 @@ export class Hud {
     p.textContent = text;
     $('toasts').appendChild(p);
     setTimeout(() => p.remove(), 5200);
-    while ($('toasts').children.length > 4) $('toasts').firstChild.remove();
+    while ($('toasts').children.length > 3) $('toasts').firstChild.remove();
   }
 
   objective(text) {

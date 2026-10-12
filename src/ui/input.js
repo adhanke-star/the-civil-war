@@ -16,8 +16,8 @@
 //   box-select; two fingers pinch to zoom and drag to pan; double-tap a brigade to fly to it. The browser's
 //   own pinch and its compatibility mouse events after a touch are suppressed.
 // Keys: H hold, C charge, R run, F fall back, X halt, V hold fire, Space pause, 1/2/3 speed, M map, L army
-//   list, B march targeting, T ranged target, Enter commit, Esc cancel/deselect, ? help, G delegate (with your own
-//   brigades selected; with none, G cycles quality).
+//   list, B march targeting, T ranged target, Enter commit, Esc cancel/deselect, ? help, O settings (src/ui/settings-panel.js),
+//   G delegate (with your own brigades selected; with none, G cycles quality).
 //   During march targeting arrows move the destination and Q/E face the ghost; Shift uses finer steps.
 // Delegate (the card's Delegate button or G): pick a place (click or tap the field, a drag still pans; or arrows and
 //   Enter, as march targeting), then the HUD chooser asks Attack, Defend or Support (Game.delegate); Esc cancels.
@@ -628,6 +628,7 @@ export class Input {
     const onButton = !!e.target?.closest?.('button, a[href], [role="button"]');
     if (onButton && (k === 'enter' || k === ' ')) return;
     if (k === '?') { e.preventDefault(); this.hud.openMenu(e.target); return; }
+    if (k === 'o' && !e.shiftKey) { e.preventDefault(); if (!e.repeat) { this.cancelTargeting(); this.hud.openSettings?.(e.target); } return; }
     if (k === 'b' || k === 't') { e.preventDefault(); if (!e.repeat) this.beginTargeting(k === 'b' ? 'march' : 'attack', e.shiftKey); return; }
     if (k === 'g' && this.delegable().length) { e.preventDefault(); if (!e.repeat) this.beginTargeting('delegate'); return; }
     if (this.targeting) {

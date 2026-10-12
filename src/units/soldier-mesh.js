@@ -15,9 +15,25 @@
 // FIGURE_VIEW is the per-frame figure drawing state the game writes (src/game.js updateFigureView) and the
 // units read: which styles draw (rigged 3D figures, baked sprites from src/units/impostor.js, or both while
 // look.figureStyle is compared split-screen), each style's clip side, the divider and the figure size.
+//
+// Gore (look.gore, the Settings panel): FALLEN mirrors it. Off: each casualty lies GORE_FADE.delay seconds, sinks into the
+// ground over GORE_FADE.fade seconds and is then hidden (FallenPool here, ImpostorPool in impostor.js). Looks only: the
+// pools are drawing state; nothing in the simulation reads them. FALLEN.clock is the fade's clock (main.js: the game's
+// simulation time; tests set their own).
 
 import * as THREE from 'three';
 import { buildFigureGeometry, boneTexture, BONE_COUNT, CLIP_ROWS, fallenFrame } from './figure.js';
+import { define, on, GORE_KEY, GORE_SPEC, GORE_FADE } from '../settings.js';
+
+export const FALLEN = { gore: true, clock: () => (typeof performance !== 'undefined' ? performance.now() : Date.now()) / 1000 };
+FALLEN.gore = define(GORE_KEY, GORE_SPEC);
+on(GORE_KEY, (v) => { FALLEN.gore = v; });
+/** How far a fading casualty has gone: 0 lying, 0..1 sinking, 1 hidden (gore off only). */
+export function fadeOf(age, gore = FALLEN.gore) {
+  if (gore || !(age > GORE_FADE.delay)) return 0;
+  return Math.min(1, (age - GORE_FADE.delay) / GORE_FADE.fade);
+}
+export const SINK = 0.4; // of the figure scale: how deep a faded casualty sinks before it is hidden
 
 export const FIGURE_SCALE = 4.4; // UG:G-style: figures are enlarged so they read as individuals from the battle camera
 export const LOD_NEAR = 300; // m from the camera: full detail inside, medium to LOD_FAR, far beyond
@@ -280,6 +296,10 @@ export class FallenPool {
     this.clip = clip;
     this.bakeable = new Uint8Array(capacity);
     this.bakedClip = 0;
+    this.born = new Float32Array(capacity); // FALLEN.clock() when each man was laid down
+    this.baseY = new Float32Array(capacity);
+    this.hiddenTo = 0; // gore off: casualties [0, hiddenTo) have faded out (clip 2)
+    this.sunk = false; // some casualty is drawn below its ground height or hidden by the gore fade
     const geo = instancedGeometry(figureGeometry(1, kit), anim, tint, clip);
     this.material = soldierMaterial(colors);
     this.mesh = new THREE.InstancedMesh(geo, this.material, capacity);
@@ -307,13 +327,14 @@ export class FallenPool {
     te[o + 4] = 0; te[o + 5] = s; te[o + 6] = 0; te[o + 7] = 0;
     te[o + 8] = sn; te[o + 9] = 0; te[o + 10] = c; te[o + 11] = 0;
     te[o + 12] = x; te[o + 13] = y; te[o + 14] = z; te[o + 15] = 1;
+    this.born[i] = FALLEN.clock(); this.baseY[i] = y;
     const a = this.anim.array;
     const p = fallenFrame(front);
     a[i * 4] = p; a[i * 4 + 1] = p; a[i * 4 + 2] = 0; a[i * 4 + 3] = 0;
     const t = this.tint.array;
     t[i * 4] = coatVar; t[i * 4 + 1] = trouserVar; t[i * 4 + 2] = 1; t[i * 4 + 3] = 0;
     this.bakeable[i] = bakeable ? 1 : 0;
-    this.clip.array[i] = bakeable ? this.bakedClip : 0;
+    this.clip.array[i] = i < this.hiddenTo ? 2 : bakeable ? this.bakedClip : 0;
     this.dirty = true;
   }
 
@@ -322,13 +343,46 @@ export class FallenPool {
     if (c === this.bakedClip) return;
     this.bakedClip = c;
     const a = this.clip.array;
-    for (let i = 0; i < this.used; i++) if (this.bakeable[i]) a[i] = c;
+    for (let i = this.hiddenTo; i < this.used; i++) if (this.bakeable[i]) a[i] = c;
     this.dirty = true;
+  }
+
+  /** Gore off: sink the casualties older than GORE_FADE.delay and hide the faded; gore on: put every one back. */
+  fade() {
+    const te = this.mesh.instanceMatrix.array, clip = this.clip.array;
+    if (FALLEN.gore) {
+      if (!this.sunk) return null;
+      for (let i = 0; i < this.used; i++) { te[i * 16 + 13] = this.baseY[i]; clip[i] = this.bakeable[i] ? this.bakedClip : 0; }
+      this.hiddenTo = 0; this.sunk = false; this.dirty = true;
+      return null;
+    }
+    const now = FALLEN.clock();
+    let lo = -1, hi = -1;
+    for (let i = this.hiddenTo; i < this.used; i++) {
+      const k = fadeOf(now - this.born[i], false);
+      if (k <= 0) break; // laid down in order, so the rest are younger
+      const o = i * 16, y = k >= 1 ? this.baseY[i] : this.baseY[i] - k * SINK * te[o + 5];
+      if (te[o + 13] === y && (k < 1 || clip[i] === 2)) continue;
+      te[o + 13] = y;
+      if (k >= 1) { clip[i] = 2; this.hiddenTo = i + 1; }
+      if (lo < 0) lo = i;
+      hi = i; this.sunk = true;
+    }
+    return lo < 0 ? null : [lo, hi];
   }
 
   flush() {
     this.mesh.count = this.used;
+    const range = this.fade();
+    if (!this.dirty && range) {
+      // only the fading casualties changed: upload just their rows
+      const [lo, n] = [range[0], range[1] - range[0] + 1];
+      this.mesh.instanceMatrix.clearUpdateRanges(); this.mesh.instanceMatrix.addUpdateRange(lo * 16, n * 16); this.mesh.instanceMatrix.needsUpdate = true;
+      this.clip.clearUpdateRanges(); this.clip.addUpdateRange(lo, n); this.clip.needsUpdate = true;
+      return;
+    }
     if (!this.dirty) return;
+    this.mesh.instanceMatrix.clearUpdateRanges(); this.clip.clearUpdateRanges();
     this.mesh.instanceMatrix.needsUpdate = true;
     this.anim.needsUpdate = true;
     this.tint.needsUpdate = true;

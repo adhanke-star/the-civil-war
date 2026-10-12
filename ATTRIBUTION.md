@@ -84,3 +84,74 @@
   buckle follow a sourced dress summary (authentic-campaigner.com, adolphusconfederateuniforms.com, NPS Vicksburg
   collection, tools/bake/README.md); colours and cut are **Inferred estimates, not Verified**. No person, unit or
   regiment is depicted.
+
+## Sound and music (`assets/audio/`)
+Downloaded once to a scratch folder (never committed), cut and normalised with ffmpeg 8.1: effects mono MP3 96 kbps
+(one-shots peak-normalised to -2 dBFS, loops loudness-normalised and made seamless by crossfading the last 2 s into the
+first), music stereo MP3 112 kbps at -18 LUFS with short fades. Freesound files are the site's public 128 kbps previews.
+Every source below is CC0 1.0 or public domain; no CC-BY item is used. None of the `craigsmith` Freesound items
+(digitised studio effects of uncertain provenance) is used. Order calls are labelled in src/audio/bank.js ORDER_CALLS
+and in the Settings panel; none is captioned as an 1862 tactical signal.
+- `assets/audio/sfx/volley-1.mp3`, `assets/audio/sfx/volley-2.mp3`, `assets/audio/sfx/volley-3.mp3` — CC0 1.0 —
+  ragged company volleys mixed here from three single-shot recordings: mlsulli, "Musket Shot",
+  https://freesound.org/people/mlsulli/sounds/234869/ (0.62-2.0 s); bruno.auzet, "Old musket bangs, outdoors",
+  https://freesound.org/people/bruno.auzet/sounds/538795/ (0.08-2.4 s); fennelliott, "Musket single shot",
+  https://freesound.org/people/fennelliott/sounds/347647/ (0-1.9 s, -8 dB). Twelve shots each (seeded delays 0-0.7 s,
+  pitch +-12%, -14 to 0 dB), limited, cut to 2.8 s with a 0.8 s fade.
+- `assets/audio/sfx/shot-1.mp3` — CC0 1.0 — mlsulli, "Musket Shot", https://freesound.org/people/mlsulli/sounds/234869/
+  (0.62-2.0 s). A real musket fired at a performance.
+- `assets/audio/sfx/shot-2.mp3` — CC0 1.0 — bruno.auzet, "Old musket bangs, outdoors",
+  https://freesound.org/people/bruno.auzet/sounds/538795/ (0.08-2.4 s).
+- `assets/audio/sfx/cannon.mp3` — CC0 1.0 — adeluc4, "Cannon fired at a Civil War reenactment",
+  https://freesound.org/people/adeluc4/sounds/125348/ (0.15-2.5 s).
+- `assets/audio/sfx/shell-burst.mp3` — CC0 1.0 — vabadus, "M406 HE grenade burst on gravel" (a modern grenade, pitched
+  down to 72% and low-passed at 3.2 kHz to stand in for a shell burst), https://freesound.org/people/vabadus/sounds/151076/.
+- `assets/audio/sfx/fire-bed.mp3` — CC0 1.0 — electra, "Civil War reenactment from a distance" (recorded near Portland,
+  Oregon, about 1991), https://freesound.org/people/electra/sounds/442293/ (50-74 s: steady distant musketry; a 22 s loop).
+- `assets/audio/sfx/cheer.mp3` — CC0 1.0 — joelcarrsound, massed war cry at a Battle of Hastings reenactment (no words),
+  https://freesound.org/people/joelcarrsound/sounds/521831/ (0.15-2.45 s). Used for the cheer as a charge goes in.
+- `assets/audio/sfx/call-charge.mp3` — Public domain (US federal work) — "Charge", US Air Force Heritage of America Band,
+  https://commons.wikimedia.org/wiki/File%3ACharge_-_Concert_Band_-_United_States_Air_Force_Heritage_of_America_Band.mp3
+  (0.9-7.0 s). The standard US service call; answers Charge.
+- `assets/audio/sfx/call-attention.mp3` — Public domain (US federal work) — "Attention", US Army Ceremonial Band,
+  https://commons.wikimedia.org/wiki/File%3AAttention_Bugle_Call_%28US%29.oga (0.35-4.4 s). A modern US Army call; answers
+  a ranged attack order.
+- `assets/audio/sfx/call-recall.mp3` — Public domain (US federal work) — "Recall", U.S. Army Bands,
+  https://commons.wikimedia.org/wiki/File%3ARecall.ogg (0.2-4.2 s). A modern US Army call, the nearest recording to a halt;
+  answers Hold, Halt and Hold fire.
+- `assets/audio/sfx/call-retreat.mp3` — Public domain (US federal work) — "Retreat", U.S. Army Bands,
+  https://commons.wikimedia.org/wiki/File%3ARetreat.ogg (first phrase, 0.4-4.6 s). This is the modern Army's evening flag
+  call, used only as a fall-back cue; it is not the 1862 tactical retreat signal and is never captioned as one.
+- `assets/audio/sfx/drum-march.mp3`, `assets/audio/sfx/drum-quick.mp3` — CC0 1.0 (per the Commons page, via the Free
+  Music Archive; a US Army unit's recording) — The United States Army Old Guard Fife and Drum Corps, "Reveille Variation /
+  Drum Call / Slow Scotch / Quick Scotch / Yankee Doodle",
+  https://commons.wikimedia.org/wiki/File%3AThe_United_States_Army_Old_Guard_Fife_and_Drum_Corps_-_09_-_Reveille_VariationDrum_CallSlow_ScotchQuick_ScotchYankee_DoodleMont.ogg
+  (drums-only passages 1.0-4.6 s and 101.0-104.6 s, found by spectral flatness: no fife). Rope-tension field drums;
+  answer march and run orders.
+- `assets/audio/sfx/horse-gallop.mp3` — CC0 1.0 — Max_Headroom, "Horse galloping on hard dry ground",
+  https://freesound.org/people/Max_Headroom/sounds/175356/ (0.1-5.7 s, looped).
+- `assets/audio/sfx/horse-whinny.mp3` — CC0 1.0 — L.Finck, "Whinnying horse, far away",
+  https://freesound.org/people/L.Finck/sounds/636554/ (4.3-6.1 s).
+- `assets/audio/sfx/amb-spring.mp3` — CC0 1.0 — rubindaniel, early-spring meadow birdsong with soft wind (Hungary;
+  European birds), https://freesound.org/people/rubindaniel/sounds/847380/ (60-92 s, a 30 s loop at -24 LUFS). Spring
+  and summer fields.
+- `assets/audio/sfx/amb-autumn.mp3` — CC0 1.0 — Globofonia, open field wind, northern Mexico (wind only),
+  https://freesound.org/people/Globofonia/sounds/553733/ (20-52 s, a 30 s loop at -24 LUFS). Autumn fields.
+- `assets/audio/sfx/amb-winter.mp3` — CC0 1.0 — szegvari, cold winter wind with sparse birds,
+  https://freesound.org/people/szegvari/sounds/608269/ (0-32 s, a 30 s loop at -24 LUFS). Winter fields.
+- `assets/audio/music/title.mp3` — CC0 1.0 (per the Commons page) — The United States Army Old Guard Fife and Drum Corps,
+  "Brandywine Quickstep",
+  https://commons.wikimedia.org/wiki/File%3AThe_United_States_Army_Old_Guard_Fife_and_Drum_Corps_-_10_-_Brandywine_Quickstep_from_the_Minstrel_Boy_Show.ogg
+  (whole, 112 s, 2 s fade). Fife and drum. Title.
+- `assets/audio/music/camp.mp3` — Public domain (US federal work) — "Tenting Tonight on the Old Camp Ground" (Walter
+  Kittredge, 1863), US Army Field Band and Chorus, https://commons.wikimedia.org/wiki/File%3ATenting_Tonight_on_Old_Camp_Ground.ogg
+  (0-161 s, cut at a pause with a 2.5 s fade so the file stays under 2.5 MB; the last verse is dropped). Camp.
+- `assets/audio/music/results.mp3` — Public domain (US federal work) — "When Johnny Comes Marching Home" (Patrick Gilmore,
+  1863), US Navy Band Brass Quartet (arr. John Schroeder),
+  https://commons.wikimedia.org/wiki/File%3AWhen_Johnny_Comes_Marching_Home_-_Brass_Quartet_-_United_States_Navy_Band.opus
+  (whole, 75.5 s). Results.
+- `assets/audio/music/lament.mp3` — Public domain (US federal work) — "Nearer, My God, to Thee" (Lowell Mason, 1856), US Air
+  Force Band Ceremonial Brass,
+  https://commons.wikimedia.org/wiki/File%3ANearer_My_God_to_Thee_-_Ceremonial_Brass_-_United_States_Air_Force_Band.mp3
+  (0-148 s, to the end of the playing). Results after heavy losses.
+- Reward card sounds (src/reward/sfx.js) stay synthesised (no file).
