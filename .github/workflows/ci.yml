@@ -128,6 +128,9 @@ jobs:
       - run: npm ci
 
       - name: Smoke run in ${{ matrix.browser }}
+        # Firefox refuses to start when $HOME is not owned by the container user
+        env:
+          HOME: /root
         run: node tools/test-browsers.mjs --browser=${{ matrix.browser }}
 
       - name: Upload browser output
