@@ -37,13 +37,15 @@
 // The baked shadow falls to the screen's lower right whatever the camera yaw: the bake's light is fixed
 // relative to its camera, so the shadow turns with the view, not with the sun.
 //
-// Only a Union infantryman is baked. Confederate infantry reuse it with a shader tint that moves the blue coat
-// and trousers to grey/butternut: a PLACEHOLDER until a Confederate bake exists.
+// Each side has its own bake: a Union infantryman (assets/figures/union-infantry/) and a Western Confederate
+// infantryman (assets/figures/confederate-infantry/: shell jacket in grey jean, butternut or faded tan, mostly
+// slouch hats; bake run 38186582847, see its soldier.json `source`). Each side's pool attaches its own atlas.
 
 import * as THREE from 'three';
 import { FIGURE_VIEW, LOD_NEAR, splitHook, CLIP_FRAG } from './soldier-mesh.js';
 
-export const BAKED_BASE = './assets/figures/union-infantry/';
+export const BAKED_BASES = { US: './assets/figures/union-infantry/', CS: './assets/figures/confederate-infantry/' };
+export const BAKED_BASE = BAKED_BASES.US;
 /** Pose codes the units push (see unit.js animate). */
 export const BAKE_CLIP = { STAND: 0, WALK: 1, AIM: 2, FIRE: 3, RECOVER: 4, FALLEN: 5, LOAD: 6 };
 const TAU = Math.PI * 2;
@@ -321,7 +323,6 @@ const FRAG = /* glsl */ `
   uniform sampler2D uMap;
   uniform vec2 uPage;
   uniform float uMaxLod;
-  uniform float uTint;
   uniform float uExposure;
   varying vec2 vPx;
   varying vec4 vRect;
@@ -348,15 +349,7 @@ const FRAG = /* glsl */ `
       if (t.a < ${ALPHA_CUT.toFixed(2)}) discard;
     #endif
     vec3 c = toLinear(t.rgb / max(t.a, 0.001)); // un-premultiply, then decode sRGB
-    if (uTint > 0.5) {
-      // PLACEHOLDER Confederate: blue cloth (coat, trousers, kepi) becomes grey to butternut, per man
-      float blue = clamp((c.b - max(c.r, c.g)) / max(c.b, 0.001) * 2.5, 0.0, 1.0);
-      float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
-      vec3 cloth = mix(vec3(0.30, 0.29, 0.26), vec3(0.36, 0.25, 0.12), vVar);
-      c = mix(c, cloth * (0.45 + 2.2 * l), blue);
-    } else {
-      c *= 0.92 + 0.16 * vVar; // a little difference between men
-    }
+    c *= 0.92 + 0.16 * vVar; // a little difference between men
     c = acesInv(c) / uExposure;
     #ifdef USE_FOG
       c = mix(c, fogColor, smoothstep(fogNear, fogFar, vFogDepth));
@@ -384,10 +377,9 @@ function quad() {
  * re-pushes the casualties: their baked direction follows the camera). Draws nothing until attach(atlas).
  */
 export class ImpostorPool {
-  constructor(capacity, { side = 'US', tint = 0 } = {}) {
+  constructor(capacity, { side = 'US' } = {}) {
     this.capacity = capacity;
     this.side = side;
-    this.tint = tint;
     this.group = new THREE.Group();
     this.group.name = `baked-${side}`;
     this.group.visible = false;
@@ -436,7 +428,6 @@ export class ImpostorPool {
         uMap: { value: tex },
         uPage: { value: new THREE.Vector2(T.pages[page].w, T.pages[page].h) },
         uMaxLod: { value: MAX_LOD[tier] ?? 1 },
-        uTint: { value: this.tint },
         uExposure: { value: BAKE_EXPOSURE },
         uCosBake: { value: Math.cos(this.layout.elevation) },
         uSoftFar: { value: this.softFar },

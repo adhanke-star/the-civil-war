@@ -48,7 +48,7 @@ import { Unit, MEN_PER_FIGURE_OPTIONS, MEN_PER_CREW_FIGURE, SPEED, setMenPerFigu
 import { Battery, GunPool } from './units/battery.js';
 import { SoldierPool, FallenPool, FlagPool, UNIFORMS, FIGURE_VIEW, FIGURE_SCALE } from './units/soldier-mesh.js';
 import { framePos } from './units/figure.js';
-import { ImpostorPool, loadBakedAtlas } from './units/impostor.js';
+import { ImpostorPool, loadBakedAtlas, BAKED_BASES } from './units/impostor.js';
 import { LOOK } from './ui/look.js';
 import { on as onSetting } from './settings.js';
 import { compareState } from './sandbox/compare.js';
@@ -546,12 +546,13 @@ export class Game {
       CS: new FallenPool(cap('CS'), UNIFORMS.CS, { kit: 'CS' }),
     };
     this.halos = new HaloPool(cap('US') + cap('CS'));
-    // baked sprites (the Confederates are a tinted PLACEHOLDER of the Union bake)
+    // baked sprites: each side draws from its own bake (BAKED_BASES)
     this.impostors = {
-      US: new ImpostorPool(cap('US'), { side: 'US', tint: 0 }),
-      CS: new ImpostorPool(cap('CS'), { side: 'CS', tint: 1 }),
+      US: new ImpostorPool(cap('US'), { side: 'US' }),
+      CS: new ImpostorPool(cap('CS'), { side: 'CS' }),
     };
-    this.baked = { state: 'idle', atlas: null, error: null }; // idle | loading | ready | failed
+    // idle | loading | ready | failed; atlases per side, atlas = the Union one (older readers)
+    this.baked = { state: 'idle', atlas: null, atlases: null, error: null };
     scene.add(this.impostors.US.mesh, this.impostors.CS.mesh);
     // cavalry horses (one per trooper figure; a horse-holder leads three) plus room for sandbox spawns
     const cavalryFigs = poolDefs.filter((d) => d.type === 'cavalry').reduce((s, d) => s + Math.round(d.men / minRatio) + 6, 0);
@@ -638,14 +639,15 @@ export class Game {
   /** Historical seconds per simulation second: the scenario's clockRatio, else CLOCK_RATIO. */
   get clockRatio() { return clockRatioOf(this); }
 
-  /** Start loading the baked atlas (once); the rigged figures draw until it is ready. */
+  /** Start loading both sides' baked atlases (once); the rigged figures draw until both are ready. */
   ensureBaked() {
     if (this.baked.state !== 'idle') return;
     this.baked.state = 'loading';
-    loadBakedAtlas().then((atlas) => {
-      this.baked.atlas = atlas;
-      this.impostors.US.attach(atlas);
-      this.impostors.CS.attach(atlas);
+    Promise.all([loadBakedAtlas(BAKED_BASES.US), loadBakedAtlas(BAKED_BASES.CS)]).then(([us, cs]) => {
+      this.baked.atlas = us;
+      this.baked.atlases = { US: us, CS: cs };
+      this.impostors.US.attach(us);
+      this.impostors.CS.attach(cs);
       this.baked.state = 'ready';
     }).catch((err) => {
       this.baked.state = 'failed';

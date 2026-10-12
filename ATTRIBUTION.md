@@ -70,5 +70,17 @@
     built by the tools/bake scripts, with procedural textures only (no image textures). Their dimensions,
     colours, garment cut, kit layout, loading drill and weathering are **Inferred / placeholder estimates,
     not Verified**; belt and box plates are plain shapes with no lettering. No person, unit or regiment is
-    depicted. Confederate infantry are this same sprite tinted grey/butternut in the shader: a
-    **placeholder**, not a depiction of a Confederate uniform.
+    depicted.
+- `assets/figures/confederate-infantry/` (soldier_field_0.png, soldier_field_h2_slouch_roll_butternut_0.png,
+  soldier_field_h4_slouch_noroll_fadedtan_0.png, soldier_field_h3_cap_roll_greyjean_0.png, soldier_close_0-4.png,
+  soldier.json) — sprite atlases of one Western Confederate infantryman, rendered with the same pipeline
+  (branch `bake`, tools/bake with SIDE=cs, run 38186582847, artifact bake-cs-34, 2026-10-12). Shipped: the close
+  tier's base look and four field looks (grey jean / slouch; butternut / slouch; faded tan / slouch, no roll;
+  grey jean / forage cap). Same CC0 sources as above: MakeHuman system assets (skins `young_caucasian_male`,
+  `young_caucasian_male2`, `middleage_caucasian_male`; hair `short01`-`short04`; eyebrows `eyebrow001/003/005/007`;
+  eyelashes `eyelashes01/02`; eyes `high-poly`), the bodyparts05 pack (beards `grinsegold_beard_sigmund_wip`,
+  `culturalibre_faun_beard`, `rehmanpolanski_moustache_viking`) and MPFB2 v2.0.17. Shell jacket cut, jean colours
+  (hex values estimated from surviving garments, faded), slouch-hat share (~3 of 4), blanket roll and plain frame
+  buckle follow a sourced dress summary (authentic-campaigner.com, adolphusconfederateuniforms.com, NPS Vicksburg
+  collection, tools/bake/README.md); colours and cut are **Inferred estimates, not Verified**. No person, unit or
+  regiment is depicted.

@@ -499,6 +499,21 @@ async function bakedUnit() {
     ? `field looks ${L.tiers.field.looks.join(', ')}; 200 men by index -> ${p1} (same again: ${p1 === p2}); 1-3 looks: stable, all used, shares within 40%; controls fail as they must: random "${vRand[0]}", constant "${vOne[0]}"`
     : [...vReal, p1 === p2 ? '' : `pushing the same men twice gave ${p1} then ${p2}`, nLooks >= 2 && usedLooks < 2 ? `only one look used: ${p1}` : '',
       vRand.length ? '' : 'CONTROL: a random look passed', vOne.length ? '' : 'CONTROL: a single look passed'].filter(Boolean).join(' | '));
+
+  // the Confederate pack: its own bake, a sound layout, every page on disk at its listed size, several field looks
+  const csDir = path.join(ROOT, 'assets', 'figures', 'confederate-infantry');
+  const csManifest = JSON.parse(await fs.readFile(path.join(csDir, 'soldier.json'), 'utf8'));
+  const LC = new I.AtlasLayout(csManifest);
+  const csBad = [...LC.missing.map((m) => `missing frame ${m}`), ...LC.problems().map((r) => `rect off its page: ${r}`)];
+  if (csManifest.side !== 'cs') csBad.push(`side ${csManifest.side} (want cs)`);
+  if (LC.tiers.field.looks.length < 3) csBad.push(`only ${LC.tiers.field.looks.length} field looks`);
+  if (I.BAKED_BASES.CS === I.BAKED_BASES.US) csBad.push('CS reads the Union atlas');
+  for (const tier of Object.values(LC.tiers)) for (const p of tier.pages) {
+    const png = PNG.sync.read(await fs.readFile(path.join(csDir, p.file)));
+    if (png.width !== p.w || png.height !== p.h) csBad.push(`${p.file} is ${png.width}x${png.height}, listed ${p.w}x${p.h}`);
+  }
+  check('baked-confederate', csBad.length === 0, csBad.length ? csBad.join(' | ')
+    : `own bake (run ${csManifest.source && csManifest.source.run}); field looks ${LC.tiers.field.looks.join(', ')}; every page on disk at its listed size`);
 }
 
 /**

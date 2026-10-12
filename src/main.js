@@ -350,7 +350,8 @@ function frame(now) {
     stats.riggedDrawn = drawn.rigged;
     stats.sprites = drawn.sprites;
     stats.spriteCalls = drawn.calls;
-    stats.atlasMB = game.baked.atlas ? Math.round(game.baked.atlas.memoryBytes() / 1e5) / 10 : 0;
+    const atlases = game.baked.atlases ? Object.values(game.baked.atlases) : [];
+    stats.atlasMB = Math.round(atlases.reduce((b, a) => b + a.memoryBytes(), 0) / 1e5) / 10;
     stats.simTime = Math.round(game.simTime);
     stats.puffs = effects.puffs;
     fpsEl.textContent = stats.fps.toFixed(0);
