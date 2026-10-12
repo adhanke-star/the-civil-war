@@ -181,9 +181,13 @@ export async function historyControls({ browser, url, check, shot, result, watch
       const m = await import('./src/ui/records.js');
       const b = document.createElement('button');
       b.id = 'test-open-book'; b.type = 'button'; b.textContent = 'Open the record book (test)';
+      b.style.cssText = 'position:fixed;left:8px;top:8px;z-index:2147483647;min-height:44px';
       b.addEventListener('click', () => { b.remove(); window.__rb = m.openRecordBook(document.body, save); }, { once: true });
       document.body.append(b);
     });
+    // a modal the camp opened itself (a level-up moment) makes the rest of the page inert: dismiss it first, as a player would
+    for (let i = 0; i < 4 && await page.evaluate(() => !!document.querySelector('dialog[open]')); i++) await page.keyboard.press('Escape');
+    result.historyBookOpenDialogs = await page.evaluate(() => [...document.querySelectorAll('dialog[open]')].map((d) => d.id || d.className));
     await page.locator('#test-open-book').click();
     await page.evaluate(() => window.__rb.ready);
     const camped = await page.evaluate(() => ({ open: document.getElementById('record-book')?.open, focus: document.activeElement?.id,
