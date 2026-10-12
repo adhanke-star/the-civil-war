@@ -100,6 +100,8 @@ export async function traitsControls({ browser, url, check, shot, result, watchE
     });
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.getElementById('traits-dialog')?.open, null, { timeout: 10000 });
+    // the dialog's close event (which resumes the field) fires a task after `open` drops: let it run
+    await page.waitForFunction(() => !window.__game.hud?.traitsPaused, null, { timeout: 5000 }).catch(() => {});
     const closed = await page.evaluate(() => ({ focus: document.activeElement?.id, paused: window.__game.game.paused, log: window.__pauseLog,
       atOpen: window.__traitsOpen, hudPaused: window.__game.hud?.traitsPaused, hud: !!window.__game.hud }));
     // the dialog puts the field back as it found it: running if it was running when the dialog opened
