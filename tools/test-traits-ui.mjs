@@ -62,8 +62,12 @@ export async function traitsControls({ browser, url, check, shot, result, watchE
 
     // the Records dialog by keyboard
     // auto-pause off here: an arrival or rout pausing the running battle must not read as the dialog failing to resume it
-    await page.evaluate(async () => { (await import('./src/settings.js')).set('rules.autoPause', false);
-      const { game } = window.__game; if (game.paused) game.togglePause(); });
+    await page.evaluate(async () => { (await import('./src/settings.js')).set('rules.autoPause', false); });
+    // a briefing still open holds the field paused until Begin: begin it, as a player would, then resume
+    if (await page.evaluate(() => !!document.getElementById('briefing')?.open)) await page.locator('#briefing-begin').click();
+    await page.evaluate(() => { const { game } = window.__game; if (game.paused) game.togglePause(); });
+    await page.waitForFunction(() => !window.__game.game.paused, null, { timeout: 5000 }).catch(() => {});
+    const runningBefore = await page.evaluate(() => !window.__game.game.paused);
     await page.locator('#uc-traits-more').focus();
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => document.getElementById('traits-dialog')?.open, null, { timeout: 10000 });
@@ -96,7 +100,8 @@ export async function traitsControls({ browser, url, check, shot, result, watchE
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.getElementById('traits-dialog')?.open, null, { timeout: 10000 });
     const closed = await page.evaluate(() => ({ focus: document.activeElement?.id, paused: window.__game.game.paused, log: window.__pauseLog }));
-    check('traits-dialog-close', closed.focus === 'uc-traits-more' && closed.paused === false, `after Escape: focus ${closed.focus}, paused ${closed.paused}; changes ${JSON.stringify(closed.log)}`);
+    // the dialog puts the field back as it found it: running if it was running when the dialog opened
+    check('traits-dialog-close', closed.focus === 'uc-traits-more' && closed.paused === !runningBefore, `after Escape: focus ${closed.focus}, paused ${closed.paused} (running before: ${runningBefore}); changes ${JSON.stringify(closed.log)}`);
 
     // 320 px: the card and the dialog fit
     await page.evaluate(() => { const { game } = window.__game; if (!game.paused) game.togglePause(); });

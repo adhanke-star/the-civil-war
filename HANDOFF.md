@@ -1,5 +1,12 @@
 # Handoff — existing v1 (2026-10-11, Claude Opus 5.5)
 
+**2026-10-12: v1 is complete** — see STATE.md and docs/release-v1.md. Work happened on branch `packs` (worktree
+/private/tmp/the-civil-war-packs-20261011) and main fast-forwards to green packs commits. Every system has a CPU
+probe (`node tools/test-<name>.mjs`, plus `--prove-fail`) and a browser module wired into `tools/test.mjs` shards;
+`tools/test-playthrough.mjs`, `tools/test-browsers.mjs` and `tools/test-offline.mjs` run as their own CI jobs.
+Coders worked to written contracts (session scratchpad contract-*.md); history research files are in the scratchpad
+and their kept results are checked in (tools/data, assets/traits.json, pack sources).
+
 **Process (DECISIONS 0108):** AGENTS.md §3 light loop. Change → `node tools/test.mjs --unit` locally →
 commit → push → read that SHA's CI (three browser shards + probes) and Pages → look at the uploaded
 screenshots. The byte-exact source-lock regime (parent inverses, embedded copies, collectors, transfer
