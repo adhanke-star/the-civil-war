@@ -28,6 +28,7 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import playwright from 'playwright';
 import { startServer, ROOT } from './serve.mjs';
+import { progressionReceipt } from './balance-progression.mjs';
 
 const arg = (name, fallback) => (process.argv.find((a) => a.startsWith(`--${name}=`)) || `--${name}=${fallback}`).split('=')[1];
 const FF_BUDGET_MS = Number(arg('ff-budget', 180)) * 1000; // wall time one phase may spend fast-forwarding
@@ -355,6 +356,9 @@ async function playPhase(page, errors, { index, replay = false, plan }) {
   if (savedTitle !== 'Campaign saved') throw new Error(`the phase was not saved: ${await visible(page)}`);
   row.afterS = secs(Date.now() - afterStart);
   const after = await slotSave(page); observe(after, `${label}-saved`);
+  row.economy = progressionReceipt(before, marched, after);
+  // Read-only actual save for candidate migration analysis; no invented held/loss/capture/turn-in receipts.
+  await fs.writeFile(path.join(OUT, 'final-save.json'), JSON.stringify(after));
   const last = after.campaign.history.at(-1), ids = Object.keys(menBefore);
   const expectIndex = index + 1; // a first play advances past this phase; its replay leaves the ladder where the first play left it
   check(`${label}-recorded`, last?.awardId === row.awardId && last.grade === result.grade && last.replay === replay && after.campaign.index === expectIndex

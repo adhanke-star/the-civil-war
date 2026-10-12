@@ -1,5 +1,17 @@
 # Handoff — existing v1 (2026-10-11, Claude Opus 5.5)
 
+Latest bounded branch work (0130–0131): diagnostic-only progression CPU6/6+6mutants and real playthrough
+economy/final-save export; no thresholds adopted. Mastery model1076/currentL8, documented surplus1476/L9,
+not combat-play evidence. Observer12/12+12mutants corrects DOM-event rejection, actualresize, synchronized
+GPU peaks separate from CPU arrays and native buffer upload ownership. Failed38266404188 report/log retained:
+all11scene states observed then missing-page predicate failed. Conservative upper bound stays reported.
+Foragers actual CI38267168225 shard4 captured three caches/Silver; fourth halted to fight atsim630 (wavering,
+2407men). Astra admits one native Run order for fourthleg, then Run off/Hold, unchanged placements/support/AI.
+Fresh fullCI and actual Gold/save screenshots required; no integration until allnine jobs green. Prototype
+resource lifecycle only genuinely unused buckets: procedural officers/crews/cavalry/casualties still required.
+Do not dispose whole pools, drop field looks/directions or guess DPR1 fits. Both hybrid and PNG fallback must
+fit250,000,000 synchronizedGPU scene/transition estimate; native pools/CPUdecode peak stayUNRUN.
+
 **Current owner/scope (Aaron, 2026-10-12): Codex/Sol is sole product writer**, with Astra deciding uncertain
 design/history/tuning choices. Worktree `/private/tmp/cw-v1-1-20261012`, branch `v1-1-gaps-20261012`, starts
 from released v1 `558456f447c984f8868c688bd3acbb6e8c6551bd`. Licence `a79ec3a` and terrain `21eb4a3`

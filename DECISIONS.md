@@ -1,5 +1,17 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0131 — Use the native Run order for the fourth supply-cache leg (Astra, 2026-10-12)
+
+Preserve CI38267168225 shard4's actual failure: Rousseau captured three caches, halted to fight before the fourth (sim630,2407men,wavering), and saved Silver; UI/axe/320px/provenance passed. Admit one native Run toggle before the fourth march, unchanged supporting orders/positions/AI/combat, then Run off and Hold after capture. Record engagement, follow, target, morale/fatigue. No repeated reissue or forced win; if this bounded tactic fails, return the evidence before changing placement/tactics.
+
+## 0130 — Compare progression with actual economy receipts before tuning (Sol, 2026-10-12)
+
+The diagnostic-only candidate thresholds remain [0,30,75,135,210,300,405,525,660,800], not adopted. Six CPU controls and six rejecting mutants exercise real decision, phase, sale, reward/save APIs: the labelled Decisive/held/no-US-loss model yields806 phase income plus270 affordable decision income (1076 reputation,currentL8); selling only actual unissued phase-card surplus adds400 (1476,currentL9). No assumed captures or combat-play claim. Export real per-phase economy and final save from the next agent playthrough; actual570/L5 to candidateL8 must reconcile three cards exactly, preserve points/shop state, reload/export/import/idempotence and refuse capacity overflow before Astra chooses numbers.
+
+## 0129 — Correct scene accounting and measure owned buffers before resource changes (Astra, 2026-10-12)
+
+Preserve failed scene38266404188: all11 scenes/six states had GL0/no unknowns, then its missing-page check mistook a message-less DOM error event for success. Bind actual404 hits, record rejection separately, await actual resize. Retain conservative independent-maxima/CPU-double-count upper bound; compare synchronized GPU reservations including pending deletes/replacement/default-framebuffer overlap to the unchanged250,000,000 limit, with CPU arrays separate. Map bufferData upload arrays to actual GL buffers/owners; unmatched bytes remain counted. Prototype only genuinely unused procedural buckets (officers/crews/cavalry/casualties remain), then exact-demand instance storage if needed, then measured render-pixel ceiling with actual images. No global close-only, missing looks/directions/figures, or silent quality/budget reduction. Hybrid and PNG fallback both need full scene/transition verification before adoption.
+
 ## 0128 — Mirror native NPOT mip-level conversion in the diagnostic observer (Astra, 2026-10-12)
 
 Preserve failed scene38265339357: native allocations succeeded (GL0) but Three's fractional log2(NPOT)+1 storage levels threw in observer bookkeeping, caught by Three, omitting61,667,400 field-atlas bytes. Canonicalize observed GLsizei storage arguments after leaving native calls unchanged; bookkeeping errors become fatal diagnostic unknowns. Add native-fractional CPU control, console-error capture and bounded texture/signature/slot details. Astra authorizes one corrected Actions observation after focused controls; no budget/native/adoption claim from the failed result.

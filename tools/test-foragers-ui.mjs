@@ -35,6 +35,7 @@ export async function foragersControls({browser,url,check,shot,result,watchError
     await page.setViewportSize({width:1024,height:768});
     const route=[];
     for(let index=1;index<=4;index++) {
+      if(index===4){await page.locator('[data-order="run"]').click();check('foragers-run-final-leg',await page.locator('[data-order="run"]').getAttribute('aria-pressed')==='true','one deliberate native Run order bypasses march-to-fight halt');}
       await page.locator('#capture-count').click();
       await page.locator(`[data-crate-order="buell-game-supply-${index}"]`).click();
       let state;
@@ -42,13 +43,15 @@ export async function foragersControls({browser,url,check,shot,result,watchError
         state=await page.evaluate(({index})=>{
           const g=window.__game.game;g.paused=false;g.fastForward(25);g.paused=true;
           const u=g.units.find(u=>u.id==='us-rousseau-brigade'),c=g.fieldCaptures.crates[index-1];
-          return {index,simTime:g.simTime,over:g.over,owner:c.owner,status:c.status,stores:g.featReport()[u.id].stores,men:u.men,state:u.state,x:u.x,z:u.z};
+          return {index,simTime:g.simTime,over:g.over,owner:c.owner,status:c.status,stores:g.featReport()[u.id].stores,men:u.men,state:u.state,x:u.x,z:u.z,
+            run:u.run,engaged:u.engaged,followActive:u.follow.active,target:u.target?.id||null,morale:u.morale,fatigue:u.fatigue};
         },{index});
         if(state.stores>=index||state.over||state.men===0)break;
       }
       route.push(state);check(`foragers-route-${index}`,state.owner==='US'&&state.stores>=index&&state.men>0,JSON.stringify(state));
       if(state.stores<index)break;
     }
+    if(route.length===4&&route[3].stores===4){await page.locator('[data-order="run"]').click();await page.locator('[data-order="hold"]').click();check('foragers-hold-after-capture',await page.evaluate(()=>!window.__game.game.selected.run&&window.__game.game.selected.order.firm),'native Hold ends the deliberate running leg');}
     result.foragersRoute=route;
     check('foragers-four-distinct',route.length===4&&route[3].stores===4&&route[3].men>0,'one surviving franchise brigade captured all four through native march controls');
     await shot(page,'foragers-four-stores');

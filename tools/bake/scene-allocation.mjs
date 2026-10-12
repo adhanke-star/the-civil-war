@@ -1,4 +1,18 @@
 // Diagnostic-only accounting of WebGL reservations. These are API bytes, not native driver measurements.
+export async function rejectionObservation(run) {
+  try {await run();return {rejected:false,message:''};}
+  catch(e){return {rejected:true,message:e?.message||e?.type||String(e)};}
+}
+// Synchronized GPU estimate, including a resize's old/new default surfaces. CPU arrays are separate.
+export class ReservationPeak {
+  constructor(){this.peak=0;this.framebuffer=0;this.dimensions='';this.current=0;}
+  sample(apiBytes,width,height,attributes){
+    const framebuffer=width*height*(8+(attributes.depth?4:0)+(attributes.stencil?4:0));
+    const dimensions=`${width}:${height}`,old=dimensions!==this.dimensions?this.framebuffer:0;
+    this.current=apiBytes+framebuffer;this.peak=Math.max(this.peak,this.current+old);
+    this.framebuffer=framebuffer;this.dimensions=dimensions;return this.current;
+  }
+}
 export function mipSizes(w,h,bpp,levels=Math.floor(Math.log2(Math.max(w,h)))+1) {
   if(![w,h,bpp,levels].every(Number.isSafeInteger)||w<1||h<1||bpp<1||levels<1||levels>32)throw new Error('allocation: invalid mip dimensions');
   const out=[];for(let i=0;i<levels;i++){out.push({w,h,bytes:w*h*bpp});w=Math.max(1,w>>1);h=Math.max(1,h>>1);}return out;
@@ -11,6 +25,7 @@ export class AllocationLedger {
     if(!r){r={kind,slots:new Map()};this.objects.set(id,r);}
     const prior=r.slots.get(slot)||0;
     this.peak=Math.max(this.peak,this.bytes+bytes-(overlap?0:prior));
+    this.onReservation?.(this.bytes+bytes-(overlap?0:prior));
     this.bytes+=bytes-prior;r.slots.set(slot,bytes);this.calls++;
   }
   retire(id){if(this.objects.has(id))this.retired.add(id);}
@@ -24,9 +39,10 @@ export class AllocationLedger {
 
 /** Installed only in an owned diagnostic context before game boot. No product code or GL arguments changed. */
 export function installAllocationObserver(source) {
-  const Ledger=(0,eval)('('+source.ledger+')'),mips=(0,eval)('('+source.mips+')');
+  const Ledger=(0,eval)('('+source.ledger+')'),mips=(0,eval)('('+source.mips+')'),Peak=(0,eval)('('+source.reservationPeak+')');
   const contexts=new WeakMap();
-  const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),textures:new Map(),textureIds:new Map(),signatures:[],unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};contexts.set(gl,s);}return s;};
+  const sample=(gl,s,bytes=s.ledger.bytes)=>s.gpu.sample(bytes,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.getContextAttributes());
+  const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),gpu:new Peak(),bufferArrays:new WeakMap(),bufferIds:new Map(),textures:new Map(),textureIds:new Map(),signatures:[],unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};s.ledger.onReservation=bytes=>sample(gl,s,bytes);contexts.set(gl,s);}return s;};
   const unknown=(s,value)=>{if(!s.unknown.includes(value))s.unknown.push(value);};
   const signature=(gl,s,id,call,raw,canonical)=>{
     if(!s.textureIds.has(id))s.textureIds.set(id,s.textureIds.size+1);
@@ -67,7 +83,7 @@ export function installAllocationObserver(source) {
   const wrap=(proto,name,after)=>{
     const native=proto[name];if(typeof native!=='function')return;
     proto[name]=function(...args){const value=native.apply(this,args),s=state(this);s.calls[name]=(s.calls[name]||0)+1;
-      try{after(this,args,value);}catch(error){unknown(s,`observer:${name}:${error.message}`);}return value;};
+      try{sample(this,s);after(this,args,value);sample(this,s);}catch(error){unknown(s,`observer:${name}:${error.message}`);}return value;};
   };
   for(const proto of [globalThis.WebGLRenderingContext?.prototype,globalThis.WebGL2RenderingContext?.prototype].filter(Boolean)) {
     for(const [name,compressed,volume]of [['texImage2D',false,false],['compressedTexImage2D',true,false],['texImage3D',false,true],['compressedTexImage3D',true,true]])
@@ -97,6 +113,7 @@ export function installAllocationObserver(source) {
       if(!id){unknown(s,`unknown buffer target:${target}`);return;}
       const data=a[1],element=data?.BYTES_PER_ELEMENT||1,bytes=typeof data==='number'?data:a[4]?a[4]*element:(data?.byteLength||0)-(a[3]||0)*element;
       s.ledger.reserve(id,'buffer',0,bytes);
+      if(ArrayBuffer.isView(data)){s.bufferArrays.set(data,id);if(!s.bufferIds.has(id))s.bufferIds.set(id,s.bufferIds.size+1);}
     });
     for(const multisample of [false,true])wrap(proto,multisample?'renderbufferStorageMultisample':'renderbufferStorage',(gl,a)=>{
       const s=state(gl),offset=multisample?1:0,samples=multisample?Math.max(1,a[1]):1,id=gl.getParameter(gl.RENDERBUFFER_BINDING);
@@ -107,13 +124,15 @@ export function installAllocationObserver(source) {
       wrap(proto,name,(gl,a)=>{const s=state(gl);s.ledger.retire(a[0]);if(kind==='texture')s.textures.delete(a[0]);});
     wrap(proto,'finish',gl=>state(gl).ledger.sync());
   }
-  window.__allocation={snapshot(gl){const s=state(gl),attrs=gl.getContextAttributes(),pixels=gl.drawingBufferWidth*gl.drawingBufferHeight;
+  window.__allocation={bufferReservation(gl,array){const s=state(gl),id=s.bufferArrays.get(array),r=s.ledger.objects.get(id);return r?{id:s.bufferIds.get(id),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(id)}:null;},snapshot(gl){const s=state(gl),attrs=gl.getContextAttributes(),pixels=gl.drawingBufferWidth*gl.drawingBufferHeight;
     // Conservative two RGBA8 colour surfaces plus a 32-bit depth surface; browser/driver storage is unmeasured.
     const defaultFramebuffer=pixels*(8+(attrs.depth?4:0)+(attrs.stencil?4:0));
     const dimensions=`${gl.drawingBufferWidth}:${gl.drawingBufferHeight}`;
     s.defaultPeak=Math.max(s.defaultPeak,defaultFramebuffer+(dimensions!==s.defaultDimensions?s.defaultBytes:0));
     s.defaultBytes=defaultFramebuffer;s.defaultDimensions=dimensions;
+    sample(gl,s);
     return {...s.ledger.snapshot(),defaultFramebuffer,defaultPeak:s.defaultPeak,framebufferAssumption:'two RGBA8 colour surfaces, 32-bit depth/stencil when enabled; no native measurement',
+      gpuCurrent:s.gpu.current,gpuPeak:s.gpu.peak,
       dimensions:[gl.drawingBufferWidth,gl.drawingBufferHeight],attributes:attrs,unknown:s.unknown,calls:s.calls,signatures:s.signatures,
       textureSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='texture').map(([id,r])=>({texture:s.textureIds.get(id),slots:Object.fromEntries(r.slots)}))};
   }};
