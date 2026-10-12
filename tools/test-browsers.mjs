@@ -29,7 +29,9 @@ function watch(page, url, into) {
 }
 
 const { server, url } = await startServer({ port: 0 });
-const browser = await playwright[name].launch({ headless: true });
+// headless Firefox on CI has only a software GPU and blocklists WebGL 2 there; a real Firefox does not
+const browser = await playwright[name].launch({ headless: true, ...(name === 'firefox' ? { firefoxUserPrefs: {
+  'webgl.force-enabled': true, 'webgl.disable-fail-if-major-performance-caveat': true, 'webgl.enable-webgl2': true } } : {}) });
 console.log(`${name} ${browser.version()} at ${url}`);
 try {
   // 1. title and Continue
