@@ -390,8 +390,9 @@ export class Hud {
       d = document.createElement('dialog');
       d.id = 'traits-dialog'; d.setAttribute('aria-labelledby', 'traits-title');
       d.addEventListener('close', () => {
-        if (this.traitsPaused && this.game && this.game.paused) this.game.togglePause();
+        const resume = this.traitsPaused;
         this.traitsPaused = false;
+        if (resume && this.game && this.game.paused) this.game.togglePause();
         const back = this.traitsTrigger;
         this.traitsTrigger = null;
         const target = back && back.isConnected && !back.closest('[hidden]') && back.getClientRects().length ? back : this.canvas;
@@ -413,7 +414,7 @@ export class Hud {
     if (this.rts) this.rts.inertia = null;
     this.traitsTrigger = trigger;
     if (this.game && !this.game.paused) { this.game.togglePause(); this.traitsPaused = true; }
-    d.showModal();
+    if (!d.open) d.showModal();
     title.focus({ preventScroll: true });
     return d;
   }

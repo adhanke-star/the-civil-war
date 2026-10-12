@@ -73,6 +73,7 @@ export async function traitsControls({ browser, url, check, shot, result, watchE
     await page.waitForFunction(() => document.getElementById('traits-dialog')?.open, null, { timeout: 10000 });
     const dialog = await page.evaluate(() => {
       const d = document.getElementById('traits-dialog');
+      window.__traitsOpen = { hudPaused: window.__game.hud?.traitsPaused, sameGame: window.__game.hud?.game === window.__game.game };
       return { focus: document.activeElement?.id, paused: window.__game.game.paused, title: d.querySelector('#traits-title')?.textContent,
         men: [...d.querySelectorAll('.traits-man')].map((m) => ({ name: m.dataset.commander, traits: [...m.querySelectorAll('.traits-trait')].map((li) => ({
           key: li.dataset.trait, label: li.querySelector('.traits-label')?.textContent, rule: li.querySelector('.traits-rule')?.textContent ?? '',
@@ -99,9 +100,10 @@ export async function traitsControls({ browser, url, check, shot, result, watchE
     });
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.getElementById('traits-dialog')?.open, null, { timeout: 10000 });
-    const closed = await page.evaluate(() => ({ focus: document.activeElement?.id, paused: window.__game.game.paused, log: window.__pauseLog }));
+    const closed = await page.evaluate(() => ({ focus: document.activeElement?.id, paused: window.__game.game.paused, log: window.__pauseLog,
+      atOpen: window.__traitsOpen, hudPaused: window.__game.hud?.traitsPaused, hud: !!window.__game.hud }));
     // the dialog puts the field back as it found it: running if it was running when the dialog opened
-    check('traits-dialog-close', closed.focus === 'uc-traits-more' && closed.paused === !runningBefore, `after Escape: focus ${closed.focus}, paused ${closed.paused} (running before: ${runningBefore}); changes ${JSON.stringify(closed.log)}`);
+    check('traits-dialog-close', closed.focus === 'uc-traits-more' && closed.paused === !runningBefore, `after Escape: focus ${closed.focus}, paused ${closed.paused} (running before: ${runningBefore}); changes ${JSON.stringify(closed.log)}; at open ${JSON.stringify(closed.atOpen)}; hud ${closed.hud} flag ${closed.hudPaused}`);
 
     // 320 px: the card and the dialog fit
     await page.evaluate(() => { const { game } = window.__game; if (!game.paused) game.togglePause(); });
