@@ -8,6 +8,11 @@ with all mutants; same-SHA CI, actual screenshots and playthrough still required
 First remote command slice (0119) adds Hardee dawn/Polk Round Forest, explicit Inferred membership only:
 CPU10/10 plus10 mutants and traits18/18 plus18 mutants pass; no new mounted/rally/risk/RNG system.
 Generic Command labels, separate relationship sources, browser module --command-chain in shard4.
+Current compression diagnostic: dispatch pack-figures.yml mode=current on this branch. It fetches CS bake38186582847
+on Actions only and compares five current Union/CS close/field pages (extra CS butternut close look) against
+PNG/raw/UASTC and direct BC7/ASTC, actual GPU mips0/1/2 and five numbered light/dark comparison images.
+Only reports/images upload; no runtime adoption/full encode; unchanged thresholds, fieldable=false.
+CPU current-compression7/7 +7 mutants; inspect same-SHA Actions report before any codec choice (0118).
 Next source slice recommended by Astra: Hardee's effective Slaughter Pen command over Lucius Polk,
 Bushrod Johnson and Wood, with actual phase window/attachments before admission; Cheatham still unbound.
 `node tools/test.mjs --unit` is the local smoke; browsers/heavy suites run only on Actions.

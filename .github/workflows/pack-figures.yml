@@ -3,10 +3,11 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Report-only residency, two-page diagnosis, direct candidate, or full legacy packaging
+        description: Current two-army diagnosis, or retained legacy modes
         type: choice
-        default: diagnostic
+        default: current
         options:
+          - current
           - diagnostic
           - candidate
           - full
@@ -19,8 +20,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
-    runs-on: ${{ inputs.mode == 'candidate' && 'ubuntu-24.04' || 'ubuntu-latest' }}
-    timeout-minutes: ${{ inputs.mode == 'candidate' && 90 || 40 }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: ${{ (inputs.mode == 'candidate' || inputs.mode == 'current') && 90 || 40 }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -35,9 +36,15 @@ jobs:
       - name: Fetch the approved existing bake on the runner only
         run: |
           set -euo pipefail
-          gh api repos/adhanke-star/the-civil-war/actions/runs/37347072866 --jq '[.head_sha,.conclusion] | join(" ")' > "$RUNNER_TEMP/source.txt"
-          test "$(cat "$RUNNER_TEMP/source.txt")" = '820846fdc2fe11782a36b219220edcb16e222f92 success'
-          gh run download 37347072866 --repo adhanke-star/the-civil-war -n bake-33 -D "$RUNNER_TEMP/approved-bake"
+          if [ '${{ inputs.mode }}' = current ]; then
+            gh api repos/adhanke-star/the-civil-war/actions/runs/38186582847 --jq '.conclusion' > "$RUNNER_TEMP/source.txt"
+            test "$(cat "$RUNNER_TEMP/source.txt")" = success
+            gh run download 38186582847 --repo adhanke-star/the-civil-war -n bake-cs-34 -D "$RUNNER_TEMP/current-cs-bake"
+          else
+            gh api repos/adhanke-star/the-civil-war/actions/runs/37347072866 --jq '[.head_sha,.conclusion] | join(" ")' > "$RUNNER_TEMP/source.txt"
+            test "$(cat "$RUNNER_TEMP/source.txt")" = '820846fdc2fe11782a36b219220edcb16e222f92 success'
+            gh run download 37347072866 --repo adhanke-star/the-civil-war -n bake-33 -D "$RUNNER_TEMP/approved-bake"
+          fi
       - name: Pinned Khronos encoder (Apache-2.0; build tool only)
         if: inputs.mode != 'residency'
         run: |
@@ -48,7 +55,7 @@ jobs:
           tar -xf "$RUNNER_TEMP/ktx.tar.bz2" -C "$RUNNER_TEMP/ktx" --strip-components=1
           echo "$RUNNER_TEMP/ktx/bin" >> "$GITHUB_PATH"
       - name: Pinned direct BC7 C++ encoder (MIT; no ISPC)
-        if: inputs.mode == 'candidate'
+        if: inputs.mode == 'candidate' || inputs.mode == 'current'
         run: |
           set -euo pipefail
           curl -fsSL --retry 3 -o "$RUNNER_TEMP/bc7-source.tar.gz" https://codeload.github.com/richgel999/bc7enc_rdo/tar.gz/b9438627eef73a1157e84201b6fa6eb2ffd6d9f0
@@ -60,14 +67,18 @@ jobs:
           cmake -S "$RUNNER_TEMP/bc7-source" -B "$RUNNER_TEMP/bc7-build" -DCMAKE_BUILD_TYPE=Release -DSUPPORT_BC7E=OFF -DCMAKE_POLICY_VERSION_MINIMUM=3.5 '-DCMAKE_CXX_FLAGS=-include cstdint'
           cmake --build "$RUNNER_TEMP/bc7-build" --parallel 2
           echo "BC7_ENCODER=$RUNNER_TEMP/bc7-build/bc7enc" >> "$GITHUB_ENV"
-          gh run download 37374456139 --repo adhanke-star/the-civil-war -n compression-review -D "$RUNNER_TEMP/historical-uastc"
-          echo "HISTORICAL_REVIEW=$RUNNER_TEMP/historical-uastc" >> "$GITHUB_ENV"
+          if [ '${{ inputs.mode }}' = candidate ]; then
+            gh run download 37374456139 --repo adhanke-star/the-civil-war -n compression-review -D "$RUNNER_TEMP/historical-uastc"
+            echo "HISTORICAL_REVIEW=$RUNNER_TEMP/historical-uastc" >> "$GITHUB_ENV"
+          fi
       - name: Preserve approved identities; encode only the selected mode
         if: inputs.mode != 'residency'
         env:
           PACK_MODE: ${{ inputs.mode }}
         run: |
-          if [ "$PACK_MODE" = diagnostic ]; then
+          if [ "$PACK_MODE" = current ]; then
+            node tools/bake/current-compression.mjs "$RUNNER_TEMP/current-cs-bake/atlas"
+          elif [ "$PACK_MODE" = diagnostic ]; then
             node tools/bake/compress.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack --diagnostic
           elif [ "$PACK_MODE" = candidate ]; then
             node tools/bake/compress.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack --candidate
@@ -78,8 +89,22 @@ jobs:
             exit 1
           fi
       - name: GPU readback against every approved PNG and meaningful broken controls
-        if: inputs.mode != 'residency'
+        if: inputs.mode != 'residency' && inputs.mode != 'current'
         run: node tools/bake/review-compression.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack
+      - name: Current five-page actual GPU readback, mips 0/1/2, unchanged quality thresholds
+        if: inputs.mode == 'current'
+        run: node tools/bake/review-current-compression.mjs
+      - name: Current diagnostic reports and five numbered comparison images only
+        if: always() && inputs.mode == 'current'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: current-compression-review
+          path: |
+            .out/current-compression/compression.json
+            .out/current-compression/quality.json
+            .out/current-compression/current-compression-*.png
+          retention-days: 7
+          if-no-files-found: warn
       - name: Bind the historical full original-PNG report and assess residency only
         if: inputs.mode == 'residency'
         run: |
@@ -110,7 +135,7 @@ jobs:
           if-no-files-found: error
           compression-level: 0
       - name: Small quality report and comparison sheets
-        if: always() && inputs.mode != 'residency'
+        if: always() && inputs.mode != 'residency' && inputs.mode != 'current'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: compression-review
