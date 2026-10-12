@@ -2,6 +2,7 @@
 // never a live battle. Three slots: slot 1 keeps the original key, so existing saves become slot 1.
 import { ARMS, PRACTICE_ARMS, UNIQUES, VETERANCY, GRADES, CONDITIONS, itemDef } from '../reward/data.js';
 import { ratings, canCarry, equip } from '../reward/model.js';
+import { BADGE_BY_ID, TIERS, slotsFor } from './badges.js';
 
 export const SAVE_KEY = 'cw.progress';
 export const PROGRESS_DB = 'cw.progress';
@@ -160,11 +161,58 @@ function economyRecord(v, campaign, issuedCount) {
   return { rp, reputation, level, shopSeen: number(v.shopSeen, 'shop level seen', 1, level), ledger };
 }
 
+/**
+ * v2 badges (src/franchise/badges.js writes them). A franchise brigade may carry `badges` (kept, at most its slots by
+ * veterancy), `offer` (earned while the slots were full, waiting for the player's choice in camp) and `xfactor` (the id of
+ * its first Gold, always kept). The campaign may carry `enemy`: { [CS formation id]: { badges, xfactor? } }. Every entry
+ * is { id, tier, awardId, feat }: the badge, its tier, the recorded phase award that earned it and the feat amount. A
+ * badge id appears once per brigade (kept or offered). Saves written before badges have none of these fields.
+ */
+export const BADGE_LIMITS = Object.freeze({ list: 20, enemy: 2000, feat: 10000000 });
+function badgeList(v, label, max, seen) {
+  const rows = list(v, label, 1, max);
+  return rows.map((r) => {
+    shape(r, ['id', 'tier', 'awardId', 'feat']);
+    if (!has(BADGE_BY_ID, r.id) || !TIERS.includes(r.tier)) bad(`unknown badge or tier in ${label}.`);
+    if (seen.has(r.id)) bad('a badge appears twice on one formation.');
+    seen.add(r.id);
+    return { id: r.id, tier: r.tier, awardId: id(r.awardId, 'badge award identity'), feat: number(r.feat, 'badge feat', 0, BADGE_LIMITS.feat) };
+  });
+}
+function xfactorOf(v, kept, label) {
+  if (typeof v !== 'string' || !kept.some((b) => b.id === v && b.tier === 'gold')) bad(`${label} X-Factor must be a kept Gold badge.`);
+  return v;
+}
+/** A brigade's badge fields (v2), in canonical order; {} when it has none. */
+function brigadeBadges(b, vet) {
+  const seen = new Set(), out = {};
+  if (has(b, 'badges')) {
+    out.badges = badgeList(b.badges, 'brigade badges', BADGE_LIMITS.list, seen);
+    if (out.badges.length > slotsFor(vet)) bad('a brigade keeps more badges than its slots.');
+  }
+  if (has(b, 'offer')) out.offer = badgeList(b.offer, 'badges on offer', BADGE_LIMITS.list, seen);
+  if (has(b, 'xfactor')) out.xfactor = xfactorOf(b.xfactor, out.badges || [], 'the brigade\'s');
+  return out;
+}
+function enemyRecord(v) {
+  if (!v || typeof v !== 'object' || Array.isArray(v) || ![Object.prototype, null].includes(Object.getPrototypeOf(v))) bad('invalid enemy badges.');
+  const keys = Object.keys(v);
+  if (!keys.length || keys.length > BADGE_LIMITS.enemy) bad('incomplete or oversized enemy badges.');
+  const out = {};
+  for (const key of keys.sort()) {
+    const e = v[key];
+    shape(e, ['badges'], ['xfactor']);
+    const badges = badgeList(e.badges, 'enemy badges', 4, new Set());
+    out[id(key, 'enemy formation identity')] = { badges, ...(has(e, 'xfactor') ? { xfactor: xfactorOf(e.xfactor, badges, 'an enemy formation\'s') } : {}) };
+  }
+  return out;
+}
+
 /** Strict canonical copy. Imported derived OVR is never trusted; it is recomputed. */
 export function validateSnapshot(v) {
   // Version 2 is only the campaign kind; any other version-2 record is an unsupported version.
   const v2 = !!v && typeof v === 'object' && v.version === 2 && v.kind === 'campaign';
-  if (v2) shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade', 'slot', 'campaign'], ['updated', ...ECONOMY_FIELDS]);
+  if (v2) shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade', 'slot', 'campaign'], ['updated', 'enemy', ...ECONOMY_FIELDS]);
   else shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade']);
   if (v.format !== 'the-civil-war' || (!v2 && (v.version !== 1 || v.kind !== 'completed-reward'))) bad('unsupported save format or version.');
   const awardId = id(v.awardId, 'completed award identity');
@@ -182,7 +230,7 @@ export function validateSnapshot(v) {
     return it;
   };
   const army = list(v.army, 'army', 1, 200).map((b) => {
-    shape(b, ['id', 'label', 'kind', 'men', 'vet', 'weapon', 'base'], v2 ? ['guns', 'ovr', 'unitId'] : ['guns', 'ovr']);
+    shape(b, ['id', 'label', 'kind', 'men', 'vet', 'weapon', 'base'], v2 ? ['guns', 'ovr', 'unitId', 'badges', 'offer', 'xfactor'] : ['guns', 'ovr']);
     const bid = id(b.id, 'brigade identity');
     if (has(b, 'unitId')) {
       if (unitIds.has(id(b.unitId, 'field unit identity'))) bad('duplicate field unit identity.');
@@ -199,9 +247,10 @@ export function validateSnapshot(v) {
     if (b.kind === 'battery') out.guns = number(b.guns, 'guns', 0, 200);
     else if (has(b, 'guns')) bad('infantry cannot own guns.');
     if (out.weapon.depot || !canCarry(out, out.weapon)) bad('incompatible equipped gear.');
-    out.ovr = ratings(out).ovr;
+    const badges = v2 ? brigadeBadges(b, out.vet) : {};
+    out.ovr = ratings({ ...out, ...badges }).ovr; // kept badges add their card points (a game rule)
     if (has(b, 'unitId')) out.unitId = b.unitId;
-    return out;
+    return Object.assign(out, badges);
   });
   const depot = list(v.depot, 'depot', 0, 2000).map((it) => add(item(it), null));
   const issuedRaw = list(v.issued, 'issued records', 0, 5000);
@@ -232,6 +281,7 @@ export function validateSnapshot(v) {
       slot: number(v.slot, 'save slot', 1, SAVE_SLOTS.length), campaign,
       rp: economy.rp, reputation: economy.reputation, level: economy.level, shopSeen: economy.shopSeen, ledger: economy.ledger }
     : { format: 'the-civil-war', version: 1, kind: 'completed-reward', awardId, army, depot, issued, seed, grade: v.grade };
+  if (v2 && has(v, 'enemy')) out.enemy = enemyRecord(v.enemy);
   if (v2 && has(v, 'updated')) {
     if (typeof v.updated !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(v.updated)) bad('invalid update time.');
     out.updated = v.updated;

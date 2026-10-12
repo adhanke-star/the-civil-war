@@ -103,3 +103,11 @@
 #front #camp-confirm h2 { margin: 0 0 10px; overflow-wrap: anywhere; }
 @media (max-width: 850px) { #front #camp-shop-stock { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 520px) { #front #camp-shop { padding: 14px 12px; } #front #camp-shop-stock { grid-template-columns: minmax(0, 1fr); } #front #camp-shop-toggle { width: 100%; } }
+/* badges in camp (src/ui/entry.js): card emblems open the detail; the keep choice is a checkbox list */
+#front .camp-choose-button { grid-column: 1 / -1; width: 100%; margin-top: 8px; border-color: #c9a64a; white-space: normal; }
+#front #camp-badge h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 16px 0 6px; font-size: 15px; }
+#front #camp-badge ul { margin: 4px 0 0; padding-left: 20px; }
+#front #camp-badge a { color: var(--rw-ink); overflow-wrap: anywhere; }
+#front #camp-choose fieldset { margin: 10px 0; padding: 8px 10px; border: 1px solid #827c8b; border-radius: 8px; }
+#front .camp-choose-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; overflow-wrap: anywhere; }
+#front .camp-choose-row input { width: 20px; height: 20px; margin: 0; }

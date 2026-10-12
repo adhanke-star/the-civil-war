@@ -170,7 +170,11 @@ export class Effects {
     if (this.ok) this.batch.update(dt);
   }
 
-  /** Shared presentation seam for future earned moments. Sandbox callers explicitly label previews. */
+  /**
+   * Shared presentation seam for X-Factor moments: the sandbox preview (labelled as one) and an earned X-Factor brigade's
+   * first fight in a battle (src/game.js xFactorStep, label "X-Factor: <badge>"). Banner, warm glow along the line and the
+   * sting follow look.xFactorStyle and reduced motion; nothing here changes combat.
+   */
   xFactor(unit, { preview = false, label = preview ? 'X-Factor preview' : 'X-Factor' } = {}) {
     if (!unit?.alive || LOOK.xFactorStyle === 'off') return false;
     this.stopMomentSound();

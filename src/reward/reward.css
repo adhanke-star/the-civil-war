@@ -455,6 +455,65 @@ body.sb-open-left .rw { left: var(--sb-w, 0px); }
 .rw-levelup-moment-note .rw-shape { width: 1.2em; height: 1.2em; }
 .rw-levelup-moment[data-motion="reduced"], .rw-levelup-moment[data-motion="reduced"] * { animation: none !important; transition: none !important; }
 @keyframes rw-levelup-life { 0% { opacity: 0; } 10% { opacity: 1; } 78% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ---- badges (src/franchise/badges.js; src/reward/sequence.js badgeChip, also the camp and the battle card) ------------
+   The emblem's shape is its category (Fire circle, Assault diamond, Defence shield, Support square, Batteries hexagon);
+   the tier is a colour AND its letter (B/S/G); the name is written beside it. Shared by the HUD, so fallbacks are given. */
+.cw-badge { --b-tier: #b07a42; --b-ink: #1b1209; display: inline-flex; align-items: center; gap: 6px; min-height: 26px; max-width: 100%; padding: 2px 8px 2px 2px;
+  border-radius: 999px; border: 1px solid rgba(255,255,255,0.16); background: rgba(0,0,0,0.28); color: inherit; font: inherit; font-size: 12.5px; font-weight: 700; line-height: 1.15; vertical-align: middle; }
+.cw-badge[data-tier="silver"] { --b-tier: #c4ccd6; --b-ink: #14181e; }
+.cw-badge[data-tier="gold"] { --b-tier: #f0c75e; --b-ink: #1f1600; }
+button.cw-badge { cursor: pointer; }
+button.cw-badge:hover { border-color: var(--b-tier); }
+button.cw-badge:focus-visible { outline: 3px solid var(--rw-focus, #ffd27a); outline-offset: 2px; }
+.cw-badge-mark { position: relative; flex: none; display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; background: var(--b-tier); color: var(--b-ink);
+  font-size: 10.5px; font-weight: 900; letter-spacing: 0.02em; box-shadow: inset 0 0 0 1.5px rgba(0,0,0,0.35); }
+.cw-badge-mark small { position: absolute; right: -4px; bottom: -4px; display: grid; place-items: center; width: 13px; height: 13px; border-radius: 50%; background: #10131a; color: var(--b-tier);
+  border: 1px solid var(--b-tier); font-size: 8.5px; font-weight: 900; }
+.cw-badge[data-cat="fire"] .cw-badge-mark { border-radius: 50%; }
+.cw-badge[data-cat="assault"] .cw-badge-mark { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.cw-badge[data-cat="assault"] .cw-badge-mark small { right: 0; bottom: -2px; }
+.cw-badge[data-cat="defence"] .cw-badge-mark { border-radius: 4px 4px 50% 50% / 4px 4px 60% 60%; }
+.cw-badge[data-cat="support"] .cw-badge-mark { border-radius: 3px; }
+.cw-badge[data-cat="batteries"] .cw-badge-mark { clip-path: polygon(25% 2%, 75% 2%, 100% 50%, 75% 98%, 25% 98%, 0 50%); }
+.cw-badge[data-cat="batteries"] .cw-badge-mark small { right: 0; bottom: -2px; }
+.cw-badge-name { min-width: 0; overflow-wrap: anywhere; }
+.cw-badge.is-xfactor { border-color: #f0c75e; box-shadow: 0 0 0 1px rgba(240,199,94,0.5), 0 0 14px rgba(240,199,94,0.45); }
+.rw-bbadges { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+.rw-brig > .rw-bbadges { grid-column: 1 / -1; margin-top: 0; }
+.rw-bbadges-new { padding: 2px 8px; border-radius: 999px; border: 1px dashed currentColor; color: inherit; font-size: 12px; font-weight: 700; }
+.rw-brig.has-xfactor { box-shadow: var(--rw-card-shadow), 0 0 0 2px rgba(240,199,94,0.65), 0 0 22px rgba(240,199,94,0.35); }
+/* after-action: badges stamped onto their brigades with the feat */
+.rw-badges { width: min(560px, 100%); margin: 16px auto 0; padding: 16px 18px; text-align: left; border: 1px solid var(--rw-rule); border-radius: 12px; background: var(--rw-faint); }
+.rw-badge-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.rw-badge-row { display: flex; align-items: flex-start; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--rw-rule); }
+.rw-badge-row .rw-badge-stamp { flex: none; opacity: 0.25; transform: scale(1.6) rotate(-10deg); transition: opacity 0.2s, transform 0.35s cubic-bezier(0.2, 1.6, 0.4, 1); }
+.rw-badge-row.is-stamped .rw-badge-stamp { opacity: 1; transform: none; }
+.rw[data-motion="reduced"] .rw-badge-row .rw-badge-stamp { opacity: 1; transform: none; }
+.rw-badge-text { display: grid; gap: 2px; min-width: 0; overflow-wrap: anywhere; font-size: 13.5px; }
+.rw-badge-text b { font-size: 14.5px; }
+.rw-badge-x { color: var(--rw-accent); font-weight: 800; }
+/* the X-Factor moment: full-screen, never takes focus or a click; leaves on its own (sequence.js xFactorMoment) */
+.rw-xfactor-moment { position: fixed; inset: 0; z-index: 61; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 16px;
+  color: #fff6dd; text-align: center; background: radial-gradient(70% 55% at 50% 50%, rgba(40,22,4,0.86) 0%, rgba(20,12,4,0.6) 60%, rgba(10,8,4,0) 100%);
+  animation: rw-levelup-life 3.6s ease-out both; }
+.rw-xfactor-moment p { position: relative; margin: 0; max-width: calc(100vw - 32px); overflow-wrap: anywhere; }
+.rw-xfactor-glow { position: absolute; left: 50%; top: 50%; width: 130vmin; height: 70vmin; transform: translate(-50%, -50%); border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(255,170,60,0.5) 0%, rgba(240,199,94,0.16) 40%, rgba(240,199,94,0) 66%); animation: rw-levelup-glow 3.6s ease-out both; }
+.rw-xfactor-kicker { font-size: clamp(40px, 12vw, 96px); font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase; color: #f0c75e; text-shadow: 0 0 36px rgba(255,170,60,0.6);
+  animation: rw-stamp 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both 0.1s; }
+.rw-xfactor-name { display: inline-flex; align-items: center; gap: 12px; font-size: clamp(20px, 4.5vw, 32px); font-weight: 800; }
+.rw-xfactor-name .cw-badge { font-size: 16px; }
+.rw-xfactor-who { font-size: clamp(14px, 2.6vw, 18px); font-weight: 600; color: #f4e6c2; }
+.rw-xfactor-moment[data-style="subtle"] { inset: auto 0 18% 0; background: rgba(20,12,4,0.88); border-block: 2px solid #f0c75e; animation: none; }
+.rw-xfactor-moment[data-style="subtle"] *, .rw-xfactor-moment[data-style="subtle"] .rw-xfactor-glow { animation: none !important; }
+.rw-xfactor-moment[data-style="subtle"] .rw-xfactor-glow { display: none; }
+.rw-xfactor-moment[data-style="subtle"] .rw-xfactor-kicker { font-size: 28px; text-shadow: none; }
+/* the battle card (src/ui/hud.js): the selected brigade's badges and its X-Factor */
+.ucbadges { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 0; }
+.ucbadges .cw-badge { min-height: 22px; font-size: 11.5px; }
+.ucbadges .cw-badge-mark { width: 20px; height: 20px; font-size: 9.5px; }
+#unitcard.has-xfactor { box-shadow: 0 0 0 2px rgba(240,199,94,0.7), 0 0 20px rgba(255,170,60,0.45); }
 @keyframes rw-levelup-glow { from { transform: translate(-50%, -50%) scale(0.4); opacity: 0; } 25% { opacity: 1; } to { transform: translate(-50%, -50%) scale(1.15); opacity: 0.6; } }
 
 /* ---- small screens ------------------------------------------------------------------------------------------ */
@@ -523,3 +582,5 @@ body.sb-open-left .rw { left: var(--sb-w, 0px); }
 @media (prefers-reduced-motion: reduce) {
   .rw *, .rw *::before, .rw *::after { animation: none !important; transition: none !important; }
 }
+/* an X-Factor brigade's flag on the battlefield (src/ui/hud.js addUnit) */
+.marker.has-xfactor svg { filter: drop-shadow(0 0 5px rgba(255,170,60,0.95)); }

@@ -11,11 +11,15 @@
 // it shows his rally radius (Game.selectCommander) and describes him in the empty card.
 // Cavalry: the marker's staff stands on a horseshoe; the card's cavalry row says Mounted, Dismounted, Dismounting or
 // Remounting with the reach of its arms, and its Dismount toggle (N; pressed = on foot) orders orderSelected('dismount').
+// Badges (src/franchise/badges.js): the card shows the selected formation's badges from its definition (shape, tier
+// letter and name in each emblem's label; the camp's emblems, styled in src/reward/reward.css). An X-Factor brigade's card
+// and flag carry a warm glow (has-xfactor); its moment in battle arrives through showMoment (src/fx/effects.js).
 
 import * as THREE from 'three';
 import { LOOK } from './look.js';
 import { on as onSetting } from '../settings.js';
 import { Minimap } from './minimap.js';
+import { BADGE_BY_ID, TIER_NAMES } from '../franchise/badges.js';
 
 const $ = (id) => document.getElementById(id);
 const _v = new THREE.Vector3();
@@ -351,6 +355,30 @@ export class Hud {
     else this.hideRegimentTip('field');
   }
 
+  /** The card's badge emblems for u (its definition's badges; hidden without any) and the X-Factor glow. */
+  fillBadges(u) {
+    let row = $('uc-badges');
+    if (!row) {
+      const state = $('uc-state');
+      if (!state) return;
+      row = document.createElement('p'); row.id = 'uc-badges'; row.className = 'ucbadges'; state.after(row);
+    }
+    const list = u && Array.isArray(u.def?.badges) ? u.def.badges.filter((b) => BADGE_BY_ID[b?.id] && TIER_NAMES[b.tier]) : [];
+    row.replaceChildren(...list.map((b) => {
+      const def = BADGE_BY_ID[b.id], tier = TIER_NAMES[b.tier], label = `${def.name}, ${tier} badge${b.xfactor ? ', X-Factor' : ''}`;
+      const chip = document.createElement('span');
+      chip.className = `cw-badge${b.xfactor ? ' is-xfactor' : ''}`; chip.dataset.badge = def.id; chip.dataset.tier = b.tier; chip.dataset.cat = def.category;
+      chip.setAttribute('role', 'img'); chip.setAttribute('aria-label', label); chip.title = label;
+      const mark = document.createElement('span'); mark.className = 'cw-badge-mark'; mark.setAttribute('aria-hidden', 'true');
+      const code = document.createElement('span'); code.textContent = def.mark;
+      const letter = document.createElement('small'); letter.textContent = tier[0];
+      mark.append(code, letter); chip.append(mark);
+      return chip;
+    }));
+    row.hidden = !list.length;
+    $('unitcard')?.classList.toggle('has-xfactor', list.some((b) => b.xfactor === true));
+  }
+
   /** The card's regiment list for u (rebuilt when the selection changes). */
   fillRegiments(u) {
     const list = $('uc-regiments');
@@ -494,6 +522,7 @@ export class Hud {
     b.innerHTML = `<span class="info"><span class="nm"></span><span class="cmd"></span><span class="st"></span></span>${markerSvg(u.side, u.type)}<span class="hf" aria-hidden="true">HOLD FIRE</span>`
       + '<span class="mstr"><span class="sbar"><i></i></span><span class="glyph"></span><span class="str"></span></span><span class="cdn" aria-hidden="true">Commander down</span><span class="act"></span>';
     b.querySelector('.nm').textContent = u.short;
+    if (Array.isArray(u.def?.badges) && u.def.badges.some((x) => x?.xfactor === true)) b.classList.add('has-xfactor'); // warm glow on its flag
     b.querySelector('.cmd').textContent = commanderLine(u);
     // pointer presses go through ui/input.js (select, drag an order, double-tap); a click without a pointer
     // (Enter or Space on a focused flag: detail 0) selects it from the keyboard
@@ -555,6 +584,7 @@ export class Hud {
     const empty = $('uc-empty');
     if (empty) { const text = general ? this.generalText(general) : this.emptyText; if (empty.textContent !== text) empty.textContent = text; }
     this.fillRegiments(u);
+    this.fillBadges(u);
     this.hideRegimentTip('card');
     if (!u) {
       this.updateOrders();

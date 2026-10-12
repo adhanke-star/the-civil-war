@@ -3,7 +3,8 @@
 //   rollLoot({ seed, grade, captures, forceLegendary }) -> { seed, grade, captures, cards }
 //       cards are item instances sorted commons first, rarest last:
 //       { uid, itemId, tier, conditionId, source: 'issue'|'capture', from }
-//   ratings(brigade) -> { arms, fire, melee, morale, drill, ovr }   (the four card bars + OVR)
+//   ratings(brigade) -> { arms, fire, melee, morale, drill, ovr }   (the four card bars + OVR; kept badges add their card
+//       points, a game rule from src/franchise/tuning.js BADGE_RULES, to one bar each before OVR is weighed)
 //   ovr(brigade)     -> number, gear-led (arms dominate); every weight lives in TUNING
 //   compare(brigade, item) -> { ok, reason?, before, after, delta }   (before/after are ratings())
 //   bestFit(brigades, item) -> the brigade with the largest OVR gain (null if none can carry it)
@@ -14,6 +15,7 @@
 // with repeaters outrate veterans; it is this one TUNING object to change after Aaron plays).
 
 import { TIERS, TIER_BY_ID, ARMS, UNIQUES, CONDITIONS, CONDITION_BY_ID, GRADES, CAPTURE_PLACES, ISSUE_PLACE, itemDef } from './data.js';
+import { ratingBonus } from '../franchise/badges.js';
 
 export const TUNING = {
   // Named per-round combat calibration (game choice). Practice smooth/gun anchor to generic
@@ -173,15 +175,16 @@ export function canCarry(brigade, item) {
   return brigade.kind === 'battery' ? def.arm === 'artillery' : def.arm === 'infantry';
 }
 
-/** The card bars and OVR of a brigade with its current weapon. */
+/** The card bars and OVR of a brigade with its current weapon (and kept badges). */
 export function ratings(brigade) {
   const arms = armsRating(brigade.weapon);
   const def = itemDef(brigade.weapon.itemId);
   const b = brigade.base;
-  const fire = clamp(Math.round(TUNING.fire.skill * b.fire + TUNING.fire.arms * arms), 1, 99);
-  const melee = clamp(Math.round(b.melee + (def.mods?.melee || 0)), 1, 99);
-  const morale = clamp(Math.round(b.morale + TUNING.moraleFromArms * (arms - 50)), 1, 99);
-  const drill = clamp(Math.round(b.drill + (def.mods?.drill || 0)), 1, 99);
+  const bonus = ratingBonus(brigade.badges); // all zero without badges
+  const fire = clamp(Math.round(TUNING.fire.skill * b.fire + TUNING.fire.arms * arms) + bonus.fire, 1, 99);
+  const melee = clamp(Math.round(b.melee + (def.mods?.melee || 0)) + bonus.melee, 1, 99);
+  const morale = clamp(Math.round(b.morale + TUNING.moraleFromArms * (arms - 50)) + bonus.morale, 1, 99);
+  const drill = clamp(Math.round(b.drill + (def.mods?.drill || 0)) + bonus.drill, 1, 99);
   const w = TUNING.ovr.weights;
   const raw = w.arms * arms + w.fire * fire + w.melee * melee + w.morale * morale + w.drill * drill;
   const ovrV = clamp(Math.round(TUNING.ovr.floor + TUNING.ovr.scale * raw + (TUNING.vetBonus[brigade.vet] || 0)), 1, 99);

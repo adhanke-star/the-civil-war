@@ -31,6 +31,11 @@
 // it is compared); the atlas loads the first time baked is wanted and the rigged figures draw until it is in.
 // look.menPerFigure re-forms the infantry at 1:10 or 1:5, never denser than the phase's scenario.menPerFigure
 // (sim/phase.js phaseMenPerFigure, default 5); pools are sized at that phase minimum from the start.
+// Badges (DESIGN.md §3; src/franchise/badges.js): a definition's badges ([{ id, tier, xfactor? }], from the campaign save)
+// set the unit's badge effects in combat.js. featReport() returns every unit's feat statistics for the phase result; the
+// game adds the feats only it sees (field stores taken; guns surrendered to a captor). An X-Factor brigade's first fight
+// in a battle plays its moment (effects.xFactor: banner, warm glow, sting; look.xFactorStyle) and a feed line, once
+// (state in a WeakMap; no own Game keys).
 // Cavalry (DESIGN.md §2; rules in sim/combat.js, units/unit.js and sim/ai.js): horses are drawn by one MountPool, made only
 // when the roster (or a sandbox spawn) has cavalry and kept in a WeakMap (no own Game keys). Dismount (orderSelected
 // 'dismount', the card's button and N) toggles a regiment on and off its horses. A mounted regiment's charge pursues its
@@ -49,7 +54,8 @@ import { on as onSetting } from './settings.js';
 import { compareState } from './sandbox/compare.js';
 import { HaloPool } from './units/halos.js';
 import { HorsePool, HORSE_COATS, RallyRings, MountPool } from './units/mounts.js';
-import { Combat, CLOCK_RATIO, CAVALRY, CAVALRY_WEAPONS, defaultWeapon, horsed } from './sim/combat.js';
+import { Combat, CLOCK_RATIO, CAVALRY, CAVALRY_WEAPONS, defaultWeapon, horsed, featsOf, featStats, featGunsTaken, setBadgeEffects, xFactorOf } from './sim/combat.js';
+import { BADGE_BY_ID } from './franchise/badges.js';
 import { Ai, DELEGATE_ROLES } from './sim/ai.js';
 import { RULES } from './sim/rules.js';
 import { mulberry32, inWoods, PLAN } from './world/landscape.js';
@@ -85,6 +91,8 @@ const freezeCapture = value => {
 const captureState = game => reinforcementState.get(game)?.capture;
 // Cavalry horses: { mounts } only once cavalry is on the field (no own Game keys; legacy scenes allocate nothing).
 const cavalryState = new WeakMap();
+// X-Factor brigades whose moment has played this battle (game -> Set of units); empty on fields without badges.
+const xfactorShown = new WeakMap();
 const RIDE_SURRENDER_S = 3; // sim s of being ridden down after which a routing unit surrenders (surrender enabled)
 /** The game's MountPool, made on first need with room for `figures` horses. */
 function ensureMounts(game, figures) {
@@ -219,7 +227,7 @@ function captureCorridors(game) {
 
 function commitSurrenders(game, state, before, h, contacts = null) {
   const capture = state.capture, after = captureCorridors(game), timers = new Map(), proposed = new Map(capture.records), due = [];
-  const overruns = new Map();
+  const overruns = new Map(), captors = new Map();
   if (contacts) for (const source of capture.sources) {
     const attacker = source.unit;
     if (!attacker?.alive || attacker.state !== 'steady') continue;
@@ -245,11 +253,13 @@ function commitSurrenders(game, state, before, h, contacts = null) {
       if (!captor) continue;
       proposed.set(s.def.id, { men: u.men, killedWounded: s.def.men - u.men,
         captorSide: captor.side, captureAtSec: game.simTime, gunConditions: (u.gunSlots || []).map(g => g.alive) });
-      due.push(u);
+      due.push(u); captors.set(u, captor);
     }
   }
   // Refusal leaves surrender-owned timers, records, men, selection and callbacks unchanged.
   observeCaptures(game, state, proposed);
+  // Gun-takers (counting only): a surrendering battery's serviceable guns go to its captor, once per battery.
+  for (const u of due) if (Array.isArray(u.gunSlots)) featGunsTaken(captors.get(u), u);
   for (const u of due) u.surrender();
   capture.records = proposed; capture.timers = timers;
   if (!due.length) return;
@@ -685,6 +695,7 @@ export class Game {
     if (u.officer) u.officer.coat = HORSE_COATS[seed % HORSE_COATS.length];
     if (u.bearers) u.flags = commandState.get(this)?.flags ?? null;
     if (u.type === 'cavalry') u.mounts = cavalryState.get(this)?.mounts ?? null;
+    if (Array.isArray(d.badges) && d.badges.length) setBadgeEffects(u, d.badges); // campaign badges (combat.js effects)
     this.entities.add(u.vehicle);
     return u;
   }
@@ -1086,11 +1097,47 @@ export class Game {
       if (e.kind === 'rout' && !e.forced && e.unit && e.unit.side === this.playerSide) this.alert(`${e.unit.short} is routing.`, e.unit.x, e.unit.z);
     }
     if (!this.over) for (const e of this.fieldCaptures.step(this.units, h)) {
+      this.storesFeat(e);
       this.event(`${e.side === this.playerSide ? 'Your troops' : 'The enemy'} ${e.previous ? 'retake' : 'capture'} ${e.name}.`,
         null, 'capture', e);
     }
+    this.xFactorStep();
     this.checkObjective(h, !!state && this.simTime === state.plan.horizon);
     } finally { if (guarded) state.capture.tickActive = false; }
+  }
+
+  /** Foragers (counting only): field stores taken go to the nearest unbroken formation of the taking side. */
+  storesFeat(e) {
+    let best = null, bd = Infinity;
+    for (const u of this.units) {
+      if (u.side !== e.side || !u.alive || u.state === 'routing') continue;
+      const d = Math.hypot(u.x - e.x, u.z - e.z);
+      if (d < bd) { bd = d; best = u; }
+    }
+    if (best) featsOf(best).stores++;
+  }
+
+  /** An X-Factor brigade's first fight this battle (it fires, is under fire or in melee): its moment and a feed line, once. */
+  xFactorStep() {
+    for (const u of this.units) {
+      const x = xFactorOf(u);
+      if (!x || !u.alive || u.state === 'routing' || !(u.fireT > 0 || u.underFire > 0 || u.melee)) continue;
+      const shown = xfactorShown.get(this) || new Set();
+      if (shown.has(u)) continue;
+      shown.add(u);
+      xfactorShown.set(this, shown);
+      const name = BADGE_BY_ID[x.id]?.name || 'X-Factor', who = u.side === this.playerSide ? '' : 'Enemy ';
+      this.event(`${who}X-Factor: ${u.short} (${name}). Friends within 300 m share its edge.`, u, 'xfactor');
+      try { this.effects?.xFactor?.(u, { label: `${who}X-Factor: ${name}` }); }
+      catch (err) { console.warn('X-Factor moment unavailable:', err?.message ?? err); }
+    }
+  }
+
+  /** Every unit's feat statistics so far: { [id]: { side, xp, menStart, ...FEAT_STATS } } (src/franchise/badges.js). */
+  featReport() {
+    const out = {};
+    for (const u of this.units) out[u.id] = { side: u.side, xp: u.xp, menStart: u.menMax, ...featStats(u) };
+    return out;
   }
 
   /** A line for the event feed (clock time, sentence, where). */

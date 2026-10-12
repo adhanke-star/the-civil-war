@@ -15,6 +15,13 @@
 //     track and, when a level was reached, an inline level-up panel with its reward card plus levelUpMoment below.
 //   levelUpMoment(host, { to, opened, shopTier, reduced }) -> the full-screen level-up moment: a non-blocking layer
 //     (pointer-events none, aria-hidden; the caller announces it) that leaves on its own; static under reduced motion.
+//   Badges (src/franchise/badges.js): `afterAction.badges` (or, for a campaign award recorded on this page, badgeAward(
+//     awardId)) stamps each badge or tier-up earned onto its brigade with its feat, names the enemy's, and plays the first
+//     Gold's X-Factor moment once: xFactorMoment(host, { brigade, badgeId, reduced, style }), full-screen and non-blocking
+//     like the level-up, with a sound-sting hook (setXFactorSting); look.xFactorStyle 'subtle' (or reduced motion) keeps a
+//     static banner and no sting, 'off' shows none. badgeChip(entry, { button }) is the shared badge emblem (shape by
+//     category, tier letter and name: colour is never the only cue); brigCard shows the kept badges, the X-Factor and any
+//     badges waiting for the camp's choice.
 //
 // State lives in one plain object (S). Settings come from src/settings.js (defineRewardSettings below);
 // the 'screens.cardStyle' choice can be split-screened through src/sandbox/compare.js.
@@ -26,6 +33,7 @@ import { rollLoot, ratings, compare, bestFit, equip, armsRating, canCarry, makeR
 import * as sfx from './sfx.js';
 import { validateSnapshot, completedSnapshot } from '../franchise/save.js';
 import { assertSavedReward } from '../franchise/practice.js';
+import { BADGE_BY_ID, TIER_NAMES, featText, effectText, badgeAward, BADGE_RULES_NOTE } from '../franchise/badges.js';
 
 const STYLE_SLUG = { 'clean modern': 'modern', 'period desk': 'desk', hybrid: 'hybrid' };
 const BARS = [['fire', 'Fire'], ['melee', 'Melee'], ['morale', 'Morale'], ['drill', 'Drill']];
@@ -239,7 +247,7 @@ export function staticCard(inst) {
 }
 
 /** A brigade card (rating-first front). interactive: a role=button target in the issue step. */
-export function brigCard(b, i, { interactive = true, show = ratings(b) } = {}) {
+export function brigCard(b, i, { interactive = true, show = ratings(b), onBadge = null } = {}) {
   const def = itemDef(b.weapon.itemId);
   const cond = CONDITION_BY_ID[b.weapon.conditionId];
   const r = ratings(b);
@@ -270,8 +278,65 @@ export function brigCard(b, i, { interactive = true, show = ratings(b) } = {}) {
     el('span', { class: 'rw-star', hidden: true }, el('span', { 'aria-hidden': 'true', text: '★ ' }), 'Best fit'),
     el('span', { class: 'rw-delta', 'aria-hidden': 'true' })),
   weap, bars,
-  el('span', { class: 'rw-blocked', hidden: true }));
+  el('span', { class: 'rw-blocked', hidden: true }),
+  badgeRow(b, onBadge));
+  const kept = Array.isArray(b.badges) ? b.badges.filter((x) => BADGE_BY_ID[x.id]) : [];
+  if (kept.length || b.xfactor || b.offer?.length) {
+    card.setAttribute('aria-label', `${card.getAttribute('aria-label')}. Badges: ${kept.length ? kept.map((x) => `${BADGE_BY_ID[x.id].name} ${TIER_NAMES[x.tier]}`).join(', ') : 'none kept'}`
+      + `${b.xfactor && BADGE_BY_ID[b.xfactor] ? `; X-Factor: ${BADGE_BY_ID[b.xfactor].name}` : ''}${b.offer?.length ? `; ${b.offer.length} new to place in camp` : ''}`);
+  }
+  if (b.xfactor) card.classList.add('has-xfactor');
   return card;
+}
+
+// ---- badges ---------------------------------------------------------------------------------------------------------
+/** The badge emblem: shape by category, the tier's letter and colour, and the name. `button`: a details button. */
+export function badgeChip(entry, { button = false, compact = false } = {}) {
+  const def = BADGE_BY_ID[entry.id], tier = TIER_NAMES[entry.tier] || entry.tier;
+  const label = `${def.name}, ${tier} badge${entry.xfactor ? ', X-Factor' : ''}`;
+  const node = el(button ? 'button' : 'span', { class: `cw-badge${entry.xfactor ? ' is-xfactor' : ''}`, 'data-badge': def.id, 'data-tier': entry.tier,
+    'data-cat': def.category, ...(button ? { type: 'button', 'aria-label': `${label}: details` } : { role: 'img', 'aria-label': label }), title: label },
+  el('span', { class: 'cw-badge-mark', 'aria-hidden': 'true' }, el('span', { text: def.mark }), el('small', { text: tier[0] })),
+  compact ? null : el('span', { class: 'cw-badge-name', 'aria-hidden': 'true', text: def.name }));
+  return node;
+}
+/** A brigade card's badge row (null without badges); onBadge(entry, brigade) makes each emblem a details button. */
+function badgeRow(b, onBadge) {
+  const kept = Array.isArray(b.badges) ? b.badges.filter((x) => BADGE_BY_ID[x.id]) : [];
+  if (!kept.length && !b.offer?.length) return null;
+  const row = el('span', { class: 'rw-bbadges' });
+  for (const x of kept) {
+    const chip = badgeChip({ ...x, xfactor: x.id === b.xfactor }, { button: !!onBadge, compact: kept.length > 2 });
+    if (onBadge) chip.addEventListener('click', (e) => { e.stopPropagation(); onBadge(x, b, chip); });
+    row.append(chip);
+  }
+  if (b.offer?.length) row.append(el('span', { class: 'rw-bbadges-new', text: `${b.offer.length} new badge${b.offer.length === 1 ? '' : 's'} to place` }));
+  return row;
+}
+
+let xfactorSting = () => sfx.play('sting', { level: 'full' });
+/** The X-Factor moment's sound sting (no audio asset yet: the synthesised reward sting). Pass null to silence it. */
+export function setXFactorSting(fn) { xfactorSting = typeof fn === 'function' ? fn : () => {}; }
+/**
+ * The X-Factor moment (DESIGN §4b X-Factor look: dramatic, toned down by a setting): a full-screen, non-blocking banner
+ * over the after-action that leaves on its own. style 'full' animates with a warm glow and the sting; 'subtle' (and
+ * reduced motion) is a static banner without sound; 'off' shows nothing (returns null). window.__xfactors lists every
+ * moment shown on this page (the UI test checks it plays once).
+ */
+export function xFactorMoment(host, { brigade, badgeId, reduced = false, style = 'full', speed = 1 } = {}) {
+  const def = BADGE_BY_ID[badgeId];
+  if (!def || style === 'off') return null;
+  const quiet = reduced || style !== 'full';
+  const node = el('div', { class: 'rw-xfactor-moment', 'aria-hidden': 'true', 'data-badge': def.id, 'data-style': quiet ? 'subtle' : 'full' },
+    el('div', { class: 'rw-xfactor-glow' }),
+    el('p', { class: 'rw-xfactor-kicker', text: 'X-Factor' }),
+    el('p', { class: 'rw-xfactor-name' }, badgeChip({ id: def.id, tier: 'gold', xfactor: true }, { compact: true }), el('b', { text: def.name })),
+    el('p', { class: 'rw-xfactor-who', text: `${brigade}: its first Gold. Friends within 300 m share its edge in battle (game rule).` }));
+  host.append(node);
+  (globalThis.__xfactors ||= []).push(`${brigade}|${def.id}`);
+  if (!quiet) { try { xfactorSting(); } catch { /* a missing sound never blocks the moment */ } }
+  const timer = setTimeout(() => node.remove(), quiet ? 2400 : Math.round(3600 / (Number(speed) || 1)));
+  return { node, remove() { clearTimeout(timer); node.remove(); } };
 }
 
 /** A compact loot card in the tray. */
@@ -360,6 +425,10 @@ export function mountReward(root, opts = {}) {
     timers: new Set(), rafs: new Set(), waiters: new Set(), unsubs: [],
     ui: {},
   };
+  // A campaign award recorded on this page: show each brigade's badges on its cards (display and ratings only; the saved
+  // badges are the campaign save's, and the issue log carries weapons alone).
+  const badgeCards = opts.afterAction ? (opts.afterAction.badges ?? badgeAward(awardId))?.cards ?? null : null;
+  if (badgeCards) S.army = S.army.map((b) => (Object.hasOwn(badgeCards, b.id) ? { ...b, ...badgeCards[b.id] } : b));
   S.armyStart = S.army.map((b) => ({ ...b, base: { ...b.base }, weapon: { ...b.weapon } }));
   S.tray = (prepared ? cards : completed?.depot ?? [...(starting?.depot ?? []), ...cards]).map((c) => ({ ...c }));
 
@@ -445,6 +514,7 @@ export function mountReward(root, opts = {}) {
 
   // ---- a. after action ----------------------------------------------------------------------------------
   function renderAfterAction() {
+    const award = opts.afterAction ? opts.afterAction.badges ?? (S.awardId ? badgeAward(S.awardId) : null) : null;
     const crates = el('ul', { class: 'rw-crates', 'aria-label': `Captured crates: ${S.captures.length}` });
     S.captures.forEach((tierId, i) => {
       const t = TIER_BY_ID[tierId];
@@ -459,6 +529,7 @@ export function mountReward(root, opts = {}) {
       opts.afterAction ? el('p', { class: 'rw-hint', text: `${opts.afterAction.surviving.toLocaleString()} surviving men · ${opts.afterAction.losses.toLocaleString()} lost · ${opts.afterAction.guns} crewed guns. ${opts.afterAction.note ?? 'Practice rewards and ratings are game values; this does not record the historical outcome.'}` }) : null,
       opts.afterAction?.surrenderResult ? el('p', { class: 'rw-hint', text: surrenderReportText(opts.afterAction.surrenderResult) }) : null,
       pointsBlock(opts.afterAction?.points),
+      badgesBlock(award),
       el('div', { class: 'rw-aar-stats' },
         el('p', { class: 'rw-aar-stat' }, el('b', { text: String(S.captures.length) }), el('span', { text: 'Captures' })),
         el('p', { class: 'rw-aar-stat' }, el('b', { text: String(nIssue) }), el('span', { text: 'Quartermaster issue' })),
@@ -470,6 +541,43 @@ export function mountReward(root, opts = {}) {
     const p = opts.afterAction?.points;
     announce(`${S.grade}. ${p ? `${p.points} requisition points; reputation ${p.reputation.to}, level ${p.level}.${p.levelUp ? ` Reputation level ${p.levelUp.to} reached; a reward card goes to your depot.` : ''} ` : ''}${S.captures.length} captures. ${S.cards.length} cards to open.`);
     if (p) later(() => countPoints(sec, p), ms(450));
+    if (award) stampBadges(sec, award, !!p?.levelUp);
+  }
+
+  // ---- badges earned this phase (campaign phases; feats and effects are game rules) ----
+  function badgesBlock(award) {
+    if (!award || !(award.brigades?.length || award.enemy?.length)) return null;
+    const rows = el('ol', { class: 'rw-badge-list' });
+    let i = 0;
+    for (const br of award.brigades) for (const e of br.earned) {
+      const def = BADGE_BY_ID[e.id];
+      if (!def) continue;
+      const what = e.from ? `${TIER_NAMES[e.from]} to ${TIER_NAMES[e.tier]}` : `${TIER_NAMES[e.tier]}, new`;
+      rows.append(el('li', { class: 'rw-badge-row', style: `--i:${i++}`, 'data-badge': e.id, 'data-brigade': br.id, 'data-tier': e.tier },
+        el('span', { class: 'rw-badge-stamp' }, badgeChip({ id: e.id, tier: e.tier, xfactor: br.xfactor === e.id })),
+        el('span', { class: 'rw-badge-text' },
+          el('b', { text: `${br.label}: ${def.name} (${what})` }),
+          el('span', { text: `${featText(def, e.feat)}. ${effectText(def, e.tier)} (game rule).${e.kept ? '' : ' Its slots are full: choose which badges to keep in camp.'}` }),
+          br.xfactor === e.id ? el('span', { class: 'rw-badge-x', text: 'X-Factor: its first Gold.' }) : null)));
+    }
+    const enemy = (award.enemy || []).flatMap((f) => f.earned.map((e) => `${BADGE_BY_ID[e.id]?.name ?? e.id} ${TIER_NAMES[e.tier]}${f.xfactor === e.id ? ' (X-Factor)' : ''}`));
+    return el('section', { class: 'rw-badges', 'aria-labelledby': 'rw-badges-title', 'data-badges': String(i) },
+      el('h2', { class: 'rw-points-title', id: 'rw-badges-title' }, 'Badges', el('span', { class: 'rw-rule-tag', text: 'Game rule' })),
+      i ? rows : el('p', { class: 'rw-dim', text: award.loan ? 'An army on loan earns no franchise badges.' : 'No brigade earned a badge this phase.' }),
+      enemy.length ? el('p', { class: 'rw-hint rw-badge-enemy', text: `The enemy earned: ${enemy.join(', ')}. Its formations carry them into later phases.` }) : null,
+      el('p', { class: 'rw-dim', text: `${BADGE_RULES_NOTE} Open a badge on its brigade card in camp for the real example and its sources.` }));
+  }
+  function stampBadges(sec, award, levelUp) {
+    const rows = [...sec.querySelectorAll('.rw-badge-row')];
+    const parts = award.brigades.flatMap((br) => br.earned.map((e) => `${br.label}: ${BADGE_BY_ID[e.id]?.name} ${TIER_NAMES[e.tier]}`));
+    if (parts.length) later(() => announce(`Badges earned: ${parts.join('; ')}.`), ms(1200) + 60);
+    rows.forEach((row, k) => later(() => { row.classList.add('is-stamped'); if (!S.reduced) sfx.play('stamp'); }, ms(900 + 260 * k)));
+    const x = award.brigades.find((br) => br.xfactor);
+    if (!x || S.xfShown) return;
+    S.xfShown = true;
+    // After any level-up moment has left (both are full-screen layers).
+    const at = levelUp ? (S.reduced ? 1900 : ms(1400) + Math.round(2800 / speed())) : ms(900 + 260 * rows.length);
+    later(() => xFactorMoment(rootEl, { brigade: x.label, badgeId: x.xfactor, reduced: S.reduced, style: get('look.xFactorStyle') ?? 'full', speed: speed() }), at);
   }
 
   // ---- requisition points (campaign phases; game rules) ----

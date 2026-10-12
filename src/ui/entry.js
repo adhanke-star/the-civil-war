@@ -1,11 +1,16 @@
 // Completed-army camp. Explicit imports and depot exchanges share the authoritative save seam. A campaign camp also has
 // the Requisition drawer (src/franchise/economy.js: reputation track, this phase's stock, buy and turn-in with a confirm,
 // each written through the store's compare-and-set exchange) and plays the level-up moment when a turn-in reaches a level.
+// Badges (src/franchise/badges.js): each campaign brigade card shows its kept badges as buttons; one opens the badge's
+// detail (the feat, tiers and effect, labelled game rules, apart from the real example with its provenance and source
+// links). A brigade with more badges than slots shows "Choose badges to keep": a keyboard dialog of checkboxes (the X-Factor
+// fixed) written through the same compare-and-set exchange (campaign.js chooseBadges); Cancel or Escape changes nothing.
 import { createProgressStore, parseSnapshot, exportSnapshot, exchangeDepot, listSlots, MAX_SAVE_BYTES } from '../franchise/save.js';
-import { newCampaign } from '../franchise/campaign.js';
+import { newCampaign, chooseBadges } from '../franchise/campaign.js';
+import { BADGE_BY_ID, TIER_NAMES, BADGE_RULES_NOTE, featText, effectText, threshold, categoryName, slotsFor } from '../franchise/badges.js';
 import { loadCampaign, loadPackSummary, ladderPosition, formatDate } from './briefing.js';
 import { get } from '../settings.js';
-import { brigCard, staticCard, itemLabel, defineRewardSettings, levelUpMoment } from '../reward/sequence.js';
+import { brigCard, staticCard, itemLabel, defineRewardSettings, levelUpMoment, badgeChip } from '../reward/sequence.js';
 import { shopStock, buyLot, turnInCard, markShopSeen, levelUps, turnInPoints, nextLevelAt, shopTierFor, ECONOMY, RULES_NOTE } from '../franchise/economy.js';
 import { TIER_BY_ID, itemDef } from '../reward/data.js';
 import { compare, bestFit } from '../reward/model.js';
@@ -104,6 +109,18 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       <div id="camp-ratings"></div><p id="camp-exchange-note" role="status"></p>
       <div class="camp-compare-actions"><button id="camp-compare-cancel" type="button">Cancel</button><button id="camp-issue" type="button">Issue and save</button></div>
     </dialog>
+    <dialog id="camp-badge" aria-labelledby="camp-badge-heading">
+      <h2 id="camp-badge-heading" tabindex="-1"></h2><p id="camp-badge-brigade"></p>
+      <section aria-labelledby="camp-badge-rule-heading"><h3 id="camp-badge-rule-heading">The feat and its effect <span class="rw-rule-tag">Game rule</span></h3><p id="camp-badge-feat"></p><p id="camp-badge-effect"></p><p id="camp-badge-tiers"></p></section>
+      <section aria-labelledby="camp-badge-history-heading"><h3 id="camp-badge-history-heading">The real example <span class="rw-rule-tag" id="camp-badge-provenance"></span></h3>
+        <p id="camp-badge-unit"></p><p id="camp-badge-event"></p><p id="camp-badge-text"></p><p id="camp-badge-sources-label">Sources</p><ul id="camp-badge-sources" aria-labelledby="camp-badge-sources-label"></ul></section>
+      <div class="camp-compare-actions"><button id="camp-badge-close" type="button">Close</button></div>
+    </dialog>
+    <dialog id="camp-choose" aria-labelledby="camp-choose-heading" aria-describedby="camp-choose-note">
+      <h2 id="camp-choose-heading" tabindex="-1"></h2><p id="camp-choose-note"></p>
+      <fieldset id="camp-choose-set"><legend id="camp-choose-legend">Badges to keep</legend><div id="camp-choose-rows"></div></fieldset><p id="camp-choose-status" role="status"></p>
+      <div class="camp-compare-actions"><button id="camp-choose-cancel" type="button">Cancel</button><button id="camp-choose-save" type="button">Keep these and save</button></div>
+    </dialog>
     <dialog id="deploy-review" aria-labelledby="deploy-heading" aria-describedby="deploy-note">
       <h2 id="deploy-heading" tabindex="-1">Deploy your saved army</h2><p id="deploy-note" role="status"></p>
       <ul id="deploy-formations" aria-label="Formations taking the field"></ul>
@@ -127,6 +144,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     node('entry-discard-exchange').hidden = !pendingExchange;
     node('entry-discard-exchange').disabled = importing;
     root.querySelectorAll('.camp-compare-button').forEach((b) => { b.disabled = importing || !!pendingImport || !!pendingExchange; });
+    root.querySelectorAll('.camp-choose-button').forEach((b) => { b.disabled = importing || !!pendingImport || !!pendingExchange; });
     root.querySelectorAll('.camp-turnin-button, .camp-buy-button').forEach((b) => { b.disabled = importing || !!pendingImport || !!pendingExchange || b.dataset.blocked === 'true'; });
     node('camp-shop-toggle').disabled = importing || !!pendingImport || !!pendingExchange;
     root.querySelectorAll('a[href]').forEach((a) => a.setAttribute('aria-disabled', String(importing || !!pendingExchange)));
@@ -321,6 +339,78 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     if (saved.depot.some((it) => it.uid === item.uid) && trigger.isConnected) trigger.focus();
     else focusDepot(item.uid, index);
   }
+  // ---- badges: the detail (game rule apart from the sourced real example) and the keep choice ----
+  const badgeDialog = node('camp-badge');
+  let badgeTrigger = null;
+  function openBadge(entry, brigade, trigger) {
+    const def = BADGE_BY_ID[entry.id];
+    if (!def) return;
+    const ex = def.example, x = brigade.xfactor === entry.id;
+    node('camp-badge-heading').textContent = `${def.name}: ${TIER_NAMES[entry.tier]}${x ? ' · X-Factor' : ''}`;
+    node('camp-badge-brigade').textContent = `${brigade.label} · ${categoryName(def.category)} badge${x ? '. Its first Gold, the brigade\'s X-Factor: friends within 300 m share its battle effect.' : ''}`;
+    node('camp-badge-feat').textContent = `Earned for ${featText(def, entry.feat)} in one phase.`;
+    node('camp-badge-effect').textContent = `${effectText(def, entry.tier)}.`;
+    node('camp-badge-tiers').textContent = `Bronze ${threshold(def, 'bronze')}, Silver ${threshold(def, 'silver')}, Gold ${threshold(def, 'gold')} in one phase (${def.stat === 'holdingLoss' ? 'per cent of starting men' : def.feat}). ${BADGE_RULES_NOTE}`;
+    node('camp-badge-provenance').textContent = ex.provenance;
+    node('camp-badge-unit').textContent = ex.unit;
+    node('camp-badge-event').textContent = `${ex.event}${ex.theatre === 'Western' ? '' : ` (${ex.theatre} theatre)`}`;
+    node('camp-badge-text').textContent = ex.text;
+    node('camp-badge-sources').replaceChildren(...ex.sources.map((s) => {
+      const li = document.createElement('li'), a = document.createElement('a');
+      a.href = s.url; a.textContent = s.label; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      li.append(a); return li;
+    }));
+    badgeTrigger = trigger; badgeDialog.showModal(); node('camp-badge-heading').focus();
+  }
+  node('camp-badge-close').addEventListener('click', () => badgeDialog.close());
+  badgeDialog.addEventListener('close', () => { if (badgeTrigger?.isConnected) badgeTrigger.focus(); badgeTrigger = null; });
+  const chooseDialog = node('camp-choose');
+  let choosing = null;
+  function openChoose(brigadeId, trigger) {
+    if (importing || pendingImport || pendingExchange || !saved || saved.version !== 2) return;
+    const b = saved.army.find((x) => x.id === brigadeId);
+    if (!b || !b.offer?.length) return;
+    const slots = slotsFor(b.vet), all = [...(b.badges || []), ...b.offer];
+    choosing = { brigadeId, trigger, slots };
+    node('camp-choose-heading').textContent = `${b.label}: choose badges`;
+    node('camp-choose-note').textContent = `A ${b.vet} brigade has ${slots} badge slot${slots === 1 ? '' : 's'}. Keep up to ${slots}; the others are let go for good.${b.xfactor ? ' The X-Factor badge is always kept.' : ''} Slots and badges are game rules.`;
+    node('camp-choose-legend').textContent = `Badges to keep (up to ${slots})`;
+    node('camp-choose-rows').replaceChildren(...all.map((x) => {
+      const def = BADGE_BY_ID[x.id], label = document.createElement('label'), box = document.createElement('input');
+      box.type = 'checkbox'; box.value = x.id; box.checked = (b.badges || []).some((k) => k.id === x.id); box.className = 'camp-choose-box';
+      if (x.id === b.xfactor) { box.checked = true; box.disabled = true; }
+      label.className = 'camp-choose-row'; label.append(box, badgeChip({ ...x, xfactor: x.id === b.xfactor }, { compact: true }),
+        ` ${def.name} · ${TIER_NAMES[x.tier]} · ${featText(def, x.feat)}${b.offer.includes(x) ? ' (new)' : ''}`);
+      return label;
+    }));
+    node('camp-choose-status').textContent = '';
+    phase = 'reviewing'; chooseDialog.showModal(); node('camp-choose-heading').focus();
+  }
+  node('camp-choose-cancel').addEventListener('click', () => chooseDialog.close('cancel'));
+  chooseDialog.addEventListener('close', () => {
+    if (phase === 'reviewing') phase = 'idle';
+    const t = choosing?.trigger; choosing = null;
+    if (chooseDialog.returnValue !== 'saved' && t?.isConnected) t.focus();
+    chooseDialog.returnValue = '';
+  });
+  node('camp-choose-save').addEventListener('click', async () => {
+    if (!choosing || importing) return;
+    const keep = [...node('camp-choose-rows').querySelectorAll('.camp-choose-box')].filter((n) => n.checked).map((n) => n.value);
+    if (keep.length > choosing.slots) { node('camp-choose-status').textContent = `Choose at most ${choosing.slots}; ${keep.length} are ticked.`; return; }
+    const { brigadeId } = choosing, baseline = saved;
+    importing = true; controls(); node('camp-choose-status').textContent = 'Saving…';
+    try {
+      saved = await store.exchange(chooseBadges, { brigadeId, keep }, { previous: baseline }); failed = false;
+      const b = saved.army.find((x) => x.id === brigadeId);
+      importing = false; chooseDialog.close('saved'); render();
+      status.textContent = `${b.label} keeps ${b.badges?.length ? b.badges.map((x) => `${BADGE_BY_ID[x.id].name} (${TIER_NAMES[x.tier]})`).join(', ') : 'no badges'}. Saved.`;
+      const card = node('camp-army').querySelector(`[data-brigade-id="${CSS.escape(brigadeId)}"]`);
+      (card?.querySelector('button') || status).focus();
+    } catch (err) {
+      importing = false;
+      node('camp-choose-status').textContent = `${err.message} Your saved army is unchanged; reload the camp if progress changed elsewhere.`;
+    } finally { importing = false; controls(); }
+  });
   node('camp-shop-toggle').addEventListener('click', async () => {
     if (importing || pendingImport || pendingExchange || !saved || saved.version !== 2) return;
     shopOpen = !shopOpen; render(); node('camp-shop-toggle').focus();
@@ -345,7 +435,15 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       renderShop();
       node('entry-summary').textContent = `${saved.army.length} formations · ${saved.army.reduce((n, b) => n + b.men, 0).toLocaleString()} men · ${saved.grade ?? 'no phase fought yet'}`;
       paged(saved.army, node('camp-army'), node('army-pages'), (b, i) => {
-        const card = brigCard(b, i, { interactive: false }); card.dataset.brigadeId = b.id; return card;
+        const v2 = saved.version === 2;
+        const card = brigCard(b, i, { interactive: false, onBadge: v2 ? (x, br, chip) => openBadge(x, br, chip) : null }); card.dataset.brigadeId = b.id;
+        if (v2 && b.offer?.length) {
+          const choose = document.createElement('button'); choose.type = 'button'; choose.className = 'camp-choose-button';
+          choose.textContent = 'Choose badges to keep'; choose.setAttribute('aria-label', `Choose which badges ${b.label} keeps`);
+          choose.disabled = importing || !!pendingImport || !!pendingExchange;
+          choose.addEventListener('click', () => openChoose(b.id, choose)); card.append(choose);
+        }
+        return card;
       }, 'brigades', 'army');
       node('depot-note').textContent = saved.depot.length ? `${saved.depot.length} cards kept in the depot. Compare a card to issue it; your current weapon returns here.${saved.version === 2 ? ' A card you do not need can be turned in for requisition points.' : ''}` : 'No spare arms in the depot.';
       paged(saved.depot, node('camp-depot'), node('depot-pages'), (item) => {

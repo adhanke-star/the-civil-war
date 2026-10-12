@@ -37,11 +37,24 @@
 //     surrender accounting) without halting; no other unit fights a routing one.
 //   - screening: an infantry brigade within CAVALRY.screen of an enemy cavalry regiment that is not routing
 //     marches CAVALRY.screenSlow as fast (SCREENED, refreshed with the targets; unit.js move reads it).
+//   - feat statistics (DESIGN.md §3 Badges; src/franchise/badges.js FEAT_STATS): each unit's phase counters live in a
+//     module WeakMap (featsOf; never an own key on the unit or the Combat): casualties inflicted by band and situation
+//     (beyond 200 m, beyond 150 m on a larger formation, from a flank or the rear, falling back, from a fence line or farm
+//     buildings, from woods, with canister), the first volley after Hold Fire with its target within 60 m and the 15 s
+//     after it, losses taken while holding and returning fire, charges that broke a foe (one larger than the charger, one
+//     in cover), charges that reached the enemy again after a failed one, guns taken, enemy formations that broke near it
+//     while it held, seconds steady under flank fire or beside a routing friend, quick rallies and (unit.js) metres
+//     marched. Counting draws no random number and changes nothing the battle reads.
+//   - badge effects (src/franchise/tuning.js BADGE_RULES; setBadgeEffects from the unit's definition): small conditional
+//     multipliers (fire by band or situation, canister, ammunition per volley, melee by situation, morale losses, rally,
+//     resupply, fatigue), plus an X-Factor brigade's aura for friends within BADGE_RULES.xfactor.radius. A unit without
+//     badges takes exactly the old arithmetic: every badge term sits behind a check, never a multiply by 1.
 // FIRE_BASE and the drains are tuned for a few minutes of fighting per brigade, not sourced (as in the old
 // model, where FIRE_BASE was "tuned so the loop runs ~90 s"). The sandbox multipliers rules.fireEffect and
 // rules.moraleLoss scale them at the point of use; the constants here stay as they are.
 
 import { RULES } from './rules.js';
+import { FEAT_STATS, BADGE_RULES, badgeEffects } from '../franchise/badges.js';
 
 export const CLOCK_RATIO = 4;
 const YD = 0.9144;
@@ -86,12 +99,55 @@ export const horsed = (u) => u.type === 'cavalry' && !u.afoot;
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
+// ---- feat statistics and badge effects (no own keys; see the header) --------------------------------------------------
+const FEATS = new WeakMap(); // unit -> { ...FEAT_STATS counters, plus the bookkeeping below }
+const BADGE_FX = new WeakMap(); // unit -> its own badge combat fractions (badgeEffects)
+const LIVE_FX = new WeakMap(); // unit -> own fractions plus any X-Factor aura, refreshed with the targets
+const HELD_RANGE = 60, DISCIPLINE_S = 15, BREAK_S = 30, RALLY_QUICK_S = 30, REPULSE_RANGE = 150, PRESSED_RANGE = 300;
+const FAR = 200, LONG = 150, RECENT_FIRE_S = 8;
+const WORKS = new Set(['fence line', 'farm buildings']);
+/** The unit's feat record for this battle (made on first use). */
+export function featsOf(u) {
+  let r = FEATS.get(u);
+  if (!r) {
+    r = { held: false, discUntil: -1, ep: null, failed: 0, meleeBy: null, meleeT: -99, routT: null, guns: new Set() };
+    for (const k of FEAT_STATS) r[k] = 0;
+    FEATS.set(u, r);
+  }
+  return r;
+}
+/** Whole-number feat statistics of a unit (zeros when it has none yet); the phase result reads these. */
+export function featStats(u) {
+  const r = FEATS.get(u), out = {};
+  for (const k of FEAT_STATS) { const v = r ? r[k] : 0; out[k] = Number.isFinite(v) && v > 0 ? Math.floor(v) : 0; }
+  return out;
+}
+/** Credit `captor` with a battery's serviceable guns, once per battery (broken by its charge or surrendered to it). */
+export function featGunsTaken(captor, battery) {
+  if (!captor || !battery || battery.side === captor.side) return;
+  const r = featsOf(captor);
+  if (r.guns.has(battery)) return;
+  r.guns.add(battery);
+  r.gunsTaken += Array.isArray(battery.gunSlots) ? battery.gunSlots.filter((g) => g && g.alive).length : battery.guns || 0;
+}
+/** Set (or clear) a unit's badge effects from its definition's badge list; returns them (null: none). */
+export function setBadgeEffects(u, list) {
+  const fx = badgeEffects(list);
+  if (fx) BADGE_FX.set(u, fx); else { BADGE_FX.delete(u); LIVE_FX.delete(u); }
+  return fx;
+}
+/** The badge fractions in force for a unit now (its own plus any aura), or null. */
+export const badgeFx = (u) => LIVE_FX.get(u) || null;
+/** A unit's X-Factor ({ kind, fraction, id } from its own badges), or null. */
+export const xFactorOf = (u) => BADGE_FX.get(u)?.xfactor || null;
+
 export class Combat {
   #batteryContact = null;
   #stepDepth = 0;
   #command = null; // (unit) => { loss, rally } | null (game.js commandFactor)
   #hits = null; // flat [x, z, ...] of points that took fire since the last takeHits(); null: not kept
   #rideDown = null; // (cavalry, router, dt) => void: the game's surrender accounting (only with surrender enabled)
+  #now = 0; // sim time of the current step (feat clocks; a forced rout between steps uses the last one)
   constructor({ units, terrain, coverAt, fallen, fx, rnd, autoHaltSides = ['CS'], onBatteryContact = null, onRideDown = null }) {
     if (onBatteryContact !== null && typeof onBatteryContact !== 'function') throw new Error('Combat: battery contact callback must be a function or null.');
     if (onRideDown !== null && typeof onRideDown !== 'function') throw new Error('Combat: ride-down callback must be a function or null.');
@@ -212,6 +268,7 @@ export class Combat {
 
   step(dt, time) {
     this.#stepDepth++;
+    if (Number.isFinite(time)) this.#now = time;
     try {
     this.targetT -= dt;
     if (this.targetT <= 0) {
@@ -224,12 +281,14 @@ export class Combat {
         u.inWoods = c.kind === 'woods';
       }
       this.screenStep();
+      this.badgeStep();
     }
     for (const u of this.units) {
       if (!u.alive) continue;
       this.fireStep(u, dt, time);
     }
     this.meleeStep(dt, time, this.#stepDepth === 1 ? this.#batteryContact : null);
+    this.chargeEpisodes(time);
     for (const u of this.units) {
       if (!u.alive) continue;
       this.moraleStep(u, dt);
@@ -253,6 +312,67 @@ export class Combat {
       }
       if (near) SCREENED.add(u); else SCREENED.delete(u);
     }
+  }
+
+  /**
+   * Badge effects in force (LIVE_FX): each unit's own, plus an X-Factor aura from every living, unbroken X-Factor brigade
+   * of its side within BADGE_RULES.xfactor.radius (itself included). Nothing to do on a field without badges.
+   */
+  badgeStep() {
+    let auras = null, any = false;
+    for (const u of this.units) {
+      const fx = BADGE_FX.get(u);
+      if (!fx) continue;
+      any = true;
+      if (fx.xfactor && u.alive && u.state !== 'routing' && u.state !== 'captured') (auras ||= []).push(u);
+    }
+    if (!any) return;
+    const R2 = BADGE_RULES.xfactor.radius ** 2;
+    for (const u of this.units) {
+      const own = BADGE_FX.get(u);
+      let live = own || null;
+      if (auras) for (const a of auras) {
+        if (a.side !== u.side || (a.x - u.x) ** 2 + (a.z - u.z) ** 2 > R2) continue;
+        const x = BADGE_FX.get(a).xfactor;
+        if (live === null || live === own) live = { ...(own || {}) };
+        live[x.kind] = (live[x.kind] || 0) + x.fraction;
+      }
+      if (live) LIVE_FX.set(u, live); else LIVE_FX.delete(u);
+    }
+  }
+
+  /** A charge stays in contact while it fights; one out of contact for over 1 s is over (a failure unless its foe broke). */
+  chargeEpisodes(time) {
+    for (const u of this.units) {
+      const r = FEATS.get(u), ep = r && r.ep;
+      if (!ep || ep.done || time - ep.last <= 1) continue;
+      ep.done = true;
+      if (!ep.won) r.failed++;
+    }
+  }
+
+  /**
+   * A charging `a` in contact with `b` this step: opens a charge episode on a new foe (a charge that reaches the enemy
+   * after an earlier one failed counts for Relentless), keeps it open, counts casualties dealt from b's flank or rear and
+   * marks who is on b (rout() credits the break).
+   */
+  chargeFeat(a, b, bCas, time) {
+    const ra = featsOf(a);
+    if (!ra.ep || ra.ep.done || ra.ep.foe !== b) {
+      if (ra.ep && !ra.ep.done) { ra.ep.done = true; if (!ra.ep.won) ra.failed++; }
+      if (ra.failed > 0) ra.recharges++;
+      ra.ep = { foe: b, t0: time, last: time, smaller: a.men < b.men, cover: b.cover > 1, won: false, done: false };
+    }
+    ra.ep.last = time;
+    if (this.arcMult(a, b) > 1) ra.flankKills += bCas;
+    const rb = featsOf(b);
+    rb.meleeBy = a; rb.meleeT = time;
+  }
+
+  /** Losses taken by `t` while it holds its ground and returns fire (Cool Under Fire). */
+  holdingFeat(t, men, time) {
+    if (!(men > 0) || t.follow.active || t.state === 'routing' || t.order.type === 'fallback' || t.order.type === 'charge') return;
+    if (t.firing || time - t.fireT < RECENT_FIRE_S) featsOf(t).holdingLoss += men;
   }
 
   /** Sim seconds per round for u at full fatigue factor 1 (cavalry on foot: breech-loading carbines, faster). */
@@ -295,6 +415,7 @@ export class Combat {
     }
     const canFire = t && !u.holdFire && !u.melee && u.state !== 'routing' && u.order.type !== 'charge' && !(moving && (u.run || isArt)) && (!isArt || u.unlimbered) && !u.switching;
     u.firing = !!canFire && !moving;
+    if (t && u.holdFire && u.state !== 'routing') featsOf(u).held = true; // holding fire with a target (First Volley)
     const period = (u.equipmentProfile ? u.equipmentProfile.reloadSeconds : this.basePeriod(u)) * (1 + 0.5 * (u.fatigue / 100)) * (moving ? 1.5 : 1);
     if (u.reload < 1) u.reload = Math.min(1, u.reload + dt / period);
     if (!canFire || u.reload < 1) return;
@@ -334,8 +455,37 @@ export class Combat {
     const heightAdv = this.terrain.heightAt(t.x, t.z) - this.terrain.heightAt(u.x, u.z) > 8 ? 1.1 : 1;
     const wav = (u.state === 'wavering' ? 0.7 : 1) * (moving ? 0.5 : 1);
     const rate = FIRE_BASE * (fireMen / 1500) * pow * rngF * xpF * ammoF * morF * fatF * art * arc * wav / (t.cover * heightAdv) * RULES.fireEffect;
-    const cas = Math.min(t.men, rate * period * (0.78 + this.rnd() * 0.44));
+    const fx = LIVE_FX.get(u);
+    const canister = isArt && d <= CANISTER, works = WORKS.has(u.coverKind), falling = u.order.type === 'fallback';
+    let boost = 0; // badge fire effects (none without badges)
+    if (fx) {
+      if (d > FAR && fx.fireFar) boost += fx.fireFar;
+      if (d > LONG && fx.fireLong) boost += fx.fireLong;
+      if (d <= HELD_RANGE && fx.fireClose) boost += fx.fireClose;
+      if (arc > 1 && fx.fireFlank) boost += fx.fireFlank;
+      if (falling && fx.fireFallback) boost += fx.fireFallback;
+      if (works && fx.fireCover) boost += fx.fireCover;
+      if (u.inWoods && fx.fireWoods) boost += fx.fireWoods;
+      if (canister && fx.canister) boost += fx.canister;
+    }
+    const tMen = t.men;
+    const cas = Math.min(t.men, (boost ? rate * (1 + boost) : rate) * period * (0.78 + this.rnd() * 0.44));
     t.takeLosses(cas, this.fallen[t.side], time);
+    // feat statistics (counting only)
+    const r = featsOf(u);
+    if (d > FAR) r.farKills += cas;
+    if (d > LONG && tMen > u.men) r.screenKills += cas;
+    if (arc > 1) r.flankKills += cas;
+    if (falling) r.rearGuardKills += cas;
+    if (works) r.worksKills += cas;
+    if (u.inWoods) r.woodsKills += cas;
+    if (canister) r.canisterKills += cas;
+    if (r.held) {
+      r.held = false;
+      if (d <= HELD_RANGE) { r.heldVolley += cas; r.discUntil = time + DISCIPLINE_S; }
+    }
+    if (time <= r.discUntil) r.disciplineKills += cas;
+    this.holdingFeat(t, cas, time);
     if (this.#hits) this.#hits.push(t.x, t.z);
     t.underFire = 1.4;
     if (arc > 1) t.flanked = 1.0;
@@ -343,7 +493,8 @@ export class Combat {
     t.lastShooter = u; // brigade initiative turns to face fire from a flank (game.js)
     t.lastShotT = time;
     u.fireLoad = (u.fireLoad || 0) + cas; // engagement line weight (ui/readout.js)
-    u.ammo = Math.max(0, u.ammo - (isArt ? 1.0 : 1.2)); // about 80 volleys (~7 sim min) per full box
+    const use = isArt ? 1.0 : 1.2;
+    u.ammo = Math.max(0, u.ammo - (fx && fx.ammo ? use * (1 - fx.ammo) : use)); // about 80 volleys (~7 sim min) per full box
     u.shots = (u.shots || 0) + 1;
     u.kills = (u.kills || 0) + cas;
     u.fireT = time; // guns recoil, men flash (battery.js, unit.js)
@@ -380,7 +531,12 @@ export class Combat {
         const shock = rider ? this.cavalryShock(a, b) : 1;
         const atk = a.men * armA * (0.6 + 0.4 * a.morale / a.moraleMax) * (0.9 + 0.06 * a.xp) * (bCharging ? 1 : 1.15) * shock;
         const def = b.men * armB * (0.6 + 0.4 * b.morale / b.moraleMax) * (0.9 + 0.06 * b.xp) * (bCharging ? 1 : b.cover);
-        const r = atk / Math.max(1, def);
+        // badge melee effects (none without badges): the charger's, and the receiver's when it stands to receive
+        const fxA = LIVE_FX.get(a), fxB = LIVE_FX.get(b);
+        let atkB = 0, defB = 0;
+        if (fxA) atkB = (fxA.melee || 0) + (b.cover > 1 && fxA.meleeCover ? fxA.meleeCover : 0) + (b.type === 'artillery' && fxA.meleeGuns ? fxA.meleeGuns : 0);
+        if (fxB && !bCharging && fxB.meleeDefend) defB = fxB.meleeDefend;
+        const r = (atkB ? atk * (1 + atkB) : atk) / Math.max(1, defB ? def * (1 + defB) : def);
         // old: 9 x 12 men/s x ratio (108/s) with a 20% per second cap; that bled ~450 men a side in 20 s
         const base = 9 * dt * RULES.chargeEffect;
         const aCas = Math.min(a.men, a.menMax * 0.04 * dt, base * (1 / r) * (0.7 + this.rnd() * 0.6));
@@ -389,8 +545,16 @@ export class Combat {
         b.takeLosses(bCas, this.fallen[b.side], time);
         a.casTick = (a.casTick || 0) + aCas;
         b.casTick = (b.casTick || 0) + bCas;
-        if (r < 0.85) a.morale -= 18 * dt * RULES.moraleLoss * (this.#command?.(a)?.loss ?? 1);
-        if (r > 1.18) b.morale -= 18 * dt * RULES.moraleLoss * (this.#command?.(b)?.loss ?? 1);
+        if (r < 0.85) {
+          const lossA = 18 * dt * RULES.moraleLoss * (this.#command?.(a)?.loss ?? 1);
+          a.morale -= fxA && fxA.chargeMorale ? lossA * (1 - fxA.chargeMorale) : lossA;
+        }
+        if (r > 1.18) {
+          const lossB = 18 * dt * RULES.moraleLoss * (this.#command?.(b)?.loss ?? 1);
+          b.morale -= fxA && fxA.meleeShock ? lossB * (1 + fxA.meleeShock) : lossB;
+        }
+        this.chargeFeat(a, b, bCas, time);
+        this.holdingFeat(b, bCas, time);
         a.fatigue = Math.min(100, a.fatigue + 2.4 * dt * RULES.fatigueGain);
         b.fatigue = Math.min(100, b.fatigue + 2.4 * dt * RULES.fatigueGain);
       }
@@ -445,25 +609,37 @@ export class Combat {
     const k = this.#command ? this.#command(u) : null;
     const ml = RULES.moraleLoss * (k ? k.loss : 1);
     const rallyRate = k ? k.rally : 1;
-    u.morale -= (((cas / u.menMax) * 150) / rally) * ml;
+    // badge morale effects (none without badges): Cool Under Fire while holding; Unshaken against flank fire and panic
+    const fx = LIVE_FX.get(u);
+    const mlHold = fx && fx.moraleHold && !u.follow.active ? ml * (1 - fx.moraleHold) : ml;
+    const mlPanic = fx && fx.panic ? ml * (1 - fx.panic) : ml;
+    u.morale -= (((cas / u.menMax) * 150) / rally) * mlHold;
     const enemies = this.enemiesOf(u);
     const nearest = enemies.reduce((m, e) => Math.min(m, Math.hypot(e.x - u.x, e.z - u.z)), Infinity);
     u.nearestEnemy = nearest; // the brigade marches in column only with no enemy near (unit.js)
-    if (u.underFire > 0) u.morale -= (0.12 / u.cover) * dt * ml; // men in woods or behind walls feel it less
-    if (u.flanked > 0) u.morale -= 0.6 * dt * ml;
+    if (u.underFire > 0) u.morale -= (0.12 / u.cover) * dt * mlHold; // men in woods or behind walls feel it less
+    if (u.flanked > 0) u.morale -= 0.6 * dt * mlPanic;
     if (u.ammo < 18) u.morale -= 0.15 * dt * ml;
     if (u.fatigue > 60) u.morale -= 0.45 * dt * ml;
     if (u.order.firm) u.morale += 0.12 * dt; // Hold: steadied by orders to stand
     for (const f of this.units) {
       if (f !== u && f.side === u.side && f.state === 'routing' && !f.panicSeen?.has(u.id) && Math.hypot(f.x - u.x, f.z - u.z) < 180) {
         (f.panicSeen ||= new Set()).add(u.id);
-        u.morale -= 6 * ml;
+        u.morale -= 6 * mlPanic;
       }
+    }
+    // Unshaken (counting only): holding under fire while flanked or with a routing friend near
+    if (u.underFire > 0 && u.state !== 'routing' && !u.follow.active) {
+      let pressed = u.flanked > 0;
+      if (!pressed) for (const f of this.units) {
+        if (f !== u && f.side === u.side && f.state === 'routing' && Math.hypot(f.x - u.x, f.z - u.z) < PRESSED_RANGE) { pressed = true; break; }
+      }
+      if (pressed) featsOf(u).steadySeconds += dt;
     }
     u.fireLoad *= Math.exp(-dt / 4);
     if (u.state !== 'routing' && u.underFire <= 0 && nearest > 0.9 * RANGE.rifled) u.morale += 1.1 * dt * rallyRate;
     // Resupply from the trains behind the line (M1 simplification; the old model used a supply wagon).
-    if (u.state !== 'routing' && u.underFire <= 0 && nearest > 300) u.ammo = Math.min(100, u.ammo + 2 * dt);
+    if (u.state !== 'routing' && u.underFire <= 0 && nearest > 300) u.ammo = Math.min(100, u.ammo + (fx && fx.resupply ? 2 * dt * (1 + fx.resupply) : 2 * dt));
     u.underFire = Math.max(0, u.underFire - dt);
     u.flanked = Math.max(0, u.flanked - dt);
     u.morale = clamp(u.morale, 0, u.moraleMax);
@@ -471,8 +647,10 @@ export class Combat {
     const routThresh = 18 - 1.5 * u.xp;
     if (u.state === 'routing') {
       // Rally: no enemy within 220 m for 6 s.
-      if (nearest > 220 && !this.rallyBlocked?.(u)) u.rallyT += dt * rallyRate; else u.rallyT = 0;
+      if (nearest > 220 && !this.rallyBlocked?.(u)) u.rallyT += fx && fx.rally ? dt * rallyRate * (1 + fx.rally) : dt * rallyRate; else u.rallyT = 0;
       if (u.rallyT > 6) {
+        const r = FEATS.get(u);
+        if (r && r.routT !== null && this.#now - r.routT <= RALLY_QUICK_S) r.quickRallies++;
         u.state = 'wavering';
         u.morale = Math.max(u.morale, 30);
         u.order = { type: 'hold' };
@@ -507,13 +685,42 @@ export class Combat {
     u.order = { type: 'rout' };
     u.rallyT = 0;
     if (forced) u.morale = Math.min(u.morale, 10);
+    this.routFeat(u);
     this.log.push({ t: performance.now(), unit: u, kind: 'rout', forced, text: `${u.short} breaks and runs!` });
+  }
+
+  /**
+   * Feats of a break (counting only): the charge that broke `u` within BREAK_S of reaching it (Cold Steel; Shock when the
+   * charger was the smaller; Stormers when u stood in cover; Gun-takers for a battery's guns), and every enemy formation
+   * holding its ground within REPULSE_RANGE (Rock). Also starts u's quick-rally clock.
+   */
+  routFeat(u) {
+    const now = this.#now, ru = featsOf(u);
+    ru.routT = now;
+    const a = ru.meleeBy;
+    if (a && now - ru.meleeT <= 1) {
+      const ra = featsOf(a), ep = ra.ep;
+      if (ep && !ep.done && ep.foe === u && now - ep.t0 <= BREAK_S) {
+        ep.won = true;
+        ra.chargeBreaks++;
+        if (ep.smaller) ra.shockBreaks++;
+        if (ep.cover) ra.stormed++;
+        if (u.type === 'artillery') featGunsTaken(a, u);
+      }
+    }
+    for (const e of this.units) {
+      if (e.side === u.side || !e.alive || e.state === 'routing' || e.state === 'captured' || e.follow.active
+        || e.order.type === 'charge' || e.order.type === 'fallback' || Math.hypot(e.x - u.x, e.z - u.z) > REPULSE_RANGE) continue;
+      featsOf(e).repulses++;
+    }
   }
 
   fatigueStep(u, dt) {
     const moving = u.follow.active || u.state === 'routing';
     // as in the old model, standing still rests a unit even while it fires
-    if (moving) u.fatigue += (u.state === 'routing' || u.run || u.order.type === 'charge' ? 1.2 : 0.3) * dt * RULES.fatigueGain;
+    const fx = LIVE_FX.get(u);
+    if (moving && fx && fx.fatigue) u.fatigue += (u.state === 'routing' || u.run || u.order.type === 'charge' ? 1.2 : 0.3) * dt * RULES.fatigueGain * (1 - fx.fatigue);
+    else if (moving) u.fatigue += (u.state === 'routing' || u.run || u.order.type === 'charge' ? 1.2 : 0.3) * dt * RULES.fatigueGain;
     else u.fatigue -= (u.firing ? 0.35 : 0.9) * dt;
     u.fatigue = clamp(u.fatigue, 0, 100);
   }

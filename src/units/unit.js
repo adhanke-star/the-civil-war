@@ -28,6 +28,8 @@
 // Command (game.js commandStep): a brigade commander can be hit (commandDown = { kind: 'wounded'|'killed', at });
 // a wounded officer rides to the rear and leaves the field, a killed one falls beside his standing horse.
 //
+// Feat statistics (src/sim/combat.js featsOf; DESIGN.md §3 Badges): move() adds the metres marched under orders.
+//
 // Orders (set by game.js): move (march to the mark; may halt on the way to fight, see pauseMarch), attack
 // (close on a target to effective range and fire; the game steers it), charge, fallback, hold. holdFire is a
 // standing flag on the unit, not an order: it survives new orders until toggled off.
@@ -47,7 +49,7 @@ import { framePos } from './figure.js';
 import { BAKE_CLIP } from './impostor.js';
 import { mulberry32 } from '../world/landscape.js';
 import { RULES } from '../sim/rules.js';
-import { CAVALRY, SCREENED, defaultWeapon } from '../sim/combat.js';
+import { CAVALRY, SCREENED, defaultWeapon, featsOf } from '../sim/combat.js';
 import { LOOK } from '../ui/look.js';
 import { equipmentProfile } from '../sim/equipment.js';
 import { define, on as onSetting } from '../settings.js';
@@ -742,6 +744,12 @@ export class Unit {
     if (this.switching) this.mountStep(dt);
     const o = this.order;
     const v = this.vehicle;
+    // Hard Marchers (counting only; src/sim/combat.js featsOf): ground covered on a march or attack order since the last
+    // step, at the velocity the vehicle just moved with. Reads nothing back into the march.
+    if (this.follow.active && this.state !== 'routing' && (o.type === 'move' || o.type === 'attack')) {
+      const walked = Math.hypot(v.velocity.x, v.velocity.z) * dt;
+      if (walked > 0) featsOf(this).marched += walked;
+    }
     const horse = this.type === 'cavalry' && this.mounted && !this.switching;
     let speed = SPEED.walk;
     if (this.state === 'routing') speed = SPEED.rout;
