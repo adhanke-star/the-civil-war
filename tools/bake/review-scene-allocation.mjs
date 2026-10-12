@@ -4,6 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { startServer, ROOT } from '../serve.mjs';
 import { AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation } from './scene-allocation.mjs';
+import {installInactiveFigures} from './inactive-figures.mjs';
 
 function inventory() {
   const {scene,post,game}=window.__game,arrays=new Map(),textures=new Set();let declaredArrayBytes=0;
@@ -44,7 +45,9 @@ async function main(){
   if(fs.existsSync(out)||fs.realpathSync(outputRoot)!==outputRoot)throw new Error('scene allocation: needs fresh real .out/scene-allocation');
   fs.mkdirSync(out);
   const campaign=JSON.parse(fs.readFileSync(path.join(ROOT,'assets/campaign.json')));
+  const inactive=process.env.SCENE_INACTIVE==='true';
   const report={diagnosticOnly:true,fieldable:false,toolSha:process.env.GITHUB_SHA,route:'current PNG, both armies',cases:[],complete:false,
+    inactivePrototype:inactive,
     limits:{gpuBytes:250000000},nativeDriverMemory:'UNRUN',cpuDecodePeak:'UNRUN',
     unverified:['native driver storage/pools and deferred releases after context destruction','whole-fight effect maximum beyond exercised frames','future sandbox spawns beyond declared pools','CPU image decode/upload-copy peaks']};
   const source={ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString()};
@@ -74,6 +77,7 @@ async function main(){
           console.log(entry.phaseId,label,JSON.stringify({reservation:data.conservativeReservation,...data.allocation.byKind,arrays:data.declaredArrayBytes,pages:data.atlasPages}));
         };
         await capture('field');
+        if(inactive){await page.evaluate(source=>{const g=window.__game.game;g.__inactiveStats=(0,eval)('('+source+')')(g);g.animate(0);},installInactiveFigures.toString());await capture('inactive-field');}
         await page.evaluate(async()=>{await Promise.all(Object.values(window.__game.game.baked.atlases).map(a=>a.load('close')));});
         await capture('both-close-tiers');
         // Every phase exercises native depth ownership and resize, not just an assumed maximum.
@@ -86,6 +90,23 @@ async function main(){
         await resized({width:1366,height:1024});await capture('lens-resize');
         await page.evaluate(()=>window.__game.post.endSoldierView());await capture('lens-retired');
         await resized({width:320,height:568});await capture('narrow-resize');
+        if(inactive&&entry.phaseId==='lookout-mountain'){
+          await resized({width:1024,height:768});
+          const transition=async(label,style,compare=false)=>{
+            const state=await page.evaluate(async({style,compare})=>{
+              const g=window.__game.game,S=await import('./src/settings.js'),C=await import('./src/sandbox/compare.js');
+              const combat=()=>JSON.stringify({time:g.simTime,orders:g.orders,holder:g.holder,units:g.units.map(u=>({id:u.id,men:u.men,morale:u.morale,ammo:u.ammo,state:u.state,order:u.order.type,x:u.x,z:u.z}))});
+              const before=combat();C.stopCompare();S.set('look.figureStyle',style);
+              if(compare){const spec=S.all().find(s=>s.key==='look.figureStyle').spec;C.startCompare('look.figureStyle',spec,style,()=>{});}
+              g.animate(0);return {combatUnchanged:combat()===before,stats:{...g.__inactiveStats},procedural:g.pools.US.pushed+g.pools.CS.pushed,baked:g.impostors.US.drawn+g.impostors.CS.drawn};
+            },{style,compare});
+            row.transitions||=[];row.transitions.push({label,...state});if(!state.combatUnchanged)throw new Error('inactive prototype: style changed combat state');
+            await capture(label);await page.screenshot({path:path.join(out,`${String(row.transitions.length).padStart(2,'0')}-${label}.png`)});
+          };
+          await transition('rigged-reactivation','rigged');await transition('baked-reclamation','baked');
+          await transition('compare-rigged-left','rigged',true);await transition('compare-baked-left','baked',true);
+          await transition('baked-restored','baked');
+        }
         row.complete=true;
       } finally {await ctx.close();save();}
       console.log(`SCENE ${index+1}/${campaign.phases.length} complete`);

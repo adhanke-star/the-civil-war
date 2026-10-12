@@ -1,5 +1,15 @@
 # Handoff — existing v1 (2026-10-11, Claude Opus 5.5)
 
+Latest0133: corrected baseline scene38269841040/268c501 SUCCESS, all11x6 states+actual404; synchronizedGPU
+peak437,579,014 exceeds250M, retainedupper498,626,748. Fully mapped buffers; future unuploaded arrays remain
+separate demand. Inactive diagnostic5/5+5mutants retains CPU records, releases only empty standing buckets or
+fully clipped casualties, outline/gore/rigged/split restoration; Actions envSCENE_INACTIVE=true via pack-figures
+mode=scene inactive=true. No product adoption. Optional next lossless terrain Uint16 partition approved:
+unchanged triangles/winding/Float32positionsUV/bounds/materialuniform seam,65535vertex chunk max (reserve65535),
+measure separate and combined actualGPU/savings/extra draws/future uploads before renderpixel ceiling.
+Foragers268c501 actualRun route4 succeeds sim275/2425men, savedGold after real loot flow; shard4green and
+actual1024/320PNG inspected. FullCI38269804238 stillpending; main remains09a12f1. FailedSilver route retained.
+
 0132 adds --difficulty-matrix/shard4: six fresh unchanged Buell/dawn battles, same authored seeds/rosters,
 identical accepted time-zero player infantry marches, genuine auto-pause resumes, natural termination.
 Successful native AI orders (nested once), reserve activation/redirection at passes, holder/loss/grade

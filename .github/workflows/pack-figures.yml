@@ -14,6 +14,10 @@ on:
           - candidate
           - full
           - residency
+      inactive:
+        description: Scene mode only; diagnostic inactive figure buffer reclamation
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
@@ -101,16 +105,22 @@ jobs:
         run: node tools/bake/review-current-compression.mjs
       - name: Current whole-scene allocation observation, both armies and all campaign phases
         if: inputs.mode == 'scene'
+        env:
+          SCENE_INACTIVE: ${{ inputs.inactive }}
         run: |
           node tools/test-scene-allocation.mjs
           node tools/test-scene-allocation.mjs --prove-fail
+          node tools/test-inactive-figures.mjs
+          node tools/test-inactive-figures.mjs --prove-fail
           node tools/bake/review-scene-allocation.mjs
       - name: Scene allocation report only, no assets or adoption
         if: always() && inputs.mode == 'scene'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: scene-allocation
-          path: .out/scene-allocation/report.json
+          path: |
+            .out/scene-allocation/report.json
+            .out/scene-allocation/*.png
           retention-days: 7
           if-no-files-found: warn
       - name: Current diagnostic reports and five numbered comparison images only

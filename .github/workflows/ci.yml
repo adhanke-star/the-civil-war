@@ -85,7 +85,7 @@ jobs:
             surrender-runtime surrender-result surrender-result-ui equipment reward save practice captures intro \
             sandbox-rules look view spacing residency moments keyboard soldier-view surrender-activation \
             captured-guns battery-overrun captured-loadouts packs large ai masking campaign campaign-ui ground delegation shiloh command stones-river \
-            cavalry chattanooga economy badges orders history audio art hooks traits command-chain current-compression scene-allocation foragers progression difficulty-matrix; do
+            cavalry chattanooga economy badges orders history audio art hooks traits command-chain current-compression scene-allocation foragers progression difficulty-matrix inactive-figures; do
             for mode in "" --prove-fail; do
               echo "::group::node tools/test-$name.mjs $mode"
               node "tools/test-$name.mjs" $mode
