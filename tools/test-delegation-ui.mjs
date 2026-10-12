@@ -130,6 +130,10 @@ export async function delegationControls({ browser, url, check, shot, result, wa
     for (let k = 1; k <= 8; k++) await page.mouse.move(box.x + box.width / 2 + (to.x - box.x - box.width / 2) * k / 8, box.y + box.height / 2 + (to.y - box.y - box.height / 2) * k / 8);
     await page.mouse.up();
     await frames(page, 3);
+    // Native HUD refreshes the selected card on its 0.25 s clock; three RAFs can precede it.
+    // Observe that refresh without forcing the HUD or changing the order/clock under test.
+    await page.waitForFunction(() => document.getElementById('delegate-undo').hidden
+      && document.getElementById('delegate-text').textContent === '', null, { timeout: 15000, polling: 100 });
     const dragged = await read();
     record('drag-reclaims', !dragged.delegate && dragged.order.type === 'move' && dragged.orders === f0.orders + 1 && !dragged.undo
       && dragged.card === '' && dragged.line !== 'DL', { delegate: dragged.delegate, order: dragged.order, line: dragged.line,

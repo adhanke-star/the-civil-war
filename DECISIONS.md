@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0153 — Observe native delegation-card refresh before asserting drag reclamation (Sol/Astra, 2026-10-12)
+
+Automatic main CI38298643624/c328 failed only delegation-ui-drag-reclaims: actual delegate null, move order, orders2->3 and US arrow were correct; Undo and role text still showed the preceding delegation. Canonical artifact11769522440 has132 checks/one failure/console clean and the subsequent Escape observation shows the naturally refreshed empty card/hidden Undo. HUD.update refreshes these outputs on its existing0.25s cardTimer; three RAFs can precede it. The test now waits at most15s for native empty role text/hidden Undo before the unchanged complete compound assertion. No forced HUD update, fixed sleep, clock/order mutation or product change. Astra accepts the narrow diagnosis/fix; syntax/diff pass. New exact-SHA fullCI and artifact readback remain required; retain this failed run rather than rerun it for luck.
+
 ## 0152 — Correct compressed reservations and restore diagnostic ownership exactly (Sol/Astra, 2026-10-12)
 
 Collector-only slice; no asset or renderer policy adopted. Immutable ASTC4x4/BC7 storage now charges ceil(w/4)*ceil(h/4)*16 for every mip, including tiny tails; compressed subimage uploads do not reserve duplicate storage, native arguments stay intact, unknown formats still prevent a verdict. Pending old default surfaces accumulate through subsequent allocations/multiple resizes until observed native finish. Both synchronized GPU peak and historical default-surface peak retain that overlap, including resize -> finish -> first snapshot. Astra reproduced and root fixed the original immutable-format gap and two resize-accounting gaps; the new regression control removes the per-sample peak line and rejects the actual old behavior.

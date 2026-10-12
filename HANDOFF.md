@@ -1,5 +1,15 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0153 ACTIVE — root sole writer. Automatic mainCI38298643624/c328 failed only delegation drag's
+stale card/Undo; native delegate/order/count/arrow correct, subsequent native refresh correct.
+Artifact11769522440 read independently,132 checks/one fail/errors+warnings empty. Test-only bounded
+wait for native card/Undo refresh precedes unchanged compound assertion; Astra accepts, no HUD/timer
+change. Exact newsource CI/readback required. Loader38299022067 shard3 artifact11769554455 passes
+144/144,11 loader rows including genuine ASTC/native GL failure, console clean; campaign11770009923
+201/201/errors0/failure null. Loader test1 pending, collector38300634794 pending; no main integration.
+Resource next slice also requires normal-motion/full-smoke maximum, since reduced motion suppresses
+smoke; existing retained scene cannot prove that maximum. All prior contracts below still bind.
+
 LATEST0152 ACTIVE WORK — root remains sole writer; no owner transfer yet.
 Loader source dcbeb0516ceb36f74ef0cff6d6034da00efa1f01 pushed; exactCI38299022067 in progress:
 probes/Firefox/WebKit/offline pass; four shards and actualplaythrough still pending. Read existing CI and
