@@ -25,6 +25,7 @@
 import { validateCampaign } from '../franchise/campaign.js';
 import { exchangeDepot, validateSnapshot } from '../franchise/save.js';
 import { preparePhase } from '../sim/phase.js';
+import { chainCommanders } from '../sim/ai.js';
 import { validateDeck, effectText } from '../franchise/decisions.js';
 import { whenArt, loadArt, portraitArt, genericPortrait, portraitLine } from './art.js';
 
@@ -223,10 +224,21 @@ export function phaseArmyCommander(scenario, side) {
   const c = scenario && scenario.enemyCommander;
   return c && typeof c === 'object' && c.side === side && words(c.name) ? c : null;
 }
+function chainEntry(data, scenario, c) {
+  const entry = traitEntry(data, scenario, c.name, { rank: c.rank, role: c.role, chain: true,
+    phaseNote: `Command influence: ${c.status} This is a command relationship, not a plotted location or rally radius.`, phaseSources: c.sources });
+  if (!entry) return null;
+  entry.traits = entry.traits.filter(t => t.key !== 'reckless');
+  return entry.traits.length ? entry : null;
+}
+/** Every entry affecting this card, preserving own/army order for phases without a chain. */
+export const formationTraitEntries = t => t ? [t.own, ...(t.chain || []), t.army].filter(Boolean) : [];
 /** The traits that apply to formation u: its own commander's (null once he is down) and its army commander's. */
 export function formationTraits(data, scenario, u) {
   const c = u && u.commander, general = phaseArmyCommander(scenario, u?.side);
+  const chain = chainCommanders(scenario, u).map(c => chainEntry(data, scenario, c)).filter(Boolean);
   return { own: c && words(c.name) && !u.commandDown ? traitEntry(data, scenario, c.name, { rank: words(c.rank), role: 'this formation\'s commander' }) : null,
+    ...(chain.length ? { chain } : {}),
     army: general ? traitEntry(data, scenario, general.name, { rank: words(general.rank), role: words(general.role), army: true, status: words(general.status), phaseNote: words(general.note) }) : null };
 }
 /** Every man on `side` this phase gives traits: the army commander first, then the roster's commanders in order (once each). */
@@ -235,6 +247,12 @@ export function traitedCommanders(data, scenario, side) {
   if (general) {
     seen.add(general.name);
     const e = traitEntry(data, scenario, general.name, { rank: words(general.rank), role: words(general.role), army: true, status: words(general.status), phaseNote: words(general.note) });
+    if (e) out.push(e);
+  }
+  for (const c of scenario?.commandChain || []) {
+    if (c.side !== side || seen.has(c.name)) continue;
+    seen.add(c.name);
+    const e = chainEntry(data, scenario, c);
     if (e) out.push(e);
   }
   for (const u of [...(Array.isArray(scenario?.units) ? scenario.units : []), ...(Array.isArray(scenario?.reinforcements) ? scenario.reinforcements : [])]) {
@@ -266,6 +284,16 @@ export function traitDetails(entry, doc = document, level = 'h3') {
   box.append(make(level, 'traits-name', `${commanderTitle(entry)}${entry.role ? `, ${entry.role}` : ''}`));
   box.append(make('p', 'traits-prov', `Provenance: ${entry.provenance || 'not given'} (Verified: two independent sources agree; Inferred: one source; Disputed: sources differ).`));
   if (entry.phaseNote) box.append(make('p', 'traits-note', entry.phaseNote));
+  if (entry.phaseSources?.length) {
+    const p = make('p', 'traits-command-sources', 'Command relationship sources: ');
+    for (const [i, source] of entry.phaseSources.entries()) {
+      const parsed = briefingSources([source])[0];
+      if (!parsed?.href) continue;
+      const a = make('a', '', parsed.label || source); a.href = parsed.href; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      p.append(i ? '; ' : '', a);
+    }
+    box.append(p);
+  }
   if (entry.note) {
     const p = make('p', `traits-note${entry.note.kind === 'record' ? ' is-record' : ''}`, entry.note.text);
     for (const s of Array.isArray(entry.note.sources) ? entry.note.sources : []) {

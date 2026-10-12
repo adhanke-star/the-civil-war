@@ -124,6 +124,11 @@ export function armyCommander(scenario, side) {
   const c = scenario && scenario.enemyCommander;
   return c && typeof c === 'object' && c.side === side && typeof c.name === 'string' && c.name.trim() ? c : null;
 }
+/** Explicit phase membership only; scheduled formations inherit this when they arrive. */
+export function chainCommanders(scenario, unit) {
+  return unit && Array.isArray(scenario?.commandChain)
+    ? scenario.commandChain.filter(c => c.side === unit.side && Array.isArray(c.units) && c.units.includes(unit.id)) : NO_TRAITS;
+}
 /** Traits composed into the AI's numbers (src/franchise/tuning.js TRAITS): starts add, factors multiply, the largest wait and pass. */
 export function composeTraits(keys) {
   const list = [...new Set(keys || [])].filter((k) => TRAITS.keys.includes(k));
@@ -173,10 +178,11 @@ export class Ai {
   traitsOf(u) {
     const c = u && u.commander;
     const own = c && c.name && !u.commandDown ? commanderTraits(this.game.scenario, c.name) : NO_TRAITS;
-    if (!own.length && !this.armyTraits.length) return NO_TEMPERAMENT;
-    const key = `${own.join(',')}|${this.armyTraits.join(',')}`;
+    const chain = chainCommanders(this.game.scenario, u).flatMap(c => commanderTraits(this.game.scenario, c.name)).filter(k => k !== 'reckless');
+    if (!own.length && !chain.length && !this.armyTraits.length) return NO_TEMPERAMENT;
+    const key = `${own.join(',')}|${chain.join(',')}|${this.armyTraits.join(',')}`;
     let T = this.temperaments.get(key);
-    if (!T) { T = composeTraits([...own, ...this.armyTraits]); this.temperaments.set(key, T); }
+    if (!T) { T = composeTraits([...own, ...chain, ...this.armyTraits]); this.temperaments.set(key, T); }
     return T;
   }
 

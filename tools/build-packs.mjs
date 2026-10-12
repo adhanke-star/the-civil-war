@@ -191,7 +191,8 @@ export function buildPackFrom(src, traits = traitsTable()) {
     });
     const roster = [...units, ...reinforcements];
     const enemyCommander = enemyCommanderRow(phase.enemyCommander, phase.id);
-    const named = [...(enemyCommander ? [enemyCommander.name] : []), ...roster.map((u) => u.commander?.name).filter(Boolean)];
+    const commandChain = phase.commandChain === undefined ? undefined : structuredClone(phase.commandChain);
+    const named = [...(enemyCommander ? [enemyCommander.name] : []), ...(commandChain || []).map(c => c.name), ...roster.map((u) => u.commander?.name).filter(Boolean)];
     const commanderTraits = Object.fromEntries([...new Set(named)].filter((name) => traits.has(name)).map((name) => [name, [...traits.get(name)]]));
     const menPerFigure = menPerFigureFor(roster);
     const [ox, oz] = resolve(phase.objective.at, `${phase.id} objective`);
@@ -217,6 +218,7 @@ export function buildPackFrom(src, traits = traitsTable()) {
       units,
       ...(reinforcements.length ? { reinforcements } : {}),
       ...(enemyCommander ? { enemyCommander } : {}),
+      ...(commandChain !== undefined ? { commandChain } : {}),
       ...(Object.keys(commanderTraits).length ? { commanderTraits } : {}),
       positionsNote: phase.positionsNote,
       strengthNote: phase.strengthNote,

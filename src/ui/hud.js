@@ -37,7 +37,7 @@ import { Minimap } from './minimap.js';
 import { BADGE_BY_ID, TIER_NAMES, campEffectLines } from '../franchise/badges.js';
 import { openSettings } from './settings-panel.js';
 import { loadArt, portraitArt, genericPortrait, portraitLine } from './art.js';
-import { loadTraits, formationTraits, traitRuleLine, traitDetails, commanderTitle } from './briefing.js';
+import { loadTraits, formationTraits, formationTraitEntries, traitRuleLine, traitDetails, commanderTitle } from './briefing.js';
 
 const $ = (id) => document.getElementById(id);
 const _v = new THREE.Vector3();
@@ -342,7 +342,7 @@ export class Hud {
   unitTraits(u) {
     if (!u || !this.traitData || !this.game || u.side === this.playerSide) return null;
     const t = formationTraits(this.traitData, this.game.scenario, u);
-    return t.own || t.army ? t : null;
+    return formationTraitEntries(t).length ? t : null;
   }
 
   /** The card's traits block for u: a row per man (labels, provenance), the game rule, a record note, Records and sources. */
@@ -350,18 +350,18 @@ export class Hud {
     const box = $('uc-traits');
     if (!box) return;
     const t = this.unitTraits(u);
-    const key = t ? `${u.id}|${t.own ? t.own.name : ''}|${t.army ? t.army.name : ''}` : '';
+    const key = t ? `${u.id}|${formationTraitEntries(t).map(e => e.name).join('|')}` : '';
     if (key === this.traitsKey) return;
     this.traitsKey = key;
     box.replaceChildren();
     box.hidden = !t;
     if (!t) return;
     const make = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
-    for (const [who, e] of [['own', t.own], ['army', t.army]]) {
+    for (const [who, e] of [['own', t.own], ...(t.chain || []).map(e => ['chain', e]), ['army', t.army]]) {
       if (!e) continue;
       const row = make('p', 'uct-row');
       row.dataset.who = who;
-      row.append(make('span', 'uct-who', `${who === 'army' ? 'Army: ' : ''}${commanderTitle(e)}`));
+      row.append(make('span', 'uct-who', `${who === 'army' ? 'Army: ' : who === 'chain' ? 'Command: ' : ''}${commanderTitle(e)}`));
       for (const tr of e.traits) {
         const chip = make('span', 'uct-chip', tr.label);
         chip.dataset.trait = tr.key; chip.title = tr.effect;
@@ -370,9 +370,9 @@ export class Hud {
       row.append(' ', make('span', 'uct-prov', `Provenance: ${e.provenance || 'not given'}`));
       box.append(row);
     }
-    const rule = traitRuleLine([t.own, t.army]);
+    const rule = traitRuleLine(formationTraitEntries(t));
     if (rule) box.append(make('p', 'uct-rule', rule));
-    for (const e of [t.own, t.army]) if (e && e.note && e.note.kind === 'record') box.append(make('p', 'uct-note', e.note.text));
+    for (const e of formationTraitEntries(t)) if (e.note && e.note.kind === 'record') box.append(make('p', 'uct-note', e.note.text));
     const more = make('button', 'uct-more', 'Records and sources');
     more.type = 'button'; more.id = 'uc-traits-more';
     more.setAttribute('aria-haspopup', 'dialog');
@@ -408,7 +408,7 @@ export class Hud {
     const close = document.createElement('button');
     close.type = 'button'; close.id = 'traits-close'; close.textContent = 'Close';
     close.addEventListener('click', () => d.close());
-    d.replaceChildren(title, sub, ...[t.own, t.army].filter(Boolean).map((e) => traitDetails(e, document, 'h3')), close);
+    d.replaceChildren(title, sub, ...formationTraitEntries(t).map((e) => traitDetails(e, document, 'h3')), close);
     this.closeDelegate(null, false);
     this.rts?.keys.clear();
     if (this.rts) this.rts.inertia = null;
@@ -424,7 +424,7 @@ export class Hud {
     const t = this.unitTraits(u);
     if (!t) return '';
     const words = (e) => e.traits.map((x) => x.label).join(', ');
-    return `${t.own ? ` Commander: ${words(t.own)}.` : ''}${t.army ? ` Army commander ${t.army.name}: ${words(t.army)}.` : ''}`;
+    return `${t.own ? ` Commander: ${words(t.own)}.` : ''}${(t.chain || []).map(e => ` Command influence ${e.name}: ${words(e)}.`).join('')}${t.army ? ` Army commander ${t.army.name}: ${words(t.army)}.` : ''}`;
   }
 
   /** The Settings button in the strip, "All settings" in the menu, and the O key in the help sheet. */

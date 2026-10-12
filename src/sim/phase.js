@@ -166,6 +166,23 @@ function commanders(value) {
       || c.units.some(id => !roster.has(id) || roster.get(id).side !== c.side)) fail('commander units must be 1 to 48 distinct brigades of his side in the roster.');
   }
 }
+// Remote command influence, not a located figure: no rally radius, injury roll or inferred coordinates.
+const CHAIN_KEYS = ['name', 'rank', 'role', 'side', 'units', 'sources', 'status'];
+function commandChain(value) {
+  const list = value.commandChain;
+  if (!Array.isArray(list) || list.length > COMMANDER_LIMITS.commanders) fail('commandChain must be an array of at most 24.');
+  const roster = new Map([...value.units, ...(value.reinforcements || [])].map(u => [u.id, u]));
+  const names = new Set();
+  for (const c of list) {
+    if (!record(c) || Object.keys(c).some(key => !CHAIN_KEYS.includes(key))) fail('commandChain has unsupported fields.');
+    if (!['US', 'CS'].includes(c.side) || !['name', 'rank', 'role', 'status'].every(key => text(c[key]))) fail('commandChain needs side, name, rank, role and status.');
+    if (names.has(c.name)) fail('commandChain names must be unique within the phase.');
+    names.add(c.name);
+    if (!sourceList(c.sources) || c.sources.some(s => { try { const u = new URL(s); return !['https:', 'http:'].includes(u.protocol); } catch { return true; } })) fail('commandChain needs 1 to 16 http(s) source URLs.');
+    if (!Array.isArray(c.units) || !c.units.length || c.units.length > COMMANDER_LIMITS.units || new Set(c.units).size !== c.units.length
+      || c.units.some(id => !roster.has(id) || roster.get(id).side !== c.side)) fail('commandChain units must be 1 to 48 distinct formations of his side in the roster.');
+  }
+}
 // Unit types the runtime draws and fights, and the generic weapons each may carry (absent: smooth, or carbine for cavalry).
 export const UNIT_TYPES = Object.freeze(['infantry', 'artillery', 'cavalry']);
 const WEAPONS = Object.freeze({ infantry: ['smooth', 'rifled'], artillery: ['parrott', 'napoleon', 'smbart'], cavalry: CAVALRY_WEAPONS });
@@ -206,6 +223,7 @@ function scenario(value) {
   if (own(objective, 'mode')) fail('objective mode is unsupported; the scenario attacker defines it.');
   battleFields(value);
   if (own(value, 'commanders')) commanders(value);
+  if (own(value, 'commandChain')) commandChain(value);
   if (own(value, 'opening')) {
     if (!Array.isArray(value.opening)) fail('opening must be an array.');
     const ordered = new Set();

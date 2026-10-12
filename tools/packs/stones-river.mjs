@@ -237,6 +237,11 @@ const PHASE1 = {
   retreat: { US: { near: 'rosecransHQ', bearing: 175, m: 170 }, CS: { near: 'gresham', bearing: 95, m: 1460 } },
   camera: { target: { near: 'gresham', bearing: 5, m: 550 }, lookBearing: 210, dist: 1800 },
   enemyCommander: BRAGG([ABT_SR, CWS(4, 'Collapse of the Union Right'), ABT_BRAGG]),
+  commandChain: [{ name: 'William J. Hardee', rank: 'Lieutenant General', role: 'commanding the attacking corps', side: 'CS',
+    units: ['cs-rains-brigade', 'cs-ector-brigade', 'cs-mcnair-brigade', 'cs-humphreys-battery', 'cs-liddell-brigade', 'cs-swett-battery', 'cs-bjohnson-brigade', 'cs-lpolk-brigade', 'cs-wood-brigade'],
+    sources: ['https://npshistory.com/publications/civil_war_series/23/sec4.htm', 'https://en.wikipedia.org/wiki/Stones_River_Confederate_order_of_battle',
+      'https://www.battlefields.org/learn/biographies/william-j-hardee'],
+    status: 'Inferred: the phase binds the listed McCown and Cleburne formations to Hardee\'s attacking corps (NPS narrative and OR-derived roster); exact command timing and position are not plotted.' }],
   victory: {
     attackerHolds: 'The Confederates hold the Wilkinson Pike at 09:30. (In 1862 they crossed it: the right wing was driven back nearly a mile by 08:00 and toward the Nashville Pike by about 10:00.)',
     defenderHolds: 'The Wilkinson Pike is still in Union hands at 09:30. (In 1862 it was not, though the wing bent back to the Nashville Pike without collapsing.)',
@@ -540,6 +545,10 @@ const PHASE3 = {
   retreat: { US: { near: 'cemetery', bearing: 315, m: 600 }, CS: { near: 'cowanSite', bearing: 150, m: 1360 } },
   camera: { target: { near: 'hazen', bearing: 280, m: 30 }, lookBearing: 150, dist: 1600 },
   enemyCommander: BRAGG([ABT_SR, CWS(7, 'Redundant Slaughter in the Round Forest'), ABT_BRAGG]),
+  commandChain: [{ name: 'Leonidas Polk', rank: 'Lieutenant General', role: 'commanding the corps attacking the Round Forest', side: 'CS',
+    units: ['cs-chalmers-brigade', 'cs-donelson-brigade'], sources: ['https://npshistory.com/publications/civil_war_series/23/sec7.htm', 'https://en.wikipedia.org/wiki/Stones_River_Confederate_order_of_battle',
+      'https://home.nps.gov/people/leonidas-polk.htm'],
+    status: 'Inferred: the phase binds Chalmers and Donelson to Polk\'s corps attacks (NPS narrative and OR-derived roster); later temporary assignments are not inferred from arrival time.' }],
   victory: {
     attackerHolds: 'The Confederates hold the Round Forest at 16:30. (In 1862 they never took it: four attacks were thrown back.)',
     defenderHolds: 'The Round Forest is still in Union hands at 16:30, as it was in 1862: the only part of the original Union line held all day.',

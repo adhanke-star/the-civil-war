@@ -517,8 +517,8 @@ body:has(.sb-toggle.sb-closed:not(.sb-left)) #soldier-view-hint { right: calc(va
 .traits-claim { font-size: 13.5px; }
 .traits-sources { margin: 2px 0 0; padding-left: 18px; font-size: 13px; }
 .traits-sources li { margin: 4px 0; overflow-wrap: anywhere; }
-.traits-sources a, .traits-note a { color: var(--focus); }
-.traits-sources a { display: inline-block; min-height: 24px; padding: 2px 0; }
+.traits-sources a, .traits-note a, .traits-command-sources a { color: var(--focus); }
+.traits-sources a, .traits-command-sources a { display: inline-block; min-height: 24px; padding: 2px 0; }
 .traits-cite { color: var(--dim); }
 .traits-quote { display: block; margin: 2px 0 0; font-style: italic; color: var(--text); }
 #traits-close { min-width: 120px; }

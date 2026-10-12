@@ -5,6 +5,11 @@ design/history/tuning choices. Worktree `/private/tmp/cw-v1-1-20261012`, branch 
 from released v1 `558456f447c984f8868c688bd3acbb6e8c6551bd`. Licence commit `a79ec3a` pushed; its CI pending.
 Stones River southern tile/deployment correction passes CPU15/15 plus15 mutants, traits18/18 and packs13/13
 with all mutants; same-SHA CI, actual screenshots and playthrough still required before integration.
+First remote command slice (0119) adds Hardee dawn/Polk Round Forest, explicit Inferred membership only:
+CPU10/10 plus10 mutants and traits18/18 plus18 mutants pass; no new mounted/rally/risk/RNG system.
+Generic Command labels, separate relationship sources, browser module --command-chain in shard4.
+Next source slice recommended by Astra: Hardee's effective Slaughter Pen command over Lucius Polk,
+Bushrod Johnson and Wood, with actual phase window/attachments before admission; Cheatham still unbound.
 `node tools/test.mjs --unit` is the local smoke; browsers/heavy suites run only on Actions.
 
 Finish v1.1 gaps and tag/release, then write an Astra-approved v2 plan and build weekly playable milestones:

@@ -142,7 +142,7 @@ const TRAIT_CHECKS = [
         const c = s.enemyCommander;
         assert.ok(c && c.side === 'CS' && c.name && c.rank && c.role && c.status && c.sources?.length >= 1 && c.sources.every((x) => /https?:\/\//.test(x)),
           `packs-carry: ${id}/${ph} does not name its army commander with sources`);
-        const present = [c.name, ...[...s.units, ...(s.reinforcements || [])].map((u) => u.commander?.name).filter(Boolean)];
+        const present = [c.name, ...(s.commandChain || []).map(c => c.name), ...[...s.units, ...(s.reinforcements || [])].map((u) => u.commander?.name).filter(Boolean)];
         const want = Object.fromEntries([...new Set(present)].filter((n) => has(table, n)).map((n) => [n, table[n].traits]));
         assert.deepEqual(s.commanderTraits || {}, want, `packs-carry: ${id}/${ph} carries the wrong traits for the men present`);
       }

@@ -846,10 +846,39 @@
           ],
           "status": "Verified: he commanded the Army of Tennessee at Stones River (ABT; NPS Civil War Series 23)."
         },
+        "commandChain": [
+          {
+            "name": "William J. Hardee",
+            "rank": "Lieutenant General",
+            "role": "commanding the attacking corps",
+            "side": "CS",
+            "units": [
+              "cs-rains-brigade",
+              "cs-ector-brigade",
+              "cs-mcnair-brigade",
+              "cs-humphreys-battery",
+              "cs-liddell-brigade",
+              "cs-swett-battery",
+              "cs-bjohnson-brigade",
+              "cs-lpolk-brigade",
+              "cs-wood-brigade"
+            ],
+            "sources": [
+              "https://npshistory.com/publications/civil_war_series/23/sec4.htm",
+              "https://en.wikipedia.org/wiki/Stones_River_Confederate_order_of_battle",
+              "https://www.battlefields.org/learn/biographies/william-j-hardee"
+            ],
+            "status": "Inferred: the phase binds the listed McCown and Cleburne formations to Hardee's attacking corps (NPS narrative and OR-derived roster); exact command timing and position are not plotted."
+          }
+        ],
         "commanderTraits": {
           "Braxton Bragg": [
             "aggressive",
             "stubborn"
+          ],
+          "William J. Hardee": [
+            "methodical",
+            "aggressive"
           ]
         },
         "positionsNote": "The inferred deployment sketch is anchored at the Gresham Lane - Franklin Road approach, now inside the enlarged terrain. Exact formation locations and the unlocated headquarters/house woods remain Inferred; the northern Wilkinson Pike objective is geographic. The previous 600-800 m northward map-edge displacement is removed. Johnson's brigades stand along Gresham Lane with Willich refused on the right and Baldwin in reserve, Davis's three brigades between them and the Wilkinson Pike (Johnson and Davis reports; NPS). McCown's three brigades start south-west of the Union right and step off at 06:15; Cleburne's four arrive behind them from 06:30 (he was 500-600 yards back at dawn). All positions Inferred.",
@@ -2571,10 +2600,32 @@
           ],
           "status": "Verified: he commanded the Army of Tennessee at Stones River (ABT; NPS Civil War Series 23)."
         },
+        "commandChain": [
+          {
+            "name": "Leonidas Polk",
+            "rank": "Lieutenant General",
+            "role": "commanding the corps attacking the Round Forest",
+            "side": "CS",
+            "units": [
+              "cs-chalmers-brigade",
+              "cs-donelson-brigade"
+            ],
+            "sources": [
+              "https://npshistory.com/publications/civil_war_series/23/sec7.htm",
+              "https://en.wikipedia.org/wiki/Stones_River_Confederate_order_of_battle",
+              "https://home.nps.gov/people/leonidas-polk.htm"
+            ],
+            "status": "Inferred: the phase binds Chalmers and Donelson to Polk's corps attacks (NPS narrative and OR-derived roster); later temporary assignments are not inferred from arrival time."
+          }
+        ],
         "commanderTraits": {
           "Braxton Bragg": [
             "aggressive",
             "stubborn"
+          ],
+          "Leonidas Polk": [
+            "slow",
+            "cautious"
           ],
           "James R. Chalmers": [
             "impetuous",
