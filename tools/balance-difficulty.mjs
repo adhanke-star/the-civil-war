@@ -16,6 +16,16 @@ export function pairwiseOrderTraces(rows) {
   const comparisons=[];for(let i=0;i<rows.length;i++)for(let j=i+1;j<rows.length;j++)comparisons.push({pair:[rows[i].difficulty,rows[j].difficulty],different:JSON.stringify(rows[i].trace.orders)!==JSON.stringify(rows[j].trace.orders)});
   return comparisons;
 }
+/** Classify an observed native reserve decision from its actual inputs; never issue an order. */
+export function reserveActivationCause(row) {
+  const {clock,start,end,at,temperament,level,nearest,holder,playerSide}=row;
+  if(!row.accepted||![clock,start,end,temperament.start,temperament.reach].every(Number.isFinite))return null;
+  if(at!==null&&clock>=at+temperament.start)return 'set-time';
+  if(level.reserve==='set')return at===null&&clock>=start+(end-start)*level.reserveShare+temperament.start?'half-time':null;
+  if(nearest!==null&&nearest<level.reserveReach*temperament.reach)return 'enemy-near';
+  if(holder===playerSide)return 'objective-lost';
+  return level.threat&&holder==='contested'?'objective-contested':null;
+}
 /** Owned Actions context only. Native calls/arguments/results/errors survive; nested methods count once. */
 export function installDifficultyStartGate(scope=globalThis) {
   const native=scope.requestAnimationFrame;let held=true;
@@ -30,11 +40,22 @@ export function installDifficultyStartGate(scope=globalThis) {
   scope.__difficultyStartGate=gate;return gate;
 }
 export function installDifficultyTrace(game) {
-  const trace={orders:[],passes:0,reserves:[],holder:[{at:game.simTime,value:game.holder}],overflow:false},bound=new WeakSet(),reserve=new Map();
+  const trace={orders:[],passes:0,reserves:[],activations:[],holder:[{at:game.simTime,value:game.holder}],overflow:false},bound=new WeakSet(),reserve=new Map(),lastWait=new Map();
   const time=()=>Math.round(game.simTime*1000)/1000;
   const point=p=>Array.isArray(p)?p.map(v=>Math.round(v*1000)/1000):null;
   let inPass=false,depth=0;
   const append=(list,row)=>{if(list.length>=20000){trace.overflow=true;return;}list.push(row);};
+  const nativeActivates=game.ai.activates;
+  if(typeof nativeActivates==='function')game.ai.activates=function(...args){
+    const value=nativeActivates.apply(this,args),[u,role,nd,,T]=args;
+    if(role==='reserve'){
+      const at=u.def.ai.at,seconds=s=>{const [h,m]=s.split(':').map(Number);return h*3600+m*60;};
+      const row={id:u.id,sim:game.simTime,clock:game.clockStart+game.simTime*game.clockRatio,start:game.clockStart,end:game.clockEnd,
+        at:at===undefined?null:seconds(at),nearest:Number.isFinite(nd)?nd:null,holder:game.holder,playerSide:game.playerSide,
+        temperament:{start:(T?.start||0)*game.clockRatio,reach:T?.reach??1},level:{reserve:this.level.reserve,reserveShare:this.level.reserveShare,reserveReach:this.level.reserveReach,threat:this.level.threat},accepted:value===true};
+      if(value===true)append(trace.activations,{...row,previousWait:lastWait.get(u.id)||null});else lastWait.set(u.id,row);
+    }return value;
+  };
   const bind=u=>{
     if(bound.has(u)||u.side===game.playerSide)return;bound.add(u);
     for(const name of ['orderMove','orderAttack','orderFallback','orderCharge','orderHold','orderHalt','toggleMount']){

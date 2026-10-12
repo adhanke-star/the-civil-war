@@ -1,7 +1,7 @@
 // Six unchanged authored battles with fixed player commands; outcomes are observations, not balance targets.
 import fs from 'node:fs';
-import {fixedPlayerOrders,pairwiseOrderTraces,installDifficultyTrace,installDifficultyStartGate,authoredDuration} from './balance-difficulty.mjs';
-const CASES=[['shiloh','buell-attacks'],['stones-river','dawn-on-the-right']];
+import {fixedPlayerOrders,pairwiseOrderTraces,installDifficultyTrace,installDifficultyStartGate,authoredDuration,reserveActivationCause} from './balance-difficulty.mjs';
+const CASES=[['shiloh','buell-attacks'],['stones-river','dawn-on-the-right'],['chattanooga','lookout-mountain']];
 export async function difficultyControls({browser,url,check,shot,result,watchErrors}) {
   const started=Date.now();result.difficultyMatrix=[];
   try{for(const [packId,phaseId]of CASES){
@@ -38,6 +38,14 @@ export async function difficultyControls({browser,url,check,shot,result,watchErr
           units:g.units.map(u=>({id:u.id,side:u.side,menStart:u.menMax,men:u.men,state:u.state,x:u.x,z:u.z})),feats:g.featReport()};}));
         row.wallSeconds=(Date.now()-began)/1000;
         check(`difficulty-${phaseId}-${difficulty}-complete`,row.over&&!row.trace.overflow&&errors.length===0,JSON.stringify({over:row.over,sim:row.simTime,passes:row.trace.passes,orders:row.trace.orders.length,errors}));
+        if(phaseId==='lookout-mountain'){
+          const activation=row.trace.activations.find(a=>a.id==='cs-moore-brigade'),transitions=row.trace.reserves.filter(a=>a.id==='cs-moore-brigade');
+          row.reserveObservation={activation,cause:activation?reserveActivationCause(activation):null,transitions,
+            orders:row.trace.orders.filter(o=>o.id==='cs-moore-brigade'),earlyThreat:activation&&activation.clock<activation.at+activation.temperament.start?'observed':'unobserved'};
+          check(`difficulty-lookout-${difficulty}-reserve`,!!row.reserveObservation.cause&&transitions.some(t=>t.active)&&row.reserveObservation.orders.length>0,
+            JSON.stringify(row.reserveObservation));
+          if(!row.reserveObservation.cause||!transitions.some(t=>t.active)||!row.reserveObservation.orders.length)throw new Error('difficulty matrix: actual Moore reserve activation/order not proved');
+        }
         await shot(page,`difficulty-${phaseId}-${difficulty}-result`);
         if(!row.over||row.trace.overflow||errors.length)throw new Error('difficulty matrix: incomplete observation retained');
       }finally{await ctx.close();}
