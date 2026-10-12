@@ -51,7 +51,8 @@ preserve slavery. Sources are listed in the game (briefings, after-action, cards
 - Sound and music were chosen by measurement; nobody has listened to them on a device.
 - The Stones River dawn phase sits about 700 m north of the true ground (edge of the terrain tile).
 - Card art is museum photography rather than 3D renders; the Belgian rifle-musket has a labelled silhouette.
-- No project licence file yet: all rights reserved by default; third-party assets keep their own licences.
+- Original code is now MIT; original authored data/text are CC-BY 4.0 (Aaron, 12 October 2026).
+  Third-party material retains its own licences and public-domain status; see LICENSE-data-text.md and ATTRIBUTION.md.
 
 ## Proof
 

@@ -1,5 +1,9 @@
 # Attribution
 
+Original program code is [MIT](LICENSE); original authored data and text are
+[CC-BY 4.0](LICENSE-data-text.md). The credits below govern third-party material;
+these project licences do not replace them or restrict public-domain sources.
+
 ## Code (vendored in `vendor/`, each folder carries its LICENSE)
 - three.js 0.186.1 — MIT — https://github.com/mrdoob/three.js
 - Yuka 0.7.8 — MIT — https://github.com/Mugen87/yuka

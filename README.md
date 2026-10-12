@@ -13,3 +13,6 @@ has the controls and the Quality setting (G toggles Auto / High / Low).
 
 Plain JavaScript ES modules, three.js 0.186.1, no build step. Third-party libraries are vendored in
 `vendor/` with their licenses. Asset credits are in `ATTRIBUTION.md`.
+
+Original code: [MIT](LICENSE). Original authored data and text:
+[CC-BY 4.0](LICENSE-data-text.md). Credited third-party material retains its own licence.

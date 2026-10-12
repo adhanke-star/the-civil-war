@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0116 — Original code MIT; original data and text CC-BY 4.0 (Aaron, 2026-10-12)
+
+Aaron approved MIT for original code and CC-BY 4.0 for original authored data and text. LICENSE contains MIT; LICENSE-data-text.md grants CC-BY 4.0 with attribution to Aaron Hanke, The Civil War, and links the legal terms. Third-party code, quotations, images and recordings retain their own credits/licences; public-domain facts and sources remain public domain. This closes the missing project-licence gap without relicensing other people's material.
+
 ## 0115 — Enemy commanders' sourced traits shape only AI decisions (2026-10-12)
 
 Ten Confederate commanders carry 1–2 temperament traits kept from a source check that opened every cited page (assets/traits.json, built from tools/data/cs-traits-verified.json; provenance per man; dropped traits never shipped). Traits change only AI timing and choices (TRAITS in src/franchise/tuning.js; tested: frozen orders give identical casualties with and without traits); Johnston's "reckless" shows as "led from the front" and acts through the existing commander roll. Each phase names its enemy army commander (Johnston, Beauregard, Bragg); corps commanders are not modelled, so Polk, Hardee and Cheatham have no effect yet. Chalmers's card notes Fort Pillow (12 April 1864), where surrendered Black soldiers were massacred. Traits and difficulty compose.
