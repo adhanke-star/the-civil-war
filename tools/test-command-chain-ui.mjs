@@ -47,6 +47,31 @@ export async function commandChainControls({ browser, url, check, shot, result, 
       await page.waitForFunction(() => !document.querySelector('#uc-traits [data-who="own"]'));
       check(`command-chain-down-${tag}`, (await page.locator('#uc-traits [data-who="chain"]').innerText()).includes(name), 'higher command influence remains after brigade commander falls');
     }
+    // Seed a completed dawn with Wood eliminated, then use the real campaign loader for Slaughter Pen.
+    await page.goto(url+'?nosw');
+    await page.waitForFunction(()=>window.__entry&&!window.__entry.importing,null,{timeout:60000});
+    await page.evaluate(async()=>{
+      const C=await import('./src/franchise/campaign.js'),S=await import('./src/franchise/save.js');
+      const campaign=await(await fetch('./assets/campaign.json')).json();let save=C.newCampaign({campaign,slot:1,seed:1862});
+      const packs={};
+      for(const entry of campaign.phases.slice(0,5)){
+        packs[entry.packId]??=await(await fetch(`./assets/packs/${entry.packId}.json`)).json();
+        const s=packs[entry.packId].phases.find(p=>p.id===entry.phaseId).scenario;
+        save=C.recordPhase(save,campaign,{packId:entry.packId,phaseId:entry.phaseId,winner:null,grade:'Draw',loot:[],
+          units:[...s.units,...(s.reinforcements||[])].map(u=>({id:u.id,side:u.side,menStart:u.men,men:entry.phaseId==='dawn-on-the-right'&&u.id==='cs-wood-brigade'?0:u.men}))});
+      }
+      await S.createProgressStore(undefined,{slot:1}).complete(save);
+    });
+    await page.goto(url+'?campaign=1&quality=low&nosw');
+    await page.waitForFunction(()=>window.__ready&&window.__game?.game,null,{timeout:180000,polling:250});
+    const carry=await page.evaluate(()=>{
+      const g=window.__game.game;return {wood:g.units.some(u=>u.id==='cs-wood-brigade'),chain:g.scenario.commandChain,
+        commanders:g.commanders.length,hardee:g.ai.traitsOf(g.units.find(u=>u.id==='cs-lpolk-brigade')).keys};
+    });
+    result.commandChainCarry=carry;
+    check('command-chain-campaign-carry',!carry.wood&&carry.chain.find(c=>c.name==='William J. Hardee').units.join(',')==='cs-lpolk-brigade,cs-bjohnson-brigade'
+      &&carry.hardee.length>0&&carry.commanders===0,'Slaughter Pen loads after a dawn elimination; surviving chain authority acts');
+    await shot(page,'command-chain-campaign-carry');
     // Briefing of the actual dawn scenario; no interception or forged source/trait data.
     await page.goto(url + '?nosw');
     await page.waitForFunction(() => window.__entry && !window.__entry.importing, null, { timeout: 60000 });

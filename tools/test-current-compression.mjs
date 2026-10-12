@@ -2,7 +2,9 @@
 import assert from 'node:assert/strict';
 import { PNG } from 'pngjs';
 import { selectPages, EXTRA_LOOK } from './bake/current-compression.mjs';
-import { colourComposite } from './bake/review-current-compression.mjs';
+import { selectClosePages } from './bake/current-compression.mjs';
+import { colourComposite, closeQualified } from './bake/review-current-compression.mjs';
+import fs from 'node:fs';
 import { mipBytes } from './bake/compress.mjs';
 import { comparePixels } from './bake/review-compression.mjs';
 function manifest(extra=false) {
@@ -11,8 +13,42 @@ function manifest(extra=false) {
   if(extra)m.tiers.close.variants={[EXTRA_LOOK]:{...group('close'),pages:[{file:`soldier_close_${EXTRA_LOOK}_0.png`,w:8,h:8}]}};
   return m;
 }
-const api={select:selectPages,composite:colourComposite,bytes:mipBytes,compare:comparePixels};
+function closeManifest(){
+  const m=JSON.parse(fs.readFileSync(new URL('../assets/figures/confederate-infantry/soldier.json',import.meta.url)));
+  const v=structuredClone(m.tiers.close);delete v.variants;
+  v.pages.forEach((p,i)=>p.file=`soldier_close_${EXTRA_LOOK}_${i}.png`);
+  m.tiers.close.variants={[EXTRA_LOOK]:v};return m;
+}
+function qualification(){
+  return {mode:'cs-close-qualification',sheets:['numbered.png'],pages:selectClosePages(closeManifest()).map(p=>({id:p.id,look:p.look,frames:p.frames.length,shownFrames:p.frames.length,
+    integrity:true,controls:Object.fromEntries(['upload','rawBase','identity','missing','unsupported','WrongAlpha','DoublePremul','AutomaticSrgb'].map(k=>[k,true])),
+    astcGpu:'RUN',quality:{astc:true,'astc-software':true}}))};
+}
+const api={select:selectPages,close:selectClosePages,qualified:closeQualified,composite:colourComposite,bytes:mipBytes,compare:comparePixels};
 const checks=[
+  ['all-close-frames',a=>{
+    const m=closeManifest(),pages=a.close(m);
+    assert.equal(pages.length,10,'all-close-frames: ten full pages');
+    for(const look of ['base',EXTRA_LOOK]){
+      const frames=pages.filter(p=>p.look===look).flatMap(p=>p.frames);
+      const source=look==='base'?m.tiers.close:m.tiers.close.variants[look];
+      assert.equal(frames.length,288,'all-close-frames: every frame and direction included');
+      assert.deepEqual(Object.fromEntries(frames),source.frames,'all-close-frames: rectangles, anchors and scale preserved');
+    }
+  }],
+  ['close-rejects',a=>{
+    for(const change of [m=>delete m.tiers.close.variants[EXTRA_LOOK],m=>m.tiers.close.pages.pop(),
+      m=>Object.values(m.tiers.close.frames)[0].page=5,m=>Object.values(m.tiers.close.frames)[0].ax=NaN]){
+      const m=closeManifest();change(m);let e;try{a.close(m);}catch(x){e=x;}assert.ok(e,'close-rejects: missing page/look, orphan frame and broken anchor cannot qualify');
+    }
+  }],
+  ['qualification-evidence',a=>{
+    assert.ok(a.qualified(qualification()),'qualification-evidence: complete ten-page ASTC evidence qualifies');
+    for(const change of [r=>r.pages.pop(),r=>r.pages[0].astcGpu='UNRUN',r=>r.pages[0].quality.astc=false,r=>r.pages[0].quality['astc-software']=false,
+      r=>r.pages[0].controls.WrongAlpha=false,r=>r.pages[0].integrity=false,r=>r.pages[0].shownFrames--,r=>r.sheets=[],r=>r.pages[0].frames--]){
+      const r=qualification();change(r);assert.ok(!a.qualified(r),'qualification-evidence: no missing, failed or unseen evidence is accepted');
+    }
+  }],
   ['coverage',a=>assert.deepEqual(a.select(manifest(),manifest(true)).map(p=>[p.side,p.tier,p.look]),
     [['US','close','base'],['US','field','base'],['CS','close','base'],['CS','close',EXTRA_LOOK],['CS','field','base']], 'coverage: both armies and additional Confederate close identity')],
   ['missing-look',a=>{let e;try{a.select(manifest(),manifest());}catch(x){e=x;}assert.ok(e,'missing-look: absence cannot silently omit required comparison');}],
@@ -33,6 +69,7 @@ const checks=[
   }],
 ];
 const mutants={coverage:{select:(...x)=>selectPages(...x).slice(0,4)},'missing-look':{select:()=>[]},'page-bounds':{select:()=>[]},'frame-bounds':{select:()=>[]},
+  'all-close-frames':{close:m=>selectClosePages(m).map(p=>({...p,frames:p.frames.slice(0,3)}))},'close-rejects':{close:()=>[]},'qualification-evidence':{qualified:()=>true},
   'complete-mips':{bytes:()=>({block16:64,rgba8:256,levels:1})},thresholds:{compare:()=>({ok:true})},
   'once-premultiplied':{composite:()=>{const p=new PNG({width:1,height:1});p.data=Buffer.from([64,32,16,255]);return PNG.sync.write(p);}}};
 for(const [,check]of checks)await check(api);

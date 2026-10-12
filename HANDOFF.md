@@ -2,23 +2,22 @@
 
 **Current owner/scope (Aaron, 2026-10-12): Codex/Sol is sole product writer**, with Astra deciding uncertain
 design/history/tuning choices. Worktree `/private/tmp/cw-v1-1-20261012`, branch `v1-1-gaps-20261012`, starts
-from released v1 `558456f447c984f8868c688bd3acbb6e8c6551bd`. Licence commit `a79ec3a` pushed; its CI pending.
-Stones River southern tile/deployment correction passes CPU15/15 plus15 mutants, traits18/18 and packs13/13
-with all mutants; same-SHA CI, actual screenshots and playthrough still required before integration.
-First remote command slice (0119) adds Hardee dawn/Polk Round Forest, explicit Inferred membership only:
-CPU10/10 plus10 mutants and traits18/18 plus18 mutants pass; no new mounted/rally/risk/RNG system.
+from released v1 `558456f447c984f8868c688bd3acbb6e8c6551bd`. Licence `a79ec3a` and terrain `21eb4a3`
+fully green; origin/main is21eb4a3, Pages38258206345 green. Actual dawn screenshot inspected.
+Remote command (0119–0122) adds Hardee dawn/Slaughter Pen, Polk Round Forest, Cheatham/Maney alone,
+all Inferred explicit membership. CPU13/13 +13 mutants, existing campaign21/21 +21 mutants pass;
+no new mounted/rally/risk/RNG system. Authored source rosters remain strict; campaign carry projects
+authority onto surviving initial and scheduled formations, dropping only empty rows.
 Generic Command labels, separate relationship sources, browser module --command-chain in shard4.
-Current compression diagnostic: dispatch pack-figures.yml mode=current on this branch. It fetches CS bake38186582847
-on Actions only and compares five current Union/CS close/field pages (extra CS butternut close look) against
-PNG/raw/UASTC and direct BC7/ASTC, actual GPU mips0/1/2 and five numbered light/dark comparison images.
-Only reports/images upload; no runtime adoption/full encode; unchanged thresholds, fieldable=false.
-CPU current-compression7/7 +7 mutants; inspect same-SHA Actions report before any codec choice (0118).
-Second source slice (0120–0121) admits Hardee over Lucius Polk, Bushrod Johnson and Wood at Slaughter Pen,
-and Cheatham over Maney alone as division command (all Inferred). No Vaughan/Donelson/Cheatham bind.
-CPU10/10 +mutants and traits18/18 +mutants pass. First-chain CI38257182560 shard4 failed in the new
-harness waiting for an optional briefing absent on raw battle URLs; optional DOM lookup fixed. Product
-card checks had not yet run there; new same-SHA CI/full playthrough/screenshots required before adoption.
-Terrain21eb4a3 fully greenCI38255014432, actual dawn screenshot inspected, advanced origin/main.
+Current five-page diagnostic38258100565/d5c5191 is complete with valid controls. UASTC/direct BC7 fail;
+ASTC passes sampled CS close base/butternut, fails the other samples. No compressed runtime adopted.
+Next pack-figures.yml mode=cs-close qualifies all ten CS close pages from bake38186582847 on Actions only:
+288 unchanged frames/look, actual GPU/software mips0/1/2, complete-chain metadata/allocations, every frame
+over light/dark ground in numbered sheets, unchanged quality thresholds. CPU current-compression10/10 +10
+mutants pass. Qualification is fieldable=false: full two-army scene/transition GPU budget<=250,000,000,
+separate CPU accounting, capability/failure fallback and Aaron's actual numbered-image approval required.
+No Vaughan/Donelson/Cheatham bind. CI38258851080/4d4cd38 passed all4 shards/probes/Firefox/WebKit/offline
+but playthrough failed dawn-to-Slaughter Pen carry (0122); failed receipt retained, fix needs fresh full CI.
 `node tools/test.mjs --unit` is the local smoke; browsers/heavy suites run only on Actions.
 
 Finish v1.1 gaps and tag/release, then write an Astra-approved v2 plan and build weekly playable milestones:

@@ -8,6 +8,7 @@ on:
         default: current
         options:
           - current
+          - cs-close
           - diagnostic
           - candidate
           - full
@@ -21,7 +22,7 @@ concurrency:
 jobs:
   package:
     runs-on: ubuntu-24.04
-    timeout-minutes: ${{ (inputs.mode == 'candidate' || inputs.mode == 'current') && 90 || 40 }}
+    timeout-minutes: ${{ (inputs.mode == 'candidate' || inputs.mode == 'current' || inputs.mode == 'cs-close') && 90 || 40 }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -36,7 +37,7 @@ jobs:
       - name: Fetch the approved existing bake on the runner only
         run: |
           set -euo pipefail
-          if [ '${{ inputs.mode }}' = current ]; then
+          if [ '${{ inputs.mode }}' = current ] || [ '${{ inputs.mode }}' = cs-close ]; then
             gh api repos/adhanke-star/the-civil-war/actions/runs/38186582847 --jq '.conclusion' > "$RUNNER_TEMP/source.txt"
             test "$(cat "$RUNNER_TEMP/source.txt")" = success
             gh run download 38186582847 --repo adhanke-star/the-civil-war -n bake-cs-34 -D "$RUNNER_TEMP/current-cs-bake"
@@ -78,6 +79,8 @@ jobs:
         run: |
           if [ "$PACK_MODE" = current ]; then
             node tools/bake/current-compression.mjs "$RUNNER_TEMP/current-cs-bake/atlas"
+          elif [ "$PACK_MODE" = cs-close ]; then
+            node tools/bake/current-compression.mjs "$RUNNER_TEMP/current-cs-bake/atlas" --cs-close
           elif [ "$PACK_MODE" = diagnostic ]; then
             node tools/bake/compress.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack --diagnostic
           elif [ "$PACK_MODE" = candidate ]; then
@@ -89,10 +92,10 @@ jobs:
             exit 1
           fi
       - name: GPU readback against every approved PNG and meaningful broken controls
-        if: inputs.mode != 'residency' && inputs.mode != 'current'
+        if: inputs.mode != 'residency' && inputs.mode != 'current' && inputs.mode != 'cs-close'
         run: node tools/bake/review-compression.mjs "$RUNNER_TEMP/approved-bake/atlas" .out/figure-pack
       - name: Current five-page actual GPU readback, mips 0/1/2, unchanged quality thresholds
-        if: inputs.mode == 'current'
+        if: inputs.mode == 'current' || inputs.mode == 'cs-close'
         run: node tools/bake/review-current-compression.mjs
       - name: Current diagnostic reports and five numbered comparison images only
         if: always() && inputs.mode == 'current'
@@ -105,6 +108,29 @@ jobs:
             .out/current-compression/current-compression-*.png
           retention-days: 7
           if-no-files-found: warn
+      - name: CS close qualification reports and every numbered frame comparison
+        if: always() && inputs.mode == 'cs-close'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cs-close-qualification-review
+          path: |
+            .out/current-compression/compression.json
+            .out/current-compression/quality.json
+            .out/current-compression/soldier-source.json
+            .out/current-compression/cs-close-[0-9][0-9][0-9].png
+          retention-days: 7
+          if-no-files-found: warn
+      - name: Qualified close ASTC files only; no adoption or release approval
+        if: success() && inputs.mode == 'cs-close'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cs-close-qualified-astc
+          path: |
+            .out/current-compression/*-astc.ktx2
+            .out/current-compression/soldier-source.json
+          retention-days: 7
+          if-no-files-found: error
+          compression-level: 0
       - name: Bind the historical full original-PNG report and assess residency only
         if: inputs.mode == 'residency'
         run: |
@@ -135,7 +161,7 @@ jobs:
           if-no-files-found: error
           compression-level: 0
       - name: Small quality report and comparison sheets
-        if: always() && inputs.mode != 'residency' && inputs.mode != 'current'
+        if: always() && inputs.mode != 'residency' && inputs.mode != 'current' && inputs.mode != 'cs-close'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: compression-review

@@ -246,6 +246,9 @@ export function applyCampaign(scenario, save, phase) {
   if (!out.units.length) fail('no formation of this phase is left to take the field.');
   const present = new Set([...out.units, ...(out.reinforcements || [])].map((d) => d.id));
   if (Array.isArray(out.opening)) out.opening = out.opening.filter((o) => present.has(o.id));
+  // Authored membership was validated before carryover. Keep authority over surviving initial/arriving formations.
+  if (Array.isArray(out.commandChain)) out.commandChain = out.commandChain
+    .map(c => ({ ...c, units: c.units.filter(id => present.has(id)) })).filter(c => c.units.length);
   out.difficulty = campaignDifficulty(s); // the campaign's level, so the page's ?difficulty= never overrides it (src/game.js)
   return out;
 }

@@ -11,10 +11,21 @@ import { LOOK } from '../src/ui/look.js';
 import * as settings from '../src/settings.js';
 import { formationTraits, formationTraitEntries } from '../src/ui/briefing.js';
 import { henryHillRun } from './test-packs.mjs';
+import { newCampaign, campaignPhase, recordPhase, applyCampaign } from '../src/franchise/campaign.js';
 
 const read = p => JSON.parse(fs.readFileSync(new URL('../' + p, import.meta.url)));
 const HH = read('assets/scenarios/henry-hill.json'), pack = read('assets/packs/stones-river.json'), data = read('assets/traits.json');
 const oracle = JSON.parse(fs.readFileSync(new URL('./test-packs.mjs', import.meta.url), 'utf8').match(/^const HENRY_ORACLE = (\{.*\});$/m)[1]);
+const campaign=read('assets/campaign.json');
+function carried(dead) {
+  let save=newCampaign({campaign,slot:1,seed:1862});
+  for(const entry of campaign.phases.slice(0,5)) {
+    const source=read(`assets/packs/${entry.packId}.json`).phases.find(p=>p.id===entry.phaseId).scenario;
+    save=recordPhase(save,campaign,{packId:entry.packId,phaseId:entry.phaseId,winner:null,grade:'Draw',loot:[],
+      units:[...source.units,...(source.reinforcements||[])].map(u=>({id:u.id,side:u.side,menStart:u.men,men:entry.phaseId==='dawn-on-the-right'&&dead.includes(u.id)?0:u.men}))});
+  }
+  return [save,campaignPhase(save,campaign)];
+}
 const name = 'Fictional corps commander (test only)', own = 'Fictional brigade commander (test only)';
 const row = { name, rank: 'Lieutenant General', role: 'test corps command', side: 'CS', units: ['jackson'], sources: ['https://example.org/test-only'], status: 'Fictional, test only.' };
 const terrain = { half: 3500, heightAt: () => 0, slopeAt: () => 0, inBounds: () => true };
@@ -39,8 +50,29 @@ const tick = (g, sec) => { for (let i = 0; i < sec / 0.05; i++) g.tick(0.05); };
 const trace = g => ({ units: g.units.map(u => [u.id, u.men, u.morale, u.ammo, u.fatigue, u.state, u.x, u.z, u.order.type]),
   next: g.rnd(), commandDraws: g.commandState().draws, commandNext: g.commandState().rnd(), generals: g.commanders.length });
 const api = { prepare: prepareFieldScenario, game, traits: (g, u) => g.ai.traitsOf(u),
-  packs: () => structuredClone(pack), chain: chainCommanders, ui: formationTraits, henry: henryHillRun };
+  packs: () => structuredClone(pack), chain: chainCommanders, ui: formationTraits, henry: henryHillRun, apply:applyCampaign };
 const checks = [
+  ['campaign-survivors', a=>{
+    const source=structuredClone(pack.phases.find(p=>p.id==='slaughter-pen').scenario),before=structuredClone(source);
+    const [save,phase]=carried(['cs-wood-brigade']);const out=a.apply(source,save,phase);
+    assert.deepEqual(out.commandChain.find(c=>c.name==='William J. Hardee').units,['cs-lpolk-brigade','cs-bjohnson-brigade'],'campaign-survivors: destroyed formation removed from chain');
+    assert.deepEqual(source,before,'campaign-survivors: authored sources and roster remain unchanged');
+    assert.deepEqual(out.commandChain.find(c=>c.name==='William J. Hardee').sources,before.commandChain[0].sources,'campaign-survivors: surviving authority keeps opened sources');
+    assert.ok(a.prepare(out,'pack').commandChain.length===2,'campaign-survivors: carried field passes strict phase validation');
+  }],
+  ['campaign-empty', a=>{
+    const source=pack.phases.find(p=>p.id==='slaughter-pen').scenario,[save,phase]=carried(['cs-lpolk-brigade','cs-bjohnson-brigade','cs-wood-brigade']);
+    const out=a.apply(source,save,phase);
+    assert.deepEqual(out.commandChain.map(c=>c.name),['Benjamin F. Cheatham'],'campaign-empty: empty command omitted, other authority remains');
+    assert.ok(a.prepare(out,'pack').commandChain.length===1,'campaign-empty: no empty row violates strict validation');
+  }],
+  ['campaign-arrivals', a=>{
+    const source=structuredClone(pack.phases.find(p=>p.id==='slaughter-pen').scenario),u=source.units.find(u=>u.id==='cs-wood-brigade');
+    source.units=source.units.filter(d=>d!==u);source.reinforcements=[...(source.reinforcements||[]),{...u,atSec:30,noticeSec:0,entry:'Test-only scheduled arrival'}];
+    const [save,phase]=carried(['cs-bjohnson-brigade']);const out=a.apply(source,save,phase);
+    assert.deepEqual(out.commandChain[0].units,['cs-lpolk-brigade','cs-wood-brigade'],'campaign-arrivals: surviving scheduled members retained in original order');
+    assert.ok(a.prepare(out,'pack').commandChain.length===2,'campaign-arrivals: initial and scheduled roster both validate');
+  }],
   ['phase-membership', a => {
     const p = a.packs(), expected = [
       ['dawn-on-the-right', 'William J. Hardee', ['cs-rains-brigade','cs-ector-brigade','cs-mcnair-brigade','cs-humphreys-battery','cs-liddell-brigade','cs-swett-battery','cs-bjohnson-brigade','cs-lpolk-brigade','cs-wood-brigade']],
@@ -129,6 +161,9 @@ const checks = [
   ['henry-hill', a => { assert.deepEqual(a.henry(), oracle, 'henry-hill: existing golden unchanged'); }],
 ];
 const mutants = {
+  'campaign-survivors': {apply:(s,v,p)=>({...applyCampaign(s,v,p),commandChain:structuredClone(s.commandChain)})},
+  'campaign-empty': {apply:(s,v,p)=>({...applyCampaign(s,v,p),commandChain:structuredClone(s.commandChain)})},
+  'campaign-arrivals': {apply:(s,v,p)=>{const o=applyCampaign(s,v,p),ids=new Set(o.units.map(u=>u.id));o.commandChain=o.commandChain.map(c=>({...c,units:c.units.filter(id=>ids.has(id))}));return o;}},
   'phase-membership': { packs: () => { const p = structuredClone(pack); p.phases[0].scenario.commandChain[0].units.pop(); return p; } },
   isolation: { chain: s => s.commandChain },
   'compose-down': { traits: (g,u) => composeTraits(['stubborn', ...g.ai.traitsOf(u).keys]) },
