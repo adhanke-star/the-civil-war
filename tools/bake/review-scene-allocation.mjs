@@ -48,6 +48,7 @@ async function main(){
       const ctx=await browser.newContext({viewport:{width:1024,height:768},deviceScaleFactor:2,reducedMotion:'reduce'});
       await ctx.addInitScript(installAllocationObserver,source);
       const page=await ctx.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
+      page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
       const row={...entry,states:[],errors};report.cases.push(row);
       try{
         await page.goto(`${url}?battle=${entry.packId}&phase=${entry.phaseId}&quality=high&nosw`);

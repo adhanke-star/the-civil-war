@@ -16,7 +16,12 @@ Full cs-close38261826032/09a12f1 is a retained quality failure: all ten pages/57
 controls green; both short page4s fail mip2 alpha-edge95 (10/9 vs8). Astra authorizes a new 8ASTC/2originalPNG
 hybrid qualification only (0125), CS close48,996,984 GPU bytes, unchanged frames/anchors and quality limits.
 Next pack-figures.yml mode=scene observes all eleven current PNG scenes, both armies, field/close/lens/resize
-and failure, with conservative API reservations, complete mips and geometry. CPU8/8 +8 mutants pass.
+and failure, with conservative API reservations, complete mips and geometry. First scene38265339357 failed
+observer NPOT mip conversion, not nativeGL; omitted61,667,400 field atlas bytes, retained complete failed report/log.
+Fixed observer preserves native args, canonicalizes GLsizei levels, captures bookkeeping/console failures and
+bounded texture signatures/slots. CPU9/9 +9 mutants; one corrected Actions run authorized (0128).
+Root-owned Foragers WIP implements0127 four fictional common60m caches in Buell only, distinct performation/store
+credit and briefing/field/loot provenance. CPU6/6 +6 mutants; actual route/UI/fullCI UNRUN, no adoption yet.
 Qualification remains fieldable=false: whole two-army scene/transition<=250,000,000, separate CPU peaks,
 capability/failure fallback and delegated root/Astra actual numbered-image review required. Owner-only
 visual approval from0123 is withdrawn (0124); Aaron sees actual images, no new permission gate.

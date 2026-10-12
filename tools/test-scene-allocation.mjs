@@ -31,10 +31,11 @@ function observed() {
     gl.generateMipmap(gl.TEXTURE_CUBE_MAP);const cubeAdded=snap().bytes-floating.bytes;
     gl.deleteTexture(cube);gl.finish();
     const prior=snap().bytes;bind('TEXTURE_BINDING_2D');gl.texStorage2D(gl.TEXTURE_2D,4,gl.RGBA8,8,8);gl.generateMipmap(gl.TEXTURE_2D);const immutableAdded=snap().bytes-prior;
+    const priorNpot=snap().bytes;bind('TEXTURE_BINDING_2D');gl.texStorage2D(gl.TEXTURE_2D,Math.log2(7)+1,gl.RGBA8,7,5);gl.generateMipmap(gl.TEXTURE_2D);const npotAdded=snap().bytes-priorNpot;
     const priorCompressed=snap().bytes;bind('TEXTURE_BINDING_2D');gl.compressedTexImage2D(gl.TEXTURE_2D,0,0x93B0,7,5,0,new Uint8Array(64));const compressedAdded=snap().bytes-priorCompressed;
     const small=snap();gl.drawingBufferWidth=200;gl.drawingBufferHeight=100;const resized=snap();
     bind('TEXTURE_BINDING_2D');gl.compressedTexImage2D(gl.TEXTURE_2D,0,99999,4,4,0,new Uint8Array(16));const unknown=snap();
-    return {rgba,beforeFinish,afterFinish,floating,cubeAdded,immutableAdded,compressedAdded,small,resized,unknown,native:gl.native};
+    return {rgba,beforeFinish,afterFinish,floating,cubeAdded,immutableAdded,npotAdded,compressedAdded,small,resized,unknown,native:gl.native};
   } finally {for(const [key,value]of Object.entries(saved)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}}
 }
 const api={Ledger:AllocationLedger,mips:mipSizes,observe:observed};
@@ -45,6 +46,7 @@ const checks=[
   ['native-uncompressed',a=>{const o=a.observe();assert.equal(o.rgba.byKind.texture,172,'native-uncompressed: actual image overload plus mips');assert.equal(o.floating.byKind.texture,256,'native-uncompressed: half-float colour');assert.equal(o.floating.byKind.renderbuffer,128,'native-uncompressed: conservative depth');assert.equal(o.floating.byKind.buffer,12,'native-uncompressed: typed-array offset and length');assert.equal(o.native[0].args.length,6,'native-uncompressed: GL call left intact');}],
   ['cube-storage',a=>{const o=a.observe();assert.equal(o.cubeAdded,2040,'cube-storage: all six complete cube faces');assert.equal(o.immutableAdded,340,'cube-storage: immutable generation never doubles storage');}],
   ['compressed-blocks',a=>assert.equal(a.observe().compressedAdded,64,'compressed-blocks: padded ASTC blocks')],
+  ['native-npot-storage',a=>{const o=a.observe();assert.equal(o.npotAdded,168,'native-npot-storage: fractional GLsizei level conversion charges full NPOT tail');assert.ok(!o.unknown.unknown.some(x=>x.startsWith('observer:')),'native-npot-storage: observer never hides native allocation');assert.equal(o.native.find(c=>c.name==='texStorage2D'&&c.args[3]===7).args[1],Math.log2(7)+1,'native-npot-storage: native arguments unchanged');}],
   ['resize-overlap',a=>{const o=a.observe();assert.equal(o.small.defaultFramebuffer,60000,'resize-overlap: two colours and depth');assert.equal(o.resized.defaultPeak,300000,'resize-overlap: old plus new default surfaces');}],
   ['unknown-refuses-verdict',a=>assert.ok(a.observe().unknown.unknown.includes('compressed format:99999'),'unknown-refuses-verdict: unsupported formats prevent verdict')],
 ];
@@ -55,6 +57,7 @@ const mutants={
   'deferred-delete':changed('beforeFinish',{bytes:0,pendingDeleteBytes:0}),
   'native-uncompressed':changed('rgba',{byKind:{texture:128}}),
   'cube-storage':changed('cubeAdded',340),'compressed-blocks':changed('compressedAdded',35),
+  'native-npot-storage':changed('npotAdded',0),
   'resize-overlap':changed('resized',{defaultPeak:240000}),'unknown-refuses-verdict':changed('unknown',{unknown:[]}),
 };
 for(const [,check]of checks)check(api);

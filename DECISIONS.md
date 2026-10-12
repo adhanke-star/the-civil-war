@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0128 — Mirror native NPOT mip-level conversion in the diagnostic observer (Astra, 2026-10-12)
+
+Preserve failed scene38265339357: native allocations succeeded (GL0) but Three's fractional log2(NPOT)+1 storage levels threw in observer bookkeeping, caught by Three, omitting61,667,400 field-atlas bytes. Canonicalize observed GLsizei storage arguments after leaving native calls unchanged; bookkeeping errors become fatal diagnostic unknowns. Add native-fractional CPU control, console-error capture and bounded texture/signature/slot details. Astra authorizes one corrected Actions observation after focused controls; no budget/native/adoption claim from the failed result.
+
+## 0127 — Four optional fictional supply caches on Buell's approach (Astra, 2026-10-12)
+
+The Foragers pilot is Buell Attacks alone, first nonloan phase: four common neutral60m caches at(-170,-650),(-100,-390),(-100,-150),(-180,170), numbered Game supply cache1–4. Briefing, field controls and loot explicitly disclaim historical locations. Distinct credit is per store/formation/Game phase, so a retake cannot farm the same formation's feat; another formation may earn its own capture. Preserve deployments/AI/victory/history and all existing combat/badge goldens. CPU counting/award controls and actual surviving-franchise route, contested/shortfall, save/UI/accessibility checks precede expansion or adoption; route remains UNRUN while this implementation is WIP.
+
 ## 0126 — Measure progression; admit four distinct fictional stores in one phase (Astra, 2026-10-12)
 
 Hold the proposed reputation thresholds pending an actual economy diagnostic: observed campaign outcomes, feasible decisions, replay improvement, documented surplus sales and existing-save level/card reconciliation. The phase-only maximum806 excludes decision/sale reputation. Admit four explicitly fictional game-rule supply objectives in one nonloan franchise phase first, with distinct store IDs per formation per phase, contested/retake and saved-award checks; no victory-objective or historical narrative change. Preserve badge/combat goldens. Exact phase/positions and numbers await the bounded review.

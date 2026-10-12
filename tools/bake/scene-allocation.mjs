@@ -26,8 +26,13 @@ export class AllocationLedger {
 export function installAllocationObserver(source) {
   const Ledger=(0,eval)('('+source.ledger+')'),mips=(0,eval)('('+source.mips+')');
   const contexts=new WeakMap();
-  const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),textures:new Map(),unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};contexts.set(gl,s);}return s;};
+  const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),textures:new Map(),textureIds:new Map(),signatures:[],unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};contexts.set(gl,s);}return s;};
   const unknown=(s,value)=>{if(!s.unknown.includes(value))s.unknown.push(value);};
+  const signature=(gl,s,id,call,raw,canonical)=>{
+    if(!s.textureIds.has(id))s.textureIds.set(id,s.textureIds.size+1);
+    if(s.signatures.length>=256){unknown(s,'texture signature limit');return;}
+    s.signatures.push({texture:s.textureIds.get(id),call,activeUnit:gl.ACTIVE_TEXTURE===undefined?null:gl.getParameter(gl.ACTIVE_TEXTURE),raw,canonical});
+  };
   const bpp=(gl,s,format,type)=>{
     const entries=[['R8',1],['RG8',2],['RGB8',4],['RGBA8',4],['SRGB8',4],['SRGB8_ALPHA8',4],['R16F',2],['RG16F',4],['RGB16F',8],['RGBA16F',8],
       ['R32F',4],['RG32F',8],['RGB32F',16],['RGBA32F',16],['DEPTH_COMPONENT16',4],['DEPTH_COMPONENT24',4],['DEPTH_COMPONENT32F',4],['DEPTH24_STENCIL8',4],['DEPTH32F_STENCIL8',8],['STENCIL_INDEX8',1]];
@@ -56,23 +61,29 @@ export function installAllocationObserver(source) {
     } else bytes=w*h*d*bpp(gl,s,format,type);
     if(![w,h,d,bytes].every(Number.isSafeInteger)){unknown(s,'invalid image dimensions');return;}
     s.ledger.reserve(id,'texture',`${target}:${level}`,bytes);
+    signature(gl,s,id,compressed?'compressed image':'image',{target,level,format,w,h,d,type},{target,level,w,h,d,bytes});
     if(level===0)s.textures.set(id,{target,w,h,d,bpp:compressed?null:bpp(gl,s,format,type),immutable:false});
   };
   const wrap=(proto,name,after)=>{
     const native=proto[name];if(typeof native!=='function')return;
-    proto[name]=function(...args){const value=native.apply(this,args),s=state(this);s.calls[name]=(s.calls[name]||0)+1;after(this,args,value);return value;};
+    proto[name]=function(...args){const value=native.apply(this,args),s=state(this);s.calls[name]=(s.calls[name]||0)+1;
+      try{after(this,args,value);}catch(error){unknown(s,`observer:${name}:${error.message}`);}return value;};
   };
   for(const proto of [globalThis.WebGLRenderingContext?.prototype,globalThis.WebGL2RenderingContext?.prototype].filter(Boolean)) {
     for(const [name,compressed,volume]of [['texImage2D',false,false],['compressedTexImage2D',true,false],['texImage3D',false,true],['compressedTexImage3D',true,true]])
       wrap(proto,name,(gl,args)=>recordImage(gl,args,compressed,volume));
     for(const volume of [false,true])wrap(proto,volume?'texStorage3D':'texStorage2D',(gl,a)=>{
-      const s=state(gl),[target,levels,format,w,h]=a,d=volume?a[5]:1,id=texture(gl,target),n=bpp(gl,s,format);
+      // WebIDL GLsizei conversion truncates Three's fractional log2(NPOT)+1 level argument.
+      const s=state(gl),[target,rawLevels,format]=a,levels=Math.trunc(rawLevels),w=Math.trunc(a[3]),h=Math.trunc(a[4]),
+        d=volume?Math.trunc(a[5]):1,id=texture(gl,target),n=bpp(gl,s,format);
       if(!id){unknown(s,'storage without bound texture');return;}
+      signature(gl,s,id,'immutable storage',{target,levels:rawLevels,w:a[3],h:a[4],d:volume?a[5]:1,format},{target,levels,w,h,d,bpp:n});
       for(const [i,m]of mips(w,h,n,levels).entries())s.ledger.reserve(id,'texture',`${target}:${i}`,m.bytes*(target===gl.TEXTURE_3D?Math.max(1,d>>i):d)*(target===gl.TEXTURE_CUBE_MAP?6:1));
       s.textures.set(id,{target,w,h,d,bpp:n,immutable:true});
     });
     wrap(proto,'generateMipmap',(gl,a)=>{
       const s=state(gl),id=texture(gl,a[0]),m=s.textures.get(id);
+      signature(gl,s,id,'generate mipmaps',{target:a[0]},{base:m||null});
       if(!m?.bpp){unknown(s,'mipmap without known base');return;}
       if(m.immutable)return; // texStorage already reserved every level; generation changes pixels only.
       const targets=a[0]===gl.TEXTURE_CUBE_MAP?[0,1,2,3,4,5].map(i=>gl.TEXTURE_CUBE_MAP_POSITIVE_X+i):[m.target];
@@ -103,6 +114,7 @@ export function installAllocationObserver(source) {
     s.defaultPeak=Math.max(s.defaultPeak,defaultFramebuffer+(dimensions!==s.defaultDimensions?s.defaultBytes:0));
     s.defaultBytes=defaultFramebuffer;s.defaultDimensions=dimensions;
     return {...s.ledger.snapshot(),defaultFramebuffer,defaultPeak:s.defaultPeak,framebufferAssumption:'two RGBA8 colour surfaces, 32-bit depth/stencil when enabled; no native measurement',
-      dimensions:[gl.drawingBufferWidth,gl.drawingBufferHeight],attributes:attrs,unknown:s.unknown,calls:s.calls};
+      dimensions:[gl.drawingBufferWidth,gl.drawingBufferHeight],attributes:attrs,unknown:s.unknown,calls:s.calls,signatures:s.signatures,
+      textureSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='texture').map(([id,r])=>({texture:s.textureIds.get(id),slots:Object.fromEntries(r.slots)}))};
   }};
 }

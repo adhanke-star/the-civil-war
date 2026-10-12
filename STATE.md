@@ -9,7 +9,8 @@ v1.1: licence/terrain/command carry fully green at09a12f1; origin/main09a12f1, P
 Remote command (0119–0121): Hardee dawn/Slaughter Pen, Polk Round Forest, Cheatham/Maney only.
 CPU13/13 + mutants; carry projection09a12f1 CI38261729029 all9 jobs green, actual screenshots inspected.
 Full ASTC38261826032 fails short page4s; 8ASTC/2PNG qualification authorized, no adoption (0125).
-Next: whole-scene Actions reservation diagnostic (8 CPU controls), hybrid fallback/visual review and balance.
+Scene38265339357 failed observer NPOT conversion; fixed9 CPU controls, corrected Actions run next (0128).
+Foragers four-cache Buell pilot is root-owned WIP; actual route/CI UNRUN. Hybrid/progression still pending.
 Native UHD 617/iPad frame rates and device sound remain unmeasured; no requested device runs.
 MAIN checkout keeps 11 protected uncommitted P2o files untouched; P2o is parked (DECISIONS 0109).
 After completed v1.1/tag/release: Astra-approved v2 plan, officers, Confederate franchise, Eastern campaign,
