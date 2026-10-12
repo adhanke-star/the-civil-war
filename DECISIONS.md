@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0111 — Confederate figures from their own bake (2026-10-12)
+
+The shader tint that turned the Union sprite grey (a placeholder DESIGN forbids shipping) is gone. `tools/bake` takes SIDE=cs and baked a Western shell-jacket infantryman (run 38186582847): grey jean, butternut and faded-tan jean, about three slouch hats to one forage cap, blanket roll, plain buckle, following a sourced dress summary; colours are Inferred estimates. Shipped: the close tier's base look and four field looks (14 MB of PNG); the other five looks stay in the CI artifact to hold graphics memory near the Union pack's. Each side's sprite pool loads its own atlas.
+
+## 0110 — Campaign rules: points, reputation, badges, cavalry, Estimated strengths, title flow (2026-10-12)
+
+Game rules (all tunables in `src/franchise/tuning.js`, labelled "game rule" in the UI): requisition points per phase by grade (Decisive 60, Victory 40, Draw 20, Defeat 10; +15 objective held, +10 low losses; loan phases half); reputation = points earned, levels 1–10 unlock shop tiers and deal a reward card; the shop is date-gated by each arm's sourced availability, captured-only arms never stocked. Twenty badges by feat (Silver 2×, Gold 4× the Bronze feat in one phase), slots by veterancy, first Gold = X-Factor with a 300 m aura; the enemy carries its badges forward. Cavalry rides at 2.2× infantry speed and dismounts to fight. Where a source gives only a division or brigade total, regiments get an equal share marked Estimated with that method; battery crews are a game value of 20 men a gun. Title: Continue is the primary button, New campaign secondary; a practice camp offers "Begin the campaign".
+
 ## 0109 — Park the P2o feedback reader; terrain from TIGER; AI attacks; masking on (2026-10-11)
 
 P2o (one bounded feedback region) is parked on branch `p2o-feedback`, not shipped: its opaque box (up to 180 px tall) covers the top of the battlefield whenever a tip shows, which hid the tilt-shift band entirely and cut the visible saturation change from 96% to 60% of sampled pixels in CI. A lighter readability fix belongs to P6 HUD polish. MAIN's uncommitted copy stays untouched. Battle terrain comes from USGS 3DEP; roads from Census TIGERweb (public domain), since the National Map has no park roads and OSM geometry is ODbL. Modern roads stand in for period alignments (Inferred). AI units may now attack or wait in reserve; friendly lines mask fire by default (sandbox toggle), and golden oracles changed only where masking applies.
