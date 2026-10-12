@@ -1,5 +1,28 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+TRANSFER0155 — context transfer before the whole-scene matrix phase. Root releases sole writing at
+this relay; next fresh ChatGPT/Codex Sol session retains Aaron's selected main model/effort. Astra
+gpt-6-astra/high is read-only/uncertainty judge, max ONE active helper; prior helper idle. No provider
+quota evidence available; do not invent remaining capacity. No simultaneous edits.
+Latest source ef17689446e1200f0771bd5b1e5e8222a13a9f1e CI38302772299 pending. This relay is docs-only;
+read source CI, not a fictitious relay-source run. Parent repair839733d485a8461b26622bb78534b156890ebd01
+CI38301706060 pending; collectord7402025541d6bb70ab5454f6225eadc428098c7 CI38300634794 pending.
+Loaderdcbeb0516ceb36f74ef0cff6d6034da00efa1f01 CI38299022067 all9green/canonical readback pass.
+Collector completed receipts already read: shard3 artifact11770471953 144/144 incl delegation drag
+native/card/Undo pass; shard2 artifact11771836035 365/365; campaign11771331694 201/201/errors0/failure
+null. No aggregate collector/source acceptance until remaining jobs/readbacks. Mainc328/Pages live
+sw66; auto-main failure38298643624/11769522440 retained and test-only repair0153 awaiting acceptance.
+Owned worktree clean at this relay, MAIN13a7b136 exact protected11 unchanged; COORDINATION absent.
+Resume: cd /private/tmp/cw-v1-1-20261012; git fetch origin; git status --short;
+git rev-parse HEAD origin/main origin/v1-1-gaps-20261012; gh run view 38302772299.
+Read AGENTS -> COORDINATION if present -> STATE -> HANDOFF0155..0152 -> release-v1 -> DECISIONS
+0150..0154/0141..0149/0108 -> DESIGN -> PLAN. Next bounded task: read existing pending exact CI, repair
+actual red gates only with scoped evidence, read canonical artifacts; integrate only accepted exact
+source SHA then Pages. Next source phase: implement full qualified-both matrix with export helper,
+digest-bound runner-temp acquisition, actual capacities/smoke/latent/failure-inclusive maxima/exact
+restoration and rejecting completeness controls; no scene dispatch until that contract is implemented.
+Critical execution detail appears below and in the final copy-paste packet; pointers do not waive it.
+
 LATEST0154 ACTIVE — root sole writer until final transfer packet; no simultaneous provider edits.
 Existing export helper validateHybridExport/current-compression probe23+23 now admits exact two close
 looks/all576frames/76sheets/11files/8containers/2originalPNG hashes/fullmips/provenance. Final actual
