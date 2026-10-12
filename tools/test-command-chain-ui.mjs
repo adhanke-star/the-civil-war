@@ -9,40 +9,43 @@ export async function commandChainControls({ browser, url, check, shot, result, 
     return a.violations.filter(v => v.impact === 'serious' || v.impact === 'critical').map(v => v.id);
   };
   try {
-    for (const [phase, id, name] of [['dawn-on-the-right','cs-rains-brigade','William J. Hardee'], ['round-forest','cs-chalmers-brigade','Leonidas Polk']]) {
+    for (const [phase, id, name] of [['dawn-on-the-right','cs-rains-brigade','William J. Hardee'], ['slaughter-pen','cs-wood-brigade','William J. Hardee'],
+      ['slaughter-pen','cs-maney-brigade','Benjamin F. Cheatham'], ['round-forest','cs-chalmers-brigade','Leonidas Polk']]) {
+      const tag = `${phase}-${id}`;
       await page.goto(`${url}?battle=stones-river&phase=${phase}&quality=low&nosw`);
       await page.waitForFunction(() => window.__ready && window.__game?.game, null, { timeout: 180000, polling: 250 });
-      if (await page.locator('#briefing').evaluate(d => d.open)) await page.locator('#briefing-begin').click();
+      if (await page.evaluate(() => document.getElementById('briefing')?.open)) await page.locator('#briefing-begin').click();
       await page.evaluate(id => { const { game } = window.__game; if (!game.paused) game.togglePause(); game.select(game.units.find(u => u.id === id)); }, id);
       await page.waitForFunction(name => document.querySelector('#uc-traits [data-who="chain"]')?.textContent.includes(name), name, { timeout: 30000 });
       const card = await page.evaluate(id => ({ rows: [...document.querySelectorAll('#uc-traits .uct-row')].map(r => [r.dataset.who, r.textContent]),
         generals: window.__game.game.commanders.length, keys: window.__game.game.ai.traitsOf(window.__game.game.units.find(u => u.id === id)).keys }), id);
-      result[`commandChain-${phase}`] = card;
-      check(`command-chain-card-${phase}`, card.rows.some(([who,text]) => who === 'chain' && text.includes(name)) && card.generals === 0,
+      result[`commandChain-${tag}`] = card;
+      check(`command-chain-card-${tag}`, card.rows.some(([who,text]) => who === 'chain' && text.includes(name)) && card.generals === 0,
         `${name} command influence on the card; ${card.generals} physical generals`);
-      check(`command-chain-axe-${phase}`, (await axe('#unitcard')).length === 0, 'no serious/critical card violations');
-      await shot(page, `command-chain-${phase}-card`);
+      check(`command-chain-axe-${tag}`, (await axe('#unitcard')).length === 0, 'no serious/critical card violations');
+      await shot(page, `command-chain-${tag}-card`);
       await page.locator('#uc-traits-more').focus(); await page.keyboard.press('Enter');
       await page.waitForFunction(() => document.getElementById('traits-dialog')?.open);
       const record = page.locator(`#traits-dialog .traits-man[data-commander="${name}"]`);
       const text = await record.innerText();
       const links = await record.locator('.traits-command-sources a').evaluateAll(a => a.map(n => ({ href: n.href, rel: n.rel })));
-      check(`command-chain-sources-${phase}`, text.includes('Command influence: Inferred:') && text.includes('not a plotted location')
-        && links.length === 3 && links.every(a => /^https:\/\//.test(a.href) && a.rel.includes('noopener')), `relationship provenance and ${links.length} opened source links`);
+      const expectedSources = name === 'Benjamin F. Cheatham' ? 4 : phase === 'slaughter-pen' ? 5 : 3;
+      check(`command-chain-sources-${tag}`, text.includes('Command influence: Inferred:') && text.includes('not a plotted location')
+        && links.length === expectedSources && links.every(a => /^https:\/\//.test(a.href) && a.rel.includes('noopener')), `relationship provenance and ${links.length} opened source links`);
       await record.locator('.traits-command-sources a').first().focus();
-      check(`command-chain-keyboard-${phase}`, await page.evaluate(() => document.activeElement?.tagName === 'A' && !!document.activeElement.closest('#traits-dialog')),
+      check(`command-chain-keyboard-${tag}`, await page.evaluate(() => document.activeElement?.tagName === 'A' && !!document.activeElement.closest('#traits-dialog')),
         'source links take keyboard focus within Records');
-      check(`command-chain-record-axe-${phase}`, (await axe('#traits-dialog')).length === 0, 'no serious/critical Records violations');
+      check(`command-chain-record-axe-${tag}`, (await axe('#traits-dialog')).length === 0, 'no serious/critical Records violations');
       await page.setViewportSize({ width: 320, height: 568 });
-      check(`command-chain-320-${phase}`, await page.locator('#traits-dialog').evaluate(d => d.scrollWidth <= d.clientWidth + 1), 'Records and relationship sources fit 320px');
-      await shot(page, `command-chain-${phase}-records-320`);
+      check(`command-chain-320-${tag}`, await page.locator('#traits-dialog').evaluate(d => d.scrollWidth <= d.clientWidth + 1), 'Records and relationship sources fit 320px');
+      await shot(page, `command-chain-${tag}-records-320`);
       await page.keyboard.press('Escape');
       await page.waitForFunction(() => !document.getElementById('traits-dialog')?.open && !window.__game.hud.traitsPaused);
-      check(`command-chain-close-${phase}`, await page.evaluate(() => document.activeElement?.id === 'uc-traits-more' && window.__game.game.paused), 'Escape restores focus and preserves an already-paused battle');
+      check(`command-chain-close-${tag}`, await page.evaluate(() => document.activeElement?.id === 'uc-traits-more' && window.__game.game.paused), 'Escape restores focus and preserves an already-paused battle');
       await page.setViewportSize({ width: 1024, height: 768 });
       await page.evaluate(id => { const { game } = window.__game; const u = game.units.find(u => u.id === id); game.commanderDown(u, 'wounded'); game.select(u); }, id);
       await page.waitForFunction(() => !document.querySelector('#uc-traits [data-who="own"]'));
-      check(`command-chain-down-${phase}`, (await page.locator('#uc-traits [data-who="chain"]').innerText()).includes(name), 'corps influence remains after brigade commander falls');
+      check(`command-chain-down-${tag}`, (await page.locator('#uc-traits [data-who="chain"]').innerText()).includes(name), 'higher command influence remains after brigade commander falls');
     }
     // Briefing of the actual dawn scenario; no interception or forged source/trait data.
     await page.goto(url + '?nosw');

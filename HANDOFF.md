@@ -13,8 +13,12 @@ on Actions only and compares five current Union/CS close/field pages (extra CS b
 PNG/raw/UASTC and direct BC7/ASTC, actual GPU mips0/1/2 and five numbered light/dark comparison images.
 Only reports/images upload; no runtime adoption/full encode; unchanged thresholds, fieldable=false.
 CPU current-compression7/7 +7 mutants; inspect same-SHA Actions report before any codec choice (0118).
-Next source slice recommended by Astra: Hardee's effective Slaughter Pen command over Lucius Polk,
-Bushrod Johnson and Wood, with actual phase window/attachments before admission; Cheatham still unbound.
+Second source slice (0120–0121) admits Hardee over Lucius Polk, Bushrod Johnson and Wood at Slaughter Pen,
+and Cheatham over Maney alone as division command (all Inferred). No Vaughan/Donelson/Cheatham bind.
+CPU10/10 +mutants and traits18/18 +mutants pass. First-chain CI38257182560 shard4 failed in the new
+harness waiting for an optional briefing absent on raw battle URLs; optional DOM lookup fixed. Product
+card checks had not yet run there; new same-SHA CI/full playthrough/screenshots required before adoption.
+Terrain21eb4a3 fully greenCI38255014432, actual dawn screenshot inspected, advanced origin/main.
 `node tools/test.mjs --unit` is the local smoke; browsers/heavy suites run only on Actions.
 
 Finish v1.1 gaps and tag/release, then write an Astra-approved v2 plan and build weekly playable milestones:

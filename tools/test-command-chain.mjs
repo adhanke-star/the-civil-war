@@ -44,12 +44,15 @@ const checks = [
   ['phase-membership', a => {
     const p = a.packs(), expected = [
       ['dawn-on-the-right', 'William J. Hardee', ['cs-rains-brigade','cs-ector-brigade','cs-mcnair-brigade','cs-humphreys-battery','cs-liddell-brigade','cs-swett-battery','cs-bjohnson-brigade','cs-lpolk-brigade','cs-wood-brigade']],
+      ['slaughter-pen', 'William J. Hardee', ['cs-lpolk-brigade','cs-bjohnson-brigade','cs-wood-brigade']],
+      ['slaughter-pen', 'Benjamin F. Cheatham', ['cs-maney-brigade']],
       ['round-forest', 'Leonidas Polk', ['cs-chalmers-brigade','cs-donelson-brigade']]];
-    assert.equal(p.phases.filter(p => p.scenario.commandChain).length, 2, 'phase-membership: only admitted phases have chains');
+    assert.equal(p.phases.filter(p => p.scenario.commandChain).length, 3, 'phase-membership: only admitted phases have chains');
+    assert.equal(p.phases.reduce((n,p) => n + (p.scenario.commandChain?.length || 0), 0), 4, 'phase-membership: no unsourced extra relationship');
     for (const [id, n, ids] of expected) {
-      const s = p.phases.find(p => p.id === id).scenario, c = s.commandChain[0];
-      assert.deepEqual([c.name, c.rank, c.side, c.units], [n, 'Lieutenant General', 'CS', ids], 'phase-membership: exact source-admitted formations and rank');
-      assert.ok(c.status.startsWith('Inferred:') && c.sources.length === 3 && c.sources.every(s => /^https:\/\//.test(s)), 'phase-membership: relationship provenance retained');
+      const s = p.phases.find(p => p.id === id).scenario, c = s.commandChain.find(c => c.name === n);
+      assert.deepEqual([c.name, c.rank, c.side, c.units], [n, n === 'Benjamin F. Cheatham' ? 'Major General' : 'Lieutenant General', 'CS', ids], 'phase-membership: exact source-admitted formations and rank');
+      assert.ok(c.status.startsWith('Inferred:') && c.sources.length >= 3 && c.sources.every(s => /^https:\/\//.test(s)), 'phase-membership: relationship provenance retained');
       assert.deepEqual(s.commanderTraits[n], data.commanders[n].traits, 'phase-membership: sourced traits carried');
     }
   }],
