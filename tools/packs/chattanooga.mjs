@@ -65,7 +65,7 @@ const POOL_US = (regs) => `strength Estimated: no brigade or regimental strength
 
 // ---- landmarks (WGS84; landmark research 2026-10-11 and the terrain assets) ---------------------------------------
 // Most are modern reservation, monument or cemetery anchors, used to place 1863 positions relative to them. A few are
-// derived from the terrain assets' own OSM lines and USGS 3DEP heights (said in each note).
+// derived from the terrain assets' own road and stream lines (TIGERweb, NHD) and USGS 3DEP heights (said in each note).
 const LANDMARKS = {
   // chattanooga terrain
   orchardKnob: { lat: 35.0404, lon: -85.2737, note: 'Orchard Knob summit: the reservation monuments (HMDB MT-64/65, about 35.0404,-85.2737 via search snippets) sit on the 3DEP high point of the knob (about 30 m above the plain); the OSM "Orchard Knob" point (35.0398,-85.2780) lies about 390 m west on flat ground and is not used. Verified (HMDB and the DEM agree within about 20 m).' },

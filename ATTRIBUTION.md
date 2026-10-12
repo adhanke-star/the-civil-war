@@ -45,6 +45,7 @@
   https://commons.wikimedia.org/wiki/File:Wade_Hampton.jpg — public domain.
 - Place positions: NPS Public POIs (MANA) cross-checked with OpenStreetMap/Wikidata/Wikipedia; coordinates
   only (facts), each cited in `assets/scenarios/henry-hill.json`. No OSM geometry is shipped.
+- `assets/icons/` — the app icons (a plain guidon, no text), drawn for this game by `tools/make-icons.mjs`; CC0.
 - Fonts: none shipped; ground labels are traced from the system serif (Georgia / Times / DejaVu Serif) at
   load and extruded. (The three.js example typefaces were considered and rejected: MgOpen licence, not CC0/CC-BY.)
 - Figures, horses, guns, limbers and buildings are procedural geometry built in src/ (no model files), except
