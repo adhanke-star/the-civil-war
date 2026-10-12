@@ -17,6 +17,18 @@ export function pairwiseOrderTraces(rows) {
   return comparisons;
 }
 /** Owned Actions context only. Native calls/arguments/results/errors survive; nested methods count once. */
+export function installDifficultyStartGate(scope=globalThis) {
+  const native=scope.requestAnimationFrame;let held=true;
+  scope.requestAnimationFrame=function(callback){
+    if(typeof callback!=='function')return native.call(this,callback);
+    return native.call(this,function(timestamp){
+      if(held&&scope.__game?.game)scope.__game.game.paused=true;
+      return callback.call(this,timestamp);
+    });
+  };
+  const gate={release(){held=false;},get held(){return held;}};
+  scope.__difficultyStartGate=gate;return gate;
+}
 export function installDifficultyTrace(game) {
   const trace={orders:[],passes:0,reserves:[],holder:[{at:game.simTime,value:game.holder}],overflow:false},bound=new WeakSet(),reserve=new Map();
   const time=()=>Math.round(game.simTime*1000)/1000;

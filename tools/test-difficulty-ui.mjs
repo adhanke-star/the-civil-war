@@ -1,6 +1,6 @@
 // Six unchanged authored battles with fixed player commands; outcomes are observations, not balance targets.
 import fs from 'node:fs';
-import {fixedPlayerOrders,pairwiseOrderTraces,installDifficultyTrace,authoredDuration} from './balance-difficulty.mjs';
+import {fixedPlayerOrders,pairwiseOrderTraces,installDifficultyTrace,installDifficultyStartGate,authoredDuration} from './balance-difficulty.mjs';
 const CASES=[['shiloh','buell-attacks'],['stones-river','dawn-on-the-right']];
 export async function difficultyControls({browser,url,check,shot,result,watchErrors}) {
   const started=Date.now();result.difficultyMatrix=[];
@@ -12,16 +12,21 @@ export async function difficultyControls({browser,url,check,shot,result,watchErr
       const ctx=await browser.newContext({viewport:{width:1024,height:768},reducedMotion:'reduce'}),page=await ctx.newPage(),errors=[],row={difficulty,errors};rows.push(row);
       watchErrors(page,url,errors);const began=Date.now();
       try{
+        await ctx.addInitScript(installDifficultyStartGate);
         await page.goto(`${url}?battle=${packId}&phase=${phaseId}&difficulty=${difficulty}&quality=low&nosw`);
-        await page.waitForFunction(()=>window.__ready&&window.__game?.game&&document.getElementById('briefing')?.open,null,{timeout:180000,polling:250});
+        await page.waitForFunction(()=>window.__ready&&window.__game?.game,null,{timeout:180000,polling:250});
         row.start=await page.evaluate(({orders,source})=>{
-          const g=window.__game.game;document.getElementById('briefing-begin').click();g.paused=true;
+          const g=window.__game.game;g.paused=true;
+          if(g.simTime!==0)throw new Error('difficulty matrix: start gate missed time zero');
           const start={at:g.simTime,seed:g.scenario.seed,interval:g.ai.level.interval,roster:g.scenario.units.map(u=>({id:u.id,side:u.side,men:u.men,x:u.x,z:u.z}))};
           g.__difficultyTrace=(0,eval)('('+source+')')(g);
           start.orders=orders.map(o=>{const u=g.units.find(u=>u.id===o.unitId);return {...o,accepted:!!g.order(u,o)};});return start;
         },{orders,source:installDifficultyTrace.toString()});
         check(`difficulty-${phaseId}-${difficulty}-start`,row.start.at===0&&row.start.seed===authored.seed&&row.start.orders.every(o=>o.accepted),JSON.stringify(row.start));
         if(row.start.at!==0||row.start.seed!==authored.seed||!row.start.orders.every(o=>o.accepted))throw new Error('difficulty matrix: starting commands/seed/time not comparable');
+        const expectedRoster=authored.units.map(u=>({id:u.id,side:u.side,men:u.men,x:u.x,z:u.z}));
+        if(JSON.stringify(row.start.roster)!==JSON.stringify(expectedRoster))throw new Error('difficulty matrix: authored starting roster changed');
+        await page.evaluate(()=>{const g=window.__game.game;if(g.simTime!==0||!g.paused)throw new Error('difficulty matrix: start gate drift');window.__difficultyStartGate.release();});
         row.autoPauseResumes=0;
         let over=false;for(let chunk=0;chunk<Math.ceil((duration+5)/20)&&!over;chunk++){
           const advanced=await page.evaluate(()=>{const g=window.__game.game,target=g.simTime+20;let resumes=0,iterations=0;

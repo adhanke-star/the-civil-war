@@ -1,5 +1,13 @@
 # Handoff — existing v1 (2026-10-11, Claude Opus 5.5)
 
+0135 corrects the direct-link difficulty harness: no briefing is mounted. Owned context RAF start gate
+pauses before callbacks until ready/time0/authored seed+roster/accepted fixed orders verified; release
+never unpauses. Native handles/cancel/timestamps/receiver/errors preserved; CPU5/5+5mutants green.
+Failed38270835011 retained; six actual runs still pending. Origin/main268c501 after fullCI38269804238
+all9green and actual Foragers/progression readback; Pages38273383530 green, automatic mainCI pending.
+Inactive scene38272065399 failed screenshot timeout after Lookout rigged-reactivation; retainedlog,
+not accepted; partition-only38273183860 running. No runtime resource adoption.
+
 0134 authorizes NEXT product progression slice (not yet implemented): thresholds[0,30,75,135,210,300,405,525,660,800],
 all other economy/combat/badge numbers preserved. Actual268c501 playthrough38269804238:201/201,605rep/currentL6,
 4Draw/3Defeat/5Decisive, phase465+decisions140/no turn-ins; candidateL8 exactlycards7/8, preservation/idempotence
