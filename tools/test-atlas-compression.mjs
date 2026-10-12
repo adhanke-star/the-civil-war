@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {createDefaultContainer,write} from '../vendor/three/examples/jsm/libs/ktx-parse.module.js';
-import {parseAtlasAstc,pageMipBytes,astcAvailable} from '../src/units/atlas-compression.js';
+import {parseAtlasAstc,pageMipBytes,astcAvailable,createAtlasAstcTexture} from '../src/units/atlas-compression.js';
+import * as THREE from '../vendor/three/build/three.module.js';
 const page={w:8,h:8,encoding:'astc4x4',alpha:'premultiplied-gamma-bytes'};
 function fixture(metadata={}){
  const c=createDefaultContainer();Object.assign(c,{vkFormat:157,pixelWidth:8,pixelHeight:8,levelCount:4,keyValue:metadata});
@@ -8,9 +9,10 @@ function fixture(metadata={}){
  c.levels=pageMipBytes(8,8,true).levels.map(l=>({levelData:new Uint8Array(l.bytes).fill(l.width),uncompressedByteLength:l.bytes}));return write(c);
 }
 const original=fixture(),edit=(offset,value,big=false)=>{const b=original.slice(),v=new DataView(b.buffer);if(big)v.setBigUint64(offset,BigInt(value),true);else v.setUint32(offset,value,true);return b;};
-const api={parse:parseAtlasAstc,mips:pageMipBytes,caps:astcAvailable};
+const api={parse:parseAtlasAstc,mips:pageMipBytes,caps:astcAvailable,texture:createAtlasAstcTexture};
 const refuses=(a,b,p=page)=>assert.throws(()=>a.parse(b,p),/baked ASTC/);
 const checks=[
+ ['texture-adapter',a=>{const t=a.texture(THREE,original,page);assert.ok(t.isCompressedTexture,'texture-adapter: native compressed texture');assert.equal(t.userData.atlasMipBytes,112,'texture-adapter: exact bytes');assert.equal(t.format,THREE.RGBA_ASTC_4x4_Format,'texture-adapter: explicit linear ASTC');assert.equal(t.mipmaps.length,4,'texture-adapter: complete chain');assert.equal(t.premultiplyAlpha,false,'texture-adapter: no double premultiplication');assert.equal(t.colorSpace,THREE.NoColorSpace,'texture-adapter: shader owns decode');assert.equal(t.generateMipmaps,false,'texture-adapter: explicit encoder mips');assert.equal(t.flipY,false,'texture-adapter: preserved orientation');assert.equal(t.minFilter,THREE.LinearMipmapLinearFilter,'texture-adapter: native mip filtering');assert.equal(t.magFilter,THREE.LinearFilter,'texture-adapter: native magnification');assert.equal(t.wrapS,THREE.ClampToEdgeWrapping,'texture-adapter: preserved edge');assert.equal(t.wrapT,THREE.ClampToEdgeWrapping,'texture-adapter: preserved edge');assert.ok(t.version>0,'texture-adapter: upload requested');t.dispose();}],
  ['complete-chain',a=>{const before=original.slice(),r=a.parse(original,page);assert.deepEqual(r.mipmaps.map(m=>[m.width,m.height,m.data.length]),[[8,8,64],[4,4,16],[2,2,16],[1,1,16]],'complete-chain: exact mip payloads');assert.equal(r.bytes,112,'complete-chain: actual blocks');assert.deepEqual(original,before,'complete-chain: input bytes unchanged');}],
  ['npot-accounting',a=>{assert.equal(a.mips(5,3).bytes,72,'npot-accounting: floor each level');assert.equal(a.mips(5,3,true).bytes,64,'npot-accounting: full compressed chain including subblocks');}],
  ['manifest-bind',a=>{for(const p of [{...page,w:4},{...page,encoding:'uastc'},{...page,alpha:'straight'}])refuses(a,original,p);}],
@@ -24,6 +26,7 @@ const checks=[
 for(const [name,check]of checks){try{check(api);}catch(e){e.message=`${name}: ${e.message}`;throw e;}}console.log(`ATLAS-COMPRESSION OK (${checks.length}/${checks.length})`);
 if(process.argv.includes('--prove-fail')){
  const mutants={
+  'texture-adapter':{texture:()=>({isCompressedTexture:false})},
   'complete-chain':{parse:()=>({mipmaps:[],bytes:0})},'npot-accounting':{mips:()=>({bytes:0})},'capability-route':{caps:()=>true},
  };
  for(const [name,check]of checks){const mutant=mutants[name]||{parse:()=>({mipmaps:[],bytes:0})};let error;try{check({...api,...mutant});}catch(e){error=e;}assert.equal(error?.code,'ERR_ASSERTION',`${name}: mutant must reject its own assertion`);console.log(`CAUGHT ${name}`);}

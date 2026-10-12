@@ -4,6 +4,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { gzipSync, gunzipSync } from 'node:zlib';
+import {createHash} from 'node:crypto';
 import { PNG } from 'pngjs';
 import { ROOT } from '../serve.mjs';
 import { mipBytes, markPremultiplied, candidateKtx, markCandidate, bc7DdsPayload } from './compress.mjs';
@@ -23,6 +24,7 @@ export function selectClosePages(cs) {
   }
   return selected;
 }
+export function selectHybridClosePages(cs){return selectClosePages(cs).map(p=>({...p,encoding:p.id.endsWith('-4')?'png':'astc4x4'}));}
 export function selectPages(us, cs) {
   const pages = [];
   for (const [side, m] of [['US', us], ['CS', cs]]) for (const tier of ['close', 'field']) {
@@ -88,11 +90,12 @@ async function main() {
     if (JSON.stringify(cs.tiers?.[tier]?.frames) !== JSON.stringify(kept.tiers[tier].frames)
       || JSON.stringify(cs.tiers[tier].pages) !== JSON.stringify(kept.tiers[tier].pages)) throw new Error('current compression: source base differs from current Confederate manifest');
   }
-  const closeOnly=process.argv[3]==='--cs-close';
+  const hybrid=process.argv[3]==='--hybrid',closeOnly=process.argv[3]==='--cs-close'||hybrid;
   if(process.argv[3]&&!closeOnly)throw new Error('current compression: unsupported mode');
-  const selected = closeOnly?selectClosePages(cs):selectPages(us,cs), out = freshOut();
+  const selected = hybrid?selectHybridClosePages(cs):closeOnly?selectClosePages(cs):selectPages(us,cs), out = freshOut();
   const report = { diagnosticOnly: true, fieldable: false, toolSha: process.env.GITHUB_SHA,
-    mode:closeOnly?'cs-close-qualification':'current-diagnostic',sources: { US: 'current shipped Union manifest/pages', CS: kept.source }, pages: [] };
+    mode:hybrid?'cs-close-hybrid':closeOnly?'cs-close-qualification':'current-diagnostic',sources: { US: 'current shipped Union manifest/pages', CS: kept.source },
+    encoder:{version:'4.4.2',format:'ASTC_4x4_UNORM_BLOCK',quality:'exhaustive',mips:'box',transfer:'linear',primaries:'none',alpha:'once-premultiplied display bytes'},pages: [] };
   if(closeOnly){const target=structuredClone(kept);target.tiers.close.variants={[EXTRA_LOOK]:structuredClone(cs.tiers.close.variants[EXTRA_LOOK])};fs.writeFileSync(path.join(out,'soldier-source.json'),JSON.stringify(target));}
   try {
     for (const p of selected) {
@@ -117,7 +120,7 @@ async function main() {
         command(process.env.BC7_ENCODER,['-C','-u4','-p64','-g',source,path.join(work,dds)]);
         fs.writeFileSync(block,bc7DdsPayload(readSmall(work,dds),l.width,l.height)); blocks.push(block);
       }
-      for(const format of closeOnly?['astc']:['bc7','astc']) {
+      for(const format of hybrid&&p.encoding==='png'?[]:closeOnly?['astc']:['bc7','astc']) {
         files[format]=p.id+'-'+format+'.ktx2'; const dest=path.join(out,files[format]);
         command('ktx',format==='bc7'
           ? ['create','--raw','--format','BC7_UNORM_BLOCK','--width',String(p.w),'--height',String(p.h),'--levels',String(raw.levels.length),'--assign-tf','linear','--assign-primaries','none',...blocks,dest]
@@ -125,12 +128,12 @@ async function main() {
         const b=readSmall(out,files[format]); markCandidate(b,p.w,p.h,format); fs.writeFileSync(dest,b);
       }
       const astcSoftware=[];
-      for(const lod of [0,1,2]) {
+      for(const lod of files.astc?[0,1,2]:[]) {
         const file=p.id+`-astc-mip${lod}.png`;
         command('ktx',['extract','--level',String(lod),path.join(out,files.astc),path.join(out,file)]); astcSoftware.push(file);
       }
       if(closeOnly)files.raw=retainRaw(out,files.raw);
-      report.pages.push({...p,original:p.id+'-original.png',files,astcSoftware,allocation:mipBytes(p.w,p.h)});
+      report.pages.push({...p,sourceSha256:createHash('sha256').update(input).digest('hex'),original:p.id+'-original.png',files,astcSoftware,allocation:mipBytes(p.w,p.h)});
       fs.writeFileSync(path.join(out,'compression.json'),JSON.stringify(report,null,2));
       report.outputBytes=outputBytes();
       console.log(`ENCODED ${p.id}`);

@@ -8,8 +8,10 @@ import { startServer, ROOT } from '../serve.mjs';
 import { candidateKtx } from './compress.mjs';
 import { readSmall, outputBytes } from './current-compression.mjs';
 import { comparePixels, candidateSupported } from './review-compression.mjs';
+import {createHash} from 'node:crypto';
+import {parseAtlasAstc} from '../../src/units/atlas-compression.js';
 
-export async function gpuReadback({ png, premul, files, w, h }) {
+export async function gpuReadback({ png, premul, files, w, h, hybrid=false }) {
   const T=window.T, renderer=window.renderer, gl=renderer.getContext(), ext=gl.getExtension('WEBGL_compressed_texture_astc');
   const caps={maxTextureSize:gl.getParameter(gl.MAX_TEXTURE_SIZE),formats:[...gl.getParameter(gl.COMPRESSED_TEXTURE_FORMATS)],
     bptc:!!gl.getExtension('EXT_texture_compression_bptc'),astc:!!ext,profiles:ext?ext.getSupportedProfiles():[]};
@@ -20,13 +22,19 @@ export async function gpuReadback({ png, premul, files, w, h }) {
   if(files.uastc){textures.uastc=await decode(files.uastc);textures.rgba=await decode(files.uastc,window.rgbaDecoder);}
   if(files.bc7)textures.bc7=await decode(files.bc7);
   const astcSupported=window.supported(caps,'astc',w,h);
-  if(astcSupported) textures.astc=await decode(files.astc);
+  let parserRejected=null;
+  if(files.astc&&hybrid){
+    const bytes=un64(files.astc),descriptor={w,h,encoding:'astc4x4',alpha:'premultiplied-gamma-bytes'};
+    parserRejected=[bytes.subarray(0,79),bytes.subarray(0,bytes.length-1),(()=>{const b=bytes.slice();b[12]=158;return b;})()].every(b=>{try{window.atlasAdapter.parseAtlasAstc(b,descriptor);return false;}catch(e){return e.message.startsWith('baked ASTC:');}});
+    parserRejected=parserRejected&&(()=>{try{window.atlasAdapter.parseAtlasAstc(bytes,{...descriptor,w:w/2});return false;}catch(e){return e.message.startsWith('baked ASTC:');}})();
+    if(astcSupported)textures.astc=window.atlasAdapter.createAtlasAstcTexture(T,bytes,descriptor);
+  }else if(files.astc&&astcSupported)textures.astc=await decode(files.astc);
   const metadata={};
   for(const [name,t] of Object.entries(textures)) {
     Object.assign(t,{colorSpace:T.NoColorSpace,flipY:false,generateMipmaps:name==='png'||name==='premul',premultiplyAlpha:name==='png',
       minFilter:T.LinearMipmapLinearFilter,magFilter:T.LinearFilter}); t.needsUpdate=true;
     metadata[name]={format:Object.entries(T).find(([k,v])=>k.endsWith('Format')&&v===t.format)?.[0],allocation:t.mipmaps.reduce((s,m)=>s+m.data.byteLength,0),
-      levels:t.mipmaps.length,colorSpace:t.colorSpace,premultiplyAlpha:t.premultiplyAlpha,generateMipmaps:t.generateMipmaps,flipY:t.flipY};
+      levels:t.mipmaps.length,colorSpace:t.colorSpace,premultiplyAlpha:t.premultiplyAlpha,generateMipmaps:t.generateMipmaps,flipY:t.flipY,adapterBytes:t.userData.atlasMipBytes??null};
   }
   const scene=new T.Scene(),camera=new T.Camera(),geometry=new T.PlaneGeometry(2,2);
   const material=new T.ShaderMaterial({uniforms:{map:{value:textures.raw},lod:{value:0},broken:{value:0}},
@@ -47,8 +55,9 @@ export async function gpuReadback({ png, premul, files, w, h }) {
         levels.push({lod,width,height,data});
       } finally { renderer.setRenderTarget(null);rt.dispose(); }
     }
-    return {caps,metadata,astcSupported,errors,levels,unsupportedRejected:!window.supported({...caps,bptc:false,astc:false,formats:[]},'bc7',w,h)
-      && !window.supported({...caps,bptc:false,astc:false,formats:[]},'astc',w,h)};
+    return {caps,metadata,astcSupported:!!textures.astc,parserRejected,errors,levels,unsupportedRejected:!window.supported({...caps,bptc:false,astc:false,formats:[]},'bc7',w,h)
+      && !window.supported({...caps,bptc:false,astc:false,formats:[]},'astc',w,h)
+      &&(!hybrid||!window.atlasAdapter.astcAvailable({getExtension:()=>null},[{w,h}]))};
   } finally {Object.values(textures).forEach(t=>t.dispose());geometry.dispose();material.dispose();}
 }
 export function colourComposite(data, width, height, f, lod, background) {
@@ -75,10 +84,21 @@ export function closeQualified(review) {
       &&p.astcGpu==='RUN'&&p.quality['astc-software']===true&&p.quality.astc===true&&p.shownFrames===p.frames)
     &&review.sheets.length>0;
 }
+export function hybridQualified(review){
+  return review.mode==='cs-close-hybrid'&&review.pages.length===10&&new Set(review.pages.map(p=>p.id)).size===10
+    &&['base','h2_slouch_roll_butternut'].every(look=>{
+      const pages=review.pages.filter(p=>p.look===look);
+      return pages.length===5&&pages.reduce((n,p)=>n+p.frames,0)===288
+        &&[0,1,2,3,4].every(i=>pages.some(p=>p.id===`cs-close-${look}-${i}`&&p.encoding===(i===4?'png':'astc4x4')));
+    })&&review.pages.every(p=>p.integrity&&/^[a-f0-9]{64}$/.test(p.sourceSha256)&&p.sourceBound===true&&p.shownFrames===p.frames
+      &&Object.keys(p.controls).length===(p.encoding==='png'?8:9)&&Object.values(p.controls).every(v=>v===true)
+      &&(p.encoding==='png'?p.quality.png===true:p.astcGpu==='RUN'&&p.quality.astc===true&&p.quality['astc-software']===true&&p.metadata.astc.adapterBytes===p.allocation.block16))
+    &&review.sheets.length>0;
+}
 async function main() {
   if(process.env.GITHUB_ACTIONS!=='true') throw new Error('current compression review: Actions only');
   const out=fs.realpathSync(path.join(ROOT,'.out/current-compression')),report=JSON.parse(readSmall(out,'compression.json'));
-  const closeOnly=report.mode==='cs-close-qualification';
+  const hybrid=report.mode==='cs-close-hybrid',closeOnly=report.mode==='cs-close-qualification'||hybrid;
   if(report.pages.length!==(closeOnly?10:5) || report.fieldable!==false) throw new Error('current compression review: coverage incomplete');
   const review={diagnosticOnly:true,fieldable:false,mode:report.mode,toolSha:process.env.GITHUB_SHA,sources:report.sources,pages:[],sheets:[],complete:false,qualified:false};
   const {server,url}=await startServer({port:0});let browser;
@@ -86,41 +106,44 @@ async function main() {
     browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
     const page=await browser.newPage();
     await page.route(url+'current-compression',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><script type="importmap">{"imports":{"three":"/node_modules/three/build/three.module.js"}}</script><script type="module">'+
-      "import * as T from 'three';import {KTX2Loader} from '/node_modules/three/examples/jsm/loaders/KTX2Loader.js';window.T=T;window.renderer=new T.WebGLRenderer({antialias:false});"+
+      "import * as T from 'three';import * as atlasAdapter from '/src/units/atlas-compression.js';import {KTX2Loader} from '/node_modules/three/examples/jsm/loaders/KTX2Loader.js';window.atlasAdapter=atlasAdapter;window.T=T;window.renderer=new T.WebGLRenderer({antialias:false});"+
       "window.decoder=new KTX2Loader().setTranscoderPath('/node_modules/three/examples/jsm/libs/basis/').setWorkerLimit(1).detectSupport(renderer);window.rgbaDecoder=new KTX2Loader().setTranscoderPath('/node_modules/three/examples/jsm/libs/basis/').setWorkerLimit(1).detectSupport(renderer);for(const k of Object.keys(rgbaDecoder.workerConfig))rgbaDecoder.workerConfig[k]=false;window.supported="+candidateSupported.toString()+';window.ready=true;</script>'}));
     for(const [i,p] of report.pages.entries()) {
       await page.goto(url+'current-compression');await page.waitForFunction(()=>window.ready);
       const files=Object.fromEntries(Object.entries(p.files).map(([f,name])=>[f,readSmall(out,name)])),png=readSmall(out,p.original),premul=PNG.sync.read(png);
       for(let k=0;k<premul.data.length;k+=4)for(let c=0;c<3;c++)premul.data[k+c]=Math.round(premul.data[k+c]*premul.data[k+3]/255);
-      const direct=closeOnly?['raw','astc']:['raw','bc7','astc'];
+      const sourceBound=createHash('sha256').update(png).digest('hex')===p.sourceSha256;
+      const direct=closeOnly?['raw',...(files.astc?['astc']:[])]:['raw','bc7','astc'];
       const info=Object.fromEntries(direct.map(f=>[f,candidateKtx(files[f],p.w,p.h,f)]));
-      const actual=await page.evaluate(gpuReadback,{png:png.toString('base64'),premul:premul.data.toString('base64'),files:Object.fromEntries(Object.entries(files).map(([k,b])=>[k,b.toString('base64')])),w:p.w,h:p.h});
+      if(hybrid&&p.encoding==='astc4x4')parseAtlasAstc(files.astc,{...p,alpha:'premultiplied-gamma-bytes'});
+      const actual=await page.evaluate(gpuReadback,{png:png.toString('base64'),premul:premul.data.toString('base64'),files:Object.fromEntries(Object.entries(files).map(([k,b])=>[k,b.toString('base64')])),w:p.w,h:p.h,hybrid});
       const levels=actual.levels.map(l=>({...l,data:Object.fromEntries(Object.entries(l.data).map(([k,b])=>[k,Buffer.from(b,'base64')]))})),comparisons=[];
       for(const l of levels) {
-        const soft=PNG.sync.read(readSmall(out,p.astcSoftware[l.lod]));
-        if(soft.width!==l.width||soft.height!==l.height)throw new Error('current compression: software dimensions');
-        l.data['astc-software']=soft.data;
-        for(const route of ['premul','raw',...(closeOnly?[]:['rgba','uastc','bc7']),'astc-software',...(actual.astcSupported?['astc']:[])]) comparisons.push({route:'png->'+route,lod:l.lod,metrics:comparePixels(l.data.png,l.data[route])});
-        for(const route of [...(closeOnly?[]:['uastc','bc7']),'astc-software',...(actual.astcSupported?['astc']:[])])comparisons.push({route:'raw->'+route,lod:l.lod,metrics:comparePixels(l.data.raw,l.data[route])});
+        if(files.astc){const soft=PNG.sync.read(readSmall(out,p.astcSoftware[l.lod]));
+          if(soft.width!==l.width||soft.height!==l.height)throw new Error('current compression: software dimensions');l.data['astc-software']=soft.data;}
+        for(const route of ['premul','raw',...(closeOnly?[]:['rgba','uastc','bc7']),...(files.astc?['astc-software']:[]),...(actual.astcSupported?['astc']:[])]) comparisons.push({route:'png->'+route,lod:l.lod,metrics:comparePixels(l.data.png,l.data[route])});
+        for(const route of [...(closeOnly?[]:['uastc','bc7']),...(files.astc?['astc-software']:[]),...(actual.astcSupported?['astc']:[])])comparisons.push({route:'raw->'+route,lod:l.lod,metrics:comparePixels(l.data.raw,l.data[route])});
       }
       const at=(route,lod)=>comparisons.find(c=>c.route===route&&c.lod===lod).metrics;
       const base=levels[0].data.raw;
       const controls={upload:[0,1,2].every(l=>at('png->premul',l).ok),rawBase:at('png->raw',0).ok,identity:levels.every((l,i)=>l.data.raw.equals(info.raw.levels[i].data)),
         missing:!comparePixels(base,Buffer.alloc(base.length)).ok,unsupported:actual.unsupportedRejected};
       for(const k of ['WrongAlpha','DoublePremul','AutomaticSrgb'])controls[k]=!comparePixels(base,levels[0].data[k]).ok;
+      if(hybrid&&files.astc)controls.parser=actual.parserRejected===true;
       const md=actual.metadata,integrity=actual.errors.every(e=>e===0)&&md.raw.format==='RGBAFormat'
         &&(closeOnly||(md.rgba.format==='RGBAFormat'&&md.uastc.format==='RGBA_BPTC_Format'&&md.bc7.format==='RGBA_BPTC_Format'))
         && (!actual.astcSupported||md.astc.format==='RGBA_ASTC_4x4_Format')
         && ['raw',...(closeOnly?[]:['bc7']),...(actual.astcSupported?['astc']:[])].every(f=>md[f].allocation===info[f].allocation&&md[f].levels===p.allocation.levels)
         && (closeOnly||(md.uastc.allocation===p.allocation.block16&&md.rgba.allocation===p.allocation.rgba8))
         && Object.entries(md).every(([n,m])=>m.colorSpace===''&&m.flipY===false&&m.premultiplyAlpha===(n==='png')&&m.generateMipmaps===(n==='png'||n==='premul'));
-      const quality=Object.fromEntries([...(closeOnly?[]:['uastc','bc7']),'astc-software',...(actual.astcSupported?['astc']:[])].map(f=>[f,comparisons.filter(c=>c.route.endsWith('->'+f)).every(c=>c.metrics.ok)]));
-      const entry={id:p.id,look:p.look,frames:p.frames.length,shownFrames:0,integrity,controls,quality,comparisons,allocation:p.allocation,metadata:md,capabilities:actual.caps,glErrors:actual.errors,astcGpu:actual.astcSupported?'RUN':'UNRUN'};
+      const quality=Object.fromEntries([...(closeOnly?[]:['uastc','bc7']),...(files.astc?['astc-software']:[]),...(actual.astcSupported?['astc']:[])].map(f=>[f,comparisons.filter(c=>c.route.endsWith('->'+f)).every(c=>c.metrics.ok)]));
+      if(hybrid&&p.encoding==='png')quality.png=sourceBound&&levels.every(l=>comparePixels(l.data.png,l.data.premul).ok);
+      const entry={id:p.id,look:p.look,encoding:p.encoding,sourceSha256:p.sourceSha256,sourceBound,frames:p.frames.length,shownFrames:0,integrity,controls,quality,comparisons,allocation:p.allocation,metadata:md,capabilities:actual.caps,glErrors:actual.errors,astcGpu:actual.astcSupported?'RUN':'UNRUN'};
       review.pages.push(entry);
       if(closeOnly) {
         await page.evaluate(()=>{decoder.dispose();rgbaDecoder.dispose();renderer.dispose();});
         await page.setViewportSize({width:1800,height:1000});
-        const routes=['png','astc-software',...(actual.astcSupported?['astc']:[])];
+        const routes=['png',...(files.astc?['astc-software']:['raw']),...(actual.astcSupported?['astc']:[])];
         for(let offset=0;offset<p.frames.length;offset+=8) {
           const cards=[];
           for(const [key,f]of p.frames.slice(offset,offset+8)) {
@@ -133,7 +156,7 @@ async function main() {
             cards.push(`<section><h2>${key}</h2>${backgrounds.join('')}</section>`);
           }
           const number=review.sheets.length+1,sheet=`cs-close-${String(number).padStart(3,'0')}.png`;
-          await page.setContent(`<style>body{background:#eee8da;color:#20251a;font:16px sans-serif}h2{font-size:18px;margin:4px}.row{display:flex;align-items:center}figure{flex:1;margin:2px;min-width:0}img{width:100%;height:130px;object-fit:contain}section{background:#d9ddc9;padding:4px;margin:8px}</style><h1>${number}. CS CLOSE QUALIFICATION — ${p.id}</h1><p>Every frame, direction and mip0/1/2 over light/dark ground. Original PNG / ASTC software / actual ASTC GPU ${entry.astcGpu}. Qualification only; visual approval, scene memory and runtime fallback remain required.</p>${cards.join('')}`);
+          await page.setContent(`<style>body{background:#eee8da;color:#20251a;font:16px sans-serif}h2{font-size:18px;margin:4px}.row{display:flex;align-items:center}figure{flex:1;margin:2px;min-width:0}img{width:100%;height:130px;object-fit:contain}section{background:#d9ddc9;padding:4px;margin:8px}</style><h1>${number}. CS CLOSE QUALIFICATION — ${p.id}</h1><p>Every frame, direction and mip0/1/2 over light/dark ground. ${hybrid&&p.encoding==='png'?'Original unchanged PNG retained; raw control':'Original PNG / ASTC software / actual ASTC GPU '+entry.astcGpu}. Qualification only; visual approval, scene memory and runtime fallback remain required.</p>${cards.join('')}`);
           await page.evaluate(()=>Promise.all([...document.images].map(im=>im.decode())));
           await page.screenshot({path:path.join(out,sheet),fullPage:true});review.sheets.push(sheet);
           entry.shownFrames+=Math.min(8,p.frames.length-offset);
@@ -157,9 +180,23 @@ async function main() {
       console.log(p.id,JSON.stringify({integrity,controls,quality}));
     }
     review.complete=review.pages.every(p=>p.integrity&&Object.values(p.controls).every(Boolean))&&(closeOnly?review.pages.every(p=>p.frames===p.shownFrames):review.sheets.length===5);
-    review.qualified=closeOnly&&closeQualified(review);
+    review.qualified=closeOnly&&(hybrid?hybridQualified(review):closeQualified(review));
     if(!review.complete)throw new Error('current compression: diagnostic integrity/control failure; inspect quality.json');
     if(closeOnly&&!review.qualified){console.error('CS close qualification HALT: a required page/route failed unchanged quality; inspect quality.json');process.exitCode=1;}
+    if(hybrid&&review.complete&&review.qualified){
+      const exported=path.join(out,'qualified-hybrid');fs.mkdirSync(exported);
+      const manifest=JSON.parse(readSmall(out,'soldier-source.json'));
+      for(const p of report.pages){
+        const group=p.look==='base'?manifest.tiers.close:manifest.tiers.close.variants[p.look],index=Number(p.id.slice(-1));
+        const source=p.encoding==='png'?p.original:p.files.astc,bytes=readSmall(out,source);
+        if(p.encoding==='png'&&createHash('sha256').update(bytes).digest('hex')!==p.sourceSha256)throw new Error('hybrid export: original PNG changed');
+        if(p.encoding==='astc4x4')parseAtlasAstc(bytes,{...p,alpha:'premultiplied-gamma-bytes'});
+        fs.writeFileSync(path.join(exported,source),bytes,{flag:'wx'});
+        group.pages[index]={...group.pages[index],file:source,bytes:bytes.length,mipLevels:p.allocation.levels,encoding:p.encoding,alpha:p.encoding==='png'?'straight-gamma-bytes':'premultiplied-gamma-bytes'};
+      }
+      fs.writeFileSync(path.join(exported,'soldier-hybrid.json'),JSON.stringify(manifest),{flag:'wx'});
+      review.outputBytes=outputBytes();
+    }
   } finally {fs.writeFileSync(path.join(out,'quality.json'),JSON.stringify(review,null,2));if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(fs.realpathSync(process.argv[1])).href)await main();

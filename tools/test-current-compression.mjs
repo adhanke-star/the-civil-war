@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict';
 import { PNG } from 'pngjs';
 import { selectPages, EXTRA_LOOK } from './bake/current-compression.mjs';
-import { selectClosePages } from './bake/current-compression.mjs';
-import { colourComposite, closeQualified } from './bake/review-current-compression.mjs';
+import { selectClosePages,selectHybridClosePages } from './bake/current-compression.mjs';
+import { colourComposite, closeQualified,hybridQualified } from './bake/review-current-compression.mjs';
 import fs from 'node:fs';
 import { mipBytes } from './bake/compress.mjs';
 import { comparePixels } from './bake/review-compression.mjs';
@@ -24,8 +24,14 @@ function qualification(){
     integrity:true,controls:Object.fromEntries(['upload','rawBase','identity','missing','unsupported','WrongAlpha','DoublePremul','AutomaticSrgb'].map(k=>[k,true])),
     astcGpu:'RUN',quality:{astc:true,'astc-software':true}}))};
 }
-const api={select:selectPages,close:selectClosePages,qualified:closeQualified,composite:colourComposite,bytes:mipBytes,compare:comparePixels};
+function hybridQualification(){return {...qualification(),mode:'cs-close-hybrid',pages:selectHybridClosePages(closeManifest()).map(p=>{
+ const q=qualification().pages.find(q=>q.id===p.id),compressed=p.encoding==='astc4x4';return {...q,encoding:p.encoding,sourceSha256:'a'.repeat(64),sourceBound:true,
+ controls:{...q.controls,...(compressed?{parser:true}:{})},quality:compressed?q.quality:{png:true},allocation:{block16:112},metadata:compressed?{astc:{adapterBytes:112}}:{}};
+})};}
+const api={select:selectPages,close:selectClosePages,hybrid:selectHybridClosePages,qualified:closeQualified,hybridQualified,composite:colourComposite,bytes:mipBytes,compare:comparePixels};
 const checks=[
+ ['hybrid-route',a=>{const pages=a.hybrid(closeManifest());assert.equal(pages.filter(p=>p.encoding==='astc4x4').length,8,'hybrid-route: eight compressed pages');assert.deepEqual(pages.filter(p=>p.encoding==='png').map(p=>p.id),[`cs-close-base-4`,`cs-close-${EXTRA_LOOK}-4`],'hybrid-route: both short originals retained');assert.deepEqual(pages.map(({encoding,...p})=>p),selectClosePages(closeManifest()),'hybrid-route: no metadata or frame changes');}],
+ ['hybrid-evidence',a=>{assert.ok(a.hybridQualified(hybridQualification()),'hybrid-evidence: complete mixed qualification');for(const change of [r=>r.pages.pop(),r=>r.pages[0].encoding='png',r=>r.pages[0].sourceBound=false,r=>r.pages[0].sourceSha256='bad',r=>r.pages[0].controls.parser=false,r=>r.pages[0].metadata.astc.adapterBytes=0,r=>r.pages[0].astcGpu='UNRUN',r=>r.pages[0].quality.astc=false,r=>r.pages[4].quality.png=false,r=>r.pages[0].shownFrames--,r=>r.sheets=[]]){const r=hybridQualification();change(r);assert.ok(!a.hybridQualified(r),'hybrid-evidence: missing parser/GPU/hash/quality/frame evidence refused');}}],
   ['all-close-frames',a=>{
     const m=closeManifest(),pages=a.close(m);
     assert.equal(pages.length,10,'all-close-frames: ten full pages');
@@ -68,7 +74,7 @@ const checks=[
     assert.ok(p.data[0]>85&&p.data[0]<95&&p.data[3]===255,'once-premultiplied: unpremultiply before linear blend and display conversion');
   }],
 ];
-const mutants={coverage:{select:(...x)=>selectPages(...x).slice(0,4)},'missing-look':{select:()=>[]},'page-bounds':{select:()=>[]},'frame-bounds':{select:()=>[]},
+const mutants={'hybrid-route':{hybrid:selectClosePages},'hybrid-evidence':{hybridQualified:()=>true},coverage:{select:(...x)=>selectPages(...x).slice(0,4)},'missing-look':{select:()=>[]},'page-bounds':{select:()=>[]},'frame-bounds':{select:()=>[]},
   'all-close-frames':{close:m=>selectClosePages(m).map(p=>({...p,frames:p.frames.slice(0,3)}))},'close-rejects':{close:()=>[]},'qualification-evidence':{qualified:()=>true},
   'complete-mips':{bytes:()=>({block16:64,rgba8:256,levels:1})},thresholds:{compare:()=>({ok:true})},
   'once-premultiplied':{composite:()=>{const p=new PNG({width:1,height:1});p.data=Buffer.from([64,32,16,255]);return PNG.sync.write(p);}}};
