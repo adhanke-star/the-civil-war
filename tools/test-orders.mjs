@@ -178,7 +178,7 @@ export const ORDERS_CHECKS = [
       CAMP.defaultMorale + CAMP.rest.morale - pen, 'stores-shortage: the shortage did not reach the field definition\'s morale');
   }],
   ['upgrades', (api) => {
-    refuses('upgrades', () => api.buyUpgrade(rich(api, { level: 1, rp: 50 }), { id: 'wagons' }), /^Economy: that upgrade opens at reputation level 2; the army is at level 1/);
+    refuses('upgrades', () => api.buyUpgrade(rich(api, { level: 1, rp: 25 }), { id: 'wagons' }), /^Economy: that upgrade opens at reputation level 2; the army is at level 1/);
     const s = rich(api, { level: 5, rp: 1000, past: true });
     const w = api.buyUpgrade(s, { id: 'wagons' });
     assert.deepEqual([w.rp, w.reputation, w.upgrades, api.depotCapacity(w) - api.depotCapacity(s)], [s.rp - CAMP.upgrades.wagons.price, s.reputation, ['wagons'], CAMP.upgrades.wagons.cards], 'upgrades: Wagons price, reputation kept, capacity');
@@ -196,7 +196,7 @@ export const ORDERS_CHECKS = [
     assert.ok(api.buyLot(more, { itemId: lot.itemId, date: '1862-04' }).depot.length === full.depot.length + 1, 'upgrades: bought wagons must make room in the depot');
   }],
   ['training-slot', (api) => {
-    refuses('training-slot', () => api.buyTraining(rich(api, { level: 1, rp: 50 }), { brigadeId: 'alpha', bar: 'fire' }), /^Economy: training opens at reputation level 2/);
+    refuses('training-slot', () => api.buyTraining(rich(api, { level: 1, rp: 25 }), { brigadeId: 'alpha', bar: 'fire' }), /^Economy: training opens at reputation level 2/);
     let s = rich(api);
     const base = s.army[0].base.fire;
     for (let i = 0; i < 3; i++) s = api.buyTraining(s, { brigadeId: 'alpha', bar: 'fire' });

@@ -1,5 +1,15 @@
 # Handoff — existing v1 (2026-10-11, Claude Opus 5.5)
 
+0137 source candidate implements0134: pure level-rewards helper, coordinated validated load/import/complete/
+exchange/issue, baseline compare BEFORE migration, ascending bounded delivery for2000depot+1MiB UTF8.
+CPU14/14+14mutants and retained actual605/L6→8two cards7/8 passed; constructed570/L5→8threecards is
+separately labelled. Economy14/save18/campaign21/orders13/reward21/progression6 controls passed.
+Pending depot/byte notice with status/ARIA; byte-blocked rewards may remain pending (no ledger-space
+recovery UI). sw65; browser --level-rewards/shard2 +fullCI pending, NOT yet on main.
+New corrected difficulty e652a27 CI38274491038 running; inactive screenshot/LOD8788dcb scene38274789165
+running. Partition8148 scene38273183860 failed Lookout before screenshot (same30s timeout), log retained;
+owned render gate now begins BEFORE Lookout field capture for either prototype, rerun pending.
+
 0135 corrects the direct-link difficulty harness: no briefing is mounted. Owned context RAF start gate
 pauses before callbacks until ready/time0/authored seed+roster/accepted fixed orders verified; release
 never unpauses. Native handles/cancel/timestamps/receiver/errors preserved; CPU5/5+5mutants green.

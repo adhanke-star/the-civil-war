@@ -78,6 +78,7 @@ async function main(){
           if(data.glError||data.allocation.unknown.length||errors.length)throw new Error(`scene allocation: ${entry.phaseId}/${label} incomplete: GL${data.glError}, ${data.allocation.unknown.join(',')}, ${errors.join(',')}`);
           console.log(entry.phaseId,label,JSON.stringify({reservation:data.conservativeReservation,...data.allocation.byKind,arrays:data.declaredArrayBytes,pages:data.atlasPages}));
         };
+        if((inactive||partition)&&entry.phaseId==='lookout-mountain')await page.evaluate(source=>{window.__sceneRenderGate=(0,eval)('('+source+')')(window.__game.post);},installRenderGate.toString());
         await capture('field');
         if(partition){
           if(entry.phaseId==='lookout-mountain')await page.screenshot({path:path.join(out,'terrain-partition-01-before.png')});
@@ -105,7 +106,6 @@ async function main(){
         await resized({width:320,height:568});await capture('narrow-resize');
         if(inactive&&entry.phaseId==='lookout-mountain'){
           await resized({width:1024,height:768});
-          await page.evaluate(source=>{window.__sceneRenderGate=(0,eval)('('+source+')')(window.__game.post);},installRenderGate.toString());
           const transition=async(label,style,compare=false)=>{
             const state=await page.evaluate(async({style,compare})=>{
               const g=window.__game.game,S=await import('./src/settings.js'),C=await import('./src/sandbox/compare.js');

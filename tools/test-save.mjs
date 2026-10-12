@@ -203,7 +203,8 @@ const CHECKS = [
     const before = fixture(), { mem } = env(), raw = mem.getItem(real.SAVE_KEY);
     for (const locks of [null, {}, { request: async () => { throw new Error('denied'); } }, () => { throw new Error('denied'); }]) {
       const store = s.createProgressStore(mem, { locks });
-      assert(name, same(await store.load(), before) && !!real.exportSnapshot(before), 'coordination failure also blocked reading/export');
+      assert(name, same(real.parseSnapshot(await store.readRawBaseline()), before) && !!real.exportSnapshot(before), 'coordination failure blocked raw reading/export');
+      await rejected(name, () => store.load(), 'coordinat');
       await rejected(name, () => store.issue(command(before), { previous: before }), 'coordinat');
       await rejected(name, () => store.complete(fixture('next'), { previous: before }), 'coordinat');
       await rejected(name, () => store.import(JSON.stringify(before), { previousRaw: raw }), 'coordinat');

@@ -111,9 +111,9 @@ export const ECONOMY_CHECKS = [
     assert.deepEqual([old.reputation, old.rp, won.reputation], [90, 90, 90], 'replay-improvement: totals');
   }],
   ['levels', (api) => {
-    const at = [0, 59, 60, 149, 150, 269, 270, 420, 600, 810, 1050, 1319, 1320, 1620, 99999];
-    assert.deepEqual(at.map(api.levelFor), [1, 1, 2, 2, 3, 3, 4, 5, 6, 7, 8, 8, 9, 10, 10], 'levels: thresholds 0/60/150/270/420/600/810/1050/1320/1620');
-    assert.deepEqual([1, 2, 9, 10].map(api.nextLevelAt), [60, 150, 1620, null], 'levels: next threshold');
+    const at = [0, 29, 30, 74, 75, 134, 135, 210, 300, 405, 525, 659, 660, 800, 99999];
+    assert.deepEqual(at.map(api.levelFor), [1, 1, 2, 2, 3, 3, 4, 5, 6, 7, 8, 8, 9, 10, 10], 'levels: thresholds 0/30/75/135/210/300/405/525/660/800');
+    assert.deepEqual([1, 2, 9, 10].map(api.nextLevelAt), [30, 75, 800, null], 'levels: next threshold');
     assert.deepEqual(Array.from({ length: 10 }, (_, i) => api.shopTierFor(i + 1)),
       ['common', 'common', 'uncommon', 'uncommon', 'rare', 'rare', 'veryRare', 'veryRare', 'legendary', 'legendary'], 'levels: shop tier by level');
   }],
@@ -129,10 +129,10 @@ export const ECONOMY_CHECKS = [
     // A jump over several levels deals one card per level, into the depot, recorded once each.
     const s = api.turnInCard(stocked(api, ['legendary', 'legendary']), { itemUid: 'test-econ.1.fixture.0' });
     const t = api.turnInCard(s, { itemUid: 'test-econ.1.fixture.1' });
-    assert.deepEqual([s.level, t.level, t.reputation], [2, 3, 160], 'level-card: levels reached by two 80-point turn-ins');
-    assert.deepEqual(t.ledger.filter((r) => r.kind === 'level').map((r) => r.level), [2, 3], 'level-card: one ledger record per level');
-    assert.deepEqual(t.depot.map((it) => it.uid), ['test-econ.1.level.2', 'test-econ.1.level.3'], 'level-card: reward cards not in the depot');
-    assert.deepEqual(api.levelUps(s, t)?.cards.map((c) => c.uid), ['test-econ.1.level.3'], 'level-card: levelUps names the newly dealt card');
+    assert.deepEqual([s.level, t.level, t.reputation], [3, 4, 160], 'level-card: levels reached by two 80-point turn-ins');
+    assert.deepEqual(t.ledger.filter((r) => r.kind === 'level').map((r) => r.level), [2, 3, 4], 'level-card: one ledger record per level');
+    assert.deepEqual(t.depot.map((it) => it.uid), ['test-econ.1.level.2', 'test-econ.1.level.3', 'test-econ.1.level.4'], 'level-card: reward cards not in the depot');
+    assert.deepEqual(api.levelUps(s, t)?.cards.map((c) => c.uid), ['test-econ.1.level.4'], 'level-card: levelUps names the newly dealt card');
   }],
   ['shop-gating', (api) => {
     const atLevel = (seed, level) => {
@@ -162,7 +162,7 @@ export const ECONOMY_CHECKS = [
   }],
   ['buy-exchange', async (api) => {
     let s = api.turnInCard(stocked(api, ['legendary']), { itemUid: 'test-econ.1.fixture.0' }); // 80 points, level 2 (Common shop)
-    const date = '1862-04-06', lot = api.shopStock(s, { date })[0];
+    const date = '1862-04-06', lot = api.shopStock(s, { date }).find(o=>o.tier==='common');
     assert.ok(lot && lot.price === 30 && !lot.sold, 'buy-exchange: fixture shop has no Common lot');
     const mem = memory({ 'cw.progress': JSON.stringify(s) }), store = api.createProgressStore(mem, { locks: mem.locks });
     const bought = await store.exchange(api.buyLot, { itemId: lot.itemId, date }, { previous: s });
@@ -173,8 +173,8 @@ export const ECONOMY_CHECKS = [
     assert.ok(api.shopStock(bought, { date }).find((o) => o.itemId === lot.itemId).sold, 'buy-exchange: a bought lot is not marked sold');
     refuses('buy-exchange', () => api.buyLot(bought, { itemId: lot.itemId, date }), /^Economy: that lot has already been bought/);
     refuses('buy-exchange', () => api.buyLot(bought, { itemId: 'whitworth', date }), /^Economy: that lot is not in stock/);
-    const poor = api.buyLot(bought, { itemId: api.shopStock(bought, { date }).find((o) => !o.sold).itemId, date });
-    const rest = api.shopStock(poor, { date }).find((o) => !o.sold);
+    const poor = api.buyLot(bought, { itemId: api.shopStock(bought, { date }).find((o) => !o.sold&&o.tier==='common').itemId, date });
+    const rest = api.shopStock(poor, { date }).find((o) => !o.sold&&o.tier==='common');
     if (rest) refuses('buy-exchange', () => api.buyLot(poor, { itemId: rest.itemId, date }), /^Economy: it costs 30 requisition points and you have 20/);
     await refusesAsync('buy-exchange', () => store.exchange(api.buyLot, { itemId: lot.itemId, date }, { previous: s }), /^Progress: progress changed since this exchange was reviewed/);
     assert.equal(mem.data.get('cw.progress'), JSON.stringify(bought), 'buy-exchange: a stale-baseline exchange changed storage');
@@ -203,7 +203,7 @@ export const ECONOMY_CHECKS = [
     const { rp, reputation, level, shopSeen, ledger, ...bare } = t;
     const bad = [[{ ...t, rp: t.rp + 1 }, /do not match the ledger/], [{ ...t, reputation: t.reputation + 5, rp: t.rp + 5 }, /do not match the ledger/],
       [{ ...t, ledger: [...t.ledger, phase] }, /one recorded phase/], [{ ...t, ledger: [{ ...phase, awardId: 'test-econ.1.pz.z.1' }, turn] }, /one recorded phase/],
-      [{ ...t, depot: [...t.depot, turn.item] }, /still in the inventory/], [{ ...t, level: 2 }, /reward cards/], [{ ...t, shopSeen: 2 }, /shop level seen/],
+      [{ ...t, depot: [...t.depot, turn.item] }, /still in the inventory/], [{ ...t, level: 3 }, /reward cards/], [{ ...t, shopSeen: 3 }, /shop level seen/],
       [{ ...bare, rp }, /missing or unsupported fields/], [{ ...t, ledger: [...t.ledger, { kind: 'gift', points: 5 }] }, /invalid requisition ledger entry/],
       [{ ...t, ledger: [phase, { ...turn, at: 3 }] }, /turn-in position/], [{ ...t, rp: -5, reputation: t.reputation, ledger: [...t.ledger, { kind: 'buy', uid: 'test-econ.1.shop.0.m1842', itemId: 'm1842', tier: 'common', price: t.reputation + 5, phase: 0 }] }, /requisition points/]];
     for (const [v, pattern] of bad) refuses('ledger-audit', () => api.validateSnapshot(v), pattern);
@@ -217,23 +217,23 @@ export const ECONOMY_CHECKS = [
     try { old = api.parseSnapshot(JSON.stringify(before)); } catch (e) { assert.fail(`old-saves: a pre-economy v2 save did not load (${e.message})`); }
     assert.deepEqual([old.rp, old.reputation, old.level, old.shopSeen, old.ledger], [0, 0, 1, 1, []], 'old-saves: a pre-economy v2 save must load as 0/0/1');
     const next = play(api, old, { grade: 'Decisive', held: true, lossUS: 10, lossCS: 400 }).after;
-    assert.deepEqual([next.rp, next.reputation, next.level], [85, 85, 2], 'old-saves: a pre-economy save does not earn from zero');
+    assert.deepEqual([next.rp, next.reputation, next.level], [85, 85, 3], 'old-saves: a pre-economy save does not earn from zero');
   }],
   ['shop-seen', (api) => {
     const s = fresh(api);
     assert.deepEqual([s.level, s.shopSeen, api.markShopSeen(s)], [1, 1, s], 'shop-seen: a fresh campaign starts at level 1 with nothing new');
     const up = api.turnInCard(stocked(api, ['legendary']), { itemUid: 'test-econ.1.fixture.0' });
-    assert.deepEqual([up.level, up.shopSeen], [2, 1], 'shop-seen: a level-up must leave the shop marked new');
+    assert.deepEqual([up.level, up.shopSeen], [3, 1], 'shop-seen: a level-up must leave the shop marked new');
     const seen = api.markShopSeen(up);
-    assert.deepEqual([seen.shopSeen, seen.rp, seen.depot.length, api.markShopSeen(seen)], [2, up.rp, up.depot.length, seen], 'shop-seen: opening the shop clears the marker and nothing else');
+    assert.deepEqual([seen.shopSeen, seen.rp, seen.depot.length, api.markShopSeen(seen)], [3, up.rp, up.depot.length, seen], 'shop-seen: opening the shop clears the marker and nothing else');
   }],
   ['phase-summary', (api) => {
     let s = fresh(api);
     s = play(api, s, { grade: 'Decisive', held: true, lossUS: 10, lossCS: 400 }).after; // loan: 42
     const before = s, p2 = play(api, s, { grade: 'Decisive', held: true, lossUS: 10, lossCS: 400 }); // 85 -> 127, level 2
     const sum = api.phaseSummary(before, p2.after);
-    assert.deepEqual([sum.points, sum.lines.reduce((n, l) => n + l.points, 0), sum.reputation, sum.level, sum.nextAt], [85, 85, { from: 42, to: 127 }, 2, 150], 'phase-summary: breakdown and totals');
-    assert.deepEqual([sum.levelUp?.from, sum.levelUp?.to, sum.levelUp?.cards.map((c) => c.uid)], [1, 2, ['test-econ.1.level.2']], 'phase-summary: level reached and its reward card');
+    assert.deepEqual([sum.points, sum.lines.reduce((n, l) => n + l.points, 0), sum.reputation, sum.level, sum.nextAt], [85, 85, { from: 42, to: 127 }, 3, 135], 'phase-summary: breakdown and totals');
+    assert.deepEqual([sum.levelUp?.from, sum.levelUp?.to, sum.levelUp?.cards.map((c) => c.uid)], [2, 3, ['test-econ.1.level.3']], 'phase-summary: level reached and its reward card');
     const loan = api.phaseSummary(fresh(api), before);
     assert.deepEqual(loan.lines.map((l) => l.id), ['grade', 'held', 'lowLoss', 'loan'], 'phase-summary: loan line missing');
     assert.equal(api.phaseSummary(p2.after, api.recordPhase(p2.after, CAMPAIGN, p2.record)), null, 'phase-summary: a re-recorded award shows points again');

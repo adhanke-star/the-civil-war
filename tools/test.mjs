@@ -1802,6 +1802,7 @@ async function browserChecks(server, url) {
     if (process.argv.includes('--audio')) { result.mode = 'sound, settings, gore and feed'; const { audioControls } = await import('./test-audio-ui.mjs'); await audioControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--history')) { result.mode = 'after-action history, replay, record book and ending'; const { historyControls } = await import('./test-history-ui.mjs'); await historyControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--orders')) { result.mode = 'decision cards and camp orders'; const { ordersControls } = await import('./test-orders-ui.mjs'); await ordersControls({ browser, url, check, shot, result, watchErrors }); return; }
+    if (process.argv.includes('--level-rewards')) { result.mode = 'deferred level rewards'; const {levelRewardsControls} = await import('./test-level-rewards-ui.mjs'); await levelRewardsControls({browser,url,check,shot,result,watchErrors}); return; }
     if (process.argv.includes('--economy')) { result.mode = 'requisition points and shop'; const { economyControls } = await import('./test-economy-ui.mjs'); await economyControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--packs-ui')) { result.mode = 'battle packs only'; const { packsUIControls } = await import('./test-packs-ui.mjs'); await packsUIControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--delegation')) { result.mode = 'delegation UI only'; const { delegationControls } = await import('./test-delegation-ui.mjs'); await delegationControls({ browser, url, check, shot, result, watchErrors }); return; }
@@ -1847,6 +1848,8 @@ async function browserChecks(server, url) {
       await rewardFocusControls({ browser, url, check, result });
       const { economyControls } = await import('./test-economy-ui.mjs');
       await economyControls({ browser, url, check, shot, result, watchErrors });
+      const {levelRewardsControls} = await import('./test-level-rewards-ui.mjs');
+      await levelRewardsControls({browser,url,check,shot,result,watchErrors});
       const { badgesControls } = await import('./test-badges-ui.mjs');
       await badgesControls({ browser, url, check, shot, result, watchErrors });
       const { artControls } = await import('./test-art-ui.mjs');

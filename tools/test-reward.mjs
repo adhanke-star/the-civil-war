@@ -297,7 +297,7 @@ const SAVE_CHECKS = [
     mem.getItem = () => { throw new Error('blocked'); };
     await rejectedAsync(() => store.load(), 'save-storage-failure', 'read');
     await rejectedAsync(() => store.complete(input), 'save-storage-failure', 'read');
-    await rejectedAsync(() => s.createProgressStore(() => { throw new Error('blocked'); }).load(), 'save-storage-failure', 'unavailable');
+    await rejectedAsync(() => s.createProgressStore(() => { throw new Error('blocked'); }, {locks:{request:(key,opts,run)=>run()}}).load(), 'save-storage-failure', 'unavailable');
   }],
   ['save-conflict', async (m, d, s) => {
     const mem = memoryStorage(), store = progress(s, mem);

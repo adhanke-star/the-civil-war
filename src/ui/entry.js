@@ -31,7 +31,7 @@ import { ORDERS, orderName, orderText, setOrder, breakCamp, campReport, supplyNe
 import { cardsFor, recorded, optionOpen, chooseDecision, historyOf, effectText as decisionEffect, DECISIONS_NOTE } from '../franchise/decisions.js';
 import { get } from '../settings.js';
 import { brigCard, staticCard, itemLabel, defineRewardSettings, levelUpMoment, badgeChip } from '../reward/sequence.js';
-import { shopStock, buyLot, turnInCard, markShopSeen, levelUps, turnInPoints, nextLevelAt, shopTierFor, ECONOMY, RULES_NOTE, CAMP,
+import { shopStock, buyLot, turnInCard, markShopSeen, levelUps, turnInPoints, nextLevelAt, shopTierFor, pendingLevelRewards, pendingLevelRewardReason, ECONOMY, RULES_NOTE, CAMP,
   storesOf, upgradesOf, depotCapacity, buyStores, buyUpgrade, buyTraining, buySlot, trainingOffer, rerollPreview, rerollAffix } from '../franchise/economy.js';
 import { TIER_BY_ID, STORE_ITEMS, STORE_BY_ID, VETERANCY, itemDef, conditionEffect } from '../reward/data.js';
 import { compare, bestFit } from '../reward/model.js';
@@ -128,7 +128,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
           <div id="camp-order-rows" role="list" aria-label="Brigade orders"></div><div id="order-pages" class="entry-pages"></div>
         </section>
         <section id="camp-shop" aria-labelledby="camp-shop-heading" hidden>
-          <div class="camp-shop-head"><div><h2 id="camp-shop-heading" tabindex="-1">Requisition</h2><p id="camp-reputation"></p>
+          <div class="camp-shop-head"><div><h2 id="camp-shop-heading" tabindex="-1">Requisition</h2><p id="camp-reputation"></p><p id="camp-level-pending" role="status" hidden></p>
             <div id="camp-rep-track" class="rw-rep-track" role="progressbar"><i></i></div><p id="camp-shop-new" hidden></p></div>
             <button id="camp-shop-toggle" type="button" aria-expanded="false" aria-controls="camp-shop-drawer">Open Requisition</button></div>
           <div id="camp-shop-drawer" hidden><p class="entry-note" id="camp-shop-note"></p><p id="camp-shop-status" role="status" tabindex="-1"></p>
@@ -299,11 +299,16 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     node('camp-shop').hidden = !v2;
     if (!v2) { shopOpen = false; return; }
     const next = nextLevelAt(saved.level), from = ECONOMY.levels[saved.level - 1], track = node('camp-rep-track');
+    const pending=pendingLevelRewards(saved);
     node('camp-reputation').textContent = `Reputation ${saved.reputation.toLocaleString()} · Level ${saved.level} of ${ECONOMY.levels.length} · ${next === null ? 'top level' : `next level at ${next.toLocaleString()}`} · ${saved.rp.toLocaleString()} points to spend`;
+    const pendingNotice=node('camp-level-pending'),reason=pendingLevelRewardReason(saved);pendingNotice.hidden=!pending;
+    const prefix=`${pending} level reward${pending===1?'':'s'} pending.`;
+    pendingNotice.textContent=!pending?'':reason==='depot'?`${prefix} Turn in a card to free a depot slot; delivery also requires room in the save.`:reason==='size'?`${prefix} This save has reached its size limit. Your army and earned reputation are preserved.`:`${prefix} Reload the camp to retry delivery.`;
     track.hidden = next === null;
     if (next !== null) {
-      track.setAttribute('aria-label', `Reputation toward level ${saved.level + 1}`);
-      track.setAttribute('aria-valuemin', String(from)); track.setAttribute('aria-valuemax', String(next)); track.setAttribute('aria-valuenow', String(saved.reputation));
+      track.setAttribute('aria-label', pending ? 'Reputation; level rewards waiting for save space' : `Reputation toward level ${saved.level + 1}`);
+      track.setAttribute('aria-valuemin', String(from)); track.setAttribute('aria-valuemax', String(next)); track.setAttribute('aria-valuenow', String(Math.max(from,Math.min(next,saved.reputation))));
+      track.setAttribute('aria-valuetext',`${saved.reputation.toLocaleString()} reputation${pending?`, ${pending} level rewards waiting for save space`:''}`);
       track.firstElementChild.style.width = `${Math.max(0, Math.min(100, Math.round(100 * (saved.reputation - from) / (next - from))))}%`;
     }
     node('camp-shop-new').hidden = saved.shopSeen >= saved.level;

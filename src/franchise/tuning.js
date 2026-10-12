@@ -14,7 +14,7 @@ export const ECONOMY = Object.freeze({
   // Shop prices by rarity (condition is rolled like loot and does not change the price).
   price: Object.freeze({ common: 30, uncommon: 60, rare: 120, veryRare: 240, legendary: 480 }),
   // Reputation (cumulative RP earned, never reduced by spending) needed for levels 1-10.
-  levels: Object.freeze([0, 60, 150, 270, 420, 600, 810, 1050, 1320, 1620]),
+  levels: Object.freeze([0, 30, 75, 135, 210, 300, 405, 525, 660, 800]),
   // The reward card dealt on reaching a level (index = level; levels 0 and 1 deal none).
   levelCardTier: Object.freeze([null, null, 'uncommon', 'uncommon', 'rare', 'rare', 'veryRare', 'veryRare', 'veryRare', 'legendary', 'legendary']),
   // The highest rarity the shop stocks at each level (index = level).

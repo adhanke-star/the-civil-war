@@ -25,13 +25,16 @@
 //   and position, filtered to rarities the reputation has opened and to arms in service by the next phase's month.
 //   Captured-only arms are never stocked. Condition is rolled like loot; price is by rarity. Purchases go to the depot,
 //   which holds wagons x CAMP.cardsPerWagon cards (+ the Wagons upgrade) for purchases; loot and reward cards are never
-//   refused (the 2,000-card and 1 MB save limits still apply).
+//   refused by wagon capacity; level rewards wait when the 2,000-card or 1 MiB save limit would be exceeded.
 // - Camp (P5c; numbers in tuning.js CAMP): store lots (any number), army upgrades (once each, opened by reputation level),
 //   bought training (+points to one card bar, capped with camp orders by CAMP.barCap, price pro rata when the cap leaves less
 //   room), one extra badge slot per brigade, and affix re-rolls (price by rarity; the new condition is fixed by the campaign
 //   seed, the item and how many times it was re-rolled, never the old one, and the player confirms it before paying).
 import { ECONOMY, CAMP } from './tuning.js';
-import { validateSnapshot } from './save.js';
+import { validateSnapshot, MAX_SAVE_BYTES } from './save.js';
+import {reconcileLevelRewards,pendingLevelRewardReason as rewardReason} from './level-rewards.js';
+export {levelFor,levelCard,pendingLevelRewards} from './level-rewards.js';
+export const pendingLevelRewardReason=s=>rewardReason(s,MAX_SAVE_BYTES);
 import { ARMS, TIER_BY_ID, CONDITION_BY_ID, STORE_BY_ID, itemDef } from '../reward/data.js';
 import { makeRng, rollCondition, rerollCondition } from '../reward/model.js';
 import { BARS } from './badges.js';
@@ -42,12 +45,6 @@ const fail = (message) => { throw new Error(`Economy: ${message}`); };
 const DEPOT_LIMIT = 2000;
 const rank = (tier) => TIER_BY_ID[tier].rank;
 
-/** The reputation level (1-10) a cumulative total reaches. */
-export function levelFor(reputation) {
-  let level = 1;
-  ECONOMY.levels.forEach((at, i) => { if (reputation >= at) level = i + 1; });
-  return level;
-}
 /** Reputation needed for the level after `level`, or null at the top. */
 export const nextLevelAt = (level) => (level < ECONOMY.levels.length ? ECONOMY.levels[level] : null);
 /** The highest rarity the shop stocks at a level. */
@@ -70,29 +67,9 @@ function campaignSave(save) {
   return s;
 }
 
-/** The reward card for reaching `level`: deterministic from the campaign seed and level; never a captured-only arm. */
-export function levelCard({ seed, campaignId, slot, level }) {
-  const tier = ECONOMY.levelCardTier[level];
-  if (!tier) fail('this level deals no reward card.');
-  const rng = makeRng(`${seed}:level:${level}`);
-  const pool = ARMS.filter((a) => a.tier === tier && a.capturedOnly !== true);
-  if (!pool.length) fail(`no ${tier} arm can be dealt.`);
-  const def = rng.pick(pool);
-  return { uid: `${campaignId}.${slot}.level.${level}`, itemId: def.id, tier: def.tier, conditionId: rollCondition(rng),
-    source: 'reward', from: `Reputation level ${level} reward card` };
-}
-
-/** Add earned points (reputation and spendable) and deal a card for every level reached. Not validated. */
+/** Add earned points and deliver each level reward that fits; remaining rewards are derived. Not validated. */
 export function earn(s, points) {
-  const reputation = s.reputation + points, level = Math.max(s.level, levelFor(reputation));
-  const depot = [...s.depot], ledger = [...s.ledger];
-  for (let l = s.level + 1; l <= level; l++) {
-    const card = levelCard({ seed: s.seed, campaignId: s.campaign.id, slot: s.slot, level: l });
-    if (depot.length >= DEPOT_LIMIT) fail('the depot wagons are full; turn in or issue a card before the reward card can be dealt.');
-    depot.push(card);
-    ledger.push({ kind: 'level', level: l, uid: card.uid });
-  }
-  return { ...s, rp: s.rp + points, reputation, level, depot, ledger };
+  return reconcileLevelRewards({...s,rp:s.rp+points,reputation:s.reputation+points},MAX_SAVE_BYTES);
 }
 
 /**

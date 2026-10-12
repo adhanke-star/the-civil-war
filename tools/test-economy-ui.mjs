@@ -6,16 +6,17 @@
 //    panel shows its reward card, and the full-screen moment plays once without taking focus or blocking a click.
 // 2. The real flow (reduced motion), on a fictional one-phase campaign served by Playwright route interception of
 //    assets/campaign.json and assets/packs/test-economy.json (Henry Hill ground, 21 July 1861; nothing ships for it).
-//    Slot 1 is seeded at 50 reputation. Camp -> Next -> Briefing -> forced Union win -> After-action & loot: the points
-//    breakdown matches the saved ledger and level 2 plays once; back in camp nothing replays; the drawer opens by
-//    keyboard, stocks only Common arms in service by July 1861, a buy and a turn-in each go through a confirm (Escape
-//    cancels with storage untouched); the turn-in reaches level 3 and its moment plays once; axe, 320 px, screenshots.
+//    Slot 1 is seeded at 50 reputation (level2). Camp -> Next -> Briefing -> forced Union win -> After-action & loot: the points
+//    breakdown matches the saved ledger and the highest crossed level plays once; back in camp nothing replays; the drawer opens by
+//    keyboard, stocks historically eligible arms up to the opened rarity in service by July 1861, a buy and a turn-in each go through a confirm (Escape
+//    cancels with storage untouched); the turn-in crosses further levels and its moment plays once; axe, 320 px, screenshots.
 //    The battle result is forced through the documented hook window.__game.game (as tools/test-campaign-ui.mjs does).
 import fs from 'node:fs';
 import { AxeBuilder } from '@axe-core/playwright';
 import { probeProgress, seedProgress } from './test-progress-browser.mjs';
 import * as campaign from '../src/franchise/campaign.js';
 import * as economy from '../src/franchise/economy.js';
+import {ARMS,TIER_BY_ID} from '../src/reward/data.js';
 import { validateSnapshot } from '../src/franchise/save.js';
 
 const HH = JSON.parse(fs.readFileSync(new URL('../assets/scenarios/henry-hill.json', import.meta.url)));
@@ -37,7 +38,7 @@ function seededSave() {
   for (const it of spare) s = economy.turnInCard(s, { itemUid: it.uid });
   return s;
 }
-/** A recorded phase that reaches level 2, for the count-up mount. */
+/** A recorded phase that reaches level 3, for the count-up mount. */
 function countSummary() {
   const s0 = campaign.newCampaign({ campaign: CAMPAIGN, slot: 2, seed: 7 }), p = campaign.campaignPhase(s0, CAMPAIGN);
   const after = campaign.recordPhase(s0, CAMPAIGN, { packId: PACK_ID, phaseId: 'p1', awardId: p.awardId, winner: 'US', grade: 'Decisive', held: true,
@@ -77,12 +78,12 @@ export async function economyControls({ browser, url, check, shot, result, watch
       return { level: m?.dataset.level, events: m && getComputedStyle(m).pointerEvents, hidden: m?.getAttribute('aria-hidden'), log: window.__levelUps,
         clickable: !!hit?.closest('.rw-primary'), focus: document.activeElement?.id };
     });
-    check('economy-count-levelup', count.panel === '2' && count.cards === 1 && moment.level === '2' && moment.events === 'none' && moment.hidden === 'true'
-      && JSON.stringify(moment.log) === '[2]' && moment.clickable && moment.focus === 'rw-aar-grade',
+    check('economy-count-levelup', count.panel === '3' && count.cards === 2 && moment.level === '3' && moment.events === 'none' && moment.hidden === 'true'
+      && JSON.stringify(moment.log) === '[3]' && moment.clickable && moment.focus === 'rw-aar-grade',
     `inline level-up panel ${count.panel} with ${count.cards} card; full-screen moment level ${moment.level}, pointer-events ${moment.events}, focus ${moment.focus}, Open the loot clickable ${moment.clickable}`);
     await shot(page, 'economy-aar-levelup');
     await page.waitForFunction(() => !document.querySelector('.rw-levelup-moment'), null, { timeout: 10000 });
-    check('economy-moment-leaves', await page.evaluate(() => JSON.stringify(window.__levelUps)) === '[2]', 'the moment leaves on its own and was shown once');
+    check('economy-moment-leaves', await page.evaluate(() => JSON.stringify(window.__levelUps)) === '[3]', 'the moment leaves on its own and was shown once');
     const axe = await new AxeBuilder({ page }).include('.rw').analyze();
     const bad = axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
     check('economy-aar-axe', bad.length === 0, bad.length ? bad.map((v) => `${v.impact} ${v.id}`).join(', ') : `0 serious/critical (${axe.violations.length} minor)`);
@@ -108,7 +109,7 @@ export async function economyControls({ browser, url, check, shot, result, watch
     await camp();
     const open = await page.evaluate(() => ({ shop: !document.getElementById('camp-shop').hidden, rep: document.getElementById('camp-reputation').textContent,
       drawer: document.getElementById('camp-shop-drawer').hidden, turnIns: document.querySelectorAll('.camp-turnin-button').length, log: window.__levelUps ?? [] }));
-    check('economy-camp-start', open.shop && open.drawer && open.rep.startsWith('Reputation 50 · Level 1 of 10') && open.turnIns === 1 && open.log.length === 0,
+    check('economy-camp-start', open.shop && open.drawer && open.rep.startsWith('Reputation 50 · Level 2 of 10') && open.turnIns === 2 && open.log.length === 0,
       `${open.rep}; drawer closed; ${open.turnIns} turn-in button; no moment on load`);
     // ---- the phase: Briefing, forced Union win, after-action points ----
     await page.locator('#camp-next').click();
@@ -138,8 +139,8 @@ export async function economyControls({ browser, url, check, shot, result, watch
     check('economy-aar-points', paid && aar.points === paid.points && aar.shown === `+${paid.points}` && after.reputation === 50 + paid.points && aar.tag === 'Game rule'
       && aar.lines[0][0] === 'grade' && resultText.includes(`Requisition points: +${paid.points}`),
     `after-action +${aar.points} (${aar.lines.map((l) => l.join(' ')).join(', ')}) = saved ledger ${paid?.points}; reputation ${after.reputation}`);
-    check('economy-aar-levelup-once', after.level === 2 && aar.level === '2' && JSON.stringify(aar.log) === '[2]'
-      && after.depot.some((it) => it.uid === 'test-econ.1.level.2' && it.source === 'reward') && after.shopSeen === 1,
+    check('economy-aar-levelup-once', after.level === economy.levelFor(50+paid.points) && aar.level === String(after.level) && JSON.stringify(aar.log) === JSON.stringify([after.level])
+      && Array.from({length:after.level-start.level},(_,i)=>start.level+i+1).every(l=>after.ledger.some(r=>r.kind==='level'&&r.level===l)&&after.depot.some(it=>it.uid===`test-econ.1.level.${l}`&&it.source==='reward')) && after.shopSeen === 1,
     `level ${after.level}; moment log ${JSON.stringify(aar.log)}; reward card in the depot; shop still marked new`);
     // ---- back in camp: nothing replays; the drawer opens by keyboard ----
     await camp();
@@ -150,10 +151,10 @@ export async function economyControls({ browser, url, check, shot, result, watch
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => !window.__entry.importing && document.getElementById('camp-shop-toggle').getAttribute('aria-expanded') === 'true'
       && document.querySelectorAll('#camp-shop-stock .camp-lot').length > 0, null, { timeout: 15000 });
-    for (let i = 0; i < 60 && (await stored()).shopSeen !== 2; i++) await page.waitForTimeout(250);
+    for (let i = 0; i < 60 && (await stored()).shopSeen !== after.level; i++) await page.waitForTimeout(250);
     const drawer = await page.evaluate(() => ({ lots: [...document.querySelectorAll('#camp-shop-stock .camp-lot')].map((n) => n.dataset.lot), focus: document.activeElement?.id,
       fresh: !document.getElementById('camp-shop-new').hidden, note: document.getElementById('camp-shop-note').textContent, cites: document.querySelectorAll('#camp-shop-stock .camp-lot-cite a').length }));
-    const allowed = ['m1842', 'sixPdr'];
+    const allowed = ARMS.filter(a=>!a.capturedOnly&&a.from<='1861-07'&&TIER_BY_ID[a.tier].rank<=TIER_BY_ID[economy.shopTierFor(after.level)].rank).map(a=>a.id);
     check('economy-drawer-keyboard', drawer.focus === 'camp-shop-toggle' && drawer.lots.length > 0 && drawer.lots.every((id) => allowed.includes(id)) && !drawer.fresh
       && drawer.note.includes('July 1861') && drawer.cites >= drawer.lots.length,
     `Enter opened the drawer (focus ${drawer.focus}); lots ${drawer.lots.join(', ')} (Common, in service by July 1861); marker cleared; ${drawer.cites} cited sources`);
@@ -163,7 +164,7 @@ export async function economyControls({ browser, url, check, shot, result, watch
     check('economy-camp-axe', bad.length === 0, bad.length ? bad.map((v) => `${v.impact} ${v.id}`).join(', ') : `0 serious/critical (${axe.violations.length} minor)`);
     await page.locator('#camp-shop').scrollIntoViewIfNeeded(); await shot(page, 'economy-camp-drawer');
     // ---- buy: Escape cancels with storage untouched, then confirm ----
-    const lot = drawer.lots[0], buy = page.locator(`#camp-shop-stock [data-lot="${lot}"] .camp-buy-button`), before = await raw();
+    const lot = drawer.lots.find(id=>['m1842','sixPdr'].includes(id)), buy = page.locator(`#camp-shop-stock [data-lot="${lot}"] .camp-buy-button`), before = await raw();
     await buy.click();
     await page.waitForFunction(() => document.getElementById('camp-confirm').open);
     const dialog = await page.evaluate(() => ({ focus: document.activeElement.id, role: document.getElementById('camp-confirm').getAttribute('role'), ok: document.getElementById('camp-confirm-ok').textContent }));
@@ -188,8 +189,8 @@ export async function economyControls({ browser, url, check, shot, result, watch
       status: document.getElementById('camp-shop-status').textContent, gone: !document.querySelector('[data-item-uid="test-econ.1.fixture.legend"]') }));
     check('economy-turn-in', turnOk === 'Turn in for 80 points' && turned.reputation === boughtSave.reputation + 80 && turned.rp === boughtSave.rp + 80 && ui.gone
       && !turned.depot.some((it) => it.uid === LEGENDARY), `confirmed "${turnOk}": reputation ${boughtSave.reputation} → ${turned.reputation}; card left the depot`);
-    check('economy-camp-levelup-once', turned.level === 3 && ui.moment === '3' && JSON.stringify(ui.log) === '[3]' && ui.status.includes('Reputation level 3 reached')
-      && turned.depot.some((it) => it.uid === 'test-econ.1.level.3'), `level ${turned.level}; moment ${ui.moment}; log ${JSON.stringify(ui.log)}; reward card dealt`);
+    check('economy-camp-levelup-once', turned.level === economy.levelFor(boughtSave.reputation+80) && ui.moment === String(turned.level) && JSON.stringify(ui.log) === JSON.stringify([turned.level]) && ui.status.includes(`Reputation level ${turned.level} reached`)
+      && Array.from({length:turned.level-boughtSave.level},(_,i)=>boughtSave.level+i+1).every(l=>turned.depot.some(it=>it.uid===`test-econ.1.level.${l}`)), `level ${turned.level}; moment ${ui.moment}; log ${JSON.stringify(ui.log)}; reward card dealt`);
     await shot(page, 'economy-camp-levelup');
     await page.setViewportSize({ width: 320, height: 568 });
     check('economy-camp-320', await page.locator('#front').evaluate((n) => n.scrollWidth <= n.clientWidth + 1), '320px wide with the drawer open: no horizontal overflow');

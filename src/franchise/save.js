@@ -4,6 +4,7 @@ import { ARMS, PRACTICE_ARMS, UNIQUES, VETERANCY, GRADES, CONDITIONS, itemDef } 
 import { ratings, canCarry, equip } from '../reward/model.js';
 import { BADGE_BY_ID, TIERS, slotsFor, BARS } from './badges.js';
 import { CAMP, DIFFICULTY } from './tuning.js';
+import { reconcileLevelRewards } from './level-rewards.js';
 
 export const SAVE_KEY = 'cw.progress';
 export const PROGRESS_DB = 'cw.progress';
@@ -600,10 +601,17 @@ export function createProgressStore(storage, { locks, slot = 1 } = {}) {
     catch { bad('cannot read browser storage. Retry; existing progress has not been replaced.'); }
   }
   function write(s, snapshot) {
-    try { s.setItem(key, JSON.stringify(snapshot)); }
+    const text=JSON.stringify(snapshot);
+    if(new TextEncoder().encode(text).length>MAX_SAVE_BYTES)bad('save exceeds the 1 MB limit.');
+    try { s.setItem(key, text); }
     catch { bad('could not save. Keep this page open, retry, or export your completed army.'); }
     return snapshot;
   }
+  const reconciled=snapshot=>owned(validateSnapshot(reconcileLevelRewards(snapshot,MAX_SAVE_BYTES)));
+  const persistRewards=(s,current)=>{
+    const next=reconciled(current);
+    return JSON.stringify(next)===JSON.stringify(current)?current:write(s,next);
+  };
   async function locked(operation) {
     if (storage === undefined) return databaseTransaction(operation, 'readwrite', key);
     let manager;
@@ -622,7 +630,7 @@ export function createProgressStore(storage, { locks, slot = 1 } = {}) {
     key,
     async readRawBaseline() { return reading((s) => read(s)); },
     async load() {
-      return reading((s) => { const raw = read(s); return raw === null ? null : parseSnapshot(raw); });
+      return locked((s) => { const raw = read(s); return raw === null ? null : persistRewards(s,owned(parseSnapshot(raw))); });
     },
     async complete(result, { previous = null } = {}) {
       // Canonical copies are made before waiting; caller mutation cannot change a queued command.
@@ -630,9 +638,9 @@ export function createProgressStore(storage, { locks, slot = 1 } = {}) {
       const baseline = previous === null ? null : validateSnapshot(previous);
       return locked((s) => {
         const raw = read(s), current = raw === null ? null : parseSnapshot(raw);
-        if (current?.awardId === snapshot.awardId) return { snapshot: current, saved: true, duplicate: true };
+        if (current?.awardId === snapshot.awardId) return { snapshot: persistRewards(s,owned(current)), saved: true, duplicate: true };
         if (JSON.stringify(current) !== JSON.stringify(baseline)) bad('progress changed since this demo started. Export this result before replacing the saved army.');
-        return { snapshot: write(s, snapshot), saved: true, duplicate: false };
+        return { snapshot: write(s, reconciled(snapshot)), saved: true, duplicate: false };
       });
     },
     async import(text, { previousRaw } = {}) {
@@ -641,7 +649,7 @@ export function createProgressStore(storage, { locks, slot = 1 } = {}) {
       return locked((s) => {
         // No parsing of old bytes: explicit imports can repair unchanged corrupt progress.
         if (read(s) !== previousRaw) bad('progress changed since this import was reviewed. Export the pending file or choose it again.');
-        return write(s, snapshot);
+        return write(s, reconciled(snapshot));
       });
     },
     /**
@@ -654,7 +662,7 @@ export function createProgressStore(storage, { locks, slot = 1 } = {}) {
       return locked((s) => {
         const raw = read(s), current = raw === null ? null : parseSnapshot(raw);
         if (JSON.stringify(current) !== JSON.stringify(baseline)) bad('progress changed since this exchange was reviewed. Export the pending army or reload saved progress.');
-        return write(s, draft);
+        return write(s, reconciled(draft));
       });
     },
     async issue(command, { previous } = {}) {
@@ -662,7 +670,7 @@ export function createProgressStore(storage, { locks, slot = 1 } = {}) {
       return locked((s) => {
         const raw = read(s), current = raw === null ? null : parseSnapshot(raw);
         if (JSON.stringify(current) !== JSON.stringify(baseline)) bad('progress changed since this equipment was reviewed. Export the pending army or reload saved progress.');
-        return write(s, draft);
+        return write(s, reconciled(draft));
       });
     },
   };
