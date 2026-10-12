@@ -1002,6 +1002,32 @@
             "status": "Identity Verified; strength Estimated: Cheatham's division 3,032 (Handbook App. B) times Johnson's 54.0 percent share of the compile's division total (2,052 of 3,801) = 1,637; alternatives 1,516 (equal split) to 1,822 (casualty-weighted); weapon smooth: Staff Ride Handbook p.16-17 and Daniel say most Confederates carried obsolete smoothbores and converted flintlocks (about 4,000 Enfields army-wide); no brigade return found; xp 1 (green): game default; no Confederate formation's earlier service was researched for this pack; position Inferred: joined the fight at Rhea Field about 09:00 after Polk's battery went into position there (Handbook); AI: attacks Rhea Field at once."
           }
         ],
+        "enemyCommander": {
+          "side": "CS",
+          "name": "Albert Sidney Johnston",
+          "rank": "General",
+          "role": "commanding the Confederate Army of the Mississippi",
+          "sources": [
+            "American Battlefield Trust, Albert Sidney Johnston (biography): https://www.battlefields.org/learn/biographies/albert-sidney-johnston",
+            "Daniel (with Allen), The Battle of Shiloh, NPS Civil War Series 22, sec3 (The Confederate Advance): https://npshistory.com/publications/civil_war_series/22/sec3.htm",
+            "NPS Shiloh, Death of Albert Sidney Johnston, Tour Stop 17 (struck while personally directing his reserves): https://www.nps.gov/places/death-of-albert-sidney-johnston-tour-stop-17.htm"
+          ],
+          "status": "Verified: he commanded the army that attacked on 6 April (ABT; NPS Civil War Series 22; NPS tour stop 17)."
+        },
+        "commanderTraits": {
+          "Albert Sidney Johnston": [
+            "aggressive",
+            "reckless"
+          ],
+          "Patrick R. Cleburne": [
+            "aggressive",
+            "skilled-defender"
+          ],
+          "James R. Chalmers": [
+            "impetuous",
+            "aggressive"
+          ]
+        },
         "positionsNote": "Union formations start in or beside their camps at 05:00 (Sherman's report places Hildebrand east and Buckland west of Shiloh Meeting-House; the Handbook places Peabody's and Miller's camps north of Fraley, Seay and Spain fields). Hardee's line (Cleburne left, Wood centre, Shaver right, Gladden far right) starts south-west of the camps and steps off at 06:30 (Handbook and NPS plaque O; Daniel's map caption says 06:00). Bragg's and Polk's brigades enter at the times they came into action (Handbook, Daniel). All positions Inferred.",
         "strengthNote": "Union strengths are 5 April present-for-duty totals (Handbook App. A, from the OR revised abstract), not dawn effectives. Confederate strengths disagree between the Handbook, the NPS corps plaque and a rounded online compile; each formation carries its own method. Battery crews are a game value of 20 per gun.",
         "historyNote": "Peabody's patrol found Hardee's skirmishers about 04:55, but the Confederate line broke Peabody's and Miller's brigades by about 09:00 (Peabody was killed), and Sherman, wounded, held the Shiloh Church ridge until about 10:00 before falling back to the Hamburg-Purdy road.",
@@ -2057,6 +2083,29 @@
             "status": "Identity Verified; guns Disputed: 53 by 16:30 (Handbook, Daniel) against 62 (Ruggles, Reed, NPS Handbook 10) and about 55 (one article); 53 used; crew Estimated: game value 20 per gun (the old project's 1,200 crew had no source and was not carried); weapon smbart: the batteries are not named; 6-pdr smoothbores dominate the army's battery inventories in the compile; xp 1 (green): game default; no Confederate formation's earlier service was researched for this pack; position Inferred: along the road on the west side of Duncan Field, about 400 yards from the Sunken Road; gathering began 15:30 (Handbook); no AI march: the guns stand and fire from their line; credit Disputed: Ruggles and Maj. Francis Shoup both claimed it."
           }
         ],
+        "enemyCommander": {
+          "side": "CS",
+          "name": "Albert Sidney Johnston",
+          "rank": "General",
+          "role": "commanding the Confederate Army of the Mississippi",
+          "sources": [
+            "NPS Shiloh, Death of Albert Sidney Johnston, Tour Stop 17 (struck while personally directing his reserves): https://www.nps.gov/places/death-of-albert-sidney-johnston-tour-stop-17.htm",
+            "American Battlefield Trust, Shiloh, April 6, 1862 (map page: Johnston shot as he rode ahead of his troops; Beauregard assumed command and called a halt as darkness approached): https://battlefields.org/learn/maps/shiloh-april-6-1862-day-one",
+            "American Battlefield Trust, Albert Sidney Johnston (biography): https://www.battlefields.org/learn/biographies/albert-sidney-johnston"
+          ],
+          "status": "Verified: in command when the phase opens at 10:00 (NPS tour stop 17; ABT); the hour Beauregard took over is not sourced.",
+          "note": "Commands when this phase opens. He was mortally wounded that afternoon while directing his reserves and Beauregard took command; the sources used here give no hour, so the game keeps Johnston for the whole phase."
+        },
+        "commanderTraits": {
+          "Albert Sidney Johnston": [
+            "aggressive",
+            "reckless"
+          ],
+          "James R. Chalmers": [
+            "impetuous",
+            "aggressive"
+          ]
+        },
         "positionsNote": "The Union line follows Reed and the Staff Ride Handbook: Tuttle in the old road on Duncan Field's east edge, Sweeny north of the Corinth road, Prentiss's remnant and the 23rd Missouri toward Sarah Bell's field, Lauman facing west and Williams's brigade (Pugh) facing south at the cotton field, McArthur arriving east of the Peach Orchard. No frontages were measured; all positions Inferred. Confederate brigades that fought here enter at the times they attacked (Handbook, Daniel, Reed).",
         "strengthNote": "Union figures are present-for-duty returns (Handbook App. A), not the men on the road; Sweeny's and McArthur's detachments are Estimated from regiment figures. Confederate figures are pre-battle aggregates or rounded compiles; each formation carries its method. Ruggles's 53 guns (62 by tradition) are one formation with a game crew of 20 per gun.",
         "historyNote": "The Sunken Road line held against about eight uncoordinated attacks from 10:30 to 15:30, then collapsed when its flanks gave way and Ruggles's massed guns opened, and about 2,200 Union soldiers including Prentiss surrendered at 17:30.",
@@ -2761,6 +2810,27 @@
             "status": "Identity Verified; strength Inferred: about 600 men in line by 18:00 (Handbook, one source; the brigade had 1,876 present, all across by 19:30); weapon smooth: no arms source; the same low-confidence default as in Buell attacks, kept equal across phases; xp 1 (green): game rule for Grant's and Buell's volunteer formations at Shiloh other than the Fort Donelson division; no unit-level service history was researched; position Inferred: ferried to Pittsburg Landing from about 17:30 and in line on the extreme left by 18:00 (Handbook; the 77th Pennsylvania history puts eight companies of the 36th Indiana and four of the 6th Ohio a quarter mile in front of the Log House); rank: Colonel on 6 April; his brigadier's commission came later in 1862."
           }
         ],
+        "enemyCommander": {
+          "side": "CS",
+          "name": "P. G. T. Beauregard",
+          "rank": "General",
+          "role": "commanding the Confederate Army of the Mississippi after Johnston fell",
+          "sources": [
+            "American Battlefield Trust, Shiloh, April 6, 1862 (map page: Johnston shot as he rode ahead of his troops; Beauregard assumed command and called a halt as darkness approached): https://battlefields.org/learn/maps/shiloh-april-6-1862-day-one",
+            "American Battlefield Trust, Shiloh Battle Facts and Summary: https://www.battlefields.org/learn/civil-war/battles/shiloh",
+            "Daniel (with Allen), The Battle of Shiloh, NPS Civil War Series 22, sec13 (Beauregard Claims Victory): https://npshistory.com/publications/civil_war_series/22/sec13.htm"
+          ],
+          "status": "Verified: Beauregard assumed command after Johnston was mortally wounded and halted the attacks at dark (ABT map page and battle summary; NPS Civil War Series 22)."
+        },
+        "commanderTraits": {
+          "P. G. T. Beauregard": [
+            "cautious"
+          ],
+          "James R. Chalmers": [
+            "impetuous",
+            "aggressive"
+          ]
+        },
         "positionsNote": "The gun line follows the NPS tablets and monuments (Madison's battery monument, Markgraf's tablet coordinates) and the Handbook (Stand 15); Silversparre's exact spot is not sourced and is placed between them. Hurlbut stands on the right of the guns (Grant's Memoirs) and McClernand in the centre of the line further west (Daniel). The gunboats Tyler and Lexington and the routed remnant of W. H. L. Wallace's division are not fielded (see each phase note). All positions Inferred.",
         "strengthNote": "No formation has a sourced 18:00 strength. Hurlbut and McClernand are start-of-day present minus the day's killed, wounded and missing (a ceiling: stragglers are not removed); Chalmers is his own report's 2,039 less his losses; Jackson is a regiment-count share of Withers's division less his losses. Batteries carry a game crew of 20 per gun. Deas's and Anderson's brigades formed but did not attack (Handbook) and are left out.",
         "historyNote": "Chalmers's and Jackson's attack across Dill Branch about 18:00 was thrown back by Webster's gun line, the gunboats and the first of Buell's men, and Beauregard halted the army for the night.",
@@ -3921,6 +3991,30 @@
             "status": "Identity Verified; strength Estimated: 7,552 - 2 x 2,517 = 2,518; weapon smooth: UNSOURCED default; xp 1 (green): game rule for Grant's and Buell's volunteer formations at Shiloh other than the Fort Donelson division; no unit-level service history was researched; position Inferred: arrived about noon and formed on Kirk's left at Woolf Field (77th Pennsylvania history)."
           }
         ],
+        "enemyCommander": {
+          "side": "CS",
+          "name": "P. G. T. Beauregard",
+          "rank": "General",
+          "role": "commanding the Confederate Army of the Mississippi after Johnston fell",
+          "sources": [
+            "Daniel (with Allen), The Battle of Shiloh, NPS Civil War Series 22, sec13 (Beauregard Claims Victory): https://npshistory.com/publications/civil_war_series/22/sec13.htm",
+            "American Battlefield Trust, Shiloh Battle Facts and Summary: https://www.battlefields.org/learn/civil-war/battles/shiloh"
+          ],
+          "status": "Verified: Beauregard assumed command after Johnston was mortally wounded and halted the attacks at dark (ABT map page and battle summary; NPS Civil War Series 22)."
+        },
+        "commanderTraits": {
+          "P. G. T. Beauregard": [
+            "cautious"
+          ],
+          "James R. Chalmers": [
+            "impetuous",
+            "aggressive"
+          ],
+          "Patrick R. Cleburne": [
+            "aggressive",
+            "skilled-defender"
+          ]
+        },
         "positionsNote": "Nelson's brigades (Ammen, Bruce, Hazen, left to right) start south of Dill Branch on the Hamburg-Savannah road, Crittenden's (Smith in front, Boyle behind) and McCook's (Rousseau, Kirk behind) to their right, and Lew Wallace's division north of Water Oaks Pond (Epperson, the 77th Pennsylvania history, Daniel). Wicker, Jones, Woolf and the Davis wheat field have no sourced coordinates, so the Confederate positions are placed by the fields that are mapped. All positions Inferred.",
         "strengthNote": "Army of the Ohio brigades are splits of the NPS plaque division totals (Nelson 4,541; Crittenden 3,825; McCook 7,552), not returns. Confederate 7 April strengths are Estimated: an average regiment of 408 (from Chalmers's report and Cleburne's compile figure) times regiments, less the brigade's two-day losses. Lew Wallace's 5,837 is the NPS plaque figure for the whole division.",
         "historyNote": "Nelson and Crittenden reached the Hamburg-Purdy road about 14:00 while McCook and Lew Wallace drove west toward Shiloh Church, and Beauregard withdrew to Corinth behind Breckinridge's rear guard.",

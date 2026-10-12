@@ -56,8 +56,26 @@
 // holding infantry, steady and unengaged, attacks (fire, never a charge) a breakthrough within 400 m: an enemy formation
 // inside the objective it defends, or within 200 m of a routing friend. Delegated own brigades are not affected. The AI
 // gives orders only: no level changes a combat number.
+//
+// Temperament (DESIGN §4b "AI character", P3t; game rules in src/franchise/tuning.js TRAITS; history in assets/traits.json):
+// an AI formation takes the traits the phase's data gives its own commander (scenario.commanderTraits[unit.commander.name],
+// dropped once he is down) and its army commander (scenario.enemyCommander of this side; his own `reckless` stays his).
+// They compose (composeTraits) and change only decisions and timing, on top of the difficulty level:
+//   aggressive        attacks and reserves begin sooner, a reserve commits on a farther enemy, a stopped or repulsed attacker
+//                     goes forward again sooner
+//   impetuous         steps off before its set time and waits less for the formations beside it
+//   cautious          begins later, commits a reserve only on a nearer enemy, renews a stopped march more slowly, and a
+//                     shaken (not only wavering) formation falls back when the nearest enemy outnumbers it
+//   stubborn          under a hold order it falls back only when the nearest enemy has `hold` times its men
+//   methodical        once begun, waits up to `wait` s for the other attackers and reserves sharing its target; never renews
+//                     a stopped march sooner than its level
+//   skilled-defender  a holding infantry brigade counter-attacks a breakthrough at any level (as a General's does) and, before
+//                     the enemy is near, moves once to the best nearby cover no nearer the enemy
+//   slow              decides only every `pass`-th AI pass and renews a stopped march more slowly
+//   reckless          the man himself is at risk from fire farther off (src/game.js commandStep; no AI decision)
+// A formation without traits runs every rule above exactly as before (Henry Hill and every oracle unchanged).
 
-import { DIFFICULTY } from '../franchise/tuning.js';
+import { DIFFICULTY, TRAITS } from '../franchise/tuning.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 export const AI_ROLES = Object.freeze(['hold', 'attack', 'reserve']);
@@ -90,6 +108,48 @@ export const roleOf = (u) => {
   return ai && (ai.role === 'attack' || ai.role === 'reserve') ? ai.role : 'hold';
 };
 
+// ---- temperament (see the header) ----------------------------------------------------------------------------------
+const NO_TRAITS = Object.freeze([]);
+/** The usual rules: a formation without traits (every factor 1, every shift 0). */
+export const NO_TEMPERAMENT = Object.freeze({ keys: NO_TRAITS, start: 0, reach: 1, reissue: 1, cool: 1, shaken: false, hold: 1, wait: 0,
+  counter: null, cover: null, pass: 1 });
+/** The known trait keys the phase's data gives this man (scenario.commanderTraits[name]); [] without data. */
+export function commanderTraits(scenario, name) {
+  const map = scenario && scenario.commanderTraits;
+  if (!map || typeof map !== 'object' || typeof name !== 'string' || !Object.prototype.hasOwnProperty.call(map, name) || !Array.isArray(map[name])) return NO_TRAITS;
+  return map[name].filter((k) => TRAITS.keys.includes(k));
+}
+/** The phase's army commander of `side` (scenario.enemyCommander: { side, name, rank, role, sources, status }), or null. */
+export function armyCommander(scenario, side) {
+  const c = scenario && scenario.enemyCommander;
+  return c && typeof c === 'object' && c.side === side && typeof c.name === 'string' && c.name.trim() ? c : null;
+}
+/** Traits composed into the AI's numbers (src/franchise/tuning.js TRAITS): starts add, factors multiply, the largest wait and pass. */
+export function composeTraits(keys) {
+  const list = [...new Set(keys || [])].filter((k) => TRAITS.keys.includes(k));
+  if (!list.length) return NO_TEMPERAMENT;
+  const T = { keys: Object.freeze(list), start: 0, reach: 1, reissue: 1, cool: 1, shaken: false, hold: 1, wait: 0, counter: null, cover: null, pass: 1 };
+  let window = 1, steady = false;
+  for (const k of list) {
+    const r = TRAITS[k];
+    if (r.start) T.start += r.start;
+    if (r.reach) T.reach *= r.reach;
+    if (r.reissue) T.reissue *= r.reissue;
+    if (r.cool) T.cool *= r.cool;
+    if (r.shaken) T.shaken = true;
+    if (r.hold) T.hold = Math.max(T.hold, r.hold);
+    if (r.wait) T.wait = Math.max(T.wait, r.wait);
+    if (r.window) window *= r.window;
+    if (r.steady) steady = true;
+    if (r.counter) T.counter = r.counter;
+    if (r.cover) T.cover = r.cover;
+    if (r.pass) T.pass = Math.max(T.pass, Math.round(r.pass));
+  }
+  T.wait *= window;
+  if (steady) T.reissue = Math.max(1, T.reissue);
+  return Object.freeze(T);
+}
+
 export class Ai {
   constructor(game, opts, level = 'veteran') {
     this.game = game;
@@ -101,6 +161,30 @@ export class Ai {
     this.memo = new WeakMap(); // unit -> { active, issued, via } (attack and reserve roles only)
     this.groups = new Map(); // target key -> { dir, pos: Map(unit -> lateral offset), n, right, left }
     this.delegation = new WeakMap(); // delegated own unit -> { d, aim, facing, issued, friend, spot, replaced }
+    // temperament: the army commander's traits (his `reckless` is his own), composed sets by key, passes seen by slow formations
+    const general = armyCommander(game.scenario, this.side);
+    this.armyTraits = general ? commanderTraits(game.scenario, general.name).filter((k) => k !== 'reckless') : NO_TRAITS;
+    this.temperaments = new Map();
+    this.passes = new WeakMap();
+    this.covered = new WeakSet(); // skilled defenders that have chosen their cover
+  }
+
+  /** One AI formation's composed traits: its own commander's (while he is up) and its army commander's. */
+  traitsOf(u) {
+    const c = u && u.commander;
+    const own = c && c.name && !u.commandDown ? commanderTraits(this.game.scenario, c.name) : NO_TRAITS;
+    if (!own.length && !this.armyTraits.length) return NO_TEMPERAMENT;
+    const key = `${own.join(',')}|${this.armyTraits.join(',')}`;
+    let T = this.temperaments.get(key);
+    if (!T) { T = composeTraits([...own, ...this.armyTraits]); this.temperaments.set(key, T); }
+    return T;
+  }
+
+  /** The fallback rule (wavering, or shaken when cautious; the nearest enemy within 200 m outnumbering it, `hold` times under a hold order). */
+  retires(u, near, nd, T = this.traitsOf(u)) {
+    if (!near || !(nd < 200) || u.follow.active || !((u.lastFallback || -99) < this.game.simTime - 25)) return false;
+    if (u.state !== 'wavering' && !(T.shaken && u.state === 'shaken')) return false;
+    return near.men > u.men * (u.order.type === 'hold' ? T.hold : 1);
   }
 
   step(dt) {
@@ -110,6 +194,12 @@ export class Ai {
     const units = this.game.units;
     for (const u of units) {
       if (u.side !== this.side || !u.alive || u.state === 'routing' || u.melee || u.manual) continue;
+      const T = this.traitsOf(u);
+      if (T.pass > 1) { // slow: this formation decides every T.pass-th pass
+        const k = this.passes.get(u) ?? 0;
+        this.passes.set(u, k + 1);
+        if (k % T.pass) continue;
+      }
       const foes = units.filter((e) => e.side !== u.side && e.alive);
       let near = null, nd = Infinity;
       for (const e of foes) {
@@ -118,8 +208,8 @@ export class Ai {
         if (d < nd) { nd = d; near = e; }
       }
       const role = roleOf(u);
-      if (u.type === 'cavalry' && this.cavalryStep(u, role, near, nd)) continue;
-      if (role !== 'hold') { this.press(u, role, near, nd); continue; }
+      if (u.type === 'cavalry' && this.cavalryStep(u, role, near, nd, T)) continue;
+      if (role !== 'hold') { this.press(u, role, near, nd, T); continue; }
       if (!near) continue;
       const ahead = Math.abs(wrap(Math.atan2(near.x - u.x, near.z - u.z) - u.facing)) < 1.1;
       if (u.type === 'infantry' && u.state === 'steady' && u.order.type !== 'charge' && nd < this.chargeReach && ahead &&
@@ -128,12 +218,15 @@ export class Ai {
         continue;
       }
       if (u.order.type === 'charge') continue;
-      if (u.state === 'wavering' && nd < 200 && near.men > u.men && !u.follow.active && (u.lastFallback || -99) < this.game.simTime - 25) {
+      if (this.retires(u, near, nd, T)) {
         u.lastFallback = this.game.simTime;
         u.orderFallback(110);
         continue;
       }
-      if (this.level.counter && this.counter(u)) continue; // General: counter-attack a local breakthrough
+      // General (or a skilled defender at any level): counter-attack a local breakthrough
+      const C = this.level.counter || T.counter;
+      if (C && this.counter(u, C)) continue;
+      if (T.cover && this.seekCover(u, T.cover, near, nd)) continue; // a skilled defender takes the nearby cover once
       if (!u.follow.active && u.order.type === 'hold' && !u.order.firm && u.state !== 'wavering') {
         u.order = { type: 'hold', firm: true }; // back in position after a charge or fallback
       }
@@ -154,13 +247,13 @@ export class Ai {
   // Cavalry (see the header): pursuit, shock charges, flank attacks, dismounting to hold
 
   /** One AI cavalry regiment; true when it acted (the role's own step is skipped). */
-  cavalryStep(u, role, near, nd) {
+  cavalryStep(u, role, near, nd, T = this.traitsOf(u)) {
     if (u.order.type === 'charge' || u.switching) return true; // charging (the game steers the pursuit) or switching
     let s = null;
     if (role !== 'hold') {
       s = this.memo.get(u);
       if (!s) { s = { active: false, issued: -Infinity, via: 0 }; this.memo.set(u, s); }
-      if (!s.active) s.active = this.activates(u, role, nd);
+      if (!s.active) s.active = this.activates(u, role, nd, s, T);
       if (s.active && this.level.threat) this.committed(u, role, s);
     }
     const horse = u.mounted && !u.switching;
@@ -177,7 +270,7 @@ export class Ai {
       }
       return false;
     }
-    return this.flankAttack(u, s);
+    return this.flankAttack(u, s, T);
   }
 
   /** The routing enemy this regiment may ride down: within PURSUE_REACH, no fresh enemy within PURSUE_CLEAR of it. */
@@ -195,7 +288,7 @@ export class Ai {
   }
 
   /** An attacking regiment rides to a flank of its prey and charges from there; false with no prey in reach. */
-  flankAttack(u, s) {
+  flankAttack(u, s, T = this.traitsOf(u)) {
     const g = this.game, lim = g.terrain.half - EDGE;
     let prey = null, best = Infinity;
     for (const e of g.units) {
@@ -217,7 +310,7 @@ export class Ai {
       this.holdFace(u, prey, Math.hypot(prey.x - u.x, prey.z - u.z));
       return true;
     }
-    if (u.state === 'wavering' || g.simTime - s.issued < this.level.reissue || g.simTime - (u.lastFallback ?? -Infinity) < FALLBACK_COOL_S) return false;
+    if (u.state === 'wavering' || g.simTime - s.issued < this.level.reissue * T.reissue || g.simTime - (u.lastFallback ?? -Infinity) < FALLBACK_COOL_S * T.cool) return false;
     if (u.orderMove([[u.x, u.z], p], { endFacing: Math.atan2(prey.x - p[0], prey.z - p[1]) })) s.issued = g.simTime;
     return true;
   }
@@ -244,11 +337,14 @@ export class Ai {
     }
   }
 
-  /** Attack and reserve roles: the shared charge and fallback rules, then wait or advance. */
-  press(u, role, near, nd) {
+  /** Attack and reserve roles: the shared charge and fallback rules, then wait (for its time, or its neighbours) or advance. */
+  press(u, role, near, nd, T = this.traitsOf(u)) {
     let s = this.memo.get(u);
     if (!s) { s = { active: false, issued: -Infinity, via: 0 }; this.memo.set(u, s); }
-    if (!s.active) s.active = this.activates(u, role, nd);
+    if (!s.active) {
+      s.active = this.activates(u, role, nd, s, T);
+      if (s.active && T.wait > 0) s.waitUntil = this.game.simTime + T.wait; // methodical: coordinate with the neighbours
+    }
     if (s.active && this.level.threat) this.committed(u, role, s);
     if (near) {
       const ahead = Math.abs(wrap(Math.atan2(near.x - u.x, near.z - u.z) - u.facing)) < 1.1;
@@ -259,24 +355,40 @@ export class Ai {
       }
     }
     if (u.order.type === 'charge') return;
-    if (near && u.state === 'wavering' && nd < 200 && near.men > u.men && !u.follow.active && (u.lastFallback || -99) < this.game.simTime - 25) {
+    if (this.retires(u, near, nd, T)) {
       u.lastFallback = this.game.simTime;
       u.orderFallback(110);
       return;
     }
-    if (!s.active) { this.holdFace(u, near, nd); return; }
-    this.advance(u, s, near, nd);
+    if (!s.active || (s.waitUntil > this.game.simTime && this.neighboursPending(u))) { this.holdFace(u, near, nd); return; }
+    this.advance(u, s, near, nd, T);
   }
 
-  /** Has this unit's role begun? Attack: at `at` (at once without it). Reserve: at `at`, an enemy close, or the objective lost. */
-  activates(u, role, nd) {
+  /** Methodical: another living AI attacker or reserve sharing u's target that has not begun yet. */
+  neighboursPending(u) {
+    const key = this.targetKey(u);
+    return this.game.units.some((v) => v !== u && v.side === u.side && v.alive && v.state !== 'routing' && !v.manual && roleOf(v) !== 'hold'
+      && this.targetKey(v) === key && !this.memo.get(v)?.active);
+  }
+
+  /**
+   * Has this unit's role begun? Attack: at `at` (at once without it). Reserve: at `at`, an enemy close, or the objective lost.
+   * Traits move the times by T.start sim s (an attack without `at` can only be delayed, from its first moment on the field)
+   * and the reserve's enemy distance by T.reach.
+   */
+  activates(u, role, nd, s = null, T = this.traitsOf(u)) {
     const ai = u.def.ai, g = this.game, L = this.level;
-    const now = g.clockStart + g.simTime * g.clockRatio;
-    if (ai.at !== undefined && now >= clockSec(ai.at)) return true;
-    if (role === 'attack') return ai.at === undefined;
+    const now = g.clockStart + g.simTime * g.clockRatio, shift = T.start ? T.start * g.clockRatio : 0;
+    if (ai.at !== undefined && now >= clockSec(ai.at) + shift) return true;
+    if (role === 'attack') {
+      if (ai.at !== undefined) return false;
+      if (!(T.start > 0) || !s) return true;
+      if (s.seen === undefined) s.seen = g.simTime; // cautious: hold a while after first standing on the field
+      return g.simTime >= s.seen + T.start;
+    }
     // Recruit: only the set time (half-way through the day without one); otherwise a threat commits it too
-    if (L.reserve === 'set') return ai.at === undefined && now >= g.clockStart + (g.clockEnd - g.clockStart) * L.reserveShare;
-    return nd < L.reserveReach || g.holder === g.playerSide || (L.threat && g.holder === 'contested');
+    if (L.reserve === 'set') return ai.at === undefined && now >= g.clockStart + (g.clockEnd - g.clockStart) * L.reserveShare + shift;
+    return nd < L.reserveReach * T.reach || g.holder === g.playerSide || (L.threat && g.holder === 'contested');
   }
 
   /**
@@ -294,10 +406,11 @@ export class Ai {
   /**
    * General: a steady, unengaged holding infantry brigade attacks (fire, never a charge) the nearest breakthrough within
    * counter.range: an enemy formation inside the objective its side defends, or within counter.reach of a routing friend.
+   * A skilled defender does the same at any level with its trait's counter (the level's, when the level has one).
    */
-  counter(u) {
-    if (u.type !== 'infantry' || u.state !== 'steady' || u.follow.active || u.engaged || u.order.type === 'attack' || this.fighting(u)) return false;
-    const C = this.level.counter, g = this.game, o = g.objective, defends = (g.scenario?.attacker ?? 'US') !== u.side;
+  counter(u, C = this.level.counter) {
+    if (!C || u.type !== 'infantry' || u.state !== 'steady' || u.follow.active || u.engaged || u.order.type === 'attack' || this.fighting(u)) return false;
+    const g = this.game, o = g.objective, defends = (g.scenario?.attacker ?? 'US') !== u.side;
     let best = null, bd = C.range;
     for (const e of g.units) {
       if (e.side === u.side || !e.alive || e.state === 'routing' || e.state === 'captured') continue;
@@ -308,6 +421,29 @@ export class Ai {
       if (through) { bd = d; best = e; }
     }
     return !!best && u.orderAttack(best);
+  }
+
+  /**
+   * Skilled defender, once: a steady, unengaged holding infantry brigade with no enemy within cover.clear m moves to the best
+   * cover (Game.coverAt) among 16 points within cover.search m (two rings of eight) when it is at least cover.gain better than
+   * where it stands and no nearer the nearest enemy; it keeps its facing. True when it was ordered there.
+   */
+  seekCover(u, cover, near, nd) {
+    if (this.covered.has(u) || u.type !== 'infantry' || u.state !== 'steady' || u.follow.active || u.engaged || u.target
+      || u.order.type !== 'hold' || nd < cover.clear) return false;
+    this.covered.add(u);
+    const g = this.game, lim = g.terrain.half - EDGE, here = g.coverAt(u.x, u.z).value;
+    let best = null, value = here + cover.gain - 1e-9;
+    for (const r of [cover.search / 2, cover.search]) {
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2, x = u.x + Math.sin(a) * r, z = u.z + Math.cos(a) * r;
+        if (Math.abs(x) > lim || Math.abs(z) > lim || (g.terrain.inBounds && !g.terrain.inBounds(x, z))) continue;
+        if (near && Math.hypot(near.x - x, near.z - z) < nd) continue; // never toward the enemy
+        const v = g.coverAt(x, z).value;
+        if (v > value) { value = v; best = [x, z]; }
+      }
+    }
+    return !!best && u.orderMove([[u.x, u.z], best], { endFacing: u.facing });
   }
 
   /** How far a battery stands from what it shoots at (its effective range). */
@@ -332,7 +468,7 @@ export class Ai {
   }
 
   /** The active attacker: march on (re-issued when stopped short), or hold and press once arrived. */
-  advance(u, s, near, nd) {
+  advance(u, s, near, nd, T = this.traitsOf(u)) {
     const g = this.game, o = g.objective;
     const r = this.route(u);
     while (s.via < r.via.length && Math.hypot(r.via[s.via][0] - u.x, r.via[s.via][1] - u.z) < VIA_PASSED) s.via++;
@@ -355,8 +491,8 @@ export class Ai {
       this.holdFace(u, near, nd);
       return;
     }
-    if (u.state === 'wavering' || this.fighting(u) || g.simTime - s.issued < this.level.reissue
-        || g.simTime - (u.lastFallback ?? -Infinity) < FALLBACK_COOL_S) { this.holdFace(u, near, nd); return; }
+    if (u.state === 'wavering' || this.fighting(u) || g.simTime - s.issued < this.level.reissue * T.reissue
+        || g.simTime - (u.lastFallback ?? -Infinity) < FALLBACK_COOL_S * T.cool) { this.holdFace(u, near, nd); return; }
     const pts = [[u.x, u.z], ...r.via.slice(s.via)];
     let end = r.aim;
     if (u.type === 'artillery') {

@@ -24,6 +24,11 @@
 // Feedback readability (DECISIONS 0109): the event feed and toasts sit on the field without a box (a translucent backing
 // behind each row's text only, a text shadow); the feed shows its 3 newest rows and scrolls to the newest (older ones
 // scroll up out of view, still reachable by keyboard, wheel and touch); toasts keep at most 3, below the objective line.
+// Temperament (P3t; assets/traits.json via src/ui/briefing.js): in a phase whose data gives commanders traits, an enemy
+// formation's card shows its own commander's traits (while he is up) and its army commander's as plain labels, the game rule
+// they drive and each man's provenance, with a record note where one is part of his record (Chalmers at Fort Pillow);
+// "Records and sources" opens a dialog (keyboard: Esc or Close returns focus; the battle pauses while it is open) with each
+// trait's claim and its opened sources as links. The enemy flag's tooltip names the traits too.
 
 import * as THREE from 'three';
 import { LOOK } from './look.js';
@@ -32,6 +37,7 @@ import { Minimap } from './minimap.js';
 import { BADGE_BY_ID, TIER_NAMES, campEffectLines } from '../franchise/badges.js';
 import { openSettings } from './settings-panel.js';
 import { loadArt, portraitArt, genericPortrait, portraitLine } from './art.js';
+import { loadTraits, formationTraits, traitRuleLine, traitDetails, commanderTitle } from './briefing.js';
 
 const $ = (id) => document.getElementById(id);
 const _v = new THREE.Vector3();
@@ -171,7 +177,7 @@ export const coverWord = (v) => (v >= 1.5 ? 'strong' : v >= 1.3 ? 'good' : 'ligh
 export const minutesText = (m) => (m < 1 ? 'under a minute' : `${Math.round(m)} min`);
 
 const titled = (rank, name) => (rank ? `${rank} ${name}` : name);
-const rankShort = (r) => ({ 'Brigadier General': 'Brig. Gen.', Colonel: 'Col.', Captain: 'Capt.', Lieutenant: 'Lt.', 'First Lieutenant': '1st Lt.', Major: 'Maj.' }[r] || r || '');
+const rankShort = (r) => ({ General: 'Gen.', 'Major General': 'Maj. Gen.', 'Brigadier General': 'Brig. Gen.', Colonel: 'Col.', Captain: 'Capt.', Lieutenant: 'Lt.', 'First Lieutenant': '1st Lt.', Major: 'Maj.' }[r] || r || '');
 const commanderLine = (u) => (u.commander && u.commander.name ? `${rankShort(u.commander.rank)} ${u.commander.name}`.trim() : '');
 /** The card's name line: the commander, or his successor once he is down (generic unless sourced). */
 function cardWho(u) {
@@ -310,6 +316,114 @@ export class Hud {
     this.applyMarkerScale(LOOK.markerScale);
     onSetting('look.markerScale', (v) => this.applyMarkerScale(v));
     this.buildCommand();
+    this.buildTraits();
+  }
+
+  /** Temperament (P3t): the card's traits block and its data, only in a phase whose data gives commanders traits. */
+  buildTraits() {
+    this.traitData = null;
+    this.traitsKey = null;
+    this.traitsPaused = false;
+    const s = this.game && this.game.scenario;
+    if (!s || !s.commanderTraits || typeof s.commanderTraits !== 'object' || !Object.keys(s.commanderTraits).length) return;
+    const body = $('uc-body');
+    if (body && !$('uc-traits')) {
+      const box = document.createElement('div');
+      box.id = 'uc-traits'; box.className = 'uctraits'; box.hidden = true;
+      body.insertBefore(box, $('uc-regiments') || body.querySelector('.ucdelegate'));
+    }
+    loadTraits().then((data) => {
+      this.traitData = data; this.traitsKey = null;
+      if (this.selected) this.fillTraits(this.selected);
+    }).catch((e) => console.warn('commander traits unavailable:', e?.message ?? e));
+  }
+
+  /** An enemy formation's traits as shown ({ own, army }, either null), or null for a friend or a formation without any. */
+  unitTraits(u) {
+    if (!u || !this.traitData || !this.game || u.side === this.playerSide) return null;
+    const t = formationTraits(this.traitData, this.game.scenario, u);
+    return t.own || t.army ? t : null;
+  }
+
+  /** The card's traits block for u: a row per man (labels, provenance), the game rule, a record note, Records and sources. */
+  fillTraits(u) {
+    const box = $('uc-traits');
+    if (!box) return;
+    const t = this.unitTraits(u);
+    const key = t ? `${u.id}|${t.own ? t.own.name : ''}|${t.army ? t.army.name : ''}` : '';
+    if (key === this.traitsKey) return;
+    this.traitsKey = key;
+    box.replaceChildren();
+    box.hidden = !t;
+    if (!t) return;
+    const make = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+    for (const [who, e] of [['own', t.own], ['army', t.army]]) {
+      if (!e) continue;
+      const row = make('p', 'uct-row');
+      row.dataset.who = who;
+      row.append(make('span', 'uct-who', `${who === 'army' ? 'Army: ' : ''}${commanderTitle(e)}`));
+      for (const tr of e.traits) {
+        const chip = make('span', 'uct-chip', tr.label);
+        chip.dataset.trait = tr.key; chip.title = tr.effect;
+        row.append(' ', chip);
+      }
+      row.append(' ', make('span', 'uct-prov', `Provenance: ${e.provenance || 'not given'}`));
+      box.append(row);
+    }
+    const rule = traitRuleLine([t.own, t.army]);
+    if (rule) box.append(make('p', 'uct-rule', rule));
+    for (const e of [t.own, t.army]) if (e && e.note && e.note.kind === 'record') box.append(make('p', 'uct-note', e.note.text));
+    const more = make('button', 'uct-more', 'Records and sources');
+    more.type = 'button'; more.id = 'uc-traits-more';
+    more.setAttribute('aria-haspopup', 'dialog');
+    more.title = 'Each trait\'s claim from the man\'s record and the sources behind it (the battle pauses while it is open)';
+    more.addEventListener('click', (ev) => this.openTraits(ev.currentTarget));
+    box.append(more);
+  }
+
+  /** The Records dialog for the selected enemy formation: each man's traits, game rules, claims and sources (links). */
+  openTraits(trigger = document.activeElement) {
+    const u = this.selected, t = this.unitTraits(u);
+    if (!t) return null;
+    let d = $('traits-dialog');
+    if (!d) {
+      d = document.createElement('dialog');
+      d.id = 'traits-dialog'; d.setAttribute('aria-labelledby', 'traits-title');
+      d.addEventListener('close', () => {
+        if (this.traitsPaused && this.game && this.game.paused) this.game.togglePause();
+        this.traitsPaused = false;
+        const back = this.traitsTrigger;
+        this.traitsTrigger = null;
+        const target = back && back.isConnected && !back.closest('[hidden]') && back.getClientRects().length ? back : this.canvas;
+        target?.focus({ preventScroll: true });
+      });
+      document.body.append(d);
+    }
+    const title = document.createElement('h2');
+    title.id = 'traits-title'; title.tabIndex = -1; title.textContent = `${u.short}: the commanders' records`;
+    const sub = document.createElement('p');
+    sub.className = 'sub';
+    sub.textContent = 'Each trait comes from the man\'s documented record: the claim and the opened sources behind it. What it makes the enemy do is a game rule.';
+    const close = document.createElement('button');
+    close.type = 'button'; close.id = 'traits-close'; close.textContent = 'Close';
+    close.addEventListener('click', () => d.close());
+    d.replaceChildren(title, sub, ...[t.own, t.army].filter(Boolean).map((e) => traitDetails(e, document, 'h3')), close);
+    this.closeDelegate(null, false);
+    this.rts?.keys.clear();
+    if (this.rts) this.rts.inertia = null;
+    this.traitsTrigger = trigger;
+    if (this.game && !this.game.paused) { this.game.togglePause(); this.traitsPaused = true; }
+    d.showModal();
+    title.focus({ preventScroll: true });
+    return d;
+  }
+
+  /** The enemy flag tooltip's words for its commanders' traits ('' without). */
+  traitTip(u) {
+    const t = this.unitTraits(u);
+    if (!t) return '';
+    const words = (e) => e.traits.map((x) => x.label).join(', ');
+    return `${t.own ? ` Commander: ${words(t.own)}.` : ''}${t.army ? ` Army commander ${t.army.name}: ${words(t.army)}.` : ''}`;
   }
 
   /** The Settings button in the strip, "All settings" in the menu, and the O key in the help sheet. */
@@ -629,6 +743,7 @@ export class Hud {
     if (empty) { const text = general ? this.generalText(general) : this.emptyText; if (empty.textContent !== text) empty.textContent = text; }
     this.fillRegiments(u);
     this.fillBadges(u);
+    this.fillTraits(u);
     this.hideRegimentTip('card');
     if (!u) {
       this.updateOrders();
@@ -724,6 +839,7 @@ export class Hud {
       camp.hidden = !text;
     }
     $('uc-state').textContent = `${intention(u).replace(/^[^:]*: /, '')}${u.coverKind && u.coverKind !== 'open' ? ` In ${u.coverKind}.` : ''}`;
+    if (this.traitData) this.fillTraits(u); // his own traits leave the card once he is down
   }
 
   /** The text label beside the ghost while an order is drawn: { text, x, z } or null (ui/input.js). */
@@ -828,7 +944,7 @@ export class Hud {
     for (const u of this.units) {
       const m = this.markers.get(u.id);
       if (!m || !u.alive) continue;
-      const tip = intention(u) + (u.commandDown ? ' Commander down.' : '');
+      const tip = intention(u) + (u.commandDown ? ' Commander down.' : '') + (this.traitData ? this.traitTip(u) : '');
       if (tip !== m.lastTip) {
         m.el.title = tip;
         m.el.setAttribute('aria-label', `${tip}${u.selected ? ' Selected.' : ''}`);

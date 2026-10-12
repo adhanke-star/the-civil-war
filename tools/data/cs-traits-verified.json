@@ -1,0 +1,669 @@
+{
+ "commanders": [
+  {
+   "name": "Albert Sidney Johnston",
+   "traits": [
+    "aggressive",
+    "reckless"
+   ],
+   "evidence": [
+    {
+     "trait": "aggressive",
+     "claim": "Johnston planned and launched the 6 April 1862 attack on Grant at Pittsburg Landing, intending to strike a day earlier before rain delayed him, to beat Buell's arrival.",
+     "sources": [
+      {
+       "title": "American Battlefield Trust: Albert Sidney Johnston",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/biographies/albert-sidney-johnston",
+       "page": "web page, no pagination",
+       "quote": "Johnston intended to attack Grant on April 5, 1862, but he was held back by heavy rains."
+      },
+      {
+       "title": "American Battlefield Trust: Shiloh Battle Facts and Summary",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/civil-war/battles/shiloh",
+       "page": "web page, no pagination",
+       "quote": "plan to smash Grant's army at Pittsburg Landing before Buell can arrive with more Union troops."
+      },
+      {
+       "title": "The Battle of Shiloh, Civil War Series, section 'The Confederate Advance'",
+       "author": "National Park Service, Civil War Series (hosted at npshistory.com)",
+       "url": "https://npshistory.com/publications/civil_war_series/22/sec3.htm",
+       "page": "section: The Confederate Advance (no page numbers online)",
+       "quote": "I would fight them if they were a million"
+      }
+     ]
+    },
+    {
+     "trait": "reckless",
+     "claim": "Johnston was hit behind the right knee and bled to death on 6 April 1862 while forward of his main line. ABT says he rode ahead of / too far ahead of his troops; NPS says he was personally directing reserves. The 'tourniquet in pocket' detail is in both ABT and NPS; the 'sent his surgeon away' detail was NOT found in any opened source and is dropped.",
+     "sources": [
+      {
+       "title": "American Battlefield Trust: Albert Sidney Johnston",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/biographies/albert-sidney-johnston",
+       "page": "web page, no pagination",
+       "quote": "Johnston was shot in the leg when he rode too far ahead of his troops."
+      },
+      {
+       "title": "American Battlefield Trust: Shiloh, April 6, 1862 (map page)",
+       "author": "American Battlefield Trust",
+       "url": "https://battlefields.org/learn/maps/shiloh-april-6-1862-day-one",
+       "page": "web page, no pagination",
+       "quote": "General Albert S. Johnston was shot in the right knee as he rode ahead of his troops"
+      },
+      {
+       "title": "Death of Albert Sidney Johnston, Tour Stop 17",
+       "author": "National Park Service, Shiloh NMP",
+       "url": "https://www.nps.gov/places/death-of-albert-sidney-johnston-tour-stop-17.htm",
+       "page": "web page, no pagination",
+       "quote": "While personally directing his reserves, he was struck behind the right knee by a Minie ball, which cut the large artery."
+      }
+     ]
+    }
+   ],
+   "provenance": "Disputed",
+   "provenance_note": "'aggressive' is Verified (3 opened sources, 2 independent organisations). 'reckless' is a judgment: both ABT pages (same organisation, so not independent) say he rode ahead of his troops; NPS frames the same moment as directing reserves. Behaviour agreed, label contested. Suggest the game text say 'led from the front' rather than 'reckless'.",
+   "dropped": [
+    {
+     "trait": "(claim detail) sent his own surgeon away to tend wounded",
+     "why": "Appears only in secondary/Wikipedia-derived pages; no opened ABT/NPS/Handbook page states it. Removed from the claim text."
+    }
+   ]
+  },
+  {
+   "name": "Braxton Bragg",
+   "traits": [
+    "aggressive",
+    "stubborn"
+   ],
+   "evidence": [
+    {
+     "trait": "aggressive",
+     "claim": "Bragg demanded the Perryville attack on 8 Oct 1862 on arriving at the field, and his plan opened Stones River with a dawn attack by Hardee's corps on 31 Dec 1862.",
+     "sources": [
+      {
+       "title": "American Battlefield Trust: The Battle of Perryville, Then and Now",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/articles/battle-perryville-then-now",
+       "page": "web page, no pagination",
+       "quote": "a furious Bragg demanded an attack, still unaware that Buell's entire army was arriving in Perryville."
+      },
+      {
+       "title": "The Battle of Stones River, Civil War Series, section 'Collapse of the Union Right'",
+       "author": "National Park Service, Civil War Series (hosted at npshistory.com)",
+       "url": "https://npshistory.com/publications/civil_war_series/23/sec4.htm",
+       "page": "section: Collapse of the Union Right; photo caption",
+       "quote": "At dawn on December 31, 1862, Hardee's Corps of Confederates surprised the Union right at breakfast and drove McCook's troops back nearly a mile"
+      },
+      {
+       "title": "American Battlefield Trust: Braxton Bragg",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/biographies/braxton-bragg",
+       "page": "web page, no pagination",
+       "quote": "frustrated with Bragg's poor temper and combative personality."
+      }
+     ]
+    },
+    {
+     "trait": "stubborn",
+     "claim": "On 2 Jan 1863 Bragg ordered Breckinridge's afternoon assault over Breckinridge's stated objection; it lost over 1,800 men in 45 minutes. A Tennessee reference calls him inflexible. CORRECTION: the earlier claim that he held on 3 Jan against his corps commanders' advice is refuted by the NPS series ('most of Bragg's lieutenants ... approved of the retreat'); that clause is removed.",
+     "sources": [
+      {
+       "title": "The Battle of Stones River, Civil War Series, section 'New Year's Interlude' / Jan 2",
+       "author": "National Park Service, Civil War Series (hosted at npshistory.com)",
+       "url": "https://npshistory.com/publications/civil_war_series/23/sec9.htm",
+       "page": "section on 2 January 1863 (no page numbers online)",
+       "quote": "this attack is made against my judgment, and by the special order of General Bragg."
+      },
+      {
+       "title": "Breckinridge's Charge",
+       "author": "National Park Service, Stones River NB",
+       "url": "https://www.nps.gov/stri/historyculture/breckinridge.htm",
+       "page": "web page, no pagination",
+       "quote": "Breckinridge reluctantly launched the attack with all five of his brigades at 4 PM."
+      },
+      {
+       "title": "Bragg, Braxton",
+       "author": "Tennessee Encyclopedia (Tennessee Historical Society)",
+       "url": "https://tennesseeencyclopedia.net/entries/braxton-bragg/",
+       "page": "web page, no pagination",
+       "quote": "Bragg contributed mightily to the enmity by his tactlessness, inflexibility, and vindictiveness."
+      },
+      {
+       "title": "In His Own Words: John C. Breckinridge and the Battle of Stones River (quotes his OR report)",
+       "author": "Western Theater Civil War",
+       "url": "https://www.westerntheatercivilwar.com/post/in-his-own-words-john-c-breckinridge-and-the-battle-of-stones-river",
+       "page": "web page, no pagination",
+       "quote": "we were commanded to do an impossible thing"
+      }
+     ]
+    }
+   ],
+   "provenance": "Verified",
+   "provenance_note": "Bragg's 'stubborn' rests on the Jan 2 order plus the Tennessee Encyclopedia's characterisation; ABT's own page does not use the word.",
+   "dropped": [
+    {
+     "trait": "(claim detail) held at Murfreesboro through 3 Jan against corps commanders' advice",
+     "why": "Refuted by NPS Stones River series section 'A Hard-Earned Victory': Bragg decided to withdraw at 10 A.M. on 3 Jan and most lieutenants approved."
+    }
+   ]
+  },
+  {
+   "name": "Leonidas Polk",
+   "traits": [
+    "slow",
+    "cautious"
+   ],
+   "evidence": [
+    {
+     "trait": "slow",
+     "claim": "At Chickamauga on 20 Sept 1863 the planned dawn attack on the Confederate right did not go in until about 9:30 A.M. Bragg accused Polk (commanding the right wing) of 'critically delaying orders'; NPS attributes the delay to miscommunication, so the delay is agreed and the blame is disputed.",
+     "sources": [
+      {
+       "title": "American Battlefield Trust: Leonidas Polk",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/biographies/leonidas-polk",
+       "page": "web page, no pagination",
+       "quote": "Braxton Bragg again accused Polk of disregarding and critically delaying orders while in command of roughly half of the army."
+      },
+      {
+       "title": "Chickamauga, Civil War Series, section 20 September",
+       "author": "National Park Service, Civil War Series (hosted at npshistory.com)",
+       "url": "https://npshistory.com/publications/civil_war_series/10/sec6.htm",
+       "page": "caption and text, 20 Sept (no page numbers online)",
+       "quote": "Polk's wing did not attack until 9:30 A.M."
+      },
+      {
+       "title": "Polk, Leonidas",
+       "author": "Tennessee Encyclopedia",
+       "url": "https://tennesseeencyclopedia.net/entries/leonidas-polk/",
+       "page": "web page, no pagination",
+       "quote": "At Chickamauga Bragg relieved Polk of command, had him transferred to Mississippi, and ordered him court-martialed for disobeying orders."
+      },
+      {
+       "title": "Polk, Leonidas (Dictionary of North Carolina Biography)",
+       "author": "NCpedia / UNC Press",
+       "url": "https://www.ncpedia.org/biography/polk-leonidas",
+       "page": "web page, no pagination",
+       "quote": "Polk's actions at Chickamauga were open to criticism but hardly justified Bragg's demand for a court-martial."
+      }
+     ]
+    },
+    {
+     "trait": "cautious",
+     "claim": "At Perryville on 8 Oct 1862, meeting a larger force than expected, Polk fell back to a defensive line and then delayed the attack while shifting north until 2 P.M.; Bragg criticised him for not attacking when ordered.",
+     "sources": [
+      {
+       "title": "American Battlefield Trust: The Battle of Perryville, Then and Now",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/articles/battle-perryville-then-now",
+       "page": "web page, no pagination",
+       "quote": "Polk continued to delay while shifting his men farther and farther north."
+      },
+      {
+       "title": "Polk, Leonidas",
+       "author": "Tennessee Encyclopedia",
+       "url": "https://tennesseeencyclopedia.net/entries/leonidas-polk/",
+       "page": "web page, no pagination",
+       "quote": "Bragg, who criticized him for not attacking the Union forces when ordered."
+      },
+      {
+       "title": "American Battlefield Trust: Leonidas Polk",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/biographies/leonidas-polk",
+       "page": "web page, no pagination",
+       "quote": "Bad blood developed between Polk and his superior officer, Braxton Bragg, due to Polk's refusal to follow orders during the Perryville Campaign."
+      }
+     ]
+    }
+   ],
+   "provenance": "Verified",
+   "provenance_note": "Behaviour (delay, not attacking when ordered) is agreed by all sources; cause and blame are Bragg's accusation vs NPS's miscommunication account. Game text should describe the delay, not assert disobedience. Note ABT also credits Polk's corps with taking the Round Forest twice (TN Encyclopedia) and 'dogged fighting' (NCpedia).",
+   "dropped": [
+    {
+     "trait": "(claim detail) found at a house, not at his lines",
+     "why": "Not in any opened source."
+    },
+    {
+     "trait": "(claim detail) Bragg 'suspended' Polk",
+     "why": "Sources say relieved of command / transferred to Mississippi, not suspended."
+    }
+   ]
+  },
+  {
+   "name": "Patrick R. Cleburne",
+   "traits": [
+    "aggressive",
+    "skilled-defender"
+   ],
+   "evidence": [
+    {
+     "trait": "aggressive",
+     "claim": "His men spearheaded Hardee's 31 Dec 1862 attack on the Union right at Stones River (Bragg praised the division); he stayed in command at Perryville despite two wounds; he was killed leading the assault on the Franklin breastworks on 30 Nov 1864.",
+     "sources": [
+      {
+       "title": "American Battlefield Trust: Patrick R. Cleburne",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/biographies/patrick-cleburne",
+       "page": "web page, no pagination",
+       "quote": "Cleburne and his division earned the praise of General Braxton Bragg for their incredible skill and valor."
+      },
+      {
+       "title": "Cleburne, Patrick Ronayne",
+       "author": "Tennessee Encyclopedia",
+       "url": "https://tennesseeencyclopedia.net/?p=588",
+       "page": "web page, no pagination",
+       "quote": "Cleburne's men spearheaded Hardee's attack on the Union right, driving the Federal line back three miles"
+      },
+      {
+       "title": "Patrick Ronayne Cleburne (1828-1864)",
+       "author": "Encyclopedia of Arkansas (CALS)",
+       "url": "https://encyclopediaofarkansas.net/entries/Patrick-Ronayne-Cleburne-339",
+       "page": "web page, no pagination",
+       "quote": "Cleburne died while leading a charge on the Union breastworks on November 30, 1864, in Franklin, Tennessee."
+      },
+      {
+       "title": "American Battlefield Trust: Patrick R. Cleburne",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/biographies/patrick-cleburne",
+       "page": "web page, no pagination",
+       "quote": "During the October 1862 battle at Perryville he was wounded again - twice, yet stayed in command during the battle."
+      }
+     ]
+    },
+    {
+     "trait": "skilled-defender",
+     "claim": "At Tunnel Hill (25 Nov 1863) his division anchored the line and beat the assaults; at Ringgold Gap (27 Nov) it held back a much larger force as rearguard.",
+     "sources": [
+      {
+       "title": "Cleburne, Patrick Ronayne",
+       "author": "Tennessee Encyclopedia",
+       "url": "https://tennesseeencyclopedia.net/?p=588",
+       "page": "web page, no pagination",
+       "quote": "Cleburne's division anchored the Confederate line on Missionary Ridge around Tunnel Hill."
+      },
+      {
+       "title": "Patrick Ronayne Cleburne (1828-1864)",
+       "author": "Encyclopedia of Arkansas (CALS)",
+       "url": "https://encyclopediaofarkansas.net/entries/Patrick-Ronayne-Cleburne-339",
+       "page": "web page, no pagination",
+       "quote": "his division made a stand at Ringgold Gap, Georgia, as the rearguard protecting the retreating Confederate army."
+      },
+      {
+       "title": "American Battlefield Trust: Patrick R. Cleburne",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/biographies/patrick-cleburne",
+       "page": "web page, no pagination",
+       "quote": "Cleburne had defeated every assault against his men eventually charging his attackers."
+      }
+     ]
+    }
+   ],
+   "provenance": "Verified",
+   "provenance_note": "Arkansas entry gives '4,000 men held back 15,000' at Ringgold; Tennessee Encyclopedia gives 5,500 vs 15,000 at Tunnel Hill. Numbers differ by source; do not hard-code them. Stones River exhaustion note: NPS series quotes Cleburne that exhaustion, not Union fire, ended the advance.",
+   "dropped": []
+  },
+  {
+   "name": "James R. Chalmers",
+   "traits": [
+    "impetuous",
+    "aggressive"
+   ],
+   "evidence": [
+    {
+     "trait": "impetuous",
+     "claim": "At Munfordville on 14 Sept 1862 Chalmers acted without orders from Bragg, believed the garrison was retreating when a church was burned, attacked the forts and was repulsed with about 288 casualties.",
+     "sources": [
+      {
+       "title": "American Battlefield Trust: Munfordville Battle Facts and Summary",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/civil-war/battles/munfordville",
+       "page": "web page, no pagination",
+       "quote": "Acting without orders from Bragg, Chalmers moved his command towards the Federal garrison from Cave City."
+      },
+      {
+       "title": "James Ronald Chalmers",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/biographies/james-ronald-chalmers",
+       "page": "web page, no pagination",
+       "quote": "he acted without orders and changed the Confederate battle plans."
+      },
+      {
+       "title": "Battle Detail: Munfordville (CWSAC)",
+       "author": "National Park Service, Civil War Sites Advisory Commission",
+       "url": "https://www.nps.gov/civilwar/search-battles-detail.htm?battleCode=ky008",
+       "page": "web page, no pagination",
+       "quote": "Union forces repulsed Chalmers's attacks on the 14th."
+      },
+      {
+       "title": "Confederate capture of Munfordville, Kentucky, 13-17 September 1862",
+       "author": "Rickard, historyofwar.org",
+       "url": "https://www.historyofwar.org/articles/battles_munfordville.html",
+       "page": "web page, no pagination",
+       "quote": "Still unaware of the real size of the Union garrison, Chalmers now attacked the town, suffering a serious repulse"
+      }
+     ]
+    },
+    {
+     "trait": "aggressive",
+     "claim": "On 31 Dec 1862 his 2,000 Mississippians made the first attack on the Round Forest and 'fell in windrows'; he was knocked unconscious there by a shell.",
+     "sources": [
+      {
+       "title": "The Battle of Stones River, Civil War Series, section 'Redundant Slaughter in the Round Forest'",
+       "author": "National Park Service, Civil War Series (hosted at npshistory.com)",
+       "url": "https://npshistory.com/publications/civil_war_series/23/sec7.htm",
+       "page": "section: Redundant Slaughter in the Round Forest",
+       "quote": "The first challenge to the Round Forest salient came from Brigadier General James Chalmers's 2,000 Mississippians at 9:00 A.M."
+      },
+      {
+       "title": "James Ronald Chalmers",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/biographies/james-ronald-chalmers",
+       "page": "web page, no pagination",
+       "quote": "his brigade saw action at the Battle of Stones River around the 'Round Forest,' where he was knocked unconscious by an artillery shell."
+      }
+     ]
+    }
+   ],
+   "provenance": "Verified",
+   "provenance_note": "The NPS people page dates Munfordville to November 1862; every other source says 14-17 Sept 1862 (NPS page is wrong on the date). MUST-INCLUDE note for the game: NPS says Chalmers 'commanded the Confederate force on the field in the attack on Fort Pillow, Tennessee, which ended with a massacre of surrender[ed] Federal African American soldiers' (nps.gov/people/james-ronald-chalmers.htm); the NPS Civil War Sites battle page says 'Many accused the Confederates of perpetrating a massacre ... and that controversy continues today'. The Shiloh part of the earlier aggressive claim is not supported by an opened source with detail and is dropped.",
+   "dropped": [
+    {
+     "trait": "(claim detail) Shiloh: led brigade into strong positions",
+     "why": "Opened sources only say he 'fought at the Battle of Shiloh' (NPS) / action on the Confederate right (ABT); no conduct detail."
+    },
+    {
+     "trait": "(claim detail) Bragg praised his brigade in Munfordville report; Munfordville drew Bragg into an unplanned siege",
+     "why": "Not found in any opened source (Bragg's 'unauthorized and injudicious' quote appears only in search snippets, OR text not opened)."
+    }
+   ]
+  },
+  {
+   "name": "Edward C. Walthall",
+   "traits": [
+    "stubborn",
+    "skilled-defender"
+   ],
+   "evidence": [
+    {
+     "trait": "stubborn",
+     "claim": "Walthall, wounded, kept the field at Missionary Ridge until the army was across Chickamauga Creek, and held Resaca two days under attack. Source is a 1907 Mississippi-centred, laudatory text; no second source states persistence.",
+     "sources": [
+      {
+       "title": "Encyclopedia of Mississippi History, 'Walthall, Edward Cary' (Dunbar Rowland, 1907; transcription, Wayback copy of sites.rootsweb.com/~mscivilw/walthall.htm)",
+       "author": "Dunbar Rowland (ed.), Encyclopedia of Mississippi History, vol. 2",
+       "url": "https://web.archive.org/web/2020/https://sites.rootsweb.com/~mscivilw/walthall.htm",
+       "page": "Walthall entry (page not shown in transcription)",
+       "quote": "Walthall, though painfully wounded, kept the field, held the enemy in check, and when the army was safe across the Chickamauga was lifted from his saddle"
+      }
+     ]
+    },
+    {
+     "trait": "skilled-defender",
+     "claim": "He commanded the infantry rearguard (eight brigades' fragments) that, with Forrest's cavalry, covered Hood's retreat from Nashville in Dec 1864. At Lookout Mountain (24 Nov 1863) his ~1,500 men were pushed back by Hooker's ~10,000; sources agree the position was lost, so only the rearguard role is kept as the supported claim.",
+     "sources": [
+      {
+       "title": "Nashville, Battle of",
+       "author": "Tennessee Encyclopedia",
+       "url": "https://tennesseeencyclopedia.net/entries/battle-of-nashville/",
+       "page": "web page, no pagination",
+       "quote": "Nathan Bedford Forrest's cavalry and infantry fragments from eight brigades led by General Edward C. Walthall covered the withdrawal."
+      },
+      {
+       "title": "Encyclopedia of Mississippi History, 'Walthall, Edward Cary' (1907)",
+       "author": "Dunbar Rowland (ed.)",
+       "url": "https://web.archive.org/web/2020/https://sites.rootsweb.com/~mscivilw/walthall.htm",
+       "page": "Walthall entry",
+       "quote": "on the retreat he commanded the flower of the army, eight brigades forming the infantry rearguard, to cooperate with Forrest's cavalry."
+      },
+      {
+       "title": "Cravens House (Lookout Mountain)",
+       "author": "National Park Service, Chickamauga & Chattanooga NMP",
+       "url": "https://www.nps.gov/places/cravenshouselom.htm",
+       "page": "web page, no pagination",
+       "quote": "attacking Confederate General Edward C. Walthall's brigade of 1,500 Mississippians. By early afternoon, the Confederates had been pushed back beyond the house."
+      }
+     ]
+    }
+   ],
+   "provenance": "Inferred",
+   "provenance_note": "'skilled-defender' has two independent opened sources (rearguard) but Lookout Mountain shows an overrun position; 'stubborn' has one opened source (1907 Rowland). Overall Inferred. The earlier msgw.org page failed (expired certificate); the Rowland text was read via an archive.org copy of the rootsweb transcription.",
+   "dropped": [
+    {
+     "trait": "(claim detail) Cozzens, Shipwreck of Their Hopes cited",
+     "why": "Book not opened; removed."
+    }
+   ]
+  },
+  {
+   "name": "William J. Hardee",
+   "traits": [
+    "methodical",
+    "aggressive"
+   ],
+   "evidence": [
+    {
+     "trait": "methodical",
+     "claim": "Hardee wrote Rifle and Light Infantry Tactics (1855), the standard infantry manual of both armies, and 'trained his soldiers thoroughly'; he was a firm disciplinarian and nicknamed 'Old Reliable'. The earlier claim about an 'orderly corps at Shiloh/Perryville/Stones River' is not supported in these terms; the supported claim is authorship plus training.",
+     "sources": [
+      {
+       "title": "American Battlefield Trust: William J. Hardee",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/biographies/william-j-hardee",
+       "page": "web page, no pagination",
+       "quote": "one of the most widely used infantry tactics books of the Civil War, called Rifle and Light Infantry Tactics (1853-1855), or more commonly Hardee's Tactics."
+      },
+      {
+       "title": "William J. Hardee (1815-1873)",
+       "author": "New Georgia Encyclopedia (Susan Copeland)",
+       "url": "https://www.georgiaencyclopedia.org/articles/government-politics/william-j-hardee-1815-1873",
+       "page": "web page, no pagination",
+       "quote": "He trained his soldiers thoroughly, and their success in battles earned him the nickname 'Old Reliable.'"
+      },
+      {
+       "title": "William Joseph Hardee (1815-1873)",
+       "author": "Encyclopedia of Arkansas (CALS)",
+       "url": "https://encyclopediaofarkansas.net/entries/William-Joseph-Hardee-5771",
+       "page": "web page, no pagination",
+       "quote": "William Joseph Hardee, known as 'Old Reliable,' was one of the finest corps commanders in the Confederate army."
+      }
+     ]
+    },
+    {
+     "trait": "aggressive",
+     "claim": "On 31 Dec 1862 Hardee's corps opened the dawn surprise attack on the Union right at Stones River, driving McCook back nearly a mile by 8 A.M.",
+     "sources": [
+      {
+       "title": "American Battlefield Trust: William J. Hardee",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/biographies/william-j-hardee",
+       "page": "web page, no pagination",
+       "quote": "led with great success at the Battle of Stones River, where his surprise attack against union troops under William S. Rosecrans helped turn the battle."
+      },
+      {
+       "title": "The Battle of Stones River, Civil War Series, section 'Collapse of the Union Right'",
+       "author": "National Park Service, Civil War Series (hosted at npshistory.com)",
+       "url": "https://npshistory.com/publications/civil_war_series/23/sec4.htm",
+       "page": "photo caption",
+       "quote": "At dawn on December 31, 1862, Hardee's Corps of Confederates surprised the Union right at breakfast and drove McCook's troops back nearly a mile by 8 A.M."
+      },
+      {
+       "title": "Cleburne, Patrick Ronayne",
+       "author": "Tennessee Encyclopedia",
+       "url": "https://tennesseeencyclopedia.net/?p=588",
+       "page": "web page, no pagination",
+       "quote": "Cleburne's men spearheaded Hardee's attack on the Union right"
+      }
+     ]
+    }
+   ],
+   "provenance": "Verified",
+   "provenance_note": "'methodical' is a label inferred from the manual and training record (sources never use the word). Hardee's own Perryville report (perryvillebattlefield.org/html/report-49-cs-hardee.html, an OR transcription) shows him advancing on Bragg's order and praising Cleburne; not needed for either trait.",
+   "dropped": []
+  },
+  {
+   "name": "Benjamin F. Cheatham",
+   "traits": [
+    "aggressive",
+    "impetuous"
+   ],
+   "evidence": [
+    {
+     "trait": "aggressive",
+     "claim": "Cheatham's actions at Belmont (Nov 1861) won promotion; his division opened the main Perryville attack (2 P.M., 8 Oct 1862) and carried repeated attacks at Stones River on 31 Dec 1862.",
+     "sources": [
+      {
+       "title": "Cheatham, Benjamin Franklin",
+       "author": "Tennessee Encyclopedia",
+       "url": "https://tennesseeencyclopedia.net/entries/benjamin-franklin-cheatham/",
+       "page": "web page, no pagination",
+       "quote": "His actions at Belmont in November 1861 won him a promotion to major general in March 1862."
+      },
+      {
+       "title": "American Battlefield Trust: The Battle of Perryville, Then and Now",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/articles/battle-perryville-then-now",
+       "page": "web page, no pagination",
+       "quote": "The attack finally began at 2 P. M., with Benjamin Franklin Cheatham's division attempting to seize the presumably open Union left"
+      },
+      {
+       "title": "Hardee's report, Perryville (Official Records transcription, Report No. 49)",
+       "author": "W. J. Hardee / perryvillebattlefield.org",
+       "url": "https://perryvillebattlefield.org/html/report-49-cs-hardee.html",
+       "page": "OR Series I vol. 16 pt. 1, Hardee report",
+       "quote": "General Cheatham's division crossed Doctor's Fork on our extreme right and engaged the enemy's left."
+      }
+     ]
+    },
+    {
+     "trait": "impetuous",
+     "claim": "At Stones River on 31 Dec 1862 NPS says Cheatham's poorly coordinated charges sacrificed hundreds of veterans.",
+     "sources": [
+      {
+       "title": "The Battle of Stones River, Civil War Series, section 'Sheridan's Stand'",
+       "author": "National Park Service, Civil War Series (hosted at npshistory.com)",
+       "url": "https://npshistory.com/publications/civil_war_series/23/sec5.htm",
+       "page": "section: Sheridan's Stand",
+       "quote": "Cheatham acted rashly and recklessly, sacrificing hundreds of irreplaceable veterans"
+      }
+     ]
+    }
+   ],
+   "provenance": "Inferred",
+   "provenance_note": "'impetuous' has one opened source (NPS series, an author's judgment). Other opened pages (ABT, Tennessee Encyclopedia) mention Bragg's accusation of drunkenness at Stones River ('appeared to be inebriated' / 'accused'), never proven and NOT used as evidence. The NPS series puts the broader piecemeal Round Forest attacks on Polk's corps and Bragg's orders, not Cheatham alone.",
+   "dropped": [
+    {
+     "trait": "(claim detail) led from the front at Belmont",
+     "why": "Opened pages say only that his actions at Belmont won promotion (TN Enc) / brigade commander at Belmont (ABT)."
+    }
+   ]
+  },
+  {
+   "name": "P. G. T. Beauregard",
+   "traits": [
+    "cautious"
+   ],
+   "evidence": [
+    {
+     "trait": "cautious",
+     "claim": "Before Shiloh Beauregard advised retiring to Corinth; at dusk on 6 April 1862 he halted the attacks, believing the army victorious, before Buell arrived overnight; on 29-30 May 1862 he evacuated Corinth without a serious battle, citing lack of water, disease and fear of encirclement.",
+     "sources": [
+      {
+       "title": "The Battle of Shiloh, Civil War Series, section 'The Confederate Advance'",
+       "author": "National Park Service, Civil War Series (hosted at npshistory.com)",
+       "url": "https://npshistory.com/publications/civil_war_series/22/sec3.htm",
+       "page": "section: The Confederate Advance",
+       "quote": "In Beauregard's opinion, the army should retire to Corinth."
+      },
+      {
+       "title": "American Battlefield Trust: Shiloh, April 6, 1862 (map page)",
+       "author": "American Battlefield Trust",
+       "url": "https://battlefields.org/learn/maps/shiloh-april-6-1862-day-one",
+       "page": "web page, no pagination",
+       "quote": "General Pierre G.T. Beauregard assumed command of the Confederate forces and called a halt to the attacks as darkness approached."
+      },
+      {
+       "title": "American Battlefield Trust: Shiloh Battle Facts and Summary",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/civil-war/battles/shiloh",
+       "page": "web page, no pagination",
+       "quote": "Believing his army victorious, Beauregard calls a halt to the attacks as darkness approaches."
+      },
+      {
+       "title": "American Battlefield Trust: Siege of Corinth",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/civil-war/battles/siege-corinth",
+       "page": "web page, no pagination",
+       "quote": "Faced with a lack of water, rampant disease, and the fear of being surrounded, Beauregard withdrew to Tupelo and surrendered the town without a serious battle."
+      }
+     ]
+    }
+   ],
+   "provenance": "Verified",
+   "provenance_note": "Only one trait kept (fewer than 2). ABT's reason for the dusk halt is that he believed the army victorious, not fear; keep the game text to the conduct. 'methodical' dropped: see dropped.",
+   "dropped": [
+    {
+     "trait": "methodical",
+     "why": "No opened source characterises him that way. The NPS Shiloh series and jfepperson.org's transcription of Special Orders No. 8 tie the parallel-corps order to Beauregard's plan/staff but do not state he wrote it, and jfepperson says only that it is signed by Jordan for Johnston and 'often criticized' for making command and control difficult. Williams's biography (book) was not opened. Unsupported, so dropped; also removes the Williams-vs-Daniel dispute that previously made him Disputed."
+    }
+   ]
+  },
+  {
+   "name": "Gideon J. Pillow",
+   "traits": [
+    "aggressive"
+   ],
+   "evidence": [
+    {
+     "trait": "aggressive",
+     "claim": "At daybreak 15 Feb 1862 at Fort Donelson Pillow led the breakout attack on McClernand's flank that briefly opened the Forge Road escape route; at Stones River NPS says his brigade 'was fighting well' on 2 Jan 1863.",
+     "sources": [
+      {
+       "title": "Fort Donelson, Tour Stop 9",
+       "author": "National Park Service, Fort Donelson NB",
+       "url": "https://www.nps.gov/fodo/learn/photosmultimedia/tourstop9.htm",
+       "page": "web page, no pagination",
+       "quote": "At daybreak on February 15, Pillow and Johnson's division ... attacked Gen. John A. McClernand's troops on the Union right flank"
+      },
+      {
+       "title": "Confusion on the Cumberland",
+       "author": "Civil War Monitor",
+       "url": "https://www.civilwarmonitor.com/article/confusion-on-the-cumberland/",
+       "page": "web page, no pagination",
+       "quote": "The breakout attack, led by Pillow and supported by Buckner ... Pillow initially succeeded in driving those forces back."
+      },
+      {
+       "title": "American Battlefield Trust: Gideon J. Pillow",
+       "author": "American Battlefield Trust",
+       "url": "https://www.battlefields.org/learn/biographies/gideon-j-pillow",
+       "page": "web page, no pagination",
+       "quote": "During the February 1862 assault at Fort Donelson, Pillow was initially successful in his attack on Grant's forces."
+      },
+      {
+       "title": "The Battle of Stones River, Civil War Series, section on 2 January",
+       "author": "National Park Service, Civil War Series (hosted at npshistory.com)",
+       "url": "https://npshistory.com/publications/civil_war_series/23/sec9.htm",
+       "page": "section on 2 January 1863",
+       "quote": "Gideon Pillow's brigade, meanwhile, was fighting well."
+      }
+     ]
+    }
+   ],
+   "provenance": "Verified",
+   "provenance_note": "Only one trait kept (fewer than 2). The recall is better described as indecision: NPS says the escape route closed 'because of indecision and confusion among their commanders'; Civil War Monitor and ABT say Pillow ordered the troops back to the trenches; Monitor says he passed command to Buckner 'before fleeing by riverboat'. If the designers want a second trait, 'cautious' is supportable by those three pages, but it was not in the original list so it is not added here. The Stones River tree story is reported by ABT ('It was reported that...') and is not established.",
+   "dropped": [
+    {
+     "trait": "impetuous",
+     "why": "No opened source describes Pillow as rash. His Donelson reversal was a pull-back (ABT: 'pull his men back into their trenches'; Monitor: 'ordered the troops to return to their trenches'), which reads as the opposite. The Breckinridge/tree anecdote concerns avoiding the fight, also not impetuous. Earlier 'Disputed' status (aggressive-but-vain vs cowardly) rested on unopened books."
+    }
+   ]
+  }
+ ],
+ "meta": {
+  "date": "2026-10-11",
+  "method": "Each URL below was opened via WebFetch and, where the host permitted, re-checked verbatim with curl. npshistory.com blocks curl (403), so its quotes are as returned by WebFetch's page reader. Quotes are page text, not paginated; 'page' is a section or caption. Wikipedia, search snippets and unopened books (Symonds, McDonough, Cozzens, McWhiney, Hallock, Daniel, Roland, Williams, Parks, Warner, Hughes & Stonesifer, Official Records volumes) were NOT counted. Official Records on ehistory.osu.edu returned 403; the only OR text opened is Hardee's Perryville report at perryvillebattlefield.org.",
+  "independence_note": "ABT pages are counted as one organisation: where a trait rests on several ABT pages plus nothing else, it is not called Verified.",
+  "not_run": "No OR volume, HathiTrust, archive.org book or Google Books preview was opened; Official Records citations from the earlier pass remain unverified."
+ }
+}

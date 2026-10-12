@@ -488,3 +488,37 @@ body:has(.sb-toggle.sb-closed:not(.sb-left)) #soldier-view-hint { right: calc(va
 }
 /* Unit card portrait (P6b, src/ui/art.js): period portraits and the silhouette are 4:5, so keep the head in the square. */
 .portrait[data-portrait="sourced"], .portrait[data-portrait="generic"] { background-position: center 18%; background-color: #2a2218; }
+/* Temperament (P3t; src/ui/hud.js fillTraits / openTraits): an enemy card's commanders' traits, the game rule they drive, the
+   provenance and a record note; "Records and sources" opens #traits-dialog (claims and opened sources, shared .traits-man markup
+   with the Briefing). */
+.uctraits { margin: 4px 0 0; padding: 4px 6px; border-radius: 6px; background: rgba(200, 56, 74, 0.1); border-left: 3px solid #c8384a; font-size: 12px; }
+.uctraits[hidden] { display: none; }
+.uctraits p { margin: 2px 0; line-height: 1.35; overflow-wrap: anywhere; }
+.uct-who { font-weight: 700; }
+.uct-chip { display: inline-block; padding: 0 6px; border-radius: 9px; background: rgba(255, 210, 122, 0.16); color: #ffe6b8; white-space: nowrap; }
+.uct-prov { color: var(--dim); white-space: nowrap; }
+.uct-rule { color: #c9e3a8; }
+.uct-note { color: #ffd9d2; }
+.uctraits .uct-more { min-height: 44px; margin: 2px 0 0; padding: 4px 10px; border: 1px solid var(--panel-edge); border-radius: 4px; background: rgba(255, 255, 255, 0.06); cursor: pointer; font-size: 12.5px; }
+.uctraits .uct-more:hover { background: rgba(255, 255, 255, 0.14); }
+#traits-dialog { box-sizing: border-box; width: min(640px, calc(100vw - 24px)); max-width: none; max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow: auto; }
+#traits-dialog h2 { overflow-wrap: anywhere; }
+#traits-dialog h2:focus { outline: none; }
+#traits-dialog h2:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.traits-man { margin: 10px 0 0; padding-top: 6px; border-top: 1px solid var(--panel-edge); }
+.traits-man .traits-name { margin: 6px 0 4px; font: normal 17px/1.3 Georgia, serif; overflow-wrap: anywhere; }
+.traits-man p { margin: 4px 0; line-height: 1.45; overflow-wrap: anywhere; }
+.traits-prov { font-size: 13px; color: var(--dim); }
+.traits-note { font-size: 13.5px; }
+.traits-note.is-record { padding: 6px 8px; border-left: 3px solid #c8384a; background: rgba(200, 56, 74, 0.1); color: #ffe2dc; }
+.traits-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 10px; }
+.traits-label { font-weight: 700; color: #ffe6b8; }
+.traits-rule { font-size: 13px; color: #c9e3a8; }
+.traits-claim { font-size: 13.5px; }
+.traits-sources { margin: 2px 0 0; padding-left: 18px; font-size: 13px; }
+.traits-sources li { margin: 4px 0; overflow-wrap: anywhere; }
+.traits-sources a, .traits-note a { color: var(--focus); }
+.traits-sources a { display: inline-block; min-height: 24px; padding: 2px 0; }
+.traits-cite { color: var(--dim); }
+.traits-quote { display: block; margin: 2px 0 0; font-style: italic; color: var(--text); }
+#traits-close { min-width: 120px; }

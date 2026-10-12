@@ -27,6 +27,10 @@
 // -10 morale shock, and is reported in the feed and a toast; a brigade that loses its commander shows "Commander
 // down" until the battle ends (its successor stays generic unless the data names a sourced one). Fates in the data
 // are after-action text only; nothing is scripted. Command state lives in a WeakMap (no own Game keys).
+// A general or brigade commander whose phase data gives him the `reckless` trait (P3t: "led from the front";
+// scenario.commanderTraits, src/franchise/tuning.js TRAITS.reckless) is exposed to fire within COMMAND.danger x
+// TRAITS.reckless.danger: the same roll on the same command stream, only more often. Every other trait is the AI's
+// (src/sim/ai.js) and touches no combat number.
 // Figures (src/ui/look.js): look.figureStyle picks rigged 3D figures or baked sprites (both, split-screen, while
 // it is compared); the atlas loads the first time baked is wanted and the rigged figures draw until it is in.
 // look.menPerFigure re-forms the infantry at 1:10 or 1:5, never denser than the phase's scenario.menPerFigure
@@ -65,11 +69,11 @@ import { HaloPool } from './units/halos.js';
 import { HorsePool, HORSE_COATS, RallyRings, MountPool } from './units/mounts.js';
 import { Combat, CLOCK_RATIO, CAVALRY, CAVALRY_WEAPONS, defaultWeapon, horsed, featsOf, featStats, featGunsTaken, setBadgeEffects, xFactorOf, chargedBy } from './sim/combat.js';
 import { BADGE_BY_ID } from './franchise/badges.js';
-import { Ai, DELEGATE_ROLES } from './sim/ai.js';
+import { Ai, DELEGATE_ROLES, commanderTraits } from './sim/ai.js';
 import { RULES } from './sim/rules.js';
 import { mulberry32, inWoods, PLAN } from './world/landscape.js';
 import { FieldCaptures, ColourCaptures } from './franchise/captures.js';
-import { DIFFICULTY, COLOURS } from './franchise/tuning.js';
+import { DIFFICULTY, COLOURS, TRAITS } from './franchise/tuning.js';
 import { prepareReinforcementTimeline, reinforcementWindow, captureAccounting, phaseMenPerFigure } from './sim/phase.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -481,8 +485,11 @@ function commandStep(game, h) {
   // per-tick chance from the hourly one, in historical time: 1 - (1 - H)^(t / 3600)
   const p = 1 - Math.pow(1 - Math.min(0.99, risk / 100), (h * clockRatioOf(game)) / 3600);
   const R2 = COMMAND.danger * COMMAND.danger;
-  const exposed = (x, z) => {
-    for (let i = 0; i < hits.length; i += 2) if ((hits[i] - x) ** 2 + (hits[i + 1] - z) ** 2 <= R2) return true;
+  // a commander who leads from the front (trait `reckless`, the phase's scenario.commanderTraits) is at risk from fire farther off
+  const LEAD2 = (COMMAND.danger * TRAITS.reckless.danger) ** 2;
+  const reach2 = (name) => (name && commanderTraits(game.scenario, name).includes('reckless') ? LEAD2 : R2);
+  const exposed = (x, z, r2) => {
+    for (let i = 0; i < hits.length; i += 2) if ((hits[i] - x) ** 2 + (hits[i + 1] - z) ** 2 <= r2) return true;
     return false;
   };
   const roll = (who) => {
@@ -490,11 +497,11 @@ function commandStep(game, h) {
     if (r < p / 2) commanderHit(game, who, 'killed');
     else if (r < p) commanderHit(game, who, 'wounded');
   };
-  for (const c of st.commanders) if (!c.down && !c.gone && exposed(c.x, c.z)) roll(c);
+  for (const c of st.commanders) if (!c.down && !c.gone && exposed(c.x, c.z, reach2(c.name))) roll(c);
   for (const u of game.units) {
     if (!u.officer || u.commandDown || !u.alive || u.state === 'captured') continue;
     const [x, z] = u.officerSlot();
-    if (exposed(x, z)) roll(u);
+    if (exposed(x, z, reach2(u.commander?.name))) roll(u);
   }
 }
 

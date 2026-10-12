@@ -41,6 +41,16 @@ const GRANT = 'Grant, Personal Memoirs (1885) ch. XXIV: https://www.historyofwar
 const CWRT_HICK = 'Cleveland Civil War Roundtable, Hickenlooper\'s Ohio artillery anchors the Hornets\' Nest (citing Grimsley/Woodworth, McDonough, Sword): https://www.clevelandcivilwarroundtable.com/hickenloopers-ohio-artillery-anchors-the-hornets-nest-at-shiloh/';
 const NPS_STOP1 = 'NPS Auto Tour Stop 1, Grant\'s Last Line: https://www.nps.gov/places/shiloh-auto-tour-introduction-grant-s-last-line-stop-1.htm';
 const GAME_CREW = 'Battery crew: game value of 20 men per gun (no sourced crew strength)';
+// The army commander each phase names (scenario.enemyCommander, P3t): his sourced traits (assets/traits.json) shape the
+// Confederate AI's decisions and timing, never a combat number.
+const ABT_ASJ = 'American Battlefield Trust, Albert Sidney Johnston (biography): https://www.battlefields.org/learn/biographies/albert-sidney-johnston';
+const ABT_SHILOH_MAP = 'American Battlefield Trust, Shiloh, April 6, 1862 (map page: Johnston shot as he rode ahead of his troops; Beauregard assumed command and called a halt as darkness approached): https://battlefields.org/learn/maps/shiloh-april-6-1862-day-one';
+const ABT_SHILOH = 'American Battlefield Trust, Shiloh Battle Facts and Summary: https://www.battlefields.org/learn/civil-war/battles/shiloh';
+const NPS_STOP17 = 'NPS Shiloh, Death of Albert Sidney Johnston, Tour Stop 17 (struck while personally directing his reserves): https://www.nps.gov/places/death-of-albert-sidney-johnston-tour-stop-17.htm';
+const JOHNSTON = (extra = {}) => ({ side: 'CS', name: 'Albert Sidney Johnston', rank: 'General', role: 'commanding the Confederate Army of the Mississippi',
+  sources: [ABT_ASJ, DANIEL(3, 'The Confederate Advance'), NPS_STOP17], status: 'Verified: he commanded the army that attacked on 6 April (ABT; NPS Civil War Series 22; NPS tour stop 17).', ...extra });
+const BEAUREGARD = (sources) => ({ side: 'CS', name: 'P. G. T. Beauregard', rank: 'General', role: 'commanding the Confederate Army of the Mississippi after Johnston fell',
+  sources, status: 'Verified: Beauregard assumed command after Johnston was mortally wounded and halted the attacks at dark (ABT map page and battle summary; NPS Civil War Series 22).' });
 
 // ---- provenance phrases used in unit status lines ---------------------------------------------------------------
 const XP_US = 'xp 1 (green): game rule for Grant\'s and Buell\'s volunteer formations at Shiloh other than the Fort Donelson division; no unit-level service history was researched';
@@ -223,6 +233,7 @@ const PHASE1 = {
   objective: { name: 'the camp line from Rhea Field to Spain Field', at: { mid: ['rhea', 'spain'], bearing: 353, m: 265 }, r: 750 },
   retreat: { US: { near: 'landingTown' }, CS: { near: 'woodsField', bearing: 225, m: 500 } },
   camera: { target: { near: 'rhea', bearing: 110, m: 280 }, lookBearing: 225, dist: 1700 },
+  enemyCommander: JOHNSTON(),
   victory: {
     attackerHolds: 'The Confederates hold the camp line at 09:30. (In 1862 Prentiss\'s camps were lost by about 09:00; Sherman held the church ridge until about 10:00.)',
     defenderHolds: 'The camps are still in Union hands at 09:30. (In 1862 they were not: Prentiss\'s two brigades were swept from their camps by about 09:00.)',
@@ -382,6 +393,9 @@ const PHASE2 = {
   objective: { name: 'the Sunken Road line from Duncan Field to the Peach Orchard', at: { mid: ['hornetsNest', 'peachOrchard'] }, r: 600 },
   retreat: { US: { near: 'landingTown' }, CS: { near: 'spain', bearing: 240, m: 700 } },
   camera: { target: { near: 'sunkenRoad', bearing: 200, m: 150 }, lookBearing: 240, dist: 1700 },
+  // Johnston commands when this phase opens; he fell that afternoon and Beauregard took over at an hour these sources do not give.
+  enemyCommander: JOHNSTON({ sources: [NPS_STOP17, ABT_SHILOH_MAP, ABT_ASJ], status: 'Verified: in command when the phase opens at 10:00 (NPS tour stop 17; ABT); the hour Beauregard took over is not sourced.',
+    note: 'Commands when this phase opens. He was mortally wounded that afternoon while directing his reserves and Beauregard took command; the sources used here give no hour, so the game keeps Johnston for the whole phase.' }),
   victory: {
     attackerHolds: 'The Confederates hold the Sunken Road at 17:30. (In 1862 about 2,200 Union soldiers, Prentiss among them, surrendered there at 17:30.)',
     defenderHolds: 'The Sunken Road line still stands at 17:30. (In 1862 it was surrounded and about 2,200 men surrendered.)',
@@ -550,6 +564,7 @@ const PHASE3 = {
   objective: { name: 'the ridge above Pittsburg Landing', at: { mid: ['madison', 'markgraf'], bearing: 180, m: 120 }, r: 450 },
   retreat: { US: { near: 'landingTown', bearing: 330, m: 300 }, CS: { near: 'peachOrchard', bearing: 180, m: 300 } },
   camera: { target: { near: 'dillMid', bearing: 330, m: 250 }, lookBearing: 175, dist: 1500 },
+  enemyCommander: BEAUREGARD([ABT_SHILOH_MAP, ABT_SHILOH, DANIEL(13, 'Beauregard Claims Victory')]),
   victory: {
     attackerHolds: 'The Confederates hold the ridge above Pittsburg Landing at 19:00. (In 1862 the attack across Dill Branch was thrown back.)',
     defenderHolds: 'Grant\'s last line holds at 19:00, as it did in 1862.',
@@ -653,6 +668,7 @@ const PHASE4 = {
   objective: { name: 'the Hamburg-Purdy road at Duncan and Review fields', at: { mid: ['duncan', 'review'], bearing: 180, m: 280 }, r: 600 },
   retreat: { US: { near: 'landingTown' }, CS: { near: 'rhea', bearing: 200, m: 900 } },
   camera: { target: { near: 'hornetsNest', bearing: 0, m: 700 }, lookBearing: 195, dist: 2000 },
+  enemyCommander: BEAUREGARD([DANIEL(13, 'Beauregard Claims Victory'), ABT_SHILOH]),
   victory: {
     attackerHolds: 'Union troops hold the Hamburg-Purdy road at 15:00, as Nelson and Crittenden did about 14:00 in 1862.',
     defenderHolds: 'The Confederates still hold the Hamburg-Purdy road at 15:00. (In 1862 they were driven from it about 14:00 and withdrew to Corinth.)',

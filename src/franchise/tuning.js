@@ -131,6 +131,41 @@ export const DIFFICULTY = Object.freeze({
     counter: Object.freeze({ reach: 200, range: 400 }) }),
 });
 
+// Commanders' temperament (DESIGN §4b "AI character"; P3t). assets/traits.json (tools/build-traits.mjs) holds each enemy
+// commander's 2-3 sourced traits; tools/build-packs.mjs writes a phase's `commanderTraits` (name -> keys, for the men in that
+// phase) and its `enemyCommander` (the army commander). src/sim/ai.js gives an AI formation the traits of its own commander
+// (while he is up) and of its army commander; src/game.js uses `reckless` for the man himself. Game rules, not history: a
+// trait changes only the AI's decisions and timing (and, for reckless, where the commander exposes himself), never a combat
+// number. A formation with no traits plays exactly as before. Several traits compose: starts add, factors multiply.
+//   start   sim s added to when a role begins (negative = earlier): an attack's or reserve's `at`, a Recruit reserve's set time,
+//           and (a delay only) an attack without `at`, counted from its first moment on the field
+//   reach   x the enemy distance that commits a reserve (the difficulty level's reserveReach)
+//   reissue x the sim s before a march stopped short is ordered again (the level's reissue); cool: x the 30 s before an
+//           attacker marches again after falling back
+//   shaken  it also retires when only shaken (not just wavering) with the nearest enemy outnumbering it
+//   hold    under a hold order it retires only when the nearest enemy has this many times its men (1 = the usual rule)
+//   wait    sim s an attacker or reserve, once begun, waits for the other AI formations sharing its target to begin too;
+//           window: x that wait (the largest wait of its traits, times every window)
+//   steady  its re-issue time is never shorter than its level's
+//   counter { reach, range }: a holding infantry brigade counter-attacks a breakthrough (fire, never a charge) at any level,
+//           like a General's (DIFFICULTY.general.counter)
+//   cover   { search, clear, gain }: a holding infantry brigade with no enemy within `clear` m moves once to the best cover
+//           (Game.coverAt) within `search` m that is at least `gain` better and no nearer the enemy
+//   pass    its AI pass runs every `pass`-th time (a longer reaction and re-plan interval)
+//   danger  reckless only: x the 120 m within which fire puts the commander himself at risk (src/game.js commandStep, the
+//           existing commander stream); he rides where the fighting is, so he is hit more often
+export const TRAITS = Object.freeze({
+  keys: Object.freeze(['aggressive', 'impetuous', 'cautious', 'stubborn', 'methodical', 'skilled-defender', 'slow', 'reckless']),
+  aggressive: Object.freeze({ start: -20, reach: 1.3, reissue: 0.5, cool: 0.5 }),
+  impetuous: Object.freeze({ start: -10, window: 0.25 }),
+  cautious: Object.freeze({ start: 20, reach: 0.7, reissue: 1.5, shaken: true }),
+  stubborn: Object.freeze({ hold: 1.6 }),
+  methodical: Object.freeze({ wait: 45, steady: true }),
+  'skilled-defender': Object.freeze({ counter: Object.freeze({ reach: 200, range: 350 }), cover: Object.freeze({ search: 100, clear: 250, gain: 0.15 }) }),
+  slow: Object.freeze({ pass: 2, reissue: 1.5 }),
+  reckless: Object.freeze({ danger: 1.5 }),
+});
+
 // Captured colours (DESIGN §3 Stores "colours and trophies (trophy shelf)"; src/franchise/captures.js ColourCaptures, src/game.js).
 // Each named regiment of an infantry or cavalry formation carries one colour. It is taken (once, no dice) when its formation
 // surrenders (by the captor), is destroyed (by the nearest unbroken enemy formation within `radius` m) or is broken while an

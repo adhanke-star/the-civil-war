@@ -47,6 +47,11 @@ const WIKI_OOB_CS = 'Wikipedia, Chattanooga campaign order of battle: Confederat
 const IB_HAZEN = 'Hazen\'s report (OR XXXI/2) as transcribed at ironbrigader.com';
 const IB_VD = 'Van Derveer\'s report (OR XXXI/2) as transcribed at ironbrigader.com (2025/11/16)';
 const GAME_CREW = 'Battery crew: game value of 20 men per gun (no sourced crew strength)';
+// The army commander each phase names (scenario.enemyCommander, P3t): his sourced traits (assets/traits.json) shape the
+// Confederate AI's decisions and timing, never a combat number.
+const ABT_BRAGG = 'American Battlefield Trust, Braxton Bragg (biography): https://www.battlefields.org/learn/biographies/braxton-bragg';
+const BRAGG = (sources) => ({ side: 'CS', name: 'Braxton Bragg', rank: 'General', role: 'commanding the Confederate Army of Tennessee', sources,
+  status: 'Verified: he commanded the Army of Tennessee at Chattanooga (ABT; NPS Civil War Series 9).' });
 
 // ---- provenance phrases used in unit status lines ---------------------------------------------------------------
 const XP_CH = 'xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker\'s and Sherman\'s men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched';
@@ -184,6 +189,7 @@ const PHASE1 = {
   // The defenders fell back to the rifle pits at the foot of Missionary Ridge; the Union line came from Fort Wood.
   retreat: { US: { near: 'fortWood', bearing: 270, m: 100 }, CS: { near: 'orchardKnob', bearing: 95, m: 1100 } },
   camera: { target: { near: 'fortWood', bearing: 110, m: 750 }, lookBearing: 110, dist: 1800 },
+  enemyCommander: BRAGG([NPS9(4, 'Orchard Knob'), ABT(), ABT_BRAGG]),
   victory: {
     attackerHolds: 'Orchard Knob is in Union hands at 15:30. (In 1863 Wood\'s division took it, and the rocky ridge south of it, by about 15:00.)',
     defenderHolds: 'The Confederates still hold Orchard Knob at 15:30. (In 1863 they did not: the 24th Alabama was driven off and the 28th captured almost whole.)',
@@ -277,6 +283,7 @@ const PHASE2 = {
   // Lookout Creek toward Brown's Ferry and Chattanooga.
   retreat: { US: { near: 'baldHill', bearing: 0, m: 200 }, CS: { near: 'cravens', bearing: 170, m: 1450 } },
   camera: { target: { near: 'cravens', bearing: 250, m: 1150 }, lookBearing: 45, dist: 2000 },
+  enemyCommander: BRAGG([ABT_LM, NPS9(4, 'Orchard Knob'), ABT(), ABT_BRAGG]),
   victory: {
     attackerHolds: 'Hooker\'s men hold the Cravens House bench at 15:00. (In 1863 they held it from about 13:00-14:00 on, in fog.)',
     defenderHolds: 'The Cravens House bench is still in Confederate hands at 15:00. (In 1863 it was not.)',
@@ -400,6 +407,7 @@ const PHASE3 = {
   // The Confederates retreated east toward South Chickamauga Creek; the Union line came from Chattanooga.
   retreat: { US: { near: 'fortWood', bearing: 100, m: 200 }, CS: { near: 'birdsMillCrest', bearing: 90, m: 1300 } },
   camera: { target: { near: 'orchardKnob', bearing: 150, m: 900 }, lookBearing: 100, dist: 2600 },
+  enemyCommander: BRAGG([NPS9(7, 'Bragg tried to rally Tucker, Finley and Gibson'), ABT(), ABT_BRAGG]),
   victory: {
     attackerHolds: 'The Union holds the crest at 17:30. (In 1863 the centre broke at the Bird\'s Mill Road a few minutes before 17:00 and the crest was in Union hands by about 17:30.)',
     defenderHolds: 'Bragg\'s centre still holds the crest at 17:30. (In 1863 it did not.)',

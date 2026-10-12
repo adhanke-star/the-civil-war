@@ -17,6 +17,9 @@
 //   briefingCommanders(scenario, side?, max?) -> [{ name, rank, side, named }]: the phase's commanders named in the briefing
 //                                            first, then the player's side; the dialog shows each with his period portrait
 //                                            (src/ui/art.js; exact name only) or the generic silhouette (P6b)
+//   loadTraits(), traitEntry, formationTraits, traitedCommanders, traitRuleLine, traitDetails -> enemy commanders' sourced
+//                                            temperament (P3t, assets/traits.json): the Briefing's "Opposing commanders" (labels,
+//                                            game rule, provenance; claims and sources in a disclosure) and the enemy unit card
 // Decision cards are chosen in camp before the field and this briefing load (src/ui/entry.js, the camp's Next and Replay).
 // Pure helpers do no DOM work at import time, so tools/test-campaign-ui.mjs can import this file in Node.
 import { validateCampaign } from '../franchise/campaign.js';
@@ -156,7 +159,7 @@ export function briefingSources(list) {
   return out;
 }
 
-const RANK_SHORT = { 'Major General': 'Maj. Gen.', 'Brigadier General': 'Brig. Gen.', Colonel: 'Col.', 'Lieutenant Colonel': 'Lt. Col.', Major: 'Maj.', Captain: 'Capt.',
+const RANK_SHORT = { General: 'Gen.', 'Major General': 'Maj. Gen.', 'Brigadier General': 'Brig. Gen.', Colonel: 'Col.', 'Lieutenant Colonel': 'Lt. Col.', Major: 'Maj.', Captain: 'Capt.',
   Lieutenant: 'Lt.', 'First Lieutenant': '1st Lt.', 'Second Lieutenant': '2nd Lt.' };
 /** "Col." from "Colonel" (unknown ranks pass through). */
 export const rankShort = (rank) => RANK_SHORT[rank] || rank || '';
@@ -176,6 +179,127 @@ export function briefingCommanders(scenario, side = 'US', max = 6) {
     if (c.named) named.push(c); else if (u.side === side) own.push(c);
   }
   return [...named, ...own].slice(0, max);
+}
+
+// ---- commanders' temperament (P3t; DESIGN §4b "AI character") ---------------------------------------------------------
+// assets/traits.json (tools/build-traits.mjs) holds each enemy commander's sourced traits: words (label, brief, game-rule
+// effect), the claim behind each trait with its opened sources, provenance and notes. The phase's own data says which men
+// carry which traits (scenario.commanderTraits, what src/sim/ai.js acts on) and names the army commander
+// (scenario.enemyCommander). Shown on the enemy unit card (src/ui/hud.js) and in the Briefing's "Opposing commanders".
+let traitsPending = null;
+/** assets/traits.json, validated once per page (a failed load may be retried). */
+export function loadTraits({ fetcher } = {}) {
+  if (!traitsPending) {
+    traitsPending = boundedJson('./assets/traits.json', fetcher).then(validTraits);
+    traitsPending.catch(() => { traitsPending = null; });
+  }
+  return traitsPending;
+}
+/** The traits file's shape (version 1, vocabulary, commanders), or a refusal. */
+export function validTraits(t) {
+  if (!t || t.version !== 1 || !t.vocabulary || typeof t.vocabulary !== 'object' || !t.commanders || typeof t.commanders !== 'object') throw new Error('Traits: assets/traits.json is invalid.');
+  return t;
+}
+/** The trait keys the phase gives this man (scenario.commanderTraits[name]); [] without. */
+export function phaseTraitKeys(scenario, name) {
+  const map = scenario && typeof scenario.commanderTraits === 'object' ? scenario.commanderTraits : null;
+  return map && words(name) && has(map, name) && Array.isArray(map[name]) ? map[name].filter((k) => typeof k === 'string') : [];
+}
+/**
+ * One man's traits as shown: { name, rank, role, army, traits: [{ key, label, brief, effect }], provenance, provenanceNote, note,
+ * evidence: [{ trait, claim, sources }] }, or null when the phase gives him none. Keys from the phase; words from `data`.
+ */
+export function traitEntry(data, scenario, name, extra = {}) {
+  const keys = phaseTraitKeys(scenario, name);
+  if (!keys.length) return null;
+  const rec = data && data.commanders && has(data.commanders, name) ? data.commanders[name] : null, vocab = (data && data.vocabulary) || {};
+  return { name, rank: '', role: '', army: false, ...extra,
+    traits: keys.map((k) => ({ key: k, label: words(vocab[k]?.label) || k, brief: words(vocab[k]?.brief), effect: words(vocab[k]?.effect) })),
+    provenance: words(rec?.provenance), provenanceNote: words(rec?.provenanceNote), note: rec?.note && words(rec.note.text) ? rec.note : null,
+    evidence: keys.map((k) => (Array.isArray(rec?.evidence) ? rec.evidence.find((e) => e && e.trait === k) : null)).filter(Boolean) };
+}
+/** The army commander of `side` this phase names (scenario.enemyCommander), or null. */
+export function phaseArmyCommander(scenario, side) {
+  const c = scenario && scenario.enemyCommander;
+  return c && typeof c === 'object' && c.side === side && words(c.name) ? c : null;
+}
+/** The traits that apply to formation u: its own commander's (null once he is down) and its army commander's. */
+export function formationTraits(data, scenario, u) {
+  const c = u && u.commander, general = phaseArmyCommander(scenario, u?.side);
+  return { own: c && words(c.name) && !u.commandDown ? traitEntry(data, scenario, c.name, { rank: words(c.rank), role: 'this formation\'s commander' }) : null,
+    army: general ? traitEntry(data, scenario, general.name, { rank: words(general.rank), role: words(general.role), army: true, status: words(general.status), phaseNote: words(general.note) }) : null };
+}
+/** Every man on `side` this phase gives traits: the army commander first, then the roster's commanders in order (once each). */
+export function traitedCommanders(data, scenario, side) {
+  const out = [], seen = new Set(), general = phaseArmyCommander(scenario, side);
+  if (general) {
+    seen.add(general.name);
+    const e = traitEntry(data, scenario, general.name, { rank: words(general.rank), role: words(general.role), army: true, status: words(general.status), phaseNote: words(general.note) });
+    if (e) out.push(e);
+  }
+  for (const u of [...(Array.isArray(scenario?.units) ? scenario.units : []), ...(Array.isArray(scenario?.reinforcements) ? scenario.reinforcements : [])]) {
+    const name = words(u?.commander?.name);
+    if (!name || u.side !== side || seen.has(name)) continue;
+    seen.add(name);
+    const e = traitEntry(data, scenario, name, { rank: words(u.commander.rank), role: `commanding ${words(u.name) || 'a formation'}` });
+    if (e) out.push(e);
+  }
+  return out;
+}
+/** "Game rule: a; b." from entries' brief phrases (an army commander's own `reckless` is his alone and left out). */
+export function traitRuleLine(entries) {
+  const seen = new Set(), parts = [];
+  for (const e of entries) for (const t of e ? e.traits : []) {
+    if (seen.has(t.key) || (e.army && t.key === 'reckless') || !t.brief) continue;
+    seen.add(t.key); parts.push(t.brief);
+  }
+  return parts.length ? `Game rule: ${parts.join('; ')}.` : '';
+}
+/**
+ * The details of one man's traits (DOM; the card's Records dialog and the Briefing): provenance, notes, and for each trait its
+ * game rule, the claim from his record and every opened source as a link with its page and quotation.
+ */
+export function traitDetails(entry, doc = document, level = 'h3') {
+  const make = (tag, cls, text) => { const n = doc.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
+  const box = make('section', 'traits-man');
+  box.dataset.commander = entry.name;
+  box.append(make(level, 'traits-name', `${commanderTitle(entry)}${entry.role ? `, ${entry.role}` : ''}`));
+  box.append(make('p', 'traits-prov', `Provenance: ${entry.provenance || 'not given'} (Verified: two independent sources agree; Inferred: one source; Disputed: sources differ).`));
+  if (entry.phaseNote) box.append(make('p', 'traits-note', entry.phaseNote));
+  if (entry.note) {
+    const p = make('p', `traits-note${entry.note.kind === 'record' ? ' is-record' : ''}`, entry.note.text);
+    for (const s of Array.isArray(entry.note.sources) ? entry.note.sources : []) {
+      const href = briefingSources([s.url])[0]?.href;
+      if (!href) continue;
+      const a = make('a', '', s.title); a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer';
+      p.append(' (', a, ')');
+    }
+    box.append(p);
+  }
+  const list = make('ul', 'traits-list');
+  for (const t of entry.traits) {
+    const li = make('li', 'traits-trait');
+    li.dataset.trait = t.key;
+    li.append(make('p', 'traits-label', t.label));
+    if (t.effect) li.append(make('p', 'traits-rule', t.effect));
+    const ev = entry.evidence.find((e) => e.trait === t.key);
+    if (ev) {
+      li.append(make('p', 'traits-claim', `His record: ${ev.claim}`));
+      const sources = make('ul', 'traits-sources');
+      for (const s of ev.sources || []) {
+        const href = briefingSources([s.url])[0]?.href, row = make('li');
+        if (href) { const a = make('a', '', s.title); a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer'; row.append(a); }
+        else row.append(make('span', '', s.title));
+        row.append(make('span', 'traits-cite', ` — ${s.author}${s.page ? `, ${s.page}` : ''}`));
+        if (s.quote) row.append(make('q', 'traits-quote', s.quote));
+        sources.append(row);
+      }
+      li.append(sources);
+    }
+    list.append(li);
+  }
+  box.append(list);
+  return box;
 }
 
 const DEFAULT_LOAN = "Grant's Army of the Tennessee is on loan for this phase. Its results do not change your franchise brigades; losses here carry only inside this battle.";
@@ -206,11 +330,16 @@ export function mountBriefing({ scenario, phase, game, hud, effects, onBegin = (
       cite.length ? el('figcaption', { text: `— ${cite.join(', ')}` }) : null));
   }
   const commanders = briefingCommanders(scenario, game?.playerSide || hud?.playerSide || 'US');
+  // Opposing commanders (P3t, below): the side the player faces, and assets/traits.json once loaded
+  const enemySide = (game?.playerSide || hud?.playerSide || 'US') === 'US' ? 'CS' : 'US';
+  let traitData = null;
   if (commanders.length) {
     const slot = el('section', { class: 'briefing-commanders', 'aria-labelledby': 'briefing-commanders-heading', hidden: '' });
     body.append(slot);
     loadArt(); // usually loaded already by the battle HUD
-    whenArt((m) => {
+    // whenArt answers at once when the manifest is already in, which is before this dialog is in the page: build the list a
+    // microtask later, once mountBriefing has attached the dialog (otherwise the strip stayed hidden with no portraits)
+    whenArt((m) => queueMicrotask(() => {
       if (!m || !slot.isConnected) return;
       const list = el('ul', { class: 'briefing-commander-list' });
       for (const c of commanders) {
@@ -223,7 +352,43 @@ export function mountBriefing({ scenario, phase, game, hud, effects, onBegin = (
       }
       slot.append(el('h3', { id: 'briefing-commanders-heading', text: 'Commanders' }), list);
       slot.hidden = false;
-    });
+      stripTraits();
+    }));
+  }
+  // Opposing commanders (P3t): the enemy's army commander and the enemy commanders this phase gives traits, with plain labels,
+  // the game rule, the provenance and (in a disclosure) each trait's claim and sources. Nothing shows for a phase without traits.
+  function stripTraits() { // trait labels on the portrait strip for a named enemy commander who has them
+    if (!traitData) return;
+    for (const li of body.querySelectorAll('.briefing-commander[data-commander]')) {
+      const e = commanders.find((c) => c.name === li.dataset.commander && c.side === enemySide) ? traitEntry(traitData, scenario, li.dataset.commander) : null;
+      if (!e || li.querySelector('.briefing-commander-traits')) continue;
+      li.append(el('span', { class: 'briefing-commander-traits', text: e.traits.map((t) => t.label).join(' · ') }));
+    }
+  }
+  if (scenario && scenario.commanderTraits && typeof scenario.commanderTraits === 'object' && Object.keys(scenario.commanderTraits).length) {
+    const slot = el('section', { class: 'briefing-opponents', 'aria-labelledby': 'briefing-opponents-heading', hidden: '' });
+    body.append(slot);
+    loadTraits().then((data) => {
+      traitData = data;
+      if (!slot.isConnected) return;
+      const men = traitedCommanders(data, scenario, enemySide);
+      if (!men.length) return;
+      const list = el('ul', { class: 'briefing-opponent-list' });
+      for (const e of men) {
+        const head = el('p', { class: 'briefing-opponent-name' }, el('strong', { text: commanderTitle(e) }), e.role ? `, ${e.role}` : '');
+        const chips = el('p', { class: 'briefing-opponent-traits' }, ...e.traits.map((t) => el('span', { class: 'briefing-trait', 'data-trait': t.key, title: t.effect, text: t.label })),
+          el('span', { class: 'briefing-trait-prov', text: `Provenance: ${e.provenance || 'not given'}` }));
+        const rule = traitRuleLine([{ ...e, army: false }]);
+        const more = el('details', { class: 'briefing-opponent-more' }, el('summary', { text: `${e.name}'s record and sources` }));
+        more.append(traitDetails(e, document, 'h4'));
+        list.append(el('li', { class: 'briefing-opponent', 'data-commander': e.name }, head, chips, rule ? el('p', { class: 'briefing-opponent-rule', text: rule }) : null,
+          e.note && e.note.kind === 'record' ? el('p', { class: 'briefing-opponent-note', text: e.note.text }) : null, more));
+      }
+      slot.append(el('h3', { id: 'briefing-opponents-heading', text: 'Opposing commanders' }),
+        el('p', { class: 'sub briefing-opponents-sub', text: 'Each man\'s traits come from his documented record; what they make the enemy do is a game rule.' }), list);
+      slot.hidden = false;
+      stripTraits();
+    }).catch(() => {});
   }
   const decided = decisionLines(save, phase, deck);
   if (decided.length) {

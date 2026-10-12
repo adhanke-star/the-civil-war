@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0115 — Enemy commanders' sourced traits shape only AI decisions (2026-10-12)
+
+Ten Confederate commanders carry 1–2 temperament traits kept from a source check that opened every cited page (assets/traits.json, built from tools/data/cs-traits-verified.json; provenance per man; dropped traits never shipped). Traits change only AI timing and choices (TRAITS in src/franchise/tuning.js; tested: frozen orders give identical casualties with and without traits); Johnston's "reckless" shows as "led from the front" and acts through the existing commander roll. Each phase names its enemy army commander (Johnston, Beauregard, Bragg); corps commanders are not modelled, so Polk, Hardee and Cheatham have no effect yet. Chalmers's card notes Fort Pillow (12 April 1864), where surrendered Black soldiers were massacred. Traits and difficulty compose.
+
 ## 0114 — Difficulty levels, camp effects in battle, captured colours (2026-10-12)
 
 Difficulty changes only the enemy's timing and decisions, never combat numbers (tested: frozen orders give identical casualties at every level). Recruit: auto-pause always, AI re-plans every 1 s and commits reserves only at their set time. Veteran: as before. General: no auto-pause, AI re-plans every 0.25 s, commits reserves to a threatened point and counter-attacks local breakthroughs within 400 m. Camp effects now reach the fight (game rules): training +1% per bar point (cap 6); shoe shortage starts a brigade tired; ammunition shortage starts it with half its rounds (refilled out of contact); horse shortage slows limbering; Pioneers speed woods marching. Captured colours: all of a surrendering formation's regiments, a destroyed formation's to the nearest unbroken enemy within 150 m, one to a charger that breaks a formation; kept in the save and on the camp trophy shelf.

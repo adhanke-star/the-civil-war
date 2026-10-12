@@ -40,6 +40,12 @@ const PHISTERER = 'Phisterer, The Regular Brigade of the Fourteenth Army Corps i
 const WAYSIDE = 'NPS "Hazen\'s Artillery" wayside text (hmdb.org m=168545, reproduced on usa-civil-war.com Stones River p.3; the marker is removed): https://www.hmdb.org/m.asp?m=168545';
 const LINCOLN = 'https://quod.lib.umich.edu/l/lincoln/lincoln6/1:661?rgn=div1;view=fulltext';
 const GAME_CREW = 'Battery crew: game value of 20 men per gun (no sourced crew strength)';
+// The army commander each phase names (scenario.enemyCommander, P3t): his sourced traits (assets/traits.json) shape the
+// Confederate AI's decisions and timing, never a combat number.
+const ABT_BRAGG = 'American Battlefield Trust, Braxton Bragg (biography): https://www.battlefields.org/learn/biographies/braxton-bragg';
+const NPS_BRECK = 'NPS Stones River, Breckinridge\'s Charge: https://www.nps.gov/stri/historyculture/breckinridge.htm';
+const BRAGG = (sources) => ({ side: 'CS', name: 'Braxton Bragg', rank: 'General', role: 'commanding the Confederate Army of Tennessee', sources,
+  status: 'Verified: he commanded the Army of Tennessee at Stones River (ABT; NPS Civil War Series 23).' });
 
 // ---- provenance phrases used in unit status lines ---------------------------------------------------------------
 const XP_SR = 'xp 2 (trained): game rule for both armies at Stones River, which had fought at Shiloh or Perryville in 1862; brigade-level service history was not researched';
@@ -229,6 +235,7 @@ const PHASE1 = {
   objective: { name: 'the Wilkinson Pike behind Johnson\'s and Davis\'s line', at: { near: 'wilkinsonMid' }, r: 550 },
   retreat: { US: { near: 'rosecransHQ', bearing: 175, m: 170 }, CS: { near: 'greshamLane', bearing: 95, m: 1460 } },
   camera: { target: { near: 'greshamLane', bearing: 5, m: 550 }, lookBearing: 210, dist: 1800 },
+  enemyCommander: BRAGG([ABT_SR, CWS(4, 'Collapse of the Union Right'), ABT_BRAGG]),
   victory: {
     attackerHolds: 'The Confederates hold the Wilkinson Pike at 09:30. (In 1862 they crossed it: the right wing was driven back nearly a mile by 08:00 and toward the Nashville Pike by about 10:00.)',
     defenderHolds: 'The Wilkinson Pike is still in Union hands at 09:30. (In 1862 it was not, though the wing bent back to the Nashville Pike without collapsing.)',
@@ -373,6 +380,7 @@ const PHASE2 = {
   objective: { name: 'the Slaughter Pen, the cedar pivot north of the Wilkinson Pike', at: { near: 'slaughterPen' }, r: 450 },
   retreat: { US: { near: 'visitorCenter', bearing: 180, m: 140 }, CS: { near: 'slaughterPen', bearing: 185, m: 1960 } },
   camera: { target: { near: 'slaughterPen', bearing: 205, m: 330 }, lookBearing: 200, dist: 1800 },
+  enemyCommander: BRAGG([ABT_SR, CWS(4, 'Collapse of the Union Right'), ABT_BRAGG]),
   victory: {
     attackerHolds: 'The Confederates hold the cedars at 11:30. (In 1862 they did: out of ammunition, Sheridan\'s and Negley\'s men fell back to the Nashville Pike about 11:00, but their stand had bought the time Rosecrans needed.)',
     defenderHolds: 'The cedars are still in Union hands at 11:30. (In 1862 they were not: Sheridan\'s division ran out of ammunition and fell back about 11:00.)',
@@ -530,6 +538,7 @@ const PHASE3 = {
   objective: { name: 'the Round Forest and the Nashville Pike', at: { near: 'hazen' }, r: 450 },
   retreat: { US: { near: 'cemetery', bearing: 315, m: 600 }, CS: { near: 'cowanSite', bearing: 150, m: 1360 } },
   camera: { target: { near: 'hazen', bearing: 280, m: 30 }, lookBearing: 150, dist: 1600 },
+  enemyCommander: BRAGG([ABT_SR, CWS(7, 'Redundant Slaughter in the Round Forest'), ABT_BRAGG]),
   victory: {
     attackerHolds: 'The Confederates hold the Round Forest at 16:30. (In 1862 they never took it: four attacks were thrown back.)',
     defenderHolds: 'The Round Forest is still in Union hands at 16:30, as it was in 1862: the only part of the original Union line held all day.',
@@ -648,6 +657,7 @@ const PHASE4 = {
   objective: { name: 'the high ground west of McFadden\'s Ford', at: { near: 'artilleryMonument' }, r: 350 },
   retreat: { US: { near: 'artilleryMonument', bearing: 260, m: 1300 }, CS: { near: 'artilleryMonument', bearing: 145, m: 2390 } },
   camera: { target: { near: 'artilleryMonument', bearing: 115, m: 700 }, lookBearing: 175, dist: 1700 },
+  enemyCommander: BRAGG([CWS(9, 'Breckinridge: "by the special order of General Bragg"'), NPS_BRECK, ABT_SR, ABT_BRAGG]),
   victory: {
     attackerHolds: 'Breckinridge\'s men hold the ground west of McFadden\'s Ford at 17:00. (In 1862-63 they never crossed in force: the massed guns and Negley\'s counterattack drove them back to their starting woods.)',
     defenderHolds: 'The ground west of McFadden\'s Ford is still in Union hands at 17:00, as it was on 2 January 1863.',

@@ -833,6 +833,24 @@
             "status": "Identity Verified; strength Disputed: 1,150 (Hardee's return, used) or \"not over 1,100\" (Cleburne); weapon smooth: UNSOURCED low-confidence default (an uncited forum claim that about 60% of Bragg's infantry carried smoothbores; no ordnance return for this brigade); xp 2 (trained): game rule for both armies at Stones River, which had fought at Shiloh or Perryville in 1862; brigade-level service history was not researched; position Inferred: sent from reserve to fill the gap on Polk's right; it broke the 101st Ohio and Carlin's brigade; no battery: Semple's was detached to Hanson the day before (Cleburne)."
           }
         ],
+        "enemyCommander": {
+          "side": "CS",
+          "name": "Braxton Bragg",
+          "rank": "General",
+          "role": "commanding the Confederate Army of Tennessee",
+          "sources": [
+            "American Battlefield Trust, Stones River: https://www.battlefields.org/learn/civil-war/battles/stones-river",
+            "Cozzens, The Battle of Stones River, NPS Civil War Series 23, sec4 (Collapse of the Union Right): https://npshistory.com/publications/civil_war_series/23/sec4.htm",
+            "American Battlefield Trust, Braxton Bragg (biography): https://www.battlefields.org/learn/biographies/braxton-bragg"
+          ],
+          "status": "Verified: he commanded the Army of Tennessee at Stones River (ABT; NPS Civil War Series 23)."
+        },
+        "commanderTraits": {
+          "Braxton Bragg": [
+            "aggressive",
+            "stubborn"
+          ]
+        },
         "positionsNote": "Drawn about 600-800 m north of the sourced ground: the terrain asset ends at 35.8496 N, about 400 m short of the Gresham Lane - Franklin Road junction where NPS places the start of the attack. Johnson's brigades stand along Gresham Lane with Willich refused on the right and Baldwin in reserve, Davis's three brigades between them and the Wilkinson Pike (Johnson and Davis reports; NPS). McCown's three brigades start south-west of the Union right and step off at 06:15; Cleburne's four arrive behind them from 06:30 (he was 500-600 yards back at dawn). All positions Inferred.",
         "strengthNote": "Only Willich (2,458, Gibson) and Cleburne's brigades (Hardee's present-for-duty return) have sourced strengths. Kirk and Baldwin split NPS's 6,200 for Johnson's division by regiment count; Davis's brigades use Johnson's per-regiment average; McCown's brigades split 3,921 (Hardee's 10,045 less Cleburne's 6,124) over 13 regiments and battalions. Battery guns are estimates from Barnett's division totals except Simonson's and Humphreys's; crews are a game value of 20 per gun. Wharton's 2,000 cavalry are not fielded (the engine has no cavalry).",
         "historyNote": "McCown's and Cleburne's divisions broke Kirk's and Willich's brigades within minutes of 06:22 (Willich was captured and Kirk badly wounded) and drove the Union right back nearly a mile by 08:00, but the wing re-formed on the Nashville Pike and railroad and did not collapse.",
@@ -1798,6 +1816,24 @@
             "status": "Identity Verified; crew Inferred: 3 officers and 120 men (Phisterer, inside Shepherd's 1,566); guns Estimated: no Stones River count in the research; the battery's Shiloh armament of six (four Napoleons, two Parrotts) is carried; weapon napoleon: as at Shiloh; xp 2 (trained): game rule for both armies at Stones River, which had fought at Shiloh or Perryville in 1862; brigade-level service history was not researched; position Inferred: Rousseau found guns useless in the cedars and sent it to the open ground by the pike, where the Regulars rallied; franchise lineage: Terrill's Battery H, 5th U.S. Artillery at Shiloh, the same battery under Lt. Francis L. Guenther (Verified)."
           }
         ],
+        "enemyCommander": {
+          "side": "CS",
+          "name": "Braxton Bragg",
+          "rank": "General",
+          "role": "commanding the Confederate Army of Tennessee",
+          "sources": [
+            "American Battlefield Trust, Stones River: https://www.battlefields.org/learn/civil-war/battles/stones-river",
+            "Cozzens, The Battle of Stones River, NPS Civil War Series 23, sec4 (Collapse of the Union Right): https://npshistory.com/publications/civil_war_series/23/sec4.htm",
+            "American Battlefield Trust, Braxton Bragg (biography): https://www.battlefields.org/learn/biographies/braxton-bragg"
+          ],
+          "status": "Verified: he commanded the Army of Tennessee at Stones River (ABT; NPS Civil War Series 23)."
+        },
+        "commanderTraits": {
+          "Braxton Bragg": [
+            "aggressive",
+            "stubborn"
+          ]
+        },
         "positionsNote": "Sheridan's third position about 09:00 is the opening line: Roberts astride the Wilkinson Pike with Houghtaling at the angle, Sill's brigade (Greusel) by the Harding farm, Schaefer behind facing west, Hescock and Bush on the knoll before Negley's right, Negley's brigades on the left facing south (Sheridan, Negley, Miller; Cozzens). Rousseau's Regulars and John Beatty enter the cedars at 09:30 with Guenther's battery sent to the open ground by the Nashville Pike. Withers's and Cheatham's brigades start south of the cotton field and Harding farm; Cleburne's three come from the west. The Harding house, brick kiln, Smith's house and the \"log house\" are not located. All positions Inferred.",
         "strengthNote": "Sheridan's, Rousseau's and Negley's brigades are Rosecrans's and Negley's own tables read on the page images (single sources, Inferred or Disputed by a few men); the Regulars are 1,566 less Guenther's 123 gunners. Withers's three brigades split his division's 7,774 over 21 organizations (Estimated); Cheatham's are his engaged table less each attached battery. Clock times between reports differ by up to 30 minutes (Disputed).",
         "historyNote": "Sheridan's, Negley's and Rousseau's brigades held the cedars for about two hours against piecemeal attacks, then, out of ammunition, fell back to the Nashville Pike about 11:00, leaving Houghtaling's six guns behind; Sill, Roberts and Schaefer were killed.",
@@ -2522,6 +2558,28 @@
             "status": "Identity Verified; strength Inferred: 1,575 present (Bragg's return; 23 casualties that day); weapon smooth: UNSOURCED low-confidence default (an uncited forum claim that about 60% of Bragg's infantry carried smoothbores; no ordnance return for this brigade); xp 2 (trained): game rule for both armies at Stones River, which had fought at Shiloh or Perryville in 1862; brigade-level service history was not researched; position Inferred: formed on Preston's left."
           }
         ],
+        "enemyCommander": {
+          "side": "CS",
+          "name": "Braxton Bragg",
+          "rank": "General",
+          "role": "commanding the Confederate Army of Tennessee",
+          "sources": [
+            "American Battlefield Trust, Stones River: https://www.battlefields.org/learn/civil-war/battles/stones-river",
+            "Cozzens, The Battle of Stones River, NPS Civil War Series 23, sec7 (Redundant Slaughter in the Round Forest): https://npshistory.com/publications/civil_war_series/23/sec7.htm",
+            "American Battlefield Trust, Braxton Bragg (biography): https://www.battlefields.org/learn/biographies/braxton-bragg"
+          ],
+          "status": "Verified: he commanded the Army of Tennessee at Stones River (ABT; NPS Civil War Series 23)."
+        },
+        "commanderTraits": {
+          "Braxton Bragg": [
+            "aggressive",
+            "stubborn"
+          ],
+          "James R. Chalmers": [
+            "impetuous",
+            "aggressive"
+          ]
+        },
         "positionsNote": "Hazen holds the copse at the Hazen Brigade Monument between the Nashville Pike and the railroad, with Parsons's, Cockerill's and Estep's guns beside him, Grose in reserve behind, Wagner and Cox between the railroad and the river, and Hascall coming up from the river crossing (Hazen, Grose, Wagner, Hascall, Race reports). Cruft's remnant reaches the pike at noon. Chalmers starts behind his rifle pit in the open field south-east of the copse with Donelson behind; Jackson and Adams cross from the east bank about 13:00 and Preston and Palmer about 15:30. The burnt Cowan house is placed at North Thompson Lane (Disputed). All positions Inferred.",
         "strengthNote": "Union strengths are single commanders' figures (Hazen, Grose and Cruft from leaving camp on 26 December; Wagner and Hascall engaged). Chalmers's 2,000 is Cozzens's round figure; Donelson's about 1,400 is his own; Breckinridge's four brigades are Bragg's Inclosure C. Battery guns rest on Bearss and one NPS wayside; crews are a game value of 20 per gun. First-assault clock times differ between 09:00, 10:00 and 11:00 (Disputed).",
         "historyNote": "Hazen's brigade, with Hascall, Grose, Wagner and the massed batteries, threw back four Confederate attacks between about 10:00 and 16:00 and ended the day \"not a stone's throw\" from where it began: the one part of the original Union line never given up.",
@@ -3553,6 +3611,28 @@
             "status": "Identity Verified; crew Inferred: 45 taken into battle (Bearss, one source); guns Inferred: 4 Napoleons (Bearss); weapon napoleon; xp 2 (trained): game rule for both armies at Stones River, which had fought at Shiloh or Perryville in 1862; brigade-level service history was not researched; position Inferred: brought up from reserve into the cornfield to the right of Wright's guns; arrival time Estimated: after the attack began."
           }
         ],
+        "enemyCommander": {
+          "side": "CS",
+          "name": "Braxton Bragg",
+          "rank": "General",
+          "role": "commanding the Confederate Army of Tennessee",
+          "sources": [
+            "Cozzens, The Battle of Stones River, NPS Civil War Series 23, sec9 (Breckinridge: \"by the special order of General Bragg\"): https://npshistory.com/publications/civil_war_series/23/sec9.htm",
+            "NPS Stones River, Breckinridge's Charge: https://www.nps.gov/stri/historyculture/breckinridge.htm",
+            "American Battlefield Trust, Stones River: https://www.battlefields.org/learn/civil-war/battles/stones-river",
+            "American Battlefield Trust, Braxton Bragg (biography): https://www.battlefields.org/learn/biographies/braxton-bragg"
+          ],
+          "status": "Verified: he commanded the Army of Tennessee at Stones River (ABT; NPS Civil War Series 23)."
+        },
+        "commanderTraits": {
+          "Braxton Bragg": [
+            "aggressive",
+            "stubborn"
+          ],
+          "Gideon J. Pillow": [
+            "aggressive"
+          ]
+        },
         "positionsNote": "Beatty's division holds the wooded crest about half a mile south-east of the ford across Stones River (Price on the river bluff, Fyffe on his left, Grider in reserve near the Hoover house, Grose covering the left) with the 3rd Wisconsin Battery by the Hoover house; Cruft's brigade lies among Mendenhall's guns on the hill west of the ford, which runs south-west from Negley's batteries by the ford through Swallow, Parsons and Osburn (Bearss). The 6th Ohio and 26th Pennsylvania batteries stand near the railroad about a mile south-west. Estep's, the Board of Trade and Standart's batteries come up after the attack starts; Negley's Miller and Stanley cross at 16:30. Breckinridge's two lines start at the edge of the woods about 1,600 yards south of the crest. The Hoover house and the cornfield edges are not located. All positions Inferred.",
         "strengthNote": "No Union brigade strength for 2 January was found. Price, Fyffe and Grider are Estimated from Price's two reported regiments; Grose is his own figures less his 31 December losses; Cruft is his \"about 500\"; Miller and Stanley are their 31 December strengths less Miller's \"over 500\" loss rate. Confederate strengths are 31 December present-for-duty less 31 December losses (Bragg's Inclosure C), so Disputed against Breckinridge's \"some 4,500\" and Bragg's \"over 6,000\". Gun counts are Bearss's 57 (45 on the ridge with the 3rd Wisconsin, 12 enfilading); crews are a game value of 20 per gun except Semple's.",
         "historyNote": "Breckinridge's division took the crest east of McFadden's Ford soon after 16:00 but was broken within the hour by about 57 Union guns and Negley's counterattack across the ford, losing 1,338 to about 1,800 men; Bragg withdrew from Murfreesboro on the night of 3-4 January.",

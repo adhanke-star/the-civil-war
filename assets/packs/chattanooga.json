@@ -401,6 +401,24 @@
             "status": "Identity Inferred (NPS pages; the OR does not name the summit's holders); strength Estimated: NPS 634 less the 28th's 377 = 257; weapon rifled: Inferred, not sourced to the brigade (the 6,175 small arms captured at Chattanooga were \"mostly Enfield\", OR XXXI/2 pp. 99-100; the arms collected in front of Sherman were about 91% rifled, p. 583); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: on the knob and the rifle pits at its base; exact ground not established."
           }
         ],
+        "enemyCommander": {
+          "side": "CS",
+          "name": "Braxton Bragg",
+          "rank": "General",
+          "role": "commanding the Confederate Army of Tennessee",
+          "sources": [
+            "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec4 (Orchard Knob): https://npshistory.com/publications/civil_war_series/9/sec4.htm",
+            "American Battlefield Trust, Chattanooga: https://www.battlefields.org/learn/civil-war/battles/chattanooga",
+            "American Battlefield Trust, Braxton Bragg (biography): https://www.battlefields.org/learn/biographies/braxton-bragg"
+          ],
+          "status": "Verified: he commanded the Army of Tennessee at Chattanooga (ABT; NPS Civil War Series 9)."
+        },
+        "commanderTraits": {
+          "Braxton Bragg": [
+            "aggressive",
+            "stubborn"
+          ]
+        },
         "positionsNote": "Wood's division forms on the open slope south and east of Fort Wood (Willich left, Hazen right, Beatty in double column behind Willich's left) and Sheridan's Wagner and Harker on the north and south slopes of Bushy Knob, now the National Cemetery (Wood, Sheridan). The 28th Alabama holds log-and-stone barricades on the rocky rise just south of the knob and the 24th the knob and its rifle pits (Hazen, Wood; NPS). The knob is drawn at the HMDB monuments and the 3DEP summit, not the OSM point 390 m west. Sheridan's reserve brigade (not engaged) and Bridges's battery (placed on the knob only that night) are not fielded. All positions Inferred.",
         "strengthNote": "Hazen's 2,256 effective is his own report (Inferred). Willich and Beatty split Wood's 5,200 \"effective at Mission Ridge\" (a February 1864 dispatch) plus the 23 November losses, less Hazen, by regiment after fixing four sourced regiments (Estimated). Wagner's 1,800 is Disputed (about 2,000 in another report, both for 25 November); Harker's 2,100 is Sheridan's 6,000 less Wagner, halved (Estimated). The two Alabama regiments are NPS's \"about 634\" split by the 14 December return plus the 146 captured (Estimated). Fort Wood's six heavy guns rest on one OR sentence (Inferred); crews are a game value of 20 per gun.",
         "historyNote": "Wood's division took Orchard Knob and the rocky ridge south of it by about 15:00, capturing the 28th Alabama almost whole with its colours for about 190 killed and wounded; Grant and Thomas chose to hold and entrench the knob, a mile from Missionary Ridge, rather than recall Wood.",
@@ -1025,6 +1043,29 @@
             "status": "Identity Verified; strength Estimated: 1,102 effective on 14 December plus 56 lost on 24 November = 1,158, about +/-10%; weapon rifled: Inferred, not sourced to the brigade (the 6,175 small arms captured at Chattanooga were \"mostly Enfield\", OR XXXI/2 pp. 99-100; the arms collected in front of Sherman were about 91% rifled, p. 583); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: about 300 yards south of the Cravens house, left of the road with its left on the rock bluff, relieving Walthall; arrival time Disputed: a little past 13:00 (Stevenson) to after 14:00 (NPS Series); 13:15 used."
           }
         ],
+        "enemyCommander": {
+          "side": "CS",
+          "name": "Braxton Bragg",
+          "rank": "General",
+          "role": "commanding the Confederate Army of Tennessee",
+          "sources": [
+            "American Battlefield Trust, Lookout Mountain map page: https://www.battlefields.org/learn/maps/chattanooga-lookout-mountain-nov-24-1863",
+            "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec4 (Orchard Knob): https://npshistory.com/publications/civil_war_series/9/sec4.htm",
+            "American Battlefield Trust, Chattanooga: https://www.battlefields.org/learn/civil-war/battles/chattanooga",
+            "American Battlefield Trust, Braxton Bragg (biography): https://www.battlefields.org/learn/biographies/braxton-bragg"
+          ],
+          "status": "Verified: he commanded the Army of Tennessee at Chattanooga (ABT; NPS Civil War Series 9)."
+        },
+        "commanderTraits": {
+          "Braxton Bragg": [
+            "aggressive",
+            "stubborn"
+          ],
+          "Edward C. Walthall": [
+            "stubborn",
+            "skilled-defender"
+          ]
+        },
         "positionsNote": "Geary crossed Lookout Creek at the old mill near Wauhatchie, about 2.5 miles up the creek and off the drawn map, so his three brigades open on the lower west slope at the map's south-west edge (about 1.5 km north-east of the crossing), Cobham on the right under the palisades, Ireland in the centre and Candy on the left toward the creek, with Whitaker's brigade about 300 yards behind (Geary, Cobham, Ireland). Walthall's main line and camp are on the plateau west of the Cravens house, Moore's brigade in the trenches about 400 yards south of the house and Gibson's two guns in its yard (Walthall, Moore, Jackson, Gibson). Woods and Grose cross at Woods's pole bridge at 11:00; part of Williamson's brigade follows; Pettus's three regiments come down the Summertown road at 13:15 (Disputed: 13:00 to after 14:00). Sahm's and Wiedrich's guns fire from the hills west of the creek. The peach orchard, stone wall and road junction are not located. All positions Inferred.",
         "strengthNote": "Cobham, Ireland and Candy are Geary's own table of the force engaged (OCR-garbled, Inferred); Whitaker's 1,465 is in both Cruft's and Geary's reports (Verified); Grose's 1,624 is Disputed against his own 1,693. Woods and Williamson are Osterhaus's regimental figures less the regiments he says stayed with the batteries until evening (Estimated). Walthall's 1,489 and Moore's 1,205 are 20 November effective totals quoted by Jackson (Inferred); Pettus's 1,158 is the 14 December return plus his losses (Estimated). Crews are a game value of 20 per gun.",
         "historyNote": "Geary's, Cruft's and Osterhaus's brigades took the Cravens House bench by about 13:00-14:00 and held a line 400-500 yards beyond it in the fog; Walthall's brigade lost 845 men captured, Moore and Pettus held a second line until Bragg ordered the mountain abandoned, and the Confederates were gone by the early hours of 25 November.",
@@ -1882,6 +1923,24 @@
             "status": "Identity Inferred; strength Estimated: no sourced 25 November strength; a flat 1,260, the mean of five sourced Army of Tennessee brigade effective strengths of November 1863 (Moore 1,205 and Walthall 1,489 on the 20 November return, quoted by Jackson; Lowrey 1,330, Smith 1,266 and Liddell 1,016 taken into the fight, Cleburne), low confidence; weapon rifled: Inferred, not sourced to the brigade (the 6,175 small arms captured at Chattanooga were \"mostly Enfield\", OR XXXI/2 pp. 99-100; the arms collected in front of Sherman were about 91% rifled, p. 583); xp 3 (veteran): game rule for both armies at Chattanooga, veterans of the 1863 campaigns (Chickamauga for the Army of the Cumberland and the Army of Tennessee; Hooker's and Sherman's men came from the Army of the Potomac and the Army of the Tennessee); brigade-level service history was not researched; position Inferred: on the crest south of Bragg's headquarters beside Strahl, off the drawn map: drawn at the south edge."
           }
         ],
+        "enemyCommander": {
+          "side": "CS",
+          "name": "Braxton Bragg",
+          "rank": "General",
+          "role": "commanding the Confederate Army of Tennessee",
+          "sources": [
+            "Cozzens, The Battles for Chattanooga, NPS Civil War Series 9, sec7 (Bragg tried to rally Tucker, Finley and Gibson): https://npshistory.com/publications/civil_war_series/9/sec7.htm",
+            "American Battlefield Trust, Chattanooga: https://www.battlefields.org/learn/civil-war/battles/chattanooga",
+            "American Battlefield Trust, Braxton Bragg (biography): https://www.battlefields.org/learn/biographies/braxton-bragg"
+          ],
+          "status": "Verified: he commanded the Army of Tennessee at Chattanooga (ABT; NPS Civil War Series 9)."
+        },
+        "commanderTraits": {
+          "Braxton Bragg": [
+            "aggressive",
+            "stubborn"
+          ]
+        },
         "positionsNote": "The Union line runs from Baird's division on the left (Phelps, Van Derveer, Turchin) through Wood's (Beatty, Willich, Hazen) in front of Orchard Knob and Sheridan's (Wagner, Harker, F. T. Sherman) to Carlin on the right, about 1,200 yards from the ridge (NPS; Van Derveer). On the ridge from north to south: Vaughan, Deas (in the base pits) with Waters's battery, Manigault, Tucker at the Bird's Mill Road, Bate's brigade under Tyler and the Florida brigade at the base south of the break, Cobb's battery beside Bragg's headquarters, then Strahl and Stovall (NPS; Wikipedia). The terrain ends about 150 m south of the Bragg Reservation, so Strahl and Stovall (south of headquarters) are drawn at the south edge beside it and Carlin (toward Rossville Gap) at the south-west edge, all compressed; the Bird's Mill Road is the terrain's modern alignment, about 1.2 km north of Bragg's headquarters. All positions Inferred.",
         "strengthNote": "Van Derveer's 1,679 is his table of the force engaged (Inferred); Wagner's about 2,000 is Disputed against about 1,800. Hazen is his 2,256 less his 23 November losses; Willich and Beatty split Wood's 5,200 by regiment; Harker and Sherman halve Sheridan's 6,000 less Wagner; Turchin, Phelps and Carlin use a pooled 244.8 men per regiment (all Estimated). No Confederate brigade strength for 25 November was found: all eight are a flat 1,260 (Estimated, likely high for the consolidated Tennessee and Florida brigades; NPS gives about 16,000 Confederates on the ridge, Wikipedia about 20,000, Disputed). Crews are a game value of 20 per gun. No Union battery is named in the sources for this sector, so none is fielded.",
         "historyNote": "The Union centre took the base rifle pits and then the crest in about an hour; the line first broke at the Bird's Mill Road a few minutes before 17:00, Harker's brigade took Cobb's battery beside Bragg's headquarters, and Bragg's army retreated toward Dalton, its centre broken.",

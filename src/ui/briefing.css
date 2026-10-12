@@ -30,3 +30,18 @@
 #briefing .briefing-portrait img { display: block; width: 100%; height: 100%; object-fit: cover; }
 #briefing .briefing-commander-name { font-size: 13px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
 #briefing .briefing-commander-note { font-size: 11.5px; line-height: 1.3; color: var(--dim); overflow-wrap: anywhere; }
+/* Opposing commanders (P3t; src/ui/briefing.js): plain trait labels, the game rule, provenance, and a disclosure with each
+   trait's claim and sources (shared with the unit card's Records dialog, .traits-man in hud.css). */
+#briefing .briefing-commander-traits { font-size: 11.5px; line-height: 1.3; color: #ffd9b0; overflow-wrap: anywhere; }
+#briefing .briefing-opponents h3 { margin: 14px 0 4px; }
+#briefing .briefing-opponents-sub { margin: 0 0 8px; font-size: 13px; }
+#briefing .briefing-opponent-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+#briefing .briefing-opponent { padding: 8px 10px; border-radius: 6px; background: rgba(200, 56, 74, 0.08); border-left: 3px solid #c8384a; min-width: 0; }
+#briefing .briefing-opponent p { margin: 2px 0; line-height: 1.45; overflow-wrap: anywhere; }
+#briefing .briefing-opponent-traits { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+#briefing .briefing-trait { padding: 1px 7px; border-radius: 10px; background: rgba(255, 210, 122, 0.14); color: #ffe6b8; font-size: 13px; }
+#briefing .briefing-trait-prov { font-size: 12px; color: var(--dim); }
+#briefing .briefing-opponent-rule { font-size: 13px; color: #c9e3a8; }
+#briefing .briefing-opponent-note { font-size: 13px; color: #ffd9d2; }
+#briefing .briefing-opponent-more summary { box-sizing: border-box; min-height: 44px; padding: 12px 0; line-height: 20px; cursor: pointer; color: var(--focus); font-size: 13.5px; }
+#briefing .briefing-opponent-more summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }

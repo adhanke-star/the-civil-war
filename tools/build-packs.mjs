@@ -18,6 +18,9 @@
 //   - lets a phase fight on its own terrain asset (phase.terrain, default the pack's src.terrain): every position in
 //     that phase is projected with THAT terrain's centre, and a clearing, wood, site or label that names a `terrain`
 //     is drawn only in phases on that terrain (absent: every phase); phase.groundBase overrides src.groundBase;
+//   - writes the phase's army commander (phase.enemyCommander -> scenario.enemyCommander: side, name, rank, role, sources,
+//     status, note?) and `commanderTraits`: name -> trait keys from assets/traits.json (tools/build-traits.mjs) for every man
+//     in the phase who has them (the army commander first, then the roster's commanders in order); none: no key (P3t);
 //   - validates every phase with preparePhase and prepareFieldScenario(..., 'pack') before writing.
 // Output is deterministic (no clock, no randomness) with a fixed key order, so tools/test-shiloh.mjs can rebuild
 // it in memory and compare byte for byte.
@@ -28,6 +31,23 @@ import { preparePhase, prepareFieldScenario, PACK_ID } from '../src/sim/phase.js
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const FIGURE_BUDGET = 3000; // drawn figures per phase (the pack route admits 4,000)
+/** assets/traits.json's commanders: name -> trait keys (built by tools/build-traits.mjs from the verified research). */
+export function traitsTable(file = path.join(ROOT, 'assets', 'traits.json')) {
+  const t = JSON.parse(fs.readFileSync(file, 'utf8'));
+  if (!t || typeof t.commanders !== 'object' || !t.vocabulary) throw new Error('build-packs: assets/traits.json has no commanders (run node tools/build-traits.mjs)');
+  return new Map(Object.entries(t.commanders).map(([name, c]) => {
+    if (!Array.isArray(c.traits) || !c.traits.length || c.traits.some((k) => !Object.prototype.hasOwnProperty.call(t.vocabulary, k))) throw new Error(`build-packs: traits.json: ${name} has an unknown trait`);
+    return [name, [...c.traits]];
+  }));
+}
+const words = (v) => typeof v === 'string' && v.trim().length > 0;
+/** The phase's army commander in a fixed key order (sourced: never an invented man). */
+function enemyCommanderRow(c, where) {
+  if (!c) return null;
+  if (!['US', 'CS'].includes(c.side) || !['name', 'rank', 'role', 'status'].every((k) => words(c[k])) || !Array.isArray(c.sources) || !c.sources.length
+    || c.sources.length > 16 || !c.sources.every(words) || ('note' in c && !words(c.note))) throw new Error(`build-packs: ${where}: the enemy commander needs a side, name, rank, role, 1-16 sources and a status`);
+  return { side: c.side, name: c.name, rank: c.rank, role: c.role, sources: [...new Set(c.sources)], status: c.status, ...(c.note ? { note: c.note } : {}) };
+}
 const DEG = Math.PI / 180;
 
 /** The terrain asset's frame and the fetch-terrain projection constants for it. */
@@ -143,7 +163,7 @@ function historyBlock(h) {
 }
 
 /** Build one pack from its curated module (an object with id, title, terrain, landmarks, formations, phases). */
-export function buildPackFrom(src) {
+export function buildPackFrom(src, traits = traitsTable()) {
   if (!PACK_ID.test(src.id)) throw new Error(`build-packs: invalid pack id "${src.id}"`);
   // One projection per terrain asset: a phase on another terrain resolves every position about that terrain's centre.
   const resolvers = new Map();
@@ -170,6 +190,9 @@ export function buildPackFrom(src) {
       return unitRow(ident(u.id), u, phase, resolve, { atSec, noticeSec: Math.min(atSec, 30), entry: u.entry });
     });
     const roster = [...units, ...reinforcements];
+    const enemyCommander = enemyCommanderRow(phase.enemyCommander, phase.id);
+    const named = [...(enemyCommander ? [enemyCommander.name] : []), ...roster.map((u) => u.commander?.name).filter(Boolean)];
+    const commanderTraits = Object.fromEntries([...new Set(named)].filter((name) => traits.has(name)).map((name) => [name, [...traits.get(name)]]));
     const menPerFigure = menPerFigureFor(roster);
     const [ox, oz] = resolve(phase.objective.at, `${phase.id} objective`);
     const labelAngle = round3(-camera.yaw);
@@ -193,6 +216,8 @@ export function buildPackFrom(src) {
       labelsNote: src.labelsNote,
       units,
       ...(reinforcements.length ? { reinforcements } : {}),
+      ...(enemyCommander ? { enemyCommander } : {}),
+      ...(Object.keys(commanderTraits).length ? { commanderTraits } : {}),
       positionsNote: phase.positionsNote,
       strengthNote: phase.strengthNote,
       historyNote: phase.historyNote,
