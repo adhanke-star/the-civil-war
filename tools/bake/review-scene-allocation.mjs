@@ -5,6 +5,7 @@ import { chromium } from 'playwright';
 import { startServer, ROOT } from '../serve.mjs';
 import { AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation } from './scene-allocation.mjs';
 import {installInactiveFigures} from './inactive-figures.mjs';
+import {partitionTerrain,installTerrainPartition} from './partition-terrain.mjs';
 
 function inventory() {
   const {scene,post,game}=window.__game,arrays=new Map(),textures=new Set();let declaredArrayBytes=0;
@@ -45,9 +46,10 @@ async function main(){
   if(fs.existsSync(out)||fs.realpathSync(outputRoot)!==outputRoot)throw new Error('scene allocation: needs fresh real .out/scene-allocation');
   fs.mkdirSync(out);
   const campaign=JSON.parse(fs.readFileSync(path.join(ROOT,'assets/campaign.json')));
-  const inactive=process.env.SCENE_INACTIVE==='true';
+  const inactive=process.env.SCENE_INACTIVE==='true',partition=process.env.SCENE_PARTITION==='true';
   const report={diagnosticOnly:true,fieldable:false,toolSha:process.env.GITHUB_SHA,route:'current PNG, both armies',cases:[],complete:false,
     inactivePrototype:inactive,
+    terrainPartitionPrototype:partition,
     limits:{gpuBytes:250000000},nativeDriverMemory:'UNRUN',cpuDecodePeak:'UNRUN',
     unverified:['native driver storage/pools and deferred releases after context destruction','whole-fight effect maximum beyond exercised frames','future sandbox spawns beyond declared pools','CPU image decode/upload-copy peaks']};
   const source={ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString()};
@@ -71,12 +73,23 @@ async function main(){
         });
         await page.waitForFunction(()=>window.__game.game.baked.state==='ready',null,{timeout:120000,polling:250});
         const capture=async label=>{
-          await page.evaluate(()=>{const {post,scene,camera}=window.__game;post.render(scene,camera);});
-          const data=await page.evaluate(inventory);row.states.push({label,...data});save();
+          const drawCalls=await page.evaluate(()=>{const {post,scene,camera}=window.__game,r=post.renderer,prior=r.info.autoReset;r.info.autoReset=false;r.info.reset();try{post.render(scene,camera);return r.info.render.calls;}finally{r.info.autoReset=prior;}});
+          const data=await page.evaluate(inventory);row.states.push({label,drawCalls,...data});save();
           if(data.glError||data.allocation.unknown.length||errors.length)throw new Error(`scene allocation: ${entry.phaseId}/${label} incomplete: GL${data.glError}, ${data.allocation.unknown.join(',')}, ${errors.join(',')}`);
           console.log(entry.phaseId,label,JSON.stringify({reservation:data.conservativeReservation,...data.allocation.byKind,arrays:data.declaredArrayBytes,pages:data.atlasPages}));
         };
         await capture('field');
+        if(partition){
+          if(entry.phaseId==='lookout-mountain')await page.screenshot({path:path.join(out,'terrain-partition-01-before.png')});
+          row.partition=await page.evaluate(async source=>{const THREE=await import('three'),P=(0,eval)('('+source.partition+')'),install=(0,eval)('('+source.install+')');return install(window.__game.world,THREE,P);},{partition:partitionTerrain.toString(),install:installTerrainPartition.toString()});
+          if(!row.partition.materialShared||row.partition.triangles!==row.partition.statTriangles)throw new Error('terrain partition: material/stat seam changed');
+          await capture('partition-field');
+          if(entry.phaseId==='lookout-mountain'){
+            await page.screenshot({path:path.join(out,'terrain-partition-02-after.png')});
+            await page.mouse.move(700,300);await page.mouse.wheel(0,-400);await page.waitForTimeout(1000);await capture('partition-native-zoom');
+            await page.screenshot({path:path.join(out,'terrain-partition-03-zoom.png')});
+          }
+        }
         if(inactive){await page.evaluate(source=>{const g=window.__game.game;g.__inactiveStats=(0,eval)('('+source+')')(g);g.animate(0);},installInactiveFigures.toString());await capture('inactive-field');}
         await page.evaluate(async()=>{await Promise.all(Object.values(window.__game.game.baked.atlases).map(a=>a.load('close')));});
         await capture('both-close-tiers');

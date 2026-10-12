@@ -1,5 +1,17 @@
 # Handoff — existing v1 (2026-10-11, Claude Opus 5.5)
 
+0134 authorizes NEXT product progression slice (not yet implemented): thresholds[0,30,75,135,210,300,405,525,660,800],
+all other economy/combat/badge numbers preserved. Actual268c501 playthrough38269804238:201/201,605rep/currentL6,
+4Draw/3Defeat/5Decisive, phase465+decisions140/no turn-ins; candidateL8 exactlycards7/8, preservation/idempotence
+verified in .out/progression-actual-candidate-r3.json and raw final-save/result. Historical09's570/L5 nofinalsave;
+create separate labelled legalAPI fixture for threecard migration, not fictional historical evidence.
+Full2000depot: ascending delivery only as slots fit, savedlevel advances with eachcard/ledger, remainingrewards
+derived fromrep/level. Clear pending message; retryafter validatedload/import/inventorytransactions. One real
+sale frees one card, no all-or-nothing deadlock. Existing storage coordinatedtransactions must preserve prior
+save onfailedwrite/staleconcurrency. Exactactual+constructed570/zero-one-enoughslots/sale/soldcards/repeat/
+reload/exportimport/storagefailure/concurrentstale checks required; newCPU/UI system andsw bump productonly.
+Difficulty6case andall20badgeaction-tier gates remain open; v1.1/tag/release then v2 remains the objective.
+
 Latest0133: corrected baseline scene38269841040/268c501 SUCCESS, all11x6 states+actual404; synchronizedGPU
 peak437,579,014 exceeds250M, retainedupper498,626,748. Fully mapped buffers; future unuploaded arrays remain
 separate demand. Inactive diagnostic5/5+5mutants retains CPU records, releases only empty standing buckets or

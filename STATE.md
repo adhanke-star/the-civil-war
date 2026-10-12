@@ -12,7 +12,7 @@ Full ASTC38261826032 fails short page4s; 8ASTC/2PNG qualification authorized, no
 Scene38269841040 complete11x6states/404; peak437,579,014GPU exceeds250M; native memory unmeasured.
 Inactive figure prototype5/5+5 mutants; GPU/style/split Actions pending; lossless terrain diagnostic admitted0133.
 Foragers actual4/4 caches/Gold saved in268c501 shard4; fullCI38269804238 pending, images inspected.
-Progression6/6+6 mutants and difficulty matrix4/4+4; actual CI pending; thresholds unchanged (0130/0132).
+Actual playthrough201/201,605/currentL6; Astra approves thresholds/deferred cards0134, product implementation pending.
 Native UHD 617/iPad frame rates and device sound remain unmeasured; no requested device runs.
 MAIN checkout keeps 11 protected uncommitted P2o files untouched; P2o is parked (DECISIONS 0109).
 After completed v1.1/tag/release: Astra-approved v2 plan, officers, Confederate franchise, Eastern campaign,

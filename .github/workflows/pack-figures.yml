@@ -18,6 +18,10 @@ on:
         description: Scene mode only; diagnostic inactive figure buffer reclamation
         type: boolean
         default: false
+      partition:
+        description: Scene mode only; diagnostic lossless Uint16 terrain partitions
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
@@ -107,11 +111,14 @@ jobs:
         if: inputs.mode == 'scene'
         env:
           SCENE_INACTIVE: ${{ inputs.inactive }}
+          SCENE_PARTITION: ${{ inputs.partition }}
         run: |
           node tools/test-scene-allocation.mjs
           node tools/test-scene-allocation.mjs --prove-fail
           node tools/test-inactive-figures.mjs
           node tools/test-inactive-figures.mjs --prove-fail
+          node tools/test-terrain-partition.mjs
+          node tools/test-terrain-partition.mjs --prove-fail
           node tools/bake/review-scene-allocation.mjs
       - name: Scene allocation report only, no assets or adoption
         if: always() && inputs.mode == 'scene'
