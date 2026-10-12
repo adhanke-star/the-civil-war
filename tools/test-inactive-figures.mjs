@@ -1,14 +1,18 @@
 // CPU object/record lifecycle only. Actual GPU deletion/reupload/savings are Actions observations.
 import assert from 'node:assert/strict';
 import {SoldierPool,FallenPool,UNIFORMS,FALLEN} from '../src/units/soldier-mesh.js';
-import {installInactiveFigures} from './bake/inactive-figures.mjs';
-const api={install:installInactiveFigures};
+import {installInactiveFigures,installRenderGate} from './bake/inactive-figures.mjs';
+const api={install:installInactiveFigures,gate:installRenderGate};
 function fixture(install){
   const standing=new SoldierPool(4,UNIFORMS.US,{kit:'US'}),fallen=new FallenPool(4,UNIFORMS.US,{kit:'US'}),game={pools:{US:standing},fallen:{US:fallen}},refs=standing.buckets.map(b=>({mesh:b.mesh,geo:b.mesh.geometry,matrix:b.mesh.instanceMatrix,anim:b.anim.array,tint:b.tint.array,clip:b.clip.array}));
   const stats=install(game);return {standing,fallen,game,refs,stats};
 }
 const push=p=>p.push(0,0,0,0,1,0,0,0,0,0,0,0,true);
 const checks=[
+ ['render-gate',a=>{const nativeError=new Error('native render'),calls=[],post={render(...args){calls.push({receiver:this,args});if(args[0]===nativeError)throw nativeError;return args[0];}},native=post.render,arg={scene:true},gate=a.gate(post);
+ assert.equal(post.render(arg),undefined,'render-gate: repeated automatic drawing held');assert.equal(calls.length,0,'render-gate: held callback did not draw');
+ assert.equal(gate.renderOnce(arg),arg,'render-gate: explicit native return/argument survives');assert.equal(calls[0].receiver,post,'render-gate: native receiver survives');assert.equal(gate.count,1,'render-gate: one actual draw counted');
+ let error;try{gate.renderOnce(nativeError);}catch(e){error=e;}assert.equal(error,nativeError,'render-gate: native error survives');gate.restore();assert.equal(post.render,native,'render-gate: exact native restored');assert.equal(post.render(arg),arg,'render-gate: normal rendering restored');}],
  ['outline-control',a=>{const f=fixture(a.install),p=f.standing;p.cam.set(0,0,10);p.begin();p.flush();p.setOutline(false);push(p);p.flush();assert.ok(p.buckets.filter(b=>b.outline).every(b=>!b.outline.visible),'outline-control: outline setting survives reactivation');p.begin();p.flush();p.setOutline(true);assert.ok(p.buckets.every(b=>!b.outline?.visible),'outline-control: hidden bucket cannot upload outlines');push(p);p.flush();assert.ok(p.buckets.some(b=>b.n&&b.outline?.visible),'outline-control: enabled outline restores with body');}],
  ['empty-buckets',a=>{const f=fixture(a.install);let geometry=0,meshes=0;for(const b of f.standing.buckets){b.mesh.geometry.addEventListener('dispose',()=>geometry++);b.mesh.addEventListener('dispose',()=>meshes++);b.outline?.addEventListener('dispose',()=>meshes++);}f.standing.begin();f.standing.flush();assert.ok(f.standing.buckets.every(b=>!b.mesh.visible&&!b.outline?.visible),'empty-buckets: no empty geometry uploaded');assert.equal(geometry,3,'empty-buckets: shared body/outline geometry disposed once');assert.equal(meshes,5,'empty-buckets: body and outline matrix ownership both retired');f.standing.flush();assert.equal(geometry,3,'empty-buckets: no repeated disposal churn');}],
  ['reactivation-records',a=>{const f=fixture(a.install),p=f.standing;p.begin();p.flush();push(p);p.flush();assert.equal(p.pushed,1,'reactivation-records: every pushed figure retained');assert.ok(p.buckets.some(b=>b.n===1&&b.mesh.visible),'reactivation-records: active officers/crews return');for(const [i,b]of p.buckets.entries()){const r=f.refs[i];assert.equal(b.mesh,r.mesh,'reactivation-records: mesh identity stable');assert.equal(b.mesh.geometry,r.geo,'reactivation-records: geometry identity stable');assert.equal(b.mesh.instanceMatrix,r.matrix,'reactivation-records: CPU matrix retained');assert.equal(b.anim.array,r.anim,'reactivation-records: animation retained');if(b.outline)assert.equal(b.outline.instanceMatrix,b.mesh.instanceMatrix,'reactivation-records: matrix shared once');}assert.equal(f.stats.reactivated,1,'reactivation-records: one bucket restored');}],
@@ -16,6 +20,7 @@ const checks=[
  ['hidden-gore-restore',a=>{const saved={gore:FALLEN.gore,clock:FALLEN.clock};try{let now=0;FALLEN.gore=true;FALLEN.clock=()=>now;const f=fixture(a.install),p=f.fallen,i=p.alloc();p.set(i,1,2,3,0,1,false,0,0,true);p.setBakedClip(2);p.flush();assert.equal(p.mesh.visible,false,'hidden-gore-restore: entirely clipped casualties retired');FALLEN.gore=false;now=1000;p.setBakedClip(0);p.flush();assert.equal(p.hiddenTo,1,'hidden-gore-restore: CPU fade continues while hidden');FALLEN.gore=true;p.setBakedClip(0);p.flush();assert.ok(p.mesh.visible,'hidden-gore-restore: rigged casualty restores');assert.equal(p.hiddenTo,0,'hidden-gore-restore: gore restoration preserved');assert.equal(p.mesh.instanceMatrix.array[13],2,'hidden-gore-restore: original ground restored');}finally{Object.assign(FALLEN,saved);}}],
 ];
 const mutants={
+ 'render-gate':{gate:p=>{const g=installRenderGate(p);g.restore();return g;}},
  'outline-control':{install:g=>{const s=installInactiveFigures(g);const p=g.pools.US;p.setOutline=()=>{};return s;}},
  'empty-buckets':{install:()=>({})},
  'reactivation-records':{install:g=>{const s=installInactiveFigures(g);const p=g.pools.US,native=p.flush;p.flush=function(){native.call(this);for(const b of this.buckets)b.mesh.visible=false;};return s;}},

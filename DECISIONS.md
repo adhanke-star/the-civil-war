@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0136 — Gate diagnostic scene draws during screenshots and prove LOD reupload (Astra, 2026-10-12)
+
+Retain incomplete inactive run38272065399: nine phases complete, Lookout rigged screenshot timed out30s; actual buffers20,182,462→18,118,226 (2,064,236 freed), GL0/no unknowns, combat unchanged but reactivated0. Owned post.render gate holds repeated draws while preserving browser/UI callbacks; explicit native render once+GLfinish/count before each screenshot, exact restore in finally. Keep all11 phases/styles/images/timeout. Add native camera fly-to/zoom into a previously retired near LOD bucket; require restored figures, increased reactivation count and new observed GL buffer before claiming reupload. CPU6/6+6mutants covers held/single/restored drawing and native args/receiver/errors. No product adoption or native performance claim.
+
 ## 0135 — Preserve authored time zero in direct-link difficulty contexts (Astra, 2026-10-12)
 
 Retain failed CI38270835011: direct battle links do not mount the campaign briefing, so no difficulty observation ran. Before navigation in only the six owned Actions contexts, wrap native RAF callbacks to pause the available game before each callback while held, preserving native handles/cancellation/receiver/timestamps/errors and every callback. Wait for ready/game without a briefing, assert authored seed/roster, zero simulation time and accepted fixed orders, then release without unpausing; explicit fast-forward alone advances simulation. Never rewind clocks/RNG. CPU5/5+5mutants includes preboot/cancellation/exception controls. Product unchanged; same complete six-case observation remains required.

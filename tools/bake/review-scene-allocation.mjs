@@ -4,7 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { startServer, ROOT } from '../serve.mjs';
 import { AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation } from './scene-allocation.mjs';
-import {installInactiveFigures} from './inactive-figures.mjs';
+import {installInactiveFigures,installRenderGate} from './inactive-figures.mjs';
 import {partitionTerrain,installTerrainPartition} from './partition-terrain.mjs';
 
 function inventory() {
@@ -73,8 +73,8 @@ async function main(){
         });
         await page.waitForFunction(()=>window.__game.game.baked.state==='ready',null,{timeout:120000,polling:250});
         const capture=async label=>{
-          const drawCalls=await page.evaluate(()=>{const {post,scene,camera}=window.__game,r=post.renderer,prior=r.info.autoReset;r.info.autoReset=false;r.info.reset();try{post.render(scene,camera);return r.info.render.calls;}finally{r.info.autoReset=prior;}});
-          const data=await page.evaluate(inventory);row.states.push({label,drawCalls,...data});save();
+          const drawing=await page.evaluate(()=>{const {post,scene,camera}=window.__game,r=post.renderer,prior=r.info.autoReset;r.info.autoReset=false;r.info.reset();try{if(window.__sceneRenderGate)window.__sceneRenderGate.renderOnce(scene,camera);else post.render(scene,camera);r.getContext().finish();return {drawCalls:r.info.render.calls,nativeRenders:window.__sceneRenderGate?.count??null};}finally{r.info.autoReset=prior;}});
+          const data=await page.evaluate(inventory);row.states.push({label,...drawing,...data});save();
           if(data.glError||data.allocation.unknown.length||errors.length)throw new Error(`scene allocation: ${entry.phaseId}/${label} incomplete: GL${data.glError}, ${data.allocation.unknown.join(',')}, ${errors.join(',')}`);
           console.log(entry.phaseId,label,JSON.stringify({reservation:data.conservativeReservation,...data.allocation.byKind,arrays:data.declaredArrayBytes,pages:data.atlasPages}));
         };
@@ -105,23 +105,37 @@ async function main(){
         await resized({width:320,height:568});await capture('narrow-resize');
         if(inactive&&entry.phaseId==='lookout-mountain'){
           await resized({width:1024,height:768});
+          await page.evaluate(source=>{window.__sceneRenderGate=(0,eval)('('+source+')')(window.__game.post);},installRenderGate.toString());
           const transition=async(label,style,compare=false)=>{
             const state=await page.evaluate(async({style,compare})=>{
               const g=window.__game.game,S=await import('./src/settings.js'),C=await import('./src/sandbox/compare.js');
               const combat=()=>JSON.stringify({time:g.simTime,orders:g.orders,holder:g.holder,units:g.units.map(u=>({id:u.id,men:u.men,morale:u.morale,ammo:u.ammo,state:u.state,order:u.order.type,x:u.x,z:u.z}))});
               const before=combat();C.stopCompare();S.set('look.figureStyle',style);
               if(compare){const spec=S.all().find(s=>s.key==='look.figureStyle').spec;C.startCompare('look.figureStyle',spec,style,()=>{});}
-              g.animate(0);return {combatUnchanged:combat()===before,stats:{...g.__inactiveStats},procedural:g.pools.US.pushed+g.pools.CS.pushed,baked:g.impostors.US.drawn+g.impostors.CS.drawn};
+              g.setView(window.__game.camera,innerHeight*window.__game.post.scale);g.animate(0);return {combatUnchanged:combat()===before,stats:{...g.__inactiveStats},procedural:g.pools.US.pushed+g.pools.CS.pushed,baked:g.impostors.US.drawn+g.impostors.CS.drawn};
             },{style,compare});
             row.transitions||=[];row.transitions.push({label,...state});if(!state.combatUnchanged)throw new Error('inactive prototype: style changed combat state');
             await capture(label);await page.screenshot({path:path.join(out,`${String(row.transitions.length).padStart(2,'0')}-${label}.png`)});
           };
-          await transition('rigged-reactivation','rigged');await transition('baked-reclamation','baked');
+          await transition('rigged-reactivation','rigged');
+          row.lodReactivation=await page.evaluate(()=>{
+            const {game:g,rts,post}=window.__game,b=g.pools.US.buckets.find(b=>b.lod===2&&!b.mesh.visible),u=g.units.find(u=>u.side==='US'&&u.type==='infantry'&&u.men>0);
+            if(!b||!u)throw new Error('inactive prototype: no released near bucket/formation for reactivation control');
+            const gl=post.renderer.getContext(),before=window.__allocation.bufferReservation(gl,b.mesh.instanceMatrix.array),stats={...g.__inactiveStats},goal={...rts.goal};
+            window.__reactivationBucket=b;rts.flyTo(u.x,u.z,100);rts.update(1);rts.update(1);g.setView(window.__game.camera,innerHeight*post.scale);g.animate(0);
+            return {before,stats,goal,nearCount:b.n,visible:b.mesh.visible,afterStats:{...g.__inactiveStats},cameraDistance:rts.dist};
+          });
+          await capture('near-lod-reupload');
+          row.lodReactivation.after=await page.evaluate(()=>{const b=window.__reactivationBucket,gl=window.__game.post.renderer.getContext();return window.__allocation.bufferReservation(gl,b.mesh.instanceMatrix.array);});
+          if(!row.lodReactivation.visible||!row.lodReactivation.nearCount||row.lodReactivation.afterStats.reactivated<=row.lodReactivation.stats.reactivated||!row.lodReactivation.after||row.lodReactivation.before?.id===row.lodReactivation.after.id)throw new Error('inactive prototype: released bucket GPU reupload not proved');
+          await page.screenshot({path:path.join(out,'06-near-lod-reupload.png')});
+          await page.evaluate(goal=>{const {rts,game:g,camera,post}=window.__game;Object.assign(rts.goal,goal);rts.update(1);rts.update(1);g.setView(camera,innerHeight*post.scale);g.animate(0);},row.lodReactivation.goal);
+          await transition('baked-reclamation','baked');
           await transition('compare-rigged-left','rigged',true);await transition('compare-baked-left','baked',true);
           await transition('baked-restored','baked');
         }
         row.complete=true;
-      } finally {await ctx.close();save();}
+      } finally {await page.evaluate(()=>window.__sceneRenderGate?.restore()).catch(()=>{});await ctx.close();save();}
       console.log(`SCENE ${index+1}/${campaign.phases.length} complete`);
     }
     // Actual current loader failure: successful siblings must not masquerade as a complete close tier.

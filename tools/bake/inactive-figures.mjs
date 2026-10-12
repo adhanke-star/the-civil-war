@@ -1,4 +1,9 @@
 /** Diagnostic prototype only. Retains all pool/mesh/attribute/CPU records; Three reuploads on reactivation. */
+export function installRenderGate(post) {
+  const native=post.render;let held=true,count=0;
+  post.render=function(...args){if(!held){count++;return native.apply(this,args);}};
+  return {renderOnce(...args){count++;return native.apply(post,args);},get count(){return count;},restore(){held=false;post.render=native;}};
+}
 export function installInactiveFigures(game) {
   const released=new WeakSet(),stats={released:0,reactivated:0};
   const visibility=new WeakMap();
