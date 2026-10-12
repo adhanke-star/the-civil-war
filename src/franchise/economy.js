@@ -9,6 +9,9 @@
 //   shopStock(save, { date }) -> this phase's offers [{ uid, itemId, tier, conditionId, price, sold }]
 //   buyLot(save, { itemId, date }) / turnInCard(save, { itemUid }) / markShopSeen(save) -> the next validated save
 //   levelUps(before, after) -> { from, to, cards } for any level reached between two saves (null when none)
+//   storesOf(save) / upgradesOf(save) / depotCapacity(save)   the camp's stores, army upgrades and depot capacity (P5c)
+//   buyStores(save, { store }) / buyUpgrade(save, { id }) / buyTraining(save, { brigadeId, bar }) / buySlot(save, { brigadeId })
+//   rerollPreview(save, { uid }) / rerollAffix(save, { uid, to })   one item's next condition affix (deterministic) and the paid re-roll
 //
 // Rules (game rules, labelled as such in the UI):
 // - A phase pays by grade (Decisive 60 / Victory 40 / Draw 20 / Defeat 10), +15 if the player held the objective at the
@@ -21,13 +24,19 @@
 // - The shop stocks up to six distinct catalogue arms per ladder position: a deterministic order from the campaign seed
 //   and position, filtered to rarities the reputation has opened and to arms in service by the next phase's month.
 //   Captured-only arms are never stocked. Condition is rolled like loot; price is by rarity. Purchases go to the depot,
-//   whose limits (2,000 cards, 1 MB save) still apply.
-import { ECONOMY } from './tuning.js';
+//   which holds wagons x CAMP.cardsPerWagon cards (+ the Wagons upgrade) for purchases; loot and reward cards are never
+//   refused (the 2,000-card and 1 MB save limits still apply).
+// - Camp (P5c; numbers in tuning.js CAMP): store lots (any number), army upgrades (once each, opened by reputation level),
+//   bought training (+points to one card bar, capped with camp orders by CAMP.barCap, price pro rata when the cap leaves less
+//   room), one extra badge slot per brigade, and affix re-rolls (price by rarity; the new condition is fixed by the campaign
+//   seed, the item and how many times it was re-rolled, never the old one, and the player confirms it before paying).
+import { ECONOMY, CAMP } from './tuning.js';
 import { validateSnapshot } from './save.js';
-import { ARMS, TIER_BY_ID, itemDef } from '../reward/data.js';
-import { makeRng, rollCondition } from '../reward/model.js';
+import { ARMS, TIER_BY_ID, CONDITION_BY_ID, STORE_BY_ID, itemDef } from '../reward/data.js';
+import { makeRng, rollCondition, rerollCondition } from '../reward/model.js';
+import { BARS } from './badges.js';
 
-export { ECONOMY };
+export { ECONOMY, CAMP };
 export const RULES_NOTE = 'Requisition points, reputation, reward cards and prices are game rules, not history.';
 const fail = (message) => { throw new Error(`Economy: ${message}`); };
 const DEPOT_LIMIT = 2000;
@@ -74,7 +83,7 @@ export function levelCard({ seed, campaignId, slot, level }) {
 }
 
 /** Add earned points (reputation and spendable) and deal a card for every level reached. Not validated. */
-function earn(s, points) {
+export function earn(s, points) {
   const reputation = s.reputation + points, level = Math.max(s.level, levelFor(reputation));
   const depot = [...s.depot], ledger = [...s.ledger];
   for (let l = s.level + 1; l <= level; l++) {
@@ -149,7 +158,7 @@ export function buyLot(save, { itemId, date } = {}) {
   if (!lot) fail('that lot is not in stock.');
   if (lot.sold) fail('that lot has already been bought.');
   if (s.rp < lot.price) fail(`it costs ${lot.price} requisition points and you have ${s.rp}.`);
-  if (s.depot.length >= DEPOT_LIMIT) fail('the depot wagons are full; turn in or issue a card first.');
+  if (s.depot.length >= Math.min(DEPOT_LIMIT, depotCapacity(s))) fail(`the depot wagons are full (${s.depot.length} of ${depotCapacity(s)} cards); turn in or issue a card, or buy wagons, first.`);
   const card = { uid: lot.uid, itemId: lot.itemId, tier: lot.tier, conditionId: lot.conditionId, source: 'requisition',
     from: `Requisitioned for ${lot.price} points` };
   return validateSnapshot({ ...s, rp: s.rp - lot.price, depot: [...s.depot, card],
@@ -174,3 +183,104 @@ export function markShopSeen(save) {
 
 /** Points a depot card turns in for, and a lot's price (UI wording). */
 export const turnInPoints = (item) => ECONOMY.turnIn[item.tier ?? itemDef(item.itemId).tier];
+
+// ---- camp purchases (P5c) ------------------------------------------------------------------------------------------------
+const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+/** The army's stores (a save written before the camp has the starting stores). */
+export const storesOf = (save) => ({ ...(save && save.stores ? save.stores : CAMP.start) });
+/** Army upgrades owned, in catalogue order. */
+export const upgradesOf = (save) => [...(save && save.upgrades ? save.upgrades : [])];
+/** Cards the depot's wagons hold for purchases. */
+export const depotCapacity = (save) => storesOf(save).wagons * CAMP.cardsPerWagon + (upgradesOf(save).includes('wagons') ? CAMP.upgrades.wagons.cards : 0);
+const pay = (s, price, what) => { if (s.rp < price) fail(`${what} costs ${price} requisition points and you have ${s.rp}.`); };
+
+/** Buy one lot of a store (quantity and price in CAMP.storeLots). */
+export function buyStores(save, { store } = {}) {
+  const s = campaignSave(save);
+  if (!has(CAMP.storeLots, store)) fail('that store is not for sale.');
+  const lot = CAMP.storeLots[store];
+  pay(s, lot.price, `${lot.qty} ${STORE_BY_ID[store].name.toLowerCase()}`);
+  const stores = storesOf(s);
+  stores[store] += lot.qty;
+  return validateSnapshot({ ...s, rp: s.rp - lot.price, stores, ledger: [...s.ledger, { kind: 'store', store, qty: lot.qty, price: lot.price }] });
+}
+
+/** Buy one army upgrade (once; opened at its reputation level). */
+export function buyUpgrade(save, { id } = {}) {
+  const s = campaignSave(save);
+  if (!has(CAMP.upgrades, id)) fail('that upgrade does not exist.');
+  const u = CAMP.upgrades[id], owned = upgradesOf(s);
+  if (owned.includes(id)) fail('the army already has that upgrade.');
+  if (s.level < u.level) fail(`that upgrade opens at reputation level ${u.level}; the army is at level ${s.level}.`);
+  pay(s, u.price, 'that upgrade');
+  const upgrades = Object.keys(CAMP.upgrades).filter((k) => k === id || owned.includes(k));
+  return validateSnapshot({ ...s, rp: s.rp - u.price, upgrades, ledger: [...s.ledger, { kind: 'upgrade', id, price: u.price }] });
+}
+
+const zero = () => Object.fromEntries(BARS.map((b) => [b, 0]));
+const fieldable = (b) => b.men > 0 && (b.kind !== 'battery' || b.guns > 0);
+/** Room left under the camp cap on one bar of one brigade (also bounded by the 99 rating ceiling). */
+export function barRoom(brigade, bar) {
+  const used = (brigade.bonus || zero())[bar];
+  return Math.max(0, Math.min(CAMP.barCap - used, 99 - brigade.base[bar]));
+}
+/** Add camp points to one bar (base and the camp bonus together); the caller checked the room. Not validated. */
+export function raiseBar(brigade, bar, points) {
+  const bonus = { ...(brigade.bonus || zero()) };
+  bonus[bar] += points;
+  const out = { ...brigade, base: { ...brigade.base, [bar]: brigade.base[bar] + points }, bonus };
+  delete out.ovr;
+  return out;
+}
+/** The points and price bought training would give one brigade's bar now. */
+export function trainingOffer(save, { brigadeId, bar } = {}) {
+  const s = campaignSave(save), b = s.army.find((x) => x.id === brigadeId);
+  if (!b) fail('that brigade is no longer in the army.');
+  if (!BARS.includes(bar)) fail('choose Fire, Melee, Morale or Drill.');
+  const points = Math.min(CAMP.training.points, barRoom(b, bar));
+  return { brigade: b, bar, points, price: Math.ceil((CAMP.training.price * points) / CAMP.training.points) };
+}
+/** Buy training: +points on one card bar of one brigade, capped with camp orders by CAMP.barCap. */
+export function buyTraining(save, { brigadeId, bar } = {}) {
+  const s = campaignSave(save);
+  if (s.level < CAMP.training.level) fail(`training opens at reputation level ${CAMP.training.level}; the army is at level ${s.level}.`);
+  const { brigade, points, price } = trainingOffer(s, { brigadeId, bar });
+  if (!fieldable(brigade)) fail(`${brigade.label} has no men left to train.`);
+  if (points <= 0) fail(`${brigade.label}'s ${bar} bar has reached its camp limit.`);
+  pay(s, price, 'that training');
+  return validateSnapshot({ ...s, rp: s.rp - price, army: s.army.map((b) => (b.id === brigade.id ? raiseBar(b, bar, points) : b)),
+    ledger: [...s.ledger, { kind: 'training', brigadeId, bar, points, price }] });
+}
+
+/** Buy one extra badge slot for a brigade (once per brigade). */
+export function buySlot(save, { brigadeId } = {}) {
+  const s = campaignSave(save), b = s.army.find((x) => x.id === brigadeId);
+  if (!b) fail('that brigade is no longer in the army.');
+  if (b.extraSlot) fail(`${b.label} already has its extra badge slot.`);
+  if (s.level < CAMP.extraSlot.level) fail(`extra badge slots open at reputation level ${CAMP.extraSlot.level}; the army is at level ${s.level}.`);
+  pay(s, CAMP.extraSlot.price, 'an extra badge slot');
+  return validateSnapshot({ ...s, rp: s.rp - CAMP.extraSlot.price, army: s.army.map((x) => (x === b ? { ...b, extraSlot: true } : x)),
+    ledger: [...s.ledger, { kind: 'slot', brigadeId, price: CAMP.extraSlot.price }] });
+}
+
+/** Where an item is (a depot card or a brigade's weapon) and what its next re-roll gives (deterministic; nothing changes). */
+export function rerollPreview(save, { uid } = {}) {
+  const s = campaignSave(save);
+  const brigade = s.army.find((b) => b.weapon.uid === uid), item = brigade ? brigade.weapon : s.depot.find((it) => it.uid === uid);
+  if (!item) fail('that card is no longer in the army or the depot.');
+  const n = s.ledger.filter((r) => r.kind === 'reroll' && r.uid === uid).length + 1;
+  const to = rerollCondition(makeRng(`${s.seed}:reroll:${uid}:${n}`), item.conditionId);
+  return { item, brigade: brigade || null, n, from: item.conditionId, to, price: CAMP.reroll[item.tier],
+    before: CONDITION_BY_ID[item.conditionId], after: CONDITION_BY_ID[to] };
+}
+/** Pay for the re-roll the player confirmed: `to` must be the preview's condition (a changed preview is refused). */
+export function rerollAffix(save, { uid, to } = {}) {
+  const s = campaignSave(save), p = rerollPreview(s, { uid });
+  if (to !== p.to) fail('the re-roll you confirmed is no longer the next one; review it again.');
+  pay(s, p.price, 'that re-roll');
+  const next = { ...p.item, conditionId: p.to };
+  return validateSnapshot({ ...s, rp: s.rp - p.price,
+    army: p.brigade ? s.army.map((b) => (b.id === p.brigade.id ? (() => { const o = { ...b, weapon: next }; delete o.ovr; return o; })() : b)) : s.army,
+    depot: p.brigade ? s.depot : s.depot.map((it) => (it.uid === uid ? next : it)),
+    ledger: [...s.ledger, { kind: 'reroll', uid, n: p.n, from: p.from, to: p.to, price: p.price }] });
+}

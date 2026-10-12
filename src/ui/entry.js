@@ -5,14 +5,24 @@
 // detail (the feat, tiers and effect, labelled game rules, apart from the real example with its provenance and source
 // links). A brigade with more badges than slots shows "Choose badges to keep": a keyboard dialog of checkboxes (the X-Factor
 // fixed) written through the same compare-and-set exchange (campaign.js chooseBadges); Cancel or Escape changes nothing.
+// Camp (P5c): "Camp orders and stores" sets one standing order per brigade (src/franchise/camp-orders.js) and shows the
+// stores and depot capacity; the Requisition drawer also sells stores, army upgrades, training, extra badge slots and affix
+// re-rolls (src/franchise/economy.js), each behind a confirm and the same compare-and-set exchange. Next (and Replay) first
+// deal the phase's decision cards (src/franchise/decisions.js), one at a time in a keyboard dialog that reveals what really
+// happened after the choice is saved, then march the army out of camp (breakCamp, once per phase attempt) and load the
+// field. Record book and Settings open modules other screens own (src/ui/records.js, src/ui/settings-panel.js); a
+// missing module only disables its button.
 import { createProgressStore, parseSnapshot, exportSnapshot, exchangeDepot, listSlots, MAX_SAVE_BYTES } from '../franchise/save.js';
-import { newCampaign, chooseBadges } from '../franchise/campaign.js';
-import { BADGE_BY_ID, TIER_NAMES, BADGE_RULES_NOTE, featText, effectText, threshold, categoryName, slotsFor } from '../franchise/badges.js';
-import { loadCampaign, loadPackSummary, ladderPosition, formatDate } from './briefing.js';
+import { newCampaign, chooseBadges, campaignPhase } from '../franchise/campaign.js';
+import { BADGE_BY_ID, TIER_NAMES, BADGE_RULES_NOTE, featText, effectText, threshold, categoryName, slotsOf } from '../franchise/badges.js';
+import { loadCampaign, loadPackSummary, ladderPosition, formatDate, loadDecisions } from './briefing.js';
+import { ORDERS, orderName, orderText, setOrder, breakCamp, campReport, supplyNeed, CAMP_RULES_NOTE } from '../franchise/camp-orders.js';
+import { cardsFor, recorded, optionOpen, chooseDecision, historyOf, effectText as decisionEffect, DECISIONS_NOTE } from '../franchise/decisions.js';
 import { get } from '../settings.js';
 import { brigCard, staticCard, itemLabel, defineRewardSettings, levelUpMoment, badgeChip } from '../reward/sequence.js';
-import { shopStock, buyLot, turnInCard, markShopSeen, levelUps, turnInPoints, nextLevelAt, shopTierFor, ECONOMY, RULES_NOTE } from '../franchise/economy.js';
-import { TIER_BY_ID, itemDef } from '../reward/data.js';
+import { shopStock, buyLot, turnInCard, markShopSeen, levelUps, turnInPoints, nextLevelAt, shopTierFor, ECONOMY, RULES_NOTE, CAMP,
+  storesOf, upgradesOf, depotCapacity, buyStores, buyUpgrade, buyTraining, buySlot, trainingOffer, rerollPreview, rerollAffix } from '../franchise/economy.js';
+import { TIER_BY_ID, STORE_ITEMS, STORE_BY_ID, VETERANCY, itemDef, conditionEffect } from '../reward/data.js';
 import { compare, bestFit } from '../reward/model.js';
 import { savedDeployment } from '../franchise/practice.js';
 import { loadFieldScenario } from '../sim/phase.js';
@@ -60,13 +70,14 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
   let saved = null, failed = false, pendingImport = null, pendingName = null, importing = false;
   let pendingBaseline, baselineKnown = false, phase = 'idle';
   let pendingExchange = null, activeReview = null;
-  let activeDeployment = null, disposed = false, shopOpen = false;
-  const pages = { army: 0, depot: 0 };
+  let activeDeployment = null, disposed = false, shopOpen = false, deck = null, marching = false;
+  const pages = { army: 0, depot: 0, orders: 0 };
+  const shopPick = { brigadeId: null, bar: 'fire', uid: null };
   const root = document.createElement('main'); root.id = 'front'; root.className = 'rw rw-counts';
   root.dataset.uiStyle = STYLE[get('screens.cardStyle')] || 'modern';
   root.innerHTML = `
     <div class="entry-wrap">
-      <header class="entry-head"><a href="./" class="entry-brand">The Civil War</a><p>One army. One war.</p></header>
+      <header class="entry-head"><a href="./" class="entry-brand">The Civil War</a><p>One army. One war.</p><button id="entry-settings" type="button">Settings</button></header>
       <section id="entry-title" aria-labelledby="entry-title-heading">
         <p class="rw-eyebrow">Take the field</p><h1 id="entry-title-heading">Your first command</h1>
         <p id="entry-note"></p>
@@ -76,21 +87,29 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       </section>
       <section id="entry-camp" aria-labelledby="entry-camp-heading" hidden>
         <header class="entry-camp-head"><div><p class="rw-eyebrow">Between battles</p><h1 id="entry-camp-heading">Your army</h1><p id="entry-summary"></p></div>
-          <div class="entry-field-actions"><button id="camp-begin-campaign" class="entry-primary" type="button" hidden>Begin the campaign</button><button id="camp-deploy" class="entry-primary" type="button" aria-describedby="camp-deploy-note">Deploy saved army</button><a id="camp-practice" class="entry-secondary" href="./?intro">Practice again</a></div></header>
+          <div class="entry-field-actions"><button id="camp-begin-campaign" class="entry-primary" type="button" hidden>Begin the campaign</button><button id="camp-deploy" class="entry-primary" type="button" aria-describedby="camp-deploy-note">Deploy saved army</button><a id="camp-practice" class="entry-secondary" href="./?intro">Practice again</a><button id="camp-record-book" type="button" hidden>Record book</button></div></header>
         <p class="entry-note" id="camp-deploy-note" hidden>Deploy saved army is for practice armies. Campaign brigades fight only in their own campaign phases, so their losses and loot stay on the record.</p>
         <p class="entry-note" id="camp-field-note">Deploy fights with your saved formations and equipment; actual losses return here. Practice again starts the original teaching formations and asks before replacing your army.</p>
         <section id="camp-campaign" aria-labelledby="camp-campaign-heading" hidden>
           <p class="rw-eyebrow" id="camp-campaign-position"></p><h2 id="camp-campaign-heading" tabindex="-1"></h2>
           <p id="camp-complete" hidden></p><p id="camp-campaign-note"></p>
           <div class="entry-field-actions"><a id="camp-next" class="entry-primary" href="./">Next</a><a id="camp-replay" class="entry-secondary" href="./" hidden>Replay</a></div>
+          <p id="camp-march-status" role="status" tabindex="-1"></p>
+          <div id="camp-decisions" hidden><h3 id="camp-decisions-heading">Decisions for the next phase</h3><ul id="camp-decisions-list" aria-labelledby="camp-decisions-heading"></ul></div>
           <h3 id="camp-record-heading">Record so far</h3><p id="camp-record-empty">No phase fought yet.</p><ol id="camp-record" aria-labelledby="camp-record-heading"></ol>
+        </section>
+        <section id="camp-orders" aria-labelledby="camp-orders-heading" hidden>
+          <h2 id="camp-orders-heading" tabindex="-1">Camp orders and stores</h2><p class="entry-note" id="camp-orders-note"></p>
+          <div id="camp-stores" role="list" aria-label="Army stores"></div><p id="camp-supply"></p><p id="camp-capacity"></p>
+          <p id="camp-orders-status" role="status" tabindex="-1"></p>
+          <div id="camp-order-rows" role="list" aria-label="Brigade orders"></div><div id="order-pages" class="entry-pages"></div>
         </section>
         <section id="camp-shop" aria-labelledby="camp-shop-heading" hidden>
           <div class="camp-shop-head"><div><h2 id="camp-shop-heading" tabindex="-1">Requisition</h2><p id="camp-reputation"></p>
             <div id="camp-rep-track" class="rw-rep-track" role="progressbar"><i></i></div><p id="camp-shop-new" hidden></p></div>
             <button id="camp-shop-toggle" type="button" aria-expanded="false" aria-controls="camp-shop-drawer">Open Requisition</button></div>
           <div id="camp-shop-drawer" hidden><p class="entry-note" id="camp-shop-note"></p><p id="camp-shop-status" role="status" tabindex="-1"></p>
-            <div id="camp-shop-stock" role="list" aria-label="Requisition stock"></div></div>
+            <div id="camp-shop-stock" role="list" aria-label="Requisition stock"></div><div id="camp-shop-more"></div></div>
         </section>
         <section aria-labelledby="camp-army-heading"><h2 id="camp-army-heading">Brigades</h2><div id="camp-army" class="rw-brigs is-static" role="list" aria-label="Saved brigades"></div><div id="army-pages" class="entry-pages"></div></section>
         <section aria-labelledby="camp-depot-heading"><h2 id="camp-depot-heading" tabindex="-1">Depot</h2><p id="depot-note"></p><div id="camp-depot" role="list" aria-label="Saved depot"></div><div id="depot-pages" class="entry-pages"></div></section>
@@ -121,6 +140,15 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       <fieldset id="camp-choose-set"><legend id="camp-choose-legend">Badges to keep</legend><div id="camp-choose-rows"></div></fieldset><p id="camp-choose-status" role="status"></p>
       <div class="camp-compare-actions"><button id="camp-choose-cancel" type="button">Cancel</button><button id="camp-choose-save" type="button">Keep these and save</button></div>
     </dialog>
+    <dialog id="camp-decision" aria-labelledby="camp-decision-heading" aria-describedby="camp-decision-dilemma">
+      <p class="rw-eyebrow" id="camp-decision-count"></p><h2 id="camp-decision-heading" tabindex="-1"></h2><p id="camp-decision-dilemma"></p>
+      <fieldset id="camp-decision-set"><legend>Your choice <span class="rw-rule-tag">Game rule</span></legend><div id="camp-decision-options"></div></fieldset>
+      <p id="camp-decision-status" role="status"></p>
+      <section id="camp-decision-reveal" aria-labelledby="camp-decision-reveal-heading" hidden><h3 id="camp-decision-reveal-heading" tabindex="-1">What really happened <span class="rw-rule-tag" id="camp-decision-provenance"></span></h3>
+        <p id="camp-decision-history"></p><p id="camp-decision-match"></p><p id="camp-decision-sources-label">Sources</p><ul id="camp-decision-sources" aria-labelledby="camp-decision-sources-label"></ul></section>
+      <p class="entry-note" id="camp-decision-note"></p>
+      <div class="camp-compare-actions"><button id="camp-decision-cancel" type="button">Stay in camp</button><button id="camp-decision-choose" type="button">Choose and save</button><button id="camp-decision-continue" class="entry-primary" type="button" hidden>Continue</button></div>
+    </dialog>
     <dialog id="deploy-review" aria-labelledby="deploy-heading" aria-describedby="deploy-note">
       <h2 id="deploy-heading" tabindex="-1">Deploy your saved army</h2><p id="deploy-note" role="status"></p>
       <ul id="deploy-formations" aria-label="Formations taking the field"></ul>
@@ -147,6 +175,9 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     root.querySelectorAll('.camp-choose-button').forEach((b) => { b.disabled = importing || !!pendingImport || !!pendingExchange; });
     root.querySelectorAll('.camp-turnin-button, .camp-buy-button').forEach((b) => { b.disabled = importing || !!pendingImport || !!pendingExchange || b.dataset.blocked === 'true'; });
     node('camp-shop-toggle').disabled = importing || !!pendingImport || !!pendingExchange;
+    root.querySelectorAll('.camp-order-select, .camp-shop-select').forEach((n) => { n.disabled = importing || !!pendingImport || !!pendingExchange; });
+    node('camp-record-book').disabled = importing || node('camp-record-book').dataset.missing === 'true';
+    node('entry-settings').disabled = node('entry-settings').dataset.missing === 'true';
     root.querySelectorAll('a[href]').forEach((a) => a.setAttribute('aria-disabled', String(importing || !!pendingExchange)));
   };
   function paged(items, container, controlsNode, build, noun, key) {
@@ -193,6 +224,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
   function renderCampaignStrip() {
     const v2 = saved.version === 2, c = v2 ? saved.campaign : null, known = v2 && !!ladder && ladder.def.id === c.id;
     node('camp-campaign').hidden = !v2; node('camp-deploy-note').hidden = !v2; node('camp-practice').hidden = v2;
+    node('camp-record-book').hidden = !v2;
     node('camp-field-note').hidden = v2;
     // A practice army's camp leads on into the campaign (DESIGN 4b First minute: camp, then the battles).
     node('camp-begin-campaign').hidden = v2 || !ladder;
@@ -216,6 +248,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       const replays = c.history.filter((r) => r.replay).length;
       node('camp-complete').textContent = `Campaign complete. ${c.history.length - replays} phases fought${replays ? `, ${replays} replay${replays === 1 ? '' : 's'} marked` : ''}. Final grade: ${saved.grade}.`;
     }
+    renderDecisionStrip(known && !complete ? ladder.def.phases[c.index] : null);
     node('camp-record-empty').hidden = c.history.length > 0; node('camp-record').hidden = !c.history.length;
     node('camp-record').replaceChildren(...c.history.map((r) => {
       const li = document.createElement('li'); li.dataset.grade = r.grade; if (r.replay) li.dataset.replay = 'true';
@@ -251,6 +284,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     toggle.textContent = shopOpen ? 'Close Requisition' : 'Open Requisition';
     node('camp-shop-drawer').hidden = !shopOpen;
     const grid = node('camp-shop-stock'); grid.replaceChildren();
+    renderCampShop();
     if (!shopOpen) return;
     const date = shopDate();
     let stock = null;
@@ -279,6 +313,297 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       cell.append(card, cite, buy); grid.append(cell);
     }
   }
+  // ---- camp orders and stores (src/franchise/camp-orders.js; numbers are game rules in tuning.js CAMP) ----
+  const fieldable = (b) => b.men > 0 && (b.kind !== 'battery' || b.guns > 0);
+  const vetName = (id) => VETERANCY.find((v) => v.id === id)?.name ?? id;
+  const say = (id) => (text) => { node(id).textContent = text; };
+  /** The next phase's fielded franchise brigades (from its battle pack), or null until the pack summary is loaded. */
+  function nextFielded() {
+    if (!saved || saved.version !== 2 || !ladder || ladder.def.id !== saved.campaign.id || saved.campaign.status === 'complete') return null;
+    const entry = ladder.def.phases[saved.campaign.index], us = titles.get(entry.packId)?.phases.find((p) => p.id === entry.phaseId)?.us;
+    if (!us) return null;
+    const ids = new Set(us), brigades = entry.loan ? [] : saved.army.filter((b) => b.unitId && ids.has(b.unitId) && fieldable(b));
+    return { loan: entry.loan === true, brigades, batteries: brigades.filter((b) => b.kind === 'battery').length };
+  }
+  function renderOrders() {
+    const v2 = saved.version === 2;
+    node('camp-orders').hidden = !v2;
+    if (!v2) return;
+    const st = storesOf(saved);
+    node('camp-orders-note').textContent = `One standing order per brigade, carried out when the army marches out of camp for the next phase (Next). ${ORDERS.map((o) => `${orderName(o)}: ${orderText(o)}.`).join(' ')} Fielded brigades draw stores for each phase; a brigade its stores cannot cover starts that phase with less morale. ${CAMP_RULES_NOTE} Morale is the only camp effect the battle reads today; fatigue, rounds carried and limbering speed wait on an engine hook.`;
+    node('camp-stores').replaceChildren(...STORE_ITEMS.map((x) => {
+      const row = document.createElement('div'); row.setAttribute('role', 'listitem'); row.className = 'camp-store'; row.dataset.store = x.id;
+      const name = document.createElement('b'); name.textContent = `${x.name}: ${st[x.id].toLocaleString()}`;
+      const words = document.createElement('span'); words.textContent = ` ${x.words} ${x.short}`;
+      row.append(name, words); return row;
+    }));
+    const f = nextFielded();
+    if (!f) node('camp-supply').textContent = saved.campaign.status === 'complete' ? 'The campaign is complete; no phase draws stores.' : 'The next phase\'s formations are still loading.';
+    else if (f.loan) node('camp-supply').textContent = `Next phase: the army on loan fights; your brigades draw nothing. The quartermaster's issue still arrives when you march (${CAMP.stores.filter((k) => CAMP.issue[k]).map((k) => `+${CAMP.issue[k]} ${STORE_BY_ID[k].name.toLowerCase()}`).join(', ')}).`;
+    else {
+      const need = supplyNeed(saved, f.brigades.length, f.batteries), have = Object.fromEntries(CAMP.stores.map((k) => [k, st[k] + CAMP.issue[k]]));
+      const short = Object.keys(need).filter((k) => need[k] > have[k]);
+      node('camp-supply').textContent = `Next phase: ${f.brigades.length} of your brigades take the field (${f.batteries} batter${f.batteries === 1 ? 'y' : 'ies'}). With the quartermaster's issue they draw ${Object.keys(need).filter((k) => need[k]).map((k) => `${need[k]} ${STORE_BY_ID[k].name.toLowerCase()}`).join(', ')}${short.length ? `. Short: ${short.map((k) => `${STORE_BY_ID[k].name.toLowerCase()} (${have[k]} of ${need[k]})`).join(', ')}; buy more in the Requisition drawer or some brigades start with less morale (game rule).` : '. Enough for every brigade (Target practice also spends ammunition).'}`;
+    }
+    const cap = depotCapacity(saved), owned = upgradesOf(saved);
+    node('camp-capacity').textContent = `Depot: ${saved.depot.length} of ${cap} cards (${st.wagons} wagons × ${CAMP.cardsPerWagon}${owned.includes('wagons') ? ` + ${CAMP.upgrades.wagons.cards} from the Wagons upgrade` : ''}).${saved.depot.length >= cap ? ' Full: purchases wait until a card is issued or turned in, or more wagons are bought. Loot is never refused.' : ''}`;
+    const living = saved.army.filter((b) => b.unitId && fieldable(b));
+    paged(living, node('camp-order-rows'), node('order-pages'), (b, i) => {
+      const row = document.createElement('div'); row.setAttribute('role', 'listitem'); row.className = 'camp-order-row'; row.dataset.brigadeId = b.id;
+      const label = document.createElement('label'); label.htmlFor = `camp-order-${i}`; label.textContent = b.label;
+      const select = document.createElement('select'); select.id = `camp-order-${i}`; select.className = 'camp-order-select'; select.dataset.brigadeId = b.id;
+      for (const o of ORDERS) { const opt = document.createElement('option'); opt.value = o; opt.textContent = orderName(o); select.append(opt); }
+      select.value = b.order || 'rest';
+      select.disabled = importing || !!pendingImport || !!pendingExchange;
+      select.addEventListener('change', () => changeOrder(b.id, select.value));
+      const meta = document.createElement('span'); meta.className = 'camp-order-meta';
+      const bonus = b.bonus ? ['fire', 'melee', 'morale', 'drill'].filter((k) => b.bonus[k]).map((k) => `${k[0].toUpperCase()}${k.slice(1)} +${b.bonus[k]}`) : [];
+      meta.textContent = `${vetName(b.vet)}${b.drilled ? ` · ${b.drilled} drill${b.drilled === 1 ? '' : 's'}` : ''}${bonus.length ? ` · camp ${bonus.join(', ')}` : ''}${b.extraSlot ? ' · extra badge slot' : ''}`;
+      row.append(label, select, meta); return row;
+    }, 'orders', 'orders');
+  }
+  async function changeOrder(brigadeId, order) {
+    if (importing || pendingImport || pendingExchange || !saved || saved.version !== 2) return;
+    const b = saved.army.find((x) => x.id === brigadeId);
+    await runEconomy(setOrder, { brigadeId, order }, () => `${b.label}: ${orderName(order)} (${orderText(order)}). Saved; carried out when the army marches.`, say('camp-orders-status'));
+    const again = node('camp-order-rows').querySelector(`select[data-brigade-id="${CSS.escape(brigadeId)}"]`);
+    (again || node('camp-orders-status')).focus();
+  }
+  // ---- Requisition drawer: stores, army upgrades, training, extra badge slots, affix re-rolls ----
+  const UPGRADE_NAMES = Object.freeze({ wagons: 'Wagons', ambulances: 'Ambulances', ordnance: 'Ordnance train', pioneers: 'Pioneers' });
+  const upgradeText = (id) => ({
+    wagons: `+${CAMP.upgrades.wagons.cards} depot cards.`,
+    ambulances: `${Math.round(CAMP.upgrades.ambulances.returned * 100)}% of each phase's losses in your brigades return to the ranks.`,
+    ordnance: `Ammunition drawn and spent on Target practice × ${CAMP.upgrades.ordnance.factor} (rounded up).`,
+    pioneers: 'Faster crossings and obstacle work: pending engine hook (no battle effect yet).',
+  })[id];
+  function shopButton(text, label, blocked, onClick) {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'camp-buy-button'; b.textContent = text; b.setAttribute('aria-label', label);
+    b.dataset.blocked = String(!!blocked); b.disabled = importing || !!pendingImport || !!pendingExchange || !!blocked;
+    b.addEventListener('click', () => onClick(b)); return b;
+  }
+  const h3 = (id, text) => { const h = document.createElement('h3'); h.id = id; h.textContent = text; h.tabIndex = -1; return h; };
+  const para = (text, cls) => { const p = document.createElement('p'); p.textContent = text; if (cls) p.className = cls; return p; };
+  function shopSelect(id, label, options, value, onChange) {
+    const wrap = document.createElement('div'); wrap.className = 'camp-shop-field';
+    const l = document.createElement('label'); l.htmlFor = id; l.textContent = label;
+    const sel = document.createElement('select'); sel.id = id; sel.className = 'camp-shop-select';
+    for (const [v, t] of options) { const o = document.createElement('option'); o.value = v; o.textContent = t; sel.append(o); }
+    if (options.some(([v]) => v === value)) sel.value = value;
+    sel.disabled = importing || !!pendingImport || !!pendingExchange;
+    sel.addEventListener('change', () => { onChange(sel.value); renderCampShop(); node(id).focus(); });
+    wrap.append(l, sel); return wrap;
+  }
+  function renderCampShop() {
+    const more = node('camp-shop-more'); more.replaceChildren();
+    if (!shopOpen || !saved || saved.version !== 2) return;
+    const st = storesOf(saved), owned = upgradesOf(saved), busy = importing || !!pendingImport || !!pendingExchange;
+    // Stores
+    const stores = document.createElement('section'); stores.setAttribute('aria-labelledby', 'camp-buy-stores-heading');
+    const rows = document.createElement('div'); rows.className = 'camp-shop-rows'; rows.setAttribute('role', 'list'); rows.setAttribute('aria-label', 'Stores for sale');
+    for (const x of STORE_ITEMS) {
+      const lot = CAMP.storeLots[x.id], row = document.createElement('div'); row.setAttribute('role', 'listitem'); row.className = 'camp-shop-row'; row.dataset.store = x.id;
+      row.append(para(`${x.name}: you have ${st[x.id]}. ${lot.qty} for ${lot.price} points.`),
+        shopButton(saved.rp < lot.price ? `Needs ${lot.price} points` : `Buy ${lot.qty} for ${lot.price} points`, `Buy ${lot.qty} ${x.name.toLowerCase()} for ${lot.price} requisition points`, saved.rp < lot.price,
+          (b) => openPurchase(b, { heading: `Buy ${lot.qty} ${x.name.toLowerCase()}?`, ok: `Buy for ${lot.price} points`,
+            note: `${lot.qty} ${x.name.toLowerCase()} for ${lot.price} requisition points (you have ${saved.rp}). ${x.words} Quantities and prices are game rules.` },
+          buyStores, { store: x.id }, (next) => `Bought ${lot.qty} ${x.name.toLowerCase()}; ${storesOf(next)[x.id]} in store, ${next.rp} points left.`)));
+      rows.append(row);
+    }
+    stores.append(h3('camp-buy-stores-heading', 'Stores'), rows);
+    // Army upgrades
+    const ups = document.createElement('section'); ups.setAttribute('aria-labelledby', 'camp-upgrades-heading');
+    const urows = document.createElement('div'); urows.className = 'camp-shop-rows'; urows.setAttribute('role', 'list'); urows.setAttribute('aria-label', 'Army upgrades');
+    for (const id of Object.keys(CAMP.upgrades)) {
+      const u = CAMP.upgrades[id], have = owned.includes(id), locked = saved.level < u.level, short = saved.rp < u.price;
+      const row = document.createElement('div'); row.setAttribute('role', 'listitem'); row.className = 'camp-shop-row'; row.dataset.upgrade = id;
+      row.append(para(`${UPGRADE_NAMES[id]}: ${upgradeText(id)} ${have ? 'Owned.' : locked ? `Opens at reputation level ${u.level}.` : `${u.price} points, once.`}`),
+        shopButton(have ? 'Owned' : locked ? `Opens at level ${u.level}` : short ? `Needs ${u.price} points` : `Buy for ${u.price} points`,
+          have ? `${UPGRADE_NAMES[id]} owned` : `Buy the ${UPGRADE_NAMES[id]} upgrade for ${u.price} requisition points`, have || locked || short,
+          (b) => openPurchase(b, { heading: `Buy the ${UPGRADE_NAMES[id]} upgrade?`, ok: `Buy for ${u.price} points`,
+            note: `${upgradeText(id)} It costs ${u.price} requisition points (you have ${saved.rp}) and is bought once for the whole army. A game rule.` },
+          buyUpgrade, { id }, (next) => `The army has the ${UPGRADE_NAMES[id]} upgrade; ${next.rp} points left.`)));
+      urows.append(row);
+    }
+    ups.append(h3('camp-upgrades-heading', 'Army upgrades'), urows);
+    // Training and extra badge slots
+    const living = saved.army.filter((b) => b.unitId && fieldable(b));
+    if (!living.some((b) => b.id === shopPick.brigadeId)) shopPick.brigadeId = living[0]?.id ?? null;
+    const train = document.createElement('section'); train.setAttribute('aria-labelledby', 'camp-train-heading');
+    train.append(h3('camp-train-heading', 'Brigade training and badge slots'));
+    if (!living.length) train.append(para('No brigade has men left to train.'));
+    else {
+      const b = living.find((x) => x.id === shopPick.brigadeId), offer = trainingOffer(saved, { brigadeId: b.id, bar: shopPick.bar });
+      const tLocked = saved.level < CAMP.training.level, sLocked = saved.level < CAMP.extraSlot.level, bar = shopPick.bar[0].toUpperCase() + shopPick.bar.slice(1);
+      train.append(shopSelect('camp-train-brigade', 'Brigade', living.map((x) => [x.id, x.label]), b.id, (v) => { shopPick.brigadeId = v; }),
+        shopSelect('camp-train-bar', 'Card bar', [['fire', 'Fire'], ['melee', 'Melee'], ['morale', 'Morale'], ['drill', 'Drill']], shopPick.bar, (v) => { shopPick.bar = v; }),
+        para(`Training adds up to ${CAMP.training.points} points to one card bar for ${CAMP.training.price} points (less when the camp limit of ${CAMP.barCap} per bar leaves less room). ${b.label}'s ${bar} bar has ${b.bonus?.[shopPick.bar] || 0} of ${CAMP.barCap} camp points. ${tLocked ? `Opens at reputation level ${CAMP.training.level}.` : ''} The battle reads arms and veterancy, not card bars: pending engine hook.`, 'entry-note'),
+        shopButton(tLocked ? `Opens at level ${CAMP.training.level}` : offer.points <= 0 ? `${bar} is at its camp limit` : saved.rp < offer.price ? `Needs ${offer.price} points` : `Train +${offer.points} ${bar} for ${offer.price} points`,
+          `Train ${b.label}: +${offer.points} ${bar} for ${offer.price} requisition points`, tLocked || offer.points <= 0 || saved.rp < offer.price,
+          (btn) => openPurchase(btn, { heading: `Train ${b.label}?`, ok: `Train for ${offer.price} points`,
+            note: `+${offer.points} ${bar} on ${b.label}'s card, for good, for ${offer.price} requisition points (you have ${saved.rp}). A game rule.` },
+          buyTraining, { brigadeId: b.id, bar: shopPick.bar }, (next) => `${b.label} trained: +${offer.points} ${bar}; ${next.rp} points left.`)),
+        para(`An extra badge slot lets ${b.label} keep one more badge than its veterancy allows (once per brigade): ${CAMP.extraSlot.price} points. ${sLocked ? `Opens at reputation level ${CAMP.extraSlot.level}.` : ''}`, 'entry-note'),
+        shopButton(b.extraSlot ? 'Extra slot bought' : sLocked ? `Opens at level ${CAMP.extraSlot.level}` : saved.rp < CAMP.extraSlot.price ? `Needs ${CAMP.extraSlot.price} points` : `Buy an extra badge slot for ${CAMP.extraSlot.price} points`,
+          `Buy an extra badge slot for ${b.label} for ${CAMP.extraSlot.price} requisition points`, b.extraSlot || sLocked || saved.rp < CAMP.extraSlot.price,
+          (btn) => openPurchase(btn, { heading: `An extra badge slot for ${b.label}?`, ok: `Buy for ${CAMP.extraSlot.price} points`,
+            note: `${b.label} gets ${slotsOf(b) + 1} badge slots instead of ${slotsOf(b)}, for good, for ${CAMP.extraSlot.price} requisition points (you have ${saved.rp}). A game rule.` },
+          buySlot, { brigadeId: b.id }, (next) => `${b.label} has an extra badge slot; ${next.rp} points left.`)));
+    }
+    // Affix re-rolls
+    const items = [...saved.army.map((b) => ({ item: b.weapon, where: b.label })), ...saved.depot.map((it) => ({ item: it, where: 'Depot' }))];
+    if (!items.some((x) => x.item.uid === shopPick.uid)) shopPick.uid = items[0]?.item.uid ?? null;
+    const re = document.createElement('section'); re.setAttribute('aria-labelledby', 'camp-reroll-heading');
+    re.append(h3('camp-reroll-heading', 'Re-roll an affix'));
+    if (shopPick.uid) {
+      const p = rerollPreview(saved, { uid: shopPick.uid });
+      re.append(shopSelect('camp-reroll-item', 'Card', items.map((x) => [x.item.uid, `${itemLabel(x.item)} · ${x.where}`]), shopPick.uid, (v) => { shopPick.uid = v; }),
+        para(`A re-roll replaces the card's condition affix with a different one, fixed in advance for this campaign: you see the result before you pay. ${CAMP.reroll[p.item.tier]} points for a ${TIER_BY_ID[p.item.tier].name} card. Affixes are game modifiers, not history.`, 'entry-note'),
+        shopButton(saved.rp < p.price ? `Needs ${p.price} points` : `Re-roll for ${p.price} points…`, `Re-roll the affix of ${itemLabel(p.item)} for ${p.price} requisition points`, saved.rp < p.price,
+          (btn) => openPurchase(btn, { heading: 'Re-roll this affix?', ok: `Re-roll for ${p.price} points`,
+            note: `${itemLabel(p.item)} (${p.brigade ? p.brigade.label : 'depot'}). Before: ${p.before.name} (${conditionEffect(p.before)}). After: ${p.after.name} (${conditionEffect(p.after)}). It costs ${p.price} requisition points (you have ${saved.rp}). Game modifier, not history.` },
+          rerollAffix, { uid: p.item.uid, to: p.to }, (next) => `${itemDef(p.item.itemId).name} is now ${p.after.name}; ${next.rp} points left.`)));
+    } else re.append(para('No card to re-roll.'));
+    more.append(stores, ups, train, re);
+    if (busy) more.querySelectorAll('button, select').forEach((n) => { n.disabled = true; });
+  }
+  async function openPurchase(trigger, dialog, rule, command, done) {
+    if (importing || pendingImport || pendingExchange || !saved || saved.version !== 2) return;
+    const id = trigger.closest('[data-store],[data-upgrade]') ? null : trigger.closest('section')?.querySelector('h3')?.id;
+    const key = trigger.closest('[data-store]')?.dataset.store ?? trigger.closest('[data-upgrade]')?.dataset.upgrade ?? null;
+    phase = 'reviewing';
+    const ok = await confirmAction(dialog);
+    phase = 'idle';
+    if (!ok) { trigger.focus(); return; }
+    await runEconomy(rule, command, done);
+    const back = key ? node('camp-shop-more').querySelector(`[data-store="${key}"] button:not(:disabled), [data-upgrade="${key}"] button:not(:disabled)`)
+      : id ? node(id) : null;
+    (back || node('camp-shop-status')).focus();
+  }
+  // ---- decision cards and the march out of camp (Next / Replay) ----
+  function renderDecisionStrip(next) {
+    const box = node('camp-decisions'), list = node('camp-decisions-list');
+    let phaseNow = null;
+    try { phaseNow = next && deck ? campaignPhase(saved, ladder.raw) : null; } catch { phaseNow = null; }
+    const cards = phaseNow ? cardsFor(deck, phaseNow) : [];
+    box.hidden = !cards.length;
+    list.replaceChildren(...cards.map((card) => {
+      const rec = recorded(saved, phaseNow, card.id), li = document.createElement('li');
+      li.textContent = rec ? `${card.title}: you chose “${card.options.find((o) => o.id === rec.optionId)?.label ?? rec.optionId}” (recorded; ${rec.effects.map(decisionEffect).join('; ')}).`
+        : `${card.title}: you decide when the army marches (Next).`;
+      return li;
+    }));
+  }
+  const decisionDialog = node('camp-decision');
+  function decide(card, i, n, phaseNow, replay) {
+    return new Promise((resolve) => {
+      let chosen = false;
+      node('camp-decision-count').textContent = `Decision ${i + 1} of ${n} · before ${titleOf(phaseNow.packId, phaseNow.phaseId)}${phaseNow.replay ? ' · replay: a new choice, marked on the record' : ''}`;
+      node('camp-decision-heading').textContent = card.title;
+      node('camp-decision-dilemma').textContent = card.dilemma;
+      node('camp-decision-note').textContent = DECISIONS_NOTE;
+      node('camp-decision-status').textContent = '';
+      node('camp-decision-set').hidden = false; node('camp-decision-reveal').hidden = true;
+      node('camp-decision-choose').hidden = false; node('camp-decision-continue').hidden = true;
+      node('camp-decision-cancel').textContent = 'Stay in camp';
+      node('camp-decision-options').replaceChildren(...card.options.map((o, k) => {
+        const open = optionOpen(saved, o), label = document.createElement('label'), box = document.createElement('input');
+        label.className = 'camp-decision-option'; label.dataset.option = o.id;
+        box.type = 'radio'; box.name = 'camp-decision-option'; box.value = o.id; box.id = `camp-decision-option-${k}`; box.disabled = !open.ok;
+        const text = document.createElement('span'), name = document.createElement('b');
+        name.textContent = o.label;
+        text.append(name, para(`Gain: ${o.gain}`), para(`Cost: ${o.cost}`), ...(open.ok ? [] : [para(`Not open: this ${open.reason}.`, 'camp-decision-closed')]));
+        label.append(box, text); return label;
+      }));
+      const finish = (value) => { decisionDialog.removeEventListener('close', onClose); resolve(value); };
+      const onClose = () => finish(decisionDialog.returnValue === 'done');
+      decisionDialog.addEventListener('close', onClose);
+      node('camp-decision-choose').onclick = async () => {
+        if (chosen || importing) return;
+        const pick = node('camp-decision-options').querySelector('input:checked');
+        if (!pick) { node('camp-decision-status').textContent = 'Choose one of the options first (arrow keys move between them).'; node('camp-decision-options').querySelector('input:not(:disabled)')?.focus(); return; }
+        const option = card.options.find((o) => o.id === pick.value);
+        const ok = await runEconomy(chooseDecision, { campaign: ladder.raw, deck, cardId: card.id, optionId: option.id, replay },
+          (next) => `Decision recorded: ${option.label} (${option.effects.map(decisionEffect).join('; ')}); ${next.rp} points to spend.`, say('camp-decision-status'));
+        if (!ok) return;
+        chosen = true;
+        reveal(card, option);
+      };
+      decisionDialog.returnValue = ''; decisionDialog.showModal(); node('camp-decision-heading').focus();
+    });
+  }
+  function reveal(card, option) {
+    const h = historyOf(card);
+    node('camp-decision-set').hidden = true; node('camp-decision-choose').hidden = true;
+    node('camp-decision-continue').hidden = false; node('camp-decision-reveal').hidden = false;
+    node('camp-decision-cancel').textContent = 'Stay in camp';
+    node('camp-decision-provenance').textContent = h.provenance;
+    node('camp-decision-history').textContent = h.text;
+    node('camp-decision-match').textContent = `Closest to the real choice: “${h.option.label}”. You chose “${option.label}”${h.option.id === option.id ? ', as it happened.' : '.'}`;
+    node('camp-decision-sources').replaceChildren(...h.sources.map((src) => {
+      const li = document.createElement('li');
+      if (src.url) { const a = document.createElement('a'); a.href = src.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = src.label; li.append(a); }
+      else li.textContent = src.label;
+      return li;
+    }));
+    node('camp-decision-reveal-heading').focus();
+  }
+  node('camp-decision-continue').addEventListener('click', () => decisionDialog.close('done'));
+  node('camp-decision-cancel').addEventListener('click', () => decisionDialog.close('cancel'));
+  decisionDialog.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const stops = [...decisionDialog.querySelectorAll('input,button,a[href]')].filter((n) => !n.disabled && n.getClientRects().length);
+    const radios = stops.filter((n) => n.type === 'radio'), checked = radios.find((n) => n.checked);
+    const tabbable = stops.filter((n) => n.type !== 'radio' || n === (checked || radios[0]));
+    const first = tabbable[0], last = tabbable[tabbable.length - 1];
+    if (!first) return;
+    if (e.shiftKey && [first, node('camp-decision-heading'), node('camp-decision-reveal-heading')].includes(document.activeElement)) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  /** Next / Replay: the phase's decision cards one at a time, then the march out of camp, then the field. */
+  async function leaveCamp(e, replay) {
+    if (!saved || saved.version !== 2 || !ladder || ladder.def.id !== saved.campaign.id) return;
+    e.preventDefault();
+    if (importing || pendingImport || pendingExchange || marching) return;
+    const link = e.currentTarget, href = link.href, march = say('camp-march-status');
+    marching = true;
+    try {
+      let phaseNow;
+      try { phaseNow = campaignPhase(saved, ladder.raw, { replay }); } catch (err) { march(`${err.message} Your army is unchanged.`); return; }
+      if (!phaseNow) { location.assign(href); return; }
+      if (!deck) deck = await loadDecisions().catch((err) => { console.warn('decision cards unavailable:', err?.message ?? err); return null; });
+      const cards = deck ? cardsFor(deck, phaseNow) : [];
+      for (let i = 0; i < cards.length; i++) {
+        if (recorded(saved, phaseNow, cards[i].id)) continue;
+        if (!await decide(cards[i], i, cards.length, phaseNow, replay)) { march('You stayed in camp. Choices already made are saved; Next continues from the first open card.'); link.focus(); return; }
+      }
+      if (!(saved.ready && saved.ready.awardId === phaseNow.awardId)) {
+        let fielded;
+        try { fielded = (await loadPackSummary(phaseNow.packId)).phases.find((p) => p.id === phaseNow.phaseId)?.us; } catch { fielded = undefined; }
+        const before = saved;
+        const ok = await runEconomy(breakCamp, { campaign: ladder.raw, replay, fielded }, (next) => `The army marches. ${(campReport(before, next) || []).join(' ')}`, march);
+        if (!ok) { node('camp-march-status').focus(); return; }
+      }
+      location.assign(href);
+    } finally { marching = false; }
+  }
+  node('camp-next').addEventListener('click', (e) => leaveCamp(e, false));
+  node('camp-replay').addEventListener('click', (e) => leaveCamp(e, true));
+  // ---- Record book and Settings (modules owned by other screens; a missing one only disables its button) ----
+  node('camp-record-book').addEventListener('click', () => {
+    const button = node('camp-record-book'), save = saved;
+    import('./records.js').then((m) => m.openRecordBook(document.body, save)).catch((err) => {
+      console.warn('record book unavailable:', err?.message ?? err);
+      button.dataset.missing = 'true'; button.disabled = true; status.textContent = 'The record book is not available in this version.';
+    });
+  });
+  node('entry-settings').addEventListener('click', () => {
+    const button = node('entry-settings');
+    import('./settings-panel.js').then((m) => m.openSettings(document.body)).catch((err) => {
+      console.warn('settings unavailable:', err?.message ?? err);
+      button.dataset.missing = 'true'; button.disabled = true; status.textContent = 'Settings are not available in this version.';
+    });
+  });
   const confirmDialog = node('camp-confirm');
   function confirmAction({ heading, note, ok }) {
     node('camp-confirm-heading').textContent = heading; node('camp-confirm-note').textContent = note; node('camp-confirm-ok').textContent = ok;
@@ -294,9 +619,9 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   });
   /** One economy exchange through the store's compare-and-set; plays the level-up moment if it reached a level. */
-  async function runEconomy(rule, command, done) {
+  async function runEconomy(rule, command, done, say = shopStatus) {
     const baseline = saved;
-    importing = true; controls(); shopStatus('Saving…');
+    importing = true; controls(); say('Saving…');
     try {
       const next = await store.exchange(rule, command, { previous: baseline });
       const ups = levelUps(baseline, next);
@@ -306,12 +631,12 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
         text += ` Reputation level ${ups.to} reached: ${ups.cards.length === 1 ? 'a reward card is' : `${ups.cards.length} reward cards are`} in your depot${ups.opened ? `, and the shop now stocks ${TIER_BY_ID[ups.shopTier].name} arms` : ''}.`;
         levelUpMoment(root, { to: ups.to, opened: ups.opened, shopTier: ups.shopTier, reduced: !!globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches });
       }
-      importing = false; render(); shopStatus(text); status.textContent = text;
+      importing = false; render(); say(text); status.textContent = text;
       return true;
     } catch (err) {
       importing = false; render();
       const text = `${err.message} Your saved army is unchanged; reload the camp if progress changed elsewhere.`;
-      shopStatus(text); status.textContent = text;
+      say(text); status.textContent = text;
       return false;
     } finally { importing = false; phase = 'idle'; controls(); }
   }
@@ -370,10 +695,10 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     if (importing || pendingImport || pendingExchange || !saved || saved.version !== 2) return;
     const b = saved.army.find((x) => x.id === brigadeId);
     if (!b || !b.offer?.length) return;
-    const slots = slotsFor(b.vet), all = [...(b.badges || []), ...b.offer];
+    const slots = slotsOf(b), all = [...(b.badges || []), ...b.offer];
     choosing = { brigadeId, trigger, slots };
     node('camp-choose-heading').textContent = `${b.label}: choose badges`;
-    node('camp-choose-note').textContent = `A ${b.vet} brigade has ${slots} badge slot${slots === 1 ? '' : 's'}. Keep up to ${slots}; the others are let go for good.${b.xfactor ? ' The X-Factor badge is always kept.' : ''} Slots and badges are game rules.`;
+    node('camp-choose-note').textContent = `A ${b.vet} brigade${b.extraSlot ? ' with a bought extra slot' : ''} has ${slots} badge slot${slots === 1 ? '' : 's'}. Keep up to ${slots}; the others are let go for good.${b.xfactor ? ' The X-Factor badge is always kept.' : ''} Slots and badges are game rules.`;
     node('camp-choose-legend').textContent = `Badges to keep (up to ${slots})`;
     node('camp-choose-rows').replaceChildren(...all.map((x) => {
       const def = BADGE_BY_ID[x.id], label = document.createElement('label'), box = document.createElement('input');
@@ -432,6 +757,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     if (!showCamp) renderTitleCampaign();
     if (showCamp) {
       renderCampaignStrip();
+      renderOrders();
       renderShop();
       node('entry-summary').textContent = `${saved.army.length} formations · ${saved.army.reduce((n, b) => n + b.men, 0).toLocaleString()} men · ${saved.grade ?? 'no phase fought yet'}`;
       paged(saved.army, node('camp-army'), node('army-pages'), (b, i) => {
@@ -463,7 +789,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       }, 'depot cards', 'depot');
     }
     controls();
-    window.__entry = { mode: showCamp ? 'camp' : 'title', slot, saved, failed, pending: pendingImport, shop: { open: shopOpen, date: shopDate() },
+    window.__entry = { mode: showCamp ? 'camp' : 'title', slot, saved, failed, pending: pendingImport, shop: { open: shopOpen, date: shopDate() }, decks: !!deck, get marching() { return marching; },
       campaign: ladder ? { id: ladder.def.id, slots, continueSlot: campaignSlots()[0]?.slot ?? null } : null,
       get exchange() { return pendingExchange; }, get importing() { return importing; }, get deployment() { return activeDeployment; } };
     document.title = `The Civil War — ${showCamp ? 'Your army' : 'Take the field'}`;
@@ -576,6 +902,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     if (!ladder) return;
     const showCamp = camp && !!saved && !failed, packs = new Set();
     if (showCamp && saved.version === 2) {
+      deck = await loadDecisions().catch((err) => { console.warn('decision cards unavailable:', err?.message ?? err); return null; });
       for (const r of saved.campaign.history) packs.add(r.packId);
       const next = ladder.def.phases[saved.campaign.index]; if (next) packs.add(next.packId);
     } else if (!showCamp) {

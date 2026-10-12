@@ -111,3 +111,46 @@
 #front #camp-choose fieldset { margin: 10px 0; padding: 8px 10px; border: 1px solid #827c8b; border-radius: 8px; }
 #front .camp-choose-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 6px 0; overflow-wrap: anywhere; }
 #front .camp-choose-row input { width: 20px; height: 20px; margin: 0; }
+/* Camp orders, stores, decision cards and the drawer's camp purchases (src/ui/entry.js; game rules in src/franchise/tuning.js CAMP). */
+#front .entry-head > button { flex: none; }
+#front #camp-orders { margin-top: 24px; padding: 18px 20px; border: 1px solid var(--rw-rule); border-radius: 12px; background: var(--rw-faint); }
+#front #camp-orders h2 { margin: 0 0 6px; font-size: 26px; }
+#front #camp-orders-note, #front #camp-supply, #front #camp-capacity, #front #camp-orders-status, #front #camp-march-status { overflow-wrap: anywhere; line-height: 1.5; }
+#front #camp-stores { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; margin: 12px 0; }
+#front .camp-store { padding: 8px 10px; border: 1px solid var(--rw-rule); border-radius: 8px; overflow-wrap: anywhere; line-height: 1.45; }
+#front .camp-store span { color: var(--rw-dim); font-size: 14px; }
+#front #camp-order-rows { display: grid; gap: 8px; margin-top: 10px; }
+#front .camp-order-row { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 4px 12px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--rw-rule); }
+#front .camp-order-row label { overflow-wrap: anywhere; font-weight: 700; }
+#front .camp-order-meta { grid-column: 1 / -1; color: var(--rw-dim); font-size: 14px; }
+#front .camp-order-select, #front .camp-shop-select { box-sizing: border-box; width: 100%; min-height: 48px; font: inherit; font-size: 16px; color: var(--rw-ink); background: #29232c; border: 1px solid #827c8b; border-radius: 6px; }
+#front #camp-decisions h3 { margin: 16px 0 6px; font-size: 18px; }
+#front #camp-decisions-list { margin: 0; padding-left: 22px; }
+#front #camp-decisions-list li { margin: 6px 0; line-height: 1.5; overflow-wrap: anywhere; }
+#front #camp-shop-more section { margin-top: 18px; padding-top: 10px; border-top: 1px solid var(--rw-rule); }
+#front #camp-shop-more h3 { margin: 0 0 8px; font-size: 19px; }
+#front .camp-shop-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 16px; }
+#front .camp-shop-row { display: flex; flex-direction: column; justify-content: space-between; padding: 8px 10px; border: 1px solid var(--rw-rule); border-radius: 8px; }
+#front .camp-shop-row p { margin: 0; overflow-wrap: anywhere; line-height: 1.45; }
+#front .camp-shop-field { margin: 8px 0; max-width: 520px; }
+#front .camp-shop-field label { display: block; margin-bottom: 4px; font-weight: 700; }
+#front #camp-shop-more .entry-note { overflow-wrap: anywhere; line-height: 1.5; }
+#front #camp-decision { box-sizing: border-box; width: min(620px, calc(100vw - 32px)); max-width: none; padding: 20px; }
+#front #camp-decision h2 { margin: 4px 0 10px; overflow-wrap: anywhere; }
+#front #camp-decision fieldset { margin: 10px 0; padding: 8px 10px; border: 1px solid #827c8b; border-radius: 8px; }
+#front #camp-decision legend { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+#front .camp-decision-option { display: flex; gap: 10px; align-items: flex-start; padding: 10px 4px; border-bottom: 1px solid var(--rw-rule); cursor: pointer; }
+#front .camp-decision-option:last-child { border-bottom: 0; }
+#front .camp-decision-option input { flex: none; width: 22px; height: 22px; margin: 2px 0 0; }
+#front .camp-decision-option p { margin: 4px 0 0; line-height: 1.45; overflow-wrap: anywhere; }
+#front .camp-decision-option b { overflow-wrap: anywhere; }
+#front .camp-decision-closed { color: var(--rw-dim); }
+#front #camp-decision-reveal h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0 6px; font-size: 17px; }
+#front #camp-decision-reveal ul { margin: 4px 0 0; padding-left: 20px; }
+#front #camp-decision-reveal li { margin: 4px 0; overflow-wrap: anywhere; }
+#front #camp-decision-reveal a { color: var(--rw-ink); }
+@media (max-width: 850px) { #front .camp-shop-rows, #front #camp-stores { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 520px) {
+  #front #camp-orders { padding: 14px 12px; }
+  #front .camp-order-row { grid-template-columns: minmax(0, 1fr); }
+}

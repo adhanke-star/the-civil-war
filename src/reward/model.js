@@ -10,6 +10,7 @@
 //   bestFit(brigades, item) -> the brigade with the largest OVR gain (null if none can carry it)
 //   equip(brigade, item) -> { brigade: newBrigade, displaced }   (pure: the input is not changed)
 //   rollCondition(rng) -> a condition id (shared with the economy's reward cards and shop lots)
+//   rerollCondition(rng, current) -> a different condition id (the camp's affix re-roll)
 //
 // All numbers are placeholders for feel (see DESIGN.md flag (a): gear-led OVR lets a green brigade
 // with repeaters outrate veterans; it is this one TUNING object to change after Aaron plays).
@@ -101,6 +102,13 @@ function pickItem(rng, tierId) {
 /** A condition id rolled from CONDITIONS weights (loot, level-up reward cards and shop lots all roll it). */
 export function rollCondition(rng) {
   return rng.weighted(CONDITIONS, (c) => c.weight).id;
+}
+
+/** An affix re-roll (src/franchise/economy.js rerollAffix): a condition id from CONDITIONS weights other than `current`, so
+ *  every paid re-roll changes the affix. Deterministic for the rng (the economy seeds it from campaign seed, item and count). */
+export function rerollCondition(rng, current) {
+  const pool = CONDITIONS.filter((c) => c.id !== current);
+  return rng.weighted(pool.length ? pool : CONDITIONS, (c) => c.weight).id;
 }
 
 /** Normalise captures: an array of tier ids (or { tier, from }), a count, or undefined (rolled by grade). */

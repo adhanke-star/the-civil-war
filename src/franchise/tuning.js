@@ -59,3 +59,43 @@ export const BADGE_RULES = Object.freeze({
     canister: 50, // casualties inflicted with canister (150 yd or less)
   }),
 });
+
+// Camp orders, stores, army upgrades, training, extra badge slots and affix re-rolls (DESIGN §3 Camp, Stores, Shop; read by
+// src/franchise/camp-orders.js, economy.js, decisions.js, campaign.js and save.js). Every number is a GAME RULE. Stores are
+// whole units: one "ammunition" or "rations" is what one brigade draws for one phase at `use`; shoes, blankets and tents wear
+// out at `use` per fielded brigade per phase; batteries also wear out `use.horses` horses. Morale effects reach the battle
+// through the field definition's `morale` (src/units/unit.js reads it; 78 when a definition has none).
+export const CAMP = Object.freeze({
+  defaultMorale: 78, // src/units/unit.js: a formation's morale when its definition sets none
+  stores: Object.freeze(['ammunition', 'rations', 'shoes', 'blankets', 'tents', 'horses', 'wagons']),
+  start: Object.freeze({ ammunition: 120, rations: 60, shoes: 30, blankets: 30, tents: 30, horses: 40, wagons: 12 }),
+  // The quartermaster's issue, received each time the army marches out of camp to a phase.
+  issue: Object.freeze({ ammunition: 40, rations: 20, shoes: 8, blankets: 6, tents: 6, horses: 4, wagons: 0 }),
+  // Drawn per fielded franchise brigade per phase (horses: per fielded battery).
+  use: Object.freeze({ ammunition: 4, rations: 2, shoes: 1, blankets: 1, tents: 1, horses: 2 }),
+  // Morale lost for the phase by a fielded brigade its stores could not cover (all shortages together at most shortCap).
+  shortMorale: Object.freeze({ ammunition: 6, rations: 4, shoes: 2, blankets: 2, tents: 2, horses: 3 }),
+  shortCap: 10,
+  orders: Object.freeze(['rest', 'drill', 'target']), // one per brigade; Rest is the default
+  rest: Object.freeze({ morale: 4 }), // morale for the next phase
+  drill: Object.freeze({ bar: 1, perTier: 3, maxVet: 'veteran' }), // +1 Drill bar; every third drill raises veterancy (to Veteran at most)
+  target: Object.freeze({ bar: 1, ammunition: 4 }), // +1 Fire bar for 4 ammunition (no ammunition to spare: the brigade rests)
+  barCap: 6, // card-bar points a brigade can gain in camp, per bar (orders and bought training together)
+  training: Object.freeze({ points: 2, price: 40, level: 2 }), // bought training: +2 to one bar for 40 RP, from level 2
+  extraSlot: Object.freeze({ price: 100, level: 3 }), // one extra badge slot per brigade above its veterancy's slots
+  // Re-rolling an item's condition affix costs by rarity; the new condition is never the old one.
+  reroll: Object.freeze({ common: 10, uncommon: 20, rare: 40, veryRare: 80, legendary: 160 }),
+  // Requisition drawer store lots: quantity and price (any number of lots may be bought).
+  storeLots: Object.freeze({
+    ammunition: Object.freeze({ qty: 40, price: 20 }), rations: Object.freeze({ qty: 20, price: 10 }), shoes: Object.freeze({ qty: 10, price: 10 }),
+    blankets: Object.freeze({ qty: 10, price: 10 }), tents: Object.freeze({ qty: 10, price: 15 }), horses: Object.freeze({ qty: 10, price: 20 }),
+    wagons: Object.freeze({ qty: 2, price: 30 }) }),
+  cardsPerWagon: 5, // depot capacity: wagons x 5 cards (+ the Wagons upgrade); only shop purchases are refused when full
+  // The army upgrade tree: one-time purchases, each opened at a reputation level.
+  upgrades: Object.freeze({
+    wagons: Object.freeze({ price: 60, level: 2, cards: 30 }), // +30 depot cards
+    ambulances: Object.freeze({ price: 120, level: 3, returned: 0.1 }), // a tenth of each phase's franchise losses return to the ranks
+    ordnance: Object.freeze({ price: 120, level: 4, factor: 0.75 }), // ammunition drawn and spent on target practice x 0.75 (rounded up)
+    pioneers: Object.freeze({ price: 90, level: 3 }), // faster crossings: pending an engine hook (no battle effect yet)
+  }),
+});

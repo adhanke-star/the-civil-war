@@ -2,7 +2,8 @@
 // never a live battle. Three slots: slot 1 keeps the original key, so existing saves become slot 1.
 import { ARMS, PRACTICE_ARMS, UNIQUES, VETERANCY, GRADES, CONDITIONS, itemDef } from '../reward/data.js';
 import { ratings, canCarry, equip } from '../reward/model.js';
-import { BADGE_BY_ID, TIERS, slotsFor } from './badges.js';
+import { BADGE_BY_ID, TIERS, slotsFor, BARS } from './badges.js';
+import { CAMP } from './tuning.js';
 
 export const SAVE_KEY = 'cw.progress';
 export const PROGRESS_DB = 'cw.progress';
@@ -101,14 +102,22 @@ function campaignRecord(c) {
  *   { kind: 'level', level, uid }                          the reward card dealt on reaching a level (2-10, once each)
  *   { kind: 'turnIn', item, points, at }                   a depot card exchanged for points after `at` issue records
  *   { kind: 'buy', uid, itemId, tier, price, phase }       one shop lot bought at ladder position `phase`
+ * Camp (P5c; src/franchise/economy.js and decisions.js):
+ *   { kind: 'decision', awardId, cardId, points }          a decision card's requisition points (signed; once per card and phase attempt)
+ *   { kind: 'upgrade', id, price }                         one army upgrade (once each; matches the save's `upgrades`)
+ *   { kind: 'store', store, qty, price }                   one lot of stores bought
+ *   { kind: 'training', brigadeId, bar, points, price }    bought training for one brigade's card bar
+ *   { kind: 'slot', brigadeId, price }                     one extra badge slot (once per brigade; matches its `extraSlot`)
+ *   { kind: 'reroll', uid, n, from, to, price }            the n-th affix re-roll of one item (from one condition to another)
  */
 export const ECONOMY_FIELDS = Object.freeze(['rp', 'reputation', 'level', 'shopSeen', 'ledger']);
 export const ECONOMY_LIMITS = Object.freeze({ ledger: 5000, points: 100000, levels: 10 });
 function economyRecord(v, campaign, issuedCount) {
   const present = ECONOMY_FIELDS.filter((k) => has(v, k));
-  if (!present.length) return { rp: 0, reputation: 0, level: 1, shopSeen: 1, ledger: [] };
+  if (!present.length) return { rp: 0, reputation: 0, level: 1, shopSeen: 1, ledger: [], decided: new Map(), upgrades: new Set(), slotted: new Set(), rerolls: new Map() };
   if (present.length !== ECONOMY_FIELDS.length) bad('missing or unsupported fields.');
   const awards = new Set(campaign.history.map((r) => r.awardId)), paid = new Set(), levels = new Set(), bought = new Set(), returned = new Set();
+  const decided = new Map(), upgrades = new Set(), slotted = new Set(), rerolls = new Map();
   let earned = 0, spent = 0, lastAt = 0;
   const ledger = list(v.ledger, 'requisition ledger', 0, ECONOMY_LIMITS.ledger).map((r) => {
     if (!r || typeof r !== 'object' || Array.isArray(r)) bad('invalid requisition ledger entry.');
@@ -141,6 +150,59 @@ function economyRecord(v, campaign, issuedCount) {
       earned += out.points;
       return out;
     }
+    // Camp purchases and decision points (src/franchise/economy.js, decisions.js; P5c). Spending never lowers reputation.
+    if (r.kind === 'decision') {
+      shape(r, ['kind', 'awardId', 'cardId', 'points']);
+      const key = `${id(r.awardId, 'decision phase identity')}|${id(r.cardId, 'decision card identity')}`;
+      if (decided.has(key)) bad('a decision paid twice.');
+      decided.set(key, r);
+      const points = number(r.points, 'decision points', -ECONOMY_LIMITS.points, ECONOMY_LIMITS.points);
+      if (points === 0) bad('invalid requisition ledger entry.');
+      if (points > 0) earned += points; else spent -= points;
+      return { kind: 'decision', awardId: r.awardId, cardId: r.cardId, points };
+    }
+    if (r.kind === 'upgrade') {
+      shape(r, ['kind', 'id', 'price']);
+      if (!has(CAMP.upgrades, r.id) || upgrades.has(r.id)) bad('an army upgrade is unknown or was bought twice.');
+      upgrades.add(r.id);
+      const out = { kind: 'upgrade', id: r.id, price: number(r.price, 'price', 0, ECONOMY_LIMITS.points) };
+      spent += out.price;
+      return out;
+    }
+    if (r.kind === 'store') {
+      shape(r, ['kind', 'store', 'qty', 'price']);
+      if (!CAMP.stores.includes(r.store)) bad('unknown store.');
+      const out = { kind: 'store', store: r.store, qty: number(r.qty, 'store quantity', 1, CAMP_LIMITS.store), price: number(r.price, 'price', 0, ECONOMY_LIMITS.points) };
+      spent += out.price;
+      return out;
+    }
+    if (r.kind === 'training') {
+      shape(r, ['kind', 'brigadeId', 'bar', 'points', 'price']);
+      if (!BARS.includes(r.bar)) bad('unknown training bar.');
+      const out = { kind: 'training', brigadeId: id(r.brigadeId, 'brigade identity'), bar: r.bar, points: number(r.points, 'training points', 1, CAMP_LIMITS.bonus),
+        price: number(r.price, 'price', 0, ECONOMY_LIMITS.points) };
+      spent += out.price;
+      return out;
+    }
+    if (r.kind === 'slot') {
+      shape(r, ['kind', 'brigadeId', 'price']);
+      const brigadeId = id(r.brigadeId, 'brigade identity');
+      if (slotted.has(brigadeId)) bad('a brigade bought two extra badge slots.');
+      slotted.add(brigadeId);
+      const out = { kind: 'slot', brigadeId, price: number(r.price, 'price', 0, ECONOMY_LIMITS.points) };
+      spent += out.price;
+      return out;
+    }
+    if (r.kind === 'reroll') {
+      shape(r, ['kind', 'uid', 'n', 'from', 'to', 'price']);
+      const uid = id(r.uid, 'item identity'), n = number(r.n, 're-roll count', 1, ECONOMY_LIMITS.ledger);
+      if (n !== (rerolls.get(uid) || 0) + 1) bad('affix re-rolls are out of order.');
+      rerolls.set(uid, n);
+      if (!conditions.has(r.from) || !conditions.has(r.to) || r.from === r.to) bad('invalid affix re-roll.');
+      const out = { kind: 'reroll', uid, n, from: r.from, to: r.to, price: number(r.price, 'price', 0, ECONOMY_LIMITS.points) };
+      spent += out.price;
+      return out;
+    }
     if (r.kind === 'buy') {
       shape(r, ['kind', 'uid', 'itemId', 'tier', 'price', 'phase']);
       const uid = id(r.uid, 'requisition identity');
@@ -158,7 +220,7 @@ function economyRecord(v, campaign, issuedCount) {
   if (reputation !== earned || rp !== earned - spent) bad('requisition points do not match the ledger.');
   const level = number(v.level, 'reputation level', 1, ECONOMY_LIMITS.levels);
   if (levels.size !== level - 1 || [...levels].some((n) => n > level)) bad('reputation level does not match its reward cards.');
-  return { rp, reputation, level, shopSeen: number(v.shopSeen, 'shop level seen', 1, level), ledger };
+  return { rp, reputation, level, shopSeen: number(v.shopSeen, 'shop level seen', 1, level), ledger, decided, upgrades, slotted, rerolls };
 }
 
 /**
@@ -184,11 +246,11 @@ function xfactorOf(v, kept, label) {
   return v;
 }
 /** A brigade's badge fields (v2), in canonical order; {} when it has none. */
-function brigadeBadges(b, vet) {
+function brigadeBadges(b, vet, extra = false) {
   const seen = new Set(), out = {};
   if (has(b, 'badges')) {
     out.badges = badgeList(b.badges, 'brigade badges', BADGE_LIMITS.list, seen);
-    if (out.badges.length > slotsFor(vet)) bad('a brigade keeps more badges than its slots.');
+    if (out.badges.length > slotsFor(vet) + (extra ? 1 : 0)) bad('a brigade keeps more badges than its slots.');
   }
   if (has(b, 'offer')) out.offer = badgeList(b.offer, 'badges on offer', BADGE_LIMITS.list, seen);
   if (has(b, 'xfactor')) out.xfactor = xfactorOf(b.xfactor, out.badges || [], 'the brigade\'s');
@@ -208,11 +270,83 @@ function enemyRecord(v) {
   return out;
 }
 
+/**
+ * v2 camp fields (P5c; src/franchise/camp-orders.js, economy.js and decisions.js write them). Each is optional, so saves
+ * written before the camp load with their defaults (start stores, no upgrades, no decisions, nothing ready):
+ *   stores     { ammunition, rations, shoes, blankets, tents, horses, wagons }   whole units (CAMP.stores, all present)
+ *   upgrades   [id]                     army upgrades owned, in catalogue order (the ledger's upgrade entries, exactly)
+ *   decisions  [{ awardId, packId, phaseId, cardId, optionId, replay, effects }]  decision cards chosen, once per card and
+ *              phase attempt (awardId is the attempt's award identity); effects copy the chosen option's game rules:
+ *              { kind: 'rp', amount } | { kind: 'morale', amount } | { kind: 'store', store, amount }
+ *   ready      { awardId, morale: { [brigadeId]: delta } }   the camp the army marched out of for that phase attempt
+ * Brigades may carry `order` ('rest' | 'drill' | 'target'), `drilled` (drills carried out), `bonus` ({ fire, melee, morale,
+ * drill }: card-bar points gained in camp, already added to `base`) and `extraSlot` (true: one bought badge slot).
+ */
+export const CAMP_FIELDS = Object.freeze(['stores', 'upgrades', 'decisions', 'ready']);
+export const CAMP_LIMITS = Object.freeze({ store: 1000000, bonus: 50, drilled: 1000, decisions: 2000, effects: 6, amount: 100000, morale: 100 });
+function plain(v, label) {
+  if (!v || typeof v !== 'object' || Array.isArray(v) || ![Object.prototype, null].includes(Object.getPrototypeOf(v))) bad(`invalid ${label}.`);
+  return v;
+}
+function storesRecord(v) {
+  shape(plain(v, 'stores'), [...CAMP.stores]);
+  return Object.fromEntries(CAMP.stores.map((k) => [k, number(v[k], `${k} store`, 0, CAMP_LIMITS.store)]));
+}
+const signed = (v, label) => {
+  const n = number(v, label, -CAMP_LIMITS.amount, CAMP_LIMITS.amount);
+  if (n === 0) bad(`invalid ${label}.`);
+  return n;
+};
+export function effectRecord(e) {
+  plain(e, 'decision effect');
+  if (e.kind === 'rp' || e.kind === 'morale') { shape(e, ['kind', 'amount']); return { kind: e.kind, amount: signed(e.amount, 'decision effect amount') }; }
+  if (e.kind === 'store') {
+    shape(e, ['kind', 'store', 'amount']);
+    if (!CAMP.stores.includes(e.store)) bad('unknown store in a decision effect.');
+    return { kind: 'store', store: e.store, amount: signed(e.amount, 'decision effect amount') };
+  }
+  bad('unknown decision effect.');
+}
+function decisionsRecord(v) {
+  const seen = new Set();
+  return list(v, 'decisions', 1, CAMP_LIMITS.decisions).map((r) => {
+    shape(r, ['awardId', 'packId', 'phaseId', 'cardId', 'optionId', 'replay', 'effects']);
+    const out = { awardId: id(r.awardId, 'decision phase identity'), packId: id(r.packId, 'pack identity'), phaseId: id(r.phaseId, 'phase identity'),
+      cardId: id(r.cardId, 'decision card identity'), optionId: id(r.optionId, 'decision option identity') };
+    if (typeof r.replay !== 'boolean') bad('invalid decision record.');
+    if (seen.has(`${out.awardId}|${out.cardId}`)) bad('a decision card was chosen twice for one phase.');
+    seen.add(`${out.awardId}|${out.cardId}`);
+    return { ...out, replay: r.replay, effects: list(r.effects, 'decision effects', 1, CAMP_LIMITS.effects).map(effectRecord) };
+  });
+}
+function readyRecord(v, brigadeIds) {
+  shape(plain(v, 'camp readiness'), ['awardId', 'morale']);
+  const morale = {};
+  for (const key of Object.keys(plain(v.morale, 'camp morale')).sort()) {
+    if (!brigadeIds.has(key)) bad('camp morale names a brigade that is not in the army.');
+    morale[key] = signed(v.morale[key], 'camp morale');
+    if (Math.abs(morale[key]) > CAMP_LIMITS.morale) bad('invalid camp morale.');
+  }
+  return { awardId: id(v.awardId, 'camp phase identity'), morale };
+}
+/** A brigade's camp fields (v2), in canonical order; {} when it has none. */
+function brigadeCamp(b) {
+  const out = {};
+  if (has(b, 'order')) { if (!CAMP.orders.includes(b.order)) bad('unknown camp order.'); out.order = b.order; }
+  if (has(b, 'drilled')) out.drilled = number(b.drilled, 'drills', 1, CAMP_LIMITS.drilled);
+  if (has(b, 'bonus')) {
+    shape(plain(b.bonus, 'camp bonus'), [...BARS]);
+    out.bonus = Object.fromEntries(BARS.map((k) => [k, number(b.bonus[k], `${k} camp bonus`, 0, CAMP_LIMITS.bonus)]));
+  }
+  if (has(b, 'extraSlot')) { if (b.extraSlot !== true) bad('invalid extra badge slot.'); out.extraSlot = true; }
+  return out;
+}
+
 /** Strict canonical copy. Imported derived OVR is never trusted; it is recomputed. */
 export function validateSnapshot(v) {
   // Version 2 is only the campaign kind; any other version-2 record is an unsupported version.
   const v2 = !!v && typeof v === 'object' && v.version === 2 && v.kind === 'campaign';
-  if (v2) shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade', 'slot', 'campaign'], ['updated', 'enemy', ...ECONOMY_FIELDS]);
+  if (v2) shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade', 'slot', 'campaign'], ['updated', 'enemy', ...ECONOMY_FIELDS, ...CAMP_FIELDS]);
   else shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade']);
   if (v.format !== 'the-civil-war' || (!v2 && (v.version !== 1 || v.kind !== 'completed-reward'))) bad('unsupported save format or version.');
   const awardId = id(v.awardId, 'completed award identity');
@@ -230,7 +364,7 @@ export function validateSnapshot(v) {
     return it;
   };
   const army = list(v.army, 'army', 1, 200).map((b) => {
-    shape(b, ['id', 'label', 'kind', 'men', 'vet', 'weapon', 'base'], v2 ? ['guns', 'ovr', 'unitId', 'badges', 'offer', 'xfactor'] : ['guns', 'ovr']);
+    shape(b, ['id', 'label', 'kind', 'men', 'vet', 'weapon', 'base'], v2 ? ['guns', 'ovr', 'unitId', 'badges', 'offer', 'xfactor', 'order', 'drilled', 'bonus', 'extraSlot'] : ['guns', 'ovr']);
     const bid = id(b.id, 'brigade identity');
     if (has(b, 'unitId')) {
       if (unitIds.has(id(b.unitId, 'field unit identity'))) bad('duplicate field unit identity.');
@@ -247,10 +381,11 @@ export function validateSnapshot(v) {
     if (b.kind === 'battery') out.guns = number(b.guns, 'guns', 0, 200);
     else if (has(b, 'guns')) bad('infantry cannot own guns.');
     if (out.weapon.depot || !canCarry(out, out.weapon)) bad('incompatible equipped gear.');
-    const badges = v2 ? brigadeBadges(b, out.vet) : {};
+    const camp = v2 ? brigadeCamp(b) : {};
+    const badges = v2 ? brigadeBadges(b, out.vet, camp.extraSlot === true) : {};
     out.ovr = ratings({ ...out, ...badges }).ovr; // kept badges add their card points (a game rule)
     if (has(b, 'unitId')) out.unitId = b.unitId;
-    return Object.assign(out, badges);
+    return Object.assign(out, badges, camp);
   });
   const depot = list(v.depot, 'depot', 0, 2000).map((it) => add(item(it), null));
   const issuedRaw = list(v.issued, 'issued records', 0, 5000);
@@ -282,12 +417,31 @@ export function validateSnapshot(v) {
       rp: economy.rp, reputation: economy.reputation, level: economy.level, shopSeen: economy.shopSeen, ledger: economy.ledger }
     : { format: 'the-civil-war', version: 1, kind: 'completed-reward', awardId, army, depot, issued, seed, grade: v.grade };
   if (v2 && has(v, 'enemy')) out.enemy = enemyRecord(v.enemy);
+  if (v2) campRecord(v, out, economy, brigadeIds);
   if (v2 && has(v, 'updated')) {
     if (typeof v.updated !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(v.updated)) bad('invalid update time.');
     out.updated = v.updated;
   }
   if (new TextEncoder().encode(JSON.stringify(out)).length > MAX_SAVE_BYTES) bad('save exceeds the 1 MB limit.');
   return out;
+}
+
+/** The camp fields onto a v2 output, with the ledger cross-checks (upgrades, extra slots, decision points). */
+function campRecord(v, out, economy, brigadeIds) {
+  if (has(v, 'stores')) out.stores = storesRecord(v.stores);
+  const owned = has(v, 'upgrades') ? list(v.upgrades, 'army upgrades', 1, Object.keys(CAMP.upgrades).length) : [];
+  if (owned.some((u) => !has(CAMP.upgrades, u)) || new Set(owned).size !== owned.length) bad('unknown or repeated army upgrade.');
+  const ordered = Object.keys(CAMP.upgrades).filter((u) => owned.includes(u));
+  if (JSON.stringify(ordered) !== JSON.stringify(owned) || ordered.length !== economy.upgrades.size || ordered.some((u) => !economy.upgrades.has(u))) bad('army upgrades do not match the ledger.');
+  if (ordered.length) out.upgrades = ordered;
+  const slots = new Set(out.army.filter((b) => b.extraSlot).map((b) => b.id));
+  if (slots.size !== economy.slotted.size || [...slots].some((b) => !economy.slotted.has(b))) bad('extra badge slots do not match the ledger.');
+  for (const r of out.ledger) if (r.kind === 'training' && !brigadeIds.has(r.brigadeId)) bad('training names a brigade that is not in the army.');
+  const decisions = has(v, 'decisions') ? decisionsRecord(v.decisions) : [];
+  const owed = new Map(decisions.map((d) => [`${d.awardId}|${d.cardId}`, d.effects.filter((e) => e.kind === 'rp').reduce((n, e) => n + e.amount, 0)]).filter(([, n]) => n !== 0));
+  if (owed.size !== economy.decided.size || [...owed].some(([k, n]) => economy.decided.get(k)?.points !== n)) bad('decision points do not match the ledger.');
+  if (decisions.length) out.decisions = decisions;
+  if (has(v, 'ready')) out.ready = readyRecord(v.ready, brigadeIds);
 }
 
 export function completedSnapshot(result) {

@@ -20,3 +20,5 @@
   #briefing .briefing-foot { padding: 6px 14px 12px; }
   #briefing .briefing-begin { width: 100%; }
 }
+#briefing .briefing-decisions { margin: 0 0 10px; padding-left: 18px; line-height: 1.5; }
+#briefing .briefing-decisions li { margin: 4px 0; overflow-wrap: anywhere; }

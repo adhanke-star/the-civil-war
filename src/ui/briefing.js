@@ -2,17 +2,23 @@
 // the ladder position text, the reward-issue bridge, and the field Briefing overlay shown before a campaign phase.
 //
 //   loadCampaign()                        -> { raw, def } (def validated by validateCampaign) or null when it ships empty
-//   loadPackSummary(packId)               -> { packId, title, phases: [{ id, title, date, start, line }] } (cached per page)
+//   loadPackSummary(packId)               -> { packId, title, phases: [{ id, title, date, start, line, us }] } (cached per page;
+//                                            `us` lists the phase's Union field unit ids, reinforcements included)
+//   loadDecisions()                       -> the validated decision deck (assets/decisions.json; src/franchise/decisions.js)
+//   decisionLines(save, phase, deck?)     -> plain lines for the decisions and camp morale recorded for this phase attempt
 //   ladderPosition(def, index)            -> { battle, battles, phase, phases } for "Battle N of B · Phase k of n"
 //   rewardArmy(army)                      -> the campaign army as the reward sequence's v1 brigade rows (no unitId)
 //   applyRewardIssues(next, loot, result) -> next with the reward's issue log replayed through exchangeDepot, or next
 //                                            unchanged (issued: false) when the reward's items differ from the award
 //   briefingSources(list)                 -> [{ label, href }] with only http(s) links kept
-//   mountBriefing({ scenario, phase, game, hud, effects, onBegin }) -> the paused, focused Briefing dialog
+//   mountBriefing({ scenario, phase, game, hud, effects, onBegin, save?, deck? }) -> the paused, focused Briefing dialog
+//                                            (with `save`, it also lists the decision cards chosen for this attempt)
+// Decision cards are chosen in camp before the field and this briefing load (src/ui/entry.js, the camp's Next and Replay).
 // Pure helpers do no DOM work at import time, so tools/test-campaign-ui.mjs can import this file in Node.
 import { validateCampaign } from '../franchise/campaign.js';
 import { exchangeDepot, validateSnapshot } from '../franchise/save.js';
 import { preparePhase } from '../sim/phase.js';
+import { validateDeck, effectText } from '../franchise/decisions.js';
 
 const MAX_BYTES = 1024 * 1024;
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -48,12 +54,36 @@ export function loadPackSummary(packId, { fetcher } = {}) {
       if (pack.id !== packId) throw new Error('Campaign: battle pack identity does not match its file.');
       return Object.freeze({ packId, title: pack.title, phases: Object.freeze(pack.phases.map((p) => Object.freeze({
         id: p.id, title: p.scenario.title, date: p.scenario.date, start: p.scenario.start,
-        line: shortLine(p.scenario) }))) });
+        line: shortLine(p.scenario), us: Object.freeze([...p.scenario.units, ...(Array.isArray(p.scenario.reinforcements) ? p.scenario.reinforcements : [])]
+          .filter((u) => u && u.side === 'US' && typeof u.id === 'string').map((u) => u.id)) }))) });
     });
     pending.catch(() => summaries.delete(packId));
     summaries.set(packId, pending);
   }
   return summaries.get(packId);
+}
+let deckPending = null;
+/** The decision deck (validated once per page; a failed load may be retried). */
+export function loadDecisions({ fetcher } = {}) {
+  if (!deckPending) {
+    deckPending = boundedJson('./assets/decisions.json', fetcher).then(validateDeck);
+    deckPending.catch(() => { deckPending = null; });
+  }
+  return deckPending;
+}
+/** Plain lines for the decisions recorded for this phase attempt and the camp's morale (empty when there are none). */
+export function decisionLines(save, phase, deck = null) {
+  if (!save || save.version !== 2 || !phase || typeof phase.awardId !== 'string') return [];
+  const lines = [];
+  for (const r of (save.decisions || []).filter((x) => x.awardId === phase.awardId)) {
+    const card = deck?.cards.find((c) => c.id === r.cardId), option = card?.options.find((o) => o.id === r.optionId);
+    lines.push(`${card ? `${card.title}: ${option ? option.label : r.optionId}` : 'Decision'} (game rule: ${r.effects.map(effectText).join('; ')}).`);
+  }
+  if (save.ready && save.ready.awardId === phase.awardId && !phase.loan) {
+    const m = Object.values(save.ready.morale), up = m.filter((n) => n > 0).length, down = m.filter((n) => n < 0).length;
+    if (up || down) lines.push(`Camp (game rule): ${[up ? `${up} brigade${up === 1 ? '' : 's'} rested` : '', down ? `${down} short of stores` : ''].filter(Boolean).join(', ')}; their morale is set for this phase.`);
+  }
+  return lines;
 }
 function shortLine(s) {
   if (words(s.subtitle)) return words(s.subtitle);
@@ -121,7 +151,7 @@ export function briefingSources(list) {
 const DEFAULT_LOAN = "Grant's Army of the Tennessee is on loan for this phase. Its results do not change your franchise brigades; losses here carry only inside this battle.";
 
 /** The paused Briefing overlay. Begin (or Escape) closes it, unpauses and focuses the battlefield. */
-export function mountBriefing({ scenario, phase, game, hud, effects, onBegin = () => {} }) {
+export function mountBriefing({ scenario, phase, game, hud, effects, onBegin = () => {}, save = null, deck = null }) {
   const b = has(scenario, 'briefing') && scenario.briefing && typeof scenario.briefing === 'object' ? scenario.briefing : {};
   const el = (tag, props = {}, ...kids) => {
     const n = document.createElement(tag);
@@ -144,6 +174,12 @@ export function mountBriefing({ scenario, phase, game, hud, effects, onBegin = (
     const cite = [words(b.quote.who), words(b.quote.source)].filter(Boolean);
     body.append(el('figure', { class: 'briefing-quote' }, el('blockquote', {}, el('p', { text: words(b.quote.text) })),
       cite.length ? el('figcaption', { text: `— ${cite.join(', ')}` }) : null));
+  }
+  const decided = decisionLines(save, phase, deck);
+  if (decided.length) {
+    const list = el('ul', { class: 'briefing-decisions', 'aria-labelledby': 'briefing-decisions-heading' });
+    for (const line of decided) list.append(el('li', { text: line }));
+    body.append(el('h3', { id: 'briefing-decisions-heading', text: 'Your decisions before this phase' }), list);
   }
   const sources = briefingSources(b.sources);
   if (sources.length) {

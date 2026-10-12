@@ -49,6 +49,8 @@
 // `node tools/test.mjs --badges` runs the badges and X-Factor screens only (tools/test-badges-ui.mjs, also in shard 2): the badge
 // stamped in the after-action, the X-Factor moment once, the camp card emblem and its real example with sources, the keep
 // choice by keyboard, axe and 320 px.
+// `node tools/test.mjs --orders` runs the decision cards, camp orders, stores and upgrades UI only (tools/test-orders-ui.mjs,
+// also in shard 3).
 // `node tools/test.mjs --delegation` runs the delegation UI only (tools/test-delegation-ui.mjs, also in shard 3): select,
 // Delegate, pick a place, Attack by mouse and keyboard, the pencil line, the card's role and Undo, a drag that takes
 // the brigade back, Escape, axe and 320 px.
@@ -1781,6 +1783,7 @@ async function browserChecks(server, url) {
     // Imported on demand: its CPU half imports game modules that define settings, which would skew settingsUnit.
     if (process.argv.includes('--campaign')) { result.mode = 'campaign screens and flow'; const { campaignControls } = await import('./test-campaign-ui.mjs'); await campaignControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--badges')) { result.mode = 'badges and X-Factor'; const { badgesControls } = await import('./test-badges-ui.mjs'); await badgesControls({ browser, url, check, shot, result, watchErrors }); return; }
+    if (process.argv.includes('--orders')) { result.mode = 'decision cards and camp orders'; const { ordersControls } = await import('./test-orders-ui.mjs'); await ordersControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--economy')) { result.mode = 'requisition points and shop'; const { economyControls } = await import('./test-economy-ui.mjs'); await economyControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--packs-ui')) { result.mode = 'battle packs only'; const { packsUIControls } = await import('./test-packs-ui.mjs'); await packsUIControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--delegation')) { result.mode = 'delegation UI only'; const { delegationControls } = await import('./test-delegation-ui.mjs'); await delegationControls({ browser, url, check, shot, result, watchErrors }); return; }
@@ -1836,6 +1839,8 @@ async function browserChecks(server, url) {
       await soldierViewControls({ browser, url, check, shot, result, watchErrors, native });
       const { delegationControls } = await import('./test-delegation-ui.mjs');
       await delegationControls({ browser, url, check, shot, result, watchErrors });
+      const { ordersControls } = await import('./test-orders-ui.mjs');
+      await ordersControls({ browser, url, check, shot, result, watchErrors });
     }
     // Shard 4: commanders and regiments, cavalry, then every shipped battle-pack phase on its own terrain.
     if (runs(4)) {

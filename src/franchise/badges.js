@@ -4,7 +4,7 @@
 //   BADGES / BADGE_BY_ID / BADGE_IDS        the catalogue: name, category, feat, effect and a sourced real example
 //   FEAT_STATS                              the per-unit battle statistics the field keeps (src/sim/combat.js featsOf)
 //   measure(badge, stats) / tierFor(badge, value) / featText(badge, value) / effectText(badge, tier)
-//   slotsFor(vet)                           badge slots by veterancy (Green 1, Trained 2, Veteran 3, Elite 4)
+//   slotsFor(vet) / slotsOf(brigade)        badge slots by veterancy (Green 1, Trained 2, Veteran 3, Elite 4), +1 bought slot
 //   ratingBonus(badges)                     { fire, melee, morale, drill } card-bar points (src/reward/model.js ratings)
 //   fieldBadges(list, xfactor) / badgeEffects(defBadges)  the field definition's badges and their combat fractions
 //   validateFeats(feats, units)             a phase's canonical feat statistics (recordPhase input)
@@ -209,6 +209,8 @@ export function slotsFor(vet) {
   if (!has(BADGE_RULES.slots, vet)) fail('unknown veterancy.');
   return BADGE_RULES.slots[vet];
 }
+/** A brigade's badge slots: by veterancy, +1 for a bought extra slot (`extraSlot`, src/franchise/economy.js buySlot). */
+export const slotsOf = (brigade) => slotsFor(brigade.vet) + (brigade.extraSlot === true ? 1 : 0);
 /** Card-bar points from kept badges (src/reward/model.js ratings). */
 export function ratingBonus(badges) {
   const out = { fire: 0, melee: 0, morale: 0, drill: 0 };
@@ -226,7 +228,7 @@ export const fieldBadges = (list, xfactor) => list.map((b) => ({ id: b.id, tier:
  * there are none or the list is not a valid field badge list (an unknown list never changes a battle).
  */
 export function badgeEffects(list) {
-  if (!Array.isArray(list) || !list.length || list.length > 4) return null;
+  if (!Array.isArray(list) || !list.length || list.length > 5) return null; // Elite 4 slots + one bought extra slot
   const out = {};
   let xf = null;
   for (const b of list) {
@@ -297,13 +299,13 @@ function awardBrigade(b, stats, awardId) {
     const next = entry(e.id, e.tier, awardId, e.feat);
     if (inKept) kept = kept.map((x) => (x === inKept ? next : x));
     else if (inOffer) offer = offer.map((x) => (x === inOffer ? next : x));
-    else if (kept.length < slotsFor(b.vet)) kept.push(next);
+    else if (kept.length < slotsOf(b)) kept.push(next);
     else offer.push(next);
     earned.push({ id: e.id, tier: e.tier, from: old ? old.tier : null, feat: e.feat });
     if (!xfactor && e.tier === 'gold') { xfactor = e.id; newX = e.id; }
   }
   if (newX && offer.some((x) => x.id === newX)) { kept = [...kept, offer.find((x) => x.id === newX)]; offer = offer.filter((x) => x.id !== newX); }
-  ({ kept, offer } = fit(kept, offer, slotsFor(b.vet), xfactor));
+  ({ kept, offer } = fit(kept, offer, slotsOf(b), xfactor));
   const out = { ...b };
   delete out.badges; delete out.offer; delete out.xfactor; delete out.ovr;
   if (kept.length) out.badges = kept;
@@ -344,7 +346,7 @@ export function awardBadges(save, { awardId, feats, loan = false }) {
     if (!stats && !(b.badges || []).length) return b;
     const r = awardBrigade(b, stats, awardId);
     if (r.earned.length || r.xfactor) brigades.push({ id: b.id, label: b.label, earned: r.earned, xfactor: r.xfactor, offer: (r.brigade.offer || []).length,
-      slots: slotsFor(b.vet) });
+      slots: slotsOf(b) });
     return r.brigade;
   });
   // Formations of the franchise army are never enemy formations (a loan phase's Union units are not recorded either).
@@ -373,7 +375,7 @@ export function keepBadges(brigade, keep) {
   const all = [...(brigade.badges || []), ...(brigade.offer || [])];
   if (!all.length) fail('this brigade has no badges to choose from.');
   if (keep.some((id) => !all.some((b) => b.id === id))) fail('that badge is not this brigade\'s to keep.');
-  const slots = slotsFor(brigade.vet);
+  const slots = slotsOf(brigade);
   if (keep.length > slots) fail(`${brigade.label} has ${slots} badge slot${slots === 1 ? '' : 's'}.`);
   if (brigade.xfactor && !keep.includes(brigade.xfactor)) fail('the X-Factor badge is always kept.');
   const out = { ...brigade };

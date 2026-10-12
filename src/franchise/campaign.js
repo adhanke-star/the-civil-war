@@ -20,6 +20,12 @@
 // field definition; src/game.js applies their effects); chooseBadges(save, { brigadeId, keep }) is the camp's choice when a
 // brigade has earned more badges than it has slots.
 //
+// Camp (P5c): applyCampaign also sets a fielded formation's `morale` from the camp the army marched out of for this phase
+// attempt (src/franchise/camp-orders.js breakCamp: Rest, shortages) and the decision cards chosen for it (decisions.js);
+// nothing changes when the save has neither (a phase launched without marching out of camp). With the Ambulances upgrade,
+// recordPhase returns a share of each franchise brigade's losses to the ranks. Reward and requisition cards field without
+// their `source` (the field's equipment profile knows issue and capture only).
+//
 // Joins: a ladder phase may carry `joins` (rows in the franchise schema): formations that enter the franchise army
 // when a save first reaches that phase (a new campaign reaching its first phase, or recordPhase advancing to it; never
 // a replay). Appending is idempotent by unitId, so a formation already in the army (alive or destroyed) is never added
@@ -27,7 +33,8 @@
 import { validateSnapshot } from './save.js';
 import { phaseOutcome, vetBase } from './practice.js';
 import { ARMS, UNIQUES, VETERANCY, GRADES, itemDef } from '../reward/data.js';
-import { awardPhase } from './economy.js';
+import { awardPhase, upgradesOf } from './economy.js';
+import { CAMP } from './tuning.js';
 import { validateFeats, awardBadges, noteAward, fieldBadges, keepBadges } from './badges.js';
 
 const fail = (message) => { throw new Error(`Campaign: ${message}`); };
@@ -178,7 +185,17 @@ export function applyCampaign(scenario, save, phase) {
     if (d.side === 'CS' && has(enemy, d.id)) return { ...d, badges: fieldBadges(enemy[d.id].badges, enemy[d.id].xfactor) };
     return d;
   };
-  const field = (d) => badged(place(d));
+  // Camp (P5c): the morale the march out of camp set for this phase attempt (franchise brigades off loan) and the decision
+  // cards chosen for it (every Union formation on the field). Only the definition's `morale` carries it (src/units/unit.js).
+  const ready = !loan && s.ready && s.ready.awardId === phase.awardId ? s.ready.morale : {};
+  const decided = (s.decisions || []).filter((r) => r.awardId === phase.awardId)
+    .reduce((n, r) => n + r.effects.filter((e) => e.kind === 'morale').reduce((m, e) => m + e.amount, 0), 0);
+  const steadied = (d) => {
+    if (!d) return d;
+    const b = army.get(d.id), delta = (d.side === 'US' ? decided : 0) + (b && has(ready, b.id) ? ready[b.id] : 0);
+    return delta ? { ...d, morale: Math.max(1, Math.min(100, Math.round((Number.isFinite(d.morale) ? d.morale : CAMP.defaultMorale) + delta))) } : d;
+  };
+  const field = (d) => steadied(badged(place(d)));
   const place = (d) => {
     const artillery = d.type === 'artillery';
     if (army.has(d.id)) {
@@ -187,7 +204,10 @@ export function applyCampaign(scenario, save, phase) {
       if (d.side !== 'US' || (b.kind === 'battery') !== artillery) fail(`franchise formation ${b.id} does not match its field unit.`);
       const men = Math.min(d.men, b.men), guns = artillery ? Math.min(Number.isSafeInteger(d.guns) ? d.guns : b.guns, b.guns) : 0;
       if (men <= 0 || (artillery && guns <= 0)) return null;
-      return { ...d, men, ...(artillery ? { guns } : {}), xp: vetIds.indexOf(b.vet) + 1, weapon: artillery ? 'smbart' : 'smooth', equipment: { ...b.weapon } };
+      // The field's equipment profile knows issue and capture origins only; reward and requisition cards field without one.
+      const equipment = { ...b.weapon };
+      if (!['issue', 'capture'].includes(equipment.source)) delete equipment.source;
+      return { ...d, men, ...(artillery ? { guns } : {}), xp: vetIds.indexOf(b.vet) + 1, weapon: artillery ? 'smbart' : 'smooth', equipment };
     }
     if (!has(carry, d.id)) return d;
     const c = carry[d.id], men = Math.min(d.men, c.men);
@@ -242,14 +262,15 @@ export function recordPhase(save, campaign, result) {
   const army = new Map(s.army.filter((b) => has(b, 'unitId')).map((b) => [b.unitId, b]));
   // Historical carry lives inside one battle; a new pack starts from the authored roster.
   const carry = last && last.packId === entry.packId ? { ...s.campaign.carry } : {};
-  const changed = new Map();
+  const changed = new Map(), ambulances = upgradesOf(s).includes('ambulances');
   const battleEnd = at === c.phases.length - 1 || c.phases[at + 1].packId !== entry.packId;
   for (const u of units) {
     if (army.has(u.id)) {
       if (loan) continue;
       const b = army.get(u.id);
       if (u.side !== 'US') fail(`franchise formation ${b.id} fought for the wrong side.`);
-      const men = Math.max(0, b.men - (u.menStart - u.men));
+      // Ambulances (an army upgrade, P5c): a share of the phase's losses returns to the ranks (a game rule).
+      const lost = u.menStart - u.men, men = Math.max(0, b.men - lost + (ambulances ? Math.floor(lost * CAMP.upgrades.ambulances.returned) : 0));
       const next = { ...b, men };
       if (b.kind === 'battery') next.guns = men ? Math.max(0, b.guns - (has(u, 'guns') ? u.gunsStart - u.guns : 0)) : 0;
       const tier = vetIds.indexOf(b.vet), lostHalf = u.menStart > 0 && (u.menStart - u.men) * 2 >= u.menStart;

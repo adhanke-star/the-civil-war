@@ -1,0 +1,1061 @@
+{
+ "version": 1,
+ "note": "Decision cards before campaign phases (DESIGN §1, §4b). Dilemma, historical choice and sources come from the research packets SH1-CH3 (2026-10-11); every gain and cost is a game rule (src/franchise/decisions.js). No sourced candidates: Grant's last line (SH3) and McFadden's Ford.",
+ "cards": [
+  {
+   "id": "sh1-peabody-patrol",
+   "pack": "shiloh",
+   "phase": "camps-at-dawn",
+   "title": "Peabody's patrol",
+   "dilemma": "Halleck's standing order was to avoid bringing on a general engagement, but Powell had heard a large force south of the camps. Do you send a patrol at 03:00 on your own authority, or wait for orders and stay quiet?",
+   "sources": [
+    {
+     "label": "Staff Ride Handbook Stand 1 p.60 and Stand 2 p.64",
+     "url": "https://www.govinfo.gov/content/pkg/GOVPUB-D110-PURL-LPS59543/pdf/GOVPUB-D110-PURL-LPS59543.pdf"
+    },
+    {
+     "label": "NPS Fraley Field tour stop 7"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "patrol",
+     "label": "Send the patrol at 03:00 on your own authority",
+     "gain": "The camps are roused early: +4 morale for every Union formation in this phase.",
+     "cost": "The patrol's fight uses 20 ammunition.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 4
+      },
+      {
+       "kind": "store",
+       "store": "ammunition",
+       "amount": -20
+      }
+     ]
+    },
+    {
+     "id": "wait",
+     "label": "Wait for orders and stay quiet",
+     "gain": "+15 requisition points for keeping the standing order.",
+     "cost": "The attack finds the camps unready: −4 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 15
+      },
+      {
+       "kind": "morale",
+       "amount": -4
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Peabody sent Powell with five companies. Prentiss rebuked him afterward, but the contact roused the camps about two hours before the main assault.",
+   "historicalOption": "patrol",
+   "research": "Research packet SH1 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "sh1-appler-warning",
+   "pack": "shiloh",
+   "phase": "camps-at-dawn",
+   "title": "Appler's warning",
+   "dilemma": "A wounded man runs through the 53rd Ohio's camp shouting that the enemy is coming, yet Sherman scolded you the day before. Do you form the regiment now and report, or wait for the general's say-so?",
+   "sources": [
+    {
+     "label": "Staff Ride Handbook Stand 3 p.66 and pp.54-55",
+     "url": "https://www.govinfo.gov/content/pkg/GOVPUB-D110-PURL-LPS59543/pdf/GOVPUB-D110-PURL-LPS59543.pdf"
+    },
+    {
+     "label": "Daniel, Battle of Shiloh, sec5"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "form",
+     "label": "Form the regiment now and report",
+     "gain": "The regiment is in line when the attack comes: +3 morale for every Union formation in this phase.",
+     "cost": "Turning out before breakfast costs 10 rations.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 3
+      },
+      {
+       "kind": "store",
+       "store": "rations",
+       "amount": -10
+      }
+     ]
+    },
+    {
+     "id": "wait",
+     "label": "Wait for the general's say-so",
+     "gain": "+10 requisition points: no alarm on your record.",
+     "cost": "−3 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 10
+      },
+      {
+       "kind": "morale",
+       "amount": -3
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Appler formed and reported; Sherman's reply was dismissive, and he only believed it at about 07:00 when Cleburne's men fired on him in Rhea Field.",
+   "historicalOption": "form",
+   "research": "Research packet SH1 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "sh2-retire",
+   "pack": "shiloh",
+   "phase": "hornets-nest",
+   "title": "When to give the order to retire?",
+   "dilemma": "Every hour held lets Webster mass guns at the Landing (3 batteries at 14:30, 52 guns by 17:00), but a withdrawal ordered too late finds the exits closed.",
+   "sources": [
+    {
+     "label": "Staff Ride Handbook pp.106-107, 110, 112",
+     "url": "https://www.govinfo.gov/content/pkg/GOVPUB-D110-PURL-LPS59543/pdf/GOVPUB-D110-PURL-LPS59543.pdf"
+    },
+    {
+     "label": "Daniel/Allen, 'Surrender in the Center'",
+     "url": "https://npshistory.com/publications/civil_war_series/22/sec8.htm"
+    },
+    {
+     "label": "Reed pp.19, 49",
+     "url": "https://archive.org/details/battleofshilohor00unit"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "hold",
+     "label": "Hold the road as long as possible",
+     "gain": "+20 requisition points: every hour held buys guns for the Landing line.",
+     "cost": "The men feel the exits closing: −5 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 20
+      },
+      {
+       "kind": "morale",
+       "amount": -5
+      }
+     ]
+    },
+    {
+     "id": "early",
+     "label": "Retire while the exits are still open",
+     "gain": "+4 morale for every Union formation in this phase.",
+     "cost": "The batteries' spare chests are left behind: 20 ammunition.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 4
+      },
+      {
+       "kind": "store",
+       "store": "ammunition",
+       "amount": -20
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Wallace ordered a retirement only when Sweeny's collapse (about 16:30) and the flank retreats left the road in danger, and four regiments never received the order; Prentiss ordered his retreat about 17:00. The 12th and 14th Iowa, 8th Iowa, 58th Illinois, 18th and 23rd Missouri and part of Prentiss's division surrendered at 17:30; about 2,200 were captured.",
+   "historicalOption": "hold",
+   "research": "Research packet SH2 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "sh2-guns",
+   "pack": "shiloh",
+   "phase": "hornets-nest",
+   "title": "Answer Ruggles's guns or pull the batteries back?",
+   "dilemma": "Between 15:30 and 16:30 the Confederates mass 53-62 guns opposite the road. Counter-battery fire from the 4-gun batteries risks losing them; withdrawing them leaves the infantry without canister against the next charge.",
+   "sources": [
+    {
+     "label": "Staff Ride Handbook p.106",
+     "url": "https://www.govinfo.gov/content/pkg/GOVPUB-D110-PURL-LPS59543/pdf/GOVPUB-D110-PURL-LPS59543.pdf"
+    },
+    {
+     "label": "Reed pp.49, 59",
+     "url": "https://archive.org/details/battleofshilohor00unit"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "duel",
+     "label": "Trade fire with the massed guns, then fall back",
+     "gain": "The infantry keep their guns beside them: +3 morale for every Union formation in this phase.",
+     "cost": "Counter-battery fire uses 30 ammunition.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 3
+      },
+      {
+       "kind": "store",
+       "store": "ammunition",
+       "amount": -30
+      }
+     ]
+    },
+    {
+     "id": "pull",
+     "label": "Pull the batteries back to the Landing now",
+     "gain": "+15 requisition points: the guns are saved for the Landing line.",
+     "cost": "−3 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 15
+      },
+      {
+       "kind": "morale",
+       "amount": -3
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "The Union batteries on the ridge behind the Sunken Road traded fire for about an hour, then started to fall back as the Confederate bombardment peaked; Hickenlooper and Munch finally pulled out just before the encirclement and reached the Landing line.",
+   "historicalOption": "duel",
+   "research": "Research packet SH2 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "sh4-dawn",
+   "pack": "shiloh",
+   "phase": "buell-attacks",
+   "title": "Press the attack at dawn or reform on the Landing first?",
+   "dilemma": "Nelson, Crittenden and McCook are fresh but just off the boats; Beauregard's line is disorganized and does not know Buell is present. Attack now and hit before Confederate reorganization, or wait to bring all three McCook brigades up (not all ready until near noon).",
+   "sources": [
+    {
+     "label": "Epperson",
+     "url": "https://jfepperson.org/shiloh.htm"
+    },
+    {
+     "label": "Wikipedia, Battle of Shiloh",
+     "url": "https://en.wikipedia.org/wiki/Battle_of_Shiloh"
+    },
+    {
+     "label": "NPS Civil War Series, Second Day"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "attack",
+     "label": "Attack at dawn",
+     "gain": "Hit the enemy before he reorganises: +4 morale for every Union formation in this phase.",
+     "cost": "An early start costs 10 rations.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 4
+      },
+      {
+       "kind": "store",
+       "store": "rations",
+       "amount": -10
+      }
+     ]
+    },
+    {
+     "id": "reform",
+     "label": "Reform on the Landing first",
+     "gain": "+15 requisition points: the divisions go in complete.",
+     "cost": "The enemy gains time to reorganise: −3 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 15
+      },
+      {
+       "kind": "morale",
+       "amount": -3
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Nelson advanced from before 06:00 with Crittenden following on his right and McCook's brigades joining one at a time; Grant ordered Lew Wallace forward on the right at the same time.",
+   "historicalOption": "attack",
+   "research": "Research packet SH4 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "sh4-wheat-field",
+   "pack": "shiloh",
+   "phase": "buell-attacks",
+   "title": "Hold the Davis Wheat Field or fall back to Wicker Field?",
+   "dilemma": "Hazen and W.S. Smith briefly overran Hodgson's battery, then lost it to the Crescent Regiment and 19th Louisiana; the Army of the Ohio has no reserve nearby and Hazen's brigade has lost heavily (406 casualties).",
+   "sources": [
+    {
+     "label": "NPS Civil War Series, Second Day"
+    },
+    {
+     "label": "Wikipedia, Battle of Shiloh",
+     "url": "https://en.wikipedia.org/wiki/Battle_of_Shiloh"
+    },
+    {
+     "label": "historyofwar.org"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "hold",
+     "label": "Hold the wheat field",
+     "gain": "+3 morale for every Union formation in this phase.",
+     "cost": "Holding the open field uses 20 ammunition.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 3
+      },
+      {
+       "kind": "store",
+       "store": "ammunition",
+       "amount": -20
+      }
+     ]
+    },
+    {
+     "id": "regroup",
+     "label": "Fall back to Wicker Field and regroup",
+     "gain": "+10 requisition points: the line is regrouped in order.",
+     "cost": "−2 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 10
+      },
+      {
+       "kind": "morale",
+       "amount": -2
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Nelson fell back to Wicker Field and the Sunken Road about noon, regrouped, and renewed the attack shortly after noon, reaching the Hamburg-Purdy Road about 14:00.",
+   "historicalOption": "regroup",
+   "research": "Research packet SH4 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "sr1-refuse",
+   "pack": "stones-river",
+   "phase": "dawn-on-the-right",
+   "title": "Refuse the right or stand as ordered",
+   "dilemma": "McCook had reliable word that the Confederate center was opposite his extreme right and that Hardee's corps was on that flank. Do you swing Kirk and Willich back to face south or keep the line facing east?",
+   "sources": [
+    {
+     "label": "OR Ser. I Vol. 20 Pt. 1 p. 295-296 (Johnson)"
+    },
+    {
+     "label": "NPS Civil War Series sec. 3 (Rosecrans: 'I don't like the facing so much to the east, but must confide that to you')"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "refuse",
+     "label": "Swing the right back to face south",
+     "gain": "The flank faces the attack: +5 morale for every Union formation in this phase.",
+     "cost": "Shifting the line in the night wears out 10 shoes.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 5
+      },
+      {
+       "kind": "store",
+       "store": "shoes",
+       "amount": -10
+      }
+     ]
+    },
+    {
+     "id": "stand",
+     "label": "Keep the line as the army's orders set it",
+     "gain": "+15 requisition points for keeping the orders.",
+     "cost": "−4 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 15
+      },
+      {
+       "kind": "morale",
+       "amount": -4
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "The line was not refused. Johnson refused the right of Kirk and Willich only slightly, put skirmishers 600 yards out, and told his brigade commanders to expect an attack, but no change was made in the army's orders. Rosecrans had written that he did not like the facing so much to the east but left that to McCook.",
+   "historicalOption": "stand",
+   "research": "Research packet SR1 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "sr1-rally",
+   "pack": "stones-river",
+   "phase": "dawn-on-the-right",
+   "title": "Where to rally",
+   "dilemma": "The retreating brigades can fall straight back to the Nashville Pike and railroad, or drift west along the Wilkinson and Franklin roads toward the trains.",
+   "sources": [
+    {
+     "label": "OR Ser. I Vol. 20 Pt. 1 pp. 305-307 (Gibson), pp. 337-340 (Baldwin, Tripp)"
+    },
+    {
+     "label": "NPS Civil War Series sec. 4"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "pike",
+     "label": "Fall back on the Nashville Pike and the railroad",
+     "gain": "The line re-forms on the army: +3 morale for every Union formation in this phase.",
+     "cost": "Stores left on the way: 10 rations.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 3
+      },
+      {
+       "kind": "store",
+       "store": "rations",
+       "amount": -10
+      }
+     ]
+    },
+    {
+     "id": "west",
+     "label": "Drift west toward the trains",
+     "gain": "+20 rations from the trains.",
+     "cost": "Confederate cavalry strikes the column: −5 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "store",
+       "store": "rations",
+       "amount": 20
+      },
+      {
+       "kind": "morale",
+       "amount": -5
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Most of Johnson's and Davis's men fell back by the Nashville Pike and railroad where they re-formed, but part of Willich's brigade went west toward the Wilkinson road and was hit by Confederate cavalry, losing a gun and colors; the NPS booklet says Rosecrans later faulted the Federals for going 'too far to the west'.",
+   "historicalOption": "pike",
+   "research": "Research packet SR1 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "sr2-guns",
+   "pack": "stones-river",
+   "phase": "slaughter-pen",
+   "title": "Guns in the cedars: forward or to the open ground?",
+   "dilemma": "Houghtaling, Bush and Hescock are your best weapon against attackers crossing the open field, but they sit beside rocky cedar thickets where the horses die and nothing can be hauled out; Rousseau thought the cedar brake useless for artillery.",
+   "sources": [
+    {
+     "label": "OR XX-1 No. 52 Houghtaling; No. 53 Bush; No. 51 Hescock"
+    },
+    {
+     "label": "OR XX-1 No. 63 Rousseau"
+    },
+    {
+     "label": "NPS Civil War Series 23 (Cozzens), 'The Right Redeemed'"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "forward",
+     "label": "Keep the guns forward at all hazards",
+     "gain": "The infantry keep their guns beside them: +4 morale for every Union formation in this phase.",
+     "cost": "Teams die in the cedars: 8 horses.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 4
+      },
+      {
+       "kind": "store",
+       "store": "horses",
+       "amount": -8
+      }
+     ]
+    },
+    {
+     "id": "open",
+     "label": "Move the guns back to open ground by the pike",
+     "gain": "+15 requisition points: the guns are saved.",
+     "cost": "−3 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 15
+      },
+      {
+       "kind": "morale",
+       "amount": -3
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Sheridan kept the batteries forward 'at all hazards' until ammunition and horses were gone, so Houghtaling's battery and two of Bush's guns were abandoned in the cedars; Rousseau, by contrast, moved Loomis's and Guenther's batteries back to open ground by the pike, where they broke four assaults.",
+   "historicalOption": "forward",
+   "research": "Research packet SR2 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "sr2-ammunition",
+   "pack": "stones-river",
+   "phase": "slaughter-pen",
+   "title": "Ammunition runs out: stand or withdraw?",
+   "dilemma": "Your men are fighting with the last of their 60 rounds, the right is turned, and fresh Confederate brigades (Stewart, Cleburne's) are coming on. Sheridan had orders to fall back if hard pressed but said he would have stayed if his ammunition had held.",
+   "sources": [
+    {
+     "label": "OR XX-1 No. 50 Sheridan; No. 62 Thomas; No. 78 Negley; No. 83 Stanley"
+    },
+    {
+     "label": "NPS Civil War Series 23 (Cozzens), 'The Right Redeemed'"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "stand",
+     "label": "Stand on the last rounds",
+     "gain": "+4 morale for every Union formation in this phase.",
+     "cost": "Standing uses 40 ammunition.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 4
+      },
+      {
+       "kind": "store",
+       "store": "ammunition",
+       "amount": -40
+      }
+     ]
+    },
+    {
+     "id": "withdraw",
+     "label": "Withdraw through the cedars",
+     "gain": "+15 requisition points: the division is saved to fight again.",
+     "cost": "−3 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 15
+      },
+      {
+       "kind": "morale",
+       "amount": -3
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Sheridan reported to Thomas at about 11:00 that his ammunition was entirely out and retired through the cedars, covered by Schaefer's bayonets; Greusel was pulled back by McCook's order, and Negley, with a column entering his rear, ordered his division to 'cut our way through'.",
+   "historicalOption": "withdraw",
+   "research": "Research packet SR2 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "sr3-embankment",
+   "pack": "stones-river",
+   "phase": "round-forest",
+   "title": "Hold the cotton field or fall back behind the railroad embankment",
+   "dilemma": "Hazen's line sits in the open Cowan cotton field, 'utterly untenable' by his own words, commanded from the front and both flanks, with the Confederates at the burnt house at the edge of the field.",
+   "sources": [
+    {
+     "label": "OR XX/1 No. 129 (Hazen, pp. 543-547)"
+    }
+   ],
+   "provenance": "Inferred",
+   "options": [
+    {
+     "id": "embankment",
+     "label": "Fall back behind the railroad embankment",
+     "gain": "Cover from three sides of fire: +5 morale for every Union formation in this phase.",
+     "cost": "The move costs 10 tents.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 5
+      },
+      {
+       "kind": "store",
+       "store": "tents",
+       "amount": -10
+      }
+     ]
+    },
+    {
+     "id": "field",
+     "label": "Hold the cotton field",
+     "gain": "+15 requisition points for holding the ground as placed.",
+     "cost": "The field is commanded from three sides: −4 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 15
+      },
+      {
+       "kind": "morale",
+       "amount": -4
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Hazen held the 2-foot crest through the first assaults, then withdrew behind the railroad embankment, which, he wrote, meant 'hundreds of lives were saved, the strength of my brigade doubled, and the position successfully held'.",
+   "historicalOption": "embankment",
+   "research": "Research packet SR3 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "sr3-batteries",
+   "pack": "stones-river",
+   "phase": "round-forest",
+   "title": "Cycle the batteries for ammunition or keep them in line",
+   "dilemma": "Parsons, Cockerill and Cox exhaust their ammunition at the pivot while Confederate guns on the east bank and south of the pike are firing into the position.",
+   "sources": [
+    {
+     "label": "OR XX/1 No. 95 (Mendenhall)"
+    },
+    {
+     "label": "OR XX/1 No. 122 (Parsons)"
+    },
+    {
+     "label": "OR XX/1 No. 121 (Osburn)"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "cycle",
+     "label": "Send batteries back to refill in turn",
+     "gain": "+3 morale for every Union formation in this phase.",
+     "cost": "Refilling the chests uses 20 ammunition.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 3
+      },
+      {
+       "kind": "store",
+       "store": "ammunition",
+       "amount": -20
+      }
+     ]
+    },
+    {
+     "id": "keep",
+     "label": "Keep every gun in line",
+     "gain": "+10 requisition points: no gun leaves the pivot.",
+     "cost": "−3 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 10
+      },
+      {
+       "kind": "morale",
+       "amount": -3
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Mendenhall pulled Parsons back about noon when out of ammunition, brought him and Swallow's 7th Indiana back at about 4 p.m., and sent Cockerill to a cornfield left of the railroad in the afternoon.",
+   "historicalOption": "cycle",
+   "research": "Research packet SR3 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "ch1-recon",
+   "pack": "chattanooga",
+   "phase": "orchard-knob",
+   "title": "Recon or real attack",
+   "dilemma": "The order is a demonstration to find out if Bragg is leaving. Do you stop at the picket line and fall back to Fort Wood, or press the Confederate rifle-pits and the knob?",
+   "sources": [
+    {
+     "label": "OR 31/2 Wood p. 253 ('it resulted in a substantial attack')"
+    },
+    {
+     "label": "OR 31/2 Granger pp. 128-130"
+    },
+    {
+     "label": "OR 31/2 Thomas pp. 94-95"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "attack",
+     "label": "Press the rifle-pits and the knob",
+     "gain": "+25 requisition points for the ground won.",
+     "cost": "A real attack uses 30 ammunition.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 25
+      },
+      {
+       "kind": "store",
+       "store": "ammunition",
+       "amount": -30
+      }
+     ]
+    },
+    {
+     "id": "stop",
+     "label": "Stop at the picket line and fall back",
+     "gain": "+10 requisition points for keeping to the order.",
+     "cost": "The men watch the chance pass: −3 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 10
+      },
+      {
+       "kind": "morale",
+       "amount": -3
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Wood's division kept going; the reconnaissance became a real attack on the most advanced line, and the knob and ridge were carried.",
+   "historicalOption": "attack",
+   "research": "Research packet CH1 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "ch1-hold",
+   "pack": "chattanooga",
+   "phase": "orchard-knob",
+   "title": "Hold the knob or recall Wood",
+   "dilemma": "The position is won but Bragg's batteries and main line are a mile away and Sherman is not yet across the river. Grant and Thomas debate recalling Wood to Fort Wood.",
+   "sources": [
+    {
+     "label": "NPS Civil War Series sec. 4"
+    },
+    {
+     "label": "NPS Orchard Knob page"
+    },
+    {
+     "label": "OR 31/2 Wood p. 256"
+    },
+    {
+     "label": "OR 31/2 Granger p. 130"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "hold",
+     "label": "Hold and entrench",
+     "gain": "+4 morale for every Union formation in this phase.",
+     "cost": "Digging in through the night costs 10 rations.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 4
+      },
+      {
+       "kind": "store",
+       "store": "rations",
+       "amount": -10
+      }
+     ]
+    },
+    {
+     "id": "recall",
+     "label": "Recall Wood to Fort Wood",
+     "gain": "+15 requisition points: nothing is risked under the enemy's guns.",
+     "cost": "−4 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 15
+      },
+      {
+       "kind": "morale",
+       "amount": -4
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Hold and entrench. Thomas told Wood to hold and intrench; NPS reports Rawlins argued against recall and Grant ordered 'Intrench them and send up support'. Treat the quotation attributed to Thomas ('You have gained too much to withdraw') as Inferred; it comes from a secondary summary.",
+   "historicalOption": "hold",
+   "research": "Research packet CH1 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "ch2-crossing",
+   "pack": "chattanooga",
+   "phase": "lookout-mountain",
+   "title": "Where do you cross Lookout Creek?",
+   "dilemma": "The railroad bridge near the creek mouth is destroyed and covered by Confederate rifle-pits and a railroad embankment. Forcing it means losses under fire; crossing upstream at the Wauhatchie mill ford means a long, wet flank march that could be seen or hit by the pickets.",
+   "sources": [
+    {
+     "label": "OR I/31/2 Hooker report, pp. 315-316"
+    },
+    {
+     "label": "OR I/31/2 Grose report, pp. 169-170"
+    },
+    {
+     "label": "OR I/31/2 Geary report, p. 391"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "upstream",
+     "label": "Cross upstream at the old mill",
+     "gain": "Out of the pickets' sight: +4 morale for every Union formation in this phase.",
+     "cost": "The long, wet flank march wears out 10 shoes.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 4
+      },
+      {
+       "kind": "store",
+       "store": "shoes",
+       "amount": -10
+      }
+     ]
+    },
+    {
+     "id": "bridge",
+     "label": "Force the railroad bridge",
+     "gain": "+15 requisition points for a quick crossing.",
+     "cost": "Losses under fire: −4 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 15
+      },
+      {
+       "kind": "morale",
+       "amount": -4
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Hooker sent Geary upstream to cross at the old mill, out of the Confederates' sight, with pioneers bridging the creek under two companies' cover; Grose's direct attempt at the railroad bridge was held up as a feint until Geary's fire was heard, then Grose and Woods crossed on Woods's pole bridge about 11:00.",
+   "historicalOption": "upstream",
+   "research": "Research packet CH2 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "ch2-relief",
+   "pack": "chattanooga",
+   "phase": "lookout-mountain",
+   "title": "Ammunition and relief at mid-afternoon",
+   "dilemma": "Geary's regiments have fired their boxes and refilled from captured pouches, Hooker says some troops cannot be resupplied, and Pettus's and Moore's fresh Confederate line is only 30-100 yards away in the fog. Do you rotate in Cruft and Osterhaus regiments, hold what you have, or push down the Summertown road?",
+   "sources": [
+    {
+     "label": "OR I/31/2 Geary report, pp. 397-399"
+    },
+    {
+     "label": "OR I/31/2 Osterhaus report, p. 600"
+    },
+    {
+     "label": "OR I/31/2 Hooker report, pp. 317, 333"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "rotate",
+     "label": "Rotate fresh regiments into the line and hold",
+     "gain": "+4 morale for every Union formation in this phase.",
+     "cost": "Feeding the relief costs 20 rations.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 4
+      },
+      {
+       "kind": "store",
+       "store": "rations",
+       "amount": -20
+      }
+     ]
+    },
+    {
+     "id": "push",
+     "label": "Push down the Summertown road",
+     "gain": "+25 requisition points for ground won.",
+     "cost": "Pushing in the fog uses 40 ammunition.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 25
+      },
+      {
+       "kind": "store",
+       "store": "ammunition",
+       "amount": -40
+      }
+     ]
+    },
+    {
+     "id": "hold",
+     "label": "Hold with the men you have",
+     "gain": "+10 requisition points: nothing is risked.",
+     "cost": "Tired men stay in line: −3 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 10
+      },
+      {
+       "kind": "morale",
+       "amount": -3
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Hooker did not advance. Candy's, Whitaker's and Osterhaus's regiments rotated into the line and relieved each other through the night, ammunition was carried up by hand and mule, and Hooker's report stopped at 'impregnable' and awaited the fog's lifting to descend to the valley.",
+   "historicalOption": "rotate",
+   "research": "Research packet CH2 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "ch3-climb",
+   "pack": "chattanooga",
+   "phase": "missionary-ridge",
+   "title": "Halt at the pits, or climb?",
+   "dilemma": "The order is to carry the first line of rifle pits and halt. The pits sit at the bottom of a slope swept by guns on the crest. The dead ground higher up, below the physical crest, is safer than the pits themselves.",
+   "sources": [
+    {
+     "label": "NPS Civil War Series sec7",
+     "url": "https://npshistory.com/publications/civil_war_series/9/sec7.htm"
+    },
+    {
+     "label": "American Battlefield Trust article"
+    },
+    {
+     "label": "Wikipedia Battle of Missionary Ridge",
+     "url": "https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "climb",
+     "label": "Climb on past the pits",
+     "gain": "+5 morale for every Union formation in this phase.",
+     "cost": "The climb under fire uses 30 ammunition.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 5
+      },
+      {
+       "kind": "store",
+       "store": "ammunition",
+       "amount": -30
+      }
+     ]
+    },
+    {
+     "id": "halt",
+     "label": "Halt at the pits as ordered",
+     "gain": "+15 requisition points for keeping to the order.",
+     "cost": "The pits are swept from the crest: −4 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 15
+      },
+      {
+       "kind": "morale",
+       "amount": -4
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Troops pressed on without waiting for orders. Willich later claimed he was told only to take the pits. Baird got the correct halt order and chose to push for the summit. Grant asked who had ordered the climb.",
+   "historicalOption": "climb",
+   "research": "Research packet CH3 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  },
+  {
+   "id": "ch3-commit",
+   "pack": "chattanooga",
+   "phase": "missionary-ridge",
+   "title": "Where do you commit after the line cracks?",
+   "dilemma": "Once Willich and Hazen are over the Bird's Mill Road breastworks, you can turn north into Anderson's flank, south toward Bate and Bragg's headquarters, or push straight through the crest.",
+   "sources": [
+    {
+     "label": "Wikipedia Battle of Missionary Ridge",
+     "url": "https://en.wikipedia.org/wiki/Battle_of_Missionary_Ridge"
+    },
+    {
+     "label": "NPS Civil War Series sec7",
+     "url": "https://npshistory.com/publications/civil_war_series/9/sec7.htm"
+    },
+    {
+     "label": "Hazen's OR report via ironbrigader.com"
+    }
+   ],
+   "provenance": "Verified",
+   "options": [
+    {
+     "id": "both-ways",
+     "label": "Turn along the crest both ways",
+     "gain": "+20 requisition points for the guns and ground taken.",
+     "cost": "Fighting along the crest uses 20 ammunition.",
+     "effects": [
+      {
+       "kind": "rp",
+       "amount": 20
+      },
+      {
+       "kind": "store",
+       "store": "ammunition",
+       "amount": -20
+      }
+     ]
+    },
+    {
+     "id": "straight",
+     "label": "Push straight through the crest",
+     "gain": "+4 morale for every Union formation in this phase.",
+     "cost": "The pursuit outruns the trains: 10 rations.",
+     "effects": [
+      {
+       "kind": "morale",
+       "amount": 4
+      },
+      {
+       "kind": "store",
+       "store": "rations",
+       "amount": -10
+      }
+     ]
+    },
+    {
+     "id": "re-form",
+     "label": "Hold the crest and re-form",
+     "gain": "+15 ammunition gathered on the crest.",
+     "cost": "−3 morale for every Union formation in this phase.",
+     "effects": [
+      {
+       "kind": "store",
+       "store": "ammunition",
+       "amount": 15
+      },
+      {
+       "kind": "morale",
+       "amount": -3
+      }
+     ]
+    }
+   ],
+   "historicalChoice": "Willich wheeled north against Anderson's division and Hazen swung south, using captured guns, toward Bragg's headquarters. Harker and Wagner pressed Bate's front.",
+   "historicalOption": "both-ways",
+   "research": "Research packet CH3 (2026-10-11): dilemma, historical choice and sources; gains and costs are game rules."
+  }
+ ]
+}
