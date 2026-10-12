@@ -78,6 +78,16 @@ try {
       await page.waitForTimeout(1500);
       await page.screenshot({ path: path.join(OUT, `${id}-battle.png`) });
       check(`${id}-runs`, run.advanced >= 19 && run.drawn.sprites > 0 && errors.length === 0, JSON.stringify({ run, errors: errors.slice(0, 5) }));
+      // close views of a Confederate and a Union infantry line, for looking at each side's baked figures
+      for (const side of ['CS', 'US']) {
+        const at = await page.evaluate((s) => {
+          const { game, rts } = window.__game, u = game.units.find((x) => x.alive && x.side === s && x.type === 'infantry');
+          if (u) { rts.flyTo(u.x, u.z, 90); rts.snap(); }
+          return u ? u.short || u.id : null;
+        }, side);
+        await page.waitForTimeout(2500);
+        if (at) await page.screenshot({ path: path.join(OUT, `${id}-close-${side}.png`) });
+      }
     } catch (error) {
       check(`${id}-loads`, false, `${error.message.split('\n')[0]} ${JSON.stringify(errors.slice(0, 5))}`);
     } finally {
