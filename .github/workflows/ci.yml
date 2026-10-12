@@ -110,7 +110,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        browser: [firefox, webkit]
+        browser: [firefox, webkit, offline]
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host --init
@@ -133,7 +133,10 @@ jobs:
           HOME: /root
           LIBGL_ALWAYS_SOFTWARE: '1'
         run: |
-          if [ "${{ matrix.browser }}" = firefox ]; then
+          if [ "${{ matrix.browser }}" = offline ]; then
+            # the service worker: a battle visited once plays with the network off
+            node tools/test-offline.mjs
+          elif [ "${{ matrix.browser }}" = firefox ]; then
             # headless Firefox has no GL driver in this container: Mesa's software GL under xvfb instead
             apt-get update -qq && apt-get install -y -qq libgl1-mesa-dri libegl1 libegl-mesa0 xvfb >/dev/null
             xvfb-run -a -s "-screen 0 1280x720x24" node tools/test-browsers.mjs --browser=firefox --headed

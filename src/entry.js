@@ -30,6 +30,7 @@ if (['intro', 'practice', 'battle', 'sandbox', 'tune'].some((key) => q.has(key))
   follow();
 }
 // Entry pages also participate in the installed app's existing cache.
-if (location.protocol === 'https:' && 'serviceWorker' in navigator && !q.has('nosw')) {
+// https (Pages); ?sw also registers it on a local server so CI can test offline play
+if ((location.protocol === 'https:' || q.has('sw')) && 'serviceWorker' in navigator && !q.has('nosw')) {
   navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('service worker not registered:', err.message));
 }

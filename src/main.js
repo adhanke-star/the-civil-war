@@ -476,7 +476,7 @@ if (new URLSearchParams(location.search).has('sandbox')) {
 }
 
 // Installable app: the service worker only on the live https site (local http dev and tests never get one); ?nosw skips it.
-if (location.protocol === 'https:' && 'serviceWorker' in navigator && !new URLSearchParams(location.search).has('nosw')) {
+if ((location.protocol === 'https:' || new URLSearchParams(location.search).has('sw')) && 'serviceWorker' in navigator && !new URLSearchParams(location.search).has('nosw')) {
   navigator.serviceWorker.register('./sw.js').catch((err) => console.warn('service worker not registered:', err && err.message ? err.message : err));
 }
   } finally {
