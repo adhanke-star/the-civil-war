@@ -42,6 +42,7 @@
 // slouch hats; bake run 38186582847, see its soldier.json `source`). Each side's pool attaches its own atlas.
 
 import * as THREE from 'three';
+import { astcAvailable, createAtlasAstcTexture, pageMipBytes } from './atlas-compression.js';
 import { FIGURE_VIEW, LOD_NEAR, splitHook, CLIP_FRAG, FALLEN, fadeOf, SINK } from './soldier-mesh.js';
 
 export const BAKED_BASES = { US: './assets/figures/union-infantry/', CS: './assets/figures/confederate-infantry/' };
@@ -228,44 +229,171 @@ export class AtlasLayout {
 
 /** The atlas in the browser: the manifest, then each tier's pages (base and variants) as textures on request. */
 export class BakedAtlas {
-  constructor(manifest, base = BAKED_BASE) {
+  constructor(manifest, base = BAKED_BASE, options = {}) {
     this.layout = new AtlasLayout(manifest);
     this.base = base;
     this.textures = {};
     this.state = {};
     this.pools = [];
+    // Explicit diagnostic opt-in only; ordinary product callers retain the PNG route.
+    this.diagnosticClose = options.diagnosticClose;
+    this.renderer = options.renderer;
+    this.io = options.io || {};
   }
 
   /** Load a tier's pages (premultiplied, mipmapped); attached pools then build its batches. */
   load(tier) {
+    if (this.disposed) return Promise.reject(new Error('baked atlas: disposed'));
     if (this.state[tier]) return this.state[tier];
+    if (tier === 'close' && this.diagnosticClose) {
+      this.state.close = this.loadDiagnosticClose();
+      return this.state.close;
+    }
     const T = this.layout.tiers[tier];
     const loader = new THREE.TextureLoader();
-    this.state[tier] = Promise.all(T.pages.map((p) => loader.loadAsync(this.base + p.file))).then((texs) => {
-      for (const t of texs) {
-        t.flipY = false; // atlas y runs down, as the manifest's rects do
-        t.premultiplyAlpha = true;
-        t.colorSpace = THREE.NoColorSpace; // decoded in the shader, after un-premultiplying
-        t.generateMipmaps = true;
-        t.minFilter = THREE.LinearMipmapLinearFilter;
-        t.magFilter = THREE.LinearFilter;
-        t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
-        t.needsUpdate = true;
-      }
-      this.textures[tier] = texs;
-      for (const pool of this.pools) pool.addTier(tier);
-      return texs;
+    this.state[tier] = Promise.allSettled(T.pages.map(async (p) => this.io.loadPNG
+      ? this.io.loadPNG(this.base + p.file) : loader.loadAsync(this.base + p.file))).then((settled) => {
+      const texs = settled.filter(r => r.status === 'fulfilled').map(r => r.value);
+      try {
+        const failure = settled.find(r => r.status === 'rejected');
+        if (failure) throw failure.reason;
+        if (this.disposed) throw new Error('baked atlas: disposed');
+        for (const t of texs) {
+          t.flipY = false; // atlas y runs down, as the manifest's rects do
+          t.premultiplyAlpha = true;
+          t.colorSpace = THREE.NoColorSpace; // decoded in the shader, after un-premultiplying
+          t.generateMipmaps = true;
+          t.minFilter = THREE.LinearMipmapLinearFilter;
+          t.magFilter = THREE.LinearFilter;
+          t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+          t.needsUpdate = true;
+        }
+        this.publishTier(tier, T, texs);
+        return texs;
+      } catch (error) { for (const t of texs) { try { t.dispose(); } catch {} } throw error; }
     });
     return this.state[tier];
   }
 
   loaded(tier) { return !!this.textures[tier]; }
 
-  /** Graphics memory of the loaded pages, RGBA8 with mipmaps (x 4/3), in bytes. */
+  publishTier(tier, T, textures) {
+    const prepared = [];
+    const layout = Object.assign(Object.create(Object.getPrototypeOf(this.layout)), this.layout,
+      { tiers: { ...this.layout.tiers, [tier]: T } });
+    try {
+      // Native callbacks run before reference publication and newly attached pools join the transaction.
+      for (const pool of this.pools) {
+        const entry = { pool, batches: pool.prepareTier(tier, layout, textures) }; prepared.push(entry);
+        pool.mountTier(entry.batches);
+      }
+      if (this.disposed) throw new Error('baked atlas: disposed');
+      this.layout.tiers[tier] = T;
+      this.textures[tier] = textures;
+      for (const { pool, batches } of prepared) { pool.layout = this.layout; pool.batches[tier] = batches; }
+    } catch (error) {
+      for (const { pool, batches } of prepared) { try { pool.disposeTier(batches); } catch {} }
+      throw error;
+    }
+  }
+
+  /** Exact complete mip allocation of the published pages. */
   memoryBytes() {
     let b = 0;
-    for (const tier of Object.keys(this.textures)) b += this.layout.tiers[tier].bytes * (4 / 3);
-    return Math.round(b);
+    for (const tier of Object.keys(this.textures)) for (const p of this.layout.tiers[tier].pages)
+      b += pageMipBytes(p.w, p.h, p.encoding === 'astc4x4').bytes;
+    return b;
+  }
+
+  async loadDiagnosticClose() {
+    const baseline = this.layout.tiers.close;
+    const png = async (url, page, own) => {
+      const t = await (this.io.loadPNG ? this.io.loadPNG(url) : new THREE.TextureLoader().loadAsync(url));
+      own(t);
+      Object.assign(t, { flipY: false, premultiplyAlpha: true, colorSpace: THREE.NoColorSpace,
+        generateMipmaps: true, minFilter: THREE.LinearMipmapLinearFilter, magFilter: THREE.LinearFilter,
+        wrapS: THREE.ClampToEdgeWrapping, wrapT: THREE.ClampToEdgeWrapping });
+      t.needsUpdate = true;
+      if (t.image?.width !== page.w || t.image?.height !== page.h) throw new Error('baked close: PNG dimensions');
+      return t;
+    };
+    const attempt = async (T, base, compressed) => {
+      const owned = [];
+      try {
+        // Every sibling settles before cleanup/fallback, including late successful PNGs.
+        const settled = await Promise.allSettled(T.pages.map(async p => {
+          let t;
+          if (compressed && p.encoding === 'astc4x4') {
+            const res = await (this.io.fetch || fetch)(base + p.file);
+            if (!res.ok) throw new Error(`baked close: HTTP ${res.status}`);
+            t = createAtlasAstcTexture(THREE, new Uint8Array(await res.arrayBuffer()), p); owned.push(t);
+          } else t = await png(base + p.file, p, t => owned.push(t));
+          if (this.disposed) throw new Error('baked atlas: disposed');
+          // needsUpdate alone is not proof of successful native allocation/upload.
+          const gl = this.renderer.getContext();
+          if (gl.isContextLost() || gl.getError() !== gl.NO_ERROR) throw new Error('baked close: pre-upload GL failure');
+          this.renderer.initTexture(t);
+          if (gl.isContextLost() || gl.getError() !== gl.NO_ERROR) throw new Error('baked close: upload GL failure');
+          if (this.renderer.properties) {
+            const native = this.renderer.properties.get(t);
+            if (!gl.isTexture(native.__webglTexture) || native.__version !== t.version)
+              throw new Error('baked close: native texture not uploaded');
+          }
+          return t;
+        }));
+        const failure = settled.find(r => r.status === 'rejected');
+        if (failure) throw failure.reason;
+        if (this.disposed) throw new Error('baked atlas: disposed');
+        const textures = settled.map(r => r.value);
+        this.publishTier('close', T, textures);
+        return textures;
+      } catch (error) {
+        for (const t of owned) { try { t.dispose(); } catch {} }
+        throw error;
+      }
+    };
+    try {
+      const { manifest, base, sourceManifest } = this.diagnosticClose;
+      const original = this.layout.manifest;
+      const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      if (!same(manifest.camera, original.camera) || !same(manifest.clips, original.clips)
+        || !same(manifest.tiers.field, original.tiers.field)) throw new Error('baked close: source mismatch');
+      const strip = T => Object.fromEntries(Object.entries(T).filter(([k]) => k !== 'pages' && k !== 'variants'));
+      if (!same(strip(manifest.tiers.close), strip(original.tiers.close))) throw new Error('baked close: frame mismatch');
+      if (!sourceManifest || !same(sourceManifest.camera, original.camera) || !same(sourceManifest.clips, original.clips)
+        || !same(sourceManifest.tiers.field, original.tiers.field)) throw new Error('baked close: missing source binding');
+      const sourceLooks = { base: sourceManifest.tiers.close, ...sourceManifest.tiers.close.variants };
+      const candidateLooks = { base: manifest.tiers.close, ...manifest.tiers.close.variants };
+      if (!same(Object.keys(sourceLooks), Object.keys(candidateLooks))) throw new Error('baked close: source looks');
+      for (const [name, T] of Object.entries(candidateLooks)) {
+        const source = sourceLooks[name];
+        if (!same(strip(T), strip(source)) || !same(T.pages.map(p => [p.w, p.h]), source.pages.map(p => [p.w, p.h])))
+          throw new Error('baked close: look source mismatch');
+      }
+      const candidate = new AtlasLayout(manifest);
+      const T = candidate.tiers.close;
+      if (candidate.missing.length || candidate.problems().length || T.pages.length !== 10
+        || T.pages.filter(p => p.encoding === 'astc4x4').length !== 8
+        || T.pages.filter(p => p.encoding === 'png' && p.alpha === 'straight-gamma-bytes').length !== 2)
+        throw new Error('baked close: unqualified layout');
+      if (astcAvailable(this.renderer.getContext(), T.pages)) return await attempt(T, base, true);
+    } catch (error) {
+      this.closeDiagnosticFailure = error.message;
+    }
+    if (this.disposed) throw new Error('baked atlas: disposed');
+    // Exact current single-base close layout; field object and pool references stay intact.
+    if (baseline.looks.length !== 1) throw new Error('baked close: baseline must be single-base PNG');
+    return attempt(baseline, this.base, false);
+  }
+
+  dispose() {
+    this.disposed = true;
+    const textures = this.textures; this.textures = {};
+    for (const pool of this.pools) for (const tier of ['field', 'close']) {
+      const batches = pool.batches[tier]; pool.batches[tier] = [];
+      try { pool.disposeTier(batches); } catch {}
+    }
+    for (const ts of Object.values(textures)) for (const t of ts) { try { t.dispose(); } catch {} }
   }
 }
 
@@ -412,12 +540,17 @@ export class ImpostorPool {
   /** Build the instanced batches (one per page, two passes each) for a loaded tier. */
   addTier(tier) {
     if (this.batches[tier].length || !this.atlas.textures[tier]) return;
-    const T = this.layout.tiers[tier];
-    this.atlas.textures[tier].forEach((tex, page) => {
+    this.commitTier(tier, this.prepareTier(tier, this.layout, this.atlas.textures[tier]));
+  }
+
+  prepareTier(tier, layout, textures) {
+    const T = layout.tiers[tier], batches = [], geometries = [], materials = [];
+    try { textures.forEach((tex, page) => {
       const data = new Float32Array(this.capacity * STRIDE);
       const buf = new THREE.InstancedInterleavedBuffer(data, STRIDE, 1);
       buf.setUsage(THREE.DynamicDrawUsage);
       const geo = new THREE.InstancedBufferGeometry();
+      geometries.push(geo);
       geo.index = quad().index;
       geo.setAttribute('position', quad().attributes.position);
       geo.setAttribute('iPos', new THREE.InterleavedBufferAttribute(buf, 4, 0));
@@ -430,16 +563,16 @@ export class ImpostorPool {
         uPage: { value: new THREE.Vector2(T.pages[page].w, T.pages[page].h) },
         uMaxLod: { value: MAX_LOD[tier] ?? 1 },
         uExposure: { value: BAKE_EXPOSURE },
-        uCosBake: { value: Math.cos(this.layout.elevation) },
+        uCosBake: { value: Math.cos(layout.elevation) },
         uSoftFar: { value: this.softFar },
         uSplit: { value: 0 },
       };
-      const mat = (soft) => new THREE.ShaderMaterial({
+      const mat = (soft) => { const material = new THREE.ShaderMaterial({
         uniforms, vertexShader: VERT, fragmentShader: FRAG, fog: true, defines: { SOFT: soft ? 1 : 0 },
         side: THREE.DoubleSide,
         transparent: soft, depthWrite: !soft,
         ...(soft ? { blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor } : {}),
-      });
+      }); materials.push(material); return material; };
       const split = splitHook(uniforms);
       const hook = (renderer) => { uniforms.uSoftFar.value = this.softFar; split(renderer); };
       const body = new THREE.Mesh(geo, mat(false));
@@ -452,10 +585,35 @@ export class ImpostorPool {
         m.visible = false;
         m.onBeforeRender = hook;
         m.name = `baked-${this.side}-${tier}${page}-${kind}`;
-        this.group.add(m);
       }
-      this.batches[tier].push({ tier, page, look: T.pages[page].look, data, buf, geo, body, soft, n: 0 });
-    });
+      batches.push({ tier, page, look: T.pages[page].look, data, buf, geo, body, soft, n: 0 });
+    }); } catch (error) {
+      for (const m of materials) m.dispose();
+      for (const g of geometries) { g.index = null; g.deleteAttribute('position'); g.dispose(); }
+      throw error;
+    }
+    return batches;
+  }
+
+  commitTier(tier, batches) {
+    this.mountTier(batches);
+    this.batches[tier] = batches;
+  }
+
+  mountTier(batches) {
+    for (const b of batches) this.group.add(b.body, b.soft);
+  }
+
+  disposeTier(batches) {
+    let failure;
+    const clean = fn => { try { fn(); } catch (error) { failure ||= error; } };
+    for (const b of batches) {
+      clean(() => this.group.remove(b.body)); clean(() => this.group.remove(b.soft));
+      clean(() => b.body.material.dispose()); clean(() => b.soft.material.dispose());
+      // Shared quad attributes belong to the common geometry, not this candidate.
+      b.geo.index = null; b.geo.deleteAttribute('position'); clean(() => b.geo.dispose());
+    }
+    if (failure) throw failure;
   }
 
   setView(camera) { this.cam.copy(camera.position); }

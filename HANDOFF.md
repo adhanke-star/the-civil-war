@@ -1,5 +1,32 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0151 ACTIVE WORK — Codex/Sol remains sole writer, no transfer/release of lane.
+Remote mainc328ca86c5a7671903a1f9e7c161bead2e9996da accepted CI38282610211 all9green;
+Pages38298643627 succeeds/live sw66; automatic mainCI38298643624 pending. Canonical shard checks
+251/365/132/159 all true/console clean; actual201 campaign/errors0/530rep/L8/unique2..8 (not cb600).
+Root+Astra actual76 sheets001–076 from11762905334 reviewed clean; export11762770795 independently
+binds11files/8ASTC+2originalPNG hashes/all576 frames/field/exact48,996,984 close mip bytes. Prior failed
+full-close retained. This permits diagnostic loader work, not Aaron visual approval or asset adoption.
+
+Current new source0151 extends BakedAtlas, no other cache/manager: explicit third options
+{diagnosticClose:{manifest,sourceManifest,base},renderer,io}. No production caller opts in. Full original
+sourceManifest binds both close look maps/dimensions and field/camera/clips. Capability chooses8ASTC+2PNG
+or exact current single-base PNG close. Settle all siblings, own PNG immediately, native upload GL/context/
+texture-version checks, prepare and hidden native mounts before reference publication, dynamic reentrant
+pool inclusion, cleanup across throwing observers, disposal latch, same safety for ordinary PNG loads.
+Field/layout/textures/batches/records identity retained. Exact complete mip bytes; sw67 candidate only.
+CPU18+18assertionmutants, adapter10+10/compression12+12/unit/syntax/diff pass; new browser/fullCI UNRUN.
+Actions --atlas-loader/shard3 tests atomic/fallback/lifecycle, actual native route uploads and real native
+INVALID_VALUE failure (controlled admission is explicitly separate from capability observation).
+Commit/push this scoped slice, read its exact full9CI and actual atlasLoader report before integration;
+then subsequent whole-scene both capability routes/combined prototypes/max pools/latent/reactivation/
+casualties/lens/resize/failure-overlap/pending framebuffer gates. Keep <=250,000,000 true GPU bound;
+432,441,700 baseline still fails. Measured fixed/pixel costs -> Astra ceiling -> actual images/full gates
+before separate product adoption. Six legal badge observations/level10 still open per0141/opener.
+No v1.1 release/v2plan/code yet; continue after routine greens. MAIN protected11/frozen Desktop untouched.
+No local artifact files added; retained.out near294.5MB/300M. CPU local, browsers Actions, RAM readback.
+
+
 LATEST0149 CLEAN TRANSFER — sourcec328ca8 remains pending CI38282610211; docs-only skipCI relay follows.
 Remote maincb82a67 all9green + actualcampaign600/L8/201checks/actualdifficulty159checks;
 Pages38282924776 now green; automatic mainCI38282924735 running. ProtectedMAIN11 unchanged.
