@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0114 — Difficulty levels, camp effects in battle, captured colours (2026-10-12)
+
+Difficulty changes only the enemy's timing and decisions, never combat numbers (tested: frozen orders give identical casualties at every level). Recruit: auto-pause always, AI re-plans every 1 s and commits reserves only at their set time. Veteran: as before. General: no auto-pause, AI re-plans every 0.25 s, commits reserves to a threatened point and counter-attacks local breakthroughs within 400 m. Camp effects now reach the fight (game rules): training +1% per bar point (cap 6); shoe shortage starts a brigade tired; ammunition shortage starts it with half its rounds (refilled out of contact); horse shortage slows limbering; Pioneers speed woods marching. Captured colours: all of a surrendering formation's regiments, a destroyed formation's to the nearest unbroken enemy within 150 m, one to a charger that breaks a formation; kept in the save and on the camp trophy shelf.
+
 ## 0113 — Card art from museum photographs; period portraits by exact name (2026-10-12)
 
 v1 loot cards show the real object's museum or period photograph (Smithsonian NMAH staff photographs, public domain as US government works per Wikimedia Commons, not CC0 on si.edu; CC0 battlefield cannon photos; a Library of Congress Whitworth), cut out on CSS felt with a rarity-coloured glow, instead of a baked 3D render; the Belgian rifle-musket has no free image and gets a labelled generic. Commanders get a period portrait only when the source names that exact man (66 of the packs' commanders; three withheld for doubtful identity; postwar images dated). The title backdrop is Homer's "Home, Sweet Home" (NGA, CC0) with a slow pan and drifting smoke; each battle region's camp has a period view and a trophy shelf (captured guns and arms, wagons, reputation).

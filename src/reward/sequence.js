@@ -34,6 +34,9 @@
 //     (src/ui/replay.js). Order: a (grade, you vs history, points, badges) -> h (what really happened) -> r (replay) -> loot.
 //     Each page's primary goes on; "Open the loot" (key S) skips straight to the loot from any of them. `noLoot: true`
 //     (the Battles menu) shows the same pages without loot: the last page's "Done" unmounts and calls onDone(null).
+//   Colours and camp (P5d): when `afterAction.history` carries `colours` (regiment colours the Union took this phase) or `camp`
+//     (camp effects that reached the battle, each with the formations it touched), page a lists them after the badges,
+//     labelled: the colours are this game's result, the camp effects game rules.
 //
 // State lives in one plain object (S). Settings come from src/settings.js (defineRewardSettings below);
 // the 'screens.cardStyle' choice can be split-screened through src/sandbox/compare.js.
@@ -614,6 +617,7 @@ export function mountReward(root, opts = {}) {
       story ? vsBlock(vsHistory) : null,
       pointsBlock(opts.afterAction?.points),
       badgesBlock(award),
+      hooksBlock(vsHistory),
       noLoot ? null : el('div', { class: 'rw-aar-stats' },
         el('p', { class: 'rw-aar-stat' }, el('b', { text: String(S.captures.length) }), el('span', { text: 'Captures' })),
         el('p', { class: 'rw-aar-stat' }, el('b', { text: String(nIssue) }), el('span', { text: 'Quartermaster issue' })),
@@ -717,6 +721,20 @@ export function mountReward(root, opts = {}) {
     // After any level-up moment has left (both are full-screen layers).
     const at = levelUp ? (S.reduced ? 1900 : ms(1400) + Math.round(2800 / speed())) : ms(900 + 260 * rows.length);
     later(() => xFactorMoment(rootEl, { brigade: x.label, badgeId: x.xfactor, reduced: S.reduced, style: get('look.xFactorStyle') ?? 'full', speed: speed() }), at);
+  }
+
+  // ---- captured colours and camp effects (P5d; src/franchise/practice.js historyComparison) ----
+  function hooksBlock(c) {
+    const colours = Array.isArray(c?.colours) ? c.colours : [], camp = Array.isArray(c?.camp) ? c.camp : [];
+    if (!colours.length && !camp.length) return null;
+    const names = (list) => (list.length > 3 ? `${list.slice(0, 3).join(', ')} and ${list.length - 3} more` : list.join(', '));
+    return el('section', { class: 'rw-badges rw-hooks', 'aria-labelledby': 'rw-hooks-title', 'data-colours': String(colours.length) },
+      el('h2', { class: 'rw-points-title', id: 'rw-hooks-title', text: colours.length ? 'Colours taken' : 'From camp' }),
+      colours.length ? el('ul', { class: 'rw-colours', 'aria-label': 'Colours taken this phase' },
+        ...colours.map((r) => el('li', { 'data-regiment': r.regiment, text: `${r.regiment}${r.formation ? ` (${r.formation})` : ''}: taken by ${r.by}` }))) : null,
+      colours.length ? el('p', { class: 'rw-dim', text: 'Captured colours go to the trophy shelf in camp. They are this battle\'s result, not history.' }) : null,
+      camp.length ? el('p', { class: 'rw-hint rw-camp-effects' }, el('b', { text: 'From camp (game rules): ' }),
+        camp.map((x) => `${x.effect}: ${x.text} (${names(x.formations)})`).join('; ')) : null);
   }
 
   // ---- requisition points (campaign phases; game rules) ----

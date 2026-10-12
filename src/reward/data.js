@@ -168,17 +168,17 @@ export function conditionEffect(c) {
  *  what each is for in the game; the "short" words state the game rule's penalty, never a historical claim. */
 export const STORE_ITEMS = Object.freeze([
   { id: 'ammunition', name: 'Ammunition', unit: 'loads', words: 'Cartridges and rounds. Each fielded brigade draws its loads for a phase; Target practice spends more.',
-    short: 'A brigade short of ammunition starts the phase with less morale (fewer rounds in battle: pending engine hook).' },
+    short: 'A brigade short of ammunition starts the phase with less morale and half its rounds.' },
   { id: 'rations', name: 'Rations', unit: 'loads', words: 'Hard bread, salt meat and coffee. Each fielded brigade draws rations for a phase.',
     short: 'A hungry brigade starts the phase with less morale.' },
   { id: 'shoes', name: 'Shoes', unit: 'loads', words: 'Shoes wear out on the march: each fielded brigade wears out some every phase.',
-    short: 'Barefoot men start with less morale (slower marching: pending engine hook).' },
+    short: 'Barefoot men start with less morale and already tired.' },
   { id: 'blankets', name: 'Blankets', unit: 'loads', words: 'Blankets wear out in the field: each fielded brigade wears out some every phase.',
     short: 'Cold nights cost a brigade some morale.' },
   { id: 'tents', name: 'Tents', unit: 'loads', words: 'Shelter tents wear out: each fielded brigade wears out some every phase.',
     short: 'Men without shelter start with less morale.' },
   { id: 'horses', name: 'Horses', unit: 'teams', words: 'Battery teams. Each fielded battery wears out some every phase.',
-    short: 'A battery short of teams starts with less morale (slower limbering: pending engine hook).' },
+    short: 'A battery short of teams starts with less morale and is slower to limber and unlimber.' },
   { id: 'wagons', name: 'Wagons', unit: 'wagons', words: 'Wagons carry the depot: more wagons hold more spare cards. Wagons do not wear out.',
     short: 'A full depot refuses new purchases until a card is issued or turned in.' },
 ].map((x) => Object.freeze({ ...x, gameRule: true })));

@@ -7,6 +7,8 @@
 //   slotsFor(vet) / slotsOf(brigade)        badge slots by veterancy (Green 1, Trained 2, Veteran 3, Elite 4), +1 bought slot
 //   ratingBonus(badges)                     { fire, melee, morale, drill } card-bar points (src/reward/model.js ratings)
 //   fieldBadges(list, xfactor) / badgeEffects(defBadges)  the field definition's badges and their combat fractions
+//   trainingEffects(training) / trainingText(training)    camp card-bar points on the field (P5d) as combat fractions
+//   campEffectLines(def)                    every camp effect on a field definition (P5d), as plain labelled lines
 //   validateFeats(feats, units)             a phase's canonical feat statistics (recordPhase input)
 //   awardBadges(save, { awardId, feats, loan }) -> { save, summary }   (campaign.js validates the save)
 //   keepBadges(brigade, keep)               the player's choice when a brigade has more badges than slots
@@ -22,7 +24,7 @@
 // - The enemy earns too: CS formations' feats are recorded per formation id in the campaign save (`enemy`), every phase,
 //   keeping the best tiers that fit the formation's slots by its field experience; they apply when it fights again.
 // The real examples are history (provenance and sources on each); their numbers never feed the game rules.
-import { BADGE_RULES } from './tuning.js';
+import { BADGE_RULES, CAMP } from './tuning.js';
 
 export { BADGE_RULES };
 export const TIERS = Object.freeze(['bronze', 'silver', 'gold']);
@@ -239,6 +241,47 @@ export function badgeEffects(list) {
     if (b.xfactor === true && !xf) xf = { kind: def.effect.combat, fraction: f * BADGE_RULES.xfactor.share, id: def.id };
   }
   if (xf) out.xfactor = xf;
+  return out;
+}
+
+/**
+ * Camp training on the card (P5d: camp orders and bought training, a brigade's `bonus` points; the field definition's
+ * `training`) as combat fractions through the same path as badge effects: { fire, reload, melee, morale } at
+ * CAMP.battle.perPoint % per point (src/sim/combat.js applies each: fire effect, reload and wheeling speed, melee strength,
+ * morale lost under fire), or null for no training (an unknown list never changes a battle). Game rules, labelled so.
+ */
+export function trainingEffects(training) {
+  if (!training || typeof training !== 'object' || Array.isArray(training)) return null;
+  const f = CAMP.battle.perPoint / 100, out = {};
+  const keys = { fire: 'fire', drill: 'reload', melee: 'melee', morale: 'morale' };
+  for (const k of Object.keys(training)) {
+    const n = training[k];
+    if (!has(keys, k) || !Number.isSafeInteger(n) || n < 0 || n > 50) return null;
+    if (n > 0) out[keys[k]] = n * f;
+  }
+  return Object.keys(out).length ? out : null;
+}
+/** "+3% fire effect, +2% faster reload and wheeling" for a definition's training (empty for none). */
+export function trainingText(training) {
+  const fx = trainingEffects(training);
+  if (!fx) return '';
+  const pct = (v) => `+${Math.round(v * 100)}%`;
+  return [fx.fire ? `${pct(fx.fire)} fire effect` : '', fx.reload ? `${pct(fx.reload)} faster reload and wheeling` : '',
+    fx.melee ? `${pct(fx.melee)} melee` : '', fx.morale ? `${pct(fx.morale).replace('+', '−')} morale lost under fire` : ''].filter(Boolean).join(', ');
+}
+
+/**
+ * What reached the battle from camp for one field definition (P5d game rules; src/franchise/campaign.js applyCampaign writes
+ * the fields): "Effect: detail" lines for the unit card and the after-action; [] for a definition without any.
+ */
+export function campEffectLines(def) {
+  if (!def || typeof def !== 'object') return [];
+  const out = [], training = trainingText(def.training);
+  if (training) out.push(`Camp training: ${training}`);
+  if (Number.isFinite(def.fatigue) && def.fatigue > 0) out.push(`Short of shoes: started tired (fatigue ${Math.round(def.fatigue)} of 100)`);
+  if (Number.isFinite(def.ammo) && def.ammo < 100) out.push(`Short of ammunition: started with ${Math.round(def.ammo)}% of its rounds (refilled slowly out of contact)`);
+  if (Number.isFinite(def.limber) && def.limber > 0) out.push(`Short of horses: limbers and unlimbers ${Math.round(def.limber)} s more slowly`);
+  if (def.pioneers === true) out.push(`Pioneers: through woods at ${Math.round(CAMP.upgrades.pioneers.woods * 100)}% pace (70% without)`);
   return out;
 }
 

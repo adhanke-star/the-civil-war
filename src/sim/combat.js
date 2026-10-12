@@ -49,12 +49,19 @@
 //     multipliers (fire by band or situation, canister, ammunition per volley, melee by situation, morale losses, rally,
 //     resupply, fatigue), plus an X-Factor brigade's aura for friends within BADGE_RULES.xfactor.radius. A unit without
 //     badges takes exactly the old arithmetic: every badge term sits behind a check, never a multiply by 1.
+//   - camp effects (P5d; src/franchise/tuning.js CAMP.battle; setCampEffects from the unit's definition, called by unit.js):
+//     camp card-bar points (`training`, through badges.js trainingEffects like the badges) add to the fire effect, the
+//     reload (and, in unit.js, the wheeling) speed, melee strength and cut morale lost under fire; a battery short of horses
+//     (`limber` s) must stand UNLIMBER_S + limber sim seconds after it halts before it fires (unit.js also holds it that long
+//     before it moves off); pioneers (`pioneers`) pass woods faster (unit.js). Starting fatigue and rounds are the
+//     definition's `fatigue` and `ammo` (unit.js). A definition without them takes exactly the old arithmetic.
 // FIRE_BASE and the drains are tuned for a few minutes of fighting per brigade, not sourced (as in the old
 // model, where FIRE_BASE was "tuned so the loop runs ~90 s"). The sandbox multipliers rules.fireEffect and
 // rules.moraleLoss scale them at the point of use; the constants here stay as they are.
 
 import { RULES } from './rules.js';
-import { FEAT_STATS, BADGE_RULES, badgeEffects } from '../franchise/badges.js';
+import { FEAT_STATS, BADGE_RULES, badgeEffects, trainingEffects } from '../franchise/badges.js';
+import { CAMP } from '../franchise/tuning.js';
 
 export const CLOCK_RATIO = 4;
 const YD = 0.9144;
@@ -138,6 +145,30 @@ export function setBadgeEffects(u, list) {
 }
 /** The badge fractions in force for a unit now (its own plus any aura), or null. */
 export const badgeFx = (u) => LIVE_FX.get(u) || null;
+// ---- camp effects (P5d; see the header) ----------------------------------------------------------------------------------
+const CAMP_FX = new WeakMap(); // unit -> { fire?, reload?, melee?, morale?, limber, woods, hitch, halted }
+/** Every battery's unlimbering time (src/units/battery.js UNLIMBER_S, drawn there); a battery short of horses adds its `limber`. */
+export const UNLIMBER_S = 6;
+/**
+ * Set (or clear) a unit's camp effects from its definition: `training` (camp card-bar points), `limber` (batteries only) and
+ * `pioneers`. Returns the record (null: none). The record also keeps a battery's hitching and halted clocks.
+ */
+export function setCampEffects(u, def) {
+  const fx = trainingEffects(def && def.training);
+  const limber = def && u.type === 'artillery' && Number.isFinite(def.limber) && def.limber > 0 ? def.limber : 0;
+  const woods = def && def.pioneers === true ? CAMP.upgrades.pioneers.woods : 0;
+  if (!fx && !limber && !woods) { CAMP_FX.delete(u); return null; }
+  const rec = { ...(fx || {}), limber, woods, hitch: 0, halted: Infinity };
+  CAMP_FX.set(u, rec);
+  return rec;
+}
+/** A unit's camp effects in battle (setCampEffects), or null. */
+export const campFx = (u) => CAMP_FX.get(u) || null;
+/** The enemy whose charge was on `u` within the last second (captured colours: an overrun); reads the feat record, never makes one. */
+export function chargedBy(u, now) {
+  const r = FEATS.get(u);
+  return r && r.meleeBy && now - r.meleeT <= 1 ? r.meleeBy : null;
+}
 /** A unit's X-Factor ({ kind, fraction, id } from its own badges), or null. */
 export const xFactorOf = (u) => BADGE_FX.get(u)?.xfactor || null;
 
@@ -413,11 +444,15 @@ export class Combat {
       const want = Math.atan2(t.x - u.x, t.z - u.z);
       if (Math.abs(wrap(want - u.facing)) > 0.12) u.goalFacing = want;
     }
-    const canFire = t && !u.holdFire && !u.melee && u.state !== 'routing' && u.order.type !== 'charge' && !(moving && (u.run || isArt)) && (!isArt || u.unlimbered) && !u.switching;
+    // camp effects (none without them): a battery short of horses unlimbers slowly; Drill reloads faster
+    const cf = CAMP_FX.get(u);
+    if (cf && cf.limber) cf.halted = u.follow.active || u.state === 'routing' ? 0 : cf.halted + dt;
+    const canFire = t && !u.holdFire && !u.melee && u.state !== 'routing' && u.order.type !== 'charge' && !(moving && (u.run || isArt)) && (!isArt || u.unlimbered) && !u.switching
+      && !(cf && cf.limber && cf.halted < UNLIMBER_S + cf.limber);
     u.firing = !!canFire && !moving;
     if (t && u.holdFire && u.state !== 'routing') featsOf(u).held = true; // holding fire with a target (First Volley)
     const period = (u.equipmentProfile ? u.equipmentProfile.reloadSeconds : this.basePeriod(u)) * (1 + 0.5 * (u.fatigue / 100)) * (moving ? 1.5 : 1);
-    if (u.reload < 1) u.reload = Math.min(1, u.reload + dt / period);
+    if (u.reload < 1) u.reload = Math.min(1, cf && cf.reload ? u.reload + (dt * (1 + cf.reload)) / period : u.reload + dt / period);
     if (!canFire || u.reload < 1) return;
     // A friend that stepped across the line since the last target pick masks this volley; re-pick next time.
     if (RULES.friendlyMask && this.masks(u, t)) { u.target = null; u.masked = true; u.firing = false; return; }
@@ -468,6 +503,8 @@ export class Combat {
       if (u.inWoods && fx.fireWoods) boost += fx.fireWoods;
       if (canister && fx.canister) boost += fx.canister;
     }
+    const cf = CAMP_FX.get(u);
+    if (cf && cf.fire) boost += cf.fire; // camp training: Fire points (none without them)
     const tMen = t.men;
     const cas = Math.min(t.men, (boost ? rate * (1 + boost) : rate) * period * (0.78 + this.rnd() * 0.44));
     t.takeLosses(cas, this.fallen[t.side], time);
@@ -536,6 +573,10 @@ export class Combat {
         let atkB = 0, defB = 0;
         if (fxA) atkB = (fxA.melee || 0) + (b.cover > 1 && fxA.meleeCover ? fxA.meleeCover : 0) + (b.type === 'artillery' && fxA.meleeGuns ? fxA.meleeGuns : 0);
         if (fxB && !bCharging && fxB.meleeDefend) defB = fxB.meleeDefend;
+        // camp training: Melee points on either side (none without them)
+        const cfA = CAMP_FX.get(a), cfB = CAMP_FX.get(b);
+        if (cfA && cfA.melee) atkB += cfA.melee;
+        if (cfB && cfB.melee) defB += cfB.melee;
         const r = (atkB ? atk * (1 + atkB) : atk) / Math.max(1, defB ? def * (1 + defB) : def);
         // old: 9 x 12 men/s x ratio (108/s) with a 20% per second cap; that bled ~450 men a side in 20 s
         const base = 9 * dt * RULES.chargeEffect;
@@ -607,7 +648,9 @@ export class Combat {
     // Losses drive morale (old factor 60 with a -1.1/s under-fire drain suited a ~90 s fight; over a
     // several-minute fight the flat drain alone broke a brigade that had lost 10%).
     const k = this.#command ? this.#command(u) : null;
-    const ml = RULES.moraleLoss * (k ? k.loss : 1);
+    let ml = RULES.moraleLoss * (k ? k.loss : 1);
+    const cf = CAMP_FX.get(u);
+    if (cf && cf.morale) ml *= 1 - cf.morale; // camp training: Morale points (none without them)
     const rallyRate = k ? k.rally : 1;
     // badge morale effects (none without badges): Cool Under Fire while holding; Unshaken against flank fire and panic
     const fx = LIVE_FX.get(u);

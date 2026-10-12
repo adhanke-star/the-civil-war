@@ -48,11 +48,20 @@
 //            role's march on its target, as for infantry (horsemen do not halt to fire on the way, combat.js).
 //   hold     carbine-armed and standing, it dismounts to fight on foot when an enemy comes within DISMOUNT_REACH.
 // The fallback rule and everything else are as for infantry. Delegated cavalry follows the delegation rules.
+//
+// Difficulty (DESIGN §1; src/franchise/tuning.js DIFFICULTY; new Ai(game, opts, level), default 'veteran' = everything above,
+// unchanged): the pass interval and the march re-issue time; Recruit reserves commit only at their set time (`at`, else
+// half-way through the day's window), never earlier on a threat; General reserves also commit on a contested objective
+// or an enemy within 525 m and then march to the threatened objective (not their own target or via points), and General
+// holding infantry, steady and unengaged, attacks (fire, never a charge) a breakthrough within 400 m: an enemy formation
+// inside the objective it defends, or within 200 m of a routing friend. Delegated own brigades are not affected. The AI
+// gives orders only: no level changes a combat number.
+
+import { DIFFICULTY } from '../franchise/tuning.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 export const AI_ROLES = Object.freeze(['hold', 'attack', 'reserve']);
-const RESERVE_REACH = 350; // m: an enemy this close commits a reserve
-const REISSUE_S = 8; // sim s between march orders to a unit that has stopped short
+const REISSUE_S = 8; // sim s between march orders to a delegated unit that has stopped short (the enemy AI: its level's reissue)
 const FALLBACK_COOL_S = 30; // sim s after a fallback before the march is ordered again
 const VIA_PASSED = 60; // m: a waypoint this close counts as passed
 const ARRIVE = 25; // m: this close to its own final point a unit has arrived
@@ -82,8 +91,10 @@ export const roleOf = (u) => {
 };
 
 export class Ai {
-  constructor(game, opts) {
+  constructor(game, opts, level = 'veteran') {
     this.game = game;
+    this.difficulty = DIFFICULTY.levels.includes(level) ? level : 'veteran';
+    this.level = DIFFICULTY[this.difficulty]; // interval, reissue, reserve rule, threat, counter (tuning.js)
     this.side = game.playerSide === 'US' ? 'CS' : 'US';
     this.t = 0;
     this.chargeReach = opts.chargeReach || 170;
@@ -95,7 +106,7 @@ export class Ai {
   step(dt) {
     this.t -= dt;
     if (this.t > 0) return;
-    this.t = 0.5;
+    this.t = this.level.interval;
     const units = this.game.units;
     for (const u of units) {
       if (u.side !== this.side || !u.alive || u.state === 'routing' || u.melee || u.manual) continue;
@@ -122,6 +133,7 @@ export class Ai {
         u.orderFallback(110);
         continue;
       }
+      if (this.level.counter && this.counter(u)) continue; // General: counter-attack a local breakthrough
       if (!u.follow.active && u.order.type === 'hold' && !u.order.firm && u.state !== 'wavering') {
         u.order = { type: 'hold', firm: true }; // back in position after a charge or fallback
       }
@@ -149,6 +161,7 @@ export class Ai {
       s = this.memo.get(u);
       if (!s) { s = { active: false, issued: -Infinity, via: 0 }; this.memo.set(u, s); }
       if (!s.active) s.active = this.activates(u, role, nd);
+      if (s.active && this.level.threat) this.committed(u, role, s);
     }
     const horse = u.mounted && !u.switching;
     if (horse && u.state === 'steady') {
@@ -204,7 +217,7 @@ export class Ai {
       this.holdFace(u, prey, Math.hypot(prey.x - u.x, prey.z - u.z));
       return true;
     }
-    if (u.state === 'wavering' || g.simTime - s.issued < REISSUE_S || g.simTime - (u.lastFallback ?? -Infinity) < FALLBACK_COOL_S) return false;
+    if (u.state === 'wavering' || g.simTime - s.issued < this.level.reissue || g.simTime - (u.lastFallback ?? -Infinity) < FALLBACK_COOL_S) return false;
     if (u.orderMove([[u.x, u.z], p], { endFacing: Math.atan2(prey.x - p[0], prey.z - p[1]) })) s.issued = g.simTime;
     return true;
   }
@@ -236,6 +249,7 @@ export class Ai {
     let s = this.memo.get(u);
     if (!s) { s = { active: false, issued: -Infinity, via: 0 }; this.memo.set(u, s); }
     if (!s.active) s.active = this.activates(u, role, nd);
+    if (s.active && this.level.threat) this.committed(u, role, s);
     if (near) {
       const ahead = Math.abs(wrap(Math.atan2(near.x - u.x, near.z - u.z) - u.facing)) < 1.1;
       if (u.type === 'infantry' && u.state === 'steady' && u.order.type !== 'charge' && nd < this.chargeReach && ahead &&
@@ -256,11 +270,44 @@ export class Ai {
 
   /** Has this unit's role begun? Attack: at `at` (at once without it). Reserve: at `at`, an enemy close, or the objective lost. */
   activates(u, role, nd) {
-    const ai = u.def.ai, g = this.game;
+    const ai = u.def.ai, g = this.game, L = this.level;
     const now = g.clockStart + g.simTime * g.clockRatio;
     if (ai.at !== undefined && now >= clockSec(ai.at)) return true;
     if (role === 'attack') return ai.at === undefined;
-    return nd < RESERVE_REACH || g.holder === g.playerSide;
+    // Recruit: only the set time (half-way through the day without one); otherwise a threat commits it too
+    if (L.reserve === 'set') return ai.at === undefined && now >= g.clockStart + (g.clockEnd - g.clockStart) * L.reserveShare;
+    return nd < L.reserveReach || g.holder === g.playerSide || (L.threat && g.holder === 'contested');
+  }
+
+  /**
+   * General: a committed reserve whose objective is threatened (lost or contested), then or later, is sent to the objective
+   * once; a march already under way toward its own target is halted so the next order takes it there.
+   */
+  committed(u, role, s) {
+    const g = this.game;
+    if (role !== 'reserve' || !this.level.threat || s.toObjective || !(g.holder === g.playerSide || g.holder === 'contested')) return;
+    s.toObjective = true;
+    s.issued = -Infinity;
+    if (u.follow.active && u.order.type === 'move') { u.stop(); u.order = { type: 'hold', firm: true }; }
+  }
+
+  /**
+   * General: a steady, unengaged holding infantry brigade attacks (fire, never a charge) the nearest breakthrough within
+   * counter.range: an enemy formation inside the objective its side defends, or within counter.reach of a routing friend.
+   */
+  counter(u) {
+    if (u.type !== 'infantry' || u.state !== 'steady' || u.follow.active || u.engaged || u.order.type === 'attack' || this.fighting(u)) return false;
+    const C = this.level.counter, g = this.game, o = g.objective, defends = (g.scenario?.attacker ?? 'US') !== u.side;
+    let best = null, bd = C.range;
+    for (const e of g.units) {
+      if (e.side === u.side || !e.alive || e.state === 'routing' || e.state === 'captured') continue;
+      const d = Math.hypot(e.x - u.x, e.z - u.z);
+      if (d >= bd) continue;
+      const through = (defends && Math.hypot(e.x - o.x, e.z - o.z) < o.r)
+        || g.units.some((f) => f.side === u.side && f.alive && f.state === 'routing' && Math.hypot(f.x - e.x, f.z - e.z) < C.reach);
+      if (through) { bd = d; best = e; }
+    }
+    return !!best && u.orderAttack(best);
   }
 
   /** How far a battery stands from what it shoots at (its effective range). */
@@ -308,7 +355,7 @@ export class Ai {
       this.holdFace(u, near, nd);
       return;
     }
-    if (u.state === 'wavering' || this.fighting(u) || g.simTime - s.issued < REISSUE_S
+    if (u.state === 'wavering' || this.fighting(u) || g.simTime - s.issued < this.level.reissue
         || g.simTime - (u.lastFallback ?? -Infinity) < FALLBACK_COOL_S) { this.holdFace(u, near, nd); return; }
     const pts = [[u.x, u.z], ...r.via.slice(s.via)];
     let end = r.aim;
@@ -327,8 +374,9 @@ export class Ai {
   route(u) {
     const g = this.game, ai = u.def.ai, lim = g.terrain.half - EDGE;
     const clamp = (p) => [Math.max(-lim, Math.min(lim, p[0])), Math.max(-lim, Math.min(lim, p[1]))];
-    const target = clamp(ai.target || [g.objective.x, g.objective.z]);
-    const via = (ai.via || []).map(clamp);
+    const sent = this.memo.get(u)?.toObjective === true; // General: a reserve sent to the threatened objective
+    const target = clamp(sent ? [g.objective.x, g.objective.z] : ai.target || [g.objective.x, g.objective.z]);
+    const via = sent ? [] : (ai.via || []).map(clamp);
     const grp = this.slot(u, target);
     const off = grp.pos.get(u);
     // across the approach: (dz, -dx) is the line's right hand when facing along (dx, dz)
@@ -367,7 +415,7 @@ export class Ai {
 
   /** The group key: the unit's target (default the objective centre), kept inside the ground. */
   targetKey(v) {
-    const lim = this.game.terrain.half - EDGE, o = this.game.objective, p = v.def.ai.target || [o.x, o.z];
+    const lim = this.game.terrain.half - EDGE, o = this.game.objective, p = this.memo.get(v)?.toObjective ? [o.x, o.z] : v.def.ai.target || [o.x, o.z];
     return Math.max(-lim, Math.min(lim, p[0])) + ',' + Math.max(-lim, Math.min(lim, p[1]));
   }
 

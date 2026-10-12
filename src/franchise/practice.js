@@ -5,6 +5,7 @@ import { introScenario, surrenderOption } from './intro.js';
 import { ARMS, UNIQUES, CONDITIONS, VETERANCY, ISSUE_PLACE } from '../reward/data.js';
 import { gradeSpec, rollLoot, seedOf } from '../reward/model.js';
 import { validateReplay } from '../sim/recorder.js';
+import { campEffectLines } from './badges.js';
 
 const fail = (message) => { throw new Error(`Practice: ${message}`); };
 const WEAPONS = { infantry: new Set(['smooth', 'rifled']), artillery: new Set(['smbart', 'parrott']) };
@@ -237,7 +238,8 @@ const GAME_GRADES = { decisive: 'Decisive', victory: 'Victory', draw: 'Draw', de
  * requisition points), the deterministic loot of `awardId` and each fielded formation's feat statistics (`feats`, for
  * badges), the map replay track when a recorder was attached (`replay`, src/sim/recorder.js; null otherwise) and "you vs
  * history" (`history`, historyComparison below). Rejects an altered roster exactly like practiceOutcome. Grants nothing by
- * itself; the campaign records it.
+ * itself; the campaign records it. Colours the Union took (P5d; src/game.js colourReport) ride along as `colours`
+ * ([{ unitId, regiment, side, by }], only when there are any) for recordPhase's trophy shelf.
  */
 export function phaseOutcome({ game, scenario, awardId, seed }) {
   if (!game || !scenario || game.scenario !== scenario || game.playerSide !== 'US' || game.over !== true
@@ -268,18 +270,41 @@ export function phaseOutcome({ game, scenario, awardId, seed }) {
   // a replay that cannot be recorded never blocks the phase result: the after-action then simply has no replay page
   let replay = null;
   try { replay = game.recorder ? validateReplay(game.recorder.track(game)) : null; } catch { replay = null; }
+  const colours = colourRows(game, 'US').filter((r) => defs.has(r.unitId)).map((r) => ({ unitId: r.unitId, regiment: r.regiment, side: r.side, by: r.by }));
   return frozen({ winner: game.result.winner, grade, held: game.holder === 'US', units, captures, cards, feats: phaseFeats(game, live),
-    replay, history: historyComparison({ game, scenario, units, grade }) });
+    replay, history: historyComparison({ game, scenario, units, grade }), ...(colours.length ? { colours } : {}) });
 }
 
 const clockMinutes = (t) => (typeof t === 'string' && /^\d{2}:\d{2}$/.test(t) ? Number(t.slice(0, 2)) * 60 + Number(t.slice(3)) : null);
 const hhmm = (minutes) => `${String(Math.floor(minutes / 60) % 24).padStart(2, '0')}:${String(Math.floor(minutes % 60)).padStart(2, '0')}`;
+/** The colours one side took in a game (src/game.js colourReport; [] for a game that keeps none). */
+function colourRows(game, side) {
+  if (typeof game?.colourReport !== 'function') return [];
+  const rows = game.colourReport(side);
+  return Array.isArray(rows) ? rows.filter((r) => r && typeof r.unitId === 'string' && typeof r.regiment === 'string' && r.regiment.trim()
+    && ['US', 'CS'].includes(r.side) && typeof r.by === 'string' && r.by.trim()).map((r) => ({ ...r })) : [];
+}
+/** What reached this phase's battle from camp (P5d game rules): one line per effect with the Union formations it touched. */
+function campRows(scenario) {
+  const out = new Map();
+  for (const d of [...(scenario.units || []), ...(scenario.reinforcements || [])]) {
+    if (d.side !== 'US') continue;
+    for (const line of campEffectLines(d)) {
+      const key = line.split(':')[0];
+      if (!out.has(key)) out.set(key, { effect: key, text: line.slice(key.length + 1).trim(), formations: [] });
+      out.get(key).formations.push(d.short || d.name);
+    }
+  }
+  return [...out.values()];
+}
+
 /**
  * "You vs history" for one finished battle-pack phase (campaign or Battles menu): the player's objective result, Union
  * and Confederate losses against the phase's sourced historical casualties (scenario.history, or null where none), the
  * clock the phase ended at against the historical window's end, and the game's scale (men per figure, clock ratio).
  * `units` are phaseOutcome rows ({ side, menStart, men }); without them the live roster is read (unarrived formations
- * lose nothing). Display data only: it grants and records nothing.
+ * lose nothing). Display data only: it grants and records nothing. With anything to show it also carries `colours` (those the
+ * Union took this phase) and `camp` (P5d: each camp effect that reached the battle and the Union formations it touched).
  */
 export function historyComparison({ game, scenario, units = null, grade = null }) {
   if (!game || !scenario) fail('a history comparison needs the finished phase.');
@@ -290,6 +315,8 @@ export function historyComparison({ game, scenario, units = null, grade = null }
   const startMin = clockMinutes(scenario.start), endMin = clockMinutes(scenario.end);
   const finishedAt = startMin === null ? null : hhmm(startMin + (game.simTime || 0) * ratio / 60);
   const h = scenario.history || null;
+  const colours = colourRows(game, 'US').map((r) => ({ regiment: r.regiment, formation: r.formation ?? '', by: r.by, how: r.how ?? '' }));
+  const camp = campRows(scenario), extras = { ...(colours.length ? { colours } : {}), ...(camp.length ? { camp } : {}) };
   return {
     title: scenario.title ?? '', objective: scenario.objective?.name ?? '',
     result: { winner: game.result?.winner ?? null, grade: grade ?? GAME_GRADES[game.result?.grade] ?? null, why: game.result?.why ?? '', held: game.holder === 'US' },
@@ -299,6 +326,7 @@ export function historyComparison({ game, scenario, units = null, grade = null }
     history: { note: scenario.historyNote || '', start: scenario.start ?? null, end: scenario.end ?? null, casualties: h ? { ...h.casualties } : null },
     scale: { menPerFigure: Number.isInteger(scenario.menPerFigure) ? scenario.menPerFigure : 5, clockRatio: ratio },
     story: h,
+    ...extras,
   };
 }
 

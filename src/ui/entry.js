@@ -17,12 +17,17 @@
 // camp shows a period view of the campaign's current battle with its caption and source, and a trophy shelf drawn from the
 // save: captured guns and arms (items whose source is capture), the wagons in the stores (one icon each up to a cap, then
 // ×N) and the reputation level. Campaign brigade cards carry their commander's period portrait or the generic silhouette.
+// P5d: New campaign offers Recruit / Veteran / General (src/franchise/tuning.js DIFFICULTY; Veteran checked) above the slots
+// and starts the campaign at the chosen level; the camp names the campaign's level; the Battles list has its own choice,
+// carried on each phase link as ?difficulty= (none for Veteran). The trophy shelf also lists the regiment colours the army
+// took (save `trophies.colours`), and the camp's notes say where camp orders, training, shortages and pioneers reach the battle.
 import { createProgressStore, parseSnapshot, exportSnapshot, exchangeDepot, listSlots, MAX_SAVE_BYTES } from '../franchise/save.js';
-import { newCampaign, chooseBadges, campaignPhase } from '../franchise/campaign.js';
+import { newCampaign, chooseBadges, campaignPhase, campaignDifficulty } from '../franchise/campaign.js';
+import { DIFFICULTY } from '../franchise/tuning.js';
 import { BADGE_BY_ID, TIER_NAMES, BADGE_RULES_NOTE, featText, effectText, threshold, categoryName, slotsOf } from '../franchise/badges.js';
 import { loadCampaign, loadPackSummary, ladderPosition, formatDate, loadDecisions, rankShort } from './briefing.js';
 import { loadArt, backdropArt, whenArt } from './art.js';
-import { ORDERS, orderName, orderText, setOrder, breakCamp, campReport, supplyNeed, CAMP_RULES_NOTE } from '../franchise/camp-orders.js';
+import { ORDERS, orderName, orderText, setOrder, breakCamp, campReport, supplyNeed, CAMP_RULES_NOTE, BATTLE_NOTE, shortText } from '../franchise/camp-orders.js';
 import { cardsFor, recorded, optionOpen, chooseDecision, historyOf, effectText as decisionEffect, DECISIONS_NOTE } from '../franchise/decisions.js';
 import { get } from '../settings.js';
 import { brigCard, staticCard, itemLabel, defineRewardSettings, levelUpMoment, badgeChip } from '../reward/sequence.js';
@@ -36,6 +41,16 @@ import { loadFieldScenario } from '../sim/phase.js';
 const PAGE_SIZE = 12;
 const ART_DELAY_MS = 900; // backdrop, portraits and card pictures follow the first render (P6b)
 const STYLE = { 'clean modern': 'modern', 'period desk': 'desk', hybrid: 'hybrid' };
+// Difficulty in plain words (game rules; src/sim/ai.js and src/game.js apply them). Combat numbers never change with the level.
+const DIFFICULTY_TEXT = Object.freeze({
+  recruit: 'A slower enemy whose reserves wait for their set time; the battle always pauses on a rout, an arrival or a threatened objective.',
+  veteran: 'The enemy as designed; the Auto-pause setting decides when the battle pauses.',
+  general: 'A faster enemy that sends its reserves to the threatened point and counter-attacks breakthroughs; the battle never pauses itself.',
+});
+const DIFFICULTY_NOTE = 'Difficulty changes only how the enemy commands and when the battle pauses: casualties, fire and morale work the same at every level.';
+const difficultyName = (level) => DIFFICULTY.names[level] || DIFFICULTY.names.veteran;
+/** A Battles-list phase link at a difficulty (Veteran adds nothing to the address). */
+const battleHref = (packId, phaseId, level) => `./?battle=${encodeURIComponent(packId)}&phase=${encodeURIComponent(phaseId)}${level && level !== 'veteran' ? `&difficulty=${level}` : ''}`;
 export function showFieldFailure({ href = './?camp', message = 'Your saved army is unchanged. Return to camp and try again.' } = {}) {
   document.getElementById('battle').hidden = true;
   const root = document.createElement('main'); root.id = 'front'; root.className = 'rw rw-counts';
@@ -91,7 +106,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
         <p id="entry-note"></p>
         <div class="entry-title-actions"><button id="entry-campaign-continue" class="entry-primary" type="button" aria-describedby="entry-campaign-slot" hidden>Continue</button><button id="entry-new-campaign" type="button" hidden>New campaign</button><button id="entry-battles" type="button" aria-expanded="false" aria-controls="entry-battle-list" hidden>Battles</button><button id="entry-continue" class="entry-primary" type="button">Continue</button></div>
         <p id="entry-campaign-slot" hidden></p>
-        <section id="entry-battle-list" aria-labelledby="entry-battles-heading" hidden><h2 id="entry-battles-heading" tabindex="-1">Battles</h2><p class="entry-note">Every built phase with its historical armies. No loot, and your campaign army is not changed.</p><p id="entry-battles-status" role="status"></p><div id="entry-battle-rows"></div></section>
+        <section id="entry-battle-list" aria-labelledby="entry-battles-heading" hidden><h2 id="entry-battles-heading" tabindex="-1">Battles</h2><p class="entry-note">Every built phase with its historical armies. No loot, and your campaign army is not changed.</p><p class="entry-battles-difficulty"><label for="entry-battles-difficulty">Difficulty</label><select id="entry-battles-difficulty"><option value="recruit">Recruit</option><option value="veteran" selected>Veteran</option><option value="general">General</option></select></p><p class="entry-note" id="entry-battles-difficulty-note"></p><p id="entry-battles-status" role="status"></p><div id="entry-battle-rows"></div></section>
       </section>
       <section id="entry-camp" aria-labelledby="entry-camp-heading" hidden>
         <header class="entry-camp-head"><div><p class="rw-eyebrow">Between battles</p><h1 id="entry-camp-heading">Your army</h1><p id="entry-summary"></p></div>
@@ -100,7 +115,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
         <p class="entry-note" id="camp-field-note">Deploy fights with your saved formations and equipment; actual losses return here. Practice again starts the original teaching formations and asks before replacing your army.</p>
         <section id="camp-campaign" aria-labelledby="camp-campaign-heading" hidden>
           <p class="rw-eyebrow" id="camp-campaign-position"></p><h2 id="camp-campaign-heading" tabindex="-1"></h2>
-          <p id="camp-complete" hidden></p><p id="camp-campaign-note"></p>
+          <p id="camp-complete" hidden></p><p id="camp-campaign-note"></p><p id="camp-difficulty"></p>
           <div class="entry-field-actions"><a id="camp-next" class="entry-primary" href="./">Next</a><a id="camp-replay" class="entry-secondary" href="./" hidden>Replay</a></div>
           <p id="camp-march-status" role="status" tabindex="-1"></p>
           <div id="camp-decisions" hidden><h3 id="camp-decisions-heading">Decisions for the next phase</h3><ul id="camp-decisions-list" aria-labelledby="camp-decisions-heading"></ul></div>
@@ -123,7 +138,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
         <section aria-labelledby="camp-army-heading"><h2 id="camp-army-heading">Brigades</h2><div id="camp-army" class="rw-brigs is-static" role="list" aria-label="Saved brigades"></div><div id="army-pages" class="entry-pages"></div></section>
         <section aria-labelledby="camp-depot-heading"><h2 id="camp-depot-heading" tabindex="-1">Depot</h2><p id="depot-note"></p><div id="camp-depot" role="list" aria-label="Saved depot"></div><div id="depot-pages" class="entry-pages"></div></section>
       </section>
-      <dialog id="slot-picker" aria-labelledby="slot-picker-heading" aria-describedby="slot-picker-note"><h2 id="slot-picker-heading" tabindex="-1">New campaign: choose a save slot</h2><p id="slot-picker-note">Each slot keeps one army. The campaign autosaves between phases and in camp.</p><div id="slot-rows" role="group" aria-label="Save slots"></div><p id="slot-picker-status" role="status"></p><div class="camp-compare-actions"><button id="slot-picker-cancel" type="button">Cancel</button></div></dialog>
+      <dialog id="slot-picker" aria-labelledby="slot-picker-heading" aria-describedby="slot-picker-note"><h2 id="slot-picker-heading" tabindex="-1">New campaign: choose a save slot</h2><p id="slot-picker-note">Each slot keeps one army. The campaign autosaves between phases and in camp.</p><fieldset id="slot-difficulty" aria-describedby="slot-difficulty-note"><legend>Difficulty</legend>${DIFFICULTY.levels.map((l) => `<label class="slot-difficulty-choice"><input type="radio" name="slot-difficulty" id="slot-difficulty-${l}" value="${l}"${l === 'veteran' ? ' checked' : ''}><span><b>${difficultyName(l)}</b> ${DIFFICULTY_TEXT[l]}</span></label>`).join('')}<p class="entry-note" id="slot-difficulty-note">${DIFFICULTY_NOTE} The level stays with the campaign.</p></fieldset><div id="slot-rows" role="group" aria-label="Save slots"></div><p id="slot-picker-status" role="status"></p><div class="camp-compare-actions"><button id="slot-picker-cancel" type="button">Cancel</button></div></dialog>
       <dialog id="slot-overwrite" role="alertdialog" aria-labelledby="slot-overwrite-heading" aria-describedby="slot-overwrite-note"><h2 id="slot-overwrite-heading">Overwrite this slot?</h2><p id="slot-overwrite-note"></p><div class="camp-compare-actions"><button id="slot-overwrite-cancel" type="button">Cancel</button><button id="slot-overwrite-confirm" type="button">Overwrite</button></div></dialog>
       <dialog id="camp-confirm" role="alertdialog" aria-labelledby="camp-confirm-heading" aria-describedby="camp-confirm-note"><h2 id="camp-confirm-heading" tabindex="-1"></h2><p id="camp-confirm-note"></p><div class="camp-compare-actions"><button id="camp-confirm-cancel" type="button">Cancel</button><button id="camp-confirm-ok" type="button"></button></div></dialog>
       <section class="entry-transfer" aria-label="Army transfer"><p id="entry-status" role="status"></p><button id="entry-export" type="button" disabled>Export army</button><button id="entry-export-saved" type="button" hidden>Export displayed saved army</button><button id="entry-import" type="button">Import army</button><button id="entry-retry" type="button" hidden>Retry loading</button><button id="entry-discard-exchange" type="button" hidden>Discard pending exchange and reload</button><input id="entry-file" type="file" accept=".json,application/json" hidden></section>
@@ -258,6 +273,9 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       const replays = c.history.filter((r) => r.replay).length;
       node('camp-complete').textContent = `Campaign complete. ${c.history.length - replays} phases fought${replays ? `, ${replays} replay${replays === 1 ? '' : 's'} marked` : ''}. Final grade: ${saved.grade}.`;
     }
+    const level = campaignDifficulty(saved);
+    node('camp-difficulty').textContent = `Difficulty: ${difficultyName(level)}. ${DIFFICULTY_TEXT[level]} ${DIFFICULTY_NOTE}`;
+    node('camp-difficulty').dataset.difficulty = level;
     renderDecisionStrip(known && !complete ? ladder.def.phases[c.index] : null);
     node('camp-record-empty').hidden = c.history.length > 0; node('camp-record').hidden = !c.history.length;
     node('camp-record').replaceChildren(...c.history.map((r) => {
@@ -340,11 +358,11 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     node('camp-orders').hidden = !v2;
     if (!v2) return;
     const st = storesOf(saved);
-    node('camp-orders-note').textContent = `One standing order per brigade, carried out when the army marches out of camp for the next phase (Next). ${ORDERS.map((o) => `${orderName(o)}: ${orderText(o)}.`).join(' ')} Fielded brigades draw stores for each phase; a brigade its stores cannot cover starts that phase with less morale. ${CAMP_RULES_NOTE} Morale is the only camp effect the battle reads today; fatigue, rounds carried and limbering speed wait on an engine hook.`;
+    node('camp-orders-note').textContent = `One standing order per brigade, carried out when the army marches out of camp for the next phase (Next). ${ORDERS.map((o) => `${orderName(o)}: ${orderText(o)}.`).join(' ')} Fielded brigades draw stores for each phase; a brigade its stores cannot cover starts that phase with less morale. ${BATTLE_NOTE} ${CAMP_RULES_NOTE}`;
     node('camp-stores').replaceChildren(...STORE_ITEMS.map((x) => {
       const row = document.createElement('div'); row.setAttribute('role', 'listitem'); row.className = 'camp-store'; row.dataset.store = x.id;
       const name = document.createElement('b'); name.textContent = `${x.name}: ${st[x.id].toLocaleString()}`;
-      const words = document.createElement('span'); words.textContent = ` ${x.words} ${x.short}`;
+      const words = document.createElement('span'); words.textContent = ` ${x.words} ${shortText(x.id) || x.short}`;
       row.append(name, words); return row;
     }));
     const f = nextFielded();
@@ -353,7 +371,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     else {
       const need = supplyNeed(saved, f.brigades.length, f.batteries), have = Object.fromEntries(CAMP.stores.map((k) => [k, st[k] + CAMP.issue[k]]));
       const short = Object.keys(need).filter((k) => need[k] > have[k]);
-      node('camp-supply').textContent = `Next phase: ${f.brigades.length} of your brigades take the field (${f.batteries} batter${f.batteries === 1 ? 'y' : 'ies'}). With the quartermaster's issue they draw ${Object.keys(need).filter((k) => need[k]).map((k) => `${need[k]} ${STORE_BY_ID[k].name.toLowerCase()}`).join(', ')}${short.length ? `. Short: ${short.map((k) => `${STORE_BY_ID[k].name.toLowerCase()} (${have[k]} of ${need[k]})`).join(', ')}; buy more in the Requisition drawer or some brigades start with less morale (game rule).` : '. Enough for every brigade (Target practice also spends ammunition).'}`;
+      node('camp-supply').textContent = `Next phase: ${f.brigades.length} of your brigades take the field (${f.batteries} batter${f.batteries === 1 ? 'y' : 'ies'}). With the quartermaster's issue they draw ${Object.keys(need).filter((k) => need[k]).map((k) => `${need[k]} ${STORE_BY_ID[k].name.toLowerCase()}`).join(', ')}${short.length ? `. Short: ${short.map((k) => `${STORE_BY_ID[k].name.toLowerCase()} (${have[k]} of ${need[k]})`).join(', ')}; buy more in the Requisition drawer or some brigades start with less morale and carry the shortage into battle (game rule).` : '. Enough for every brigade (Target practice also spends ammunition).'}`;
     }
     const cap = depotCapacity(saved), owned = upgradesOf(saved);
     node('camp-capacity').textContent = `Depot: ${saved.depot.length} of ${cap} cards (${st.wagons} wagons × ${CAMP.cardsPerWagon}${owned.includes('wagons') ? ` + ${CAMP.upgrades.wagons.cards} from the Wagons upgrade` : ''}).${saved.depot.length >= cap ? ' Full: purchases wait until a card is issued or turned in, or more wagons are bought. Loot is never refused.' : ''}`;
@@ -385,7 +403,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     wagons: `+${CAMP.upgrades.wagons.cards} depot cards.`,
     ambulances: `${Math.round(CAMP.upgrades.ambulances.returned * 100)}% of each phase's losses in your brigades return to the ranks.`,
     ordnance: `Ammunition drawn and spent on Target practice × ${CAMP.upgrades.ordnance.factor} (rounded up).`,
-    pioneers: 'Faster crossings and obstacle work: pending engine hook (no battle effect yet).',
+    pioneers: `Your brigades and batteries march through woods at ${Math.round(CAMP.upgrades.pioneers.woods * 100)}% pace instead of 70%. Streams and fords do not slow troops in this version, so the upgrade gains nothing there.`,
   })[id];
   function shopButton(text, label, blocked, onClick) {
     const b = document.createElement('button'); b.type = 'button'; b.className = 'camp-buy-button'; b.textContent = text; b.setAttribute('aria-label', label);
@@ -447,7 +465,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       const tLocked = saved.level < CAMP.training.level, sLocked = saved.level < CAMP.extraSlot.level, bar = shopPick.bar[0].toUpperCase() + shopPick.bar.slice(1);
       train.append(shopSelect('camp-train-brigade', 'Brigade', living.map((x) => [x.id, x.label]), b.id, (v) => { shopPick.brigadeId = v; }),
         shopSelect('camp-train-bar', 'Card bar', [['fire', 'Fire'], ['melee', 'Melee'], ['morale', 'Morale'], ['drill', 'Drill']], shopPick.bar, (v) => { shopPick.bar = v; }),
-        para(`Training adds up to ${CAMP.training.points} points to one card bar for ${CAMP.training.price} points (less when the camp limit of ${CAMP.barCap} per bar leaves less room). ${b.label}'s ${bar} bar has ${b.bonus?.[shopPick.bar] || 0} of ${CAMP.barCap} camp points. ${tLocked ? `Opens at reputation level ${CAMP.training.level}.` : ''} The battle reads arms and veterancy, not card bars: pending engine hook.`, 'entry-note'),
+        para(`Training adds up to ${CAMP.training.points} points to one card bar for ${CAMP.training.price} points (less when the camp limit of ${CAMP.barCap} per bar leaves less room). ${b.label}'s ${bar} bar has ${b.bonus?.[shopPick.bar] || 0} of ${CAMP.barCap} camp points. ${tLocked ? `Opens at reputation level ${CAMP.training.level}.` : ''} In battle each camp point gives +${CAMP.battle.perPoint}% (Fire: fire effect; Drill: reload and wheeling; Melee: melee; Morale: less morale lost under fire).`, 'entry-note'),
         shopButton(tLocked ? `Opens at level ${CAMP.training.level}` : offer.points <= 0 ? `${bar} is at its camp limit` : saved.rp < offer.price ? `Needs ${offer.price} points` : `Train +${offer.points} ${bar} for ${offer.price} points`,
           `Train ${b.label}: +${offer.points} ${bar} for ${offer.price} requisition points`, tLocked || offer.points <= 0 || saved.rp < offer.price,
           (btn) => openPurchase(btn, { heading: `Train ${b.label}?`, ok: `Train for ${offer.price} points`,
@@ -803,6 +821,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
   const ICONS = {
     gun: '<svg viewBox="0 0 32 20" class="camp-trophy-icon"><circle cx="11" cy="13" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 9 L30 4 L31 7 L10 12 Z M2 18 L11 13" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg>',
     arm: '<svg viewBox="0 0 32 20" class="camp-trophy-icon"><path d="M1 8 H22 L24 7 H27 L31 13 L30 16 L22 12 H1 Z" fill="currentColor"/></svg>',
+    colour: '<svg viewBox="0 0 32 20" class="camp-trophy-icon"><path d="M4 1 V19" stroke="currentColor" stroke-width="2"/><path d="M5 2 H27 L23 7 L27 12 H5 Z" fill="currentColor" opacity="0.85"/></svg>',
     wagon: '<svg viewBox="0 0 32 20" class="camp-trophy-icon"><path d="M3 4 C8 -1 24 -1 29 4 V12 H3 Z" fill="currentColor" opacity="0.75"/><circle cx="8" cy="15" r="4" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="24" cy="15" r="4" fill="none" stroke="currentColor" stroke-width="2"/></svg>',
   };
   const plural = (n, one, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
@@ -830,6 +849,20 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     }
     rows.push(trophy('guns', guns.length, guns.length ? `Captured guns: ${plural(guns.length, 'gun')} (${names(guns)})` : 'Captured guns: none yet', ICONS.gun));
     rows.push(trophy('arms', arms.length, arms.length ? `Captured arms: ${plural(arms.length, 'card')} (${names(arms)})` : 'Captured arms: none yet', ICONS.arm));
+    if (v2) {
+      // Regiment colours the army took (P5d; save trophies.colours): each named with the phase and the brigade that took it.
+      const colours = saved.trophies?.colours || [], row = trophy('colours', colours.length, colours.length ? `Captured colours: ${plural(colours.length, 'colour')}` : 'Captured colours: none yet', ICONS.colour);
+      if (colours.length) {
+        const ul = document.createElement('ul'); ul.className = 'camp-colours'; ul.setAttribute('aria-label', 'Captured colours');
+        for (const c of colours.slice(0, SHELF_CAP)) {
+          const li = document.createElement('li'); li.dataset.regiment = c.regiment;
+          li.textContent = `${c.regiment}, taken by ${c.by} at ${titleOf(c.packId, c.phaseId)}`; ul.append(li);
+        }
+        if (colours.length > SHELF_CAP) { const li = document.createElement('li'); li.textContent = `and ${colours.length - SHELF_CAP} more`; ul.append(li); }
+        row.append(ul);
+      }
+      rows.push(row);
+    }
     if (v2) { const w = storesOf(saved).wagons; rows.push(trophy('wagons', w, `Wagons in the train: ${plural(w, 'wagon')}`, ICONS.wagon)); }
     node('camp-shelf').replaceChildren(...rows);
   }
@@ -1098,7 +1131,8 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     try {
       const target = createProgressStore(undefined, { slot: row.slot }), previousRaw = await target.readRawBaseline();
       if (row.empty && previousRaw !== null) throw new Error(`Progress: slot ${row.slot} was filled elsewhere. Choose it again to review overwriting it.`);
-      const fresh = newCampaign({ campaign: ladder.raw, slot: row.slot, seed: globalThis.crypto.getRandomValues(new Uint32Array(1))[0], at: new Date().toISOString() });
+      const difficulty = picker.querySelector('input[name="slot-difficulty"]:checked')?.value || 'veteran';
+      const fresh = newCampaign({ campaign: ladder.raw, slot: row.slot, seed: globalThis.crypto.getRandomValues(new Uint32Array(1))[0], at: new Date().toISOString(), difficulty });
       await target.import(exportSnapshot(fresh), { previousRaw });
       started = true; location.assign(`./?camp=${row.slot}`);
     } catch (err) { node('slot-picker-status').textContent = `${err.message} No slot was changed.`; }
@@ -1119,7 +1153,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
   node('slot-overwrite-confirm').addEventListener('click', () => overwrite.close('overwrite'));
   for (const d of [picker, overwrite]) d.addEventListener('keydown', (e) => {
     if (e.key !== 'Tab') return;
-    const stops = [...d.querySelectorAll('button')].filter((b) => !b.disabled && b.getClientRects().length), first = stops[0], last = stops[stops.length - 1];
+    const stops = [...d.querySelectorAll('button, input[type="radio"]:checked')].filter((b) => !b.disabled && b.getClientRects().length), first = stops[0], last = stops[stops.length - 1];
     if (!first) { e.preventDefault(); return; }
     if (e.shiftKey && [first, node('slot-picker-heading')].includes(document.activeElement)) { e.preventDefault(); last.focus(); }
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
@@ -1139,7 +1173,8 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
           heading.textContent = sum.title;
           for (const p of sum.phases) {
             const li = document.createElement('li'), a = document.createElement('a'), note = document.createElement('p');
-            a.href = `./?battle=${encodeURIComponent(packId)}&phase=${encodeURIComponent(p.id)}`; a.textContent = p.title;
+            a.href = battleHref(packId, p.id, node('entry-battles-difficulty').value); a.textContent = p.title;
+            a.dataset.pack = packId; a.dataset.phase = p.id;
             a.addEventListener('click', (e) => { if (importing || pendingExchange) e.preventDefault(); });
             note.textContent = [formatDate(p.date), p.start, p.line].filter(Boolean).join(' · ');
             li.append(a, note); items.append(li);
@@ -1154,6 +1189,14 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     }
     (node('entry-battle-rows').querySelector('a') || node('entry-battles-heading')).focus();
   });
+  // The Battles list's own difficulty: every phase link carries it (?difficulty=; none for Veteran).
+  const battlesDifficulty = () => {
+    const level = node('entry-battles-difficulty').value;
+    node('entry-battles-difficulty-note').textContent = `${difficultyName(level)}: ${DIFFICULTY_TEXT[level]} ${DIFFICULTY_NOTE}`;
+    node('entry-battle-rows').querySelectorAll('a[data-pack]').forEach((a) => { a.href = battleHref(a.dataset.pack, a.dataset.phase, level); });
+  };
+  node('entry-battles-difficulty').addEventListener('change', battlesDifficulty);
+  battlesDifficulty();
   node('entry-retry').addEventListener('click', async () => {
     if (importing) return;
     if (pendingExchange) { await openExchange(pendingExchange.command.itemUid, node('entry-retry'), true); return; }

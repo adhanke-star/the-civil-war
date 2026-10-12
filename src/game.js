@@ -42,6 +42,15 @@
 // target (pursueStep re-aims it twice a second, a little ahead of a fleeing one); the Attack order on a routing unit is a
 // charge for horsemen, and their Charge also takes routing targets. With surrender enabled, a routing unit ridden down
 // for RIDE_SURRENDER_S surrenders to the horsemen through the same capture accounting as a blocked rout or an overrun.
+// Difficulty (DESIGN.md §1; src/franchise/tuning.js DIFFICULTY): the scenario's `difficulty` (a campaign phase carries its
+// save's, src/franchise/campaign.js applyCampaign), else the page's ?difficulty= (the Battles list), else Veteran; kept in a
+// WeakMap (difficultyOf; no own Game keys). It sets the AI's level (src/sim/ai.js) and the auto-pause: Recruit always
+// pauses on a rout, an arrival or a threatened objective, Veteran follows rules.autoPause, General never pauses. No level
+// touches a combat number.
+// Captured colours (src/franchise/captures.js ColourCaptures; rules in tuning.js COLOURS): a formation's colours go to its
+// captor when it surrenders, to the nearest unbroken enemy within COLOURS.radius when it is destroyed, and one colour to the
+// charger when it breaks with an enemy charge on it (combat.js chargedBy); each is taken once, with a feed line ('colours').
+// colourReport(side) lists them for the phase result (src/franchise/practice.js). No random draws; state in a WeakMap.
 
 import { EntityManager } from 'yuka';
 import { Unit, MEN_PER_FIGURE_OPTIONS, MEN_PER_CREW_FIGURE, SPEED, setMenPerFigure } from './units/unit.js';
@@ -54,12 +63,13 @@ import { on as onSetting } from './settings.js';
 import { compareState } from './sandbox/compare.js';
 import { HaloPool } from './units/halos.js';
 import { HorsePool, HORSE_COATS, RallyRings, MountPool } from './units/mounts.js';
-import { Combat, CLOCK_RATIO, CAVALRY, CAVALRY_WEAPONS, defaultWeapon, horsed, featsOf, featStats, featGunsTaken, setBadgeEffects, xFactorOf } from './sim/combat.js';
+import { Combat, CLOCK_RATIO, CAVALRY, CAVALRY_WEAPONS, defaultWeapon, horsed, featsOf, featStats, featGunsTaken, setBadgeEffects, xFactorOf, chargedBy } from './sim/combat.js';
 import { BADGE_BY_ID } from './franchise/badges.js';
 import { Ai, DELEGATE_ROLES } from './sim/ai.js';
 import { RULES } from './sim/rules.js';
 import { mulberry32, inWoods, PLAN } from './world/landscape.js';
-import { FieldCaptures } from './franchise/captures.js';
+import { FieldCaptures, ColourCaptures } from './franchise/captures.js';
+import { DIFFICULTY, COLOURS } from './franchise/tuning.js';
 import { prepareReinforcementTimeline, reinforcementWindow, captureAccounting, phaseMenPerFigure } from './sim/phase.js';
 
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -94,6 +104,50 @@ const cavalryState = new WeakMap();
 // X-Factor brigades whose moment has played this battle (game -> Set of units); empty on fields without badges.
 const xfactorShown = new WeakMap();
 const RIDE_SURRENDER_S = 3; // sim s of being ridden down after which a routing unit surrenders (surrender enabled)
+// Difficulty and captured colours (see the header): game -> level; game -> { colours: ColourCaptures, fallen: Set of units seen dead }.
+const difficultyState = new WeakMap();
+const colourState = new WeakMap();
+/** This battle's difficulty level ('recruit' | 'veteran' | 'general'); Veteran for a Game made any other way. */
+export const difficultyOf = (game) => difficultyState.get(game) ?? 'veteran';
+/** The scenario's difficulty, else the page's ?difficulty= (Battles list), else Veteran. */
+function difficultyFrom(scenario) {
+  if (Object.prototype.hasOwnProperty.call(scenario, 'difficulty')) return DIFFICULTY.levels.includes(scenario.difficulty) ? scenario.difficulty : 'veteran';
+  let asked = null;
+  try { asked = globalThis.location ? new URLSearchParams(globalThis.location.search).get('difficulty') : null; } catch { asked = null; }
+  return DIFFICULTY.levels.includes(asked) ? asked : 'veteran';
+}
+/** Feed lines for colours just taken. */
+function coloursTaken(game, rows) {
+  for (const r of rows) {
+    const by = game.units.find((u) => u.id === r.byId) || null, ours = r.bySide === game.playerSide;
+    game.event(ours ? `${r.by} takes a colour: ${r.regiment} (${r.formation}).` : `Colour lost: ${r.regiment} (${r.formation}), taken by ${r.by}.`, by, 'colours');
+  }
+}
+/** A formation broken with an enemy charge on it: the charger takes the colour of the block nearest it. */
+function colourOverrun(game, u) {
+  const st = colourState.get(game);
+  if (!st || !st.colours.carries(u)) return;
+  const by = chargedBy(u, game.simTime);
+  if (!by || !by.alive || by.side === u.side || by.state === 'routing' || by.state === 'captured') return;
+  coloursTaken(game, st.colours.takeNear(u, by, game.simTime, 'overrun'));
+}
+/** Destroyed formations (no men left, not surrendered): the nearest unbroken enemy within COLOURS.radius takes their colours. */
+function colourStep(game) {
+  const st = colourState.get(game);
+  if (!st) return;
+  for (const u of game.units) {
+    if (u.alive || u.state === 'captured' || st.fallen.has(u)) continue;
+    st.fallen.add(u);
+    if (!st.colours.carries(u)) continue;
+    let by = null, bd = COLOURS.radius;
+    for (const e of game.units) {
+      if (e.side === u.side || !e.alive || e.state === 'routing' || e.state === 'captured') continue;
+      const d = Math.hypot(e.x - u.x, e.z - u.z);
+      if (d <= bd) { bd = d; by = e; }
+    }
+    if (by) coloursTaken(game, st.colours.takeAll(u, by, game.simTime, 'destroyed'));
+  }
+}
 /** The game's MountPool, made on first need with room for `figures` horses. */
 function ensureMounts(game, figures) {
   let st = cavalryState.get(game);
@@ -270,6 +324,8 @@ function commitSurrenders(game, state, before, h, contacts = null) {
     game.emit('select', game.selected);
   }
   for (const u of due) game.event(`${u.short} surrenders: ${proposed.get(u.id).men} prisoners.`, u, 'surrender');
+  const colours = colourState.get(game)?.colours;
+  if (colours) for (const u of due) coloursTaken(game, colours.takeAll(u, captors.get(u), game.simTime, 'surrender'));
   game.alert(`${due.map(u => u.short).join(', ')} surrendered.`, due[0].x, due[0].z);
 }
 
@@ -599,7 +655,10 @@ export class Game {
       } : null });
     if (state?.capture) this.combat.rallyBlocked = u => state.capture.pre.has(u);
     this.combat.setCommand((u) => commandFactor(this, u));
-    this.ai = new Ai(this, scenario.ai || {});
+    const level = difficultyFrom(scenario);
+    difficultyState.set(this, level);
+    colourState.set(this, { colours: new ColourCaptures(), fallen: new Set() });
+    this.ai = new Ai(this, scenario.ai || {}, level);
     // the defenders begin under orders to hold their ground; AI attack and reserve roles (u.def.ai, ai.js) hold
     // the same way until they activate, then the AI replaces this with move orders (a firm hold blocks nothing)
     for (const u of this.units) if (u.side !== playerSide) u.order = { type: 'hold', firm: true };
@@ -1102,7 +1161,9 @@ export class Game {
       const e = this.combat.log[this.logSeen++];
       this.event(e.text, e.unit, e.kind); // the feed shows it (or a toast with look.eventFeed off, main.js)
       if (e.kind === 'rout' && !e.forced && e.unit && e.unit.side === this.playerSide) this.alert(`${e.unit.short} is routing.`, e.unit.x, e.unit.z);
+      if (e.kind === 'rout' && !e.forced && e.unit) colourOverrun(this, e.unit);
     }
+    colourStep(this);
     if (!this.over) for (const e of this.fieldCaptures.step(this.units, h)) {
       this.storesFeat(e);
       this.event(`${e.side === this.playerSide ? 'Your troops' : 'The enemy'} ${e.previous ? 'retake' : 'capture'} ${e.name}.`,
@@ -1148,15 +1209,21 @@ export class Game {
     return out;
   }
 
+  /** Colours taken this battle (by `side` when given): [{ unitId, regiment, formation, side, byId, by, bySide, atSec, how }]. */
+  colourReport(side = null) {
+    return colourState.get(this)?.colours.report(side) ?? [];
+  }
+
   /** A line for the event feed (clock time, sentence, where). */
   event(text, unit, kind = 'info', at) {
     const p = at || (unit ? { x: unit.x, z: unit.z } : null);
     this.emit('event', { text, time: this.clockText().time, x: p ? p.x : null, z: p ? p.z : null, side: unit ? unit.side : at?.side || null, kind, unit: unit || null });
   }
 
-  /** Auto-pause (rules.autoPause): pause and tell the HUD why (it shows a banner with "Fly there"). */
+  /** Auto-pause (by difficulty: Recruit always, Veteran rules.autoPause, General never): pause and tell the HUD why (a banner with "Fly there"). */
   alert(text, x, z) {
-    if (!RULES.autoPause || this.paused) return;
+    const pause = DIFFICULTY[difficultyOf(this)].pause;
+    if (pause === 'never' || (pause === 'setting' && !RULES.autoPause) || this.paused) return;
     this.paused = true;
     this.emit('alert', { text, x, z });
   }

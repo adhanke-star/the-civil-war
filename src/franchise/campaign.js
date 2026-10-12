@@ -3,8 +3,9 @@
 // persists the v2 saves these functions return; phaseOutcome (practice.js) turns a finished field into a result.
 //
 //   validateCampaign(json)                      -> frozen canonical campaign definition
-//   newCampaign({ campaign, slot, seed, at? })  -> v2 save at index 0 with the franchise roster as its army
-//                                                  (plus any formations that join at the first phase)
+//   newCampaign({ campaign, slot, seed, at?, difficulty? }) -> v2 save at index 0 with the franchise roster as its army
+//                                                  (plus any formations that join at the first phase), at that difficulty
+//   campaignDifficulty(save)                    -> 'recruit' | 'veteran' | 'general' (absent in the save: Veteran)
 //   campaignPhase(save, campaign, { replay? })  -> the next phase (or the last one again) with its award identity
 //   applyCampaign(scenario, save, phase)        -> a NEW scenario with carried strength and franchise state applied
 //   recordPhase(save, campaign, result)         -> the next validated save (history, carry, losses, veterancy, loot)
@@ -26,15 +27,22 @@
 // recordPhase returns a share of each franchise brigade's losses to the ranks. Reward and requisition cards field without
 // their `source` (the field's equipment profile knows issue and capture only).
 //
+// Camp in battle (P5d; game rules in tuning.js CAMP.battle): every fielded franchise brigade (off loan) also carries its camp
+// card points (`training`, from its `bonus`) and, with the Pioneers upgrade, `pioneers`; one that marched out of camp short
+// of stores for this phase attempt (`ready.short`) starts with `fatigue` (shoes), fewer rounds (`ammo`, ammunition) or, a
+// battery, a slow `limber` (horses). The scenario carries the campaign's `difficulty` (src/game.js reads it). Captured
+// colours (P5d): a result may carry `colours` (phaseOutcome: the Union's, [{ unitId, regiment, side, by }]); recordPhase keeps
+// each in the save's `trophies.colours` once per formation, regiment and pack phase (a replay never adds the same colour).
+//
 // Joins: a ladder phase may carry `joins` (rows in the franchise schema): formations that enter the franchise army
 // when a save first reaches that phase (a new campaign reaching its first phase, or recordPhase advancing to it; never
 // a replay). Appending is idempotent by unitId, so a formation already in the army (alive or destroyed) is never added
 // twice. unitIds are unique across the franchise and every phase's joins; a loan phase cannot carry joins.
-import { validateSnapshot } from './save.js';
+import { validateSnapshot, colourKey, TROPHY_LIMITS } from './save.js';
 import { phaseOutcome, vetBase } from './practice.js';
 import { ARMS, UNIQUES, VETERANCY, GRADES, itemDef } from '../reward/data.js';
 import { awardPhase, upgradesOf } from './economy.js';
-import { CAMP } from './tuning.js';
+import { CAMP, DIFFICULTY } from './tuning.js';
 import { validateFeats, awardBadges, noteAward, fieldBadges, keepBadges } from './badges.js';
 
 const fail = (message) => { throw new Error(`Campaign: ${message}`); };
@@ -142,13 +150,18 @@ function withJoins(army, c, slot, through) {
 }
 
 /** A fresh v2 save: index 0, the franchise roster (and the first phase's joins) as its army, nothing in the depot. */
-export function newCampaign({ campaign, slot, seed, at } = {}) {
+export function newCampaign({ campaign, slot, seed, at, difficulty } = {}) {
   const c = validateCampaign(campaign);
   if (!c.franchise.length || !c.phases.length) fail('this campaign has no franchise roster or phases yet.');
+  if (difficulty !== undefined && !DIFFICULTY.levels.includes(difficulty)) fail('choose Recruit, Veteran or General.');
   const army = withJoins(c.franchise.map((r) => enlist(c, slot, r, 'muster', MUSTER)), c, slot, 0);
   return validateSnapshot({ format: 'the-civil-war', version: 2, kind: 'campaign', awardId: `${c.id}.${slot}.start`, army, depot: [], issued: [],
-    seed, grade: null, slot, campaign: { id: c.id, index: 0, status: 'in-progress', history: [], carry: {} }, ...(at === undefined ? {} : { updated: at }) });
+    seed, grade: null, slot, campaign: { id: c.id, index: 0, status: 'in-progress', history: [], carry: {} }, ...(at === undefined ? {} : { updated: at }),
+    ...(difficulty && difficulty !== 'veteran' ? { difficulty } : {}) });
 }
+
+/** The campaign's difficulty: 'recruit', 'veteran' or 'general' (a save without one, older saves too, is Veteran). */
+export const campaignDifficulty = (save) => (save && DIFFICULTY.levels.includes(save.difficulty) ? save.difficulty : 'veteran');
 
 /** The phase to play next (null when complete), or with { replay: true } the last finished phase again. */
 export function campaignPhase(save, campaign, { replay = false } = {}) {
@@ -195,6 +208,19 @@ export function applyCampaign(scenario, save, phase) {
     const b = army.get(d.id), delta = (d.side === 'US' ? decided : 0) + (b && has(ready, b.id) ? ready[b.id] : 0);
     return delta ? { ...d, morale: Math.max(1, Math.min(100, Math.round((Number.isFinite(d.morale) ? d.morale : CAMP.defaultMorale) + delta))) } : d;
   };
+  // Camp in battle (P5d): card points, pioneers, and the stores each brigade lacked on the march out for this attempt.
+  const short = !loan && s.ready && s.ready.awardId === phase.awardId && s.ready.short ? s.ready.short : {};
+  const pioneers = upgradesOf(s).includes('pioneers');
+  const camped = (b, artillery) => {
+    const out = {}, training = Object.fromEntries(Object.entries(b.bonus || {}).filter(([, n]) => n > 0));
+    if (Object.keys(training).length) out.training = training;
+    if (pioneers) out.pioneers = true;
+    const lacks = has(short, b.id) ? short[b.id] : [];
+    if (lacks.includes('shoes')) out.fatigue = CAMP.battle.fatigue;
+    if (lacks.includes('ammunition')) out.ammo = CAMP.battle.ammo;
+    if (artillery && lacks.includes('horses')) out.limber = CAMP.battle.limber;
+    return out;
+  };
   const field = (d) => steadied(badged(place(d)));
   const place = (d) => {
     const artillery = d.type === 'artillery';
@@ -207,7 +233,7 @@ export function applyCampaign(scenario, save, phase) {
       // The field's equipment profile knows issue and capture origins only; reward and requisition cards field without one.
       const equipment = { ...b.weapon };
       if (!['issue', 'capture'].includes(equipment.source)) delete equipment.source;
-      return { ...d, men, ...(artillery ? { guns } : {}), xp: vetIds.indexOf(b.vet) + 1, weapon: artillery ? 'smbart' : 'smooth', equipment };
+      return { ...d, men, ...(artillery ? { guns } : {}), xp: vetIds.indexOf(b.vet) + 1, weapon: artillery ? 'smbart' : 'smooth', equipment, ...camped(b, artillery) };
     }
     if (!has(carry, d.id)) return d;
     const c = carry[d.id], men = Math.min(d.men, c.men);
@@ -220,6 +246,7 @@ export function applyCampaign(scenario, save, phase) {
   if (!out.units.length) fail('no formation of this phase is left to take the field.');
   const present = new Set([...out.units, ...(out.reinforcements || [])].map((d) => d.id));
   if (Array.isArray(out.opening)) out.opening = out.opening.filter((o) => present.has(o.id));
+  out.difficulty = campaignDifficulty(s); // the campaign's level, so the page's ?difficulty= never overrides it (src/game.js)
   return out;
 }
 
@@ -229,7 +256,7 @@ export function applyCampaign(scenario, save, phase) {
  */
 export function recordPhase(save, campaign, result) {
   const c = validateCampaign(campaign), s = campaignSave(save, c);
-  shape(result, ['packId', 'phaseId', 'winner', 'grade', 'units', 'loot'], ['awardId', 'at', 'held', 'feats'], 'phase result');
+  shape(result, ['packId', 'phaseId', 'winner', 'grade', 'units', 'loot'], ['awardId', 'at', 'held', 'feats', 'colours'], 'phase result');
   if (has(result, 'held') && typeof result.held !== 'boolean') fail('held must be true or false when present.');
   const history = s.campaign.history, last = history[history.length - 1];
   if (has(result, 'awardId') && last && result.awardId === s.awardId && last.awardId === s.awardId && same(last, result.packId, result.phaseId)) return s;
@@ -259,6 +286,14 @@ export function recordPhase(save, campaign, result) {
   try { if (has(result, 'feats')) feats = validateFeats(result.feats, units); }
   catch (err) { fail(String(err.message).replace(/^Badges: /, '')); }
   if (!Array.isArray(result.loot) || result.loot.some((it) => !it || typeof it.uid !== 'string' || !it.uid.startsWith(`${awardId}.`))) fail('loot does not belong to this award.');
+  // Captured colours (P5d): each names a formation of this result; kept once per formation, regiment and pack phase.
+  const colours = has(result, 'colours') ? result.colours : [];
+  if (!Array.isArray(colours) || colours.length > CAMPAIGN_LIMITS.units * 8) fail('invalid captured colours.');
+  const taken = colours.map((r) => {
+    shape(r, ['unitId', 'regiment', 'side', 'by'], [], 'captured colour');
+    if (!ids.has(r.unitId) || !['US', 'CS'].includes(r.side) || units.find((u) => u.id === r.unitId).side !== r.side) fail('a captured colour does not match its formation.');
+    return { regiment: words(r.regiment, 'colour regiment'), side: r.side, unitId: r.unitId, packId: entry.packId, phaseId: entry.phaseId, awardId, by: words(r.by, 'colour captor') };
+  });
   const army = new Map(s.army.filter((b) => has(b, 'unitId')).map((b) => [b.unitId, b]));
   // Historical carry lives inside one battle; a new pack starts from the authored roster.
   const carry = last && last.packId === entry.packId ? { ...s.campaign.carry } : {};
@@ -294,6 +329,11 @@ export function recordPhase(save, campaign, result) {
       history: [...history, { packId: entry.packId, phaseId: entry.phaseId, awardId, winner: result.winner, grade: result.grade,
         lossesUS: losses.US, lossesCS: losses.CS, replay }], carry },
     ...(has(result, 'at') ? { updated: result.at } : {}) };
+  if (taken.length) {
+    const kept = [...(s.trophies?.colours || [])], seen = new Set(kept.map(colourKey));
+    for (const r of taken) if (!seen.has(colourKey(r)) && kept.length < TROPHY_LIMITS.colours) { seen.add(colourKey(r)); kept.push(r); }
+    if (kept.length) draft.trophies = { colours: kept };
+  }
   // Badges for this award (every brigade re-fitted to its slots too); then the whole save is validated.
   const badges = awardBadges(draft, { awardId, feats, loan });
   const next = validateSnapshot(badges.save);
@@ -308,7 +348,8 @@ export function phaseResult({ phase, game, scenario }) {
   const outcome = phaseOutcome({ game, scenario, awardId: phase.awardId, seed: phase.seed });
   return { outcome, record: { packId: phase.packId, phaseId: phase.phaseId, awardId: phase.awardId, winner: outcome.winner,
     grade: outcome.grade, held: outcome.held === true, units: outcome.units.map((u) => ({ ...u })), loot: outcome.cards.map((c) => ({ ...c })),
-    ...(outcome.feats ? { feats: Object.fromEntries(Object.entries(outcome.feats).map(([id, f]) => [id, { ...f }])) } : {}) } };
+    ...(outcome.feats ? { feats: Object.fromEntries(Object.entries(outcome.feats).map(([id, f]) => [id, { ...f }])) } : {}),
+    ...(outcome.colours?.length ? { colours: outcome.colours.map((r) => ({ unitId: r.unitId, regiment: r.regiment, side: r.side, by: r.by })) } : {}) } };
 }
 
 /**

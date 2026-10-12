@@ -14,6 +14,9 @@
 // Badges (src/franchise/badges.js): the card shows the selected formation's badges from its definition (shape, tier
 // letter and name in each emblem's label; the camp's emblems, styled in src/reward/reward.css). An X-Factor brigade's card
 // and flag carry a warm glow (has-xfactor); its moment in battle arrives through showMoment (src/fx/effects.js).
+// Camp (P5d): the card's camp line (#uc-camp, under the command line) names what reached this battle from camp (camp training,
+// a shortage of shoes, ammunition or horses, pioneers; badges.js campEffectLines on its definition), with the rounds it has
+// now when it started short, labelled game rules; hidden for a formation without any.
 // Settings (src/ui/settings-panel.js): the strip's Settings button, "All settings" in the menu and the O key
 // (src/ui/input.js) open the panel (quality, volumes, gore, X-Factor effects); the help sheet lists the key.
 // Portraits (P6b, src/ui/art.js): the unit card shows the commander's period portrait when one is sourced for exactly his
@@ -26,7 +29,7 @@ import * as THREE from 'three';
 import { LOOK } from './look.js';
 import { on as onSetting } from '../settings.js';
 import { Minimap } from './minimap.js';
-import { BADGE_BY_ID, TIER_NAMES } from '../franchise/badges.js';
+import { BADGE_BY_ID, TIER_NAMES, campEffectLines } from '../franchise/badges.js';
 import { openSettings } from './settings-panel.js';
 import { loadArt, portraitArt, genericPortrait, portraitLine } from './art.js';
 
@@ -712,6 +715,14 @@ export class Hud {
     }
     const mount = $('uc-mount');
     if (mount) { const text = mountText(u); if (mount.textContent !== text) mount.textContent = text; }
+    let camp = $('uc-camp');
+    if (!camp && line) { camp = document.createElement('p'); camp.id = 'uc-camp'; camp.className = 'uccommand ucamp'; camp.hidden = true; line.after(camp); }
+    if (camp) {
+      const lines = campEffectLines(u.def);
+      const text = lines.length ? `${lines.join(' · ')}${Number.isFinite(u.def?.ammo) ? ` · rounds now ${Math.round(u.ammo)}%` : ''} (game rules)` : '';
+      if (camp.textContent !== text) camp.textContent = text;
+      camp.hidden = !text;
+    }
     $('uc-state').textContent = `${intention(u).replace(/^[^:]*: /, '')}${u.coverKind && u.coverKind !== 'open' ? ` In ${u.coverKind}.` : ''}`;
   }
 

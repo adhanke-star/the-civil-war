@@ -3,7 +3,7 @@
 import { ARMS, PRACTICE_ARMS, UNIQUES, VETERANCY, GRADES, CONDITIONS, itemDef } from '../reward/data.js';
 import { ratings, canCarry, equip } from '../reward/model.js';
 import { BADGE_BY_ID, TIERS, slotsFor, BARS } from './badges.js';
-import { CAMP } from './tuning.js';
+import { CAMP, DIFFICULTY } from './tuning.js';
 
 export const SAVE_KEY = 'cw.progress';
 export const PROGRESS_DB = 'cw.progress';
@@ -278,7 +278,8 @@ function enemyRecord(v) {
  *   decisions  [{ awardId, packId, phaseId, cardId, optionId, replay, effects }]  decision cards chosen, once per card and
  *              phase attempt (awardId is the attempt's award identity); effects copy the chosen option's game rules:
  *              { kind: 'rp', amount } | { kind: 'morale', amount } | { kind: 'store', store, amount }
- *   ready      { awardId, morale: { [brigadeId]: delta } }   the camp the army marched out of for that phase attempt
+ *   ready      { awardId, morale: { [brigadeId]: delta }, short?: { [brigadeId]: [store] } }   the camp the army marched out
+ *              of for that phase attempt; `short` (P5d) lists the stores each brigade lacked (they follow it into battle)
  * Brigades may carry `order` ('rest' | 'drill' | 'target'), `drilled` (drills carried out), `bonus` ({ fire, melee, morale,
  * drill }: card-bar points gained in camp, already added to `base`) and `extraSlot` (true: one bought badge slot).
  */
@@ -320,14 +321,52 @@ function decisionsRecord(v) {
   });
 }
 function readyRecord(v, brigadeIds) {
-  shape(plain(v, 'camp readiness'), ['awardId', 'morale']);
+  shape(plain(v, 'camp readiness'), ['awardId', 'morale'], ['short']);
   const morale = {};
   for (const key of Object.keys(plain(v.morale, 'camp morale')).sort()) {
     if (!brigadeIds.has(key)) bad('camp morale names a brigade that is not in the army.');
     morale[key] = signed(v.morale[key], 'camp morale');
     if (Math.abs(morale[key]) > CAMP_LIMITS.morale) bad('invalid camp morale.');
   }
-  return { awardId: id(v.awardId, 'camp phase identity'), morale };
+  const out = { awardId: id(v.awardId, 'camp phase identity'), morale };
+  if (has(v, 'short')) {
+    const keys = Object.keys(plain(v.short, 'camp shortages')).sort(), short = {};
+    if (!keys.length) bad('invalid camp shortages.');
+    for (const key of keys) {
+      if (!brigadeIds.has(key)) bad('camp shortages name a brigade that is not in the army.');
+      const lacks = list(v.short[key], 'camp shortages', 1, CAMP.stores.length);
+      if (lacks.some((k) => !CAMP.stores.includes(k) || k === 'wagons') || new Set(lacks).size !== lacks.length) bad('invalid camp shortages.');
+      short[key] = CAMP.stores.filter((k) => lacks.includes(k));
+    }
+    out.short = short;
+  }
+  return out;
+}
+
+/**
+ * v2 difficulty and trophies (P5d). `difficulty` is the campaign's level (src/franchise/tuning.js DIFFICULTY), chosen when it
+ * starts: 'recruit' or 'general' are stored; Veteran is the default and is never stored, so older saves load as Veteran.
+ * `trophies` { colours: [{ regiment, side, unitId, packId, phaseId, awardId, by }] }: regiment colours the army took (the
+ * regiment's side, its formation's field id, the phase and recorded award, and the brigade that took it), at most once per
+ * formation, regiment and pack phase (src/franchise/campaign.js recordPhase appends them).
+ */
+export const HOOK_FIELDS = Object.freeze(['difficulty', 'trophies']);
+export const TROPHY_LIMITS = Object.freeze({ colours: 1000 });
+export const colourKey = (r) => `${r.packId}|${r.phaseId}|${r.unitId}|${r.regiment}`;
+function trophiesRecord(v, awards) {
+  shape(plain(v, 'trophies'), ['colours']);
+  const seen = new Set();
+  const colours = list(v.colours, 'captured colours', 1, TROPHY_LIMITS.colours).map((r) => {
+    shape(plain(r, 'captured colour'), ['regiment', 'side', 'unitId', 'packId', 'phaseId', 'awardId', 'by']);
+    if (!['US', 'CS'].includes(r.side)) bad('invalid captured colour side.');
+    const row = { regiment: word(r.regiment, 'colour regiment'), side: r.side, unitId: id(r.unitId, 'colour formation identity'),
+      packId: id(r.packId, 'pack identity'), phaseId: id(r.phaseId, 'phase identity'), awardId: id(r.awardId, 'colour award identity'), by: word(r.by, 'colour captor') };
+    if (!awards.has(row.awardId)) bad('a captured colour must belong to a recorded phase.');
+    if (seen.has(colourKey(row))) bad('a captured colour was recorded twice.');
+    seen.add(colourKey(row));
+    return row;
+  });
+  return { colours };
 }
 /** A brigade's camp fields (v2), in canonical order; {} when it has none. */
 function brigadeCamp(b) {
@@ -346,7 +385,7 @@ function brigadeCamp(b) {
 export function validateSnapshot(v) {
   // Version 2 is only the campaign kind; any other version-2 record is an unsupported version.
   const v2 = !!v && typeof v === 'object' && v.version === 2 && v.kind === 'campaign';
-  if (v2) shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade', 'slot', 'campaign'], ['updated', 'enemy', ...ECONOMY_FIELDS, ...CAMP_FIELDS]);
+  if (v2) shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade', 'slot', 'campaign'], ['updated', 'enemy', ...ECONOMY_FIELDS, ...CAMP_FIELDS, ...HOOK_FIELDS]);
   else shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade']);
   if (v.format !== 'the-civil-war' || (!v2 && (v.version !== 1 || v.kind !== 'completed-reward'))) bad('unsupported save format or version.');
   const awardId = id(v.awardId, 'completed award identity');
@@ -418,6 +457,11 @@ export function validateSnapshot(v) {
     : { format: 'the-civil-war', version: 1, kind: 'completed-reward', awardId, army, depot, issued, seed, grade: v.grade };
   if (v2 && has(v, 'enemy')) out.enemy = enemyRecord(v.enemy);
   if (v2) campRecord(v, out, economy, brigadeIds);
+  if (v2 && has(v, 'difficulty')) {
+    if (!DIFFICULTY.levels.includes(v.difficulty)) bad('unknown difficulty.');
+    if (v.difficulty !== 'veteran') out.difficulty = v.difficulty;
+  }
+  if (v2 && has(v, 'trophies')) out.trophies = trophiesRecord(v.trophies, new Set(campaign.history.map((r) => r.awardId)));
   if (v2 && has(v, 'updated')) {
     if (typeof v.updated !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(v.updated)) bad('invalid update time.');
     out.updated = v.updated;

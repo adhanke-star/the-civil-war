@@ -49,6 +49,8 @@
 // `node tools/test.mjs --badges` runs the badges and X-Factor screens only (tools/test-badges-ui.mjs, also in shard 2): the badge
 // stamped in the after-action, the X-Factor moment once, the camp card emblem and its real example with sources, the keep
 // choice by keyboard, axe and 320 px.
+// `node tools/test.mjs --hooks` runs the difficulty, camp-effects and captured-colours UI only (tools/test-hooks-ui.mjs,
+// also in shard 3).
 // `node tools/test.mjs --art` runs the card art, portraits and living title/camp checks only (tools/test-art-ui.mjs, also
 // in shard 2).
 // `node tools/test.mjs --audio` runs the sound, Settings panel, gore and feed-readability checks only
@@ -1789,6 +1791,7 @@ async function browserChecks(server, url) {
     // Imported on demand: its CPU half imports game modules that define settings, which would skew settingsUnit.
     if (process.argv.includes('--campaign')) { result.mode = 'campaign screens and flow'; const { campaignControls } = await import('./test-campaign-ui.mjs'); await campaignControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--badges')) { result.mode = 'badges and X-Factor'; const { badgesControls } = await import('./test-badges-ui.mjs'); await badgesControls({ browser, url, check, shot, result, watchErrors }); return; }
+    if (process.argv.includes('--hooks')) { result.mode = 'difficulty, camp effects in battle and captured colours'; const { hooksControls } = await import('./test-hooks-ui.mjs'); await hooksControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--art')) { result.mode = 'card art, portraits and backdrops'; const { artControls } = await import('./test-art-ui.mjs'); await artControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--audio')) { result.mode = 'sound, settings, gore and feed'; const { audioControls } = await import('./test-audio-ui.mjs'); await audioControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--history')) { result.mode = 'after-action history, replay, record book and ending'; const { historyControls } = await import('./test-history-ui.mjs'); await historyControls({ browser, url, check, shot, result, watchErrors }); return; }
@@ -1854,6 +1857,8 @@ async function browserChecks(server, url) {
       await delegationControls({ browser, url, check, shot, result, watchErrors });
       const { ordersControls } = await import('./test-orders-ui.mjs');
       await ordersControls({ browser, url, check, shot, result, watchErrors });
+      const { hooksControls } = await import('./test-hooks-ui.mjs');
+      await hooksControls({ browser, url, check, shot, result, watchErrors });
     }
     // Shard 4: commanders and regiments, cavalry, then every shipped battle-pack phase on its own terrain.
     if (runs(4)) {

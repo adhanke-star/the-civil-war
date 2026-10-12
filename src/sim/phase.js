@@ -4,6 +4,7 @@ import { DEPLOYMENT_LIMITS } from '../franchise/practice.js';
 import { FieldCaptures } from '../franchise/captures.js';
 import { VETERANCY } from '../reward/data.js';
 import { CLOCK_RATIO, CAVALRY_WEAPONS } from './combat.js';
+import { DIFFICULTY } from '../franchise/tuning.js';
 
 export const PHASE_LIMITS = Object.freeze({ bytes: 1024 * 1024, depth: 32 });
 const fail = message => { throw new Error('Phase: ' + message); };
@@ -78,6 +79,21 @@ function battleFields(value) {
   if (own(value, 'season') && !['summer', 'spring', 'autumn', 'winter'].includes(value.season)) fail('season is unsupported.');
   if (own(value, 'menPerFigure')) phaseMenPerFigure(value);
   if (own(value, 'history')) phaseHistory(value.history);
+  // Optional difficulty (src/franchise/tuning.js DIFFICULTY; a campaign phase carries its save's): AI timing and auto-pause only.
+  if (own(value, 'difficulty') && !DIFFICULTY.levels.includes(value.difficulty)) fail('difficulty must be recruit, veteran or general.');
+}
+// Optional camp effects on a formation (P5d; src/franchise/campaign.js applyCampaign writes them; game rules in
+// src/franchise/tuning.js CAMP.battle; src/units/unit.js and src/sim/combat.js apply them): starting `fatigue` and `ammo`
+// (0-100), a battery's extra `limber` seconds (0-60), `pioneers` (true) and `training` (camp card-bar points, whole 0-50).
+const CAMP_UNIT_KEYS = ['fatigue', 'ammo', 'limber', 'pioneers', 'training'];
+const TRAINING_KEYS = ['fire', 'melee', 'morale', 'drill'];
+function campFields(unit) {
+  const pct = key => !own(unit, key) || (finite(unit[key]) && unit[key] >= 0 && unit[key] <= 100);
+  if (!pct('fatigue') || !pct('ammo')) fail('unit starting fatigue and rounds must be from 0 to 100.');
+  if (own(unit, 'limber') && (unit.type !== 'artillery' || !finite(unit.limber) || unit.limber < 0 || unit.limber > 60)) fail('only a battery limbers slowly, by 0 to 60 seconds.');
+  if (own(unit, 'pioneers') && unit.pioneers !== true) fail('unit pioneers must be true when present.');
+  if (own(unit, 'training') && (!record(unit.training) || !Object.keys(unit.training).length || Object.keys(unit.training).some(key => !TRAINING_KEYS.includes(key)
+    || !Number.isSafeInteger(unit.training[key]) || unit.training[key] < 0 || unit.training[key] > 50))) fail('unit training must be camp card-bar points (fire, melee, morale, drill) from 0 to 50.');
 }
 // Optional scenario.history (the after-action's "what really happened" and "you vs history"): 1-3 outcome paragraphs,
 // the historical casualties (null, a whole number or a [low, high] range per side, with the basis and a provenance word),
@@ -176,6 +192,7 @@ function scenario(value) {
     if (!['x', 'z', 'facing', 'men'].every(key => finite(unit[key])) || unit.men <= 0) fail('unit geometry and positive strength must be finite.');
     if (own(unit, 'guns') && (!Number.isInteger(unit.guns) || unit.guns < 0)) fail('gun count must be a nonnegative integer.');
     if (own(unit, 'ai')) unitAi(unit.ai, value);
+    if (CAMP_UNIT_KEYS.some(key => own(unit, key))) campFields(unit);
     if (own(unit, 'regimentMen') && (!Array.isArray(unit.regimentMen) || !Array.isArray(unit.regiments) || unit.regimentMen.length !== unit.regiments.length
       || !unit.regimentMen.every(n => Number.isSafeInteger(n) && n > 0))) fail('regiment men must be positive integers, one per regiment.');
     if (own(unit, 'commander') && record(unit.commander) && own(unit.commander, 'successor')) successor(unit.commander.successor);

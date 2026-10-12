@@ -64,7 +64,8 @@ export const BADGE_RULES = Object.freeze({
 // src/franchise/camp-orders.js, economy.js, decisions.js, campaign.js and save.js). Every number is a GAME RULE. Stores are
 // whole units: one "ammunition" or "rations" is what one brigade draws for one phase at `use`; shoes, blankets and tents wear
 // out at `use` per fielded brigade per phase; batteries also wear out `use.horses` horses. Morale effects reach the battle
-// through the field definition's `morale` (src/units/unit.js reads it; 78 when a definition has none).
+// through the field definition's `morale` (src/units/unit.js reads it; 78 when a definition has none); the other camp
+// effects through `battle` below.
 export const CAMP = Object.freeze({
   defaultMorale: 78, // src/units/unit.js: a formation's morale when its definition sets none
   stores: Object.freeze(['ammunition', 'rations', 'shoes', 'blankets', 'tents', 'horses', 'wagons']),
@@ -96,6 +97,42 @@ export const CAMP = Object.freeze({
     wagons: Object.freeze({ price: 60, level: 2, cards: 30 }), // +30 depot cards
     ambulances: Object.freeze({ price: 120, level: 3, returned: 0.1 }), // a tenth of each phase's franchise losses return to the ranks
     ordnance: Object.freeze({ price: 120, level: 4, factor: 0.75 }), // ammunition drawn and spent on target practice x 0.75 (rounded up)
-    pioneers: Object.freeze({ price: 90, level: 3 }), // faster crossings: pending an engine hook (no battle effect yet)
+    pioneers: Object.freeze({ price: 90, level: 3, woods: 0.8 }), // fielded franchise brigades and batteries march through woods at x0.8 (x0.7 without)
+  }),
+  // Camp effects in battle (P5d): src/franchise/campaign.js applyCampaign writes them on the field definition (`training`,
+  // `fatigue`, `ammo`, `limber`, `pioneers`; src/sim/phase.js validates them); src/units/unit.js and src/sim/combat.js apply
+  // them. A definition without them fights exactly as before.
+  battle: Object.freeze({
+    perPoint: 1, // % per camp card-bar point (camp orders and bought training): Fire -> fire effect, Drill -> reload and wheeling
+    //              speed, Melee -> melee strength, Morale -> morale lost under fire (a bar's camp points are capped by barCap)
+    fatigue: 30, // starting fatigue (of 100) for a brigade short of shoes (fatigue slows the march and the fire; rest recovers it)
+    ammo: 50, // starting rounds (% of a full box) for a brigade short of ammunition (resupply out of contact refills it slowly)
+    limber: 6, // extra sim seconds a battery short of horses takes to limber up before it moves and to unlimber after it halts
   }),
 });
+
+// Difficulty (DESIGN §1 Difficulty: "smarter, faster AI and no auto-pause; never hidden stat bonuses"). Read by src/sim/ai.js and
+// src/game.js; chosen for a campaign when it starts (saved; absent = Veteran) and on the Battles list. Every level fights with
+// identical combat numbers: only the AI's timing and decisions and the auto-pause change. Game rules, not history.
+//   pause     'always': pause on a rout, an arrival or a threatened objective whatever the Auto-pause setting; 'setting': the
+//             Auto-pause setting (rules.autoPause) decides; 'never': no auto-pause
+//   interval  sim seconds between AI passes (reaction time); reissue: sim s before a march stopped short is ordered again
+//   reserve   'set': a reserve commits only at its set time (`at`, else `reserveShare` of the day's window), never earlier on a
+//             threat; 'threat': today's triggers (its time, an enemy within reserveReach, the objective lost)
+//   threat    a committed reserve marches to the threatened objective (contested or lost) instead of its own target
+//   counter   { reach, range }: a breakthrough is an enemy formation inside the objective or within `reach` m of a routing
+//             friend; a steady holding infantry brigade within `range` m of it attacks it (fire, never a charge); null: none
+export const DIFFICULTY = Object.freeze({
+  levels: Object.freeze(['recruit', 'veteran', 'general']),
+  names: Object.freeze({ recruit: 'Recruit', veteran: 'Veteran', general: 'General' }),
+  recruit: Object.freeze({ pause: 'always', interval: 1, reissue: 12, reserve: 'set', reserveShare: 0.5, reserveReach: 350, threat: false, counter: null }),
+  veteran: Object.freeze({ pause: 'setting', interval: 0.5, reissue: 8, reserve: 'threat', reserveShare: 0, reserveReach: 350, threat: false, counter: null }),
+  general: Object.freeze({ pause: 'never', interval: 0.25, reissue: 4, reserve: 'threat', reserveShare: 0, reserveReach: 525, threat: true,
+    counter: Object.freeze({ reach: 200, range: 400 }) }),
+});
+
+// Captured colours (DESIGN §3 Stores "colours and trophies (trophy shelf)"; src/franchise/captures.js ColourCaptures, src/game.js).
+// Each named regiment of an infantry or cavalry formation carries one colour. It is taken (once, no dice) when its formation
+// surrenders (by the captor), is destroyed (by the nearest unbroken enemy formation within `radius` m) or is broken while an
+// enemy charge is on it (by the charger: the colour of the regiment block nearest the charger). Game rules, not history.
+export const COLOURS = Object.freeze({ radius: 150 });

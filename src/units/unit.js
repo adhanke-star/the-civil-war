@@ -30,6 +30,13 @@
 //
 // Feat statistics (src/sim/combat.js featsOf; DESIGN.md §3 Badges): move() adds the metres marched under orders.
 //
+// Camp effects (P5d; game rules in src/franchise/tuning.js CAMP.battle, written by src/franchise/campaign.js applyCampaign,
+// validated by src/sim/phase.js): the definition's `fatigue` and `ammo` are the starting fatigue (0-100; a brigade short of
+// shoes) and rounds (0-100; short of ammunition); `training` (camp card-bar points), `limber` and `pioneers` go to
+// combat.js setCampEffects. move() reads them back: pioneers march through woods at CAMP.upgrades.pioneers.woods (x0.7
+// without), a battery short of horses stands `limber` sim seconds hitching up before each march moves off, and camp Drill
+// points wheel the line faster. A definition without them moves exactly as before.
+//
 // Orders (set by game.js): move (march to the mark; may halt on the way to fight, see pauseMarch), attack
 // (close on a target to effective range and fire; the game steers it), charge, fallback, hold. holdFire is a
 // standing flag on the unit, not an order: it survives new orders until toggled off.
@@ -49,7 +56,7 @@ import { framePos } from './figure.js';
 import { BAKE_CLIP } from './impostor.js';
 import { mulberry32 } from '../world/landscape.js';
 import { RULES } from '../sim/rules.js';
-import { CAVALRY, SCREENED, defaultWeapon, featsOf } from '../sim/combat.js';
+import { CAVALRY, SCREENED, defaultWeapon, featsOf, setCampEffects, campFx } from '../sim/combat.js';
 import { LOOK } from '../ui/look.js';
 import { equipmentProfile } from '../sim/equipment.js';
 import { define, on as onSetting } from '../settings.js';
@@ -185,8 +192,9 @@ export class Unit {
     this.men = def.men;
     this.morale = def.morale ?? 78;
     this.moraleMax = this.morale;
-    this.fatigue = 0;
-    this.ammo = 100;
+    // camp effects (P5d): a brigade short of shoes starts tired, one short of ammunition with fewer rounds (0 and 100 without)
+    this.fatigue = Number.isFinite(def.fatigue) ? Math.max(0, Math.min(100, def.fatigue)) : 0;
+    this.ammo = Number.isFinite(def.ammo) ? Math.max(0, Math.min(100, def.ammo)) : 100;
     this.reload = 1; // 1 = loaded
     this.cover = 1;
     this.state = 'steady'; // steady | shaken | wavering | routing
@@ -215,6 +223,7 @@ export class Unit {
     this.lastShooter = null;
     this.lastShotT = -99;
     this.formation = 'line';
+    setCampEffects(this, def); // camp training, a battery's slow limbering, pioneers (combat.js; nothing without them)
     this.rnd = mulberry32(seed);
     if (this.type === 'cavalry') {
       this.mounted = true;
@@ -760,13 +769,21 @@ export class Unit {
     else if (this.switching) speed = 0; // dismounting or remounting: the regiment stands
     if (this.state === 'wavering' && o.type !== 'fallback') speed *= 0.5;
     speed *= 1 - 0.4 * (this.fatigue / 100);
+    // camp effects (P5d; combat.js setCampEffects): pioneers in woods, a battery short of horses hitching up, Drill wheeling
+    const cf = campFx(this);
     // ground: woods slow the line, slopes too
     const slope = this.terrain.slopeAt(this.x, this.z);
     speed *= Math.max(0.55, 1 - slope * 0.8);
-    if (this.inWoods) speed *= horse ? CAVALRY.woods : 0.7;
+    if (this.inWoods) speed *= horse ? CAVALRY.woods : cf && cf.woods ? cf.woods : 0.7;
     if (this.formation === 'column') speed *= 1.1; // a road column keeps a better pace than a line over fields
     if (SCREENED.has(this)) speed *= CAVALRY.screenSlow; // skirmishing enemy horsemen slow the march
     speed *= RULES.marchSpeed;
+    if (cf && cf.limber) {
+      // short of horses: the battery stands cf.limber sim seconds limbering up before each march moves off
+      if (this.follow.active && this.state !== 'routing') {
+        if (cf.hitch < cf.limber) { cf.hitch += dt; speed = 0; v.velocity.set(0, 0, 0); }
+      } else cf.hitch = 0;
+    }
     v.maxSpeed = speed;
 
     if (this.state === 'routing') {
@@ -812,11 +829,13 @@ export class Unit {
           else if (o.type !== 'charge') this.order = { type: 'hold' };
         }
       }
-      const turn = TURN_RATE * (o.type === 'charge' ? 1.6 : this.formation === 'column' ? 2.5 : 1) * dt;
+      let turn = TURN_RATE * (o.type === 'charge' ? 1.6 : this.formation === 'column' ? 2.5 : 1) * dt;
+      if (cf && cf.reload) turn *= 1 + cf.reload; // camp Drill: the line wheels faster
       this.facing += Math.max(-turn, Math.min(turn, wrap(this.goalFacing - this.facing)));
     } else {
       v.velocity.set(0, 0, 0);
-      const turn = TURN_RATE * dt;
+      let turn = TURN_RATE * dt;
+      if (cf && cf.reload) turn *= 1 + cf.reload;
       this.facing += Math.max(-turn, Math.min(turn, wrap(this.goalFacing - this.facing)));
     }
     // keep inside the mapped ground
