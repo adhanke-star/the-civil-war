@@ -87,10 +87,16 @@ export async function traitsControls({ browser, url, check, shot, result, watchE
     const dialogAxe = await axe('#traits-dialog', 'traitsDialogAxe');
     check('traits-dialog-axe', !dialogAxe, dialogAxe || '0 serious/critical in the Records dialog');
     await shot(page, 'traits-dialog');
+    // record every change of game.paused from here on, with where it came from (CI diagnosis)
+    await page.evaluate(() => {
+      const g = window.__game.game; let v = g.paused; window.__pauseLog = [];
+      Object.defineProperty(g, 'paused', { configurable: true, get: () => v,
+        set: (x) => { if (x !== v) window.__pauseLog.push(`${x} ${(new Error().stack || '').split('\n').slice(2, 5).map((l) => l.trim()).join(' < ')}`); v = x; } });
+    });
     await page.keyboard.press('Escape');
     await page.waitForFunction(() => !document.getElementById('traits-dialog')?.open, null, { timeout: 10000 });
-    const closed = await page.evaluate(() => ({ focus: document.activeElement?.id, paused: window.__game.game.paused }));
-    check('traits-dialog-close', closed.focus === 'uc-traits-more' && closed.paused === false, `after Escape: focus ${closed.focus}, paused ${closed.paused}`);
+    const closed = await page.evaluate(() => ({ focus: document.activeElement?.id, paused: window.__game.game.paused, log: window.__pauseLog }));
+    check('traits-dialog-close', closed.focus === 'uc-traits-more' && closed.paused === false, `after Escape: focus ${closed.focus}, paused ${closed.paused}; changes ${JSON.stringify(closed.log)}`);
 
     // 320 px: the card and the dialog fit
     await page.evaluate(() => { const { game } = window.__game; if (!game.paused) game.togglePause(); });
