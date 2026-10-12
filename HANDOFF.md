@@ -20,7 +20,7 @@ fresh canonical251/365/144/159/201/6x3 clean. ef17689 autoCI38305892063 also ind
 Pages38316968306 success/live cw-v67 verified; automatic mainCI38316968182 pending (probes/smoke
 green; four shards/campaign pending). This docs-only relay is not accepted by its source parent's CI.
 MAIN13a7b136/indexEMPTY/exact11 protected paths unchanged; owned branch clean after relay push.
-COORDINATION absent; .out294,464,069B before packet, below300M; preserve every receipt.
+COORDINATION absent; .out294,464,117B before packet, below300M; preserve every receipt.
 Resume: git fetch origin/status/rev-parse/worktrees, read existing38317432412 and38316968182;
 full exact source readback/repair actual red first. Never cancel/duplicate/rerun for luck.
 Only accepted exact SOURCE integrates main, then newmainCI/Pages/liveSW; protected localMAIN untouched.
