@@ -114,7 +114,13 @@ export async function artControls({ browser, url, check, shot, result, watchErro
         hud: { setPaused() {}, playerSide: 'US' }, effects: null, onBegin() {} });
       if (battle) battle.id = 'battle';
     });
-    await page.waitForFunction(imagesLoaded, '#briefing .briefing-commanders img', { timeout: 15000 });
+    await page.waitForFunction(imagesLoaded, '#briefing .briefing-commanders img', { timeout: 15000 }).catch(async (e) => {
+      // say what the briefing holds when its portraits never finish (CI diagnosis)
+      const why = await page.evaluate(() => ({ briefings: document.querySelectorAll('#briefing').length,
+        section: !!document.querySelector('#briefing .briefing-commanders'), hidden: document.querySelector('#briefing .briefing-commanders')?.hidden ?? null,
+        imgs: [...document.querySelectorAll('#briefing .briefing-commanders img')].map((i) => [i.getAttribute('src'), i.complete, i.naturalWidth]) }));
+      throw new Error(`briefing portraits never loaded: ${JSON.stringify(why)} (${e.message.split('\n')[0]})`);
+    });
     const brief = await page.evaluate(() => ({ rows: [...document.querySelectorAll('#briefing .briefing-commander')].map((li) => [li.dataset.commander, li.className]),
       first: document.querySelector('#briefing .briefing-commander-name')?.textContent, focus: document.activeElement?.id }));
     check('art-briefing-commanders', brief.rows[0]?.[0] === 'Everett Peabody' && brief.rows[0][1].includes('is-sourced') && brief.first === 'Col. Everett Peabody'
