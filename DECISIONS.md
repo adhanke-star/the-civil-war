@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0145 — Observe the actual transient badge DOM before its native timer removes it (Astra, 2026-10-12)
+
+Preserve failed249b7af CI38278399491/test2: only badges-aar-xfactor failed, because persistent stamped rows/log let the wait succeed after the actual2400ms reduced-motion banner vanished. Test-only owned MutationObserver installed before each mount captures the connected banner in insertion callback, its badge/style/pointer-events/ARIA/focus/button hit-test/copied log/stamped rows/time, then native removal and once-only log. Same observation in full-motion branch; unchanged assertions plus actual connected/removal requirements. Disconnect in finally; keep native timers/motion/product/goldens unchanged. After-action PNGs are not labelled transient visibility proof. Existing badge15+15mutants green; actual browser/fullCI still pending.
+
 ## 0144 — Distinguish earned reputation from pending card delivery (Astra, 2026-10-12)
 
 Actual fb8733d camp at570 reputation/L5/full depot showed a next threshold already exceeded. Pending copy now says rewards earned through level8, preserving saved level, raw reputation, points and capacity reason; progress label identifies level6 delivery pending and value text states three pending rewards. Ordinary next-threshold copy remains when delivery is complete; numeric ARIA stays clamped. Browser assertion binds actual copy/ARIA/320px/axe; sw66. No economy/storage changes. fb8733d CI38277578796 all9green; actual playthrough201/201/errors0/530 reputation/L8/receipts2..8 strictly validated; remote main fast-forwarded fb8733d.

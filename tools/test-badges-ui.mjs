@@ -39,6 +39,29 @@ function stampSummary() {
   return { summary: badges.badgeAward(after.awardId), army: after.army };
 }
 
+/** Capture the real transient DOM in its insertion microtask, before native removal can race a later protocol call. */
+function observeMoment(){
+  window.__badgeMomentObserver?.disconnect();window.__badgeMomentObservation=null;
+  let seen=null;
+  const observer=new MutationObserver(records=>{
+    for(const record of records)for(const added of record.addedNodes){
+      const m=added.nodeType===1&&(added.matches('.rw-xfactor-moment')?added:added.querySelector('.rw-xfactor-moment'));
+      if(!m||!m.isConnected||seen)continue;
+      seen=m;const button=document.querySelector('.rw-aar .rw-primary');button.scrollIntoView({block:'center'});
+      const b=button.getBoundingClientRect(),hit=document.elementFromPoint(b.left+b.width/2,b.top+b.height/2);
+      window.__badgeMomentObservation={connected:m.isConnected,badge:m.dataset.badge,style:m.dataset.style,events:getComputedStyle(m).pointerEvents,
+        hidden:m.getAttribute('aria-hidden'),log:[...(window.__xfactors??[])],focus:document.activeElement?.id,clickable:!!hit?.closest('.rw-primary'),insertedAt:performance.now(),
+        rows:[...document.querySelectorAll('.rw-badge-row')].map(r=>[r.dataset.badge,r.dataset.tier,r.querySelector('.rw-badge-text')?.textContent]),
+        stamped:document.querySelectorAll('.rw-badge-row.is-stamped').length,enemy:document.querySelector('.rw-badge-enemy')?.textContent??'',tag:document.querySelector('.rw-badges .rw-rule-tag')?.textContent,
+        removedAt:null,removalLog:null};
+    }
+    if(seen&&!seen.isConnected&&window.__badgeMomentObservation.removedAt===null){
+      window.__badgeMomentObservation.removedAt=performance.now();window.__badgeMomentObservation.removalLog=[...(window.__xfactors??[])];
+    }
+  });observer.observe(document.body,{childList:true,subtree:true});window.__badgeMomentObserver=observer;
+}
+const disconnectMoment=()=>{window.__badgeMomentObserver?.disconnect();};
+
 export async function badgesControls({ browser, url, check, shot, result, watchErrors }) {
   // ---- 1. the real campaign flow and camp (reduced motion) ----
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, reducedMotion: 'reduce' });
@@ -67,23 +90,20 @@ export async function badgesControls({ browser, url, check, shot, result, watchE
       g.checkObjective(0, true);
     }, GOLD);
     await page.waitForFunction(() => document.getElementById('result').open && !document.getElementById('result-action').hidden, null, { timeout: 30000 });
+    await page.evaluate(observeMoment);
     await page.locator('#result-action').click();
-    await page.waitForFunction(() => document.querySelectorAll('.rw-badge-row.is-stamped').length > 0 && (window.__xfactors ?? []).length > 0, null, { timeout: 15000 });
-    const aar = await page.evaluate(() => {
-      const m = document.querySelector('.rw-xfactor-moment'), button = document.querySelector('.rw-aar .rw-primary');
-      button.scrollIntoView({ block: 'center' });
-      const b = button.getBoundingClientRect(), hit = document.elementFromPoint(b.left + b.width / 2, b.top + b.height / 2);
-      return { rows: [...document.querySelectorAll('.rw-badge-row')].map((r) => [r.dataset.badge, r.dataset.tier, r.querySelector('.rw-badge-text')?.textContent]),
-        log: window.__xfactors, style: m?.dataset.style, events: m && getComputedStyle(m).pointerEvents, hidden: m?.getAttribute('aria-hidden'),
-        clickable: !!hit?.closest('.rw-primary'), focus: document.activeElement?.id, tag: document.querySelector('.rw-badges .rw-rule-tag')?.textContent };
-    });
+    await page.waitForFunction(() => window.__badgeMomentObservation, null, { timeout: 15000 });
+    const aar = await page.evaluate(() => window.__badgeMomentObservation);
     const sharp = aar.rows.find((r) => r[0] === 'sharpshooters');
     check('badges-aar-stamped', sharp && sharp[1] === 'gold' && sharp[2].includes(`${GOLD} casualties inflicted by fire from beyond 200 m`) && sharp[2].includes('game rule')
       && aar.rows.some((r) => r[0] === 'hardMarchers') && aar.tag === 'Game rule',
     `after-action stamps ${aar.rows.map((r) => `${r[0]} ${r[1]}`).join(', ')} with the feat ("${sharp?.[2]?.slice(0, 80)}…")`);
-    check('badges-aar-xfactor', JSON.stringify(aar.log) === '["Test brigade (fictional)|sharpshooters"]' && aar.style === 'subtle' && aar.events === 'none'
+    check('badges-aar-xfactor', aar.connected && aar.badge==='sharpshooters' && JSON.stringify(aar.log) === '["Test brigade (fictional)|sharpshooters"]' && aar.style === 'subtle' && aar.events === 'none'
       && aar.hidden === 'true' && aar.clickable && aar.focus === 'rw-aar-grade',
     `X-Factor moment ${JSON.stringify(aar.log)}, ${aar.style} under reduced motion, pointer-events ${aar.events}, focus ${aar.focus}`);
+    await page.waitForFunction(()=>window.__badgeMomentObservation&&window.__badgeMomentObservation.removedAt!==null,null,{timeout:15000});
+    result.badgesReducedMoment=await page.evaluate(()=>window.__badgeMomentObservation);
+    check('badges-reduced-moment-once',result.badgesReducedMoment.removedAt>=result.badgesReducedMoment.insertedAt&&JSON.stringify(result.badgesReducedMoment.removalLog)==='["Test brigade (fictional)|sharpshooters"]','connected reduced-motion banner leaves through native removal exactly once');
     await shot(page, 'badges-aar-campaign');
     await page.getByRole('button', { name: /^Open the loot/ }).click();
     await page.keyboard.press('s');
@@ -150,33 +170,31 @@ export async function badgesControls({ browser, url, check, shot, result, watchE
     await page.locator('#camp-army').scrollIntoViewIfNeeded(); await shot(page, 'badges-camp-320');
     const real = errors.filter((e) => !/ERR_ABORTED|NS_BINDING_ABORTED/.test(e));
     check('badges-console', real.length === 0, real.length ? real.slice(0, 4).join(' | ') : `no page errors or failed requests (${errors.length - real.length} navigation aborts)`);
-  } finally { await ctx.close().catch(() => {}); }
+  } finally { await page.evaluate(disconnectMoment).catch(()=>{});await ctx.close().catch(() => {}); }
 
   // ---- 2. the stamping and the full X-Factor moment at full motion ----
   const full = await browser.newContext({ viewport: { width: 1024, height: 768 }, reducedMotion: 'no-preference' });
+  const fullPage=await full.newPage();
   try {
-    const page = await full.newPage(), errors = []; watchErrors(page, url, errors);
+    const page = fullPage, errors = []; watchErrors(page, url, errors);
     await page.goto(url + '?nosw'); await page.waitForFunction(() => window.__entry && !window.__entry.importing, null, { timeout: 60000 });
     const { summary } = stampSummary();
+    await page.evaluate(observeMoment);
     await page.evaluate(async (summary) => {
       const { mountReward } = await import('./src/reward/sequence.js');
       window.__xfactors = [];
       mountReward(document.body, { seed: 11, grade: 'Victory', rememberReplay: false, afterAction: { title: 'Fictional', why: 'Fictional test result.', surviving: 10, losses: 1, guns: 0,
         eyebrow: 'Campaign · Fictional', note: 'Test only.', badges: summary } });
     }, summary);
-    await page.waitForFunction(() => (window.__xfactors ?? []).length > 0 && document.querySelector('.rw-xfactor-moment'), null, { timeout: 15000 });
-    const moment = await page.evaluate(() => {
-      const m = document.querySelector('.rw-xfactor-moment');
-      return { style: m.dataset.style, events: getComputedStyle(m).pointerEvents, log: window.__xfactors, focus: document.activeElement?.id,
-        stamped: document.querySelectorAll('.rw-badge-row.is-stamped').length, rows: document.querySelectorAll('.rw-badge-row').length,
-        enemy: document.querySelector('.rw-badge-enemy')?.textContent ?? '' };
-    });
-    check('badges-full-moment', moment.style === 'full' && moment.events === 'none' && moment.focus === 'rw-aar-grade' && moment.rows >= 2 && moment.stamped === moment.rows
+    await page.waitForFunction(() => window.__badgeMomentObservation, null, { timeout: 15000 });
+    const moment = await page.evaluate(() => ({...window.__badgeMomentObservation,rows:window.__badgeMomentObservation.rows.length}));
+    check('badges-full-moment', moment.connected && moment.badge==='sharpshooters' && moment.style === 'full' && moment.events === 'none' && moment.focus === 'rw-aar-grade' && moment.rows >= 2 && moment.stamped === moment.rows
       && JSON.stringify(moment.log) === '["Test brigade (fictional)|sharpshooters"]' && /Rock Bronze/.test(moment.enemy),
     `${moment.stamped}/${moment.rows} rows stamped; full moment ${JSON.stringify(moment.log)}; enemy line "${moment.enemy.slice(0, 60)}"`);
-    await shot(page, 'badges-aar-xfactor');
-    await page.waitForFunction(() => !document.querySelector('.rw-xfactor-moment'), null, { timeout: 15000 });
-    check('badges-moment-once', await page.evaluate(() => (window.__xfactors ?? []).length === 1), 'the X-Factor moment leaves on its own and was shown once');
+    await shot(page, 'badges-aar-after-moment-observation');
+    await page.waitForFunction(() => window.__badgeMomentObservation&&window.__badgeMomentObservation.removedAt!==null, null, { timeout: 15000 });
+    result.badgesFullMoment=await page.evaluate(()=>window.__badgeMomentObservation);
+    check('badges-moment-once', result.badgesFullMoment.removedAt>=result.badgesFullMoment.insertedAt&&JSON.stringify(result.badgesFullMoment.removalLog)==='["Test brigade (fictional)|sharpshooters"]'&&await page.evaluate(() => (window.__xfactors ?? []).length === 1), 'the observed connected X-Factor moment leaves on its own and was shown once');
     const axe = await new AxeBuilder({ page }).include('.rw').analyze();
     const bad = axe.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
     check('badges-aar-axe', bad.length === 0, bad.length ? bad.map((v) => `${v.impact} ${v.id}`).join(', ') : `0 serious/critical (${axe.violations.length} minor)`);
@@ -184,5 +202,5 @@ export async function badgesControls({ browser, url, check, shot, result, watchE
     check('badges-aar-320', await page.locator('.rw-aar').evaluate((n) => n.scrollWidth <= n.clientWidth + 1), '320px wide: the badges panel does not overflow the after-action');
     await shot(page, 'badges-aar-320');
     check('badges-full-console', errors.length === 0, errors.length ? errors.slice(0, 4).join(' | ') : 'no page errors');
-  } finally { await full.close().catch(() => {}); }
+  } finally { await fullPage.evaluate(disconnectMoment).catch(()=>{});await full.close().catch(() => {}); }
 }
