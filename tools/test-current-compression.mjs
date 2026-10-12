@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { PNG } from 'pngjs';
 import { selectPages, EXTRA_LOOK } from './bake/current-compression.mjs';
 import { selectClosePages,selectHybridClosePages } from './bake/current-compression.mjs';
-import { colourComposite, closeQualified,hybridQualified,validateHybridExport } from './bake/review-current-compression.mjs';
+import { colourComposite, closeQualified,hybridQualified,validateHybridExport,QUALIFIED_HYBRID,
+  validateQualifiedArtifacts,validateQualifiedZip,selectQualifiedMembers,validateQualifiedSceneInput,acquireQualifiedHybrid } from './bake/review-current-compression.mjs';
 import {loaderFixture} from './atlas-loader-fixture.mjs';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
@@ -53,8 +54,50 @@ function exportInput(){
  files.set('soldier-hybrid.json',new TextEncoder().encode(JSON.stringify(manifest)));
  return {current,source,manifest,compression,quality,files};
 }
-const api={select:selectPages,close:selectClosePages,hybrid:selectHybridClosePages,qualified:closeQualified,hybridQualified,composite:colourComposite,bytes:mipBytes,compare:comparePixels,export:validateHybridExport};
+function retainedMetadata(){
+ const Q=QUALIFIED_HYBRID;return {run:{id:Q.run,head_sha:Q.sha,status:'completed',conclusion:'success'},artifacts:[Q.optimized,Q.review].map(s=>({id:s.id,name:s.name,size_in_bytes:s.size,expired:false,workflow_run:{id:Q.run,head_sha:Q.sha}}))};
+}
+function mustReject(call,pattern,message){let error;try{call();}catch(e){error=e;}assert.ok(error&&pattern.test(error.message),message);}
+// Tiny stored ZIPs exercise archive selection without network, output files or retained large assets.
+function archive(entries){
+ const local=[],central=[];let offset=0;
+ for(const {name,body='fixture',mode=0x81a4,crcWrong=false,sizeWrong=false}of entries){
+  const n=Buffer.from(name),b=Buffer.from(body);let crc=0xffffffff;
+  for(const byte of b){crc^=byte;for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}crc=(crc^0xffffffff)>>>0;
+  if(crcWrong)crc^=1;
+  const l=Buffer.alloc(30);l.writeUInt32LE(0x04034b50);l.writeUInt16LE(20,4);l.writeUInt32LE(crc>>>0,14);l.writeUInt32LE(b.length,18);l.writeUInt32LE(sizeWrong?99000000:b.length,22);l.writeUInt16LE(n.length,26);
+  const c=Buffer.alloc(46);c.writeUInt32LE(0x02014b50);c.writeUInt16LE(0x0314,4);c.writeUInt16LE(20,6);c.writeUInt32LE(crc>>>0,16);c.writeUInt32LE(b.length,20);c.writeUInt32LE(sizeWrong?99000000:b.length,24);c.writeUInt16LE(n.length,28);c.writeUInt32LE((mode*65536)>>>0,38);c.writeUInt32LE(offset,42);
+  local.push(l,n,b);central.push(c,n);offset+=l.length+n.length+b.length;
+ }
+ const cd=Buffer.concat(central),end=Buffer.alloc(22);end.writeUInt32LE(0x06054b50);end.writeUInt16LE(entries.length,8);end.writeUInt16LE(entries.length,10);end.writeUInt32LE(cd.length,12);end.writeUInt32LE(offset,16);
+ return Buffer.concat([...local,cd,end]);
+}
+const exportEntries=()=>[{name:'soldier-hybrid.json'},...Array.from({length:10},(_,i)=>({name:`cs-close-base-${i}.ktx2`}))];
+const api={select:selectPages,close:selectClosePages,hybrid:selectHybridClosePages,qualified:closeQualified,hybridQualified,composite:colourComposite,bytes:mipBytes,compare:comparePixels,export:validateHybridExport,
+ metadata:validateQualifiedArtifacts,zip:validateQualifiedZip,members:selectQualifiedMembers,sceneInput:validateQualifiedSceneInput,acquire:acquireQualifiedHybrid};
 const checks=[
+ ['acquisition-metadata',a=>{const m=retainedMetadata();assert.equal(a.metadata(m.run,m.artifacts),true,'acquisition-metadata: retained successful run and both artifacts');}],
+ ...Object.entries({
+  'acquisition-run':m=>m.run.id++, 'acquisition-sha':m=>m.run.head_sha='b'.repeat(40),
+  'acquisition-status':m=>m.run.status='in_progress','acquisition-conclusion':m=>m.run.conclusion='failure',
+  'acquisition-id':m=>m.artifacts[0].id++, 'acquisition-name':m=>m.artifacts[0].name='other',
+  'acquisition-expiry':m=>m.artifacts[0].expired=true,'acquisition-size':m=>m.artifacts[0].size_in_bytes++,
+  'acquisition-artifact-run':m=>m.artifacts[0].workflow_run.id++, 'acquisition-artifact-sha':m=>m.artifacts[0].workflow_run.head_sha='b'.repeat(40),
+  'acquisition-duplicate':m=>m.artifacts[1]=structuredClone(m.artifacts[0]),
+ }).map(([name,change])=>[name,a=>{const m=retainedMetadata();change(m);mustReject(()=>a.metadata(m.run,m.artifacts),/hybrid acquisition/,`${name}: mismatched retained identity rejected`);}]),
+ ['acquisition-zip',a=>{const b=Buffer.from('downloaded bytes'),spec={size:b.length,digest:createHash('sha256').update(b).digest('hex')};assert.equal(a.zip(b,spec),true,'acquisition-zip: actual downloaded hash passes');b[0]^=1;mustReject(()=>a.zip(b,spec),/ZIP identity/,'acquisition-zip: changed payload rejected despite unchanged metadata');mustReject(()=>a.zip(b,QUALIFIED_HYBRID.review),/ZIP identity/,'acquisition-zip: swapped archive rejected');}],
+ ['acquisition-before-download',async a=>{const m=retainedMetadata();m.run.conclusion='failure';let downloads=0;let error;try{await a.acquire({}, {json:async endpoint=>endpoint.startsWith('runs/')?m.run:m.artifacts.find(x=>endpoint===`artifacts/${x.id}`),zip:async()=>{downloads++;throw Error('unexpected download');}});}catch(e){error=e;}assert.ok(error?.message.includes('qualification run')&&downloads===0,'acquisition-before-download: metadata refusal precedes ZIP IO');}],
+ ['acquisition-before-extraction',async a=>{const m=retainedMetadata();const downloads=[];let error;try{await a.acquire({}, {json:async endpoint=>endpoint.startsWith('runs/')?m.run:m.artifacts.find(x=>endpoint===`artifacts/${x.id}`),zip:async id=>{downloads.push(id);return Buffer.from('invalid archive');}});}catch(e){error=e;}assert.ok(error?.message.includes('ZIP identity')&&JSON.stringify(downloads)===JSON.stringify([QUALIFIED_HYBRID.optimized.id]),'acquisition-before-extraction: wrapper binds downloaded digest before second IO or extraction');}],
+ ['acquisition-members',async a=>{const files=await a.members(archive(exportEntries()),'optimized');assert.equal(files.size,11,'acquisition-members: exact eleven files');const r=await a.members(archive([{name:'soldier-source.json'},{name:'compression.json'},{name:'quality.json'},{name:'cs-close-001.png',crcWrong:true}]),'review');assert.equal(r.size,3,'acquisition-members: review PNG is never inflated or CRC-read');}],
+ ...Object.entries({
+  'acquisition-missing-member':e=>e.pop(),'acquisition-extra-member':e=>e.push({name:'extra.txt'}),
+  'acquisition-duplicate-member':e=>e.push({...e[0]}),'acquisition-traversal':e=>e[0].name='../soldier-hybrid.json',
+  'acquisition-absolute':e=>e[0].name='/soldier-hybrid.json','acquisition-backslash':e=>e[0].name='folder\\soldier-hybrid.json',
+  'acquisition-symlink':e=>e[0].mode=0xa1ff,'acquisition-crc':e=>e[0].crcWrong=true,'acquisition-expansion':e=>e[0].sizeWrong=true,
+ }).map(([name,change])=>[name,async a=>{const e=exportEntries();change(e);let error;try{await a.members(archive(e),'optimized');}catch(x){error=x;}assert.ok(error,`${name}: invalid selected archive refused`);}]),
+ ['acquisition-truncated',async a=>{let error;try{await a.members(archive(exportEntries()).subarray(0,50),'optimized');}catch(x){error=x;}assert.ok(error,'acquisition-truncated: short ZIP refused');}],
+ ['acquisition-report-source',a=>{const r=exportInput();mustReject(()=>a.sceneInput(r),/report source/,'acquisition-report-source: matching unretained report pair refused');}],
+ ['acquisition-fixed-bytes',a=>{const r=exportInput();r.compression.toolSha=r.quality.toolSha=QUALIFIED_HYBRID.sha;mustReject(()=>a.sceneInput(r),/exact close allocation/,'acquisition-fixed-bytes: valid synthetic export is not retained full allocation');}],
  ['export-coverage',a=>{assert.deepEqual(a.export(exportInput()),{files:11,astc:8,png:2,frames:576,closeGpuBytes:1576},'export-coverage: actual containers, original PNGs and every source frame');}],
  ...Object.entries({
   'export-evidence':r=>r.quality.qualified=false,
@@ -117,6 +160,16 @@ const mutants={'hybrid-route':{hybrid:selectClosePages},'hybrid-evidence':{hybri
   'complete-mips':{bytes:()=>({block16:64,rgba8:256,levels:1})},thresholds:{compare:()=>({ok:true})},
   'once-premultiplied':{composite:()=>{const p=new PNG({width:1,height:1});p.data=Buffer.from([64,32,16,255]);return PNG.sync.write(p);}}};
 for(const [name]of checks.filter(([name])=>name.startsWith('export-')))mutants[name]={export:name==='export-coverage'?()=>({}):()=>({files:11})};
+for(const [name]of checks.filter(([name])=>name.startsWith('acquisition-'))){
+ if(name==='acquisition-metadata')mutants[name]={metadata:()=>false};
+ else if(name==='acquisition-zip')mutants[name]={zip:()=>true};
+ else if(name==='acquisition-before-download')mutants[name]={acquire:async(_,io)=>io.zip(1)};
+ else if(name==='acquisition-before-extraction')mutants[name]={acquire:async()=>({})};
+ else if(name==='acquisition-members')mutants[name]={members:async()=>new Map()};
+ else if(name==='acquisition-report-source'||name==='acquisition-fixed-bytes')mutants[name]={sceneInput:()=>({})};
+ else if(name.endsWith('member')||['acquisition-traversal','acquisition-absolute','acquisition-backslash','acquisition-symlink','acquisition-crc','acquisition-expansion','acquisition-truncated'].includes(name))mutants[name]={members:async()=>new Map()};
+ else mutants[name]={metadata:()=>true};
+}
 for(const [,check]of checks)await check(api);
 console.log(`CURRENT-COMPRESSION OK (${checks.length}/${checks.length})`);
 if(process.argv.includes('--prove-fail')){

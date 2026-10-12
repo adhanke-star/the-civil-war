@@ -1,5 +1,21 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0160 ACTIVE — Sol sole writer in /private/tmp/cw-v1-1-20261012; no simultaneous provider edits.
+Accepted source/main68be65b8e90751467502a9279e37d325411bc712 CI38317432412 all9green/fresh canonical
+251/365/148/159/201/errors[]/failure null/smoke6each clean. Actual native terrain lifecycle passes
+source92B/chunks132B/restored92B with fresh IDs, labelled detached pending ownership, native retirement,
+exact original identities/bytes, GL0/unknown0/unmapped0 and terrain/capture/render/allocation cleanup.
+Small fixture only: whole-battle restoration/resource verdict UNRUN. Parent maina9b54f6 automatic
+38316968182 independently all9green/full canonical readback. Remote main fast-forward exactly68;
+Pages38323648531 success; automaticmainCI38323648533 pending. ProtectedMAIN11 unchanged.
+0157 bounded acquisition helpers in existing review-current-compression.mjs and CPU test;
+51+51 controls/unit/syntax/diff and final Astra approved; full exact source acceptance pending. No actual acquisition/
+materialization/browser caller/workflow input/scene dispatch/assets/SW change. ReportSHA/fixed bytes
+and both downloaded digest+API identities bind retained38282452947 exports before extraction.
+Next after this preparation source acceptance: synchronous native capacities/byte-state restoration,
+normal-motion200systems/800particles, fresh fault producers, full22+88 reducer/workflow, dispatch once.
+Source gates/local and CI run IDs will be updated at next clean boundary; root stays ACTIVE.
+
 TRANSFER0159 — context transfer before the large qualified-both matrix phase. Root releases sole
 writing at this docs-only skipCI relay. Fresh ChatGPT/Codex Sol retains Aaron's chosen model/effort;
 Astra gpt-6-astra/high is read-only uncertainty judge, at most ONE helper. Prior Astra is idle and

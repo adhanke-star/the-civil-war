@@ -9,7 +9,7 @@ MAIN's eleven protected WIP files stay untouched. COORDINATION.md is absent; rea
 |---|---|
 | Project licence | Aaron approved MIT code + CC-BY 4.0 original data/text; a79ec3a; full CI green, live |
 | Stones River southern ground | Rebuilt tile + coherent dawn deployment;21eb4a3 full CI/actual screenshots/Pages green |
-| Compressed atlases and more CS looks | Mixed8ASTC/2PNG38282452947 qualified/diagnostic only; loader live cw-v67; a9b54f6 observer prep accepted;0156 native restoration prerequisite source/CI next; full22route/max/fault matrix unimplemented; no adoption |
+| Compressed atlases and more CS looks | Mixed8ASTC/2PNG38282452947 qualified/diagnostic only; loader live cw-v67;68be65b native fixture accepted/sourceCI green;0157 acquisition helpers CPU51+51/Astra approved pending source acceptance; full22route/max/fault matrix unimplemented; no adoption |
 | Higher commanders | Four sourced Inferred rows across three Stones phases; carryfix09a12f1 full CI38261729029/actual image readback green, integrated |
 | Balance | Actual09a12f1 campaign201/201, grades3Defeat/4Draw/2Victory/3Decisive incl replay;570rep/L5; proposed numbers held. Buell four fictional stores7/7 CPU+7 controls, actual route/fullCI next (0127) |
 

@@ -10,6 +10,90 @@ import { readSmall, outputBytes, selectClosePages } from './current-compression.
 import { comparePixels, candidateSupported } from './review-compression.mjs';
 import {createHash} from 'node:crypto';
 import {parseAtlasAstc,pageMipBytes} from '../../src/units/atlas-compression.js';
+import {execFileSync} from 'node:child_process';
+import {createRequire} from 'node:module';
+
+// Immutable retained qualification. Acquisition is separate from export parsing and never writes assets.
+export const QUALIFIED_HYBRID = Object.freeze({
+  run:38282452947,sha:'9d60c12cfddadac7c74e7126b33ba568071c2066',closeGpuBytes:48996984,
+  optimized:Object.freeze({id:11762770795,name:'cs-close-qualified-hybrid',size:41324044,
+    digest:'278f619d48f77a22ce9be20ea3f0461e0e5e933960fa14953a02a9664194b60b'}),
+  review:Object.freeze({id:11762905334,name:'cs-close-qualification-review',size:79493756,
+    digest:'b9b761a24435489cfe272c90cbe04b60f7b9eb62c8ffec5f1b0f1ae37454452b'}),
+});
+export function validateQualifiedArtifacts(run,artifacts){
+  const Q=QUALIFIED_HYBRID;
+  if(run?.id!==Q.run||run.head_sha!==Q.sha||run.status!=='completed'||run.conclusion!=='success')throw Error('hybrid acquisition: qualification run');
+  if(!Array.isArray(artifacts)||artifacts.length!==2)throw Error('hybrid acquisition: artifact coverage');
+  for(const spec of [Q.optimized,Q.review]){
+    const matches=artifacts.filter(a=>a.id===spec.id),a=matches[0];
+    if(matches.length!==1||a.name!==spec.name||a.expired!==false||a.size_in_bytes!==spec.size
+      ||a.workflow_run?.id!==Q.run||a.workflow_run.head_sha!==Q.sha)throw Error('hybrid acquisition: artifact identity');
+  }
+  return true;
+}
+export function validateQualifiedZip(bytes,spec){
+  if(!(bytes instanceof Uint8Array)||bytes.length!==spec.size||bytes.length>=99000000
+    ||createHash('sha256').update(bytes).digest('hex')!==spec.digest)throw Error('hybrid acquisition: ZIP identity');
+  return true;
+}
+export function validateQualifiedSceneInput(input){
+  if(input.compression?.toolSha!==QUALIFIED_HYBRID.sha||input.quality?.toolSha!==QUALIFIED_HYBRID.sha)throw Error('hybrid acquisition: report source');
+  const admission=validateHybridExport(input);
+  if(admission.closeGpuBytes!==QUALIFIED_HYBRID.closeGpuBytes)throw Error('hybrid acquisition: exact close allocation');
+  return admission;
+}
+// Parse only digest-bound archives in production. Review PNGs are never opened/inflated.
+export async function selectQualifiedMembers(bytes,kind){
+  const require=createRequire(import.meta.url),{yauzl}=require(path.join(path.dirname(require.resolve('playwright-core/package.json')),'lib/utilsBundle.js'));
+  const review=['soldier-source.json','compression.json','quality.json'],selected=new Map(),seen=new Set();let total=0;
+  if(!['optimized','review'].includes(kind))throw Error('hybrid acquisition: archive kind');
+  await new Promise((resolve,reject)=>yauzl.fromBuffer(Buffer.from(bytes),{lazyEntries:true},(error,zip)=>{
+    if(error)return reject(error);
+    const fail=e=>{zip.close();reject(e);};zip.on('error',fail);zip.on('end',resolve);
+    zip.on('entry',entry=>{
+      const name=entry.fileName,mode=entry.externalFileAttributes>>>16;
+      const allowed=kind==='optimized'?name==='soldier-hybrid.json'||/^cs-close-[a-z0-9_-]+\.(png|ktx2)$/.test(name)
+        :review.includes(name)||/^cs-close-0(?:0[1-9]|[1-6][0-9]|7[0-6])\.png$/.test(name);
+      if(!allowed||seen.has(name)||name.includes('\\')||(mode&0xf000)===0xa000)return fail(Error('hybrid acquisition: member identity'));
+      seen.add(name);
+      if(kind==='review'&&!review.includes(name)){zip.readEntry();return;}
+      if(!Number.isSafeInteger(entry.uncompressedSize)||entry.uncompressedSize<0||entry.uncompressedSize>=99000000
+        ||(total+=entry.uncompressedSize)>=99000000)return fail(Error('hybrid acquisition: selected size'));
+      zip.openReadStream(entry,(err,stream)=>{
+        if(err)return fail(err);const chunks=[];let size=0;
+        stream.on('error',fail);stream.on('data',chunk=>{size+=chunk.length;if(size>entry.uncompressedSize){stream.destroy();fail(Error('hybrid acquisition: expanded size'));}else chunks.push(chunk);});
+        stream.on('end',()=>{
+          const b=Buffer.concat(chunks);if(b.length!==entry.uncompressedSize)return fail(Error('hybrid acquisition: short member'));
+          // ZIP CRC32 binds selected decompressed bytes as well as the outer SHA256.
+          let crc=0xffffffff;for(const byte of b){crc^=byte;for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}
+          if(((crc^0xffffffff)>>>0)!==entry.crc32)return fail(Error('hybrid acquisition: member CRC'));
+          selected.set(name,b);zip.readEntry();
+        });
+      });
+    });zip.readEntry();
+  }));
+  if(kind==='optimized'?(selected.size!==11||!selected.has('soldier-hybrid.json')):review.some(n=>!selected.has(n)))throw Error('hybrid acquisition: selected coverage');
+  return selected;
+}
+export async function acquireQualifiedHybrid(current,io){
+  if(!io){
+    if(process.env.GITHUB_ACTIONS!=='true')throw Error('hybrid acquisition: Actions only');
+    const read=endpoint=>execFileSync('gh',['api',`repos/adhanke-star/the-civil-war/actions/${endpoint}`],{maxBuffer:99000000});
+    io={json:endpoint=>JSON.parse(read(endpoint)),zip:id=>read(`artifacts/${id}/zip`)};
+  }
+  const Q=QUALIFIED_HYBRID,run=await io.json(`runs/${Q.run}`),artifacts=[];
+  for(const spec of [Q.optimized,Q.review])artifacts.push(await io.json(`artifacts/${spec.id}`));
+  validateQualifiedArtifacts(run,artifacts);
+  const archives=[];
+  for(const spec of [Q.optimized,Q.review]){const bytes=await io.zip(spec.id);validateQualifiedZip(bytes,spec);archives.push(bytes);}
+  // Both downloaded identities must pass before either archive is extracted.
+  const files=await selectQualifiedMembers(archives[0],'optimized'),review=await selectQualifiedMembers(archives[1],'review');
+  const json=(map,name)=>JSON.parse(new TextDecoder().decode(map.get(name)));
+  const input={current,files,manifest:json(files,'soldier-hybrid.json'),source:json(review,'soldier-source.json'),
+    compression:json(review,'compression.json'),quality:json(review,'quality.json')};
+  return {...input,admission:validateQualifiedSceneInput(input)};
+}
 
 export async function gpuReadback({ png, premul, files, w, h, hybrid=false }) {
   const T=window.T, renderer=window.renderer, gl=renderer.getContext(), ext=gl.getExtension('WEBGL_compressed_texture_astc');
