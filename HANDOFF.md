@@ -1,5 +1,38 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0152 ACTIVE WORK — root remains sole writer; no owner transfer yet.
+Loader source dcbeb0516ceb36f74ef0cff6d6034da00efa1f01 pushed; exactCI38299022067 in progress:
+probes/Firefox/WebKit/offline pass; four shards and actualplaythrough still pending. Read existing CI and
+canonical shard3 atlasLoader rows/native route/native GL failure before accepting this source; no rerun.
+Mainc328 accepted/Pageslive sw66; auto-mainCI38298643624 pending. All76 sheets/root+Astra/export pass.
+New collector0152 corrects immutable ASTC/BC7 complete block allocation/subimage nonallocation;
+old framebuffer surfaces stay pending through later uploads/multiple resizes until native finish, with
+per-sample historical defaultPeak retained even resize->finish->firstsnapshot. Exact GL/pool/render
+function descriptors/inherited shadows/previous observer/visibility restored; owner errors recorded and
+all independent owners attempted in scene finally. CPU17+17/inactive10+10/partition5+5 pass; Astra
+accepts narrow correctness for commit/fullCI. Actual runtime scene restoration and whole-memory UNRUN.
+
+NEXT after exact loader+collector fullCI readback: second diagnostic resource commit in existing
+review-scene-allocation.mjs/pack-figures.yml. Add scene_routes=qualified-both. On Actions only fetch
+38282452947 optimized11762770795 to RUNNER_TEMP; review11762905334 only compression.json/quality.json/
+soldier-source.json. Validate11files/eightcontainers/twoSHA256/all576 frames/exact48,996,984 bytes before
+browser; no re-encode/copy into assets. Serve allowlisted files through Playwright routes (server refuses
+.out/external symlinks; do not weaken it). Boot rigged, assert no close request, configure existing CS
+BakedAtlas diagnosticClose {manifest,sourceManifest,base},renderer; then baked. Genuine native capable
+arm; explicitly labelled masked-capability unsupported arm. All11 both armies/field/bothclose/lens/
+resize/retire/narrow; supported pool maxima including timelines/spawns/all procedural/casualty buckets,
+latent real uploads, split reversals/nearLOD/new native reservations/restoration, malformed/HTTP/actualGL/
+delayedASTC+PNG/dispose-before-fallback/pendingdelete/terminalbaseline failure. Every failure/transition
+enters maximum; unknown/unmapped fail. Preserve accepted200m framing/camera/simTime/roster/geometry/
+trees/combat. Restore native descriptors/settings/prototypes finally. Measure fixed+pixel costs and
+actual buffer/targets/samples/depth/allocation order before Astra ceiling; maxfixed>=250M HALT ceiling.
+Old Lookout sampled fixed239,085,924 +latent4,856,588 is warning only, old failure excluded from max.
+Only after<=250M BOTHroutes+actualimages/correctness/fullCI/Pages separate product adoption withSW bump.
+Dispatch new scene workflow once after newsource gates: gh workflow run pack-figures.yml --ref
+v1-1-gaps-20261012 -f mode=scene -f inactive=true -f partition=true -f scene_routes=qualified-both.
+No resource policy/art adopted, no badge harness or v1.1/v2 work yet. Preserve MAIN11/all failures/.outcap.
+
+
 LATEST0151 ACTIVE WORK — Codex/Sol remains sole writer, no transfer/release of lane.
 Remote mainc328ca86c5a7671903a1f9e7c161bead2e9996da accepted CI38282610211 all9green;
 Pages38298643627 succeeds/live sw66; automatic mainCI38298643624 pending. Canonical shard checks

@@ -5,13 +5,15 @@ export async function rejectionObservation(run) {
 }
 // Synchronized GPU estimate, including a resize's old/new default surfaces. CPU arrays are separate.
 export class ReservationPeak {
-  constructor(){this.peak=0;this.framebuffer=0;this.dimensions='';this.current=0;}
+  constructor(){this.peak=0;this.framebuffer=0;this.pendingFramebuffer=0;this.dimensions='';this.current=0;}
   sample(apiBytes,width,height,attributes){
     const framebuffer=width*height*(8+(attributes.depth?4:0)+(attributes.stencil?4:0));
-    const dimensions=`${width}:${height}`,old=dimensions!==this.dimensions?this.framebuffer:0;
-    this.current=apiBytes+framebuffer;this.peak=Math.max(this.peak,this.current+old);
+    const dimensions=`${width}:${height}`;
+    if(dimensions!==this.dimensions)this.pendingFramebuffer+=this.framebuffer;
+    this.current=apiBytes+framebuffer+this.pendingFramebuffer;this.peak=Math.max(this.peak,this.current);
     this.framebuffer=framebuffer;this.dimensions=dimensions;return this.current;
   }
+  finish(){this.pendingFramebuffer=0;}
 }
 export function mipSizes(w,h,bpp,levels=Math.floor(Math.log2(Math.max(w,h)))+1) {
   if(![w,h,bpp,levels].every(Number.isSafeInteger)||w<1||h<1||bpp<1||levels<1||levels>32)throw new Error('allocation: invalid mip dimensions');
@@ -40,8 +42,25 @@ export class AllocationLedger {
 /** Installed only in an owned diagnostic context before game boot. No product code or GL arguments changed. */
 export function installAllocationObserver(source) {
   const Ledger=(0,eval)('('+source.ledger+')'),mips=(0,eval)('('+source.mips+')'),Peak=(0,eval)('('+source.reservationPeak+')');
+  const wrappers=[],prior=Object.getOwnPropertyDescriptor(window,'__allocation');let observer,installed=false,restored=false;
+  const restore=()=>{
+    if(restored)return;
+    let failure;
+    for(const {proto,name,descriptor,wrapped}of [...wrappers].reverse()){
+      if(Object.getOwnPropertyDescriptor(proto,name)?.value!==wrapped){failure ||= new Error('allocation: wrapper ownership changed');continue;}
+      if(descriptor)Object.defineProperty(proto,name,descriptor);else delete proto[name];
+    }
+    if(installed){
+      if(Object.getOwnPropertyDescriptor(window,'__allocation')?.value!==observer)failure ||= new Error('allocation: observer ownership changed');
+      else if(prior)Object.defineProperty(window,'__allocation',prior);else delete window.__allocation;
+    }
+    if(failure)throw failure;restored=true;
+  };
   const contexts=new WeakMap();
-  const sample=(gl,s,bytes=s.ledger.bytes)=>s.gpu.sample(bytes,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.getContextAttributes());
+  const sample=(gl,s,bytes=s.ledger.bytes)=>{
+    const current=s.gpu.sample(bytes,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.getContextAttributes());
+    s.defaultPeak=Math.max(s.defaultPeak,s.gpu.framebuffer+s.gpu.pendingFramebuffer);return current;
+  };
   const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),gpu:new Peak(),bufferArrays:new WeakMap(),bufferIds:new Map(),textures:new Map(),textureIds:new Map(),signatures:[],unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};s.ledger.onReservation=bytes=>sample(gl,s,bytes);contexts.set(gl,s);}return s;};
   const unknown=(s,value)=>{if(!s.unknown.includes(value))s.unknown.push(value);};
   const signature=(gl,s,id,call,raw,canonical)=>{
@@ -82,26 +101,35 @@ export function installAllocationObserver(source) {
   };
   const wrap=(proto,name,after)=>{
     const native=proto[name];if(typeof native!=='function')return;
-    proto[name]=function(...args){const value=native.apply(this,args),s=state(this);s.calls[name]=(s.calls[name]||0)+1;
+    const descriptor=Object.getOwnPropertyDescriptor(proto,name);
+    const wrapped=function(...args){const value=native.apply(this,args),s=state(this);s.calls[name]=(s.calls[name]||0)+1;
       try{sample(this,s);after(this,args,value);sample(this,s);}catch(error){unknown(s,`observer:${name}:${error.message}`);}return value;};
+    Object.defineProperty(proto,name,{value:wrapped,writable:descriptor?.writable??true,enumerable:descriptor?.enumerable??true,configurable:descriptor?.configurable??true});
+    wrappers.push({proto,name,descriptor,wrapped});
   };
-  for(const proto of [globalThis.WebGLRenderingContext?.prototype,globalThis.WebGL2RenderingContext?.prototype].filter(Boolean)) {
+  try {for(const proto of [globalThis.WebGLRenderingContext?.prototype,globalThis.WebGL2RenderingContext?.prototype].filter(Boolean)) {
     for(const [name,compressed,volume]of [['texImage2D',false,false],['compressedTexImage2D',true,false],['texImage3D',false,true],['compressedTexImage3D',true,true]])
       wrap(proto,name,(gl,args)=>recordImage(gl,args,compressed,volume));
     for(const volume of [false,true])wrap(proto,volume?'texStorage3D':'texStorage2D',(gl,a)=>{
       // WebIDL GLsizei conversion truncates Three's fractional log2(NPOT)+1 level argument.
       const s=state(gl),[target,rawLevels,format]=a,levels=Math.trunc(rawLevels),w=Math.trunc(a[3]),h=Math.trunc(a[4]),
-        d=volume?Math.trunc(a[5]):1,id=texture(gl,target),n=bpp(gl,s,format);
+        d=volume?Math.trunc(a[5]):1,id=texture(gl,target),compressed=format===0x93B0||format===0x8E8C,
+        n=compressed?null:bpp(gl,s,format);
       if(!id){unknown(s,'storage without bound texture');return;}
-      signature(gl,s,id,'immutable storage',{target,levels:rawLevels,w:a[3],h:a[4],d:volume?a[5]:1,format},{target,levels,w,h,d,bpp:n});
-      for(const [i,m]of mips(w,h,n,levels).entries())s.ledger.reserve(id,'texture',`${target}:${i}`,m.bytes*(target===gl.TEXTURE_3D?Math.max(1,d>>i):d)*(target===gl.TEXTURE_CUBE_MAP?6:1));
-      s.textures.set(id,{target,w,h,d,bpp:n,immutable:true});
+      signature(gl,s,id,'immutable storage',{target,levels:rawLevels,w:a[3],h:a[4],d:volume?a[5]:1,format},{target,levels,w,h,d,bpp:n,compressed});
+      for(const [i,m]of mips(w,h,n||1,levels).entries()) {
+        const bytes=compressed?Math.ceil(m.w/4)*Math.ceil(m.h/4)*16:m.bytes;
+        s.ledger.reserve(id,'texture',`${target}:${i}`,bytes*(target===gl.TEXTURE_3D?Math.max(1,d>>i):d)*(target===gl.TEXTURE_CUBE_MAP?6:1));
+      }
+      s.textures.set(id,{target,w,h,d,bpp:n,compressed,immutable:true});
     });
+    // Subimages populate reserved immutable storage; they never allocate another mip chain.
+    for(const name of ['compressedTexSubImage2D','compressedTexSubImage3D'])wrap(proto,name,()=>{});
     wrap(proto,'generateMipmap',(gl,a)=>{
       const s=state(gl),id=texture(gl,a[0]),m=s.textures.get(id);
       signature(gl,s,id,'generate mipmaps',{target:a[0]},{base:m||null});
+      if(m?.immutable)return; // texStorage already reserved every level; generation changes pixels only.
       if(!m?.bpp){unknown(s,'mipmap without known base');return;}
-      if(m.immutable)return; // texStorage already reserved every level; generation changes pixels only.
       const targets=a[0]===gl.TEXTURE_CUBE_MAP?[0,1,2,3,4,5].map(i=>gl.TEXTURE_CUBE_MAP_POSITIVE_X+i):[m.target];
       for(const target of targets)for(const [i,l]of mips(m.w,m.h,m.bpp).entries())if(i)s.ledger.reserve(id,'texture',`${target}:${i}`,l.bytes*(m.target===gl.TEXTURE_3D?Math.max(1,m.d>>i):m.d),false);
     });
@@ -122,13 +150,14 @@ export function installAllocationObserver(source) {
     });
     for(const [name,kind]of [['deleteTexture','texture'],['deleteBuffer','buffer'],['deleteRenderbuffer','renderbuffer']])
       wrap(proto,name,(gl,a)=>{const s=state(gl);s.ledger.retire(a[0]);if(kind==='texture')s.textures.delete(a[0]);});
-    wrap(proto,'finish',gl=>state(gl).ledger.sync());
+    wrap(proto,'finish',gl=>{const s=state(gl);s.ledger.sync();s.gpu.finish();});
   }
-  window.__allocation={bufferReservation(gl,array){const s=state(gl),id=s.bufferArrays.get(array),r=s.ledger.objects.get(id);return r?{id:s.bufferIds.get(id),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(id)}:null;},snapshot(gl){const s=state(gl),attrs=gl.getContextAttributes(),pixels=gl.drawingBufferWidth*gl.drawingBufferHeight;
+  observer={restore,bufferReservation(gl,array){const s=state(gl),id=s.bufferArrays.get(array),r=s.ledger.objects.get(id);return r?{id:s.bufferIds.get(id),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(id)}:null;},snapshot(gl){const s=state(gl),attrs=gl.getContextAttributes(),pixels=gl.drawingBufferWidth*gl.drawingBufferHeight;
     // Conservative two RGBA8 colour surfaces plus a 32-bit depth surface; browser/driver storage is unmeasured.
     const defaultFramebuffer=pixels*(8+(attrs.depth?4:0)+(attrs.stencil?4:0));
     const dimensions=`${gl.drawingBufferWidth}:${gl.drawingBufferHeight}`;
-    s.defaultPeak=Math.max(s.defaultPeak,defaultFramebuffer+(dimensions!==s.defaultDimensions?s.defaultBytes:0));
+    sample(gl,s);
+    s.defaultPeak=Math.max(s.defaultPeak,defaultFramebuffer+s.gpu.pendingFramebuffer);
     s.defaultBytes=defaultFramebuffer;s.defaultDimensions=dimensions;
     sample(gl,s);
     return {...s.ledger.snapshot(),defaultFramebuffer,defaultPeak:s.defaultPeak,framebufferAssumption:'two RGBA8 colour surfaces, 32-bit depth/stencil when enabled; no native measurement',
@@ -136,4 +165,6 @@ export function installAllocationObserver(source) {
       dimensions:[gl.drawingBufferWidth,gl.drawingBufferHeight],attributes:attrs,unknown:s.unknown,calls:s.calls,signatures:s.signatures,
       textureSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='texture').map(([id,r])=>({texture:s.textureIds.get(id),slots:Object.fromEntries(r.slots)}))};
   }};
+  Object.defineProperty(window,'__allocation',{value:observer,writable:true,enumerable:prior?.enumerable??true,configurable:true});installed=true;
+  }catch(error){restore();throw error;}
 }

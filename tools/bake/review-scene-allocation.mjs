@@ -4,7 +4,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { startServer, ROOT } from '../serve.mjs';
 import { AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation } from './scene-allocation.mjs';
-import {installInactiveFigures,installRenderGate,renderCanvasPng} from './inactive-figures.mjs';
+import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDiagnostics} from './inactive-figures.mjs';
 import {PNG} from 'pngjs';
 import {partitionTerrain,installTerrainPartition} from './partition-terrain.mjs';
 
@@ -166,15 +166,21 @@ async function main(){
           }
         }
         row.complete=true;
-      } finally {await page.evaluate(()=>window.__sceneRenderGate?.restore()).catch(()=>{});await ctx.close();save();}
+      } finally {
+        try {row.restoration=await page.evaluate(source=>(0,eval)('('+source+')')(),restoreSceneDiagnostics.toString());}
+        catch(error){row.restoration={ok:false,errors:[error.message]};}
+        await ctx.close();save();
+        if(!row.restoration.ok)throw new Error(`scene allocation: restoration failed: ${row.restoration.errors.join(', ')}`);
+      }
       console.log(`SCENE ${index+1}/${campaign.phases.length} complete`);
     }
     // Actual current loader failure: successful siblings must not masquerade as a complete close tier.
     const ctx=await browser.newContext({viewport:{width:1024,height:768},deviceScaleFactor:2});await ctx.addInitScript(installAllocationObserver,source);
+    const page=await ctx.newPage();
     try{
       let missingHits=0;
       await ctx.route('**/assets/figures/confederate-infantry/soldier_close_0.png',r=>{missingHits++;return r.fulfill({status:404,body:'diagnostic missing page'});});
-      const page=await ctx.newPage();await page.goto(url+'?battle=stones-river&phase=dawn-on-the-right&quality=high&nosw');
+      await page.goto(url+'?battle=stones-river&phase=dawn-on-the-right&quality=high&nosw');
       await page.waitForFunction(()=>window.__ready&&window.__game?.game,null,{timeout:180000,polling:250});
       await page.evaluate(()=>window.__game.game.ensureBaked());
       await page.waitForFunction(()=>window.__game.game.baked.state==='ready',null,{timeout:120000,polling:250});
@@ -182,8 +188,13 @@ async function main(){
       failure.missingHits=missingHits;
       report.failure={...failure,...await page.evaluate(inventory),policy:'Observed existing PNG failure only. No compressed fallback or disposal claim.'};
       if(!failure.rejected||failure.published||!missingHits)throw new Error('scene allocation: missing page control was accepted or not exercised');
-    }finally{await ctx.close();save();}
-    report.complete=report.cases.length===11&&report.cases.every(c=>c.complete)&&report.failure.rejected;
+    }finally{
+      report.failure||={};
+      try {report.failure.restoration=await page.evaluate(source=>(0,eval)('('+source+')')(),restoreSceneDiagnostics.toString());}
+      catch(error){report.failure.restoration={ok:false,errors:[error.message]};}
+      await ctx.close();save();
+    }
+    report.complete=report.cases.length===11&&report.cases.every(c=>c.complete&&c.restoration.ok)&&report.failure.rejected&&report.failure.restoration.ok;
     report.maxReservation=Math.max(...report.cases.flatMap(c=>c.states.map(s=>s.conservativeReservation)));
     report.maxGpuReservation=Math.max(...report.cases.flatMap(c=>c.states.map(s=>s.gpuReservation)));
     report.withinLimit=report.maxGpuReservation<=report.limits.gpuBytes;
