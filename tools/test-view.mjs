@@ -73,6 +73,19 @@ const tests = [
     assert.equal(terrain.heightAt(r.camera.position.x, r.camera.position.z), 300);
     assert.equal(r.camera.position.y, 325);
   }, { ...api, camera: (o) => { const r = camera(o), update = r.update; r.update = (dt) => { update.call(r, dt); r.camera.position.y = r.target.y + Math.sin(r.pitch) * r.dist; }; return r; } }],
+  ['sightline-clears-a-ridge', (a) => {
+    // a 50 m crest between the camera and a target on flat ground: the camera rises until it sees over it
+    const terrain = { half: 3000, inBounds: () => true, heightAt: (x, z) => Math.abs(Math.hypot(x, z) - 75) < 8 ? 50 : 0 };
+    const r = a.camera({ terrain, target: [0, 0], dist: 100, pitch: 0.3 }); settle(r);
+    const P = r.camera.position, low = Math.sin(r.pitch) * r.dist;
+    assert.ok(low < 50, 'fixture must actually hide the target behind the crest');
+    for (let i = 1; i < 12; i++) {
+      const s = i / 12;
+      assert.ok(P.y * s >= terrain.heightAt(P.x * s, P.z * s) + 8 * s - 1e-9, `sight line under the crest at ${s.toFixed(2)}`);
+    }
+    assert.ok(P.y <= r.dist + 1e-9, 'never higher than the zoom distance above the target');
+  }, { ...api, camera: (o) => { const r = camera(o), update = r.update; r.update = (dt) => { update.call(r, dt);
+    const P = r.camera.position; P.y = Math.max(r.target.y + Math.sin(r.pitch) * r.dist, o.terrain.heightAt(P.x, P.z) + 25); }; return r; } }],
   ['easing-rate-unchanged', (a) => {
     const r = a.camera(), old = r.pitch; S.set('look.cameraElevation', 15); r.update(0.1);
     near(r.pitch, old + (rad(15)) * (1 - Math.exp(-0.9))); assert.equal(r.dist, 1150);

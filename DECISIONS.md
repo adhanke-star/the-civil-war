@@ -2,7 +2,7 @@
 
 ## 0111 — Confederate figures from their own bake (2026-10-12)
 
-The shader tint that turned the Union sprite grey (a placeholder DESIGN forbids shipping) is gone. `tools/bake` takes SIDE=cs and baked a Western shell-jacket infantryman (run 38186582847): grey jean, butternut and faded-tan jean, about three slouch hats to one forage cap, blanket roll, plain buckle, following a sourced dress summary; colours are Inferred estimates. Shipped: the close tier's base look and four field looks (14 MB of PNG); the other five looks stay in the CI artifact to hold graphics memory near the Union pack's. Each side's sprite pool loads its own atlas.
+The shader tint that turned the Union sprite grey (a placeholder DESIGN forbids shipping) is gone. `tools/bake` takes SIDE=cs and baked a Western shell-jacket infantryman (run 38186582847): grey jean, butternut and faded-tan jean, about three slouch hats to one forage cap, blanket roll, plain buckle, following a sourced dress summary; colours are Inferred estimates. Shipped: the close tier's base look and four field looks (14 MB of PNG); the other five looks stay in the CI artifact to hold graphics memory near the Union pack's. Each side's sprite pool loads its own atlas. Known gap: inside close range every Confederate wears the base look (a second close look costs about 100 MB of graphics memory uncompressed); GPU-compressed atlases (tools/bake/compress.mjs) would allow it.
 
 ## 0110 — Campaign rules: points, reputation, badges, cavalry, Estimated strengths, title flow (2026-10-12)
 

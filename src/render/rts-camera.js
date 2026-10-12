@@ -228,9 +228,18 @@ export class RtsCamera {
       this.target.y + Math.sin(this.pitch) * this.dist,
       this.target.z + Math.cos(this.yaw) * h,
     );
-    // never dip under a ridge between camera and target
-    const under = this.terrain.heightAt(this.camera.position.x, this.camera.position.z) + 25;
-    if (this.camera.position.y < under) this.camera.position.y = under;
+    // never dip under the ground, nor behind a ridge between camera and target: raise the camera until the
+    // sight line clears every sampled point of the terrain along it (a steep crest such as Missionary Ridge)
+    const P = this.camera.position, T = this.target;
+    const floor = Math.max(P.y, this.terrain.heightAt(P.x, P.z) + 25);
+    let camY = floor;
+    for (let i = 1; i < 12; i++) {
+      const s = i / 12; // fraction of the way from the target back to the camera
+      const need = this.terrain.heightAt(T.x + (P.x - T.x) * s, T.z + (P.z - T.z) * s) + 8 * s; // clearance grows from 0 at the target
+      if (T.y + (camY - T.y) * s < need) camY = T.y + (need - T.y) / s;
+    }
+    // a target down in a ravine would send the camera skyward: rise at most to the zoom distance above it
+    P.y = Math.min(camY, Math.max(floor, T.y + this.dist));
     this.camera.lookAt(this.target);
     this.camera.far = this.dist * 4 + 2000;
     this.camera.near = Math.max(2, this.dist * 0.02);
