@@ -93,7 +93,10 @@ async function main(){
           fs.writeFileSync(path.join(out,filename),bytes);delete shot.dataUrl;
           row.canvasCaptures||=[];row.canvasCaptures.push({filename,phase:entry.phaseId,toolSha:report.toolSha,...shot,bytes:bytes.length,kind:'battlefield-canvas capture; DOM HUD excluded'});save();
         };
-        if((inactive||partition)&&entry.phaseId==='lookout-mountain')await page.evaluate(source=>{window.__sceneRenderGate=(0,eval)('('+source+')')(window.__game.post);},installRenderGate.toString());
+        if((inactive||partition)&&entry.phaseId==='lookout-mountain')await page.evaluate(source=>{
+          const {post,rts,game,camera}=window.__game;window.__sceneRenderGate=(0,eval)('('+source+')')(post);
+          for(let i=0;i<12;i++)rts.update(1);game.setView(camera,innerHeight*post.scale);game.animate(0);
+        },installRenderGate.toString());
         await capture('field');
         if(partition){
           if(entry.phaseId==='lookout-mountain')await canvasShot('terrain-partition-01-before.png');
@@ -152,7 +155,7 @@ async function main(){
             row.framedComparison=await page.evaluate(()=>{
               const {game:g,rts,camera,post}=window.__game,u=g.units.find(u=>u.side==='US'&&u.type==='infantry'&&u.alive);
               if(!u)throw new Error('combined prototype: living formation needed for readable comparison');
-              rts.flyTo(u.x,u.z,200);rts.update(1);rts.update(1);g.setView(camera,innerHeight*post.scale);g.animate(0);
+              rts.flyTo(u.x,u.z,200);for(let i=0;i<12;i++)rts.update(1);g.setView(camera,innerHeight*post.scale);g.animate(0);
               return {unitId:u.id,position:[u.x,u.z],simTime:g.simTime,goal:{...rts.goal}};
             });
             await transition('framed-compare-rigged-left','rigged',true,'07-framed-compare-rigged-left.png');
