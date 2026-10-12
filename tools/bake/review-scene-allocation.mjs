@@ -121,7 +121,7 @@ async function main(){
         await resized({width:320,height:568});await capture('narrow-resize');
         if(inactive&&entry.phaseId==='lookout-mountain'){
           await resized({width:1024,height:768});
-          const transition=async(label,style,compare=false)=>{
+          const transition=async(label,style,compare=false,filename=null)=>{
             const state=await page.evaluate(async({style,compare})=>{
               const g=window.__game.game,S=await import('./src/settings.js'),C=await import('./src/sandbox/compare.js');
               const combat=()=>JSON.stringify({time:g.simTime,orders:g.orders,holder:g.holder,units:g.units.map(u=>({id:u.id,men:u.men,morale:u.morale,ammo:u.ammo,state:u.state,order:u.order.type,x:u.x,z:u.z}))});
@@ -130,7 +130,7 @@ async function main(){
               g.setView(window.__game.camera,innerHeight*window.__game.post.scale);g.animate(0);return {combatUnchanged:combat()===before,stats:{...g.__inactiveStats},procedural:g.pools.US.pushed+g.pools.CS.pushed,baked:g.impostors.US.drawn+g.impostors.CS.drawn};
             },{style,compare});
             row.transitions||=[];row.transitions.push({label,...state});if(!state.combatUnchanged)throw new Error('inactive prototype: style changed combat state');
-            await capture(label);await canvasShot(`${String(row.transitions.length).padStart(2,'0')}-${label}.png`);
+            await capture(label);await canvasShot(filename||`${String(row.transitions.length).padStart(2,'0')}-${label}.png`);
           };
           await transition('rigged-reactivation','rigged');
           row.lodReactivation=await page.evaluate(()=>{
@@ -148,6 +148,19 @@ async function main(){
           await transition('baked-reclamation','baked');
           await transition('compare-rigged-left','rigged',true);await transition('compare-baked-left','baked',true);
           await transition('baked-restored','baked');
+          if(partition){
+            row.framedComparison=await page.evaluate(()=>{
+              const {game:g,rts,camera,post}=window.__game,u=g.units.find(u=>u.side==='US'&&u.type==='infantry'&&u.alive);
+              if(!u)throw new Error('combined prototype: living formation needed for readable comparison');
+              rts.flyTo(u.x,u.z,200);rts.update(1);rts.update(1);g.setView(camera,innerHeight*post.scale);g.animate(0);
+              return {unitId:u.id,position:[u.x,u.z],simTime:g.simTime,goal:{...rts.goal}};
+            });
+            await transition('framed-compare-rigged-left','rigged',true,'07-framed-compare-rigged-left.png');
+            await transition('framed-compare-baked-left','baked',true,'08-framed-compare-baked-left.png');
+            await transition('framed-baked-restored','baked',false,'09-framed-baked-restored.png');
+            const frames=row.canvasCaptures.slice(-3);
+            if(!frames.every(s=>s.simTime===frames[0].simTime&&JSON.stringify(s.camera)===JSON.stringify(frames[0].camera)))throw new Error('combined prototype: comparison camera/time changed');
+          }
         }
         row.complete=true;
       } finally {await page.evaluate(()=>window.__sceneRenderGate?.restore()).catch(()=>{});await ctx.close();save();}

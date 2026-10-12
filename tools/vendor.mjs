@@ -30,6 +30,7 @@ const ENTRIES = [
   'three/examples/jsm/postprocessing/RenderPass.js',
   'three/examples/jsm/postprocessing/OutputPass.js',
   'three/examples/jsm/utils/BufferGeometryUtils.js',
+  'three/examples/jsm/libs/ktx-parse.module.js', // direct explicit ASTC container parsing, no transcoder
   'yuka/build/yuka.module.js',
   'three.quarks/dist/three.quarks.esm.js',
   'quarks.core/dist/quarks.core.esm.js', // three.quarks imports the bare specifier 'quarks.core'
@@ -49,6 +50,19 @@ const DATA_DIRS = ['detect-gpu/dist/benchmarks'];
 const LICENSE_NAMES = ['LICENSE', 'LICENSE.md', 'LICENSE.txt', 'license'];
 
 const problems = [];
+const preserve = process.argv.includes('--preserve');
+async function copyBytes(dest, bytes) {
+  await fs.mkdir(path.dirname(dest), { recursive: true });
+  const root=realpathSync(VENDOR),parent=realpathSync(path.dirname(dest));
+  if(root!==path.join(realpathSync(ROOT),'vendor')||dest.includes('\\')||!isInside(dest,VENDOR)
+    ||!(parent===root||isInside(parent,root)))throw new Error('vendor copy escaped its owned root');
+  if(preserve){
+    try{const st=await fs.lstat(dest);if(st.isSymbolicLink()||!st.isFile())throw new Error('vendor destination is not a regular file');
+      if(!(await fs.readFile(dest)).equals(bytes))throw new Error(`existing vendor bytes differ: ${path.relative(ROOT,dest)}`);return;
+    }catch(error){if(error.code!=='ENOENT')throw error;}
+    await fs.writeFile(dest,bytes,{flag:'wx'});
+  }else await fs.writeFile(dest,bytes);
+}
 
 function isInside(child, parent) {
   const rel = path.relative(parent, child);
@@ -111,7 +125,7 @@ async function clearVendor() {
 
 async function main() {
   const imports = await readImportMap();
-  await clearVendor();
+  if(!preserve)await clearVendor();
 
   const copied = new Map(); // repo-relative vendor path -> bytes
   const modules = []; // absolute vendor paths of JS modules
@@ -138,8 +152,7 @@ async function main() {
     const rel = path.relative(NODE_MODULES, src);
     packages.add(rel.startsWith('@') ? rel.split(path.sep).slice(0, 2).join('/') : rel.split(path.sep)[0]);
     const dest = path.join(VENDOR, rel);
-    await fs.mkdir(path.dirname(dest), { recursive: true });
-    await fs.copyFile(src, dest);
+    await copyBytes(dest,Buffer.from(source));
     copied.set(path.relative(ROOT, dest), Buffer.byteLength(source));
     modules.push(dest);
 
@@ -161,8 +174,7 @@ async function main() {
     for (const name of (await fs.readdir(src)).sort()) {
       const buf = await fs.readFile(path.join(src, name));
       const dest = path.join(VENDOR, dir, name);
-      await fs.mkdir(path.dirname(dest), { recursive: true });
-      await fs.writeFile(dest, buf);
+      await copyBytes(dest,buf);
       copied.set(path.relative(ROOT, dest), buf.length);
     }
   }
@@ -173,8 +185,7 @@ async function main() {
       try {
         const buf = await fs.readFile(src);
         const dest = path.join(VENDOR, pkg, name);
-        await fs.mkdir(path.dirname(dest), { recursive: true });
-        await fs.writeFile(dest, buf);
+        await copyBytes(dest,buf);
         copied.set(path.relative(ROOT, dest), buf.length);
         break;
       } catch {
@@ -185,6 +196,11 @@ async function main() {
       problems.push(`no LICENSE file found for vendored package ${pkg}`);
     }
   }
+
+  const parserLicense=await fs.readFile(path.join(ROOT,'tools/ktx-parse.LICENSE'));
+  const parserLicenseDest=path.join(VENDOR,'three/examples/jsm/libs/ktx-parse.LICENSE');
+  await copyBytes(parserLicenseDest,parserLicense);
+  copied.set(path.relative(ROOT,parserLicenseDest),parserLicense.length);
 
   // Every bare import inside vendor/ must resolve through the import map to a vendored file.
   for (const [spec, importer] of bareSeen) {

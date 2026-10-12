@@ -6,6 +6,8 @@ these project licences do not replace them or restrict public-domain sources.
 
 ## Code (vendored in `vendor/`, each folder carries its LICENSE)
 - three.js 0.186.1 — MIT — https://github.com/mrdoob/three.js
+- ktx-parse (the module bundled with pinned three.js 0.186.1) — MIT — Don McCurdy —
+  https://github.com/donmccurdy/ktx-parse; licence copied beside the vendored parser.
 - Yuka 0.7.8 — MIT — https://github.com/Mugen87/yuka
 - three.quarks 0.17.1 and quarks.core — MIT — https://github.com/Alchemist0823/three.quarks
 - ZzFX 1.4.0 — MIT — https://github.com/KilledByAPixel/ZzFX
@@ -19,7 +21,7 @@ these project licences do not replace them or restrict public-domain sources.
 - KTX-Software 4.4.2 — Apache-2.0 — https://github.com/KhronosGroup/KTX-Software/tree/v4.4.2
   (Actions-only atlas encoder; not shipped). Basis Universal transcoder bundled with three.js —
   Apache-2.0 — https://github.com/BinomialLLC/basis_universal/blob/master/LICENSE
-  (Actions compression review; runtime vendoring pending).
+  (Actions compression review only; the runtime direct ASTC adapter uses no transcoder).
 
 ## Data and assets
 - `assets/terrain/henry-hill.bin` — elevation from the USGS 3D Elevation Program (3DEP) bare-earth DEM,
