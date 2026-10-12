@@ -1,5 +1,11 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0148 — Accept observed difficulty distinctions without imposing a grade ordering (Astra, 2026-10-12)
+
+Independent actual4f334b5 shard4 artifact11761242799 and source review: all9 authored runs have identical accepted time-zero commands/seed/roster per phase, natural ends/errors0/no overflow, all9 pairwise order traces differ. Moore native memo/order[-85,202] transitions follow preceding refusal: Recruit716.75s crosses adjustedclock46,360 (previous46,346.5); Veteran698.50s distance455.30→454.75 below455; General507.95s682.84→682.48 below682.5. Early threat observed V/G, unobserved R; toObjective staysfalse, so no objective-redirection/universal grade-order/all-branches claim. Keep difficulty settings; bounded cadence/order/reserve gap closed. Failed aggregate4f CI remains failed for separate0147 sale race.
+
+cb82a67 CI38279658545 all9green, actual shard4 artifact11760904224 has159/159/no console errors/matrix299.44s/same real reserve transitions. Actual playthrough artifact11760649309 strictly parsed:201/201/errors0/600 reputation/L8/unique level2..8 receipts,3Draw/4Defeat/5Decisive observations. Remote main fast-forwarded cb82a67; automatic Pages38282924776 and mainCI38282924735 pending at transfer. Pending UI0144/banner0145/mixed0146/sale0147 are pushed only on owned branch, not accepted.
+
 ## 0147 — Await the confirmed sale transaction completion rather than a pre-event idle flag (Astra, 2026-10-12)
 
 Retain4f334b5 CI38279417122/test2 failed level-rewards-one-sale: observed570/L5/writes0 immediately after confirm; subsequent reload saw completed native sale. Dialog.close queues its close event, so importing may still be false before runEconomy begins. Test captures pre-confirm shop status, then awaits closed dialog, changed/nonempty status other than Saving…, and importing strictly false, using existing60000ms timeout. Both success and error settle this wait; unchanged level/reputation/depot/persisted-byte assertions decide success and report terminal status. No delay, expected-level polling or product change. CPU14+14mutants and syntax pass; browser/fullCI pending.

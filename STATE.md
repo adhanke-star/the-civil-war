@@ -1,19 +1,19 @@
 # STATE
-2026-10-12 — v1 released at 558456f; Codex/Sol sole writer in /private/tmp/cw-v1-1-20261012.
-Current branch v1-1-gaps-20261012; light loop (0108); Astra decides uncertain choices.
-v1 = the Western Campaign: Shiloh 4 + Stones River 4 + Chattanooga 3 phases through title -> decision cards ->
-briefing -> battle -> after-action (you vs history, replay) -> loot -> camp, with every P1-P7 system in
-(release notes: docs/release-v1.md; decisions 0108-0115).
-CI per SHA: 4 browser shards, CPU probes (+ --prove-fail), Firefox, WebKit, offline, full agent playthrough.
-v1.1: licence/terrain/command/Foragers accepted at268c501; origin/mainfb8733d after CI38277578796 all9green; Pages38281141861 green.
-Remote command (0119–0121): Hardee dawn/Slaughter Pen, Polk Round Forest, Cheatham/Maney only.
-CPU13/13 + mutants; carry projection09a12f1 CI38261729029 all9 jobs green, actual screenshots inspected.
-Full ASTC38261826032 fails short page4s; fresh cs-hybrid qualification0146 queued; no adoption.
-Scene38269841040 complete11x6states/404; peak437,579,014GPU exceeds250M; native memory unmeasured.
-Inactive2999 scene38276875167 complete/reupload; peak435,514,094 still>250M; partition38276878568 green; combined38279674390 green,432,441,700GPU>250M.
-Foragers4/4/Gold saved; CI38269804238 green. Difficulty sixcase e652 CI38274491038 green; Moore reserve added0142.
-Progression0137 candidate: thresholds/deferred cards+UTF8 cap, CPU14+mutants/actual605→L8 pass; fb8733d browser16 checks/fullCI green; actual530→L8/201checks, new copy0144 pending.
-Native UHD 617/iPad frame rates and device sound remain unmeasured; no requested device runs.
-MAIN checkout keeps 11 protected uncommitted P2o files untouched; P2o is parked (DECISIONS 0109).
-After completed v1.1/tag/release: Astra-approved v2 plan, officers, Confederate franchise, Eastern campaign,
-then achievements/challenges/NG+ and codex in weekly playable milestones. No new spending/accounts.
+2026-10-12 — v1 released at558456f; Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
+Branch v1-1-gaps-20261012; light loop0108; Astra decides uncertainty; COORDINATION absent.
+Existing Western campaign: Shiloh4+Stones4+Chattanooga3; current objective v1.1 then v2.
+origin/maincb82a67 accepted CI38279658545 all9green; Pages38282924776/mainCI38282924735 pending.
+Licence MIT/CC-BY4 approved; terrain/command/Foragers accepted268c501; progression acceptedfb8733d.
+Progression thresholds[0,30,75,135,210,300,405,525,660,800]; ascending capacity-bounded reward delivery.
+cb actualcampaign201/201/errors0/600rep/L8/receipts2..8; grades3Draw/4Defeat/5Decisive.
+Difficulty ninecase/actualMoore reserve accepted0148; retain settings; no universal grade ordering.
+Pending branch sourcec328ca8 CI38282610211: earned-level copy66/banner observation/sale completion wait.
+Mixed cs-hybrid9d60c12 qualification38282452947 running;8ASTC+2originalPNG; no runtime adoption.
+Parser/adapterCPU10+mutants, compression12+mutants; all576/newparserGPU/quality/export pending.
+Combined scene38279674390 complete11/GL0/404 and actual07/08/09 split images accepted0146.
+MeasuredGPU432,441,700>250M; both capability routes/max pools/latent/failure/pixel ceiling still UNRUN.
+All20 badge natural B/S/G evidence and level10 legal route still open; Foragers4/Gold saved.
+Owned .out294,463,082B of300M; preserve receipts, review future artifacts in RAM; disk12.4GiB free.
+MAIN13a7b136 protected11 dirtyP2o paths untouched; frozen Desktop read-only; no other writer.
+Native UHD617/iPad fps/sound remain UNMEASURED; no spending/accounts/device requests.
+After v1.1tag/release: Astra v2plan -> officers -> Confederate -> Eastern -> endgame/codex.

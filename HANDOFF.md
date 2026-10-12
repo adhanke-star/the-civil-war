@@ -1,5 +1,56 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+TRANSFER0148 — Fresh ChatGPT/Codex Sol sole writer; this session releases writing after this commit.
+Owned branch clean; sourcec328ca86c5a7671903a1f9e7c161bead2e9996da pushed; docs transfer follows it.
+Remote maincb82a67265c6eef7b6f8ac0496bcef9dbac113b6 fully accepted all9 CI38279658545.
+cb actual campaign artifact11760649309:201/201/errors0/600rep/L8/level2..8; shard4 artifact11760904224
+159/159/no console errors/nine difficulty cases and nativeMoore transitions. Astra0148 accepts bounded
+order/cadence/reserve evidence, retains settings; no universal grade order/objective-redirection claim.
+Automatic Pages38282924776/mainCI38282924735 pending, existingfb Pages38281141861 green.
+
+NEXT: read existing sourcec328 CI38282610211,9d CI38282451209,887 CI38282023076,45 CI38281225860;
+read mixed qualification38282452947/9d60c12 (already dispatched exactly once), do not cancel/duplicate.
+Retain failed249b7af CI38278399491/banner race and4f334b5 CI38279417122/sale pre-event race logs in.out.
+0145 owned DOM observer captures actual connected insertion/removal, no native timer change;0147 waits
+closed dialog+changed/nonempty/non-Saving status+strict idle (success OR error), no expectedlevelpolling.
+0144 copy sw66 shows earned-through level rather than exceeded threshold; fullCI/actualPNG review pending.
+
+Hybrid qualification: same bake38186582847/KTX4.4.2/exhaustive/linear/box/oncepremul;8ASTC+2byteexact
+originalshortPNGs, all576frames/anchors/dirs, actual newparserGPU mips0/1/2, unchanged RGB2/alpha1/
+edge95<=8/no clipped/samples>0, broken controls. Always reports/76sheets; optimized export artifact
+cs-close-qualified-hybrid ONLY on fullmixed success, diagnosticOnly/fieldablefalse. Prior failedfull-close
+38261826032 contains NO optimized files. ParserCPU10+10/compression12+12 pass; actualqualification UNRUN.
+
+Combined scene38279674390/cb artifact11760429580 independently read/root+Astra07/08/09 accepted exact
+camera/time200m swaps/restoration/readable bothhalves. All11 complete/GL0/unknown0/unmapped0/actual404;
+peak432,441,700/upper490,096,992>250M. Transition evidence ONLY; no prototype/loader/resource adoption.
+Next AFTERqualifiedassets: extend BakedAtlas ownership in src/units/impostor.js, use pure adapter
+src/units/atlas-compression.js; choose capablemixed vs exactcurrent single-basePNG close route BEFORE
+load; never bothPNGclose(170M)/allatlases275M. Atomic tier publish; settle ALL sibling tasks, disposeALL
+candidateownedtextures INCLUDINGshortPNGs before baselinefallback/rebindallclosepool layout/addTier.
+Retain field batches/references; exact page memory bytes; malformed/HTTP/actualupload/delayed sibling
+controls, both routes + max supported pools/casualties/latent uploads/lens/resize/failure/compare/reactivation
+scene measurements <=250,000,000 precede any measured pixelceiling and actualimage review/fullCI/adoption.
+
+In parallel only when solewriter can finish a bounded slice: six legal Veteran badge routes approved0141;
+labelled C.newCampaign/C.recordPhase Draw/null/units[]/loot[] prefix is allowed, retains actual recipe/save
+and extra low-loss income/levelcard consequences; do not spend/equip those generated prefix rewards or
+claim ordinary campaign produced army. Target actualcombat/feats/result/store persistence native.
+Slaughter coveredfire/defence/recovery; McFadden smaller supported assaults; Missionary successive positions;
+Buell gun-capture/march; keep actualForagersGold. Finite legalnative policies/trace accepted+refused, no
+manual gear/men/morale/feats/enemyorders/forcedwin/counterfarming. Naturalend, rawmeasures+B/S/Gtimes+
+opportunities/shortfalls and kept/offered/XFactor/reload/exportimport/duplicate, constructedprefix-labelled.
+CPUbookkeeping+forbiddenmutation mutants/UIflag/shard before Actions; atmostone revisedtactic thenAstra.
+Goldnumericalcrossing does not prove independent Bronze/Silver upgrades; woods onlyscenario polygons.
+
+.out294,463,082B (new tiny doc message adds bytes); no full disk downloads. RAM reader
+.out/read-artifact-r2.mjs readArtifact(artifactId,[exact root names]); boundedZIP/member selections<99MB;
+use node_repl emitImage({bytes,mimeType:PNG}) for actual numbered files. Do not parse>100MB or prune
+unknown receipts. Memory refs/oldproof regime are preservation history, not authority; no memory edits.
+No COORDINATION exists; read it before work if it appears. MAINprotected11 unchanged; no reset/stash/rebase/
+pull/broadadd there; ownedworktreeonly; CPUlocally/browsersActions; exactSHAall9green only remote-mainFF.
+No v1.1tag/release or v2plan/code yet. Continue through remainingv1 gaps/release then approvedv2 objective.
+
 Current boundary0144: fb8733d CI38277578796 all9green and actual playthrough201/201/errors0,
 12 observations (4Draw/4Defeat/3Decisive/1Victory), final save530 reputation/L8, distinct level2..8
 receipts and strict parser pass. Remote main fast-forwarded fb8733d; protected local MAIN untouched.
