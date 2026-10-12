@@ -300,15 +300,15 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     if (!v2) { shopOpen = false; return; }
     const next = nextLevelAt(saved.level), from = ECONOMY.levels[saved.level - 1], track = node('camp-rep-track');
     const pending=pendingLevelRewards(saved);
-    node('camp-reputation').textContent = `Reputation ${saved.reputation.toLocaleString()} · Level ${saved.level} of ${ECONOMY.levels.length} · ${next === null ? 'top level' : `next level at ${next.toLocaleString()}`} · ${saved.rp.toLocaleString()} points to spend`;
+    node('camp-reputation').textContent = `Reputation ${saved.reputation.toLocaleString()} · Level ${saved.level} of ${ECONOMY.levels.length} · ${pending ? `rewards earned through level ${saved.level + pending}` : next === null ? 'top level' : `next level at ${next.toLocaleString()}`} · ${saved.rp.toLocaleString()} points to spend`;
     const pendingNotice=node('camp-level-pending'),reason=pendingLevelRewardReason(saved);pendingNotice.hidden=!pending;
     const prefix=`${pending} level reward${pending===1?'':'s'} pending.`;
     pendingNotice.textContent=!pending?'':reason==='depot'?`${prefix} Turn in a card to free a depot slot; delivery also requires room in the save.`:reason==='size'?`${prefix} This save has reached its size limit. Your army and earned reputation are preserved.`:`${prefix} Reload the camp to retry delivery.`;
     track.hidden = next === null;
     if (next !== null) {
-      track.setAttribute('aria-label', pending ? 'Reputation; level rewards waiting for save space' : `Reputation toward level ${saved.level + 1}`);
+      track.setAttribute('aria-label', pending ? `Level ${saved.level + 1} reward delivery pending` : `Reputation toward level ${saved.level + 1}`);
       track.setAttribute('aria-valuemin', String(from)); track.setAttribute('aria-valuemax', String(next)); track.setAttribute('aria-valuenow', String(Math.max(from,Math.min(next,saved.reputation))));
-      track.setAttribute('aria-valuetext',`${saved.reputation.toLocaleString()} reputation${pending?`, ${pending} level rewards waiting for save space`:''}`);
+      track.setAttribute('aria-valuetext',`${saved.reputation.toLocaleString()} reputation${pending?`; rewards earned through level ${saved.level + pending}; ${pending} reward${pending===1?'':'s'} pending`:''}`);
       track.firstElementChild.style.width = `${Math.max(0, Math.min(100, Math.round(100 * (saved.reputation - from) / (next - from))))}%`;
     }
     node('camp-shop-new').hidden = saved.shopSeen >= saved.level;

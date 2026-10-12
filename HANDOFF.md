@@ -1,4 +1,19 @@
-# Handoff — existing v1 (2026-10-11, Claude Opus 5.5)
+# Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
+
+Current boundary0144: fb8733d CI38277578796 all9green and actual playthrough201/201/errors0,
+12 observations (4Draw/4Defeat/3Decisive/1Victory), final save530 reputation/L8, distinct level2..8
+receipts and strict parser pass. Remote main fast-forwarded fb8733d; protected local MAIN untouched.
+Browser deferred-reward16checks/320/axe0 passed; actual migrated and pending PNGs viewed.
+Astra pending-copy correction shows earned-through level8 instead of already-exceeded next300;
+label level6 delivery pending, value570/three pending; sw66, no storage/economy changes.
+CPU14+14mutants pass; this new copy requires its own fullCI before integration.
+Inactive2999 and partition2999 scene runs both green, still above250M; combined38279674390 pending
+with 07/08/09 native200m split framing. cb82a67/4f334b5/249b7af CI pending (actualMoore reserve).
+Root-owned uncommitted hybrid qualification in atlas-compression.js/current-compression.mjs is
+partial, not staged/adopted. Fresh8ASTC+2originalPNG/newparser GPU qualification required; prior
+failed ten-page run contains no optimized artifact. Existing .out receipts294MB: review future
+artifacts in RAM (.out/read-artifact-r2.mjs), no deletion/offload/full local report download.
+No COORDINATION present; sole writer /private/tmp/cw-v1-1-20261012; no simultaneous provider edits.
 
 0137 source candidate implements0134: pure level-rewards helper, coordinated validated load/import/complete/
 exchange/issue, baseline compare BEFORE migration, ascending bounded delivery for2000depot+1MiB UTF8.
