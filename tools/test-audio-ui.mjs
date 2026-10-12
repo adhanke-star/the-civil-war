@@ -54,7 +54,7 @@ export async function audioControls({ browser, url, check, shot, result, watchEr
     await page.waitForFunction(() => window.__ready && window.__game, null, { timeout: 180000 });
     if ((await page.locator('#sb-toggle').getAttribute('aria-expanded').catch(() => null)) === 'true') await page.locator('#sb-toggle').click();
     await page.locator('#battlefield').click({ position: { x: 640, y: 300 } }); // the first gesture
-    await page.waitForFunction(() => { const s = window.__game.audio.mixer.stats(); return s.state === 'running' && s.loaded.includes('volley-1') && s.loaded.includes('call-recall'); }, null, { timeout: 60000 })
+    await page.waitForFunction(() => { const s = window.__game.audio.mixer.stats(); return s.state === 'running' && ['volley-1', 'cannon', 'fire-bed', 'call-recall'].every((id) => s.loaded.includes(id)); }, null, { timeout: 60000 })
       .catch(() => {});
     const stats = await page.evaluate(() => window.__game.audio.mixer.stats());
     check('audio-battle-bank', stats.state === 'running' && ['volley-1', 'cannon', 'fire-bed', 'call-recall'].every((id) => stats.loaded.includes(id)) && !stats.loaded.some((id) => id.startsWith('music-')),

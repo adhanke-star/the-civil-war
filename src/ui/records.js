@@ -210,6 +210,8 @@ function shell(host, { id, eyebrow, title, extraClass = '' }) {
   };
   close.addEventListener('click', done);
   dialog.addEventListener('close', done);
+  // Esc closes it even where the browser withholds the dialog's own cancel (a modal shown without a fresh user gesture)
+  dialog.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); done(); } });
   if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
   heading.focus({ preventScroll: true });
   return { dialog, body, heading, close: done, isClosed: () => closed };
