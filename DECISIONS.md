@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0140 — Observe the coordinated launch read without weakening cancellation (Sol, 2026-10-12)
+
+CI38276475051 shard2 failed before the new level-reward browser flow: deployment's owned launch observer required readonly, while0137 now loads/reconciles inside the existing readwrite transaction. Observe that actual mode and reject readonly instead; preserve exact task/award/database/store/key/pending ownership, native Escape, settlement/focus, zero GPU/writes and exact observer restore. Retain the failed log; syntax check passes, corrected Actions still required.
+
+## 0139 — Limit extra Confederate close variation to the qualified capability route (Astra, 2026-10-12)
+
+Choose layout before close assets load: qualified ASTC uses eight compressed pages plus the two unchanged PNG short pages for both Confederate close looks. Unsupported/failed compression retains the exact current single base close look and all four current field looks, frames/directions/metadata. Never expand fallback to both PNG close looks (170,213,720 close bytes;275,132,692 all-sprite bytes before other scene allocations). Dispose partial compressed resources before loading baseline PNG and measure transitions. Both routes independently require complete scene<=250,000,000 and actual visual review; capability detection proves neither budget nor native quality/performance. Additional close variation is capability limited. Design approval only; assets/loader/route adoption still pending.
+
 ## 0138 — Preserve timed-out compositor receipts; capture actual battlefield canvas synchronously (Astra, 2026-10-12)
 
 Inactive8788dcb scene38274789165 failed the same30s Playwright compositor screenshot after nine complete phases/Lookout rigged draw; no LOD reupload ran. Partition8148 scene38273183860 similarly failed the first Lookout screenshot. Retain both logs/artifacts. Diagnostic-only native render once→GLfinish→immediate canvas PNG export in one synchronous evaluation, unchanged buffer/resolution/quality; retain all numbered images/11phases/LOD excursion. Decode PNGs, require exact canvas/GL dimensions, visible nonuniform pixels, native-render1/GL0/no unknowns, bind phase/style/compare/camera/SHA. These battlefield-canvas captures exclude DOM HUD; existing HUD screenshot gates remain. Root/Astra must inspect actual figures/terrain/compare halves/partition seams; nonblank alone is insufficient. CPU7/7+7mutants; corrected observations pending, no resource adoption.

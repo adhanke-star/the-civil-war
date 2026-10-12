@@ -188,7 +188,7 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
         gpu: window.__deployGpu, writes: window.__deployWrites, puts: window.__progressPuts });
       const ready = (row, owner = window.__entry?.deployment, s = state()) => !!row
         && owner === task && row.task === task && row.awardId === task.awardId
-        && row.database === 'cw.progress' && row.mode === 'readonly' && row.store === 'progress'
+        && row.database === 'cw.progress' && row.mode === 'readwrite' && row.store === 'progress'
         && row.key === 'cw.progress' && row.pending && !row.finished
         && s.importing && s.busy && !s.cancelled && !s.admitted && s.open && s.held && !s.released && s.gpu === 0;
       const clean = ({ task: ignored, ...row }) => row;
@@ -201,7 +201,7 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
       for (const type of ['cancel', 'close']) dialog.addEventListener(type, event, true);
       IDBDatabase.prototype.transaction = function (...args) {
         const tx = transact.apply(this, args);
-        if (this.name === 'cw.progress' && tx.mode === 'readonly' && tx.objectStoreNames.contains('progress')) {
+        if (this.name === 'cw.progress' && tx.mode === 'readwrite' && tx.objectStoreNames.contains('progress')) {
           const row = { task: window.__entry?.deployment, awardId: window.__entry?.deployment?.awardId,
             database: this.name, mode: tx.mode, pending: false, queued: state() };
           rows.push(row); byTransaction.set(tx, row);
@@ -230,7 +230,7 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
           const row = rows.find(row => ready(row)); if (!row) return { actual: false };
           const a = JSON.stringify(clean(row));
           const cases = [{ task: { ...task } }, { awardId: task.awardId + '-wrong' }, { database: 'other' },
-            { mode: 'readwrite' }, { store: 'other' }, { key: 'other' }, { pending: false }, { finished: 'complete' }];
+            { mode: 'readonly' }, { store: 'other' }, { key: 'other' }, { pending: false }, { finished: 'complete' }];
           const s = state();
           return { actual: ready(row), detached: cases.every(patch => !ready({ ...row, ...patch })),
             wrongOwner: !ready(row, { ...task }), released: !ready(row, task, { ...s, released: true }),
@@ -276,7 +276,7 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
       && retained.held && !retained.released && retained.gpu === 0 && nativeEscape.length === 2
       && nativeEscape.every(e => e.trusted) && cancelledLaunch && after.gpu === 0
       && after.writes === before.writes && after.puts === before.puts,
-    'actual pending canonical readonly request precedes native Escape; rejecting controls, retained owner, no GPU/write, settlement/focus and exact observer restore');
+    'actual pending canonical read in the coordinated readwrite transaction precedes native Escape; rejecting controls, retained owner, no GPU/write, settlement/focus and exact observer restore');
 
     const bads = [['missing', null, 'no completed army'], ['corrupt', '{broken', 'not valid json'],
       ['unsupported', JSON.stringify({ ...equipped, version: 2 }), 'unsupported'],
