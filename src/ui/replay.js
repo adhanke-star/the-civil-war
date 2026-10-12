@@ -168,7 +168,8 @@ export function mountReplay(host, { track, terrain = null, woods = [], reduced =
   }
   function frame(now) {
     if (S.dead || !S.playing) return;
-    const dt = S.last ? Math.min(100, now - S.last) : 0; S.last = now;
+    // up to 0.5 s a frame: a slow device (the battle still renders behind) keeps the 30 s pace; a tab switch does not jump
+    const dt = S.last ? Math.min(500, now - S.last) : 0; S.last = now;
     S.t = Math.min(t1, S.t + (dt / durationMs) * span);
     draw();
     if (S.t >= t1) { S.ended = true; root.dataset.ended = 'true'; setPlaying(false); return; }
