@@ -212,7 +212,8 @@ export async function historyControls({ browser, url, check, shot, result, watch
     await p2.goto(url + `?battle=${PACK_ID}&phase=p1&nosw`);
     await p2.waitForFunction(() => window.__ready && window.__game, null, { timeout: 180000 });
     // 30 s of battle (8 samples at 4 s): sample 1 arrives about 4 s into the 30 s replay, well inside the wait below
-    await p2.evaluate(() => { const g = window.__game.game; for (let i = 0; i < 600 && !g.over; i++) g.tick(0.05); });
+    // the Battles route opens on a paused briefing: resume first, or the ticks advance nothing and nothing is recorded
+    await p2.evaluate(() => { const g = window.__game.game; if (g.paused) g.togglePause(); for (let i = 0; i < 600 && !g.over; i++) g.tick(0.05); });
     await forceWin(p2);
     await p2.waitForFunction(() => document.getElementById('result').open && !document.getElementById('result-action').hidden, null, { timeout: 30000 });
     const panel = await p2.evaluate(() => document.getElementById('result-action').textContent);
@@ -222,7 +223,10 @@ export async function historyControls({ browser, url, check, shot, result, watch
     await p2.keyboard.press('Enter'); await p2.waitForFunction(() => document.querySelector('.rw[data-step="h"]'));
     await p2.keyboard.press('Enter'); await p2.waitForFunction(() => document.querySelector('.rw[data-step="r"] .rp'));
     const playing = await p2.evaluate(() => document.querySelector('.rp').dataset.playing);
-    await p2.waitForFunction(() => Number(document.querySelector('.rp').dataset.sample) > 0, null, { timeout: 25000 });
+    await p2.waitForFunction(() => Number(document.querySelector('.rp').dataset.sample) > 0, null, { timeout: 25000 }).catch(async (e) => {
+      const why = await p2.evaluate(() => { const r = document.querySelector('.rp'); return { ...r.dataset, sim: window.__game?.game?.simTime }; });
+      throw new Error(`the Battles replay never advanced: ${JSON.stringify(why)} (${e.message.split('\n')[0]})`);
+    });
     await p2.keyboard.press('Space'); // focus is on the page heading (not a button): Space pauses the replay
     const paused = await p2.evaluate(() => document.querySelector('.rp').dataset.playing);
     await shot(p2, 'history-battles-replay');
