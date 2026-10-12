@@ -4,8 +4,10 @@ TRANSFER0161 — context transfer before native maximum-stress/fault matrix impl
 sole writing at this docs-only skipCI relay; fresh ChatGPT/Codex Sol retains Aaron's selected main
 model/effort. Astra gpt-6-astra/high is read-only uncertainty judge, max ONE helper; prior helper must
 not be assumed available. Provider/session/weekly remaining usage unknown. No simultaneous edits.
-Latest SOURCE3ad8cd8df1f007295c2ca8b8d3de8039537d933c CI38323883661 running; WebKit green, other
-jobs pending at last read. Source is six paths: existing acquisition owner/test plus four relay docs.
+Latest SOURCE3ad8cd8df1f007295c2ca8b8d3de8039537d933c CI38323883661 running; probes/three smoke
+green, four shards/campaign pending. Original probe115057989694 log5,700,172B read in RAM,
+export51+51/scene38+38/cleanup12+12/terrain10+10/loader18+18/adapter10+10 confirmed; no refetch.
+Fresh smoke11779484124/11780026104/11779489011 each6/6 read. Source has six paths.
 CPU51+51 own controls, loader18+18, adapter10+10, unit/syntax/diff green; Astra approves source.
 Actual acquireQualifiedHybrid remains UNRUN: no runner-temp materialization/browser route/caller yet.
 Both metadata and downloaded digests precede extraction;11 optimized/three review JSONs/CRC/bounds;
@@ -15,7 +17,9 @@ canonical251/365/148/159/201/smoke6each clean. Actual native terrain fixture pro
 fresh restored native IDs/exact identities+bytes/pending labels/finish retirement/cleanup order/GL0.
 This fixture is not whole-battle restoration or a resource verdict. Parent maina9 automaticCI
 38316968182 independently all9green/full canonical readback. Pages38323648531 success/cw-v67 live.
-AutomaticmainCI38323648533 running; Firefox/WebKit/offline green, other jobs pending at last read.
+AutomaticmainCI38323648533 running; probes/three smoke green, four shards/campaign pending.
+Original probe115057239460 log5,696,688B read in RAM (prior export23+23 plus38/12/10/18/10);
+smoke11780100780/11779363858/11779583410 each6/6 read. Do not refetch completed producer logs.
 Resume both existing exact runs and canonical readback; repair actual reds, never rerun/cancel for luck.
 Only accepted SOURCE3ad8 integrates main; never docs-only relay using its parent's acceptance.
 Then new exactmainCI/Pages/liveSW. ProtectedMAIN13a7b136/indexEMPTY/exact11 paths untouched.
@@ -23,6 +27,11 @@ Owned worktree clean after relay; COORDINATION absent; .out294,505,584B before c
 Next source phase: synchronous native capacity/byte-state restoration; warm legal lazy owners,
 normal-motion200systems/800particles; fresh fault producers; full22+88 reducer/workflow; dispatch once
 only when complete. Keep all prior thresholds/caps/actual images/digests and fixedfloor>=250M HALT.
+Astra recommends generic synchronous transaction primitive in inactive-figures+CPU test first,
+then actual discovery/warming/bindings. Hidden restored meshes may skip GPU reupload: explicit native
+restored-array upload pass, then original visibility/counts and restored-scene render, both observed.
+Game.commandState already exposes flags/rings; legal cavalry Unit.mounts exposes private MountPool.
+No invented geometry.parent or renderer-cache version reset. Full next contract in retained packet.
 No v1.1tag/release/v2plan/code; natural badge/level10/device/resource/visual approval still open.
 Full load-bearing remaining contract is carried in .out/continuation-0161.txt and final fenced packet.
 
