@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0112 — A dominated objective is held at the day's end (2026-10-12)
+
+The first full agent playthrough (CI, 201/201 checks) ended 10 of 12 phases in a Draw, attacks included: any defender left inside the objective made it "contested". Game rule now: at the end of the day a contested objective goes to a side with at least three times the other's formed (not routing) men on it (`OBJECTIVE_DOMINANCE` in src/game.js); otherwise it is still a draw. A few stragglers no longer hold ground against a brigade. Henry Hill and the practice keep their own rules; every oracle is unchanged.
+
 ## 0111 — Confederate figures from their own bake (2026-10-12)
 
 The shader tint that turned the Union sprite grey (a placeholder DESIGN forbids shipping) is gone. `tools/bake` takes SIDE=cs and baked a Western shell-jacket infantryman (run 38186582847): grey jean, butternut and faded-tan jean, about three slouch hats to one forage cap, blanket roll, plain buckle, following a sourced dress summary; colours are Inferred estimates. Shipped: the close tier's base look and four field looks (14 MB of PNG); the other five looks stay in the CI artifact to hold graphics memory near the Union pack's. Each side's sprite pool loads its own atlas. Known gap: inside close range every Confederate wears the base look (a second close look costs about 100 MB of graphics memory uncompressed); GPU-compressed atlases (tools/bake/compress.mjs) would allow it.

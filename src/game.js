@@ -475,9 +475,12 @@ function scheduledReady(game, state) {
 
 /**
  * Battle-pack victory (the scenario names its attacker): a broken side loses; at the end the attacker
- * wins only by holding the objective alone, a contested objective is a draw, anything else is the
+ * wins by holding the objective alone or by dominating it, a contested objective is a draw, anything else is the
  * defender's. Grade is from the player's side. Henry Hill and practice keep their own rules above.
+ * Game rule (DECISIONS 0112): at the end of the day a contested objective goes to a side with at least
+ * OBJECTIVE_DOMINANCE times the other's men (formed, not routing) on it; a few stragglers do not hold ground.
  */
+export const OBJECTIVE_DOMINANCE = 3;
 function packResult(game, effective, ended) {
   const A = game.scenario.attacker, D = A === 'US' ? 'CS' : 'US';
   const V = game.scenario.victory || {}, o = game.objective;
@@ -486,8 +489,10 @@ function packResult(game, effective, ended) {
   if (effective(D) === 0 && !pendingInfantry(game, D)) result = { winner: A, why: V.defenderBroken ?? `The ${name(D)} line has broken.` };
   else if (effective(A) === 0 && !pendingInfantry(game, A)) result = { winner: D, why: V.attackerBroken ?? `The ${name(A)} line has broken.` };
   else if (ended) {
-    if (game.holder === A) result = { winner: A, why: V.attackerHolds ?? `${name(A)} troops hold ${o.name} at the end of the day.` };
-    else if (game.holder === 'contested') result = { winner: null, draw: true, why: V.draw ?? `${o.name} is still contested at the end of the day.` };
+    const st = game.objectiveStrength || { US: 0, CS: 0 }, k = OBJECTIVE_DOMINANCE;
+    const dominant = game.holder !== 'contested' ? null : st[A] >= k * st[D] ? A : st[D] >= k * st[A] ? D : null;
+    if (game.holder === A || dominant === A) result = { winner: A, why: V.attackerHolds ?? `${name(A)} troops hold ${o.name} at the end of the day.` };
+    else if (game.holder === 'contested' && !dominant) result = { winner: null, draw: true, why: V.draw ?? `${o.name} is still contested at the end of the day.` };
     else result = { winner: D, why: V.defenderHolds ?? `The ${name(A)} attack did not take ${o.name}.` };
   }
   if (!result) return null;
@@ -1168,6 +1173,7 @@ export class Game {
       if (Math.hypot(u.x - o.x, u.z - o.z) < o.r) strength[u.side] += u.men;
     }
     const prev = this.holder;
+    this.objectiveStrength = strength;
     this.holder = strength.US > 0 && strength.CS === 0 ? 'US' : strength.CS > 0 && strength.US === 0 ? 'CS' : strength.US || strength.CS ? 'contested' : 'none';
     if (prev && prev !== this.holder) {
       const ps = this.playerSide;

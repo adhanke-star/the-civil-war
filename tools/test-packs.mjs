@@ -127,6 +127,21 @@ export const PACK_CHECKS = [
     runUntilOver(g);
     assert.deepEqual(outcome(g), { over: true, winner: null, draw: true, why: `${HH.objective.name} is still contested at the end of the day.`, grade: 'draw' }, 'game-draw: contested is a draw');
   }],
+  ['game-dominance', async api => {
+    // game rule (DECISIONS 0112): a contested objective goes to a side with 3x the other's formed men on it at the day's end
+    const r = HH.objective.r, near = [OBJ[0] + r * 0.4, OBJ[1]];
+    const g = game(api, { attacker: 'US' }, { franklin: OBJ, jackson: near });
+    for (const u of g.units) u.holdFire = true;
+    unit(g, 'jackson').men = Math.floor(unit(g, 'franklin').men / 4);
+    runUntilOver(g);
+    assert.deepEqual(outcome(g), { over: true, winner: 'US', draw: false, why: `Union troops hold ${HH.objective.name} at the end of the day.`, grade: 'decisive' },
+      'game-dominance: 4:1 on a contested objective holds it');
+    const h = game(api, { attacker: 'US' }, { franklin: OBJ, jackson: near });
+    for (const u of h.units) u.holdFire = true;
+    unit(h, 'jackson').men = Math.floor(unit(h, 'franklin').men / 2);
+    runUntilOver(h);
+    assert.equal(outcome(h).draw, true, 'game-dominance: 2:1 is still a draw');
+  }],
   ['game-defender-broken', async api => {
     const g = game(api, { attacker: 'US', victory: { defenderBroken: 'Fictional: the defence broke.' } }, { franklin: FAR, jackson: [0, 0] });
     unit(g, 'jackson').takeLosses(500, g.fallen.CS, 0); g.combat.rout(unit(g, 'jackson'), true); g.tick(0.05);
@@ -183,6 +198,7 @@ const MUTANTS = {
   'game-attacker-us-holds': { transform: s => { delete s.attacker; return s; } },
   'game-attacker-cs-holds': { transform: s => { delete s.attacker; return s; } },
   'game-draw': { transform: s => { delete s.attacker; return s; } },
+  'game-dominance': { transform: s => { delete s.attacker; return s; } },
   'game-defender-broken': { transform: s => { delete s.victory; return s; } },
   'game-clock-ratio': { transform: s => { delete s.clockRatio; return s; } },
   'game-seed': { transform: s => { delete s.seed; return s; } },
