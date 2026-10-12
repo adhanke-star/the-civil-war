@@ -132,7 +132,8 @@ export async function delegationControls({ browser, url, check, shot, result, wa
     await frames(page, 3);
     const dragged = await read();
     record('drag-reclaims', !dragged.delegate && dragged.order.type === 'move' && dragged.orders === f0.orders + 1 && !dragged.undo
-      && dragged.card === '' && dragged.line !== 'DL', { delegate: dragged.delegate, order: dragged.order, line: dragged.line });
+      && dragged.card === '' && dragged.line !== 'DL', { delegate: dragged.delegate, order: dragged.order, line: dragged.line,
+      orders: [f0.orders, dragged.orders], undo: dragged.undo, card: dragged.card });
 
     // ---- Escape cancels: while picking, and in the chooser ------------------------------------------------
     await page.locator('#battlefield').focus();
