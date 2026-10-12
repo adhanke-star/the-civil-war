@@ -2,6 +2,7 @@
 // Presence rule reused from frozen T0-field-sandbox.js fldObjectiveStep; timing is game calibration.
 // Captured colours (ColourCaptures, below): which regiment colours a battle's formations took, zero random draws.
 import { TIER_BY_ID } from '../reward/data.js';
+export const GAME_SUPPLY_NOTE = 'Fictional supply objectives added for gameplay; these locations are not historical claims.';
 
 export class FieldCaptures {
   constructor(defs = []) {
@@ -11,7 +12,7 @@ export class FieldCaptures {
       if (!d || typeof d.id !== 'string' || !/^[a-z0-9-]{1,60}$/.test(d.id) || ids.has(d.id)
         || typeof d.name !== 'string' || !d.name.length || d.name.length > 80 || typeof d.tier !== 'string' || !Object.hasOwn(TIER_BY_ID, d.tier)
         || ![d.x, d.z, d.r].every(Number.isFinite) || Math.abs(d.x) > 10000 || Math.abs(d.z) > 10000
-        || d.r < 10 || d.r > 200) throw new Error('Invalid field crate');
+        || d.r < 10 || d.r > 200 || (Object.hasOwn(d, 'provenance') && d.provenance !== GAME_SUPPLY_NOTE)) throw new Error('Invalid field crate');
       ids.add(d.id);
       return { ...d, owner: null, status: 'unclaimed', candidate: null, seconds: 0 };
     });
@@ -38,7 +39,7 @@ export class FieldCaptures {
 
   held(side = 'US') {
     return this.crates.filter((c) => c.owner === side && c.status !== 'contested').map((c) => ({
-      id: c.id, tier: c.tier, from: `Captured: ${c.name} (fictional practice stores)`,
+      id: c.id, tier: c.tier, from: `Captured: ${c.name} (${c.provenance || 'fictional practice stores'})`,
     }));
   }
 }

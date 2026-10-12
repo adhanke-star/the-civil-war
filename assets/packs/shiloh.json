@@ -2922,7 +2922,8 @@
             "On 7 April Buell's Army of the Ohio and Grant's army attacked together: Nelson's, Crittenden's and McCook's divisions advanced from Pittsburg Landing while Lew Wallace's division attacked on the right.",
             "Beauregard, who had telegraphed Richmond claiming a complete victory and did not know Buell had arrived, could count perhaps 20,000 effectives on the morning line (NPS).",
             "Expect the hardest fighting in the Davis Wheat Field, Duncan Field and Woolf Field; Hazen's brigade took the heaviest Army of the Ohio losses.",
-            "This was a war to keep nearly four million people enslaved; neither the Confederates' early success nor Johnston's death changes what their army was fighting for."
+            "This was a war to keep nearly four million people enslaved; neither the Confederates' early success nor Johnston's death changes what their army was fighting for.",
+            "Fictional supply objectives added for gameplay; these locations are not historical claims."
           ],
           "quote": {
             "text": "whipped like hell before 10 O'clock tomorrow",
@@ -4002,6 +4003,44 @@
           ],
           "status": "Verified: Beauregard assumed command after Johnston was mortally wounded and halted the attacks at dark (ABT map page and battle summary; NPS Civil War Series 22)."
         },
+        "crates": [
+          {
+            "id": "buell-game-supply-1",
+            "name": "Game supply cache 1",
+            "tier": "common",
+            "x": -170,
+            "z": -650,
+            "r": 60,
+            "provenance": "Fictional supply objectives added for gameplay; these locations are not historical claims."
+          },
+          {
+            "id": "buell-game-supply-2",
+            "name": "Game supply cache 2",
+            "tier": "common",
+            "x": -100,
+            "z": -390,
+            "r": 60,
+            "provenance": "Fictional supply objectives added for gameplay; these locations are not historical claims."
+          },
+          {
+            "id": "buell-game-supply-3",
+            "name": "Game supply cache 3",
+            "tier": "common",
+            "x": -100,
+            "z": -150,
+            "r": 60,
+            "provenance": "Fictional supply objectives added for gameplay; these locations are not historical claims."
+          },
+          {
+            "id": "buell-game-supply-4",
+            "name": "Game supply cache 4",
+            "tier": "common",
+            "x": -180,
+            "z": 170,
+            "r": 60,
+            "provenance": "Fictional supply objectives added for gameplay; these locations are not historical claims."
+          }
+        ],
         "commanderTraits": {
           "P. G. T. Beauregard": [
             "cautious"

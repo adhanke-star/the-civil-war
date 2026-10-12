@@ -19,9 +19,12 @@ Next pack-figures.yml mode=scene observes all eleven current PNG scenes, both ar
 and failure, with conservative API reservations, complete mips and geometry. First scene38265339357 failed
 observer NPOT mip conversion, not nativeGL; omitted61,667,400 field atlas bytes, retained complete failed report/log.
 Fixed observer preserves native args, canonicalizes GLsizei levels, captures bookkeeping/console failures and
-bounded texture signatures/slots. CPU9/9 +9 mutants; one corrected Actions run authorized (0128).
-Root-owned Foragers WIP implements0127 four fictional common60m caches in Buell only, distinct performation/store
-credit and briefing/field/loot provenance. CPU6/6 +6 mutants; actual route/UI/fullCI UNRUN, no adoption yet.
+bounded texture signatures/slots. CPU9/9 +9 mutants; corrected b025453 Actions38266404188 running (0128).
+Foragers implementation0127 adds four fictional common60m caches in Buell only, distinct performation/store
+credit and briefing/field/loot provenance. CPU7/7 +7 mutants, unchanged badges15/15 +15 mutants and
+Shiloh12/12 +12 mutants; local unit smoke green. Actual route/UI/fullCI UNRUN, no adoption yet.
+New --foragers module/shard4 uses actual campaign save, Rousseau's four march controls, unchanged enemy AI/combat,
+supporting player attacks, native after-action/loot/save, 320px/keyboard/axe. No synthetic feats or fake battle result.
 Qualification remains fieldable=false: whole two-army scene/transition<=250,000,000, separate CPU peaks,
 capability/failure fallback and delegated root/Astra actual numbered-image review required. Owner-only
 visual approval from0123 is withdrawn (0124); Aaron sees actual images, no new permission gate.

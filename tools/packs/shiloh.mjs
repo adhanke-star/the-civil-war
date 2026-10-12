@@ -663,6 +663,11 @@ const P4_US = [EPPERSON, DANIEL(14, 'Second Day of Battle'), PA77, MEANDER, HOW]
 const PHASE4 = {
   id: 'buell-attacks', title: 'Buell attacks', subtitle: 'From Pittsburg Landing to the Hamburg-Purdy road, 7 April',
   date: '1862-04-07', start: '05:30', end: '15:00', clockRatio: 28, attacker: 'US', seed: 18620409,
+  // Optional game objectives, not historical supply locations (DECISIONS0127).
+  crates: [[-170,-650],[-100,-390],[-100,-150],[-180,170]].map(([x,z],i) => ({
+    id: `buell-game-supply-${i+1}`, name: `Game supply cache ${i+1}`, tier: 'common', x, z, r: 60,
+    provenance: 'Fictional supply objectives added for gameplay; these locations are not historical claims.',
+  })),
   // The Hamburg-Purdy road where it passes south of Duncan and Review fields: the two fields' midpoint moved 280 m
   // south onto the road; 600 m reaches both fields and the road between them.
   objective: { name: 'the Hamburg-Purdy road at Duncan and Review fields', at: { mid: ['duncan', 'review'], bearing: 180, m: 280 }, r: 600 },

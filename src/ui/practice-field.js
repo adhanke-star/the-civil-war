@@ -10,6 +10,8 @@ export function attachPracticeField({ game, scenario, hud, camera, terrain, rts,
   const counter = document.getElementById('capture-count'), layer = document.getElementById('field-crates');
   const stores = document.getElementById('field-stores'), actions = document.getElementById('stores-actions');
   const selection = document.getElementById('stores-selection'), timer = document.getElementById('intro-timer');
+  const notes = [...new Set(game.fieldCaptures.crates.map(c => c.provenance).filter(Boolean))];
+  for (const text of notes) { const note = document.createElement('p');note.className = 'sub';note.textContent = text;stores.insertBefore(note, selection); }
   if (manifest) {
     document.getElementById('intro-title').textContent = 'Your army on practice ground';
     document.getElementById('intro-text').textContent = `${manifest.allocation.formations} active formations · ${manifest.allocation.men.toLocaleString()} men · ${manifest.allocation.guns} guns. Hold the ground for 45 seconds and march onto stores. ${manifest.dormant.length} dormant formations stay unchanged in camp. Your actual losses and new loot return to camp; equipment and strengths are game values.`;

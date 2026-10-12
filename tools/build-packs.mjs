@@ -205,7 +205,7 @@ export function buildPackFrom(src, traits = traitsTable()) {
       retreat: Object.fromEntries(Object.entries(phase.retreat).map(([side, p]) => [side, resolve(p, `${phase.id} retreat ${side}`)])),
       camera,
       victory: { ...phase.victory },
-      briefing: { text: [...phase.briefing.text], ...(phase.briefing.quote ? { quote: { ...phase.briefing.quote } } : {}), sources: [...phase.briefing.sources] },
+      briefing: { text: [...phase.briefing.text, ...new Set((phase.crates || []).map(c => c.provenance).filter(Boolean))], ...(phase.briefing.quote ? { quote: { ...phase.briefing.quote } } : {}), sources: [...phase.briefing.sources] },
       // A woods-based pack clears its named fields; a fields-based pack plants its named woods (src.woods).
       ground: groundBase === 'fields' ? { base: 'fields', treeSpacing: src.treeSpacing }
         : { base: 'woods', clearings: on(src.clearings, terrain).map(([c, i]) => ({ name: c.name, polygon: oval(resolve(c.at, c.name), { ...c.shape, seed: i + 1 }) })), treeSpacing: src.treeSpacing },
@@ -219,6 +219,7 @@ export function buildPackFrom(src, traits = traitsTable()) {
       ...(reinforcements.length ? { reinforcements } : {}),
       ...(enemyCommander ? { enemyCommander } : {}),
       ...(commandChain !== undefined ? { commandChain } : {}),
+      ...(phase.crates ? { crates: structuredClone(phase.crates) } : {}),
       ...(Object.keys(commanderTraits).length ? { commanderTraits } : {}),
       positionsNote: phase.positionsNote,
       strengthNote: phase.strengthNote,

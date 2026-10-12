@@ -264,7 +264,7 @@ export function phaseOutcome({ game, scenario, awardId, seed }) {
     return row;
   });
   const grade = GAME_GRADES[game.result.grade] || (game.result.winner === 'US' ? 'Victory' : game.result.winner === null ? 'Draw' : 'Defeat');
-  const captures = heldCaptures(game, 'US', scenario.crates, (c) => `Captured: ${c.name}`);
+  const captures = heldCaptures(game, 'US', scenario.crates, (c) => `Captured: ${c.name}${c.provenance ? ` (${c.provenance})` : ''}`);
   const cards = awardCards({ awardId, seed, grade, captures });
   // The after-action's map replay (src/sim/recorder.js; only when a recorder was attached) and "you vs history".
   // a replay that cannot be recorded never blocks the phase result: the after-action then simply has no replay page

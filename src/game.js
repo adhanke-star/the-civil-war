@@ -111,6 +111,7 @@ const RIDE_SURRENDER_S = 3; // sim s of being ridden down after which a routing 
 // Difficulty and captured colours (see the header): game -> level; game -> { colours: ColourCaptures, fallen: Set of units seen dead }.
 const difficultyState = new WeakMap();
 const colourState = new WeakMap();
+const storeFeats = new WeakMap(); // Game/phase -> formation identity -> distinct store identities.
 /** This battle's difficulty level ('recruit' | 'veteran' | 'general'); Veteran for a Game made any other way. */
 export const difficultyOf = (game) => difficultyState.get(game) ?? 'veteran';
 /** The scenario's difficulty, else the page's ?difficulty= (Battles list), else Veteran. */
@@ -1184,13 +1185,18 @@ export class Game {
 
   /** Foragers (counting only): field stores taken go to the nearest unbroken formation of the taking side. */
   storesFeat(e) {
+    if (!this.fieldCaptures.crates.some(c => c.id === e.id && c.owner === e.side)) return;
     let best = null, bd = Infinity;
     for (const u of this.units) {
       if (u.side !== e.side || !u.alive || u.state === 'routing') continue;
       const d = Math.hypot(u.x - e.x, u.z - e.z);
       if (d < bd) { bd = d; best = u; }
     }
-    if (best) featsOf(best).stores++;
+    if (best) {
+      const byFormation = storeFeats.get(this) || new Map();storeFeats.set(this, byFormation);
+      const seen = byFormation.get(best.id) || new Set();byFormation.set(best.id, seen);
+      if (!seen.has(e.id)) { seen.add(e.id); featsOf(best).stores++; }
+    }
   }
 
   /** An X-Factor brigade's first fight this battle (it fires, is under fire or in melee): its moment and a feed line, once. */
