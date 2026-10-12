@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 205 256" role="img" aria-label="Generic officer silhouette">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 205 256" width="205" height="256" role="img" aria-label="Generic officer silhouette">
 <title>Generic silhouette: no sourced portrait (drawn for this game, CC0)</title>
 <defs><radialGradient id="g" cx="50%" cy="40%" r="70%"><stop offset="0" stop-color="#4a3c2a"/><stop offset="1" stop-color="#1c160f"/></radialGradient></defs>
 <rect width="205" height="256" fill="url(#g)"/>
