@@ -1,5 +1,31 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+TRANSFER0161 — context transfer before native maximum-stress/fault matrix implementation. Root releases
+sole writing at this docs-only skipCI relay; fresh ChatGPT/Codex Sol retains Aaron's selected main
+model/effort. Astra gpt-6-astra/high is read-only uncertainty judge, max ONE helper; prior helper must
+not be assumed available. Provider/session/weekly remaining usage unknown. No simultaneous edits.
+Latest SOURCE3ad8cd8df1f007295c2ca8b8d3de8039537d933c CI38323883661 running; WebKit green, other
+jobs pending at last read. Source is six paths: existing acquisition owner/test plus four relay docs.
+CPU51+51 own controls, loader18+18, adapter10+10, unit/syntax/diff green; Astra approves source.
+Actual acquireQualifiedHybrid remains UNRUN: no runner-temp materialization/browser route/caller yet.
+Both metadata and downloaded digests precede extraction;11 optimized/three review JSONs/CRC/bounds;
+exact retained reportSHA and48,996,984 close allocation required. No scene_routes/workflow dispatch.
+Accepted remote main68be65b8e90751467502a9279e37d325411bc712 branchCI38317432412 all9green,
+canonical251/365/148/159/201/smoke6each clean. Actual native terrain fixture proves92->132->92B,
+fresh restored native IDs/exact identities+bytes/pending labels/finish retirement/cleanup order/GL0.
+This fixture is not whole-battle restoration or a resource verdict. Parent maina9 automaticCI
+38316968182 independently all9green/full canonical readback. Pages38323648531 success/cw-v67 live.
+AutomaticmainCI38323648533 running; Firefox/WebKit/offline green, other jobs pending at last read.
+Resume both existing exact runs and canonical readback; repair actual reds, never rerun/cancel for luck.
+Only accepted SOURCE3ad8 integrates main; never docs-only relay using its parent's acceptance.
+Then new exactmainCI/Pages/liveSW. ProtectedMAIN13a7b136/indexEMPTY/exact11 paths untouched.
+Owned worktree clean after relay; COORDINATION absent; .out294,505,584B before commit note/packet.
+Next source phase: synchronous native capacity/byte-state restoration; warm legal lazy owners,
+normal-motion200systems/800particles; fresh fault producers; full22+88 reducer/workflow; dispatch once
+only when complete. Keep all prior thresholds/caps/actual images/digests and fixedfloor>=250M HALT.
+No v1.1tag/release/v2plan/code; natural badge/level10/device/resource/visual approval still open.
+Full load-bearing remaining contract is carried in .out/continuation-0161.txt and final fenced packet.
+
 LATEST0160 ACTIVE — Sol sole writer in /private/tmp/cw-v1-1-20261012; no simultaneous provider edits.
 Accepted source/main68be65b8e90751467502a9279e37d325411bc712 CI38317432412 all9green/fresh canonical
 251/365/148/159/201/errors[]/failure null/smoke6each clean. Actual native terrain lifecycle passes

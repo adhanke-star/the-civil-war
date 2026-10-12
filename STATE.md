@@ -1,5 +1,5 @@
 # STATE
-2026-10-12 — v1 released558456f; LATEST0160 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
+2026-10-12 — v1 released558456f; TRANSFER0161 fresh Codex/Sol owns /private/tmp/cw-v1-1-20261012.
 Branch v1-1-gaps-20261012; light loop0108; Astra uncertainty judge; COORDINATION absent.
 Objective v1.1 then Astra-approved weekly playable v2 milestones; no v1.1tag/v2plan/code yet.
 Accepted source/main68be65b CI38317432412 all9green/canonical shards251/365/148/159 clean.
@@ -12,7 +12,7 @@ Mixed38282452947/9d60c12 qualified; root+Astra viewed001–076; exact11files/576
 8ASTC+2originalPNG close48,996,984B; diagnostic only; no runtime asset adoption.
 0151 loader CPU18+18/adapter10+10/export23+23; latest actual11 UIrows/genuine native ASTC pass.
 0156 CPU38+38/cleanup12+12; native source92/chunks132/restored92B exact identities/bytes/retirement pass.
-0157 acquisitionCPU51+51/Astra/unit/syntax/diff green; fullCI pending; actual acquisition/matrix UNRUN.
+SOURCE3ad8cd8 acquisitionCPU51+51/Astra/unit/syntax/diff green; CI38323883661 pending; acquisition UNRUN.
 Whole scene GPU432,441,700>250M; qualified both×11/max pools/latent/fault/restoration/ceiling UNRUN.
 All20 badge natural B/S/G and legal level10 route open; six approved Veteran observations pending.
 .out near294.5MB/300M preserved; CPU local only; browser suites/scene runners Actions only.
