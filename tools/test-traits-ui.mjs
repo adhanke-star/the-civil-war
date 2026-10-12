@@ -61,7 +61,9 @@ export async function traitsControls({ browser, url, check, shot, result, watchE
     await page.locator('#uc-traits').scrollIntoViewIfNeeded(); await shot(page, 'traits-card');
 
     // the Records dialog by keyboard
-    await page.evaluate(() => { const { game } = window.__game; if (game.paused) game.togglePause(); });
+    // auto-pause off here: an arrival or rout pausing the running battle must not read as the dialog failing to resume it
+    await page.evaluate(async () => { (await import('./src/settings.js')).set('rules.autoPause', false);
+      const { game } = window.__game; if (game.paused) game.togglePause(); });
     await page.locator('#uc-traits-more').focus();
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => document.getElementById('traits-dialog')?.open, null, { timeout: 10000 });
