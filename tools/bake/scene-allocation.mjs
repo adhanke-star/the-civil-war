@@ -273,6 +273,7 @@ export function reduceSceneObservations(report, phases) {
     for(const s of Array.isArray(row?.states)?row.states:[])keep(s);
     for(const s of Array.isArray(row?.restoration?.samples)?row.restoration.samples:[])keep(s);
     for(const s of Array.isArray(row?.stress?.transaction?.samples)?row.stress.transaction.samples:[])keep(s?.observation);
+    for(const s of Array.isArray(row?.preload?.transaction?.samples)?row.preload.transaction.samples:[])keep(s?.observation);
   }
   if(report.sceneRoutes!==undefined&&!['current-png','qualified-both'].includes(report.sceneRoutes))fail('unknown scene route mode');
   if(report.sceneRoutes!=='qualified-both'&&(report.qualification!==undefined||report.faults!==undefined))fail('qualified evidence requires explicit qualified mode');
@@ -359,48 +360,24 @@ export function reduceSceneObservations(report, phases) {
       contexts.add(row?.contextId);
       if(row?.complete!==true||row.contextClosed!==true||!Array.isArray(row.errors)||row.errors.length)fail(label+': completed context');
       admission(row,label);
+      if(report.nativeHistoryRequired===true&&!row?.history)fail(label+': mandatory native allocation history');
     };
     const chronology=(list,label)=>{
       const ordered=list.filter(Boolean).slice().sort((a,b)=>a.sequence-b.sequence),seq=new Set();let peak=-1,finish=0;
       for(const s of ordered){const f=s.allocation?.calls?.finish||0;if(!safe(s.sequence)||seq.has(s.sequence)||s.allocation?.gpuPeak<peak||f<finish)fail(label+': sample chronology');seq.add(s.sequence);peak=s.allocation?.gpuPeak;finish=f;}
     };
-    for(const input of array(report.cases,'qualified cases')){
-      let row=input;try{row=expandSceneContext(input);}catch(error){fail(key(input)+': '+error.message);}
-      const label=key(row),states=array(row?.states,label+'/states'),transaction=row?.stress?.transaction,
-        stressSamples=array(transaction?.samples,label+'/stress samples');
-      for(const s of states)nativeSample(s,label+'/'+s?.label);
+    const validateNativeStress=(stress,e,label,mode)=>{
+      const transaction=stress?.transaction,stressSamples=array(transaction?.samples,label+'/stress samples');
       for(const s of stressSamples)nativeSample(s?.observation,label+'/stress/'+s?.label);
-      nativeRestore(row,label); // Collect every peak before rejecting malformed/duplicate identity.
-      if(!expected.includes(`${row?.packId}/${row?.phaseId}`)||!SCENE_ROUTES.includes(row?.route)||ordinary.has(label))fail(label+': ordinary tuple');
-      ordinary.set(label,{ordinaryRoster:row?.ordinaryRoster,warm:{retainedRoster:row?.warm?.retainedRoster,spawned:row?.warm?.spawned}});context(row,label);
-      const labels=states.map(s=>s?.label),required=['field','partition-field','inactive-field','both-close-tiers','lens-depth','lens-resize','lens-retired','narrow-resize',
-        'rigged-reactivation','near-lod-reupload','baked-reclamation','compare-rigged-left','compare-baked-left','baked-restored',
-        ...(row?.phaseId==='lookout-mountain'?['partition-native-zoom','framed-compare-rigged-left','framed-compare-baked-left','framed-baked-restored']:[])];
-      if(new Set(labels).size!==labels.length||required.some(l=>!labels.includes(l)))fail(label+': required ordinary/transition states');
-      for(const [name,viewport,lens] of [['field',[1024,768],false],['lens-depth',[1024,768],true],['lens-resize',[1366,1024],true],['lens-retired',[1366,1024],false],['narrow-resize',[320,568],false]]){
-        const s=states.find(s=>s?.label===name);
-        if(JSON.stringify(s?.viewport)!==JSON.stringify(viewport)||s?.lens!==lens||s?.dpr!==2)fail(label+': actual lens/viewport state '+name);
-      }
-      const pub=row?.publication,encodings=row?.route==='capable'?[...Array(4).fill('astc4x4'),'png',...Array(4).fill('astc4x4'),'png']:Array(5).fill('png');
-      if(pub?.fieldUnchanged!==true||pub.closePages!==encodings.length||JSON.stringify(pub.encodings)!==JSON.stringify(encodings)
-        ||pub.candidateRequests!==(row?.route==='capable'?10:0)||pub.failure!==null)fail(label+': exact route publication');
-      if(row?.ordinaryRoster===undefined||row?.warm?.baseline!=='explicitly warmed supported lazy resources, retained stress roster and native smoke; pristine state not claimed'
-        ||row.warm.afterOrdinary!==true||row.warm.retainedRoster===undefined||row.warm.combatUnchanged!==true)fail(label+': labelled warm baseline');
-      const transitions=Array.isArray(row?.transitions)?row.transitions:[],transitionContract=[['rigged-reactivation','rigged',false],['near-lod-reupload','rigged',false],['baked-reclamation','baked',false],['compare-rigged-left','rigged',true],['compare-baked-left','baked',true],['baked-restored','baked',false]];
-      if(!row?.lodReactivation?.after||row.lodReactivation.before?.id===row.lodReactivation.after.id||row.lodReactivation.fullArray!==true
-        ||new Set(transitions.map(t=>t?.label)).size!==transitions.length||transitionContract.some(([name,style,compare])=>!transitions.some(t=>t?.label===name&&t.style===style&&t.compare===compare))
-        ||transitions.some(t=>t?.combatUnchanged!==true||typeof t.combatBefore!=='string'||!t.combatBefore||t.combatBefore!==t.combatAfter))fail(label+': native transitions');
-      const authored=(Array.isArray(phases)?phases:[]).find(p=>p?.packId===row?.packId&&p?.phaseId===row?.phaseId)?.scenario;
-      let e;try{if(!authored||JSON.stringify(authored)!==JSON.stringify(row.scenario))throw Error('authored scenario binding');
-        e=deriveSceneStressContract(authored,{US:{field:2,close:3},CS:{field:4,close:row.route==='capable'?10:5}});
-        if(JSON.stringify(e)!==JSON.stringify(row.capacityContract))fail(label+': derived capacities');
-      }catch{fail(label+': authored capacity contract');}
+      const tiers={US:mode==='preclose'?['field']:['field','close'],CS:mode==='full'?['field','close']:['field']};
+      if(stress?.mode!==mode||JSON.stringify(stress.loadedTiers)!==JSON.stringify(tiers))fail(label+': explicit stress loaded tiers');
       const ownerLabels=e?['halos','horses','mounts','guns.US','guns.CS','guns.limbers','flags','smoke',...Array.from({length:e.commanders},(_,i)=>`rings.${i}`)]:[];
       if(e)for(const side of ['US','CS']){for(const lod of [0,1,2])ownerLabels.push(`procedural.${side}.lod${lod}`);ownerLabels.push(`fallen.${side}`);
-        for(const tier of ['field','close'])for(let page=0;page<e.pages[side][tier];page++)ownerLabels.push(`baked.${side}.${tier}.${page}`);}
-      const n=array(row?.stress?.native,label+'/native owners'),want=['stress','restore-upload','restored-scene'];
-      if(row?.stress?.ok!==true||transaction?.ok!==true||!Array.isArray(transaction.errors)||transaction.errors.length
+        for(const tier of (mode==='preclose'||mode==='terminal'&&side==='CS'?['field']:['field','close']))for(let page=0;page<e.pages[side][tier];page++)ownerLabels.push(`baked.${side}.${tier}.${page}`);}
+      const n=array(stress?.native,label+'/native owners'),want=['stress','restore-upload','restored-scene'];
+      if(stress?.ok!==true||transaction?.ok!==true||!Array.isArray(transaction.errors)||transaction.errors.length
         ||transaction.restoration?.restored!==true||n.length!==3||stressSamples.length!==3||want.some((l,i)=>n[i]?.label!==l||stressSamples[i]?.label!==l))fail(label+': stress transaction/restoration');
+      if(stressSamples.some((s,i)=>!safe(s?.observation?.sequence)||i>0&&s.observation.sequence<=stressSamples[i-1]?.observation?.sequence))fail(label+': native stress transaction order');
       for(const [receiptIndex,receipt] of n.entries()){
         const owners=array(receipt?.owners,label+'/native owner rows'),ids=new Set();
         const observation=stressSamples[receiptIndex]?.observation,slots=Array.isArray(observation?.allocation?.bufferSlots)?observation.allocation.bufferSlots:[];
@@ -432,12 +409,75 @@ export function reduceSceneObservations(report, phases) {
           if(ownerBytes!==owner?.bytes)fail(label+': owner array bytes');
           dynamicBytes+=ownerBytes;dynamicArrays+=arrays.length;
         }
-        if(row?.stress?.uniqueDynamicBytes!==dynamicBytes||transaction?.restoration?.arrays!==dynamicArrays)fail(label+': complete latent array restoration');
+        if(stress?.uniqueDynamicBytes!==dynamicBytes||transaction?.restoration?.arrays!==dynamicArrays)fail(label+': complete latent array restoration');
         if(!safe(observation?.declaredArrayBytes)||observation.declaredArrayBytes<dynamicBytes)fail(label+': complete declared dynamic arrays');
         if(slots.some(b=>Array.isArray(b?.owners)&&b.owners.some(l=>ownerLabels.includes(l))&&!ids.has(b.id)))fail(label+': unreported native owner reservation');
       }
-      if(row?.stress?.smoke?.systems!==200||row.stress.smoke.particles!==800||row.stress.smoke.capacity!==1000
+      if(stress?.smoke?.systems!==200||stress.smoke.particles!==800||stress.smoke.capacity!==1000
         ||!n.every(s=>Array.isArray(s?.owners)&&s.owners.some(o=>o?.label==='smoke'&&o.bytes===48000)))fail(label+': full native smoke');
+    };
+    for(const input of array(report.cases,'qualified cases')){
+      let row=input;try{row=expandSceneContext(input);}catch(error){fail(key(input)+': '+error.message);}
+      const label=key(row),states=array(row?.states,label+'/states'),transaction=row?.stress?.transaction,
+        stressSamples=array(transaction?.samples,label+'/stress samples');
+      for(const s of states)nativeSample(s,label+'/'+s?.label);
+      for(const s of stressSamples)nativeSample(s?.observation,label+'/stress/'+s?.label);
+      nativeRestore(row,label); // Collect every peak before rejecting malformed/duplicate identity.
+      if(!expected.includes(`${row?.packId}/${row?.phaseId}`)||!SCENE_ROUTES.includes(row?.route)||ordinary.has(label))fail(label+': ordinary tuple');
+      ordinary.set(label,{ordinaryRoster:row?.ordinaryRoster,warm:{retainedRoster:row?.warm?.retainedRoster,spawned:row?.warm?.spawned}});context(row,label);
+      const labels=states.map(s=>s?.label),required=['field','partition-field','inactive-field','both-close-tiers','lens-depth','lens-resize','lens-retired','narrow-resize',
+        'rigged-reactivation','near-lod-reupload','baked-reclamation','compare-rigged-left','compare-baked-left','baked-restored',
+        ...(row?.phaseId==='lookout-mountain'?['partition-native-zoom','framed-compare-rigged-left','framed-compare-baked-left','framed-baked-restored']:[])];
+      if(new Set(labels).size!==labels.length||required.some(l=>!labels.includes(l)))fail(label+': required ordinary/transition states');
+      if(row?.phaseId==='lookout-mountain'){
+        const captures=array(row?.canvasCaptures,label+'/canvas captures'),captureLabels=['terrain-partition-01-before.png','terrain-partition-02-after.png','terrain-partition-03-zoom.png',
+          'rigged-reactivation','near-lod-reupload','baked-reclamation','compare-rigged-left','compare-baked-left','baked-restored','framed-compare-rigged-left','framed-compare-baked-left','framed-baked-restored'];
+        if(captures.length!==12||new Set(captures.map(c=>c?.label)).size!==12||captureLabels.some(l=>!captures.some(c=>c?.label===l)))fail(label+': complete numbered Lookout canvas captures');
+        for(const c of captures){
+          if(c?.phase!==row.phaseId||c.toolSha!==report.toolSha||typeof c.filename!=='string'||!c.filename.startsWith(`${row.packId}-${row.phaseId}-${row.route}-`)
+            ||!/^[-a-zA-Z0-9_.]+\.png$/.test(c.filename)||!safe(c.bytes)||!c.bytes||!/^[a-f0-9]{64}$/.test(c.sha256||'')
+            ||!Number.isSafeInteger(c.width)||c.width<1||!Number.isSafeInteger(c.height)||c.height<1||c.width!==c.drawingWidth||c.height!==c.drawingHeight
+            ||c.nativeRenders!==1||c.glError!==0||c.opaque!==true||c.nonuniform!==true||c.kind!=='battlefield-canvas capture; DOM HUD excluded')fail(label+': actual canvas bytes/draw/readback');
+          const camera=c?.camera;
+          if(!Array.isArray(camera?.position)||camera.position.length!==3||!camera.position.every(Number.isFinite)
+            ||!Array.isArray(camera?.quaternion)||camera.quaternion.length!==4||!camera.quaternion.every(Number.isFinite)
+            ||!['fov','near','far'].every(k=>Number.isFinite(camera?.[k]))||camera.near<=0||camera.far<=camera.near
+            ||!['x','z','yaw','pitch','dist'].every(k=>Number.isFinite(camera?.goal?.[k])))fail(label+': actual native camera bindings');
+          for(const kind of ['terrain','trees']){
+            const world=c?.world?.[kind],owners=Array.isArray(world?.owners)?world.owners:[];
+            if(typeof world?.root!=='string'||!world.root||!owners.length||owners.some(o=>typeof o?.mesh!=='string'||!o.mesh||typeof o.geometry!=='string'||!o.geometry
+              ||!Array.isArray(o.arrays)||!o.arrays.length||o.arrays.some(a=>typeof a?.key!=='string'||!safe(a.bytes)||a.bytes===0||!/^[a-f0-9]{64}$/.test(a.sha256||''))
+              ||kind==='terrain'&&!o.arrays.some(a=>a.key==='position'&&a.bytes>0))
+              ||kind==='trees'&&!owners.some(o=>Array.isArray(o.arrays)&&o.arrays.some(a=>a.key==='instanceMatrix'&&a.bytes>0)))fail(label+': actual '+kind+' array bindings');
+          }
+          if(!safe(c?.world?.trees?.count)||!c.world.trees.count||!Array.isArray(c?.roster)||!c.roster.length||JSON.stringify(c.roster)!==JSON.stringify(row.ordinaryRoster))fail(label+': actual trees and ordinary roster');
+        }
+        const frames=['framed-compare-rigged-left','framed-compare-baked-left','framed-baked-restored'].map(l=>captures.find(c=>c?.label===l)),framed=row?.framedComparison;
+        if(!framed||!Array.isArray(framed.position)||framed.position.length!==2||framed.simTime!==0||framed.goal?.dist!==200
+          ||frames.some((c,i)=>!c||c.simTime!==framed.simTime||c.style!==['rigged','baked','baked'][i]||c.camera?.goal?.dist!==200
+            ||(i<2?c.comparison?.key!=='look.figureStyle'||c.comparison.a!==c.style||c.comparison.b!==['baked','rigged'][i]||c.comparison.split!==0.5:c.comparison!==null)
+            ||!Array.isArray(c.roster)||!c.roster.some(u=>u.id===framed.unitId&&u.x===framed.position[0]&&u.z===framed.position[1])
+            ||JSON.stringify(c.camera)!==JSON.stringify(frames[0]?.camera)||JSON.stringify(c.world)!==JSON.stringify(frames[0]?.world)||JSON.stringify(c.roster)!==JSON.stringify(frames[0]?.roster)))fail(label+': stable readable 200m framed comparison');
+      }
+      for(const [name,viewport,lens] of [['field',[1024,768],false],['lens-depth',[1024,768],true],['lens-resize',[1366,1024],true],['lens-retired',[1366,1024],false],['narrow-resize',[320,568],false]]){
+        const s=states.find(s=>s?.label===name);
+        if(JSON.stringify(s?.viewport)!==JSON.stringify(viewport)||s?.lens!==lens||s?.dpr!==2)fail(label+': actual lens/viewport state '+name);
+      }
+      const pub=row?.publication,encodings=row?.route==='capable'?[...Array(4).fill('astc4x4'),'png',...Array(4).fill('astc4x4'),'png']:Array(5).fill('png');
+      if(pub?.fieldUnchanged!==true||pub.closePages!==encodings.length||JSON.stringify(pub.encodings)!==JSON.stringify(encodings)
+        ||pub.candidateRequests!==(row?.route==='capable'?10:0)||pub.failure!==null)fail(label+': exact route publication');
+      if(row?.ordinaryRoster===undefined||row?.warm?.baseline!=='explicitly warmed supported lazy resources, retained stress roster and native smoke; pristine state not claimed'
+        ||row.warm.afterOrdinary!==true||row.warm.retainedRoster===undefined||row.warm.combatUnchanged!==true)fail(label+': labelled warm baseline');
+      const transitions=Array.isArray(row?.transitions)?row.transitions:[],transitionContract=[['rigged-reactivation','rigged',false],['near-lod-reupload','rigged',false],['baked-reclamation','baked',false],['compare-rigged-left','rigged',true],['compare-baked-left','baked',true],['baked-restored','baked',false]];
+      if(!row?.lodReactivation?.after||row.lodReactivation.before?.id===row.lodReactivation.after.id||row.lodReactivation.fullArray!==true
+        ||new Set(transitions.map(t=>t?.label)).size!==transitions.length||transitionContract.some(([name,style,compare])=>!transitions.some(t=>t?.label===name&&t.style===style&&t.compare===compare))
+        ||transitions.some(t=>t?.combatUnchanged!==true||typeof t.combatBefore!=='string'||!t.combatBefore||t.combatBefore!==t.combatAfter))fail(label+': native transitions');
+      const authored=(Array.isArray(phases)?phases:[]).find(p=>p?.packId===row?.packId&&p?.phaseId===row?.phaseId)?.scenario;
+      let e;try{if(!authored||JSON.stringify(authored)!==JSON.stringify(row.scenario))throw Error('authored scenario binding');
+        e=deriveSceneStressContract(authored,{US:{field:2,close:3},CS:{field:4,close:row.route==='capable'?10:5}});
+        if(JSON.stringify(e)!==JSON.stringify(row.capacityContract))fail(label+': derived capacities');
+      }catch{fail(label+': authored capacity contract');}
+      validateNativeStress(row?.stress,e,label,'full');
       chronology([...states,...stressSamples.map(s=>s?.observation),...array(row?.restoration?.samples,label+'/chronology restore')],label);
     }
     for(const input of array(report.faults,'qualified faults')){
@@ -448,6 +488,25 @@ export function reduceSceneObservations(report, phases) {
       nativeRestore(row,label);
       if(!expected.includes(`${row?.packId}/${row?.phaseId}`)||!SCENE_FAULTS.some(f=>f.route===row?.route&&f.fault===row?.fault)||faultSeen.has(label))fail(label+': fault tuple');
       faultSeen.add(label);context(row,label);
+      let e;try{
+        const authored=(Array.isArray(phases)?phases:[]).find(p=>p?.packId===row?.packId&&p?.phaseId===row?.phaseId)?.scenario;
+        if(!authored||JSON.stringify(authored)!==JSON.stringify(row.scenario))throw Error('authored fault scenario');
+        e=deriveSceneStressContract(authored,{US:{field:2,close:3},CS:{field:4,close:5}});
+        if(JSON.stringify(e)!==JSON.stringify(row.capacityContract))fail(label+': derived fault capacities');
+      }catch{fail(label+': authored fault capacity contract');}
+      const pre=row?.preload,want=['stress','restore-upload','restored-scene'],sequences=array(pre?.sampleSequences,label+'/preload sequences');
+      const preloadSamples=sequences.map((sequence,i)=>({label:want[i],observation:states.find(s=>s?.sequence===sequence)}));
+      if(sequences.length!==3||new Set(sequences).size!==3||sequences.some(n=>!safe(n))||pre?.transaction?.samples!==undefined
+        ||preloadSamples.some((s,i)=>s.observation?.label!=='preclose-'+want[i]||states.filter(x=>x?.sequence===sequences[i]).length!==1)
+        ||pre?.baseline!=='explicitly warmed supported lazy resources, retained stress roster and native smoke; pristine state not claimed'
+        ||pre?.retainedRoster===undefined||JSON.stringify(pre.retainedRoster)!==JSON.stringify(ordinary.get(key(row))?.warm?.retainedRoster)
+        ||pre?.combatUnchanged!==true)fail(label+': complete labelled preload baseline');
+      for(const boundary of ['before','after']){
+        const p=pre?.[boundary];
+        if(!p||!['US','CS'].every(side=>p[side]?.fieldReady===true&&p[side].closePromise===false&&p[side].closeTextures===false
+          &&p[side].closeBatches===0&&p[side].closeRequests===0)||p.currentSingleBaseBound!==true)fail(label+': zero-close preload '+boundary);
+      }
+      validateNativeStress({...pre,transaction:{...pre?.transaction,samples:preloadSamples}},e,label+'/preload','preclose');
       const events=array(row?.events,label+'/events'),eventSeq=new Set();let prior=-1;
       for(const event of events){if(!safe(event?.sequence)||event.sequence<=prior||eventSeq.has(event.sequence)||typeof event?.operation!=='string')fail(label+': ordered fault events');eventSeq.add(event?.sequence);prior=event?.sequence;}
       const ops=op=>events.filter(e=>e?.operation===op),fired=ops('fault-fired'),terminal=['candidate-then-baseline-terminal','baseline-terminal'].includes(row?.fault),
@@ -455,12 +514,20 @@ export function reduceSceneObservations(report, phases) {
       if(fired.length!==1||fired[0]?.fault!==row?.fault||first.length!==1)fail(label+': actual fault/first baseline request');
       const firstSample=states.find(s=>s?.label==='first-baseline-request'),pending=states.find(s=>s?.label===pendingLabel),settled=states.find(s=>s?.label===settledLabel);
       const start=states.find(s=>s?.label==='fault-start');
+      const postSamples=array(row?.stress?.transaction?.samples,label+'/postoutcome samples');
+      validateNativeStress(row?.stress,e,label+'/postoutcome',terminal?'terminal':'full');
+      if(preloadSamples.some(s=>!s.observation||s.observation.sequence>=start?.sequence)
+        ||postSamples.length!==3||postSamples.some(s=>!s?.observation||s.observation.sequence<=pending?.sequence||s.observation.sequence>=settled?.sequence
+          ||(s.observation.allocation?.calls.finish||0)!==(start?.allocation?.calls.finish||0)
+          ||row?.route==='capable'&&s.observation.allocation?.pendingDeleteBytes<firstSample?.allocation?.pendingDeleteBytes))fail(label+': preload and pending postoutcome stress chronology');
       if(!start||start.sequence>=firstSample?.sequence||(start.allocation?.calls.finish||0)!==(firstSample?.allocation?.calls.finish||0))fail(label+': no implicit finish through fault and fallback');
       if(!firstSample||firstSample.sequence!==first[0]?.sequence||!pending||!settled||firstSample.sequence>=pending.sequence||pending.sequence>=settled.sequence
         ||first[0]?.beforeNativeLoader!==true||(firstSample.allocation?.calls.finish||0)!==(pending.allocation?.calls.finish||0)
         ||(settled.allocation?.calls.finish||0)<=(pending.allocation?.calls.finish||0))fail(label+': observational overlap and explicit settlement');
       const baselineUploads=ops('baseline-upload'),baselineSettled=ops('baseline-settled'),baselineSamples=states.filter(s=>s?.label==='baseline-upload');
       if(baselineUploads.length!==(terminal?4:5)||baselineSamples.length!==baselineUploads.length||baselineSettled.length!==5
+        ||baselineSettled.some(e=>!['soldier_close_0.png','soldier_close_1.png','soldier_close_2.png','soldier_close_3.png','soldier_close_4.png'].includes(e.page))
+        ||terminal&&baselineSettled.find(e=>e.outcome==='rejected')?.page!=='soldier_close_0.png'
         ||new Set(baselineUploads.map(e=>e.page)).size!==baselineUploads.length||new Set(baselineSamples.map(e=>e.page)).size!==baselineSamples.length
         ||new Set(baselineSettled.map(e=>e.page)).size!==5||baselineSettled.filter(e=>e.outcome==='rejected').length!==(terminal?1:0)
         ||baselineSettled.some(e=>!['fulfilled','rejected'].includes(e.outcome)||e.sequence<=first[0]?.sequence||e.sequence>=pending?.sequence)
@@ -501,6 +568,9 @@ export function reduceSceneObservations(report, phases) {
           const held=ops('sibling-held'),checked=ops('held-check'),released=ops('sibling-released');
           if(held.length!==1||checked.length!==1||released.length!==1||held[0].sequence>=checked[0]?.sequence||checked[0].sequence>=released[0]?.sequence
             ||released[0].sequence>=first[0]?.sequence||checked[0]?.published!==false||checked[0].baselineRequests!==0
+            ||checked[0]?.nonHeldSettled!==9||checked[0]?.rejectionCount!==1
+            ||settlements.filter(e=>e.page!==held[0]?.page&&e.sequence<checked[0]?.sequence).length!==9
+            ||!rejected.some(e=>e.sequence<checked[0]?.sequence)
             ||held[0]?.encoding!==(row.fault.endsWith('astc')?'astc4x4':'png')||!settlements.some(e=>e.page===held[0]?.page&&e.sequence>released[0]?.sequence)
             ||!uploaded.some(e=>e.page===held[0]?.page&&e.sequence>released[0]?.sequence))fail(label+': delayed sibling evidence');
         }

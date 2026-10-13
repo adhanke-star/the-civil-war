@@ -1,5 +1,20 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0171 — root ACTIVE same-session sole writer; no transfer. Branch HEAD88c9fd3c7be2e141b9ab436d87ba64fd5198d073.
+0167 complete22ordinary+88freshfault runner/reducer WIP Astra source-clear, root168+168/unit/syntax/diff pass.
+Qualified acquisition/materialization/routes/full native fault matrix/resource ceiling remain UNRUN.
+Workflow now explicitscene_routes defaultcurrent-png/qualified-both, bothprototype guards/90minute qualified bound.
+Next commit/push scoped0167 source/docs, read its exactSHA all9CI and own canonical before once dispatching:
+gh workflow run pack-figures.yml --ref v1-1-gaps-20261012 -f mode=scene -f inactive=true -f partition=true -f scene_routes=qualified-both
+Source88 CI38337766428 all9/full own251/365/171/159+campaign201+three6smokes+probe5,714,066B clean.
+Actual current-PNG nativepreclose/full/terminal prerequisites pass, not qualified matrix/resource acceptance.
+Acceptedremote main118; ownmainCI38339367881 all9green/full own251/365/164/159+campaign201/smokes/probe clean;
+Pages38339367906 exact118 success/livecw-v68 fetched. No pending acceptance for118.
+ProtectedMAIN13a7b136 exact11paths/indexempty preserved. Local npm browser attempt interrupted130/unaccepted,
+four ownnew PNGs retained/.out297,938,617B; CPU --unit passed. No local browser/downloads/prune or simultaneous edits.
+Nativehistory strictness relies on mandatory producer flag; independent consumers remain downgradeable.
+No runtimeassets/policy/SW/release adoption. Continue autonomous loop through routine greens/CI waits.
+
 LATEST0170 — root ACTIVE sole writer; no transfer. Source11803b66a0e5246e2d6c76414d22a69c443b276f
 CI38336271223 running; shard3/startup164 artifact unread. 0166 loaded-tier modes root+Astra99+99,
 unit/syntax/diff pass. Actions-only two-context preclose/full/terminal fixture expected shard3 171,

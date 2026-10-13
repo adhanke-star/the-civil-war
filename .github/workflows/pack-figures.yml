@@ -23,6 +23,13 @@ on:
         description: Scene mode only; diagnostic lossless Uint16 terrain partitions
         type: boolean
         default: false
+      scene_routes:
+        description: Scene mode only; complete qualified two-route observation
+        type: choice
+        default: current-png
+        options:
+          - current-png
+          - qualified-both
 permissions:
   contents: read
   actions: read
@@ -32,7 +39,7 @@ concurrency:
 jobs:
   package:
     runs-on: ubuntu-24.04
-    timeout-minutes: ${{ (inputs.mode == 'candidate' || inputs.mode == 'current' || inputs.mode == 'cs-close' || inputs.mode == 'cs-hybrid') && 90 || 40 }}
+    timeout-minutes: ${{ (inputs.mode == 'candidate' || inputs.mode == 'current' || inputs.mode == 'cs-close' || inputs.mode == 'cs-hybrid' || (inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both')) && 90 || 40 }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -119,6 +126,7 @@ jobs:
         env:
           SCENE_INACTIVE: ${{ inputs.inactive }}
           SCENE_PARTITION: ${{ inputs.partition }}
+          SCENE_ROUTES: ${{ inputs.scene_routes }}
         run: |
           node tools/test-scene-allocation.mjs
           node tools/test-scene-allocation.mjs --prove-fail
@@ -134,6 +142,7 @@ jobs:
           name: scene-allocation
           path: |
             .out/scene-allocation/report.json
+            .out/scene-allocation/report-overflow.json.gz
             .out/scene-allocation/*.png
           retention-days: 7
           if-no-files-found: warn
