@@ -1,7 +1,7 @@
 // Pure CPU controls: fake native GL records unchanged calls; no browser or renderer is launched.
 import assert from 'node:assert/strict';
 import {isDeepStrictEqual} from 'node:util';
-import {AllocationLedger,mipSizes,installAllocationObserver,ReservationPeak,rejectionObservation,reduceSceneObservations,sampleSceneAllocations,initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,expandSceneContext,sceneReportEnvelope,scenePartHeader,createSceneMatrixMerger} from './bake/scene-allocation.mjs';
+import {AllocationLedger,mipSizes,installAllocationObserver,ReservationPeak,rejectionObservation,reduceSceneObservations,reduceFocusedLookoutObservations,focusedSceneResourceErrors,sampleSceneAllocations,initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,expandSceneContext,sceneReportEnvelope,scenePartHeader,createSceneMatrixMerger} from './bake/scene-allocation.mjs';
 import {deriveSceneStressContract} from './bake/inactive-figures.mjs';
 import {QUALIFIED_HYBRID} from './bake/review-current-compression.mjs';
 
@@ -39,7 +39,8 @@ function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,s
     gl.generateMipmap(gl.TEXTURE_2D);const rgba=snap(),textureIdentity=window.__allocation.textureReservation(gl,t),foreignTextureIdentity=window.__allocation.textureReservation(gl,{});
     gl.deleteTexture(t);const beforeFinish=snap(),pendingTextureIdentity=window.__allocation.textureReservation(gl,t);gl.finish();const afterFinish=snap(),retiredTextureIdentity=window.__allocation.textureReservation(gl,t);
     bind('TEXTURE_BINDING_2D');gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,8,4,0,gl.RGBA,gl.HALF_FLOAT,null);
-    bind('RENDERBUFFER_BINDING');gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,8,4);
+    const depthBuffer=bind('RENDERBUFFER_BINDING');gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,8,4);
+    const renderbufferIdentity=window.__allocation.renderbufferReservation(gl,depthBuffer),foreignRenderbufferIdentity=window.__allocation.renderbufferReservation(gl,{});
     bind('ARRAY_BUFFER_BINDING');const bufferArray=new Float32Array(10);gl.bufferData(gl.ARRAY_BUFFER,bufferArray,gl.STATIC_DRAW,2,3);const floating=snap(),bufferReservation=window.__allocation.bufferReservation(gl,bufferArray);
     const cube=bind('TEXTURE_BINDING_CUBE_MAP');
     for(let i=0;i<6;i++)gl.texImage2D(gl.TEXTURE_CUBE_MAP_POSITIVE_X+i,0,gl.RGBA8,8,8,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
@@ -72,16 +73,17 @@ function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,s
     bind('ARRAY_BUFFER_BINDING');gl.bufferData(gl.ARRAY_BUFFER,bufferArray,gl.STATIC_DRAW);
     window.__allocation.labelBufferOwners(gl,bufferArray,['demonstrated']);gl.bufferData(gl.ARRAY_BUFFER,16,gl.STATIC_DRAW);
     const reallocatedSample=sampler(window);
+    gl.deleteRenderbuffer(depthBuffer);const pendingRenderbufferIdentity=window.__allocation.renderbufferReservation(gl,depthBuffer);gl.finish();const retiredRenderbufferIdentity=window.__allocation.renderbufferReservation(gl,depthBuffer);
     const observer=window.__allocation;if(!skipRestore){observer.restore();observer.restore();}
     const after=Object.getOwnPropertyDescriptors(GL.prototype);
     const exactRestore=Object.keys(after).length===Object.keys(descriptors).length&&Object.entries(descriptors).every(([key,d])=>
       after[key]?.value===d.value&&after[key]?.get===d.get&&after[key]?.set===d.set&&after[key]?.writable===d.writable&&after[key]?.enumerable===d.enumerable&&after[key]?.configurable===d.configurable);
     const windowRestore=Object.entries(priorObserver).every(([key,value])=>Object.getOwnPropertyDescriptor(window,'__allocation')?.[key]===value);
     const inheritedRestore=!Object.hasOwn(GL.prototype,'compressedTexSubImage3D')&&GL.prototype.compressedTexSubImage3D===nativeInherited;
-    return {textureIdentity,foreignTextureIdentity,pendingTextureIdentity,retiredTextureIdentity,pendingBuffers,settledBuffers,firstSample,samplingCalls,detachedSample,unassociatedSample,retiredSample,reallocatedSample,knownId,rgba,beforeFinish,afterFinish,floating,bufferReservation,cubeAdded,immutableAdded,npotAdded,compressedAdded,astcAdded,afterAstcSubimage,bc7Added,compressedImmutableUnknown,exactRestore,windowRestore,inheritedRestore,small,resized,resizedAfterFinish,unknown,native:gl.native};
+    return {renderbufferIdentity,foreignRenderbufferIdentity,pendingRenderbufferIdentity,retiredRenderbufferIdentity,textureIdentity,foreignTextureIdentity,pendingTextureIdentity,retiredTextureIdentity,pendingBuffers,settledBuffers,firstSample,samplingCalls,detachedSample,unassociatedSample,retiredSample,reallocatedSample,knownId,rgba,beforeFinish,afterFinish,floating,bufferReservation,cubeAdded,immutableAdded,npotAdded,compressedAdded,astcAdded,afterAstcSubimage,bc7Added,compressedImmutableUnknown,exactRestore,windowRestore,inheritedRestore,small,resized,resizedAfterFinish,unknown,native:gl.native};
   } finally {for(const [key,value]of Object.entries(saved)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}}
 }
-const api={Ledger:AllocationLedger,mips:mipSizes,observe:observed,Peak:ReservationPeak,rejection:rejectionObservation,reduce:reduceSceneObservations,matrix:sceneMatrixContract,history:createSceneHistory,compact:compactSceneSample,expand:expandSceneContext,envelope:sceneReportEnvelope,merge:createSceneMatrixMerger};
+const api={Ledger:AllocationLedger,mips:mipSizes,observe:observed,Peak:ReservationPeak,rejection:rejectionObservation,reduce:reduceSceneObservations,focused:reduceFocusedLookoutObservations,resource:focusedSceneResourceErrors,matrix:sceneMatrixContract,history:createSceneHistory,compact:compactSceneSample,expand:expandSceneContext,envelope:sceneReportEnvelope,merge:createSceneMatrixMerger,header:scenePartHeader};
 const phases=Array.from({length:11},(_,i)=>({packId:'pack',phaseId:String(i),scenario:{units:[{id:'us',side:'US',type:'infantry',men:100},{id:'cs',side:'CS',type:'infantry',men:100}]}}));
 function observations(){
  const sample=(label,gpuReservation=100)=>({label,gpuReservation,conservativeReservation:gpuReservation+10,glError:0,allocation:{unknown:[]},unmappedBufferBytes:0});
@@ -243,7 +245,58 @@ function retainedArrayFixture(sampler){
  return sampler(scope);
 }
 api.sampler=sampleSceneAllocations;
+// Constructed resource bookkeeping only; the complete painted native context is Actions-only.
+function focusedResourceFixture(){
+ const events=[{kind:'texture',id:1,operation:'reserve'},{kind:'renderbuffer',id:1,operation:'reserve',detail:{samples:1,format:33189}}],
+  signatures=[{texture:1,raw:{type:5131,format:6408}}],post={texture:1,slots:{0:8},pendingDelete:false},depth={id:1,bytes:4,pendingDelete:false},
+  sample=(sequence,label,pending,live=true)=>({sequence,captureId:sequence,label,glError:0,unmappedBufferBytes:0,
+    focusedPixel:{canvas:[1,1],admission:{lensBytes:44,resizeBytes:24,pixelBytes:3639218,scale:1}},
+    allocation:{gpuPeak:100,gpuCurrent:100,bytes:88,unknown:[],defaultFramebuffer:12,dimensions:[1,1],textureSlots:[post],renderbufferSlots:[depth],signatures,nativeEvents:events,
+      bufferSlots:live?[{id:1,bytes:72,owners:['terrain-canonical-1/aGrid'],pendingDelete:pending}]:[]}}),states=[sample(1,'before',false),sample(2,'retired',true),sample(3,'settled',false,false)],
+  cycle=(index,kind,labels)=>({index,kind,complete:true,errors:[],checks:[{lost:false,error:0}],sampleLabels:labels,sampleIds:labels.map(l=>states.find(s=>s.label===l).captureId)});
+ return {states,resource:{ok:true,exactOriginal:true,bootstrapDraws:0,preparedReleased:true,pixelBytes:3639218,terrain:{kind:'canonical with retained exact original',bytes:5827098,sourceBytes:12750024},
+  postTextures:[{id:1,key:'rtScene',kind:'color',uuid:'actual-fixture-pointer',bytes:8,pendingDelete:false}],postRenderbuffers:[{id:1,key:'rtScene',bytes:4,pendingDelete:false}],cycles:[cycle(1,'resize',['before']),cycle(2,'terrain',['before','retired','settled'])]},
+  bootstrap:[{method:'GET',url:'http://localhost/?battle=chattanooga&phase=lookout-mountain&quality=high&figures=rigged&nosw',removedEntryModules:1,originalSha256:'a'.repeat(64),servedSha256:'b'.repeat(64)}]};
+}
+const focusedResourceMutations={
+ 'focused-resource-original':r=>r.resource.exactOriginal=false,
+ 'focused-resource-prepared-release':r=>r.resource.preparedReleased=false,
+ 'focused-resource-startup-draw':r=>r.resource.bootstrapDraws=1,
+ 'focused-resource-policy':r=>r.resource.pixelBytes=10562144,
+ 'focused-resource-original-bytes':r=>r.resource.terrain.sourceBytes=5827098,
+ 'focused-resource-entry-count':r=>r.bootstrap[0].removedEntryModules=2,
+ 'focused-resource-entry-hash':r=>r.bootstrap[0].servedSha256=r.bootstrap[0].originalSha256,
+ 'focused-resource-entry-phase':r=>r.bootstrap[0].url=r.bootstrap[0].url.replace('lookout-mountain','orchard-knob'),
+ 'focused-resource-foreign-depth':r=>r.resource.postRenderbuffers[0].id=2,
+ 'focused-resource-foreign-texture':r=>r.resource.postTextures[0].id=2,
+ 'focused-resource-cap':r=>r.states[2].allocation.gpuPeak=250000001,
+ 'focused-resource-pixels':r=>r.states[2].allocation.textureSlots[0].slots[0]=3639218,
+ 'focused-resource-pending-default':r=>r.states[2].allocation.gpuCurrent+=3639218,
+ 'focused-resource-rounding':r=>r.states[2].focusedPixel.admission.lensBytes=3639219,
+ 'focused-resource-canvas':r=>r.states[2].focusedPixel.canvas=[0,1],
+ 'focused-resource-half-float':r=>r.states[2].allocation.signatures.push({texture:2,raw:{type:5131,format:6408}}),
+ 'focused-resource-unowned-rb':r=>r.states[2].allocation.nativeEvents.push({kind:'renderbuffer',id:2,operation:'reserve'}),
+ 'focused-resource-finish':r=>r.resource.cycles[1].checks[0].error=1280,
+ 'focused-resource-pending':r=>r.states[1].allocation.bufferSlots[0].pendingDelete=false,
+ 'focused-resource-retirement':r=>r.states[2].allocation.bufferSlots=[{id:1,bytes:72,owners:['terrain-canonical-1/aGrid'],pendingDelete:true}],
+ 'focused-resource-null-samples':r=>r.states=[null,null],
+ 'focused-resource-restore-shape':r=>r.restoration={samples:{}},
+ 'focused-resource-null-cycle':r=>r.resource.cycles.push(null),
+ 'focused-resource-null-check':r=>r.resource.cycles[0].checks.push(null),
+ 'focused-resource-allocation-shape':r=>delete r.states[2].allocation,
+ 'focused-resource-signature-shape':r=>r.states[2].allocation.signatures={},
+ 'focused-resource-event-shape':r=>r.states[2].allocation.nativeEvents={},
+ 'focused-resource-buffer-shape':r=>r.states[0].allocation.bufferSlots={},
+};
 const checks=[
+ ['native-renderbuffer-identity',a=>{const r=a.observe();assert.deepEqual(r.renderbufferIdentity,{id:1,bytes:128,pendingDelete:false},'native-renderbuffer-identity: source native pointer binds owned depth storage');assert.equal(r.foreignRenderbufferIdentity,null,'native-renderbuffer-identity: foreign pointer has no binding');}],
+ ['native-renderbuffer-retirement',a=>{const r=a.observe();assert.deepEqual(r.pendingRenderbufferIdentity,{id:1,bytes:128,pendingDelete:true},'native-renderbuffer-retirement: pending native depth ownership survives deletion');assert.equal(r.retiredRenderbufferIdentity,null,'native-renderbuffer-retirement: only native finish removes storage');}],
+ ['focused-resource-valid',a=>assert.deepEqual(a.resource(focusedResourceFixture()),[],'focused-resource-valid: exact constructed owner/complete retirement/resource bookkeeping passes')],
+ ...Object.entries(focusedResourceMutations).map(([name,mutate])=>[name,a=>{const r=focusedResourceFixture();mutate(r);assert.ok(a.resource(r).length,name+': own changed resource evidence rejected');}]),
+ ['focused-full-reject',a=>{const r=qualifiedObservations();r.resourceFocus='canonical-lookout';assert.equal(a.reduce(r,phases).complete,false,'focused-full-reject: focused marker cannot complete original eleven-phase gate');}],
+ ['focused-merger-reject',a=>{const r=qualifiedObservations();r.resourceFocus='canonical-lookout';let rejected=false;try{a.merge(phases,r);}catch(e){rejected=/full qualified header/.test(e.message);}assert.equal(rejected,true,'focused-merger-reject: focused header cannot enter complete matrix merger');}],
+ ['focused-header-binding',a=>{const r={resourceFocus:'canonical-lookout',canonicalTerrainRepresentation:'canonical with retained exact original',postPixelBytes:3639218,mipPolicy:'full-original'};assert.deepEqual(a.header(r),r,'focused-header-binding: representation/pixel/mip semantics survive bounded transport');}],
+ ['focused-never-full',a=>{const r=a.focused({cases:[{states:[{gpuReservation:270000000,conservativeReservation:270000001}]}],resourceFocus:'canonical-lookout'},{packId:'chattanooga',phaseId:'lookout-mountain'});assert.deepEqual([r.complete,r.fullMatrixComplete,r.fieldable,r.maxGpuReservation],[false,false,false,270000000],'focused-never-full: even failed prerequisite retains full peak and cannot claim complete matrix/fielding');}],
  ['retained-cpu-accounting',a=>{const r=retainedArrayFixture(a.sampler);assert.equal(r.declaredArrayBytes,28,'retained-cpu-accounting: detached backing bytes included exactly once');assert.equal(r.retainedTerrainArrayBytes,12,'retained-cpu-accounting: visible aliases are not additional storage');assert.equal(r.conservativeReservation,28,'retained-cpu-accounting: actual retained arrays reach conservative total');}],
  ['retained-cpu-observation',a=>{const r=retainedArrayFixture(a.sampler);assert.ok(r.unuploadedArrays.some(x=>x.bytes===12&&x.owners.includes('source/detached')&&x.owners.includes('source/alias')),'retained-cpu-observation: detached aliases retained without inventing native upload');assert.equal(r.unmappedBufferBytes,0,'retained-cpu-observation: no fabricated native bytes');}],
  ['native-texture-identity',a=>{const o=a.observe();assert(o.textureIdentity?.id===o.rgba.textureSlots[0]?.texture&&o.textureIdentity.bytes===o.rgba.bytes&&!o.textureIdentity.pendingDelete&&o.foreignTextureIdentity===null,'native-texture-identity: actual pointer binds exact observer ID/bytes, no foreign inference');}],
@@ -459,6 +512,14 @@ const checks=[
 const changed=(key,value)=>({observe:()=>({...observed(),[key]:value})});
 class NoOverlap extends AllocationLedger {reserve(id,k,s,n){super.reserve(id,k,s,n,false);}}
 const mutants={
+  'native-renderbuffer-identity':changed('renderbufferIdentity',null),
+  'native-renderbuffer-retirement':changed('retiredRenderbufferIdentity',{id:1,bytes:128,pendingDelete:true}),
+  'focused-resource-valid':{resource:()=>['invented failure']},
+  ...Object.fromEntries(Object.keys(focusedResourceMutations).map(name=>[name,{resource:()=>[]}])) ,
+  'focused-full-reject':{reduce:()=>({complete:true})},
+  'focused-merger-reject':{merge:()=>({})},
+  'focused-header-binding':{header:()=>({})},
+  'focused-never-full':{focused:()=>({complete:true,fullMatrixComplete:true,fieldable:true,maxGpuReservation:0})},
   'completion-qualified':{reduce:()=>({complete:false})},
   ...Object.fromEntries(['completion-missing','completion-extra','completion-early','completion-result','completion-duration','completion-pending-id','completion-lost-peak','completion-unmarked'].map(n=>[n,{reduce:()=>({complete:true})}])),
   'parts-complete':{merge:()=>({add(){},finalize:()=>({complete:false,parts:[],withinLimit:false,maxGpuReservation:null})})},

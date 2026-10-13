@@ -50,6 +50,13 @@ on:
         options:
           - no-finish
           - native-finish
+      scene_focus:
+        description: Scene mode only; explicit ten-context canonical Lookout prerequisite
+        type: choice
+        default: full
+        options:
+          - full
+          - canonical-lookout
 permissions:
   contents: read
   actions: read
@@ -149,6 +156,7 @@ jobs:
           SCENE_INACTIVE: ${{ inputs.inactive }}
           SCENE_PARTITION: ${{ inputs.partition }}
           SCENE_ROUTES: ${{ inputs.scene_routes }}
+          SCENE_FOCUS: ${{ inputs.scene_focus }}
           SCENE_COMPLETION: ${{ inputs.scene_completion }}
         run: |
           node tools/test-scene-allocation.mjs

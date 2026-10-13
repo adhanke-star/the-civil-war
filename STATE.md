@@ -1,10 +1,10 @@
 # STATE
-2026-10-13 — v1 released558456f; ACTIVE0192 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
-Branch v1-1-gaps-20261012/sourceee89499 pushed; CI38435676019 all9/fullroot214/raw196 CLEAR; native Post peak10560740B/smallfixture only. Western ONCE38433492194 rootclear899→872/nativefiring/Silverretained/noGold. COORDINATION absent; v1.1/v2 unreleased.
+2026-10-13 — v1 released558456f; ACTIVE0193 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
+Branch v1-1-gaps-20261012/sourcefb6c0c4 pushed; CI38439784285 all9/fullroot214/raw196/terrain67 CLEAR.0193 focusedLookout10 WIP/CPU227+227/AstraCLEAR/UNITclear/nativeUNRUN. Western ONCE38433492194 rootclear899→872/nativefiring/Silverretained/noGold. COORDINATION absent; v1.1/v2 unreleased.
 Accepted remote main9e72079; sourceCI38346843720 all9/full own251/365/171/159+201+three6smokes/digests clean.
 Main9eCI38349763169 all9/fullown/digests/rawprobe clear; Pages38349763192 exact9e/livev68 clear.
 MAIN13a7b136 exact protected11 dirty paths untouched; c328 failedmainCI38298643624 retained.
-Resource old38374246655/d333 full110+144PNG capFAIL493858706B/GPU470232876B. Restoration-inclusive conditional full110fixed246360782B/pixel3639218B; fullpainted nativeUNRUN.0192 canonical original-identity adapter67+67/AstraCLEAR/UNITclear WIP; focusedLookout10 next.250MB/CPUcategories/art unchanged; no adoption.
+Resource old38374246655/d333 full110+144PNG capFAIL493858706B/GPU470232876B. Restoration-inclusive conditional fixed246360782B/pixel3639218B; focused ten-native/full110 newcap UNRUN. Actual Post prerequisite10560740B native214 clear; original-identity terrain67+67 source clear.250MB/CPUcategories/art unchanged; no adoption.
 Progression[0,30,75,135,210,300,405,525,660,800]; capacity-bounded atomic level rewards unchanged.
 Mixed38282452947/9d60c12 qualified; root+Astra viewed001–076; exact11files/576frames/digests pass.
 8ASTC+2originalPNG close48,996,984B; diagnostic only; no runtime asset adoption.
