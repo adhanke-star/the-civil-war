@@ -81,13 +81,19 @@ function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,s
     window.__allocation.labelBufferOwners(gl,bufferArray,['demonstrated']);gl.bufferData(gl.ARRAY_BUFFER,16,gl.STATIC_DRAW);
     const reallocatedSample=sampler(window);
     gl.deleteRenderbuffer(depthBuffer);const pendingRenderbufferIdentity=window.__allocation.renderbufferReservation(gl,depthBuffer);gl.finish();const retiredRenderbufferIdentity=window.__allocation.renderbufferReservation(gl,depthBuffer);
+    const lossGL=new GL(),lossTexture={};lossGL.bindings.set(lossGL.TEXTURE_BINDING_2D,lossTexture);lossGL.texImage2D(lossGL.TEXTURE_2D,0,lossGL.RGBA,lossGL.RGBA,0,{width:8,height:4});
+    const lossBefore=window.__allocation.snapshot(lossGL);lossGL.getContextAttributes=()=>null;lossGL.isContextLost=()=>true;lossGL.deleteTexture(lossTexture);lossGL.finish();
+    const lostCalls=window.__allocation.nativeCalls(lossGL),lostPrimary=window.__allocation.textureReservation(lossGL,lossTexture);lostCalls.deleteTexture=999;
+    const lostCallsFresh=window.__allocation.nativeCalls(lossGL);lossGL.getContextAttributes=()=>({depth:true,stencil:false,antialias:false});lossGL.isContextLost=()=>false;
+    const lossPending=window.__allocation.snapshot(lossGL);lossGL.finish();const lossRestored=window.__allocation.snapshot(lossGL);
+    const lossObservation={before:lossBefore,pending:lossPending,restored:lossRestored,lostPrimary,lostCallsFresh};
     const observer=window.__allocation;if(!skipRestore){observer.restore();observer.restore();}
     const after=Object.getOwnPropertyDescriptors(GL.prototype);
     const exactRestore=Object.keys(after).length===Object.keys(descriptors).length&&Object.entries(descriptors).every(([key,d])=>
       after[key]?.value===d.value&&after[key]?.get===d.get&&after[key]?.set===d.set&&after[key]?.writable===d.writable&&after[key]?.enumerable===d.enumerable&&after[key]?.configurable===d.configurable);
     const windowRestore=Object.entries(priorObserver).every(([key,value])=>Object.getOwnPropertyDescriptor(window,'__allocation')?.[key]===value);
     const inheritedRestore=!Object.hasOwn(GL.prototype,'compressedTexSubImage3D')&&GL.prototype.compressedTexSubImage3D===nativeInherited;
-    return {renderbufferIdentity,foreignRenderbufferIdentity,pendingRenderbufferIdentity,retiredRenderbufferIdentity,textureIdentity,foreignTextureIdentity,pendingTextureIdentity,retiredTextureIdentity,pendingBuffers,settledBuffers,firstSample,samplingCalls,detachedSample,unassociatedSample,retiredSample,reallocatedSample,knownId,rgba,beforeFinish,afterFinish,floating,bufferReservation,cubeAdded,immutableAdded,npotAdded,compressedAdded,astcAdded,afterAstcSubimage,bc7Added,compressedImmutableUnknown,exactRestore,windowRestore,inheritedRestore,small,resized,resizedAfterFinish,unknown,native:gl.native};
+    return {lossObservation,renderbufferIdentity,foreignRenderbufferIdentity,pendingRenderbufferIdentity,retiredRenderbufferIdentity,textureIdentity,foreignTextureIdentity,pendingTextureIdentity,retiredTextureIdentity,pendingBuffers,settledBuffers,firstSample,samplingCalls,detachedSample,unassociatedSample,retiredSample,reallocatedSample,knownId,rgba,beforeFinish,afterFinish,floating,bufferReservation,cubeAdded,immutableAdded,npotAdded,compressedAdded,astcAdded,afterAstcSubimage,bc7Added,compressedImmutableUnknown,exactRestore,windowRestore,inheritedRestore,small,resized,resizedAfterFinish,unknown,native:gl.native};
   } finally {for(const [key,value]of Object.entries(saved)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}}
 }
 const api={Ledger:AllocationLedger,mips:mipSizes,observe:observed,Peak:ReservationPeak,rejection:rejectionObservation,reduce:reduceSceneObservations,focused:reduceFocusedLookoutObservations,resource:focusedSceneResourceErrors,matrix:sceneMatrixContract,history:createSceneHistory,compact:compactSceneSample,expand:expandSceneContext,envelope:sceneReportEnvelope,merge:createSceneMatrixMerger,header:scenePartHeader};
@@ -769,6 +775,81 @@ checks.push(['full-policy-resize-admission',a=>{
  assert.deepEqual(fresh.logical,[1366,1024],'full-policy-resize-admission: new native admission binds incoming dimensions');
  assert.equal(scenePostAdmissionValid(fresh),true,'full-policy-resize-admission: new resize sample arithmetic');
 }]);mutants['full-policy-resize-admission']={postSnapshot:p=>({admission:structuredClone(p.resourceAdmission),logical:[p.width,p.height]})};
+
+// Real Post/THREE CPU owners with a recorded synchronous GL/renderer boundary; no native renderer.
+api.ownerPost=(renderer,options)=>new Post(renderer,options);
+function withPostOwner(create,options,run){
+ const prior=globalThis.window;globalThis.window={devicePixelRatio:1};
+ const events=[],listeners=new Map(),size=new THREE.Vector2(320,240),gl={NO_ERROR:0,lost:false,error:0,
+  isContextLost(){return this.lost;},getError(){const error=this.error;this.error=0;return error;},
+  finish(){events.push('finish');this.afterFinish?.();}};
+ const renderer={properties:{},domElement:{addEventListener:(name,fn)=>listeners.set(name,fn)},
+  getContext:()=>gl,getSize:v=>v.copy(size),setPixelRatio(value){events.push('ratio');this.ratio=value;this.setSize(size.x,size.y,false);},
+  setSize(w,h){events.push('size');size.set(w,h);},setRenderTarget(){events.push('target');},clear(){},render(){events.push('render');}};
+ try{const post=create(renderer,{mode:'high',...options});
+  for(const key of ['rtScene','rtSmall','rtBlur'])post[key].addEventListener('dispose',()=>events.push(key));
+  events.length=0;return run({post,renderer,gl,events,listeners,size});
+ }finally{if(prior===undefined)delete globalThis.window;else globalThis.window=prior;}
+}
+const caught=fn=>{let failed=false,error;try{fn();}catch(e){failed=true;error=e;}return {failed,error};};
+const ownerChecks=[
+ ['chronology',({post,events})=>{post.setSize(64,48);assert.deepEqual(events.slice(0,4),['rtScene','rtSmall','rtBlur','finish'],'post-owner-chronology: all owned targets retire before canvas');
+  const ratio=events.indexOf('ratio'),sizes=events.flatMap((e,i)=>e==='size'?[i]:[]);assert.equal(sizes.length,2,'post-owner-chronology: pinned nested and final canvas');
+  assert.ok(ratio>3&&events[sizes[0]+1]==='finish'&&events[sizes[1]+1]==='finish','post-owner-chronology: completion separates every native surface');
+  assert.equal(events.filter(e=>e==='finish').length,4,'post-owner-chronology: final CPU target sizing completes too');
+  assert.deepEqual([post.rtScene.width,post.rtScene.height],[64,48],'post-owner-chronology: actual target dimensions');
+  assert.ok(!Object.hasOwn(post,'_apply'),'post-owner-chronology: real Post method without wrapper');}],
+ ['default-off',({post,events})=>{post.setSize(64,48);assert.equal(post.resourceLifetime,false,'post-owner-default-off: opt-in default');
+  assert.equal(events.includes('finish'),false,'post-owner-default-off: no new native completion');assert.deepEqual([post.scale,post.requestedScale,post.rtScene.width,post.rtScene.height],[1,1,64,48],'post-owner-default-off: original high quality');}],
+ ['falsy-first',({post,events})=>{post.rtScene.addEventListener('dispose',()=>{throw undefined;});const failure=caught(()=>post.setSize(64,48));
+  assert.equal(failure.failed,true,'post-owner-falsy-first: falsy disposal still fails');assert.equal(failure.error,undefined,'post-owner-falsy-first: exact first exception');
+  assert.ok(events.includes('rtSmall')&&events.includes('rtBlur')&&!events.includes('ratio')&&!events.includes('size'),'post-owner-falsy-first: independently retire every owner before refusing replacement');
+  assert.ok(post._resourceFailed&&caught(()=>post.render({},{})).failed&&caught(()=>post.beginSoldierView({near:.1,far:10},2)).failed,'post-owner-falsy-first: failed owner cannot render or allocate lens');}],
+ ['falsy-first-later-reentry',({post,events})=>{post.rtScene.addEventListener('dispose',()=>{throw 0;});post.rtSmall.addEventListener('dispose',()=>{caught(()=>post.setSize(80,60));});
+  const first=caught(()=>post.setSize(64,48)),later=caught(()=>post.render({},{}));assert.ok(first.failed&&first.error===0&&later.failed&&later.error===0&&events.includes('rtBlur')&&events.includes('finish')&&!events.includes('size'),'post-owner-falsy-first-later-reentry: original falsy failure remains sticky through later callback and independent native cleanup');}],
+ ...['resize','render','lens'].map(kind=>['reentry-'+kind,({post,events})=>{post.rtScene.addEventListener('dispose',()=>{caught(()=>kind==='resize'?post.setSize(80,60):kind==='render'?post.render({},{}):post.beginSoldierView({near:.1,far:10},2));});
+  const failure=caught(()=>post.setSize(64,48));assert.ok(failure.failed&&post._resourceFailed&&!events.includes('ratio')&&!events.includes('size')&&!events.includes('render'),'post-owner-reentry-'+kind+': swallowed callback failure remains sticky before replacement');}]),
+ ['owner-change',({post,events})=>{post.rtScene.addEventListener('dispose',()=>{post.rtSmall=new THREE.WebGLRenderTarget(1,1);});const failure=caught(()=>post.setSize(64,48));
+  assert.ok(failure.failed&&post._resourceFailed&&!events.includes('ratio')&&events.includes('rtSmall')&&events.includes('rtBlur'),'post-owner-owner-change: captured originals retire and foreign replacement is refused');}],
+ ['depth-change',({post,events})=>{post.beginSoldierView({near:.1,far:10},2);events.length=0;post.rtScene.addEventListener('dispose',()=>{post.rtScene.depthTexture=new THREE.DepthTexture(1,1);});const failure=caught(()=>post.setSize(64,48));
+  assert.ok(failure.failed&&post._resourceFailed&&!events.includes('ratio'),'post-owner-depth-change: original lens identity must survive callbacks');}],
+ ['loss-deferral',({post,renderer,gl,events,listeners})=>{gl.lost=true;post.setSize(64,48);post.setMode('low');post.setSize(80,60);post.setMode('high');
+  assert.equal(events.length,0,'post-owner-loss-deferral: no allocation while lost');assert.equal(typeof listeners.get('webglcontextrestored'),'function','post-owner-loss-deferral: owned restoration listener');
+  renderer.properties={restored:true};gl.lost=false;listeners.get('webglcontextrestored')();assert.deepEqual([post.width,post.height,post.scale,post.rtScene.width,post.rtScene.height],[80,60,1,80,60],'post-owner-loss-deferral: latest request restored with fresh renderer properties');
+  assert.equal(events.filter(e=>e==='size').length,2,'post-owner-loss-deferral: exactly one real apply');}],
+ ['loss-mid-retirement',({post,gl,events})=>{post.rtScene.addEventListener('dispose',()=>{gl.lost=true;});post.setSize(64,48);
+  assert.ok(events.includes('rtSmall')&&events.includes('rtBlur')&&!events.includes('size')&&!events.includes('ratio')&&!events.includes('finish'),'post-owner-loss-mid-retirement: context loss stops native replacements');
+  assert.equal(post._resourceFailed,undefined,'post-owner-loss-mid-retirement: legitimate loss is not failure');}],
+ ['gl-refusal',({post,gl,events})=>{gl.error=1280;const failure=caught(()=>post.setSize(64,48));assert.ok(failure.failed&&post._resourceFailed&&!events.includes('ratio')&&!events.includes('finish'),'post-owner-gl-refusal: failed prior GL cannot admit replacement');}],
+ ['gl-completion',({post,gl,events})=>{gl.afterFinish=()=>{gl.error=1280;};const failure=caught(()=>post.setSize(64,48));assert.ok(failure.failed&&post._resourceFailed&&events.includes('finish')&&!events.includes('ratio'),'post-owner-gl-completion: actual completion must remain healthy');}],
+ ['lens-retirement',({post,events})=>{post.beginSoldierView({near:.1,far:10},2);const owned=post.soldierView;owned.material.addEventListener('dispose',()=>events.push('lens-material'));owned.depth.addEventListener('dispose',()=>events.push('lens-depth'));events.length=0;
+  post.endSoldierView();assert.deepEqual(events,['lens-material','lens-depth','finish'],'post-owner-lens-retirement: independent lens owners retire before another allocation');
+  assert.ok(post.soldierView===null&&post.rtScene.depthTexture===null&&owned.material.uniforms.tDepth.value===null,'post-owner-lens-retirement: coherent publication');post.endSoldierView();assert.equal(events.length,3,'post-owner-lens-retirement: no-op exit does not finish');}],
+ ['lens-falsy-first',({post,events})=>{post.beginSoldierView({near:.1,far:10},2);const owned=post.soldierView;owned.material.addEventListener('dispose',()=>{events.push('lens-material');throw 0;});owned.depth.addEventListener('dispose',()=>events.push('lens-depth'));events.length=0;
+  const failure=caught(()=>post.endSoldierView());assert.ok(failure.failed&&failure.error===0&&post._resourceFailed&&events.includes('lens-depth')&&!post.soldierView&&!post.rtScene.depthTexture,'post-owner-lens-falsy-first: exact primary preserved after independent depth cleanup');}],
+ ...['resize','render','lens'].map(kind=>['lens-reentry-'+kind,({post,events})=>{post.beginSoldierView({near:.1,far:10},2);const owned=post.soldierView;owned.material.addEventListener('dispose',()=>{caught(()=>kind==='resize'?post.setSize(80,60):kind==='render'?post.render({},{}):post.beginSoldierView({near:.1,far:10},2));});owned.depth.addEventListener('dispose',()=>events.push('old-depth'));events.length=0;
+  const failure=caught(()=>post.endSoldierView());assert.ok(failure.failed&&post._resourceFailed&&events.includes('old-depth')&&!events.includes('size')&&!events.includes('render')&&!post.soldierView,'post-owner-lens-reentry-'+kind+': no new allocation before old lens completion');}]),
+ ['failure-mutators',({post,gl,events})=>{gl.error=1280;caught(()=>post.setSize(64,48));assert.ok(post._resourceFailed,'post-owner-failure-mutators: initial failure retained');
+  const prior=[post.width,post.height,post.mode,post.scale,post.requestedScale,post.level,post.samplesLog.length];events.length=0;
+  for(const change of [()=>post.setSize(900,700),()=>post.setMode('low'),()=>post.startFromTier(0),()=>post.govern(1,9999)]){assert.ok(caught(change).failed,'post-owner-failure-mutators: public mutation refused');assert.deepEqual([post.width,post.height,post.mode,post.scale,post.requestedScale,post.level,post.samplesLog.length],prior,'post-owner-failure-mutators: rejection cannot alter pending owner state');}
+  assert.equal(events.length,0,'post-owner-failure-mutators: no native operation');}],
+ ['loss-during-finish',({post,renderer,gl,events,listeners})=>{gl.afterFinish=()=>{gl.lost=true;};const failure=caught(()=>post.setSize(64,48));assert.ok(!failure.failed&&!post._resourceFailed&&!events.includes('size'),'post-owner-loss-during-finish: legitimate loss defers replacement');
+  post.setSize(80,60);post.setMode('low');gl.afterFinish=null;gl.lost=false;renderer.properties={fresh:true};assert.equal(typeof listeners.get('webglcontextrestored'),'function','post-owner-loss-during-finish: genuine restoration callback');listeners.get('webglcontextrestored')();
+  assert.deepEqual([post.width,post.height,post.requestedScale,post.rtScene.width,post.rtScene.height],[80,60,.7,56,42],'post-owner-loss-during-finish: latest deferred request restores');}],
+ ['sticky-restoration',({post,gl,events,listeners})=>{gl.error=1280;const first=caught(()=>post.setSize(64,48));assert.ok(first.failed&&post._resourceFailed,'post-owner-sticky-restoration: initial owner failure');
+  assert.equal(typeof listeners.get('webglcontextrestored'),'function','post-owner-sticky-restoration: restore callback exists');events.length=0;listeners.get('webglcontextrestored')();
+  const later=caught(()=>post.beginSoldierView({near:.1,far:10},2));assert.ok(events.length===0&&later.failed&&later.error===first.error,'post-owner-sticky-restoration: restoration cannot re-enable failed owner');}]
+];
+for(const [suffix,run]of ownerChecks){const name='post-owner-'+suffix;checks.push([name,a=>withPostOwner(a.ownerPost,suffix==='default-off'?{}:{resourceLifetime:true},run)]);
+ mutants[name]={ownerPost:(renderer,options)=>new Post(renderer,{...options,resourceLifetime:suffix==='default-off'})};}
+for(const kind of ['resize','render','lens'])mutants['post-owner-lens-reentry-'+kind]={ownerPost:(renderer,options)=>{
+ const post=new Post(renderer,options);post._retireResourceOwners=function(owners){this._resourceApplying=false;return Post.prototype._retireResourceOwners.call(this,owners);};return post;}};
+mutants['post-owner-failure-mutators']={ownerPost:(renderer,options)=>{const post=new Post(renderer,options);post.setSize=function(w,h){this.width=w;this.height=h;return Post.prototype.setSize.call(this,w,h);};return post;}};
+mutants['post-owner-loss-during-finish']={ownerPost:(renderer,options)=>{const post=new Post(renderer,options);post._finishResourceLifetime=function(){const complete=Post.prototype._finishResourceLifetime.call(this);if(!complete&&renderer.getContext().isContextLost())throw Error('mutant: context loss is permanent failure');return complete;};return post;}};
+checks.push(['post-owner-invalid-option',a=>withPostOwner((renderer)=>{const failure=caught(()=>a.ownerPost(renderer,{resourceLifetime:1}));assert.ok(failure.failed&&failure.error?.message.includes('explicit lifetime boolean'),'post-owner-invalid-option: malformed option fails before setup');return new Post(renderer);},{},()=>{})]);
+mutants['post-owner-invalid-option']={ownerPost:(renderer,options)=>new Post(renderer,{...options,resourceLifetime:false})};
+checks.push(['native-loss-retirement-observation',a=>{const r=a.observe().lossObservation;assert.ok(r.lostPrimary?.pendingDelete&&r.pending.bytes===r.before.bytes&&r.pending.gpuPeak>=r.before.gpuPeak&&!r.pending.unknown.length&&r.restored.bytes===0&&r.lostCallsFresh.deleteTexture===1&&r.lostCallsFresh.finish===1,'native-loss-retirement-observation: lost deletes remain pending and counted until actual healthy completion; call snapshot immutable');}]);
+mutants['native-loss-retirement-observation']={observe:()=>{const o=observed();o.lossObservation.pending.bytes=0;return o;}};
 
 for(const [,check]of checks)await check(api);
 console.log(`SCENE-ALLOCATION OK (${checks.length}/${checks.length})`);

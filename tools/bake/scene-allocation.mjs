@@ -944,7 +944,11 @@ export function installAllocationObserver(source) {
   };
   const contexts=new WeakMap();
   const sample=(gl,s,bytes=s.ledger.bytes)=>{
-    const current=s.gpu.sample(bytes,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.getContextAttributes());
+    const attributes=gl.getContextAttributes();
+    // Actual loss returns null attributes. Retain the last conservative surface cost;
+    // disposal calls still retire known owners, without inventing a completed fence.
+    if(attributes===null&&gl.isContextLost?.())return s.gpu.current;
+    const current=s.gpu.sample(bytes,gl.drawingBufferWidth,gl.drawingBufferHeight,attributes);
     s.defaultPeak=Math.max(s.defaultPeak,s.gpu.framebuffer+s.gpu.pendingFramebuffer);return current;
   };
   const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),gpu:new Peak(),bufferArrays:new WeakMap(),bufferSources:new Map(),bufferIds:new Map(),bufferOwners:new Map(),nextBufferId:1,textures:new Map(),textureIds:new Map(),renderbufferIds:new Map(),nativeEvents:[],signatures:[],unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};s.ledger.onReservation=bytes=>sample(gl,s,bytes);
@@ -1055,11 +1059,11 @@ export function installAllocationObserver(source) {
     });
     for(const [name,kind]of [['deleteTexture','texture'],['deleteBuffer','buffer'],['deleteRenderbuffer','renderbuffer']])
       wrap(proto,name,(gl,a)=>{const s=state(gl);s.ledger.retire(a[0]);if(kind==='texture')s.textures.delete(a[0]);});
-    wrap(proto,'finish',gl=>{const s=state(gl);journal(s,'finish');s.ledger.sync();s.gpu.finish();for(const id of s.bufferIds.keys())if(!s.ledger.objects.has(id)){
+    wrap(proto,'finish',gl=>{const s=state(gl);if(gl.isContextLost?.())return;journal(s,'finish');s.ledger.sync();s.gpu.finish();for(const id of s.bufferIds.keys())if(!s.ledger.objects.has(id)){
       s.bufferArrays.get(s.bufferSources.get(id))?.delete(id);s.bufferSources.delete(id);s.bufferOwners.delete(id);s.bufferIds.delete(id);
     }});
   }
-  observer={restore,textureReservation(gl,texture){const s=state(gl),r=s.ledger.objects.get(texture);if(!r||r.kind!=='texture')return null;
+  observer={restore,nativeCalls(gl){return {...state(gl).calls};},textureReservation(gl,texture){const s=state(gl),r=s.ledger.objects.get(texture);if(!r||r.kind!=='texture')return null;
     return {id:s.textureIds.get(texture),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(texture)};
   },renderbufferReservation(gl,buffer){const s=state(gl),r=s.ledger.objects.get(buffer);if(!r||r.kind!=='renderbuffer')return null;
     if(!s.renderbufferIds.has(buffer))s.renderbufferIds.set(buffer,s.renderbufferIds.size+1);

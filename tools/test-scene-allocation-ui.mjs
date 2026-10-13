@@ -77,6 +77,101 @@ export async function sceneAllocationControls({browser,url,check,result,watchErr
   await sceneStressOwnerControls({browser,url,check,result,watchErrors,mode:'terminal'});
   await canonicalTerrainControls({browser,url,check,result,watchErrors});
   await postPixelResourceControls({browser,url,check,result,watchErrors});
+  await postOwnerResourceControls({browser,url,check,result,watchErrors});
+}
+
+// Actual opt-in owner, observed only. No diagnostic lifetime wrappers or budget adoption.
+async function postOwnerResourceControls({browser,url,check,result,watchErrors}){
+ const ctx=await browser.newContext({viewport:{width:128,height:96},deviceScaleFactor:1}),errors=[];
+ try{
+  await ctx.addInitScript(installAllocationObserver,{ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),nativeJournal:true});
+  const page=await ctx.newPage();watchErrors(page,url,errors);await page.goto(url+'?nosw');await page.waitForFunction(()=>window.__entry&&!window.__entry.importing,null,{timeout:60000});
+  const proof=await page.evaluate(async()=>{
+   const THREE=await import('three'),{Post}=await import('./src/render/post.js'),{sampleSceneAllocations}=await import('./tools/bake/scene-allocation.mjs');
+   const proof={kind:'actual default-off Post ownership prerequisite; full-art normal-entry budget/adoption UNRUN',cases:[],errors:[]};
+   const encode=bytes=>{let s='';for(let i=0;i<bytes.length;i+=16384)s+=String.fromCharCode(...bytes.subarray(i,i+16384));return btoa(s);};
+   for(const owned of [true,false]){
+    const receipt={owned,states:[],frames:[],cleanup:[],complete:false};proof.cases.push(receipt);let renderer,post,geometry,material,gl,sequence=0;
+    const attempt=(label,fn)=>{try{fn();receipt.cleanup.push({label,ok:true});}catch(e){receipt.cleanup.push({label,ok:false,error:String(e?.message??e)});}};
+    try{
+     renderer=new THREE.WebGLRenderer({antialias:false,stencil:false});renderer.setSize(32,32);gl=renderer.getContext();receipt.defaultsBefore=window.__allocation.snapshot(gl).textureSlots;
+     post=new Post(renderer,{mode:'high',...(owned?{resourceLifetime:true}:{})});post.setSize(32,32);
+     const scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,10);camera.position.z=2;
+     geometry=new THREE.PlaneGeometry(1,1);material=new THREE.MeshBasicMaterial({color:0x86734c,side:THREE.DoubleSide});scene.add(new THREE.Mesh(geometry,material));
+     const targets=[post.rtScene,post.rtSmall,post.rtBlur],textures=targets.map(t=>t.texture),arrays=[...new Set([geometry,post.quad.geometry].flatMap(g=>[...Object.values(g.attributes).map(a=>a.array),g.index.array]))];
+     const sourceBytes=arrays.map(a=>encode(new Uint8Array(a.buffer,a.byteOffset,a.byteLength))),scope={__game:{post,scene,game:{baked:{atlases:{}}}},__allocation:window.__allocation};
+     const sample=label=>{const s={label,sequence:++sequence,...sampleSceneAllocations(scope)};receipt.states.push(s);return s;};
+     const nativeOwners=()=>targets.map(t=>{const texture=renderer.properties.get(t.texture).__webglTexture;return window.__allocation.textureReservation(gl,texture);});
+     const frame=label=>{renderer.info.reset();post.render(scene,camera);gl.finish();const bytes=new Uint8Array(gl.drawingBufferWidth*gl.drawingBufferHeight*4);gl.readPixels(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.RGBA,gl.UNSIGNED_BYTE,bytes);
+      const f={label,width:gl.drawingBufferWidth,height:gl.drawingBufferHeight,pixels:encode(bytes),glError:gl.getError(),drawCalls:renderer.info.render.calls,nonuniform:bytes.some((v,i)=>v!==bytes[i%4])};receipt.frames.push(f);return f;};
+     frame('baseline');sample('baseline');receipt.oldOwners=nativeOwners();receipt.oldDepth=window.__allocation.renderbufferReservation(gl,renderer.properties.get(post.rtScene).__webglDepthbuffer);receipt.resizeStart=receipt.states.at(-1).allocation.nativeEvents.length;
+     const beforeFinish=receipt.states.at(-1).allocation.calls.finish||0;post.setSize(64,48);receipt.resized=sample('resize-before-draw');receipt.resizeFinishes=(receipt.resized.allocation.calls.finish||0)-beforeFinish;
+     frame('resized');sample('resized-drawn');receipt.newOwners=nativeOwners();receipt.newDepth=window.__allocation.renderbufferReservation(gl,renderer.properties.get(post.rtScene).__webglDepthbuffer);
+     post.setSize(32,32);frame('roundtrip');sample('roundtrip');
+     receipt.cpuOwnersStable=targets.every((t,i)=>t===[post.rtScene,post.rtSmall,post.rtBlur][i]&&t.texture===textures[i]);
+     receipt.methodsUnwrapped=['_apply','render','beginSoldierView','endSoldierView'].every(k=>!Object.hasOwn(post,k))&&renderer===post.renderer;
+     receipt.option={actual:post.resourceLifetime,diagnosticPixelBytes:post.diagnosticPixelBytes,requestedScale:post.requestedScale};
+     if(owned){
+      post.beginSoldierView(camera,2);const lens=post.soldierView;frame('lens');sample('lens');receipt.lensOwner=window.__allocation.textureReservation(gl,renderer.properties.get(lens.depth).__webglTexture);
+      const start=receipt.states.at(-1).allocation.nativeEvents.length;post.endSoldierView();const ended=sample('lens-ended');receipt.lensEvents=ended.allocation.nativeEvents.slice(start);
+      const finishes=ended.allocation.calls.finish;post.endSoldierView();receipt.noopLensFinishes=(sample('lens-noop').allocation.calls.finish||0)-finishes;
+      receipt.lensCoherent=post.soldierView===null&&post.rtScene.depthTexture===null&&lens.material.uniforms.tDepth.value===null;
+      frame('after-lens');sample('after-lens');
+      post.setSize(48,40);frame('latest-reference');sample('latest-reference');post.setSize(32,32);frame('before-loss');sample('before-loss');
+      const properties=renderer.properties;
+      const event=name=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>{renderer.domElement.removeEventListener(name,done);reject(Error('Post owner native '+name+' timeout'));},20000);function done(){clearTimeout(timer);resolve();}renderer.domElement.addEventListener(name,done,{once:true});});
+      const lost=event('webglcontextlost');renderer.forceContextLoss();await lost;
+      // These separate fixture geometry owners retire their native buffers while lost.
+      // Arrays/CPU identities remain unchanged; no observer epoch reset or cost exclusion.
+      geometry.dispose();post.quad.geometry.dispose();
+      const before=window.__allocation.nativeCalls(gl),sourceWidth=post.rtScene.width;post.setSize(80,60);post.setMode('low');post.setSize(48,40);post.setMode('high');post.render(scene,camera);
+      const after=window.__allocation.nativeCalls(gl);receipt.loss={actualLost:gl.isContextLost(),beforeCalls:before,afterCalls:after,sourceWidth,afterWidth:post.rtScene.width,failed:post._resourceFailed===true,latest:[post.width,post.height,post.requestedScale]};
+      await new Promise(resolve=>setTimeout(resolve,0));const restored=event('webglcontextrestored');renderer.forceContextRestore();await restored;
+      receipt.restoredPropertiesFresh=renderer.properties!==properties;receipt.restoredContextHealthy=!gl.isContextLost()&&!post._resourceFailed;
+      receipt.restoredAdmission={logical:[post.width,post.height],target:[post.rtScene.width,post.rtScene.height],canvas:[gl.drawingBufferWidth,gl.drawingBufferHeight],requestedScale:post.requestedScale};
+      frame('restored');sample('restored');post.setSize(32,32);frame('baseline-restored');sample('baseline-restored');receipt.defaultsAfter=window.__allocation.snapshot(gl).textureSlots.filter(t=>Object.values(t.slots).every(n=>n===4));
+     }
+     receipt.sourceBytesStable=arrays.every((a,i)=>encode(new Uint8Array(a.buffer,a.byteOffset,a.byteLength))===sourceBytes[i]);receipt.sourceArrayBytes=arrays.reduce((n,a)=>n+a.byteLength,0);receipt.complete=true;
+    }catch(e){receipt.primary=String(e?.message??e);proof.errors.push(receipt.primary);}
+    finally{
+     if(post){attempt('lens',()=>post.endSoldierView());for(const[k,t]of [['scene',post.rtScene],['small',post.rtSmall],['blur',post.rtBlur]])attempt('target-'+k,()=>t.dispose());
+      for(const[k,m]of [['down',post.downMat],['blur',post.blurMat],['final',post.finalMat]])attempt('material-'+k,()=>m.dispose());attempt('quad',()=>post.quad.geometry.dispose());}
+     if(geometry)attempt('geometry',()=>geometry.dispose());if(material)attempt('material',()=>material.dispose());if(renderer)attempt('renderer',()=>renderer.dispose());
+     if(gl&&!gl.isContextLost()){attempt('finish',()=>gl.finish());if(post)attempt('observation',()=>receipt.states.push({label:'cleanup',sequence:++sequence,...sampleSceneAllocations({__game:{post,scene:new THREE.Scene(),game:{baked:{atlases:{}}}},__allocation:window.__allocation})}));}
+     if(renderer)attempt('context',()=>renderer.forceContextLoss());receipt.complete=receipt.complete&&!receipt.primary&&receipt.cleanup.every(r=>r.ok);
+    }
+   }return proof;
+  });
+  result.postOwnerResourceProof=proof;const c=proof.cases.find(r=>r.owned),d=proof.cases.find(r=>!r.owned);
+  const healthy=s=>s.glError===0&&!s.allocation.unknown.length&&s.unmappedBufferBytes===0;
+  const frames=r=>r?.frames?.every(f=>f.glError===0&&f.drawCalls>0&&f.nonuniform&&Buffer.from(f.pixels,'base64').length===f.width*f.height*4);
+  const equal=(r,a,b)=>{const x=r?.frames?.find(f=>f.label===a),y=r?.frames?.find(f=>f.label===b);return !!x&&!!y&&x.width===y.width&&x.height===y.height&&x.pixels===y.pixels;};
+  const completed=(events,kind,id)=>{if(!Array.isArray(events))return false;const retired=events.findIndex(e=>e.operation==='retire'&&e.kind===kind&&e.id===id),released=events.findIndex(e=>e.operation==='release'&&e.kind===kind&&e.id===id);return retired>=0&&released>retired&&events.slice(retired+1,released).some(e=>e.operation==='finish');};
+  const resizeEvents=c?.resized?.allocation.nativeEvents.slice(c.resizeStart)||[];
+  check('post-owner-native-complete',proof.cases.length===2&&proof.cases.every(r=>r.complete)&&!proof.errors.length,JSON.stringify(proof.errors));
+  check('post-owner-native-real-methods',proof.cases.every(r=>r.methodsUnwrapped)&&c?.option?.actual===true&&d?.option?.actual===false&&proof.cases.every(r=>r.option?.diagnosticPixelBytes===null&&r.option?.requestedScale===1),'actual source owner without lifecycle wrappers; original High requested');
+  check('post-owner-native-cpu-identities',proof.cases.every(r=>r.cpuOwnersStable&&r.sourceBytesStable&&r.sourceArrayBytes===280),'exact CPU targets/textures/arrays retained');
+  check('post-owner-native-resize-retirement',c?.oldOwners?.length===3&&c.oldOwners.every(r=>r&&completed(resizeEvents,'texture',r.id))&&c.newOwners?.every(r=>r&&!c.oldOwners.some(o=>o.id===r.id))&&!!c.oldDepth&&!!c.newDepth&&c.oldDepth.id!==c.newDepth.id&&completed(resizeEvents,'renderbuffer',c.oldDepth.id),'all actual old color/depth IDs retired and released before replacement uploads');
+  check('post-owner-native-resize-completion',c?.resizeFinishes===4&&d?.resizeFinishes===0&&c.resized.allocation.pendingDeleteBytes===0,'actual owner retires targets, completes each native canvas replacement, and sizes targets');
+  check('post-owner-native-whole-frames',proof.cases.every(frames),'whole RGBA native draws, dimensions, nonblank and GL health');
+  check('post-owner-native-resize-roundtrip',proof.cases.every(r=>equal(r,'baseline','roundtrip')),'actual whole baseline pixels after resize roundtrip');
+  const x=c?.frames?.find(f=>f.label==='baseline'),y=d?.frames?.find(f=>f.label==='baseline');
+  check('post-owner-native-default-pixels',!!x&&!!y&&x.width===y.width&&x.height===y.height&&x.pixels===y.pixels,'default-off and enabled owners have identical full native RGBA at same High resolution');
+  check('post-owner-native-lens-retirement',!!c?.lensOwner&&completed(c.lensEvents,'texture',c.lensOwner.id)&&c.lensCoherent&&c.noopLensFinishes===0&&equal(c,'baseline','after-lens'),'real lens depth deletion completes, coherent publication and no-op exit');
+  check('post-owner-native-context-loss-deferral',c?.loss?.actualLost&&JSON.stringify(c.loss.beforeCalls)===JSON.stringify(c.loss.afterCalls)&&c.loss.sourceWidth===c.loss.afterWidth&&!c.loss.failed&&JSON.stringify(c.loss.latest)==='[48,40,1]','actual DOM loss; a different latest size/quality deferred without native calls');
+  const latestApplied=r=>r?.restoredPropertiesFresh&&r.restoredContextHealthy&&['logical','target','canvas'].every(k=>JSON.stringify(r.restoredAdmission?.[k])==='[48,40]')&&r.restoredAdmission.requestedScale===1&&equal(r,'latest-reference','restored')&&equal(r,'baseline','baseline-restored');
+  check('post-owner-native-context-restored',latestApplied(c),'actual Three fresh properties then Post latest different request; independent same-size reference and baseline whole frame equality');
+  const stale=structuredClone(c||{});if(stale.restoredAdmission)stale.restoredAdmission.target=[32,32];
+  check('post-owner-native-restoration-rejection',latestApplied(c)&&!latestApplied(stale),'stale target admission cannot pass latest-request proof');
+  check('post-owner-native-observation-health',proof.cases.every(r=>r.states.every(healthy))&&errors.length===0,errors.join('; '));
+  let replay=true,rejects=true;for(const r of proof.cases){try{const history=createSceneHistory(),compact={history,states:r.states.map(s=>compactSceneSample(history,s))};r.nativeHistory=compact;replay&&=isDeepStrictEqual(expandSceneContext(compact).states,r.states);
+   const malformed=structuredClone(compact);malformed.history.nativeEvents[0].sequence=999999;let rejected=false;try{expandSceneContext(malformed);}catch{rejected=true;}rejects&&=rejected;
+  }catch(e){replay=false;r.replayError=String(e?.message??e);}}
+  check('post-owner-native-history-replay',replay,'complete native event/slot history including actual context loss and restoration');
+  check('post-owner-native-history-rejection',rejects&&replay,'malformed native event sequences rejected independently');
+  const cleaned=r=>{const s=r.states.at(-1),defaults=new Set([...(r.defaultsBefore||[]),...(r.defaultsAfter||[])].map(t=>t.texture));return s?.label==='cleanup'&&s.allocation.byKind.buffer===0&&s.allocation.byKind.renderbuffer===0&&s.allocation.pendingDeleteBytes===0&&s.allocation.textureSlots.every(t=>defaults.has(t.texture)&&Object.values(t.slots).every(n=>n===4));};
+  check('post-owner-native-independent-cleanup',proof.cases.every(r=>r.cleanup.every(s=>s.ok)&&cleaned(r)),'all product owners independently disposed; both native default-texture epochs remain counted');
+ }finally{await ctx.close();}
 }
 
 // Focused native Post prerequisite. No full-art fixed envelope or whole-scene acceptance claim.

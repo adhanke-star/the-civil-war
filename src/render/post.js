@@ -80,7 +80,14 @@ function fsMaterial(fragmentShader, uniforms) {
 }
 
 export class Post {
-  constructor(renderer, { mode = 'auto', diagnosticPixelBytes = null } = {}) {
+  constructor(renderer, { mode = 'auto', diagnosticPixelBytes = null, resourceLifetime = false } = {}) {
+    if (typeof resourceLifetime !== 'boolean') throw new Error('Post resource: explicit lifetime boolean required.');
+    if (resourceLifetime) {
+      const gl = renderer.getContext?.();
+      if (!gl || ['finish', 'getError', 'isContextLost'].some(key => typeof gl[key] !== 'function')
+        || gl.NO_ERROR !== 0) throw new Error('Post resource: native lifetime completion unavailable.');
+    }
+    Object.defineProperty(this, 'resourceLifetime', { value: resourceLifetime, enumerable: true });
     if (diagnosticPixelBytes !== null && (!Number.isSafeInteger(diagnosticPixelBytes)
       || diagnosticPixelBytes < 44 || diagnosticPixelBytes > 250000000)) throw new Error('Post resource: invalid diagnostic pixel envelope.');
     Object.defineProperty(this, 'diagnosticPixelBytes', { value: diagnosticPixelBytes, enumerable: true });
@@ -108,6 +115,11 @@ export class Post {
     this.rtScene = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: this.samples, depthBuffer: true });
     this.rtSmall = new THREE.WebGLRenderTarget(1, 1, rtOpts);
     this.rtBlur = new THREE.WebGLRenderTarget(1, 1, rtOpts);
+    if (resourceLifetime) {
+      Object.defineProperty(this, '_resourceRenderer', { value: renderer });
+      Object.defineProperty(this, '_resourceOwners', { value: Object.freeze(
+        ['rtScene', 'rtSmall', 'rtBlur'].map(key => Object.freeze({ key, target: this[key], texture: this[key].texture }))) });
+    }
 
     this.downMat = fsMaterial(/* glsl */ `
       uniform sampler2D tSrc; uniform vec2 uTexel; varying vec2 vUv;
@@ -196,8 +208,19 @@ export class Post {
     // Lost-context target callbacks must retire before THREE installs its new GL properties.
     // Keep CPU targets and shared materials; the restored renderer allocates them lazily.
     renderer.domElement?.addEventListener('webglcontextlost', () => {
+      if (resourceLifetime) {
+        let primary, failed = false;
+        try { this.endSoldierView(); } catch (error) { primary = error; failed = true; }
+        try { this._retireResourceOwners(this._resourceOwners.map(owner => owner.target)); }
+        catch (error) { if (!failed) { primary = error; failed = true; } }
+        if (failed) throw primary;
+        return;
+      }
       try { this.endSoldierView(); }
       finally { for (const target of [this.rtScene, this.rtSmall, this.rtBlur]) target.dispose(); }
+    });
+    if (resourceLifetime) renderer.domElement?.addEventListener('webglcontextrestored', () => {
+      if (!this._resourceFailed) this._apply();
     });
     this.setMode(mode);
   }
@@ -213,6 +236,7 @@ export class Post {
    * anything; Auto then governs by measured frame rate as usual (DECISIONS 0003, 0007).
    */
   startFromTier(tier) {
+    if (this.resourceLifetime) this._assertResourceOwners();
     if (this.mode !== 'auto' || this.adjusted) return false;
     const want = { 3: 2, 2: 1.6, 1: 1.3, 0: 1 }[tier] ?? this.maxScale;
     let best = 0;
@@ -226,6 +250,7 @@ export class Post {
   }
 
   setMode(mode) {
+    if (this.resourceLifetime) this._assertResourceOwners();
     this.mode = QUALITY_MODES.includes(mode) ? mode : 'auto';
     this.level = 0;
     this.scale = this.mode === 'low' ? LOW_SCALE : this.maxScale;
@@ -238,24 +263,92 @@ export class Post {
   }
 
   _apply() {
-    if (this.diagnosticPixelBytes !== null) {
-      const prior = this.renderer.getSize(new THREE.Vector2());
-      this.resourceAdmission = derivePostResourceScale({ width: this.width, height: this.height,
-        priorWidth: prior.x, priorHeight: prior.y, requestedScale: this.requestedScale, pixelBytes: this.diagnosticPixelBytes });
-      this.scale = this.resourceAdmission.scale;
+    const owned = this.resourceLifetime === true;
+    if (owned) {
+      this._assertResourceOwners();
+      if (this.renderer.getContext().isContextLost()) return;
+      this._resourceApplying = true;
     }
-    this.renderer.setPixelRatio(this.scale);
-    this.renderer.setSize(this.width, this.height, false);
-    const n = this._samplesFor(this.scale);
-    if (n !== this.samples) {
-      this.samples = n;
-      this.rtScene.dispose();
-      this.rtScene = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: n, depthBuffer: true });
+    try {
+      const lens = this.soldierView;
+      if (owned && !this._retireResourceOwners(this._resourceOwners.map(owner => owner.target))) return;
+      if (owned) {
+        this._assertResourceOwners(true);
+        if (this.soldierView !== lens || this.rtScene.depthTexture !== (lens?.depth ?? null)) {
+          throw new Error('Post resource: lens owner changed during retirement.');
+        }
+      }
+      if (this.diagnosticPixelBytes !== null) {
+        const prior = this.renderer.getSize(new THREE.Vector2());
+        this.resourceAdmission = derivePostResourceScale({ width: this.width, height: this.height,
+          priorWidth: prior.x, priorHeight: prior.y, requestedScale: this.requestedScale, pixelBytes: this.diagnosticPixelBytes });
+        this.scale = this.resourceAdmission.scale;
+      }
+      this.renderer.setPixelRatio(this.scale);
+      if (owned && !this._finishResourceLifetime()) return;
+      this.renderer.setSize(this.width, this.height, false);
+      if (owned && !this._finishResourceLifetime()) return;
+      const n = this._samplesFor(this.scale);
+      if (n !== this.samples) {
+        if (owned) throw new Error('Post resource: unsupported sample-owner replacement.');
+        this.samples = n;
+        this.rtScene.dispose();
+        this.rtScene = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: n, depthBuffer: true });
+      }
+      this._alloc();
+      if (owned) this._finishResourceLifetime();
+    } catch (error) {
+      if (owned) this._failResourceLifetime(error);
+      throw error;
+    } finally { if (owned) this._resourceApplying = false; }
+  }
+
+  _failResourceLifetime(error) {
+    if (!this._resourceFailed) this._resourceFailure = error;
+    this._resourceFailed = true;
+    throw this._resourceFailure;
+  }
+
+  _assertResourceOwners(allowApplying = false, allowFailedCleanup = false) {
+    if (this._resourceFailed && !allowFailedCleanup) throw this._resourceFailure;
+    if (this._resourceApplying && !allowApplying) this._failResourceLifetime(new Error('Post resource: reentrant lifetime change.'));
+    if (this.renderer !== this._resourceRenderer || this._resourceOwners.some(owner =>
+      this[owner.key] !== owner.target || owner.target.texture !== owner.texture)
+      || this.rtScene.depthTexture !== (this.soldierView?.depth ?? null)) {
+      this._failResourceLifetime(new Error('Post resource: render target owner changed.'));
     }
-    this._alloc();
+  }
+
+  // The real owner completes its deletes before another native surface can replace them.
+  // This opt-in preparation does not select a pixel envelope or change requested quality.
+  _finishResourceLifetime(allowFailedCleanup = false) {
+    this._assertResourceOwners(true, allowFailedCleanup);
+    const gl = this.renderer.getContext();
+    if (gl.isContextLost()) return false;
+    if (gl.getError() !== gl.NO_ERROR) throw new Error('Post resource: native completion refused.');
+    gl.finish();
+    if (gl.isContextLost()) return false;
+    if (gl.getError() !== gl.NO_ERROR) throw new Error('Post resource: native completion failed.');
+    return true;
+  }
+
+  _retireResourceOwners(owners) {
+    let primary, failed = false, completed = false;
+    for (const owner of owners) try { owner.dispose(); }
+    catch (error) {
+      if (!failed) { primary = error; failed = true; }
+      // Keep the first exception sticky before another disposal callback can reenter.
+      try { this._failResourceLifetime(error); } catch { /* continue independent cleanup */ }
+    }
+    try { completed = this._finishResourceLifetime(true); }
+    catch (error) { if (!failed) { primary = error; failed = true; } }
+    if (failed) this._failResourceLifetime(primary);
+    if (this._resourceFailed) throw this._resourceFailure;
+    return completed;
   }
 
   setSize(w, h) {
+    if (this.resourceLifetime) this._assertResourceOwners();
     this.width = w;
     this.height = h;
     this._apply();
@@ -284,6 +377,10 @@ export class Post {
 
   /** One transient native depth attachment; ordinary map materials and samplers stay intact. */
   beginSoldierView(camera, focus) {
+    if (this.resourceLifetime) {
+      this._assertResourceOwners();
+      if (this.renderer.getContext().isContextLost()) return false;
+    }
     if (this.soldierView) { this.updateSoldierView(camera, focus); return; }
     if (this.rtScene.depthTexture) throw new Error('The scene already has a depth owner.');
     const depth = new THREE.DepthTexture(this.rtScene.width, this.rtScene.height, THREE.UnsignedIntType);
@@ -322,14 +419,21 @@ export class Post {
   endSoldierView() {
     const owned = this.soldierView;
     if (!owned) return;
+    if (this.resourceLifetime && this._resourceApplying) this._failResourceLifetime(new Error('Post resource: reentrant lens retirement.'));
     this.soldierView = null;
     this.quad.material = this.finalMat;
     owned.material.uniforms.tDepth.value = null;
     if (this.rtScene.depthTexture === owned.depth) this.rtScene.depthTexture = null;
-    try { owned.material.dispose(); } finally { owned.depth.dispose(); }
+    if (this.resourceLifetime) {
+      this._resourceApplying = true;
+      try { this._retireResourceOwners([owned.material, owned.depth]); }
+      finally { this._resourceApplying = false; }
+    }
+    else try { owned.material.dispose(); } finally { owned.depth.dispose(); }
   }
 
   render(scene, camera) {
+    if (this.resourceLifetime) this._assertResourceOwners();
     const r = this.renderer;
     // Target setup also allocates outside THREE.render's own lost-context guard.
     if (r.getContext?.().isContextLost()) return;
@@ -360,6 +464,7 @@ export class Post {
 
   /** Call once per frame (Auto mode only adjusts). */
   govern(dt, now) {
+    if (this.resourceLifetime) this._assertResourceOwners();
     if (this.mode !== 'auto') return;
     const log = this.samplesLog;
     log.push([now, dt]);
