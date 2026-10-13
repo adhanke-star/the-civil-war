@@ -80,6 +80,13 @@ export function validateBadgeSilverOrigin(o){
   return true;
 }
 
+// Continue the actual surviving forward-defence save; never reset the earned Silver brigade.
+export const BADGE_LOOKOUT_ORIGIN=Object.freeze({run:38411184483,sha:'2d8874d29ad8efc216a2ca6fe386bc08658e5d02',artifact:11822470702,name:'badge-observations-1',zipBytes:271555,zipSha:'ec4f0e753af378f0088bf40051c017b561a65988b2048b188a4f1a8bfe512c40',saveBytes:49051,saveSha:'2e8ed947a1fe196c04baa3f6b8505c9eddaf0466a2c09b0e01606c5669c6fd8c'});
+export function validateBadgeLookoutOrigin(o){
+  if(!plain(o,Object.keys(BADGE_LOOKOUT_ORIGIN))||Object.keys(o).length!==Object.keys(BADGE_LOOKOUT_ORIGIN).length||Object.keys(BADGE_LOOKOUT_ORIGIN).some(k=>o[k]!==BADGE_LOOKOUT_ORIGIN[k]))fail('lookout exact completed source/checkpoint origin');
+  return true;
+}
+
 /** One distinct McFadden defence from the genuinely saved Silver brigade. */
 export function badgeForwardDefenceTactic(game,phaseId){
   const s=game?.scenario;

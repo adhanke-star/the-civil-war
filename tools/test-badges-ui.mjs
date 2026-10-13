@@ -21,7 +21,7 @@ import * as campaign from '../src/franchise/campaign.js';
 import * as badges from '../src/franchise/badges.js';
 import { validateSnapshot,parseSnapshot,exportSnapshot } from '../src/franchise/save.js';
 import {installSceneStartGate} from './bake/inactive-figures.mjs';
-import {BADGE_PROMOTION_PHASES,BADGE_RELIEF_ORIGIN,validateBadgeReliefOrigin,BADGE_SILVER_ORIGIN,validateBadgeSilverOrigin} from './observe-badges.mjs';
+import {BADGE_PROMOTION_PHASES,BADGE_RELIEF_ORIGIN,validateBadgeReliefOrigin,BADGE_SILVER_ORIGIN,validateBadgeSilverOrigin,BADGE_LOOKOUT_ORIGIN,validateBadgeLookoutOrigin} from './observe-badges.mjs';
 import {validateDeck,cardsFor,chooseDecision} from '../src/franchise/decisions.js';
 import {breakCamp} from '../src/franchise/camp-orders.js';
 import {prepareFieldScenario} from '../src/sim/phase.js';
@@ -41,9 +41,9 @@ export function validatePromotionDeployment(deployed,initial){
 }
 
 /** Original Buell award, despite the retained failed Missionary sibling in this same run. */
-export async function acquireBadgePromotionSave({relief=false,silver=false}={}){
-  assert.equal(typeof relief,'boolean');assert.equal(typeof silver,'boolean');assert.ok(!(relief&&silver));if(relief)validateBadgeReliefOrigin(BADGE_RELIEF_ORIGIN);if(silver)validateBadgeSilverOrigin(BADGE_SILVER_ORIGIN);
-  const O=silver?BADGE_SILVER_ORIGIN:relief?BADGE_RELIEF_ORIGIN:{run:38354836201,sha:'b3e45c5d38f831a4ab7b1f72cfd50754010ff986',artifact:11792497141,name:'badge-observations-3',zipBytes:372145,
+export async function acquireBadgePromotionSave({relief=false,silver=false,lookout=false}={}){
+  for(const flag of[relief,silver,lookout])assert.equal(typeof flag,'boolean');assert.ok([relief,silver,lookout].filter(Boolean).length<=1);if(relief)validateBadgeReliefOrigin(BADGE_RELIEF_ORIGIN);if(silver)validateBadgeSilverOrigin(BADGE_SILVER_ORIGIN);if(lookout)validateBadgeLookoutOrigin(BADGE_LOOKOUT_ORIGIN);
+  const O=lookout?BADGE_LOOKOUT_ORIGIN:silver?BADGE_SILVER_ORIGIN:relief?BADGE_RELIEF_ORIGIN:{run:38354836201,sha:'b3e45c5d38f831a4ab7b1f72cfd50754010ff986',artifact:11792497141,name:'badge-observations-3',zipBytes:372145,
     zipSha:'7ca059d0720fd527da564e375f11457307bd6554e844e952840b786e9ea6f762',saveBytes:14519,saveSha:'e88bcfb43b002860b3af15b39a7bdcdaa00f004b7528d1d3659116d1db8a7503'};
   const api=async p=>{
     if(!process.env.GH_TOKEN)return execFileSync('gh',['api','repos/adhanke-star/the-civil-war'+p],{maxBuffer:99000000});
@@ -52,7 +52,7 @@ export async function acquireBadgePromotionSave({relief=false,silver=false}={}){
     const chunks=[];let n=0;for await(const c of response.body){n+=c.length;if(n>=99000000)throw Error('badge promotion original RAM bound');chunks.push(Buffer.from(c));}return Buffer.concat(chunks);
   };
   const run=JSON.parse(await api('/actions/runs/'+O.run)),artifact=JSON.parse(await api('/actions/artifacts/'+O.artifact));
-  assert.deepEqual([run.id,run.status,run.conclusion,run.head_sha,run.path],[O.run,'completed',relief||silver?'success':'failure',O.sha,'.github/workflows/pack-figures.yml']);
+  assert.deepEqual([run.id,run.status,run.conclusion,run.head_sha,run.path],[O.run,'completed',relief||silver||lookout?'success':'failure',O.sha,'.github/workflows/pack-figures.yml']);
   assert.deepEqual([artifact.id,artifact.expired,artifact.workflow_run.id,artifact.workflow_run.head_sha,artifact.name,artifact.size_in_bytes,artifact.digest],[O.artifact,false,O.run,O.sha,O.name,O.zipBytes,'sha256:'+O.zipSha]);
   const bytes=await api('/actions/artifacts/'+O.artifact+'/zip'),hash=b=>createHash('sha256').update(b).digest('hex');assert.equal(bytes.length,O.zipBytes);assert.equal(hash(bytes),O.zipSha);
   const {yauzl}=createRequire(import.meta.url)(new URL('../node_modules/playwright-core/lib/utilsBundle.js',import.meta.url).pathname),members=new Map();let total=0;
@@ -64,12 +64,20 @@ export async function acquireBadgePromotionSave({relief=false,silver=false}={}){
     });zip.readEntry();
   }));
   assert.equal(members.size,2);const a=members.get('badge-observations.json'),b=members.get('last-result.json');assert.deepEqual(a.badgeObservations,b.badgeObservations);
-  const observation=a.badgeObservations;assert.deepEqual([observation.sourceSha,String(observation.run),observation.shard,observation.complete],[O.sha,String(O.run),relief||silver?1:3,true]);
-  assert.deepEqual(observation.cases.map(c=>c.id),silver?['round-forest','mcfaddens-ford']:relief?['dawn-on-the-right','slaughter-pen','round-forest']:['slaughter-recovery','buell-capture']);
+  const observation=a.badgeObservations;assert.deepEqual([observation.sourceSha,String(observation.run),observation.shard,observation.complete],[O.sha,String(O.run),relief||silver||lookout?1:3,true]);
+  assert.deepEqual(observation.cases.map(c=>c.id),lookout?['mcfaddens-ford']:silver?['round-forest','mcfaddens-ford']:relief?['dawn-on-the-right','slaughter-pen','round-forest']:['slaughter-recovery','buell-capture']);
   for(const c of observation.cases)assert.ok(c.complete&&!c.primary&&!c.errors.length&&c.nativeCleanup.ok&&c.outerCleanup.ok&&c.contextClosed&&c.importContextClosed);
-  const original=observation.cases[silver?0:1],raw=original.saved.raw;assert.equal(Buffer.byteLength(raw),O.saveBytes);assert.equal(hash(raw),O.saveSha);
+  const original=observation.cases[silver||lookout?0:1],raw=original.saved.raw;assert.equal(Buffer.byteLength(raw),O.saveBytes);assert.equal(hash(raw),O.saveSha);
   assert.equal(raw,original.saved.exported);assert.equal(raw,original.saved.duplicateRaw);assert.equal(raw,original.reload.raw);assert.equal(raw,original.imported.raw);
   const save=parseSnapshot(raw),brigade=save.army.find(b=>b.unitId==='us-ammen-brigade');
+  if(lookout){
+    admitBadgeLookoutCheckpoint(raw);assert.equal(b.ok,true);assert.ok(b.checks.every(c=>c.ok));assert.deepEqual(b.consoleErrors,[]);assert.deepEqual(b.consoleWarnings,[]);
+    assert.equal(observation.revision,0);assert.deepEqual(observation.promotion.origin,BADGE_SILVER_ORIGIN);assert.equal(observation.promotion.witness,'supported-forward-defence');
+    const silverSource=await acquireBadgePromotionSave({silver:true});assert.equal(original.continuation.before,silverSource.raw,'actual preceding saved Silver is carried without reset');
+    assert.deepEqual(original.promotion.previous,parseSnapshot(silverSource.raw).army.find(b=>b.id===brigade.id));assert.deepEqual(original.promotion.saved,brigade);assert.equal(original.promotion.earned,null);assert.equal(original.promotion.positionsAccepted,true);
+    assert.equal(observation.promotion.achieved,false);assert.equal(observation.promotion.stopReason,'actual McFadden did not persist Silver-to-Gold');
+    return {origin:O,raw,brigadeId:brigade.id};
+  }
   if(silver){
     admitBadgeSilverCheckpoint(raw);assert.equal(observation.revision,0);assert.deepEqual(observation.promotion.origin,BADGE_RELIEF_ORIGIN);
     assert.equal(observation.promotion.witness,'battle-clock-relief');assert.equal(hash(original.continuation.before),BADGE_RELIEF_ORIGIN.saveSha);
@@ -87,6 +95,14 @@ export async function acquireBadgePromotionSave({relief=false,silver=false}={}){
     assert.ok(!original.initial.units.some(u=>u.id==='us-ammen-brigade'));assert.deepEqual(original.promotion.previous,original.promotion.saved);
   }else assert.ok(original.native.award.brigades.find(b=>b.id===brigade.id)?.earned.some(b=>b.id==='coolUnderFire'&&b.tier==='bronze'&&b.from===null));
   return {origin:O,raw,brigadeId:brigade.id};
+}
+
+/** Bind the actual living post-McFadden army, not a fresh Silver fork or an injected badge. */
+export function admitBadgeLookoutCheckpoint(raw){
+  assert.equal(typeof raw,'string','badge observation: lookout checkpoint raw');assert.equal(Buffer.byteLength(raw),BADGE_LOOKOUT_ORIGIN.saveBytes,'badge observation: lookout checkpoint bytes');assert.equal(createHash('sha256').update(raw).digest('hex'),BADGE_LOOKOUT_ORIGIN.saveSha,'badge observation: lookout checkpoint hash');
+  const save=parseSnapshot(raw),brigade=save.army.find(b=>b.unitId==='us-ammen-brigade');assert.equal(exportSnapshot(save),raw,'badge observation: lookout checkpoint canonical');assert.equal(save.campaign.index,8,'badge observation: lookout ordinary Orchard next');
+  assert.ok(brigade&&brigade.men===899&&brigade.vet==='trained'&&brigade.weapon?.itemId==='m1842','badge observation: lookout same surviving brigade');
+  assert.deepEqual(brigade.badges,[{id:'coolUnderFire',tier:'silver',awardId:'west.1.stones-river.round-forest.1',feat:21},{id:'rock',tier:'bronze',awardId:'west.1.stones-river.mcfaddens-ford.1',feat:2}],'badge observation: lookout actual kept badges');return {raw,brigadeId:brigade.id};
 }
 
 /** Admit only the unchanged actual native Silver checkpoint, never a constructed tier fixture. */

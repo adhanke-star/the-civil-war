@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {BADGE_OBSERVATIONS,badgePrefix,createBadgeCrossings,validateBadgeCommand,badgePrefixReceipt,executeBadgeCommand,installBadgeTickObserver,createBadgePolicy,createBadgeStages,installBadgeCombatObserver,badgeTactic,badgeObservationSelection,LEVEL10_ORIGIN,admitLevel10Origin,advanceBadgeChunk,badgeObservationComplete,BADGE_PROMOTION_PHASES,badgePromotionTactic,BADGE_RELIEF_ORIGIN,validateBadgeReliefOrigin,badgeReliefTactic,badgeReliefPositions,badgeReliefComplete,badgeOpenLineTactic} from './observe-badges.mjs';
 import * as C from '../src/franchise/campaign.js';
-import {validatePromotionDeployment,admitBadgeReliefCheckpoint,admitBadgeSilverCheckpoint} from './test-badges-ui.mjs';
+import {validatePromotionDeployment,admitBadgeReliefCheckpoint,admitBadgeSilverCheckpoint,admitBadgeLookoutCheckpoint} from './test-badges-ui.mjs';
 import {prepareFieldScenario} from '../src/sim/phase.js';
 import {equipmentProfile} from '../src/sim/equipment.js';
 import {badgeClockReliefTactic,badgeClockReliefPositions} from './observe-badges.mjs';
 import {BADGE_SILVER_ORIGIN,validateBadgeSilverOrigin,badgeForwardDefenceTactic,badgeForwardDefencePositions,badgeForwardDefenceComplete} from './observe-badges.mjs';
+import {BADGE_LOOKOUT_ORIGIN,validateBadgeLookoutOrigin} from './observe-badges.mjs';
 import {FEAT_STATS} from '../src/franchise/badges.js';
 const campaign=JSON.parse(fs.readFileSync(new URL('../assets/campaign.json',import.meta.url)));
 const zero=()=>({side:'US',xp:0,menStart:1000,...Object.fromEntries(FEAT_STATS.map(k=>[k,0]))});
@@ -28,6 +29,7 @@ api.deployment=validatePromotionDeployment;
 Object.assign(api,{openLine:badgeOpenLineTactic,relief:badgeReliefTactic,reliefOrigin:validateBadgeReliefOrigin,reliefPositions:badgeReliefPositions,reliefComplete:badgeReliefComplete,reliefCheckpoint:admitBadgeReliefCheckpoint});
 Object.assign(api,{clock:badgeClockReliefTactic,clockPositions:badgeClockReliefPositions});
 Object.assign(api,{forward:badgeForwardDefenceTactic,forwardPositions:badgeForwardDefencePositions,forwardComplete:badgeForwardDefenceComplete,silverOrigin:validateBadgeSilverOrigin,silverCheckpoint:admitBadgeSilverCheckpoint});
+Object.assign(api,{lookoutOrigin:validateBadgeLookoutOrigin,lookoutCheckpoint:admitBadgeLookoutCheckpoint});
 const authoredRelief=(a,id)=>{const scenario=JSON.parse(fs.readFileSync(new URL('../assets/packs/stones-river.json',import.meta.url))).phases.find(p=>p.id===id).scenario;return a.relief({scenario,playerSide:'US',simTime:0},id);};
 const reliefReceipt=t=>({cadence:1,failure:null,stages:t.plan.map(p=>({...structuredClone(p),state:'accepted',trace:{invoked:true,accepted:true,command:p.command.type==='move'?{type:'move',unitId:p.command.unitId,points:[[0,0],p.command.path.point]}:structuredClone(p.command)}}))});
 const clockReceipt=t=>{const r=reliefReceipt(t),move=r.stages.find(s=>s.id==='ammen-relief-move');move.trace.resolvedInputs={actor:[940,-230],point:[-18,-1323]};move.trace.command.points[0]=[940,-230];r.stages.find(s=>s.id==='ammen-relief-run').trace.result={run:true};r.stages.find(s=>s.id==='ammen-relief-cleanup').trace.result={run:false};return r;};
@@ -39,6 +41,9 @@ function promotionDeployment(){
   const initial={deployment:structuredClone(expected),live:expected.units.map(d=>({id:d.id,side:d.side,type:d.type||'infantry',men:d.men,menMax:d.men,guns:d.guns||0,xp:d.xp||1,weapon:d.weapon,equipment:d.equipment?equipmentProfile(d.equipment,d.type||'infantry').item:null,def:structuredClone(d),moraleMax:d.morale??78,fatigue:d.fatigue??0,ammo:d.ammo??100}))};return {expected,initial};
 }
 const checks=[
+ ['lookout-origin',a=>assert.equal(a.lookoutOrigin({...BADGE_LOOKOUT_ORIGIN}),true,'lookout-origin: completed actual surviving forward-defence source')],
+ ['lookout-origin-refusal',a=>{for(const k of Object.keys(BADGE_LOOKOUT_ORIGIN))rejects('lookout-origin-refusal',()=>a.lookoutOrigin({...BADGE_LOOKOUT_ORIGIN,[k]:null}));rejects('lookout-origin-refusal',()=>a.lookoutOrigin({...BADGE_LOOKOUT_ORIGIN,extra:true}));}],
+ ['lookout-checkpoint-refusal',a=>{for(const raw of['',' '.repeat(BADGE_LOOKOUT_ORIGIN.saveBytes)]){let error;try{a.lookoutCheckpoint(raw);}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&/lookout checkpoint/.test(error.message),'lookout-checkpoint-refusal: construction cannot replace actual carried Silver899');}}],
  ['forward-mode',a=>assert.deepEqual(a.selection(['--badge-promotion-forward-defence']),{mode:'promotion-forward-defence',shard:1},'forward-mode: one isolated genuine Silver witness')],
  ['forward-mode-refusal',a=>{for(const flag of ['--badge-promotion-clock-relief','--badge-promotion','--native','--badge-shard=1'])rejects('forward-mode-refusal',()=>a.selection(['--badge-promotion-forward-defence',flag]));}],
  ['silver-origin',a=>assert.equal(a.silverOrigin({...BADGE_SILVER_ORIGIN}),true,'silver-origin: completed immutable native Silver source')],
@@ -293,6 +298,7 @@ if(process.argv.includes('--prove-fail')){
   const changeClock=change=>(...args)=>{const t=badgeClockReliefTactic(...args);change(t);return t;};
   const changeForward=change=>(...args)=>{const t=badgeForwardDefenceTactic(...args);change(t);return t;};
   Object.assign(mutants,{
+    'lookout-origin':{lookoutOrigin:()=>false},'lookout-origin-refusal':{lookoutOrigin:()=>true},'lookout-checkpoint-refusal':{lookoutCheckpoint:()=>true},
     'forward-mode':{selection:()=>null},'forward-mode-refusal':{selection:()=>({})},'silver-origin':{silverOrigin:()=>false},'silver-origin-refusal':{silverOrigin:()=>true},'silver-checkpoint-refusal':{silverCheckpoint:()=>true},
     'forward-plan':{forward:changeForward(t=>t.plan[0].command.path.point=[0,0])},'forward-holds':{forward:changeForward(t=>t.plan.find(r=>r.id==='ammen-hold').notBefore=120)},
     'forward-survival':{forward:changeForward(t=>t.plan.find(r=>r.id==='ammen-withdraw').after=[{id:'ammen-hold',require:'success'}])},'forward-arrivals':{forward:changeForward(t=>t.plan.find(r=>r.id==='arrival-us-estep-battery').notBefore=600)},
