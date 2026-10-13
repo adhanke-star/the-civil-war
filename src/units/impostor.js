@@ -307,6 +307,8 @@ export class BakedAtlas {
 
   async loadDiagnosticClose() {
     const baseline = this.layout.tiers.close;
+    const completionBeforeFallback = this.diagnosticClose.completionBeforeFallback ?? false;
+    if (typeof completionBeforeFallback !== 'boolean') throw new Error('baked close: explicit completion boolean required');
     const observer = this.io.observeClose, observationErrors = [];
     if (observer !== undefined && typeof observer !== 'function') throw new Error('baked close observation: synchronous function required');
     const observe = event => {
@@ -377,12 +379,36 @@ export class BakedAtlas {
         this.publishTier('close', T, textures);
         return textures;
       } catch (error) {
+        const disposalErrors = [];
         for (const {texture:t,page:p,index} of owned) {
           event('dispose-start',p,index,t);
           try {t.dispose();event('dispose-result',p,index,t,{ok:true,error:null});}
-          catch (failure) {event('dispose-result',p,index,t,{ok:false,error:failure?.message || String(failure)});}
+          catch (failure) {disposalErrors.push(failure?.message || String(failure));event('dispose-result',p,index,t,{ok:false,error:failure?.message || String(failure)});}
         }
         if (observationErrors.length) throw observationFailure();
+        if (compressed && completionBeforeFallback && owned.length) {
+          // Explicit diagnostic experiment only: disposal is not GPU completion.
+          // All siblings have settled and every owned texture has been disposed first.
+          const began = performance.now();
+          event('completion-start',null,null,null,{method:'finish'});
+          try {
+            const gl = this.renderer.getContext();
+            if (disposalErrors.length || this.disposed || gl.isContextLost() || gl.getError() !== gl.NO_ERROR)
+              throw new Error('candidate disposal/context incomplete');
+            if (observationErrors.length) throw observationFailure();
+            gl.finish();
+            if (gl.isContextLost() || gl.getError() !== gl.NO_ERROR) throw new Error('native completion GL failure');
+            event('completion-result',null,null,null,{method:'finish',ok:true,elapsedMs:performance.now()-began,error:null});
+            if (observationErrors.length) throw observationFailure();
+          } catch (failure) {
+            event('completion-result',null,null,null,{method:'finish',ok:false,elapsedMs:performance.now()-began,error:failure?.message || String(failure)});
+            if (observationErrors.length) throw observationFailure();
+            const refused = new Error('baked close completion: '+(failure?.message || String(failure)));
+            refused.closeCompletionFailure = true;
+            refused.candidateFailure = error?.message || String(error);
+            refused.disposalErrors = disposalErrors.slice(); throw refused;
+          }
+        }
         throw error;
       }
     };
@@ -412,7 +438,7 @@ export class BakedAtlas {
         throw new Error('baked close: unqualified layout');
       if (astcAvailable(this.renderer.getContext(), T.pages)) return await attempt(T, base, true);
     } catch (error) {
-      if (error.closeObservationFailure) throw error;
+      if (error.closeObservationFailure || error.closeCompletionFailure) throw error;
       this.closeDiagnosticFailure = error.message;
     }
     if (this.disposed) throw new Error('baked atlas: disposed');

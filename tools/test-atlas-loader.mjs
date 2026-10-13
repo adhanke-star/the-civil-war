@@ -2,6 +2,46 @@ import assert from 'node:assert/strict';
 import { loaderFixture } from './atlas-loader-fixture.mjs';
 
 const checks = [
+  ['completion-before-fallback', {httpFailure:true}, async f=>{
+    const records=[];f.io.observeClose=e=>records.push(e);f.atlas.diagnosticClose.completionBeforeFallback=true;
+    await f.atlas.load('close');const finish=f.events.indexOf('finish'),baseline=f.events.findIndex(e=>e.startsWith('png:baseline/'));
+    assert.equal(f.events.filter(e=>e==='finish').length,1,'completion-before-fallback: exactly one native completion');
+    assert.ok(finish>f.events.lastIndexOf('dispose')&&finish<baseline,'completion-before-fallback: all disposals precede completion before fallback IO');
+    const start=records.findIndex(e=>e.operation==='completion-start'),done=records.findIndex(e=>e.operation==='completion-result');
+    assert.ok(records.filter(e=>e.operation==='dispose-result').every(e=>records.indexOf(e)<start),'completion-before-fallback: observed disposal order');
+    assert.ok(start<done&&done<records.findIndex(e=>e.attempt==='baseline'),'completion-before-fallback: explicit observed boundary');
+    assert.ok(records[done].ok&&records[done].method==='finish'&&Number.isFinite(records[done].elapsedMs)&&records[done].elapsedMs>=0,'completion-before-fallback: native method and bounded duration receipt');
+  },f=>{f.renderer.getContext().finish=()=>{};}],
+  ['completion-delayed', {httpFailure:true,delay:true},async f=>{
+    f.atlas.diagnosticClose.completionBeforeFallback=true;const task=f.atlas.load('close');for(let i=0;i<20;i++)await Promise.resolve();
+    assert.ok(!f.events.includes('finish'),'completion-delayed: no completion before the late sibling settles');
+    f.releaseLate();await task;assert.ok(f.events.indexOf('finish')>f.events.indexOf('late-done'),'completion-delayed: late upload precedes completion');
+  },f=>{f.renderer.getContext().finish=()=>f.events.unshift('finish');}],
+  ...['finishFailure','finishGlFailure'].map(key=>['completion-'+key,{httpFailure:true,[key]:true},async f=>{
+    const records=[];f.io.observeClose=e=>records.push(e);f.atlas.diagnosticClose.completionBeforeFallback=true;let failure;try{await f.atlas.load('close');}catch(e){failure=e;}
+    assert.equal(failure?.closeCompletionFailure,true,'completion-'+key+': original completion failure refuses fallback');
+    assert.ok(!f.events.some(e=>e.startsWith('png:baseline/')),'completion-'+key+': no baseline request');assert.equal(f.disposed.size,9,'completion-'+key+': all failed candidate siblings disposed');
+    assert.ok(records.some(e=>e.operation==='completion-result'&&e.ok===false),'completion-'+key+': failed result retained');
+  },f=>{f.renderer.getContext().finish=()=>f.events.push('finish');}]),
+  ['completion-default', {httpFailure:true},async f=>{await f.atlas.load('close');assert.ok(!f.events.includes('finish'),'completion-default: historical overlap remains default');},f=>{f.atlas.diagnosticClose.completionBeforeFallback=true;}],
+  ['completion-context-loss', {httpFailure:true},async f=>{
+    f.atlas.diagnosticClose.completionBeforeFallback=true;const gl=f.renderer.getContext();gl.isContextLost=()=>f.disposed.size>0;
+    let failure;try{await f.atlas.load('close');}catch(e){failure=e;}assert.equal(failure?.closeCompletionFailure,true,'completion-context-loss: lost native context refuses');assert.equal(failure?.candidateFailure,'baked close: HTTP 404','completion-context-loss: original candidate failure retained');assert.ok(!f.events.includes('finish')&&!f.events.some(e=>e.startsWith('png:baseline/')),'completion-context-loss: no native completion or fallback');
+  },f=>{const load=f.atlas.loadDiagnosticClose;f.atlas.loadDiagnosticClose=function(){this.diagnosticClose.completionBeforeFallback=false;return load.call(this);};}],
+  ['completion-context-read', {httpFailure:true},async f=>{
+    f.atlas.diagnosticClose.completionBeforeFallback=true;const get=f.renderer.getContext;let once=true;f.renderer.getContext=()=>{if(once&&f.disposed.size===9){once=false;throw Error('controlled context read');}return get();};
+    let failure;try{await f.atlas.load('close');}catch(e){failure=e;}assert.equal(failure?.closeCompletionFailure,true,'completion-context-read: context setup failure refuses fallback');assert.equal(failure?.candidateFailure,'baked close: HTTP 404','completion-context-read: candidate failure retained');assert.ok(!f.events.includes('finish')&&!f.events.some(e=>e.startsWith('png:baseline/')),'completion-context-read: no completion or baseline request');
+  },f=>{const load=f.atlas.loadDiagnosticClose;f.atlas.loadDiagnosticClose=function(){this.diagnosticClose.completionBeforeFallback=false;return load.call(this);};}],
+  ...['completion-start','completion-result'].map(operation=>['completion-observer-'+operation,{httpFailure:true},async f=>{
+    f.atlas.diagnosticClose.completionBeforeFallback=true;f.io.observeClose=e=>{if(e.operation===operation)throw Error('controlled completion observer failure');};
+    let failure;try{await f.atlas.load('close');}catch(e){failure=e;}assert.equal(failure?.closeObservationFailure,true,'completion-observer-'+operation+': observation failure refuses fallback');assert.ok(!f.events.some(e=>e.startsWith('png:baseline/')),'completion-observer-'+operation+': no baseline request');
+  },f=>{const load=f.atlas.loadDiagnosticClose;f.atlas.loadDiagnosticClose=function(){const io=f.io;delete io.observeClose;return load.call(this);};}]),
+  ['completion-unsupported', {unsupported:true},async f=>{f.atlas.diagnosticClose.completionBeforeFallback=true;await f.atlas.load('close');assert.ok(!f.events.includes('finish'),'completion-unsupported: zero candidate IO, no added finish');},f=>{const load=f.atlas.loadDiagnosticClose;f.atlas.loadDiagnosticClose=async function(){const out=await load.call(this);f.events.push('finish');return out;};}],
+  ['completion-success', {},async f=>{f.atlas.diagnosticClose.completionBeforeFallback=true;await f.atlas.load('close');assert.ok(!f.events.includes('finish'),'completion-success: successful candidate needs no fallback boundary');},f=>{const load=f.atlas.loadDiagnosticClose;f.atlas.loadDiagnosticClose=async function(){const out=await load.call(this);f.events.push('finish');return out;};}],
+  ['completion-disposal-failure', {httpFailure:true},async f=>{
+    f.atlas.diagnosticClose.completionBeforeFallback=true;const load=f.io.loadPNG;f.io.loadPNG=async url=>{const t=await load(url);if(url.startsWith('candidate/'))t.addEventListener('dispose',()=>{throw Error('controlled disposal failure');});return t;};
+    let failure;try{await f.atlas.load('close');}catch(e){failure=e;}assert.equal(failure?.closeCompletionFailure,true,'completion-disposal-failure: incomplete disposal refuses fallback');assert.ok(!f.events.includes('finish')&&!f.events.some(e=>e.startsWith('png:baseline/')),'completion-disposal-failure: no completion or fallback');
+  },f=>{const load=f.atlas.loadDiagnosticClose;f.atlas.loadDiagnosticClose=function(){this.diagnosticClose.completionBeforeFallback=false;return load.call(this);};}],
   ['success', {}, async f => { const ts = await f.atlas.load('close'); assert.equal(ts.length, 10); assert.equal(ts.filter(t => t.isCompressedTexture).length, 8);
     assert.equal(f.atlas.layout.tiers.close.looks.length, 2); assert.equal(f.atlas.memoryBytes(), 8 * 112 + 6 * 340);
     for (const t of ts) { assert.equal(t.premultiplyAlpha, !t.isCompressedTexture); assert.equal(t.generateMipmaps, !t.isCompressedTexture); assert.equal(t.flipY, false); } },

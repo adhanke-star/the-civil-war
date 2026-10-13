@@ -28,11 +28,11 @@ export function installSceneStartGate(scope=globalThis){
 }
 
 /** Configure the existing atlas before first close IO. Publication becomes a labelled loaded baseline. */
-export function configureSceneCloseRoute(scope,{manifest,sourceManifest,base,route,candidateRequests}){
+export function configureSceneCloseRoute(scope,{manifest,sourceManifest,base,route,candidateRequests,completionBeforeFallback=false}){
   const {game,post}=scope,atlases=game?.baked?.atlases,renderer=post?.renderer;
   const fail=message=>{throw Error('scene close route: '+message);};
   if(!game?.paused||!atlases?.US||!atlases.CS||!renderer||typeof candidateRequests!=='function'
-    ||!['capable','unsupported'].includes(route)||typeof base!=='string'||!/^https?:\/\/[^/]+\/__scene-qualified\/$/.test(base))fail('configuration inputs');
+    ||typeof completionBeforeFallback!=='boolean'||!['capable','unsupported'].includes(route)||typeof base!=='string'||!/^https?:\/\/[^/]+\/__scene-qualified\/$/.test(base))fail('configuration inputs');
   if(candidateRequests()!==0)fail('premature candidate IO');
   const fields=Object.entries(atlases).map(([side,atlas])=>{
     if(!atlas.textures.field?.length||atlas.state.close!==undefined||atlas.textures.close!==undefined
@@ -65,7 +65,7 @@ export function configureSceneCloseRoute(scope,{manifest,sourceManifest,base,rou
     routeRenderer={getContext:()=>facade,properties:renderer.properties,initTexture:renderer.initTexture.bind(renderer)};
     if(astcAvailable(facade,pages))fail('masked capability remains available');
   }
-  const configured={manifest,sourceManifest,base},descriptors=new Map(['diagnosticClose','renderer'].map(k=>[k,Object.getOwnPropertyDescriptor(atlas,k)]));
+  const configured={manifest,sourceManifest,base,...(completionBeforeFallback?{completionBeforeFallback:true}:{})},descriptors=new Map(['diagnosticClose','renderer'].map(k=>[k,Object.getOwnPropertyDescriptor(atlas,k)]));
   // Refuse impossible descriptor restoration before modifying either property.
   for(const key of descriptors.keys()){const d=descriptors.get(key);if(d&&(!('value'in d)||!d.writable))fail('unwritable configuration '+key);}
   atlas.diagnosticClose=configured;atlas.renderer=routeRenderer;

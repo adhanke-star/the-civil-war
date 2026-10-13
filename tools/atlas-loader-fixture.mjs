@@ -30,7 +30,8 @@ export function loaderFixture(options = {}, mutate = () => {}) {
   const gl = { NO_ERROR: 0, COMPRESSED_TEXTURE_FORMATS: 1, MAX_TEXTURE_SIZE: 2,
     getExtension: () => options.unsupported ? null : { getSupportedProfiles: () => ['ldr'] },
     getParameter: k => k === 1 ? [0x93b0] : 2048, isContextLost: () => false,
-    getError: () => { const e = error; error = 0; return e; } };
+    getError: () => { const e = error; error = 0; return e; },
+    finish(){ events.push('finish');if(options.finishFailure)throw Error('controlled native finish failure');if(options.finishGlFailure)error=0x0502; } };
   const track = t => { textures.push(t); t.addEventListener('dispose', () => { disposed.add(t); events.push('dispose'); }); return t; };
   const renderer = { getContext: () => gl, initTexture(t) {
     if (!textures.includes(t)) track(t);

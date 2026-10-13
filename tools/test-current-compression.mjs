@@ -7,7 +7,7 @@ import { colourComposite, closeQualified,hybridQualified,validateHybridExport,QU
   validateQualifiedArtifacts,validateQualifiedZip,selectQualifiedMembers,validateQualifiedSceneInput,acquireQualifiedHybrid,
   qualifiedSceneFiles,materializeQualifiedSceneInput,installQualifiedSceneRoutes,
   FAILED_SCENE_ORIGIN,validateFailedSceneOrigin,failedSceneNames,validateSceneTransportInventory,validateSceneTransportMember,
-  sceneTransportGroups,inflateFailedSceneReport,sceneTransportCRC } from './bake/review-current-compression.mjs';
+  sceneTransportGroups,inflateFailedSceneReport,sceneTransportCRC,sceneMatrixGroups } from './bake/review-current-compression.mjs';
 import {gzipSync} from 'node:zlib';
 import {loaderFixture} from './atlas-loader-fixture.mjs';
 import {createHash} from 'node:crypto';
@@ -86,11 +86,14 @@ const api={select:selectPages,close:selectClosePages,hybrid:selectHybridClosePag
  metadata:validateQualifiedArtifacts,zip:validateQualifiedZip,members:selectQualifiedMembers,sceneInput:validateQualifiedSceneInput,acquire:acquireQualifiedHybrid,
  transport:qualifiedSceneFiles,materialize:materializeQualifiedSceneInput,routes:installQualifiedSceneRoutes,
  failedOrigin:validateFailedSceneOrigin,failedNames:failedSceneNames,inventory:validateSceneTransportInventory,member:validateSceneTransportMember,
- groups:sceneTransportGroups,inflate:inflateFailedSceneReport,crc:sceneTransportCRC};
+ groups:sceneTransportGroups,inflate:inflateFailedSceneReport,crc:sceneTransportCRC,matrixGroups:sceneMatrixGroups};
 const failedMetadata=()=>{const o=FAILED_SCENE_ORIGIN;return {run:{id:o.run,head_sha:o.sha,status:'completed',conclusion:'failure',repository:{full_name:o.repo}},artifact:{id:o.artifact,name:o.name,expired:false,size_in_bytes:o.bytes,digest:'sha256:'+o.digest,workflow_run:{id:o.run,head_sha:o.sha}}};};
 const transportFixture=()=>{const names=failedSceneNames(JSON.parse(fs.readFileSync(new URL('../assets/campaign.json',import.meta.url)))),bytes=Buffer.from('abc');return {names,bytes,entries:names.map(name=>({name,bytes:3,crc32:0x352441c2,externalFileAttributes:0,generalPurposeBitFlag:0}))};};
 const overflowFixture=()=>{const bytes=Buffer.from(JSON.stringify({toolSha:FAILED_SCENE_ORIGIN.sha,complete:false,withinLimit:false,cases:[],faults:[]})),gzip=gzipSync(bytes),digest=b=>createHash('sha256').update(b).digest('hex');return {bytes,gzip,stub:{toolSha:FAILED_SCENE_ORIGIN.sha,complete:false,withinLimit:false,fieldable:false,transportFailure:{bytes:bytes.length,sha256:digest(bytes),encoding:'gzip',forensicFile:'report-overflow.json.gz',compressedBytes:gzip.length,compressedSha256:digest(gzip)}}};};
 const checks=[
+ ['scene-matrix-groups',a=>{const entries=[{name:'phase-01.json',bytes:35000000,sha256:'a'.repeat(64)},{name:'capture.png',bytes:30000000,sha256:'b'.repeat(64)},{name:'phase-02.json',bytes:20000000,sha256:'c'.repeat(64)}],g=a.matrixGroups(entries);assert.deepEqual(g.map(g=>g.map(e=>e.name)),[['capture.png'],['phase-01.json','phase-02.json']],'scene-matrix-groups: whole original bytes below60M with exact union');}],
+ ['scene-matrix-singleton',a=>{const e={name:'phase-01.json',bytes:89999999,sha256:'a'.repeat(64)},g=a.matrixGroups([e]);assert.deepEqual(g,[[e]],'scene-matrix-singleton: bounded90M phase stays whole and alone below99M reader');}],
+ ['scene-matrix-group-refusal',a=>{for(const entries of [[{name:'../escape.png',bytes:1,sha256:'a'.repeat(64)}],[{name:'capture.png',bytes:60000000,sha256:'a'.repeat(64)}],[{name:'phase-01.json',bytes:90000000,sha256:'a'.repeat(64)}],[{name:'capture.png',bytes:1,sha256:'broken'}],Array.from({length:17},(_,i)=>({name:'phase-'+i+'.json',bytes:35000000,sha256:'a'.repeat(64)}))])mustReject(()=>a.matrixGroups(entries),/scene transport/,'scene-matrix-group-refusal: traversal, oversized whole file, hash and slots reject');}],
  ['scene-original-identity',a=>{const m=failedMetadata();assert.equal(a.failedOrigin(m.run,m.artifact),true,'scene-original-identity: exact failed source and digest');}],
  ['scene-original-refusal',a=>{for(const change of [m=>m.run.head_sha='b'.repeat(40),m=>m.run.conclusion='success',m=>m.artifact.digest='sha256:'+'b'.repeat(64),m=>m.artifact.size_in_bytes++,m=>m.artifact.expired=true,m=>m.run.repository.full_name='other/repo']){const m=failedMetadata();change(m);mustReject(()=>a.failedOrigin(m.run,m.artifact),/scene transport/,'scene-original-refusal: mismatched source refuses before download');}}],
  ['scene-original-names',a=>{const c=JSON.parse(fs.readFileSync(new URL('../assets/campaign.json',import.meta.url))),names=a.failedNames(c);assert.ok(names.length===146&&names.includes('chattanooga-lookout-mountain-capable-07-framed-compare-rigged-left.png')&&names.includes('shiloh-buell-attacks-unsupported-03-baked-reclamation.png'),'scene-original-names: exact144 images plus both original reports, qualified numbering retained');}],
@@ -194,7 +197,7 @@ const checks=[
     assert.ok(p.data[0]>85&&p.data[0]<95&&p.data[3]===255,'once-premultiplied: unpremultiply before linear blend and display conversion');
   }],
 ];
-const mutants={'hybrid-route':{hybrid:selectClosePages},'hybrid-evidence':{hybridQualified:()=>true},coverage:{select:(...x)=>selectPages(...x).slice(0,4)},'missing-look':{select:()=>[]},'page-bounds':{select:()=>[]},'frame-bounds':{select:()=>[]},
+const mutants={'scene-matrix-singleton':{matrixGroups:()=>[]},'scene-matrix-groups':{matrixGroups:()=>[]},'scene-matrix-group-refusal':{matrixGroups:()=>[]},'hybrid-route':{hybrid:selectClosePages},'hybrid-evidence':{hybridQualified:()=>true},coverage:{select:(...x)=>selectPages(...x).slice(0,4)},'missing-look':{select:()=>[]},'page-bounds':{select:()=>[]},'frame-bounds':{select:()=>[]},
   'all-close-frames':{close:m=>selectClosePages(m).map(p=>({...p,frames:p.frames.slice(0,3)}))},'close-rejects':{close:()=>[]},'qualification-evidence':{qualified:()=>true},
   'complete-mips':{bytes:()=>({block16:64,rgba8:256,levels:1})},thresholds:{compare:()=>({ok:true})},
   'once-premultiplied':{composite:()=>{const p=new PNG({width:1,height:1});p.data=Buffer.from([64,32,16,255]);return PNG.sync.write(p);}}};

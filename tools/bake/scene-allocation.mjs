@@ -263,6 +263,50 @@ export function expandSceneContext(input){
     ...(input.stress?{stress:{...input.stress,...(input.stress.transaction?{transaction:{...input.stress.transaction,samples:Array.isArray(input.stress.transaction.samples)?input.stress.transaction.samples.map(s=>({...s,observation:decoded.get(s.observation)})):input.stress.transaction.samples}}:{})}}:{})};
 }
 export function reduceSceneObservations(report, phases) {
+  return reduceSceneScope(report,phases,11);
+}
+/** Exact semantic header shared by bounded parts. Source/run and native-history admission belong here too. */
+export function scenePartHeader(report){
+  return Object.fromEntries(['diagnosticOnly','fieldable','toolSha','run','route','sceneRoutes','fallbackCompletion','normalMotion','nativeHistoryRequired',
+    'inactivePrototype','terrainPartitionPrototype','terrainRestorationObserved','limits','qualification','nativeDriverMemory','cpuDecodePeak','unverified']
+    .filter(k=>Object.hasOwn(report||{},k)).map(k=>[k,structuredClone(report[k])]));
+}
+/** Consume eleven bounded phase parts; never reconstruct the aggregate JSON or retain previous rows. */
+export function createSceneMatrixMerger(phases,header){
+  const matrix=sceneMatrixContract(phases),expected=phases.map(p=>p.packId+'/'+p.phaseId),common=scenePartHeader(header),errors=[],parts=[],contexts=new Set(),tuples=new Set();
+  let maxReservation=null,maxGpuReservation=null,closed=false;
+  if(common.sceneRoutes!=='qualified-both')throw Error('scene parts: qualified header required');
+  const rowKey=(r,fault)=>r?.packId+'/'+r?.phaseId+'/'+r?.route+'/'+(fault?r?.fault:'ordinary');
+  const required=new Set([...matrix.cases.map(r=>rowKey(r,false)),...matrix.faults.map(r=>rowKey(r,true))]);
+  const mergePeak=(value,current)=>Number.isSafeInteger(value)&&value>=0?current===null?value:Math.max(value,current):current;
+  const snapshot=()=>({complete:!errors.length&&parts.length===11&&contexts.size===110&&tuples.size===110,
+    errors:errors.slice(),parts:structuredClone(parts),maxReservation,maxGpuReservation,
+    withinLimit:!errors.length&&parts.length===11&&contexts.size===110&&tuples.size===110&&maxGpuReservation!==null&&maxGpuReservation<=250000000});
+  return {add(part){
+    if(closed)throw Error('scene parts: finalized owner');
+    const at=parts.length,phase=phases[at],key=expected[at],localErrors=[];
+    const fail=message=>localErrors.push(message);let result;
+    // Readable maxima survive even a duplicate, foreign, failed or mixed-header part.
+    try{result=reduceSceneScope(part,phase?[phase]:[],1);}catch(error){result={complete:false,errors:[String(error?.message??error)],maxReservation:null,maxGpuReservation:null};}
+    maxReservation=mergePeak(result.maxReservation,maxReservation);maxGpuReservation=mergePeak(result.maxGpuReservation,maxGpuReservation);
+    if(JSON.stringify(scenePartHeader(part))!==JSON.stringify(common))fail('mixed semantic/source header');
+    if(!phase||part?.phaseKey!==key||part?.complete!==true)fail('ordered complete phase part');
+    for(const [kind,fault]of [['cases',false],['faults',true]])for(const row of Array.isArray(part?.[kind])?part[kind]:[]){
+      const tuple=rowKey(row,fault);if(!required.has(tuple)||tuples.has(tuple))fail('foreign/duplicate tuple '+tuple);tuples.add(tuple);
+      if(typeof row?.contextId!=='string'||!row.contextId||contexts.has(row.contextId))fail('foreign/duplicate context '+row?.contextId);contexts.add(row?.contextId);
+    }
+    if(!result.complete)localErrors.push(...result.errors.map(e=>'local: '+e));
+    const summary={phaseKey:part?.phaseKey??null,partComplete:localErrors.length===0,ordinary:Array.isArray(part?.cases)?part.cases.length:0,
+      faults:Array.isArray(part?.faults)?part.faults.length:0,maxReservation:result.maxReservation,maxGpuReservation:result.maxGpuReservation,errors:localErrors};
+    parts.push(summary);errors.push(...localErrors.map(e=>(key||'extra part')+': '+e));return structuredClone(summary);
+  },snapshot,finalize(){
+    if(closed)throw Error('scene parts: finalized owner');closed=true;
+    if(parts.length!==11||contexts.size!==110||tuples.size!==110||[...required].some(k=>!tuples.has(k)))errors.push('missing complete 22 ordinary + 88 fault union');
+    return snapshot();
+  }};
+}
+// Private phase scope is reachable only through the exhaustive matrix merger below.
+function reduceSceneScope(report, phases, requiredPhases) {
   const errors=[], expected=(Array.isArray(phases)?phases:[]).map(p=>`${p?.packId}/${p?.phaseId}`), seen=new Set(), samples=[];
   const fail=message=>errors.push(message);
   const keep=s=>samples.push({gpuReservation:s?.gpuReservation,conservativeReservation:s?.conservativeReservation});
@@ -276,8 +320,9 @@ export function reduceSceneObservations(report, phases) {
     for(const s of Array.isArray(row?.preload?.transaction?.samples)?row.preload.transaction.samples:[])keep(s?.observation);
   }
   if(report.sceneRoutes!==undefined&&!['current-png','qualified-both'].includes(report.sceneRoutes))fail('unknown scene route mode');
+  if(report.fallbackCompletion!==undefined&&(report.sceneRoutes!=='qualified-both'||report.fallbackCompletion!=='native-finish-after-candidate-disposal'))fail('unknown fallback completion contract');
   if(report.sceneRoutes!=='qualified-both'&&(report.qualification!==undefined||report.faults!==undefined))fail('qualified evidence requires explicit qualified mode');
-  if(new Set(expected).size!==expected.length||expected.length!==11)fail('phase contract');
+  if(new Set(expected).size!==expected.length||expected.length!==requiredPhases)fail('phase contract');
   const sample=(s,label)=>{
     keep(s);
     if(!Number.isSafeInteger(s?.gpuReservation)||s.gpuReservation<0
@@ -392,7 +437,7 @@ export function reduceSceneObservations(report, phases) {
           if(!safe(owner?.capacity)||owner.capacity!==capacity||!safe(owner.bytes))fail(label+': owner capacity');
           const strides=l?.startsWith('procedural.')||l?.startsWith('fallen.')?[64,16,16,4]:l?.startsWith('baked.')?[48]:l==='halos'?[64,16,4]:
             l==='horses'||l==='mounts'?[64,12]:l?.startsWith('guns.')?[64]:l==='flags'?[64,4]:l==='smoke'?[12,16,4,12,4]:l?.startsWith('rings.')?[12]:[];
-          const arrays=array(owner?.arrays,label+'/native arrays'),drawables=l?.startsWith('procedural.')||l?.startsWith('baked.')?2:1;
+          const arrays=array(owner?.arrays,label+'/native arrays'),drawables=l?.startsWith('baked.')||l?.startsWith('procedural.')&&!l.endsWith('.lod0')?2:1;
           if(arrays.length!==strides.length||arrays.some((a,i)=>a?.bytes!==strides[i]*capacity))fail(label+': complete native array shapes');
           if(receipt?.label==='stress'&&(!Array.isArray(owner?.instances)||owner.instances.length!==drawables
             ||owner.instances.some(n=>l?.startsWith('rings.')?n!==null:n!==capacity)))fail(label+': maximum instance counts');
@@ -514,13 +559,33 @@ export function reduceSceneObservations(report, phases) {
       if(fired.length!==1||fired[0]?.fault!==row?.fault||first.length!==1)fail(label+': actual fault/first baseline request');
       const firstSample=states.find(s=>s?.label==='first-baseline-request'),pending=states.find(s=>s?.label===pendingLabel),settled=states.find(s=>s?.label===settledLabel);
       const start=states.find(s=>s?.label==='fault-start');
+      const completion=report.fallbackCompletion==='native-finish-after-candidate-disposal'&&row?.route==='capable';
+      const completionStarts=ops('candidate-completion-start'),completionResults=ops('candidate-completion-result'),
+        beforeCompletion=states.filter(s=>s?.label==='candidate-completion-before'),afterCompletion=states.filter(s=>s?.label==='candidate-completion-after');
+      const finishCount=s=>s?.allocation?.calls?.finish||0;
+      if(completion){
+        const before=beforeCompletion[0],after=afterCompletion[0],begin=completionStarts[0],done=completionResults[0];
+        if(beforeCompletion.length!==1||afterCompletion.length!==1||completionStarts.length!==1||completionResults.length!==1
+          ||begin?.method!=='finish'||done?.method!=='finish'||done?.ok!==true||!Number.isFinite(done?.elapsedMs)||done.elapsedMs<0
+          ||before?.sequence!==begin?.sequence||after?.sequence!==done?.sequence||start?.sequence>=before?.sequence||before?.sequence>=after?.sequence
+          ||after?.sequence>=firstSample?.sequence||finishCount(before)!==finishCount(start)||finishCount(after)!==finishCount(before)+1
+          ||finishCount(firstSample)!==finishCount(after)||after?.allocation?.pendingDeleteBytes!==0
+          ||after?.allocation?.bytes!==before?.allocation?.bytes-before?.allocation?.pendingDeleteBytes
+          ||after?.allocation?.gpuPeak<before?.allocation?.gpuPeak)fail(label+': confirmed native completion before fallback');
+        for(const [kind,idKey]of [['bufferSlots','id'],['textureSlots','texture'],['renderbufferSlots','id']]){
+          const previous=array(before?.allocation?.[kind],label+'/before completion '+kind),next=array(after?.allocation?.[kind],label+'/after completion '+kind);
+          if(previous.filter(s=>s?.pendingDelete).some(s=>next.some(t=>t?.[idKey]===s[idKey])))fail(label+': native pending identity survived completion '+kind);
+        }
+        if(ops('candidate-dispose').some(e=>e.sequence>=before?.sequence)||ops('candidate-all-settled')[0]?.sequence>=before?.sequence)fail(label+': completion after settled sibling disposal');
+      }else if(completionStarts.length||completionResults.length||beforeCompletion.length||afterCompletion.length)fail(label+': unexpected completion boundary');
+      const fallbackFinishes=finishCount(start)+(completion?1:0);
       const postSamples=array(row?.stress?.transaction?.samples,label+'/postoutcome samples');
       validateNativeStress(row?.stress,e,label+'/postoutcome',terminal?'terminal':'full');
       if(preloadSamples.some(s=>!s.observation||s.observation.sequence>=start?.sequence)
         ||postSamples.length!==3||postSamples.some(s=>!s?.observation||s.observation.sequence<=pending?.sequence||s.observation.sequence>=settled?.sequence
-          ||(s.observation.allocation?.calls.finish||0)!==(start?.allocation?.calls.finish||0)
+          ||(s.observation.allocation?.calls.finish||0)!==fallbackFinishes
           ||row?.route==='capable'&&s.observation.allocation?.pendingDeleteBytes<firstSample?.allocation?.pendingDeleteBytes))fail(label+': preload and pending postoutcome stress chronology');
-      if(!start||start.sequence>=firstSample?.sequence||(start.allocation?.calls.finish||0)!==(firstSample?.allocation?.calls.finish||0))fail(label+': no implicit finish through fault and fallback');
+      if(!start||start.sequence>=firstSample?.sequence||fallbackFinishes!==finishCount(firstSample))fail(label+': exact declared finish through fault and fallback');
       if(!firstSample||firstSample.sequence!==first[0]?.sequence||!pending||!settled||firstSample.sequence>=pending.sequence||pending.sequence>=settled.sequence
         ||first[0]?.beforeNativeLoader!==true||(firstSample.allocation?.calls.finish||0)!==(pending.allocation?.calls.finish||0)
         ||(settled.allocation?.calls.finish||0)<=(pending.allocation?.calls.finish||0))fail(label+': observational overlap and explicit settlement');
@@ -534,7 +599,8 @@ export function reduceSceneObservations(report, phases) {
         ||baselineUploads.some(e=>e.beforeSample!==true||e.sequence<=first[0]?.sequence||e.sequence>=pending?.sequence
           ||!baselineSamples.some(s=>s.sequence===e.sequence&&s.page===e.page)||!baselineSettled.some(s=>s.page===e.page&&s.outcome==='fulfilled'&&s.sequence>e.sequence))
         ||baselineSettled.filter(e=>e.outcome==='fulfilled').some(e=>!baselineUploads.some(u=>u.page===e.page&&u.sequence<e.sequence))
-        ||(row?.route==='capable'&&(!(firstSample?.allocation?.pendingDeleteBytes>0)||[...baselineSamples,pending].some(s=>s?.allocation?.pendingDeleteBytes<firstSample.allocation.pendingDeleteBytes)))
+        ||(row?.route==='capable'&&(!completion&&!(firstSample?.allocation?.pendingDeleteBytes>0)||completion&&firstSample?.allocation?.pendingDeleteBytes!==0
+          ||[...baselineSamples,pending].some(s=>s?.allocation?.pendingDeleteBytes<firstSample.allocation.pendingDeleteBytes)))
         ||settled?.allocation?.pendingDeleteBytes!==0)fail(label+': baseline upload overlap and retained pending deletes');
       if(row?.route==='unsupported'){
         if(events.some(e=>typeof e?.operation==='string'&&(e.operation.startsWith('candidate-')||e.operation.startsWith('sibling-')))||row?.candidateRequests!==0)fail(label+': unsupported candidate IO');
@@ -581,8 +647,8 @@ export function reduceSceneObservations(report, phases) {
         ||(!terminal&&outcome.exactCurrentSingleBase!==true)||(terminal&&outcome.baselineSiblingsDisposed!==true))fail(label+': terminal/fallback publication');
       chronology([...states,...(Array.isArray(row?.stress?.transaction?.samples)?row.stress.transaction.samples.map(s=>s?.observation):[]),...array(row?.restoration?.samples,label+'/chronology restore')],label);
     }
-    if(ordinary.size!==22||expected.some(p=>SCENE_ROUTES.some(route=>!ordinary.has(p+'/'+route))))fail('missing qualified ordinary tuple');
-    if(faultSeen.size!==88||expected.some(p=>SCENE_FAULTS.some(f=>!faultSeen.has(p+'/'+f.route+'/'+f.fault))))fail('missing qualified fault tuple');
+    if(ordinary.size!==2*requiredPhases||expected.some(p=>SCENE_ROUTES.some(route=>!ordinary.has(p+'/'+route))))fail('missing qualified ordinary tuple');
+    if(faultSeen.size!==8*requiredPhases||expected.some(p=>SCENE_FAULTS.some(f=>!faultSeen.has(p+'/'+f.route+'/'+f.fault))))fail('missing qualified fault tuple');
     for(const p of expected){const a=ordinary.get(p+'/capable'),b=ordinary.get(p+'/unsupported');
       if(!a||!b||JSON.stringify(a.ordinaryRoster)!==JSON.stringify(b.ordinaryRoster)||JSON.stringify(a.warm?.retainedRoster)!==JSON.stringify(b.warm?.retainedRoster)
         ||JSON.stringify(a.warm?.spawned)!==JSON.stringify(b.warm?.spawned))fail(p+': paired native roster');}

@@ -37,6 +37,13 @@ on:
         options:
           - current-png
           - qualified-both
+      scene_completion:
+        description: Scene mode only; approved diagnostic candidate completion before fallback
+        type: choice
+        default: no-finish
+        options:
+          - no-finish
+          - native-finish
 permissions:
   contents: read
   actions: read
@@ -130,11 +137,13 @@ jobs:
         if: inputs.mode == 'current' || inputs.mode == 'cs-close' || inputs.mode == 'cs-hybrid'
         run: node tools/bake/review-current-compression.mjs
       - name: Current whole-scene allocation observation, both armies and all campaign phases
+        id: scene
         if: inputs.mode == 'scene'
         env:
           SCENE_INACTIVE: ${{ inputs.inactive }}
           SCENE_PARTITION: ${{ inputs.partition }}
           SCENE_ROUTES: ${{ inputs.scene_routes }}
+          SCENE_COMPLETION: ${{ inputs.scene_completion }}
         run: |
           node tools/test-scene-allocation.mjs
           node tools/test-scene-allocation.mjs --prove-fail
@@ -154,6 +163,168 @@ jobs:
             .out/scene-allocation/*.png
           retention-days: 7
           if-no-files-found: warn
+      - name: Bounded scene matrix group 00
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 0
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-00
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-00/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bounded scene matrix group 01
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 1
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-01
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-01/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bounded scene matrix group 02
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-02
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-02/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bounded scene matrix group 03
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 3
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-03
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-03/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bounded scene matrix group 04
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-04
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-04/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bounded scene matrix group 05
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 5
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-05
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-05/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bounded scene matrix group 06
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 6
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-06
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-06/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bounded scene matrix group 07
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 7
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-07
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-07/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bounded scene matrix group 08
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 8
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-08
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-08/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bounded scene matrix group 09
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 9
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-09
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-09/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bounded scene matrix group 10
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 10
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-10
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-10/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bounded scene matrix group 11
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 11
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-11
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-11/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bounded scene matrix group 12
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 12
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-12
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-12/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bounded scene matrix group 13
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 13
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-13
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-13/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bounded scene matrix group 14
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 14
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-14
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-14/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Bounded scene matrix group 15
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && fromJSON(steps.scene.outputs.matrix_groups || '0') > 15
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-15
+          path: ${{ steps.scene.outputs.matrix_root }}/matrix-15/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Preserve unaccepted whole scene bytes if bounded transport refuses
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both' && steps.scene.outputs.matrix_transport_failure == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-forensic
+          path: ${{ steps.scene.outputs.matrix_forensic_root }}/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Verify actual scene matrix ZIP set, source and bounded transport
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both'
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';import assert from 'node:assert/strict';import {execFileSync} from 'node:child_process';
+          const run=process.env.GITHUB_RUN_ID,sha=process.env.GITHUB_SHA,root='.out/scene-allocation';
+          const receipt={run,sha,complete:false,wanted:[],artifacts:[],failure:null};
+          try{
+            const m=JSON.parse(fs.readFileSync(root+'/report.json'));assert.equal(m.toolSha,sha);assert.equal(String(m.run),run);
+            receipt.wanted=['scene-allocation',...(m.groups||[]).map(g=>'scene-matrix-'+String(g.index).padStart(2,'0')),...(m.transportFailure?.policy?.includes('forensic artifact')?['scene-matrix-forensic']:[])];
+            const data=JSON.parse(execFileSync('gh',['api',`repos/adhanke-star/the-civil-war/actions/runs/${run}/artifacts?per_page=100`],{maxBuffer:1000000}));receipt.artifacts=data.artifacts;
+            assert.equal(data.total_count,receipt.wanted.length);assert.equal(new Set(data.artifacts.map(a=>a.name)).size,receipt.wanted.length);
+            assert.deepEqual(data.artifacts.map(a=>a.name).sort(),receipt.wanted.slice().sort());
+            for(const a of data.artifacts){assert.ok(a.size_in_bytes<99000000);assert.equal(a.expired,false);assert.equal(String(a.workflow_run.id),run);assert.equal(a.workflow_run.head_sha,sha);assert.match(a.digest,/^sha256:[a-f0-9]{64}$/);}
+            assert.ok(!m.transportFailure);receipt.complete=true;
+          }catch(error){receipt.failure=String(error?.message??error);process.exitCode=1;}
+          finally{fs.mkdirSync(root,{recursive:true});fs.writeFileSync(root+'/matrix-uploads.json',JSON.stringify(receipt),{flag:'wx'});console.log('SCENE MATRIX UPLOADS',JSON.stringify(receipt));}
+          JS
+      - name: Actual bounded matrix upload receipt
+        if: always() && inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-matrix-uploads
+          path: .out/scene-allocation/matrix-uploads.json
+          retention-days: 7
+          if-no-files-found: error
       - name: Current diagnostic reports and five numbered comparison images only
         if: always() && inputs.mode == 'current'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

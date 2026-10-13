@@ -64,6 +64,20 @@ export function sceneTransportGroups(entries){
   }if(current.length)groups.push(current);
   if(groups.length>16||groups.flat().length!==entries.length||new Set(groups.flat().map(e=>e.name)).size!==entries.length)transportFail('group union/slot overflow');return groups;
 }
+/** Whole-member grouping for newly produced bounded phase reports and original PNG bytes. */
+export function sceneMatrixGroups(entries){
+  if(!Array.isArray(entries)||!entries.length||new Set(entries.map(e=>e?.name)).size!==entries.length)transportFail('matrix group inventory');
+  const groups=[];let current=[],size=0;
+  for(const e of entries.slice().sort((a,b)=>a.name.localeCompare(b.name))){
+    if(typeof e.name!=='string'||!/^[A-Za-z0-9_.-]+$/.test(e.name)||!Number.isSafeInteger(e.bytes)||e.bytes<=0||e.bytes>=90000000
+      ||e.bytes>=60000000&&!/^phase-[0-9]{2}\.json(?:\.gz)?$/.test(e.name)
+      ||!/^[a-f0-9]{64}$/.test(e.sha256||''))transportFail('matrix whole member bound/binding');
+    if(e.bytes>=60000000){if(current.length){groups.push(current);current=[];size=0;}groups.push([e]);continue;}
+    if(size+e.bytes>=60000000){groups.push(current);current=[];size=0;}current.push(e);size+=e.bytes;
+  }
+  if(current.length)groups.push(current);
+  if(groups.length>16||groups.flat().length!==entries.length)transportFail('matrix group slot overflow');return groups;
+}
 export function inflateFailedSceneReport(stubBytes,gzipBytes){
   if(stubBytes.length>=99000000||gzipBytes.length>=99000000)transportFail('report input bound');
   const stub=JSON.parse(Buffer.from(stubBytes).toString()),f=stub.transportFailure;

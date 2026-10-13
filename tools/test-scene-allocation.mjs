@@ -1,7 +1,7 @@
 // Pure CPU controls: fake native GL records unchanged calls; no browser or renderer is launched.
 import assert from 'node:assert/strict';
 import {isDeepStrictEqual} from 'node:util';
-import {AllocationLedger,mipSizes,installAllocationObserver,ReservationPeak,rejectionObservation,reduceSceneObservations,sampleSceneAllocations,initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,expandSceneContext,sceneReportEnvelope} from './bake/scene-allocation.mjs';
+import {AllocationLedger,mipSizes,installAllocationObserver,ReservationPeak,rejectionObservation,reduceSceneObservations,sampleSceneAllocations,initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,expandSceneContext,sceneReportEnvelope,scenePartHeader,createSceneMatrixMerger} from './bake/scene-allocation.mjs';
 import {deriveSceneStressContract} from './bake/inactive-figures.mjs';
 import {QUALIFIED_HYBRID} from './bake/review-current-compression.mjs';
 
@@ -81,7 +81,7 @@ function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,s
     return {pendingBuffers,settledBuffers,firstSample,samplingCalls,detachedSample,unassociatedSample,retiredSample,reallocatedSample,knownId,rgba,beforeFinish,afterFinish,floating,bufferReservation,cubeAdded,immutableAdded,npotAdded,compressedAdded,astcAdded,afterAstcSubimage,bc7Added,compressedImmutableUnknown,exactRestore,windowRestore,inheritedRestore,small,resized,resizedAfterFinish,unknown,native:gl.native};
   } finally {for(const [key,value]of Object.entries(saved)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}}
 }
-const api={Ledger:AllocationLedger,mips:mipSizes,observe:observed,Peak:ReservationPeak,rejection:rejectionObservation,reduce:reduceSceneObservations,matrix:sceneMatrixContract,history:createSceneHistory,compact:compactSceneSample,expand:expandSceneContext,envelope:sceneReportEnvelope};
+const api={Ledger:AllocationLedger,mips:mipSizes,observe:observed,Peak:ReservationPeak,rejection:rejectionObservation,reduce:reduceSceneObservations,matrix:sceneMatrixContract,history:createSceneHistory,compact:compactSceneSample,expand:expandSceneContext,envelope:sceneReportEnvelope,merge:createSceneMatrixMerger};
 const phases=Array.from({length:11},(_,i)=>({packId:'pack',phaseId:String(i),scenario:{units:[{id:'us',side:'US',type:'infantry',men:100},{id:'cs',side:'CS',type:'infantry',men:100}]}}));
 function observations(){
  const sample=(label,gpuReservation=100)=>({label,gpuReservation,conservativeReservation:gpuReservation+10,glError:0,allocation:{unknown:[]},unmappedBufferBytes:0});
@@ -89,7 +89,7 @@ function observations(){
   failure:{...sample('failure',260000000),rejected:true,published:false,restoration:{ok:true}}};
 }
 // Constructed report bookkeeping only. No native GPU/context/route execution is claimed here.
-function qualifiedObservations(modelPhases=phases){
+function qualifiedObservations(modelPhases=phases,completion=false){
  const contract=sceneMatrixContract(modelPhases),candidateNames=Array.from({length:2},(_,look)=>Array.from({length:5},(_,i)=>`cs-close-${look?'h2_slouch_roll_butternut':'base'}-${i}-${i===4?'original.png':'astc.ktx2'}`)).flat(),
    report={sceneRoutes:'qualified-both',toolSha:'b'.repeat(40),diagnosticOnly:true,fieldable:false,normalMotion:true,limits:{gpuBytes:250000000},inactivePrototype:true,terrainPartitionPrototype:true,terrainRestorationObserved:true,
      qualification:{...QUALIFIED_HYBRID,members:[...candidateNames,'soldier-hybrid.json','soldier-source.json','compression.json','quality.json'].map(name=>({name,bytes:100,sha256:'a'.repeat(64)}))},cases:[],faults:[]};
@@ -108,7 +108,7 @@ function qualifiedObservations(modelPhases=phases){
    const {row,sample,restore}=make(tuple),e=deriveSceneStressContract(scenario,{US:{field:2,close:3},CS:{field:4,close:tuple.route==='capable'?10:5}}),owners=[];let id=0;
    const owner=(label,capacity,strides,drawables=1)=>owners.push({label,capacity,bytes:capacity*strides.reduce((a,b)=>a+b,0),instances:Array(drawables).fill(label.startsWith('rings.')?null:capacity),
      arrays:strides.map(n=>({bytes:capacity*n,reservations:[{id:++id,bytes:capacity*n,pendingDelete:false}]}))});
-   for(const side of ['US','CS']){for(const lod of [0,1,2])owner(`procedural.${side}.lod${lod}`,e[side],[64,16,16,4],2);owner('fallen.'+side,e[side],[64,16,16,4]);
+   for(const side of ['US','CS']){for(const lod of [0,1,2])owner(`procedural.${side}.lod${lod}`,e[side],[64,16,16,4],lod===0?1:2);owner('fallen.'+side,e[side],[64,16,16,4]);
      for(const tier of ['field','close'])for(let i=0;i<e.pages[side][tier];i++)owner(`baked.${side}.${tier}.${i}`,e[side],[48],2);}
    owner('halos',e.US+e.CS,[64,16,4]);owner('horses',e.horses,[64,12]);owner('mounts',e.mounts,[64,12]);
    for(const k of ['US','CS','limbers'])owner('guns.'+k,e.guns[k],[64]);owner('flags',e.flags,[64,4]);owner('smoke',1000,[12,16,4,12,4]);
@@ -175,14 +175,21 @@ function qualifiedObservations(modelPhases=phases){
      if(['first-pool-prepare','candidate-then-baseline-terminal'].includes(tuple.fault))add('first-pool-prepare-rejected');
      if(prepare)add('fault-fired',{fault:tuple.fault,page:candidateNames[0],native:true,glError:0x0501,actualHTTP:true,status:404});
      candidateNames.forEach((page,i)=>{if(prepare||tuple.fault==='native-upload'||i)add('candidate-dispose',{page,textureId:i+1,ok:true});});
+     if(completion){
+       const start=add('candidate-completion-start',{method:'finish'}),before=sample('candidate-completion-before',start.sequence);
+       before.allocation.renderbufferSlots=[];before.allocation.pendingDeleteBytes=1000;before.allocation.textureSlots[0].slots[0]-=1000;before.allocation.textureSlots.push({texture:999,slots:{0:1000},pendingDelete:true});row.states.push(before);
+       sync();const done=add('candidate-completion-result',{method:'finish',ok:true,elapsedMs:1}),after=sample('candidate-completion-after',done.sequence);
+       after.allocation.renderbufferSlots=[];after.allocation.bytes-=1000;after.allocation.gpuCurrent-=1000;after.allocation.byKind.texture-=1000;after.allocation.textureSlots[0].slots[0]-=1000;row.states.push(after);
+     }
    }else add('fault-fired',{fault:tuple.fault});
-   const first=add('first-baseline-request',{beforeNativeLoader:true}),firstSample=sample('first-baseline-request',first.sequence);if(tuple.route==='capable')firstSample.allocation.pendingDeleteBytes=1000;row.states.push(firstSample);
-   for(let i=0;i<5;i++){const page=`soldier_close_${i}.png`;if(!terminal||i){const e=add('baseline-upload',{page,beforeSample:true}),s=sample('baseline-upload',e.sequence);s.page=page;if(tuple.route==='capable')s.allocation.pendingDeleteBytes=1000;row.states.push(s);}add('baseline-settled',{page,outcome:terminal&&!i?'rejected':'fulfilled'});}
-   const pending=sample(terminal?'terminal-rejected-pending':'fallback-published-pending');if(tuple.route==='capable')pending.allocation.pendingDeleteBytes=1000;row.states.push(pending);
-   row.stress=stressFor(terminal?'terminal':'full',tuple.route==='capable'?1000:0);sync();row.states.push(sample(terminal?'terminal-settled':'fallback-settled'));
+   const first=add('first-baseline-request',{beforeNativeLoader:true}),firstSample=sample('first-baseline-request',first.sequence);if(tuple.route==='capable'&&!completion)firstSample.allocation.pendingDeleteBytes=1000;row.states.push(firstSample);
+   for(let i=0;i<5;i++){const page=`soldier_close_${i}.png`;if(!terminal||i){const e=add('baseline-upload',{page,beforeSample:true}),s=sample('baseline-upload',e.sequence);s.page=page;if(tuple.route==='capable'&&!completion)s.allocation.pendingDeleteBytes=1000;row.states.push(s);}add('baseline-settled',{page,outcome:terminal&&!i?'rejected':'fulfilled'});}
+   const pending=sample(terminal?'terminal-rejected-pending':'fallback-published-pending');if(tuple.route==='capable'&&!completion)pending.allocation.pendingDeleteBytes=1000;row.states.push(pending);
+   row.stress=stressFor(terminal?'terminal':'full',tuple.route==='capable'&&!completion?1000:0);sync();row.states.push(sample(terminal?'terminal-settled':'fallback-settled'));
    row.candidateRequests=tuple.route==='capable'?10:0;row.poolCount=1;row.outcome={rejected:terminal,published:!terminal,cachedClosePromise:true,fieldUnchanged:true,baselinePages:terminal?0:5,poolPages:[terminal?0:5],exactCurrentSingleBase:true,baselineSiblingsDisposed:true};
    row.restoration=restore();report.faults.push(row);
  }
+ if(completion)report.fallbackCompletion='native-finish-after-candidate-disposal';
  return report;
 }
 function transportObservations(a=api){
@@ -229,6 +236,30 @@ function transportProfile(route,fault=null){
  return {raw,context:{history,states:compact,kind:'constructed CPU transport profile; native whole-scene matrix UNRUN'}};
 }
 const checks=[
+ ['completion-qualified',a=>{const r=a.reduce(qualifiedObservations(phases,true),phases);assert.equal(r.complete,true,'completion-qualified: exact declared completion matrix schema '+JSON.stringify(r.errors?.slice(0,8)));assert.equal(r.maxGpuReservation,100000000,'completion-qualified: prior peak retained');}],
+ ...Object.entries({
+   'completion-missing':r=>r.faults[0].states=r.faults[0].states.filter(s=>s.label!=='candidate-completion-after'),
+   'completion-extra':r=>r.faults[0].states.find(s=>s.label==='candidate-completion-after').allocation.calls.finish++,
+   'completion-early':r=>r.faults[0].events.find(e=>e.operation==='candidate-completion-start').sequence=1,
+   'completion-result':r=>r.faults[0].events.find(e=>e.operation==='candidate-completion-result').ok=false,
+   'completion-duration':r=>r.faults[0].events.find(e=>e.operation==='candidate-completion-result').elapsedMs=-1,
+   'completion-pending-id':r=>r.faults[0].states.find(s=>s.label==='candidate-completion-after').allocation.textureSlots.push({texture:999,slots:{0:1000},pendingDelete:true}),
+   'completion-lost-peak':r=>r.faults[0].states.find(s=>s.label==='candidate-completion-after').allocation.gpuPeak--,
+   'completion-unmarked':r=>delete r.fallbackCompletion,
+ }).map(([name,mutate])=>[name,a=>{const r=qualifiedObservations(phases,true);mutate(r);assert.equal(a.reduce(r,phases).complete,false,name+': broken completion boundary rejects');}]),
+ ['parts-complete',a=>{const report=qualifiedObservations(),m=a.merge(phases,report);for(const p of phases){const key=p.packId+'/'+p.phaseId,match=r=>r.packId===p.packId&&r.phaseId===p.phaseId;m.add({...scenePartHeader(report),phaseKey:key,complete:true,cases:report.cases.filter(match),faults:report.faults.filter(match)});}const r=m.finalize();assert.deepEqual([r.complete,r.withinLimit,r.parts.length,r.maxGpuReservation],[true,true,11,100000000],'parts-complete: whole independently reduced 22+88 union');}],
+ ...Object.entries({
+   'parts-missing':parts=>parts.pop(),
+   'parts-duplicate':parts=>parts[1]=parts[0],
+   'parts-reordered':parts=>[parts[0],parts[1]]=[parts[1],parts[0]],
+   'parts-source':parts=>parts[1].toolSha='c'.repeat(40),
+   'parts-qualification':parts=>parts[1].qualification.members[0].sha256='c'.repeat(64),
+   'parts-completion':parts=>parts[1].fallbackCompletion='native-finish-after-candidate-disposal',
+   'parts-context':parts=>parts[1].cases[0].contextId=parts[0].cases[0].contextId,
+   'parts-roster':parts=>parts[1].faults[0].preload.retainedRoster.pop(),
+   'parts-history':parts=>parts[1].nativeHistoryRequired=true,
+ }).map(([name,mutate])=>[name,a=>{const report=qualifiedObservations(),parts=phases.map(p=>{const match=r=>r.packId===p.packId&&r.phaseId===p.phaseId;return structuredClone({...scenePartHeader(report),phaseKey:p.packId+'/'+p.phaseId,complete:true,cases:report.cases.filter(match),faults:report.faults.filter(match)});}),m=a.merge(phases,report);mutate(parts);for(const p of parts)m.add(p);assert.equal(m.finalize().complete,false,name+': whole union cannot accept altered part');}]),
+ ['parts-failed-peak',a=>{const report=qualifiedObservations(),m=a.merge(phases,report);for(const p of phases){const match=r=>r.packId===p.packId&&r.phaseId===p.phaseId,part=structuredClone({...scenePartHeader(report),phaseKey:p.packId+'/'+p.phaseId,complete:true,cases:report.cases.filter(match),faults:report.faults.filter(match)});if(p===phases[0]){part.complete=false;part.faults[0].states[0].gpuReservation=300000000;part.faults[0].states[0].conservativeReservation=310000000;}m.add(part);}const r=m.finalize();assert.deepEqual([r.complete,r.maxGpuReservation,r.maxReservation],[false,300000000,310000000],'parts-failed-peak: independently retain failed part maximum');}],
  ['scene-history-matrix-envelope',a=>{
    const contract=sceneMatrixContract(phases),templates=new Map(),model={cases:[],faults:[],kind:'CPU transport sized from one retained native fixture; not proven native worst case'};
    for(const[collection,tuples]of [['cases',contract.cases],['faults',contract.faults]])for(const tuple of tuples){const key=tuple.route+'/'+(tuple.fault||'ordinary');let t=templates.get(key);if(!t){const profile=transportProfile(tuple.route,tuple.fault);assert(isDeepStrictEqual(a.expand(profile.context).states,profile.raw),'scene-history-matrix-envelope: profiles round-trip all samples losslessly');t=profile.context;templates.set(key,t);}model[collection].push({...tuple,...t});}
@@ -415,6 +446,11 @@ const checks=[
 const changed=(key,value)=>({observe:()=>({...observed(),[key]:value})});
 class NoOverlap extends AllocationLedger {reserve(id,k,s,n){super.reserve(id,k,s,n,false);}}
 const mutants={
+  'completion-qualified':{reduce:()=>({complete:false})},
+  ...Object.fromEntries(['completion-missing','completion-extra','completion-early','completion-result','completion-duration','completion-pending-id','completion-lost-peak','completion-unmarked'].map(n=>[n,{reduce:()=>({complete:true})}])),
+  'parts-complete':{merge:()=>({add(){},finalize:()=>({complete:false,parts:[],withinLimit:false,maxGpuReservation:null})})},
+  ...Object.fromEntries(['parts-missing','parts-duplicate','parts-reordered','parts-source','parts-qualification','parts-completion','parts-context','parts-roster','parts-history'].map(n=>[n,{merge:()=>({add(){},finalize:()=>({complete:true})})}])),
+  'parts-failed-peak':{merge:()=>({add(){},finalize:()=>({complete:false,maxGpuReservation:100000000,maxReservation:100001000})})},
   'scene-history-matrix-envelope':{envelope:r=>({...sceneReportEnvelope(r),withinLimit:false})},
   'scene-history-envelope-overflow':{envelope:r=>({...sceneReportEnvelope(r),withinLimit:true})},
   'scene-history-reducer-equivalence':{reduce:(r,p)=>r.cases.some(c=>c.history)?{complete:false}:reduceSceneObservations(r,p)},

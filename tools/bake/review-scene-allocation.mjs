@@ -5,9 +5,9 @@ import {createHash} from 'node:crypto';
 import {gzipSync} from 'node:zlib';
 import { chromium } from 'playwright';
 import { startServer, ROOT } from '../serve.mjs';
-import { AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation, reduceSceneObservations, sampleSceneAllocations, initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,sceneReportEnvelope } from './scene-allocation.mjs';
+import { AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation, reduceSceneObservations, sampleSceneAllocations, initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,sceneReportEnvelope,scenePartHeader,createSceneMatrixMerger } from './scene-allocation.mjs';
 import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDiagnostics,installSceneStartGate} from './inactive-figures.mjs';
-import {acquireQualifiedHybrid,materializeQualifiedSceneInput,QUALIFIED_HYBRID,installQualifiedSceneRoutes} from './review-current-compression.mjs';
+import {acquireQualifiedHybrid,materializeQualifiedSceneInput,QUALIFIED_HYBRID,installQualifiedSceneRoutes,sceneMatrixGroups} from './review-current-compression.mjs';
 import {preparePhase,prepareFieldScenario} from '../../src/sim/phase.js';
 import {PNG} from 'pngjs';
 import {partitionTerrain,installTerrainPartition} from './partition-terrain.mjs';
@@ -34,7 +34,7 @@ async function qualifiedFaultContext({browser,url,tuple,input,transport,source,p
     if(await page.evaluate(()=>document.getElementById('briefing')?.open))await page.locator('#briefing-begin').click();
     await page.evaluate(async()=>{const S=await import('./src/settings.js'),{LOOK}=await import('./src/ui/look.js');window.__qualifiedSettings={values:S.all().map(({key,value,locked})=>({key,value,locked})),look:JSON.stringify(LOOK)};window.__game.game.ensureBaked();});
     await page.waitForFunction(()=>window.__game.game.baked.state==='ready',null,{timeout:120000,polling:250});
-    const admitted=await page.evaluate(async({manifest,sourceManifest,base,tuple,target})=>{
+    const admitted=await page.evaluate(async({manifest,sourceManifest,base,tuple,target,completionBeforeFallback})=>{
       const I=await import('./tools/bake/inactive-figures.mjs'),A=await import('./tools/bake/scene-allocation.mjs'),P=await import('./tools/bake/partition-terrain.mjs'),THREE=await import('three'),{COMMAND}=await import('./src/game.js'),
         scope=window.__game,{game,post,scene,camera,effects,world}=scope,gl=post.renderer.getContext(),atlas=game.baked.atlases.CS;
       if(game.simTime!==0||!game.paused||window.__sceneStartGate.first?.simTime!==0)throw Error('qualified fault: native time-zero startup required');
@@ -50,15 +50,16 @@ async function qualifiedFaultContext({browser,url,tuple,input,transport,source,p
       const wrap=(object,key,factory)=>{const prior=Object.getOwnPropertyDescriptor(object,key),native=object[key];if(prior&&(!('value'in prior)||!prior.writable))throw Error('qualified fault: unwritable hook '+key);
         const wrapped=factory(native);Object.defineProperty(object,key,{value:wrapped,writable:true,configurable:true,enumerable:prior?.enumerable??false});hooks.push({object,key,prior,wrapped});};
       const closeState=()=>{const p={currentSingleBaseBound:atlas.layout.tiers.close.looks.length===1};for(const[side,a]of Object.entries(game.baked.atlases))p[side]={fieldReady:a.loaded('field'),closePromise:!!a.state.close,closeTextures:!!a.textures.close,closeBatches:a.pools.reduce((n,p)=>n+p.batches.close.length,0),closeRequests:side==='CS'?candidateRequests+baselineRequests:0};return p;};
-      const before=closeState(),baselineCloseJSON=JSON.stringify(atlas.layout.tiers.close),configurationOwner=I.configureSceneCloseRoute(scope,{manifest,sourceManifest,base,route:tuple.route,candidateRequests:()=>candidateRequests});
+      const before=closeState(),baselineCloseJSON=JSON.stringify(atlas.layout.tiers.close),configurationOwner=I.configureSceneCloseRoute(scope,{manifest,sourceManifest,base,route:tuple.route,candidateRequests:()=>candidateRequests,completionBeforeFallback});
       const configuration={fieldUnchanged:configurationOwner.fieldUnchanged(),baseUnchanged:configurationOwner.fieldUnchanged(),nativeUSLoading:!game.baked.atlases.US.diagnosticClose,
         genuineCapability:tuple.route==='capable'&&configurationOwner.nativeCapability,maskedOnlyAstc:tuple.route==='unsupported'};
       // Registration precedes every mutation/load that can fail; final cleanup can settle all siblings.
       const owner={states,events,configurationOwner,baselineCloseJSON,release,closeState,get sequence(){return sequence;},take,
         async restore(){release(true);await Promise.allSettled(Object.values(game.baked.atlases).map(a=>a.state.close).filter(Boolean));const errors=[];
           for(const {object,key,prior,wrapped}of hooks.reverse()){try{if(object[key]!==wrapped)throw Error('hook ownership changed '+key);if(prior)Object.defineProperty(object,key,prior);else delete object[key];}catch(e){errors.push(e.message);}}return {ok:errors.length===0,errors};},
-        snapshot(){return {states,events,candidateRequests,poolCount:atlas.pools.length};}};window.__qualifiedFault=owner;
+        snapshot(){return {states,events,candidateRequests,poolCount:atlas.pools.length,...(this.stress?{stress:this.stress}:{})};}};window.__qualifiedFault=owner;
       const gate=I.installRenderGate(post);window.__sceneRenderGate=gate;
+      gate.renderOnce(scene,camera);take('prepartition-native-bind'); // Retain native error/peaks and source array bindings before partition disposes them.
       const terrain=P.installTerrainPartition(world,THREE,P.partitionTerrain,{reversible:true}),registration={restore(){let error;try{terrain.restore();}catch(e){error=e;}
         if(window.__sceneTerrainPartition!==registration)throw Error('fault terrain scope ownership changed');delete window.__sceneTerrainPartition;if(error)throw error;}};window.__sceneTerrainPartition=registration;
       game.__inactiveStats=I.installInactiveFigures(game);game.animate(0);
@@ -76,8 +77,11 @@ async function qualifiedFaultContext({browser,url,tuple,input,transport,source,p
       const observeClose=e=>{
         const operation=e.attempt+'-'+(e.operation==='uploaded'?'upload':e.operation==='dispose-result'?'dispose':e.operation),data={page:e.page,encoding:e.encoding,index:e.index};
         if(e.textureUUID)data.textureId=id(e.textureUUID);if(e.outcome)data.outcome=e.outcome;if(e.ok!==undefined)data.ok=e.ok;if(e.error)data.error=e.error;
+        if(e.method)data.method=e.method;if(e.elapsedMs!==undefined)data.elapsedMs=e.elapsedMs;
         if(e.attempt==='candidate'&&e.operation==='created'&&e.page===target)targetUUID=e.textureUUID;
-        if(e.attempt==='baseline'&&e.operation==='uploaded'){const event=emit('baseline-upload',{...data,beforeSample:true});take('baseline-upload',{page:e.page},event);}else emit(operation,data);
+        if(e.attempt==='baseline'&&e.operation==='uploaded'){const event=emit('baseline-upload',{...data,beforeSample:true});take('baseline-upload',{page:e.page},event);}
+        else if(e.attempt==='candidate'&&['completion-start','completion-result'].includes(e.operation)){const event=emit(operation,data);take(e.operation==='completion-start'?'candidate-completion-before':'candidate-completion-after',{},event);}
+        else emit(operation,data);
         if(e.attempt==='candidate'&&e.operation==='settled'){candidateSettled++;if(e.outcome==='rejected')candidateRejected++;maybeRelease();}
       };
       const nativeFetch=fetch,nativePNG=url=>new THREE.TextureLoader().loadAsync(url);
@@ -106,7 +110,7 @@ async function qualifiedFaultContext({browser,url,tuple,input,transport,source,p
         }return result;});
       }
       take('fault-start');return {preclose:before,configuration,preload,capacityContract:expected,scenario:game.scenario};
-    },{manifest:input.manifest,sourceManifest:input.source,base:routes.base,tuple,target});
+    },{manifest:input.manifest,sourceManifest:input.source,base:routes.base,tuple,target,completionBeforeFallback:report.fallbackCompletion==='native-finish-after-candidate-disposal'});
     if(JSON.stringify(admitted.scenario)!==JSON.stringify(row.scenario))throw Error('qualified fault: live authored scenario mismatch');Object.assign(row,admitted);
     const outcome=await page.evaluate(async tuple=>{
       const {game,post,scene,camera}=window.__game,owner=window.__qualifiedFault,CS=game.baked.atlases.CS,pending=CS.load('close'),US=game.baked.atlases.US,
@@ -123,6 +127,7 @@ async function qualifiedFaultContext({browser,url,tuple,input,transport,source,p
         return owner.take('postoutcome-'+label);
       },verifyBaseline:()=>combat()===baseline,reservations:array=>window.__allocation.bufferReservations(gl,array)});
       // Nested stress samples alone own postoutcome observations in the transport.
+      owner.stress=stress; // Cleanup retains them even if the final native finish/sample throws.
       const observations=new Set(stress.transaction.samples.map(s=>s.observation));owner.states.splice(0,owner.states.length,...owner.states.filter(s=>!observations.has(s)));
       gl.finish();owner.take(terminal?'terminal-settled':'fallback-settled');
       const baselineCreated=owner.events.filter(e=>e.operation==='baseline-created'),baselineDisposed=owner.events.filter(e=>e.operation==='baseline-dispose'&&e.ok);
@@ -170,20 +175,40 @@ async function main(){
   const campaign=JSON.parse(fs.readFileSync(path.join(ROOT,'assets/campaign.json')));
   const inactive=process.env.SCENE_INACTIVE==='true',partition=process.env.SCENE_PARTITION==='true';
   const sceneRoutes=process.env.SCENE_ROUTES||'current-png',qualified=sceneRoutes==='qualified-both';
+  const completion=process.env.SCENE_COMPLETION||'no-finish';
+  if(!['no-finish','native-finish'].includes(completion)||completion==='native-finish'&&!qualified)throw Error('scene allocation: completion experiment requires explicit qualified routes');
   if(!['current-png','qualified-both'].includes(sceneRoutes)||qualified&&(!inactive||!partition))throw Error('scene allocation: explicit routes require both prototypes');
   const phases=campaign.phases.map(entry=>{const pack=JSON.parse(fs.readFileSync(path.join(ROOT,`assets/packs/${entry.packId}.json`)));return {...entry,scenario:prepareFieldScenario(preparePhase(pack,entry.phaseId).scenario,'pack')};});
   // Immutable acquisition and fresh runner-only materialization precede browser launch.
   const input=qualified?await acquireQualifiedHybrid(JSON.parse(fs.readFileSync(path.join(ROOT,'assets/figures/confederate-infantry/soldier.json')))):null,
     transport=qualified?materializeQualifiedSceneInput(input):null,matrix=qualified?sceneMatrixContract(phases):null;
-  const report={diagnosticOnly:true,fieldable:false,toolSha:process.env.GITHUB_SHA,route:'current PNG, both armies',cases:[],complete:false,
+  const report={diagnosticOnly:true,fieldable:false,toolSha:process.env.GITHUB_SHA,run:process.env.GITHUB_RUN_ID,route:'current PNG, both armies',cases:[],complete:false,
     inactivePrototype:inactive,
     terrainPartitionPrototype:partition,terrainRestorationObserved:partition,
     limits:{gpuBytes:250000000},nativeDriverMemory:'UNRUN',cpuDecodePeak:'UNRUN',
     unverified:['native driver storage/pools and deferred releases after context destruction','whole-fight effect maximum beyond exercised frames','future sandbox spawns beyond declared pools','CPU image decode/upload-copy peaks']};
-  if(qualified)Object.assign(report,{sceneRoutes,normalMotion:true,nativeHistoryRequired:true,qualification:{...QUALIFIED_HYBRID,members:[...transport.files].map(([name,file])=>({name,bytes:file.bytes.length,sha256:file.sha256}))},faults:[]});
+  if(qualified)Object.assign(report,{sceneRoutes,...(completion==='native-finish'?{fallbackCompletion:'native-finish-after-candidate-disposal'}:{}),normalMotion:true,nativeHistoryRequired:true,qualification:{...QUALIFIED_HYBRID,members:[...transport.files].map(([name,file])=>({name,bytes:file.bytes.length,sha256:file.sha256}))},faults:[]});
+  let evidenceRoot=out,phaseCursor=0,transportFailure=null;
+  const phaseNames=Array.from({length:11},(_,i)=>'phase-'+String(i+1).padStart(2,'0')+'.json'),members=new Map(),partFiles=new Map(),captures=new Map();
+  if(qualified){const temp=process.env.RUNNER_TEMP;if(!temp||fs.realpathSync(temp)!==temp||!fs.lstatSync(temp).isDirectory())throw Error('scene parts: real runner temp required');evidenceRoot=fs.mkdtempSync(path.join(temp,'cw-scene-matrix-'));}
+  const header=scenePartHeader(report),merger=qualified?createSceneMatrixMerger(phases,header):null;
+  const digest=bytes=>createHash('sha256').update(bytes).digest('hex');
+  const writeEvidence=(name,bytes)=>{
+    if(!/^[A-Za-z0-9_.-]+$/.test(name)||fs.realpathSync(evidenceRoot)!==evidenceRoot)throw Error('scene parts: owned file containment');
+    const file=path.join(evidenceRoot,name);if(fs.existsSync(file)&&(!members.has(name)||fs.lstatSync(file).isSymbolicLink()||fs.realpathSync(file)!==file))throw Error('scene parts: foreign evidence file');
+    fs.writeFileSync(file,bytes,{flag:members.has(name)?'w':'wx'});const member={name,bytes:bytes.length,sha256:digest(bytes)};members.set(name,member);return member;
+  };
+  const manifest=()=>({...header,kind:'bounded phase parts; original PNG bytes; complete native histories',phaseParts:[...partFiles.values()],
+    captures:[...captures.values()],members:[...members.values()],tuples:matrix?{cases:matrix.cases,faults:matrix.faults}:null,
+    ...(merger?merger.snapshot():{}),...(transportFailure?{transportFailure,complete:false,withinLimit:false}:{}),fieldable:false});
   const source={ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),...(qualified?{nativeJournal:true}:{})};
   const {server,url}=await startServer({port:0});let browser;
-  const save=()=>{const envelope=sceneReportEnvelope(report);if(!envelope.withinLimit){
+  const save=()=>{const envelope=sceneReportEnvelope(report);if(qualified){
+    const name=phaseNames[Math.min(phaseCursor,10)];
+    if(!envelope.withinLimit){writeEvidence(name.replace('.json','.json.gz'),gzipSync(envelope.json));transportFailure={phaseKey:report.phaseKey,bytes:envelope.bytes,limit:envelope.limit,sha256:digest(envelope.json)};fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(manifest()));throw Error('scene parts: bounded phase overflow retained; no truncation');}
+    const member=writeEvidence(name,Buffer.from(envelope.json));partFiles.set(name,{...member,phaseKey:report.phaseKey??null,complete:report.complete===true});
+    fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(manifest()));return;
+  }if(!envelope.withinLimit){
     // Retain every observation on the runner; this failed transport cannot be admitted by the bounded reader.
     const archived=gzipSync(envelope.json),sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
     fs.writeFileSync(path.join(out,'report-overflow.json.gz'),archived);
@@ -194,6 +219,7 @@ async function main(){
   try{
     browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
     for(const [index,entry]of (qualified?matrix.cases:campaign.phases).entries()){
+      if(qualified){phaseCursor=Math.floor(index/2);report.phaseKey=entry.packId+'/'+entry.phaseId;}
       const ctx=await browser.newContext({viewport:{width:1024,height:768},deviceScaleFactor:2,reducedMotion:qualified?'no-preference':'reduce'});
       const errors=[],row={...entry,states:[],errors,...(qualified?{contextId:`${entry.packId}/${entry.phaseId}/${entry.route}/ordinary`,history:createSceneHistory(),scenario:phases.find(p=>p.packId===entry.packId&&p.phaseId===entry.phaseId).scenario}:{})};report.cases.push(row);let sequence=0,page,routes,primary;
       const observation=data=>qualified?compactSceneSample(row.history,{...data,sequence:++sequence}):data;
@@ -248,7 +274,8 @@ async function main(){
                   const bytes=new Uint8Array(a.buffer,a.byteOffset,a.byteLength).slice(),record={key,bytes:bytes.length};arrays.push(record);
                   pending.push(crypto.subtle.digest('SHA-256',bytes).then(hash=>{record.sha256=[...new Uint8Array(hash)].map(n=>n.toString(16).padStart(2,'0')).join('');}));};
                 for(const [key,a]of Object.entries(mesh.geometry.attributes))add(key,a);add('index',mesh.geometry.index);add('instanceMatrix',mesh.instanceMatrix);add('instanceColor',mesh.instanceColor);
-                owners.push({mesh:mesh.uuid,geometry:mesh.geometry.uuid,material:Array.isArray(mesh.material)?mesh.material.map(m=>m.uuid):mesh.material?.uuid,instances:mesh.isInstancedMesh?mesh.count:null,arrays});});
+                // A reversible terrain partition leaves the real root geometry empty.
+                if(arrays.some(a=>a.bytes>0))owners.push({mesh:mesh.uuid,geometry:mesh.geometry.uuid,material:Array.isArray(mesh.material)?mesh.material.map(m=>m.uuid):mesh.material?.uuid,instances:mesh.isInstancedMesh?mesh.count:null,arrays});});
                 return {kind,root:root.uuid,count:root.userData.count??null,owners};};
               receipt.world={terrain:fingerprint(world.terrainMesh,'native terrain geometry'),trees:fingerprint(world.trees,'native tree instances')};
               receipt.roster=game.units.map(u=>({id:u.id,side:u.side,type:u.type,men:u.men,x:u.x,z:u.z,order:u.order}));await Promise.all(pending);
@@ -258,8 +285,8 @@ async function main(){
           const bytes=Buffer.from(shot.dataUrl.slice('data:image/png;base64,'.length),'base64'),png=PNG.sync.read(bytes);
           let opaque=false,nonuniform=false;for(let i=0;i<png.data.length;i+=4){if(png.data[i+3])opaque=true;for(let c=0;c<4;c++)if(png.data[i+c]!==png.data[c])nonuniform=true;}
           if(png.width!==shot.width||png.height!==shot.height||!opaque||!nonuniform)throw new Error('scene canvas: dimensions/visible/nonuniform content not proved');
-          fs.writeFileSync(path.join(out,filename),bytes);delete shot.dataUrl;
-          row.canvasCaptures||=[];row.canvasCaptures.push({filename,label,phase:entry.phaseId,toolSha:report.toolSha,...shot,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),opaque,nonuniform,kind:'battlefield-canvas capture; DOM HUD excluded'});save();
+          if(qualified)writeEvidence(filename,bytes);else fs.writeFileSync(path.join(out,filename),bytes);delete shot.dataUrl;
+          row.canvasCaptures||=[];row.canvasCaptures.push({filename,label,phase:entry.phaseId,toolSha:report.toolSha,...shot,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex'),opaque,nonuniform,kind:'battlefield-canvas capture; DOM HUD excluded'});if(qualified)captures.set(filename,row.canvasCaptures.at(-1));save();
         };
         if((inactive||partition)&&entry.phaseId==='lookout-mountain')await page.evaluate(source=>{
           const {post,rts,game,camera}=window.__game;if(!window.__sceneRenderGate)window.__sceneRenderGate=(0,eval)('('+source+')')(post);
@@ -394,10 +421,16 @@ async function main(){
         if(!row.restoration.ok&&!primary)throw new Error(`scene allocation: restoration failed: ${(row.restoration.errors||[]).join(', ')}`);
       }
       console.log(`SCENE ${index+1}/${campaign.phases.length} complete`);
+      if(qualified&&index%2===1){
+        const faults=matrix.faults.filter(f=>f.packId===entry.packId&&f.phaseId===entry.phaseId);
+        for(const tuple of faults){await qualifiedFaultContext({browser,url,tuple,input,transport,source,phases,report,save});console.log('SCENE FAULT',tuple.packId,tuple.phaseId,tuple.fault,'complete');}
+        report.complete=report.cases.every(r=>r.complete)&&report.faults.every(r=>r.complete);
+        const part=merger.add(report);save();console.log('SCENE PHASE',JSON.stringify(part));
+        if(!part.partComplete)throw Error('scene parts: phase gate rejected; complete evidence retained');
+        if(index<matrix.cases.length-1){report.cases=[];report.faults=[];report.complete=false;}
+      }
     }
-    if(qualified){
-      for(const [index,tuple]of matrix.faults.entries()){await qualifiedFaultContext({browser,url,tuple,input,transport,source,phases,report,save});console.log(`SCENE FAULT ${index+1}/${matrix.faults.length} complete`);}
-    }else{
+    if(!qualified){
     // Actual current loader failure: successful siblings must not masquerade as a complete close tier.
     const ctx=await browser.newContext({viewport:{width:1024,height:768},deviceScaleFactor:2});await ctx.addInitScript(installAllocationObserver,source);
     const page=await ctx.newPage();
@@ -419,10 +452,20 @@ async function main(){
       await ctx.close();save();
     }
     }
-    const verdict=reduceSceneObservations(report,qualified?phases:campaign.phases);
-    Object.assign(report,verdict);
-    save();console.log('SCENE-ALLOCATION COMPLETE',JSON.stringify({complete:report.complete,maxReservation:report.maxReservation,maxGpuReservation:report.maxGpuReservation,withinLimit:report.withinLimit,fieldable:false}));
-    if(!report.complete)process.exitCode=1; // Budget failures are results, not a reason to discard the observation.
-  }finally{try{save();}finally{try{if(browser)await browser.close();}finally{await new Promise(resolve=>server.close(resolve));}}}
+    const verdict=qualified?merger.finalize():reduceSceneObservations(report,campaign.phases);
+    if(!qualified)Object.assign(report,verdict);
+    save();console.log('SCENE-ALLOCATION COMPLETE',JSON.stringify({...verdict,fieldable:false}));
+    if(!verdict.complete)process.exitCode=1; // Budget failures are results, not a reason to discard the observation.
+  }finally{try{save();}finally{try{if(browser)await browser.close();}finally{await new Promise(resolve=>server.close(resolve));
+    if(qualified&&members.size){
+      const output=process.env.GITHUB_OUTPUT,temp=process.env.RUNNER_TEMP;if(!output||!output.startsWith(temp+path.sep)||fs.realpathSync(output)!==output||!fs.lstatSync(output).isFile())throw Error('scene parts: runner command file containment');
+      try{
+      const groups=sceneMatrixGroups([...members.values()]),groupRoot=fs.mkdtempSync(path.join(temp,'cw-scene-groups-'));
+      for(const [i,list]of groups.entries()){const dir=path.join(groupRoot,'matrix-'+String(i).padStart(2,'0'));fs.mkdirSync(dir);for(const e of list){const from=path.join(evidenceRoot,e.name);if(fs.realpathSync(from)!==from||fs.lstatSync(from).isSymbolicLink())throw Error('scene parts: evidence source containment');fs.copyFileSync(from,path.join(dir,e.name),fs.constants.COPYFILE_EXCL);}}
+      fs.writeFileSync(path.join(out,'report.json'),JSON.stringify({...manifest(),groups:groups.map((g,index)=>({index,names:g.map(e=>e.name),bytes:g.reduce((n,e)=>n+e.bytes,0)}))}));
+      fs.appendFileSync(output,`matrix_root=${groupRoot}\nmatrix_groups=${groups.length}\n`);
+      }catch(error){transportFailure={...transportFailure,message:String(error?.message??error),policy:'all original produced bytes retained in unaccepted forensic artifact; admission rejected'};fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(manifest()));fs.appendFileSync(output,`matrix_transport_failure=true\nmatrix_forensic_root=${evidenceRoot}\n`);throw error;}
+    }
+  }}}
 }
 await main().catch(e=>{console.error(e.message);process.exitCode=1;});
