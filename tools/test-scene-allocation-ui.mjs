@@ -71,9 +71,74 @@ export async function sceneAllocationControls({browser,url,check,result,watchErr
     for(const row of report.rows)check(`scene-allocation-${row.name}`,row.ok,JSON.stringify(report.restoration));
     check('scene-allocation-errors',errors.length===0,errors.join('; '));
   } finally {await ctx.close();}
+  await sceneLifetimeControls({browser,url,check,result,watchErrors});
   await sceneTransactionControls({browser,url,check,result,watchErrors});
   await sceneStressOwnerControls({browser,url,check,result,watchErrors});
   await sceneStressOwnerControls({browser,url,check,result,watchErrors,mode:'terminal'});
+}
+
+
+// Actual small native retirement/admission proof; no whole-scene cap or adoption claim.
+async function sceneLifetimeControls({browser,url,check,result,watchErrors}){
+ const ctx=await browser.newContext({viewport:{width:64,height:64}});let page;const errors=[];
+ try{
+ await ctx.addInitScript(installAllocationObserver,{ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),nativeJournal:true});
+ page=await ctx.newPage();watchErrors(page,url,errors);
+  await page.goto(url+'?nosw');await page.waitForFunction(()=>window.__entry&&!window.__entry.importing,null,{timeout:60000});
+  const report=await page.evaluate(async()=>{
+   const THREE=await import('three'),{Post}=await import('./src/render/post.js'),
+    {installSceneLifetimeGate,installRenderGate}=await import('./tools/bake/inactive-figures.mjs'),
+    {sampleSceneAllocations}=await import('./tools/bake/scene-allocation.mjs'),
+    {partitionTerrain,installTerrainPartition}=await import('./tools/bake/partition-terrain.mjs');
+   const renderer=new THREE.WebGLRenderer({antialias:false}),post=new Post(renderer,{mode:'high'}),scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,10);
+   post.setSize(32,32);camera.position.z=2;post.beginSoldierView(camera,2);
+   const geometry=new THREE.PlaneGeometry(1,1);geometry.deleteAttribute('normal');geometry.computeBoundingBox();geometry.computeBoundingSphere();
+   const material=new THREE.MeshBasicMaterial({color:0x86734c,side:THREE.DoubleSide}),root=new THREE.Mesh(geometry,material);root.name='lifetime-native-terrain';scene.add(root);
+   const scope={__game:{post,scene,game:{baked:{atlases:{}}}},__allocation:window.__allocation,innerWidth:32,innerHeight:32,devicePixelRatio:1},gl=renderer.getContext(),samples=[],rows=[];
+   const sample=label=>{const r={label,...sampleSceneAllocations(scope)};samples.push(r);return r;},gate=installRenderGate(post),draw=()=>gate.renderOnce(scene,camera);
+   const pixels=()=>{const bytes=new Uint8Array(gl.drawingBufferWidth*gl.drawingBufferHeight*4);gl.readPixels(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.RGBA,gl.UNSIGNED_BYTE,bytes);return bytes;};
+   const native=post._apply,descriptor=Object.getOwnPropertyDescriptor(post,'_apply'),size=Object.getOwnPropertyDescriptor(renderer,'setSize'),savedDepth=post.soldierView.depth,sourceArrays=[geometry.attributes.position,geometry.attributes.uv,geometry.index],sourceBytes=sourceArrays.map(a=>Array.from(new Uint8Array(a.array.buffer,a.array.byteOffset,a.array.byteLength)));
+   const receipt={rows,samples,cleanup:[],primary:null,kind:'small native storage lifetime fixture; full110 budget and fielding UNRUN'},same=(a,b)=>['value','get','set','writable','enumerable','configurable'].every(k=>a?.[k]===b?.[k]);
+   let lifetime,terrain;
+   try{
+    draw();gl.finish();const original=sample('lifetime-original');
+    const bindings=()=>[post.rtScene.texture,post.rtSmall.texture,post.rtBlur.texture,savedDepth].map(t=>({uuid:t.uuid,...scope.__allocation.textureReservation(gl,renderer.properties.get(t).__webglTexture)})),ownedBefore=bindings();receipt.ownedBefore=ownedBefore;
+    if(ownedBefore.some(r=>!Number.isSafeInteger(r.id)||r.bytes<=0)||new Set(ownedBefore.map(r=>r.id)).size!==4)throw Error('lifetime native: exact Post texture pointers unbound');
+    lifetime=installSceneLifetimeGate(scope,{sample});receipt.resizeCycles=lifetime.cycles;post.setSize(48,48);scope.innerWidth=scope.innerHeight=48;
+    const cycle=lifetime.cycles[0],retired=cycle.samples.find(r=>r.label==='resize-retired')?.observation,settled=cycle.samples.find(r=>r.label==='resize-retired-settled')?.observation;
+    const oldTextures=ownedBefore.map(r=>r.id),oldRenderbuffers=original.allocation.renderbufferSlots.map(r=>r.id),unrelated=original.allocation.textureSlots.filter(r=>!oldTextures.includes(r.texture));
+    rows.push({name:'native-target-retirement',ok:cycle.complete&&retired?.allocation.pendingDeleteBytes>0&&settled?.allocation.pendingDeleteBytes===0
+      &&oldTextures.length>=4&&oldTextures.every(id=>retired.allocation.textureSlots.some(r=>r.texture===id&&r.pendingDelete)&&!settled.allocation.textureSlots.some(r=>r.texture===id))
+      &&oldRenderbuffers.every(id=>retired.allocation.renderbufferSlots.some(r=>r.id===id&&r.pendingDelete)&&!settled.allocation.renderbufferSlots.some(r=>r.id===id))});
+    draw();gl.finish();const replacement=sample('lifetime-replacement'),candidate=pixels(),ownedAfter=bindings();receipt.ownedAfter=ownedAfter;
+    rows.push({name:'native-target-reupload',ok:ownedAfter.length===4&&ownedAfter.every(r=>Number.isSafeInteger(r.id)&&!oldTextures.includes(r.id)&&!r.pendingDelete&&r.bytes>0)&&post.soldierView.depth===savedDepth&&post.rtScene.depthTexture===savedDepth});
+    rows.push({name:'native-unrelated-preserved',ok:unrelated.length>0&&unrelated.every(r=>replacement.allocation.textureSlots.some(n=>n.texture===r.texture&&!n.pendingDelete&&JSON.stringify(n.slots)===JSON.stringify(r.slots)))});
+    rows.push({name:'native-canvas-calls',ok:cycle.samples.filter(r=>/^resize-default-\d+$/.test(r.label)).length===2&&Object.getOwnPropertyDescriptor(renderer,'setSize').value===size.value
+      &&cycle.checks.length===4&&cycle.checks.every(r=>!r.lost&&r.error===0)});
+    // Identical final dimensions, camera, shader and source pixels through the original native route.
+    lifetime.restore();post.setSize(32,32);draw();gl.finish();post.setSize(48,48);draw();gl.finish();sample('lifetime-native-control');const control=pixels();
+    rows.push({name:'native-render-identical',ok:control.length===candidate.length&&control.every((b,i)=>b===candidate[i])&&candidate.some((b,i)=>i%4<3&&b!==candidate[i%4])&&candidate.every((b,i)=>i%4!==3||b===255)&&gl.getError()===0});
+    rows.push({name:'native-descriptors',ok:post._apply===native&&same(Object.getOwnPropertyDescriptor(post,'_apply'),descriptor)});
+    lifetime=installSceneLifetimeGate(scope,{sample});receipt.terrainCycles=lifetime.cycles;terrain=installTerrainPartition({terrainMesh:root},THREE,a=>partitionTerrain(a,3),{reversible:true});draw();gl.finish();const partitioned=sample('lifetime-partitioned'),chunkIds=partitioned.bufferOwnership.filter(r=>r.owners.some(o=>o.includes('terrain-chunk-'))).map(r=>r.id);
+    lifetime.completeTerrainRetirement(()=>terrain.restore());const terrainCycle=lifetime.cycles[0],pending=terrainCycle.samples.find(r=>r.label==='terrain-retired')?.observation,complete=terrainCycle.samples.find(r=>r.label==='terrain-retired-settled')?.observation;
+    rows.push({name:'native-terrain-retirement',ok:terrainCycle.complete&&chunkIds.length===6&&chunkIds.every(id=>pending.bufferOwnership.some(r=>r.id===id&&r.pendingDelete)&&!complete.bufferOwnership.some(r=>r.id===id))});
+    draw();gl.finish();const restored=sample('lifetime-original-reupload');
+    rows.push({name:'native-terrain-exact',ok:root.geometry===geometry&&!root.children.length&&sourceArrays.every(a=>scope.__allocation.bufferReservations(gl,a.array).some(r=>!r.pendingDelete&&r.bytes===a.array.byteLength))
+      &&JSON.stringify(sourceArrays.map(a=>Array.from(new Uint8Array(a.array.buffer,a.array.byteOffset,a.array.byteLength))))===JSON.stringify(sourceBytes)
+      &&restored.bufferOwnership.every(r=>!chunkIds.includes(r.id))&&pixels().every((b,i)=>b===control[i])});
+    receipt.resizeCycle=cycle;receipt.terrainCycle=terrainCycle;
+   }catch(error){receipt.primary=String(error?.message??error);}
+   finally{
+    const failures=[];for(const cleanup of [()=>lifetime?.restore(),()=>terrain?.restore(),()=>gate.restore(),()=>window.__allocation?.restore(),()=>post.endSoldierView(),()=>geometry.dispose(),()=>material.dispose(),()=>{for(const t of [post.rtScene,post.rtSmall,post.rtBlur])t.dispose();},()=>renderer.dispose(),()=>renderer.forceContextLoss()])try{cleanup();}catch(e){failures.push(e.message);}
+    receipt.cleanup=failures;
+   }
+   receipt.cycles=lifetime?.cycles||[];return receipt;
+  });
+  result.sceneLifetime=report;
+  check('scene-lifetime-complete',!report.primary&&report.cleanup.length===0&&report.rows.length===8,JSON.stringify({primary:report.primary,cleanup:report.cleanup}));
+  check('scene-lifetime-accounting',report.samples.length>0&&report.samples.every(s=>s.glError===0&&s.allocation.unknown.length===0&&s.unmappedBufferBytes===0),'all retained samples, including pending lifetimes');for(const row of report.rows)check('scene-lifetime-'+row.name,row.ok,JSON.stringify(report.rows));
+  check('scene-lifetime-errors',errors.length===0,errors.join('; '));
+ }finally{await ctx.close();}
 }
 
 // One actual current-PNG battle is a prerequisite proof, not the qualified 22+88 matrix.

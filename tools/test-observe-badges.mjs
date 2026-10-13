@@ -1,7 +1,7 @@
 // Constructed CPU observations test bookkeeping only; no native combat/award/level-10 claim.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {BADGE_OBSERVATIONS,badgePrefix,createBadgeCrossings,validateBadgeCommand,badgePrefixReceipt,executeBadgeCommand,installBadgeTickObserver,createBadgePolicy,createBadgeStages,installBadgeCombatObserver,badgeTactic,badgeObservationSelection,LEVEL10_ORIGIN,admitLevel10Origin,advanceBadgeChunk,badgeObservationComplete,BADGE_PROMOTION_PHASES,badgePromotionTactic,BADGE_RELIEF_ORIGIN,validateBadgeReliefOrigin,badgeReliefTactic,badgeReliefPositions,badgeReliefComplete} from './observe-badges.mjs';
+import {BADGE_OBSERVATIONS,badgePrefix,createBadgeCrossings,validateBadgeCommand,badgePrefixReceipt,executeBadgeCommand,installBadgeTickObserver,createBadgePolicy,createBadgeStages,installBadgeCombatObserver,badgeTactic,badgeObservationSelection,LEVEL10_ORIGIN,admitLevel10Origin,advanceBadgeChunk,badgeObservationComplete,BADGE_PROMOTION_PHASES,badgePromotionTactic,BADGE_RELIEF_ORIGIN,validateBadgeReliefOrigin,badgeReliefTactic,badgeReliefPositions,badgeReliefComplete,badgeOpenLineTactic} from './observe-badges.mjs';
 import * as C from '../src/franchise/campaign.js';
 import {validatePromotionDeployment,admitBadgeReliefCheckpoint} from './test-badges-ui.mjs';
 import {prepareFieldScenario} from '../src/sim/phase.js';
@@ -23,7 +23,7 @@ const combatStages=()=>{const g=nativeStages();g.combat.calls=[];g.combat.token=
 const authoredTactic=(a,id,revision=0)=>{const r=BADGE_OBSERVATIONS.find(r=>r.id===id),scenario=JSON.parse(fs.readFileSync(new URL('../assets/packs/'+r.packId+'.json',import.meta.url))).phases.find(p=>p.id===r.phaseId).scenario;return a.tactic({scenario,playerSide:'US',simTime:0},id,revision);};
 const authoredPromotion=(a,id)=>{const scenario=JSON.parse(fs.readFileSync(new URL('../assets/packs/stones-river.json',import.meta.url))).phases.find(p=>p.id===id).scenario;return a.promotion({scenario,playerSide:'US',simTime:0},id);};
 api.deployment=validatePromotionDeployment;
-Object.assign(api,{relief:badgeReliefTactic,reliefOrigin:validateBadgeReliefOrigin,reliefPositions:badgeReliefPositions,reliefComplete:badgeReliefComplete,reliefCheckpoint:admitBadgeReliefCheckpoint});
+Object.assign(api,{openLine:badgeOpenLineTactic,relief:badgeReliefTactic,reliefOrigin:validateBadgeReliefOrigin,reliefPositions:badgeReliefPositions,reliefComplete:badgeReliefComplete,reliefCheckpoint:admitBadgeReliefCheckpoint});
 const authoredRelief=(a,id)=>{const scenario=JSON.parse(fs.readFileSync(new URL('../assets/packs/stones-river.json',import.meta.url))).phases.find(p=>p.id===id).scenario;return a.relief({scenario,playerSide:'US',simTime:0},id);};
 const reliefReceipt=t=>({cadence:1,failure:null,stages:t.plan.map(p=>({...structuredClone(p),state:'accepted',trace:{invoked:true,accepted:true,command:p.command.type==='move'?{type:'move',unitId:p.command.unitId,points:[[0,0],p.command.path.point]}:structuredClone(p.command)}}))});
 function promotionDeployment(){
@@ -34,6 +34,14 @@ function promotionDeployment(){
   const initial={deployment:structuredClone(expected),live:expected.units.map(d=>({id:d.id,side:d.side,type:d.type||'infantry',men:d.men,menMax:d.men,guns:d.guns||0,xp:d.xp||1,weapon:d.weapon,equipment:d.equipment?equipmentProfile(d.equipment,d.type||'infantry').item:null,def:structuredClone(d),moraleMax:d.morale??78,fatigue:d.fatigue??0,ammo:d.ammo??100}))};return {expected,initial};
 }
 const checks=[
+ ['open-line-mode',a=>assert.deepEqual(a.selection(['--badge-promotion-open-line']),{mode:'promotion-open-line',shard:1},'open-line-mode: isolated distinct witness')],
+ ['open-line-mode-refusal',a=>{for(const flag of ['--badge-promotion','--badge-promotion-relief','--native','--badge-shard=1'])rejects('open-line-mode-refusal',()=>a.selection(['--badge-promotion-open-line',flag]));}],
+ ['open-line-position',a=>{const old=authoredRelief(api,'round-forest'),t=authoredRelief({relief:a.openLine},'round-forest');assert.deepEqual(t.plan.filter(r=>r.command.type==='move').map(r=>r.command.path.point),[[750,-450],[940,-230]],'open-line-position: source-backed closer open ground');assert.deepEqual(old.plan.find(r=>r.id==='ammen-position').command.path.point,[935,-300],'open-line-position: original relief intact');assert.equal(t.recipe.id,'open-line-round-forest','open-line-position: distinct source identity');}],
+ ['open-line-hold',a=>{const t=authoredRelief({relief:a.openLine},'round-forest');for(const id of ['ammen-hold','relief-hold-us-hazen-brigade']){const hold=t.plan.find(r=>r.id===id),point=id==='ammen-hold'?[940,-230]:[750,-450];assert.deepEqual([hold.notBefore,hold.expires,hold.condition.at(-1)],[1,240,{kind:'arrived',point,radius:25}],'open-line-hold: one actual arrival-gated Hold, no counter trigger');}assert(t.plan.every(r=>r.condition.some(c=>c.kind==='actor-orderable'))&&t.cadence===1&&t.plan.length===13,'open-line-hold: unchanged bounded cadence/roster/stages');}],
+ ['open-line-survival',a=>{const t=authoredRelief({relief:a.openLine},'round-forest'),old=authoredRelief(api,'round-forest');assert.deepEqual(t.plan.filter(r=>['ammen-withdraw','ammen-recover'].includes(r.id)),old.plan.filter(r=>['ammen-withdraw','ammen-recover'].includes(r.id)),'open-line-survival: original finite survival conditions');}],
+ ['open-line-mcfadden',a=>{const t=authoredRelief({relief:a.openLine},'mcfaddens-ford'),old=authoredRelief(api,'mcfaddens-ford');assert.deepEqual(t.plan,old.plan,'open-line-mcfadden: conditional Gold recipe unchanged, fresh actual starting strength');}],
+ ['open-line-refusal',a=>{rejects('open-line-refusal',()=>a.openLine({simTime:1,playerSide:'US',scenario:{id:'stones-river-round-forest'}},'round-forest'));rejects('open-line-refusal',()=>a.openLine({simTime:0,playerSide:'CS',scenario:{id:'stones-river-round-forest'}},'round-forest'));}],
+
   ['relief-mode',a=>assert.deepEqual(a.selection(['--badge-promotion-relief']),{mode:'promotion-relief',shard:1},'relief-mode: distinct one-job witness')],
   ['relief-mode-refusal',a=>{for(const flag of ['--badge-promotion','--native','--badge-shard=1','--badge-revisions'])rejects('relief-mode-refusal',()=>a.selection(['--badge-promotion-relief',flag]));}],
   ['relief-origin',a=>assert.equal(a.reliefOrigin(BADGE_RELIEF_ORIGIN),true,'relief-origin: immutable actual source origin')],
@@ -241,6 +249,16 @@ if(process.argv.includes('--prove-fail')){
     'relief-holds':{relief:changedRelief(t=>t.plan.find(r=>r.id==='ammen-hold').after=[])},'relief-survival':{relief:changedRelief(t=>t.plan.find(r=>r.id==='ammen-withdraw').expires=2000)},
     'relief-refusal':{relief:()=>({})},'relief-positions':{reliefPositions:()=>false},'relief-positions-refusal':{reliefPositions:()=>true},
     'relief-complete':{reliefComplete:()=>false},'relief-incomplete':{reliefComplete:()=>true},'relief-checkpoint-refusal':{reliefCheckpoint:()=>true}
+  });
+
+  const changeOpen=change=>(...args)=>{const t=badgeOpenLineTactic(...args);change(t);return t;};
+  Object.assign(mutants,{
+   'open-line-mode':{selection:()=>null},'open-line-mode-refusal':{selection:()=>({})},
+   'open-line-position':{openLine:badgeReliefTactic},
+   'open-line-hold':{openLine:changeOpen(t=>t.plan.find(r=>r.id==='ammen-hold').notBefore=120)},
+   'open-line-survival':{openLine:changeOpen(t=>t.plan.find(r=>r.id==='ammen-withdraw').expires=2000)},
+   'open-line-mcfadden':{openLine:changeOpen(t=>t.plan.find(r=>r.id==='ammen-position').command.path.point=[0,0])},
+   'open-line-refusal':{openLine:()=>({})}
   });
   // Each mutant must be caught by its own assertion; incidental TypeErrors are not proof.
   for(const[name,check]of checks){let error;try{check({...api,...mutants[name]});}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&error.message.startsWith(name),`${name}: mutant must fail its own assertion`);}

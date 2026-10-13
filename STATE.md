@@ -1,10 +1,10 @@
 # STATE
-2026-10-13 — v1 released558456f; ACTIVE0180 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
+2026-10-13 — v1 released558456f; ACTIVE0183 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
 Branch v1-1-gaps-20261012; light loop0108; Astra judge; COORDINATION absent; v1.1 then approved v2, unreleased.
 Accepted remote main9e72079; sourceCI38346843720 all9/full own251/365/171/159+201+three6smokes/digests clean.
 Main9eCI38349763169 all9/fullown/digests/rawprobe clear; Pages38349763192 exact9e/livev68 clear.
 MAIN13a7b136 exact protected11 dirty paths untouched; c328 failedmainCI38298643624 retained.
-Resource fixedtextures268,094,972B>250M: approved default-off completion investigation/source d333/Astra-clear/CI38370710068 fullown; ONCE38374246655 running/adoption held.
+Resource38374246655/d333 full110+144PNG correctness/readback clear; capFAIL493,858,706B/GPU470,232,876B; Lookout fixed255,718,364B>250M; broader fixes0182; lifetimegate118+118/scene190+190/Astra-clear WIP/nativefixtureUNRUN/no adoption.
 Progression[0,30,75,135,210,300,405,525,660,800]; capacity-bounded atomic level rewards unchanged.
 Mixed38282452947/9d60c12 qualified; root+Astra viewed001–076; exact11files/576frames/digests pass.
 8ASTC+2originalPNG close48,996,984B; diagnostic only; no runtime asset adoption.
@@ -14,6 +14,6 @@ Mixed38282452947/9d60c12 qualified; root+Astra viewed001–076; exact11files/576
 0167 matrix38343715785 failed transport90,068,783B report; original631MB artifact11789877172 retained.
 0172 transport38352343371 complete146original members/144PNG/22ordinary+45fault;43faultsUNRUN.
 0173 actualnative prerequisite own11791200565/41fullsamples/19IDs/Veteran/cleanup clear; source0c38350032246 all9/fullown251/365/171/166 clear.
-0179 L10/original6/revised6 fullown; Missionary38368977752 Bronze1/stormed0;531CI38365865191 all9/fullown; promotion38365651410 Bronze retained/noSilver, upgrade gap; approved ONE extra relief witness WIP128+128/nativeUNRUN.
+0179 L10/6first+6revised fullnative clear. Extra relief38383078179/5f90 root+Astra clear:Ammen Bronze retained/holdingLoss178<266; McFaddenUNRUN/upgradeUNPROVED; open-line135+135/Astra-clear WIP/nativeUNRUN;5f90CI38379572095 all9/fullown128+128 clear.
 .out297,938,617B/300M preserved; unintended local npm browser run interrupted130/unaccepted; CPU-only resumed.
 Native UHD617/iPad fps/sound UNMEASURED; no spending/accounts/recurring device requests.

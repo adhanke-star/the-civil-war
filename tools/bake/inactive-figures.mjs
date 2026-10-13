@@ -117,6 +117,60 @@ export function installRenderGate(post) {
     held=false;restored=true;
   }};
 }
+/** Explicit diagnostic only: retire native storage before delegating the unchanged resize. */
+export function installSceneLifetimeGate(scope,{sample}={}) {
+  const post=scope?.__game?.post||scope?.post,renderer=post?.renderer,gl=renderer?.getContext?.();
+  if(typeof sample!=='function'||typeof post?._apply!=='function'||typeof renderer?.setSize!=='function'
+    ||typeof gl?.finish!=='function'||typeof gl?.getError!=='function'||typeof gl?.isContextLost!=='function')throw Error('scene lifetime: missing synchronous native owner');
+  const keys=['rtScene','rtSmall','rtBlur'],targets=keys.map(k=>post[k]),colours=targets.map(t=>t?.texture),
+    native=post._apply,descriptor=Object.getOwnPropertyDescriptor(post,'_apply'),initialSize=renderer.setSize,initialSizeDescriptor=Object.getOwnPropertyDescriptor(renderer,'setSize');
+  if(targets.some(t=>!t?.isWebGLRenderTarget||typeof t.dispose!=='function')||new Set(targets).size!==3
+    ||descriptor?.configurable===false||initialSizeDescriptor?.configurable===false)throw Error('scene lifetime: ambiguous render target ownership');
+  const same=(a,b)=>['value','get','set','writable','enumerable','configurable'].every(k=>a?.[k]===b?.[k]);
+  const cycles=[];let restored=false,failure,failed=false,busy=false,activeDepth;
+  const owner=()=>{if(!same(Object.getOwnPropertyDescriptor(post,'_apply'),installed)||renderer.setSize!==initialSize||!same(Object.getOwnPropertyDescriptor(renderer,'setSize'),initialSizeDescriptor)||post.renderer!==renderer||renderer.getContext()!==gl||keys.some((k,i)=>post[k]!==targets[i]||targets[i].texture!==colours[i])
+    ||busy&&post.rtScene.depthTexture!==activeDepth)throw Error('scene lifetime: native owner changed');};
+  const capture=(cycle,label)=>{const value=sample(label);if(!value||typeof value!=='object'||typeof value.then==='function')throw Error('scene lifetime: synchronous sample required');
+    cycle.samples.push({label,observation:value});if(value.glError!==0||!Array.isArray(value.allocation?.unknown)||value.allocation.unknown.length||value.unmappedBufferBytes!==0)throw Error('scene lifetime: unproved native allocation sample');return value;};
+  const finish=(cycle,label)=>{owner();const lost=gl.isContextLost(),error=gl.getError();cycle.checks.push({label,lost,error});
+    if(lost||error!==gl.NO_ERROR)throw Error('scene lifetime: native completion refused');gl.finish();
+    const afterLost=gl.isContextLost(),afterError=gl.getError();cycle.checks.push({label:label+'-after',lost:afterLost,error:afterError});
+    if(afterLost||afterError!==gl.NO_ERROR)throw Error('scene lifetime: native completion failed');};
+  const run=(kind,action)=>{if(failed)throw failure;if(restored||busy)throw Error('scene lifetime: unavailable or reentrant gate');
+    owner();activeDepth=post.rtScene.depthTexture;busy=true;const cycle={kind,index:cycles.length+1,samples:[],checks:[],complete:false,errors:[]};cycles.push(cycle);
+    try{const value=action(cycle);if(value&&typeof value.then==='function')throw Error('scene lifetime: synchronous native delegation required');owner();cycle.complete=true;return value;}
+    catch(error){cycle.errors.push(error?.message||String(error));failure=error;failed=true;throw error;}finally{busy=false;}};
+  const wrapped=function(...args){if(this!==post)throw Error('scene lifetime: foreign resize receiver');return run('resize',cycle=>{
+    capture(cycle,'resize-before');const errors=[];
+    for(const target of targets)try{target.dispose();}catch(error){errors.push(error?.message||String(error));}
+    capture(cycle,'resize-retired');if(errors.length)throw Error('scene lifetime: target disposal failed: '+errors.join('; '));
+    finish(cycle,'resize-retired');capture(cycle,'resize-retired-settled');
+    const sizeNative=renderer.setSize,sizeDescriptor=Object.getOwnPropertyDescriptor(renderer,'setSize');
+    if(sizeDescriptor?.configurable===false)throw Error('scene lifetime: unwrappable canvas resize');
+    let sizeCount=0,delegatedError,delegatedFailed=false,value;
+    const sizeWrapped=function(...sizeArgs){if(this!==renderer)throw Error('scene lifetime: foreign canvas receiver');
+      const result=sizeNative.apply(this,sizeArgs);capture(cycle,'resize-default-'+(++sizeCount));return result;};
+    const sizeInstalled={value:sizeWrapped,writable:true,enumerable:sizeDescriptor?.enumerable??true,configurable:true};
+    Object.defineProperty(renderer,'setSize',sizeInstalled);
+    try{value=native.apply(this,args);}catch(error){delegatedError=error;delegatedFailed=true;}
+    finally{if(!same(Object.getOwnPropertyDescriptor(renderer,'setSize'),sizeInstalled)){if(!delegatedFailed)delegatedError=Error('scene lifetime: canvas wrapper ownership changed');delegatedFailed=true;}
+      else if(sizeDescriptor)Object.defineProperty(renderer,'setSize',sizeDescriptor);else delete renderer.setSize;}
+    if(delegatedFailed)throw delegatedError;
+    if(value&&typeof value.then==='function')throw Error('scene lifetime: synchronous native delegation required');
+    if(!sizeCount)throw Error('scene lifetime: native canvas resize not delegated');
+    capture(cycle,'resize-default-pending');finish(cycle,'resize-default');capture(cycle,'resize-default-settled');return value;
+  });};
+  const installed={value:wrapped,writable:true,enumerable:descriptor?.enumerable??true,configurable:true};
+  Object.defineProperty(post,'_apply',installed);
+  return {cycles,completeTerrainRetirement(retire){if(typeof retire!=='function')throw Error('scene lifetime: terrain retirement required');return run('terrain',cycle=>{
+    capture(cycle,'terrain-before');const value=retire();if(value&&typeof value.then==='function')throw Error('scene lifetime: synchronous terrain retirement required');
+    capture(cycle,'terrain-retired');finish(cycle,'terrain-retired');capture(cycle,'terrain-retired-settled');return value;
+  });},restore(){if(restored)return;if(busy)throw Error('scene lifetime: restoration during native delegation');
+    if(!same(Object.getOwnPropertyDescriptor(post,'_apply'),installed))throw Error('scene lifetime: resize wrapper ownership changed');
+    if(descriptor)Object.defineProperty(post,'_apply',descriptor);else delete post._apply;restored=true;
+  }};
+}
+
 /** Synchronous default-framebuffer readback; excludes the DOM HUD. Never await between draw and export. */
 export function renderCanvasPng(post,scene,camera,gate=null){
   const r=post.renderer,gl=r.getContext(),canvas=r.domElement,before=gate?.count;

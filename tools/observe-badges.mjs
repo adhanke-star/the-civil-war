@@ -95,6 +95,23 @@ export function badgeReliefTactic(game,phaseId){
   return {kind:'one authorized front-line relief witness; genuine saved upgrades unproved',recipe:{id:'relief-'+phaseId,packId:'stones-river',phaseId},revision:0,plan,cadence:1,roster};
 }
 
+/** Separately authorized, distinct open-ground defence; original relief recipe stays intact. */
+export function badgeOpenLineTactic(game,phaseId){
+  const tactic=badgeReliefTactic(game,phaseId),point=[940,-230];
+  const plan=tactic.plan.map(stage=>{
+    const next=structuredClone(stage);
+    if(phaseId==='round-forest'){
+      if(next.id==='ammen-position')next.command.path.point=point.slice();
+      if(['ammen-hold','relief-hold-us-hazen-brigade'].includes(next.id)){
+        next.notBefore=1;if(next.id==='ammen-hold')next.condition.at(-1).point=point.slice();
+      }
+    }
+    return next;
+  });
+  createBadgeStages(plan,1,tactic.roster);
+  return {...tactic,kind:'authorized forward open-ground defensive witness; genuine saved upgrades unproved',recipe:{...tactic.recipe,id:'open-line-'+phaseId},plan};
+}
+
 
 /** Positioning is a prerequisite for the next witness phase, never a badge-counter trigger. */
 export function badgeReliefPositions(tactic,receipt){
@@ -263,6 +280,7 @@ export function badgeObservationSelection(args){
   if(args.length===1&&args[0]==='--badge-missionary-revision')return {mode:'missionary-revision',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion')return {mode:'promotion',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion-relief')return {mode:'promotion-relief',shard:1};
+  if(args.length===1&&args[0]==='--badge-promotion-open-line')return {mode:'promotion-open-line',shard:1};
   const shards=args.filter(a=>/^--badge-shard=[123]$/.test(a));
   if(args.length===2&&args.includes('--badge-observations')&&shards.length===1)return {mode:'observations',shard:Number(shards[0].slice(-1))};
   if(args.length===2&&args.includes('--badge-revisions')&&shards.length===1)return {mode:'revisions',shard:Number(shards[0].slice(-1))};

@@ -1787,14 +1787,14 @@ async function browserChecks(server, url) {
       const {nativeBadgeObserverControls}=await import('./test-badges-ui.mjs');
       await nativeBadgeObserverControls({browser,url,check,result,watchErrors});return;
     }
-    if(['observations','missionary','missionary-revision','revisions','promotion','promotion-relief'].includes(BADGE_SELECTION?.mode)){
+    if(['observations','missionary','missionary-revision','revisions','promotion','promotion-relief','promotion-open-line'].includes(BADGE_SELECTION?.mode)){
       result.mode=BADGE_SELECTION.mode==='missionary'?'actual Missionary-only terminal-step repair':(BADGE_SELECTION.mode==='revisions'?'actual single legal tactic revision':'actual first native badge tactics')+' shard '+BADGE_SELECTION.shard+' of3';
       const {nativeBadgeObservations}=await import('./test-badges-ui.mjs');
       const persist=async()=>{const target=path.join(OUT_DIR,'badge-observations.json'),temporary=target+'.pending';
         await fs.writeFile(temporary,JSON.stringify(result));await fs.rename(temporary,target);};
-      if(['promotion','promotion-relief'].includes(BADGE_SELECTION.mode))result.mode=BADGE_SELECTION.mode==='promotion-relief'?'one authorized front-line relief witness from actual post-Slaughter checkpoint':'actual original Bronze brigade sequential Camp and native battle continuation';
+      if(['promotion','promotion-relief','promotion-open-line'].includes(BADGE_SELECTION.mode))result.mode=BADGE_SELECTION.mode==='promotion-open-line'?'authorized forward open-ground defensive witness from actual post-Slaughter checkpoint':BADGE_SELECTION.mode==='promotion-relief'?'one authorized front-line relief witness from actual post-Slaughter checkpoint':'actual original Bronze brigade sequential Camp and native battle continuation';
       if(BADGE_SELECTION.mode==='missionary-revision')result.mode='actual single approved Missionary revision after completed first observation';
-      await nativeBadgeObservations({browser,url,check,result,watchErrors,shard:BADGE_SELECTION.shard,persist,missionaryOnly:['missionary','missionary-revision'].includes(BADGE_SELECTION.mode),revision:['revisions','missionary-revision'].includes(BADGE_SELECTION.mode)?1:0,promotion:['promotion','promotion-relief'].includes(BADGE_SELECTION.mode),relief:BADGE_SELECTION.mode==='promotion-relief'});return;
+      await nativeBadgeObservations({browser,url,check,result,watchErrors,shard:BADGE_SELECTION.shard,persist,missionaryOnly:['missionary','missionary-revision'].includes(BADGE_SELECTION.mode),revision:['revisions','missionary-revision'].includes(BADGE_SELECTION.mode)?1:0,promotion:['promotion','promotion-relief','promotion-open-line'].includes(BADGE_SELECTION.mode),relief:['promotion-relief','promotion-open-line'].includes(BADGE_SELECTION.mode),openLine:BADGE_SELECTION.mode==='promotion-open-line'});return;
     }
     if(BADGE_SELECTION?.mode==='level10'){
       result.mode='actual played-save legal level10 continuation';

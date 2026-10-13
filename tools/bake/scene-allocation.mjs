@@ -825,7 +825,9 @@ export function installAllocationObserver(source) {
       s.bufferArrays.get(s.bufferSources.get(id))?.delete(id);s.bufferSources.delete(id);s.bufferOwners.delete(id);s.bufferIds.delete(id);
     }});
   }
-  observer={restore,labelBufferOwners(gl,array,labels){
+  observer={restore,textureReservation(gl,texture){const s=state(gl),r=s.ledger.objects.get(texture);if(!r||r.kind!=='texture')return null;
+    return {id:s.textureIds.get(texture),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(texture)};
+  },labelBufferOwners(gl,array,labels){
     if(!ArrayBuffer.isView(array)||!Array.isArray(labels)||!labels.length||labels.some(l=>typeof l!=='string'||!l))throw new Error('allocation: invalid buffer owner evidence');
     const s=state(gl),ids=s.bufferArrays.get(array);
     for(const id of ids||[]){if(!s.ledger.objects.has(id))continue;let owners=s.bufferOwners.get(id);if(!owners){owners=new Set();s.bufferOwners.set(id,owners);}for(const label of labels)owners.add(label);}

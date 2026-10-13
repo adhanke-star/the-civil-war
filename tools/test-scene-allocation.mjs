@@ -36,8 +36,8 @@ function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,s
     const gl=new GL(),snap=()=>window.__allocation.snapshot(gl),bind=(kind)=>{const o={};gl.bindings.set(gl[kind],o);return o;};
     const t=bind('TEXTURE_BINDING_2D');
     assert.equal(gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,0,{width:8,height:4}),'native-result');
-    gl.generateMipmap(gl.TEXTURE_2D);const rgba=snap();
-    gl.deleteTexture(t);const beforeFinish=snap();gl.finish();const afterFinish=snap();
+    gl.generateMipmap(gl.TEXTURE_2D);const rgba=snap(),textureIdentity=window.__allocation.textureReservation(gl,t),foreignTextureIdentity=window.__allocation.textureReservation(gl,{});
+    gl.deleteTexture(t);const beforeFinish=snap(),pendingTextureIdentity=window.__allocation.textureReservation(gl,t);gl.finish();const afterFinish=snap(),retiredTextureIdentity=window.__allocation.textureReservation(gl,t);
     bind('TEXTURE_BINDING_2D');gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,8,4,0,gl.RGBA,gl.HALF_FLOAT,null);
     bind('RENDERBUFFER_BINDING');gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,8,4);
     bind('ARRAY_BUFFER_BINDING');const bufferArray=new Float32Array(10);gl.bufferData(gl.ARRAY_BUFFER,bufferArray,gl.STATIC_DRAW,2,3);const floating=snap(),bufferReservation=window.__allocation.bufferReservation(gl,bufferArray);
@@ -78,7 +78,7 @@ function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,s
       after[key]?.value===d.value&&after[key]?.get===d.get&&after[key]?.set===d.set&&after[key]?.writable===d.writable&&after[key]?.enumerable===d.enumerable&&after[key]?.configurable===d.configurable);
     const windowRestore=Object.entries(priorObserver).every(([key,value])=>Object.getOwnPropertyDescriptor(window,'__allocation')?.[key]===value);
     const inheritedRestore=!Object.hasOwn(GL.prototype,'compressedTexSubImage3D')&&GL.prototype.compressedTexSubImage3D===nativeInherited;
-    return {pendingBuffers,settledBuffers,firstSample,samplingCalls,detachedSample,unassociatedSample,retiredSample,reallocatedSample,knownId,rgba,beforeFinish,afterFinish,floating,bufferReservation,cubeAdded,immutableAdded,npotAdded,compressedAdded,astcAdded,afterAstcSubimage,bc7Added,compressedImmutableUnknown,exactRestore,windowRestore,inheritedRestore,small,resized,resizedAfterFinish,unknown,native:gl.native};
+    return {textureIdentity,foreignTextureIdentity,pendingTextureIdentity,retiredTextureIdentity,pendingBuffers,settledBuffers,firstSample,samplingCalls,detachedSample,unassociatedSample,retiredSample,reallocatedSample,knownId,rgba,beforeFinish,afterFinish,floating,bufferReservation,cubeAdded,immutableAdded,npotAdded,compressedAdded,astcAdded,afterAstcSubimage,bc7Added,compressedImmutableUnknown,exactRestore,windowRestore,inheritedRestore,small,resized,resizedAfterFinish,unknown,native:gl.native};
   } finally {for(const [key,value]of Object.entries(saved)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}}
 }
 const api={Ledger:AllocationLedger,mips:mipSizes,observe:observed,Peak:ReservationPeak,rejection:rejectionObservation,reduce:reduceSceneObservations,matrix:sceneMatrixContract,history:createSceneHistory,compact:compactSceneSample,expand:expandSceneContext,envelope:sceneReportEnvelope,merge:createSceneMatrixMerger};
@@ -236,6 +236,9 @@ function transportProfile(route,fault=null){
  return {raw,context:{history,states:compact,kind:'constructed CPU transport profile; native whole-scene matrix UNRUN'}};
 }
 const checks=[
+ ['native-texture-identity',a=>{const o=a.observe();assert(o.textureIdentity?.id===o.rgba.textureSlots[0]?.texture&&o.textureIdentity.bytes===o.rgba.bytes&&!o.textureIdentity.pendingDelete&&o.foreignTextureIdentity===null,'native-texture-identity: actual pointer binds exact observer ID/bytes, no foreign inference');}],
+ ['native-texture-retirement',a=>{const o=a.observe();assert(o.pendingTextureIdentity?.id===o.textureIdentity.id&&o.pendingTextureIdentity.pendingDelete&&o.retiredTextureIdentity===null,'native-texture-retirement: owned pending pointer remains until actual completion');}],
+
  ['completion-qualified',a=>{const r=a.reduce(qualifiedObservations(phases,true),phases);assert.equal(r.complete,true,'completion-qualified: exact declared completion matrix schema '+JSON.stringify(r.errors?.slice(0,8)));assert.equal(r.maxGpuReservation,100000000,'completion-qualified: prior peak retained');}],
  ...Object.entries({
    'completion-missing':r=>r.faults[0].states=r.faults[0].states.filter(s=>s.label!=='candidate-completion-after'),
@@ -498,6 +501,8 @@ const mutants={
   'qualified-invalid-mode-maximum':{reduce:(r,p)=>({...reduceSceneObservations(r,p),maxGpuReservation:100000000})},
   'qualified-legacy-maximum':{reduce:(r,p)=>({...reduceSceneObservations(r,p),maxGpuReservation:100000000})},
 };
+mutants['native-texture-identity']={observe:()=>({...observed(),textureIdentity:{id:-1,bytes:0,pendingDelete:false}})};
+mutants['native-texture-retirement']={observe:()=>({...observed(),pendingTextureIdentity:null})};
 for(const [,check]of checks)await check(api);
 console.log(`SCENE-ALLOCATION OK (${checks.length}/${checks.length})`);
 if(process.argv.includes('--prove-fail')){
