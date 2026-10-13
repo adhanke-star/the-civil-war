@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {gzipSync} from 'node:zlib';
 import { chromium } from 'playwright';
 import { startServer, ROOT } from '../serve.mjs';
-import { AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation, reduceSceneObservations, reduceFocusedLookoutObservations, sampleSceneAllocations, initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,sceneReportEnvelope,scenePartHeader,createSceneMatrixMerger } from './scene-allocation.mjs';
+import { failPaintedComparison, collectPaintedIsolation, AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation, reduceSceneObservations, reduceFocusedLookoutObservations, sampleSceneAllocations, initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,sceneReportEnvelope,scenePartHeader,createSceneMatrixMerger } from './scene-allocation.mjs';
 import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDiagnostics,installSceneStartGate} from './inactive-figures.mjs';
 import {acquireQualifiedHybrid,materializeQualifiedSceneInput,QUALIFIED_HYBRID,installQualifiedSceneRoutes,sceneMatrixGroups} from './review-current-compression.mjs';
 import {preparePhase,prepareFieldScenario} from '../../src/sim/phase.js';
@@ -73,8 +73,9 @@ async function focusedSceneCleanup(page){
     // and restored allocation hooks. Descriptor cleanup is independent of that result.
     try{f.lifetime?.restore();}catch(e){errors.push(String(e?.message??e));}
     const o=f.original,root=window.__game?.world?.terrainMesh;
-    const exactOriginal=!!o&&root===o.root&&root.geometry===o.geometry&&root.material===o.material&&root.geometry.attributes.position===o.position&&root.geometry.attributes.uv===o.uv&&root.geometry.index===o.index;
+    const exactOriginal=!!o&&root===o.root&&root.geometry===o.geometry&&root.material===o.material&&root.children.length===0&&root.geometry.attributes.position===o.position&&root.geometry.attributes.uv===o.uv&&root.geometry.index===o.index;
     if(!exactOriginal)errors.push('focused original terrain identities not restored');
+    if(f.isolationClone)errors.push('painted isolation cloned material cleanup incomplete');
     return {ok:!errors.length,errors,exactOriginal,bootstrapDraws:f.bootstrapDraws,pixelBytes:f.post?.diagnosticPixelBytes,preparedReleased:f.prepared==null,terrain:f.owner&&{kind:f.owner.kind,bytes:f.owner.bytes,sourceBytes:f.owner.sourceBytes},
       postTextures:f.postTextures,postRenderbuffers:f.postRenderbuffers,samples:f.samples,cycles:(f.lifetime?.cycles||[]).map(c=>({kind:c.kind,index:c.index,complete:c.complete,errors:c.errors,checks:c.checks,sampleLabels:c.samples.map(s=>s.observation.label),sampleIds:c.samples.map(s=>s.observation.captureId)}))};
   });
@@ -399,7 +400,42 @@ async function main(){
           await viewFrames('original');row.canonical=await focusedCanonicalInstall(page);await capture('canonical-field');await viewFrames('compact');
           await page.evaluate(()=>{window.__sceneTerrainPartition.restore();window.__focusedScene.prepared=null;});await viewFrames('restored');
           for(const view of row.canonicalViews){const frames=['original','compact','restored'].map(kind=>row.canvasCaptures.find(c=>c.label===`canonical-${kind}-${view.label}`));
-            if(frames.some(c=>c.pixelSha256!==frames[0].pixelSha256||JSON.stringify(c.camera)!==JSON.stringify(frames[0].camera)||JSON.stringify(c.roster)!==JSON.stringify(frames[0].roster)||JSON.stringify(c.figurePublication)!==JSON.stringify(frames[0].figurePublication)||c.width!==frames[0].width||c.height!==frames[0].height))throw Error('focused scene: original/compact/restored whole painted frames differ');}
+            if(frames.some(c=>c.pixelSha256!==frames[0].pixelSha256||JSON.stringify(c.camera)!==JSON.stringify(frames[0].camera)||JSON.stringify(c.roster)!==JSON.stringify(frames[0].roster)||JSON.stringify(c.figurePublication)!==JSON.stringify(frames[0].figurePublication)||c.width!==frames[0].width||c.height!==frames[0].height)){
+              // A mismatch remains fatal. Collect each distinct causal control once,
+              // with a restored-original frame between variants, before retaining it.
+              row.paintedIsolation=[];
+              await failPaintedComparison(row,()=>collectPaintedIsolation({rows:row.paintedIsolation,save,
+                install:variant=>page.evaluate(async variant=>{
+                    const f=window.__focusedScene,{world}=window.__game,root=world.terrainMesh,o=f.original;
+                    if(root!==o.root||root.geometry!==o.geometry||root.material!==o.material||root.children.length)throw Error('painted isolation: original owners required');
+                    if(variant==='clone'){
+                      const clone=o.material.clone();clone.uniforms=o.material.uniforms;
+                      if(clone.vertexShader!==o.material.vertexShader||clone.fragmentShader!==o.material.fragmentShader||clone.uniforms!==o.material.uniforms)throw Error('painted isolation: unchanged shader/uniform records required');
+                      f.isolationClone=clone;root.material=clone;return {kind:'cloned unchanged material',sameUniformRecords:true,sameVertexShader:true,sameFragmentShader:true};
+                    }
+                    if(variant!=='float32-partition')throw Error('painted isolation: explicit variant required');
+                    const THREE=await import('three'),P=await import('./tools/bake/partition-terrain.mjs');let owner;
+                    f.lifetime.completeTerrainRetirement(()=>{owner=P.installTerrainPartition(world,THREE,P.partitionTerrain,{reversible:true});P.registerTerrainPartition(window,owner);});
+                    if(!owner.materialShared||root.material!==o.material||root.children.some(c=>c.material!==o.material))throw Error('painted isolation: original material required');
+                    return {kind:'Float32 position/UV Uint16 partition',bytes:owner.bytes,sourceBytes:owner.sourceBytes,triangles:owner.triangles,chunks:owner.chunks,originalMaterialShared:owner.materialShared};
+                  },variant),
+                capture:variant=>viewFrames('isolation-'+variant),
+                restore:variant=>page.evaluate(variant=>{
+                      const f=window.__focusedScene,{world}=window.__game,o=f.original;
+                      if(variant==='clone'){
+                        if(world.terrainMesh.material!==f.isolationClone)throw Error('painted isolation: cloned owner changed');
+                        world.terrainMesh.material=o.material;f.isolationClone.dispose();f.isolationClone=null;
+                      }else if(window.__sceneTerrainPartition)f.lifetime.completeTerrainRetirement(()=>window.__sceneTerrainPartition.restore());
+                      if(world.terrainMesh!==o.root||world.terrainMesh.geometry!==o.geometry||world.terrainMesh.material!==o.material||world.terrainMesh.children.length)throw Error('painted isolation: original identities not restored');
+                      return true;
+                    },variant),
+                verifyRestored:async variant=>{await viewFrames('isolation-'+variant+'-restored');
+                    for(const view of row.canonicalViews){const original=row.canvasCaptures.find(c=>c.label==='canonical-original-'+view.label),restored=row.canvasCaptures.find(c=>c.label==='canonical-isolation-'+variant+'-restored-'+view.label);
+                      if(!restored||restored.pixelSha256!==original.pixelSha256||restored.width!==original.width||restored.height!==original.height||JSON.stringify(restored.camera)!==JSON.stringify(original.camera)||JSON.stringify(restored.roster)!==JSON.stringify(original.roster)||JSON.stringify(restored.figurePublication)!==JSON.stringify(original.figurePublication))throw Error('painted isolation: exact restored painted baseline required');}
+                    return true;},
+              }));
+            }}
+
           row.canonical=await focusedCanonicalInstall(page);await capture('canonical-native-zoom');
           await page.evaluate(()=>{for(const c of window.__game.world.terrainMesh.children){const a=c.geometry.attributes.aHeight;for(let i=0;i<a.count;i++)a.array[i]+=30;a.needsUpdate=true;}});
           await capture('canonical-height-control');await canvasShot('canonical-height-control.png','canonical-height-control');

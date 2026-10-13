@@ -363,6 +363,30 @@ export function createSceneMatrixMerger(phases,header){
   }};
 }
 // Private phase scope is reachable only through the exhaustive matrix merger below.
+/** Finite causal evidence only: an unproved restored baseline stops the next variant. */
+export async function failPaintedComparison(row,collect){
+  const primary=Error('focused scene: original/compact/restored whole painted frames differ');
+  try{await collect();}catch(error){row.paintedIsolationFailure=String(error?.message??error);}
+  throw primary;
+}
+
+export async function collectPaintedIsolation({rows,install,capture,restore,verifyRestored,save}){
+  if(!Array.isArray(rows)||rows.length||[install,capture,restore,verifyRestored,save].some(f=>typeof f!=='function'))throw Error('painted isolation: fresh evidence and owned callbacks required');
+  for(const variant of ['clone','float32-partition']){
+    const row={variant,complete:false,ownersRestored:false,restored:false};rows.push(row);await save();
+    try{row.install=await install(variant);await capture(variant);row.complete=true;}
+    catch(error){row.failure=String(error?.message??error);}
+    finally{
+      try{row.ownersRestored=await restore(variant);if(row.ownersRestored!==true)throw Error('painted isolation: original owners not restored');
+        if(await verifyRestored(variant)!==true)throw Error('painted isolation: restored triplet not proved');row.restored=true;
+      }catch(error){row.restorationFailure=String(error?.message??error);}
+      await save();
+    }
+    if(!row.complete||!row.restored)break;
+  }
+  return rows;
+}
+
 function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) {
   const errors=[], expected=(Array.isArray(phases)?phases:[]).map(p=>`${p?.packId}/${p?.phaseId}`), seen=new Set(), samples=[];
   const fail=message=>errors.push(message);

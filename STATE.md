@@ -1,6 +1,6 @@
 # STATE
-2026-10-13 — v1 released558456f; ACTIVE0194 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
-Branch v1-1-gaps-20261012/source41141f4 pushed; CI38444646428 all9/fullroot214/raw196/scene227 CLEAR.0194 finite Gibson march witness WIP/CPU231+231/Astra sourceCLEAR/nativeUNRUN. Focus ONCE38448190687 FIRST RED: overview112pixels/max1; restored exact/GPU211271006B/closure clear; nine contextsUNRUN. Western ONCE38433492194 rootclear899→872/nativefiring/Silverretained/noGold. COORDINATION absent; v1.1/v2 unreleased.
+2026-10-13 — v1 released558456f; ACTIVE0195 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
+Branch v1-1-gaps-20261012/sourcecf46d82 pushed; CI38451236734 all9/fullroot251/365/214/166+201+three6/raw231 CLEAR.0194 ONCE Gibson38454126921 exactcf46 RUNNING/nativeUNRUN.0195 finite painted isolation WIP/terrain69+69/scene236+236/Astra sourceCLEAR/nativeUNRUN. Focus ONCE38448190687 FIRST RED: overview112pixels/max1; restored exact/GPU211271006B/closure clear; nine contextsUNRUN. Western ONCE38433492194 rootclear899→872/nativefiring/Silverretained/noGold. COORDINATION absent; v1.1/v2 unreleased.
 Accepted remote main9e72079; sourceCI38346843720 all9/full own251/365/171/159+201+three6smokes/digests clean.
 Main9eCI38349763169 all9/fullown/digests/rawprobe clear; Pages38349763192 exact9e/livev68 clear.
 MAIN13a7b136 exact protected11 dirty paths untouched; c328 failedmainCI38298643624 retained.

@@ -184,9 +184,10 @@ export function installTerrainPartition(world,THREE,partition,{reversible=false}
   const empty=new THREE.BufferGeometry();empty.boundingBox=source.boundingBox.clone();empty.boundingSphere=source.boundingSphere.clone();
   const children=[],geometries=[],chunkArrays=[],material=root.material,attributes={...source.attributes},index=source.index,
     box=source.boundingBox,sphere=source.boundingSphere;
+  try{
   for(const [i,chunk]of result.chunks.entries()){
-    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(chunk.position,3));geo.setAttribute('uv',new THREE.BufferAttribute(chunk.uv,2));geo.setIndex(new THREE.BufferAttribute(chunk.index,1));geo.computeBoundingBox();geo.computeBoundingSphere();
-    const mesh=new THREE.Mesh(geo,root.material);mesh.name=`terrain-chunk-${i+1}`;root.add(mesh);children.push(mesh);geometries.push(geo);
+    const geo=new THREE.BufferGeometry();geometries.push(geo);geo.setAttribute('position',new THREE.BufferAttribute(chunk.position,3));geo.setAttribute('uv',new THREE.BufferAttribute(chunk.uv,2));geo.setIndex(new THREE.BufferAttribute(chunk.index,1));geo.computeBoundingBox();geo.computeBoundingSphere();
+    const mesh=new THREE.Mesh(geo,root.material);children.push(mesh);mesh.name=`terrain-chunk-${i+1}`;root.add(mesh);
     for(const [key,a]of [...Object.entries(geo.attributes),['index',geo.index]])chunkArrays.push({array:a.array,owner:`terrain-retained-chunk-${i+1}/${key}`});
   }
   // The publication owns geometry arrays; reconstruction maps are no longer needed.
@@ -227,4 +228,20 @@ export function installTerrainPartition(world,THREE,partition,{reversible=false}
     }});
   }
   return receipt;
+  }catch(error){
+    // Publication may fail after the graph changes, including a falsy disposal
+    // exception. Restore every independently owned part before surfacing it.
+    const errors=[error];
+    try{if(root.geometry===empty||root.geometry===source)root.geometry=source;
+      else errors.push(Error('terrain partition: foreign geometry during publication rollback'));}catch(e){errors.push(e);}
+    for(const child of children)try{root.remove(child);}catch(e){errors.push(e);}
+    for(const geometry of geometries)try{geometry.dispose();}catch(e){errors.push(e);}
+    try{empty.dispose();}catch(e){errors.push(e);}
+    for(const attribute of Object.values(attributes))try{attribute.needsUpdate=true;}catch(e){errors.push(e);}
+    try{index.needsUpdate=true;}catch(e){errors.push(e);}
+    if(world.terrainMesh!==root||root.geometry!==source||root.material!==material||root.children.length
+      ||source.index!==index||source.boundingBox!==box||source.boundingSphere!==sphere
+      ||Object.entries(attributes).some(([key,value])=>source.attributes[key]!==value))errors.push(Error('terrain partition: publication rollback changed ownership'));
+    throw new AggregateError(errors,'terrain partition: publication failed');
+  }
 }

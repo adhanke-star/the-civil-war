@@ -1,7 +1,7 @@
 // Pure CPU controls: fake native GL records unchanged calls; no browser or renderer is launched.
 import assert from 'node:assert/strict';
 import {isDeepStrictEqual} from 'node:util';
-import {AllocationLedger,mipSizes,installAllocationObserver,ReservationPeak,rejectionObservation,reduceSceneObservations,reduceFocusedLookoutObservations,focusedSceneResourceErrors,sampleSceneAllocations,initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,expandSceneContext,sceneReportEnvelope,scenePartHeader,createSceneMatrixMerger} from './bake/scene-allocation.mjs';
+import {failPaintedComparison,collectPaintedIsolation,AllocationLedger,mipSizes,installAllocationObserver,ReservationPeak,rejectionObservation,reduceSceneObservations,reduceFocusedLookoutObservations,focusedSceneResourceErrors,sampleSceneAllocations,initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,expandSceneContext,sceneReportEnvelope,scenePartHeader,createSceneMatrixMerger} from './bake/scene-allocation.mjs';
 import {deriveSceneStressContract} from './bake/inactive-figures.mjs';
 import {QUALIFIED_HYBRID} from './bake/review-current-compression.mjs';
 
@@ -576,6 +576,26 @@ mutants['retained-cpu-accounting']={sampler:scope=>sampleSceneAllocations({...sc
 mutants['retained-cpu-observation']={sampler:scope=>({...sampleSceneAllocations(scope),unuploadedArrays:[]})};
 mutants['native-texture-identity']={observe:()=>({...observed(),textureIdentity:{id:-1,bytes:0,pendingDelete:false}})};
 mutants['native-texture-retirement']={observe:()=>({...observed(),pendingTextureIdentity:null})};
+api.isolate=collectPaintedIsolation;
+async function isolationFixture(a,fault){
+ const rows=[],calls=[],saves=[];const step=async(name,variant)=>{calls.push(name+'-'+variant);if(fault===name)throw 0;return true;};
+ await a.isolate({rows,install:v=>step('install',v),capture:v=>step('capture',v),restore:v=>step('restore',v),verifyRestored:async v=>fault==='verify-false'?false:step('verify',v),save:()=>saves.push(structuredClone(rows))});
+ return {rows,calls,saves};
+}
+checks.push(['isolation-finite-positive',async a=>{const f=await isolationFixture(a);assert.ok(f.rows.length===2&&f.rows.every(r=>r.complete&&r.ownersRestored&&r.restored)&&f.calls.join(',')==='install-clone,capture-clone,restore-clone,verify-clone,install-float32-partition,capture-float32-partition,restore-float32-partition,verify-float32-partition'&&f.saves.length===4&&f.saves[0][0].complete===false,'isolation-finite-positive: explicit variants once and pending/terminal evidence retained');}]);
+for(const fault of ['install','capture','restore','verify','verify-false']){
+ const name='isolation-stop-'+fault;checks.push([name,async a=>{const f=await isolationFixture(a,fault),r=f.rows[0];assert.ok(f.rows.length===1&&!f.calls.some(c=>c.endsWith('-float32-partition'))&&f.saves.length===2
+   &&(['install','capture'].includes(fault)?r?.complete===false&&r?.failure==='0'&&r?.restored===true:r?.complete===true&&r?.restored===false&&typeof r?.restorationFailure==='string'),name+': first failure kept, independent restore attempted, unproved next baseline refused');}]);
+}
+checks.push(['isolation-callback-refusal',async a=>{let error;try{await a.isolate({rows:[{}]});}catch(e){error=e;}assert.ok(error?.message?.startsWith('painted isolation:'),'isolation-callback-refusal: no reused evidence or missing owned callbacks');}]);
+for(const[name]of checks.filter(([name])=>name.startsWith('isolation-')))mutants[name]={isolate:async()=>[]};
+api.paintedFailure=failPaintedComparison;
+for(const failAt of [1,2]){
+ const name='isolation-save-primary-'+failAt;checks.push([name,async a=>{const row={paintedIsolation:[]},calls=[];let saves=0,error;
+   try{await a.paintedFailure(row,()=>collectPaintedIsolation({rows:row.paintedIsolation,install:async v=>calls.push('install-'+v),capture:async v=>calls.push('capture-'+v),restore:async v=>{calls.push('restore-'+v);return true;},verifyRestored:async v=>{calls.push('verify-'+v);return true;},save:()=>{if(++saves===failAt)throw 0;}}));}catch(e){error=e;}
+   assert.ok(error?.message==='focused scene: original/compact/restored whole painted frames differ'&&row.paintedIsolationFailure==='0'&&row.paintedIsolation.length===1
+     &&(failAt===1?calls.length===0:calls.join(',')==='install-clone,capture-clone,restore-clone,verify-clone'),name+': original mismatch remains primary while save failure/independent cleanup retained');}]);mutants[name]={paintedFailure:async()=>{}};
+}
 for(const [,check]of checks)await check(api);
 console.log(`SCENE-ALLOCATION OK (${checks.length}/${checks.length})`);
 if(process.argv.includes('--prove-fail')){

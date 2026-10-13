@@ -160,5 +160,18 @@ for(const [name]of checks.filter(([name])=>name.startsWith('canonical-reversible
  const r=installCanonicalTerrain(...args);if(name==='canonical-reversible-publish')r.restore();
  if(name==='canonical-reversible-retained')return {...r,retainedArrays:[]};return {...r,restore(){}};
 }};
+function publicationFixture(a,fault){
+ const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array([0,0,0,1,0,0,0,0,1]),3));geo.setAttribute('uv',new THREE.BufferAttribute(new Float32Array([0,0,1,0,0,1]),2));geo.setIndex(new THREE.BufferAttribute(new Uint16Array([0,1,2]),1));geo.computeBoundingBox();geo.computeBoundingSphere();
+ const root=new THREE.Mesh(geo,new THREE.MeshBasicMaterial()),owned=[],disposed=new Set(),native={...THREE,BufferGeometry:class extends THREE.BufferGeometry{constructor(){super();owned.push(this);this.addEventListener('dispose',()=>disposed.add(this));}}};
+ if(fault==='dispose')geo.dispose=()=>{throw 0;};
+ if(fault==='add'){const add=root.add;root.add=function(...children){add.apply(this,children);throw 0;};}
+ let error;try{a.install({terrainMesh:root},native,partitionTerrain,{reversible:true});}catch(e){error=e;}
+ return {geo,root,owned,disposed,error};
+}
+checks.push(
+ ['partition-publish-falsy',a=>{const f=publicationFixture(a,'dispose');assert.ok(f.error instanceof AggregateError&&f.error.errors.includes(0)&&f.root.geometry===f.geo&&!f.root.children.length&&f.owned.every(g=>f.disposed.has(g)),'partition-publish-falsy: original falsy exception/graph and independent new geometry disposal');}],
+ ['partition-publish-add',a=>{const f=publicationFixture(a,'add');assert.ok(f.error instanceof AggregateError&&f.error.errors.includes(0)&&f.root.geometry===f.geo&&!f.root.children.length&&f.owned.every(g=>f.disposed.has(g)),'partition-publish-add: after-add exception rolls back captured owned mesh/geometry');}],
+);
+for(const name of ['partition-publish-falsy','partition-publish-add'])mutants[name]={install:()=>({})};
 for(const [,check]of checks)await check(api);console.log(`TERRAIN-PARTITION OK (${checks.length}/${checks.length})`);
 if(process.argv.includes('--prove-fail')){for(const [name,check]of checks){let error;try{await check({...api,...mutants[name]});}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&error.message.startsWith(name),`${name}: mutant must fail its own assertion`);console.log(`CAUGHT ${name}`);}console.log(`TERRAIN-PARTITION CONTROLS OK (${checks.length}/${checks.length})`);}
