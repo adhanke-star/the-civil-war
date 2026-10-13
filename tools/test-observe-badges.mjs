@@ -8,7 +8,7 @@ import {prepareFieldScenario} from '../src/sim/phase.js';
 import {equipmentProfile} from '../src/sim/equipment.js';
 import {badgeClockReliefTactic,badgeClockReliefPositions} from './observe-badges.mjs';
 import {BADGE_SILVER_ORIGIN,validateBadgeSilverOrigin,badgeForwardDefenceTactic,badgeForwardDefencePositions,badgeForwardDefenceComplete} from './observe-badges.mjs';
-import {BADGE_LOOKOUT_ORIGIN,validateBadgeLookoutOrigin} from './observe-badges.mjs';
+import {BADGE_LOOKOUT_ORIGIN,validateBadgeLookoutOrigin,badgeLookoutTactic,badgeLookoutOrders,createBadgeLookoutReadiness,validateBadgeLookoutReadiness,badgeLookoutComplete} from './observe-badges.mjs';
 import {FEAT_STATS} from '../src/franchise/badges.js';
 const campaign=JSON.parse(fs.readFileSync(new URL('../assets/campaign.json',import.meta.url)));
 const zero=()=>({side:'US',xp:0,menStart:1000,...Object.fromEntries(FEAT_STATS.map(k=>[k,0]))});
@@ -30,6 +30,18 @@ Object.assign(api,{openLine:badgeOpenLineTactic,relief:badgeReliefTactic,reliefO
 Object.assign(api,{clock:badgeClockReliefTactic,clockPositions:badgeClockReliefPositions});
 Object.assign(api,{forward:badgeForwardDefenceTactic,forwardPositions:badgeForwardDefencePositions,forwardComplete:badgeForwardDefenceComplete,silverOrigin:validateBadgeSilverOrigin,silverCheckpoint:admitBadgeSilverCheckpoint});
 Object.assign(api,{lookoutOrigin:validateBadgeLookoutOrigin,lookoutCheckpoint:admitBadgeLookoutCheckpoint});
+Object.assign(api,{lookout:badgeLookoutTactic,lookoutOrders:badgeLookoutOrders,readiness:createBadgeLookoutReadiness,readinessValid:validateBadgeLookoutReadiness,lookoutComplete:badgeLookoutComplete});
+const authoredLookout=(a,id)=>a.lookout({scenario:JSON.parse(fs.readFileSync(new URL('../assets/packs/chattanooga.json',import.meta.url))).phases.find(p=>p.id===id).scenario,playerSide:'US',simTime:0},id);
+function lookoutReceipt(t){
+  const g=nativeStages(),template=g.units[0];g.units=t.roster.map((id,i)=>({...template,id,x:i,z:i,side:id.startsWith('us-')?'US':'CS',order:{type:'hold'},follow:{active:false}}));
+  g.orderSelected=function(kind){if(kind==='run')this.selected.run=!this.selected.run;else this.selected.order={type:kind};return true;};
+  const policy=createBadgeStages(t.plan,t.cadence,t.roster);for(let at=0;at<=800;at++){g.simTime=at;policy.advance(g);}g.over=true;g.simTime=801;policy.advance(g);return policy.receipt();
+}
+function readinessFixture(a){
+  const g=nativeStages();g.combat.los=()=>true;g.units[0].id='us-ammen-brigade';g.units[0].x=-100;g.units[0].z=470;g.units[0].firing=true;g.units[0].target=g.units[1];
+  const feats={'us-ammen-brigade':zero()},o=a.readiness();o.sample(g,0,feats);g.simTime=1;feats['us-ammen-brigade'].holdingLoss=3;o.sample(g,1,feats);
+  return {g,feats,o,native:{simTime:1,feats,deployment:{units:[],reinforcements:[{id:'us-ammen-brigade',side:'US',type:'infantry',atSec:0},{id:'us-woods-brigade',side:'US',type:'infantry',atSec:2}, {id:'b',side:'CS',type:'infantry',atSec:0}]}}};
+}
 const authoredRelief=(a,id)=>{const scenario=JSON.parse(fs.readFileSync(new URL('../assets/packs/stones-river.json',import.meta.url))).phases.find(p=>p.id===id).scenario;return a.relief({scenario,playerSide:'US',simTime:0},id);};
 const reliefReceipt=t=>({cadence:1,failure:null,stages:t.plan.map(p=>({...structuredClone(p),state:'accepted',trace:{invoked:true,accepted:true,command:p.command.type==='move'?{type:'move',unitId:p.command.unitId,points:[[0,0],p.command.path.point]}:structuredClone(p.command)}}))});
 const clockReceipt=t=>{const r=reliefReceipt(t),move=r.stages.find(s=>s.id==='ammen-relief-move');move.trace.resolvedInputs={actor:[940,-230],point:[-18,-1323]};move.trace.command.points[0]=[940,-230];r.stages.find(s=>s.id==='ammen-relief-run').trace.result={run:true};r.stages.find(s=>s.id==='ammen-relief-cleanup').trace.result={run:false};return r;};
@@ -41,6 +53,22 @@ function promotionDeployment(){
   const initial={deployment:structuredClone(expected),live:expected.units.map(d=>({id:d.id,side:d.side,type:d.type||'infantry',men:d.men,menMax:d.men,guns:d.guns||0,xp:d.xp||1,weapon:d.weapon,equipment:d.equipment?equipmentProfile(d.equipment,d.type||'infantry').item:null,def:structuredClone(d),moraleMax:d.morale??78,fatigue:d.fatigue??0,ammo:d.ammo??100}))};return {expected,initial};
 }
 const checks=[
+ ['lookout-mode',a=>assert.deepEqual(a.selection(['--badge-promotion-lookout']),{mode:'promotion-lookout',shard:1},'lookout-mode: actual survivor singleton')],
+ ['lookout-mode-refusal',a=>{for(const flag of ['--native','--badge-promotion','--badge-promotion-forward-defence'])rejects('lookout-mode-refusal',()=>a.selection(['--badge-promotion-lookout',flag]));}],
+ ['lookout-plan',a=>{for(const[id,count]of [['orchard-knob',11],['lookout-mountain',20]]){const t=authoredLookout(a,id);assert.ok(t.plan.length===count&&t.cadence===1&&t.recipe.phaseId===id,'lookout-plan: exact finite ordinary phase');assert.ok(t.plan.every(p=>['move','hold','run','fallback'].includes(p.command.type)&&p.condition.every(c=>['actor-orderable','arrived','pressure','recovery','separated'].includes(c.kind))),'lookout-plan: no counter conditions');}const t=authoredLookout(a,'lookout-mountain');assert.deepEqual(t.plan.find(p=>p.id==='position-us-ammen-brigade').command.path.points,[[-418.8,18.7],[-197.1,44.2],[-134.8,181.1],[-100,470]],'lookout-plan: one source-backed Ammen road path');}],
+ ['lookout-orders',a=>{const t=authoredLookout(a,'lookout-mountain');assert.equal(a.lookoutOrders(t,lookoutReceipt(t),801),true,'lookout-orders: actual stage emitter accepted paths and cleanup');}],
+ ['lookout-orders-refusal',a=>{const t=authoredLookout(a,'lookout-mountain'),good=lookoutReceipt(t);for(const change of [r=>r.stages.find(p=>p.id==='position-us-ammen-brigade').trace.resolvedInputs.actor[0]++,r=>r.stages.find(p=>p.id==='run-cleanup-us-ammen-brigade').trace.result.run=true,r=>r.stages.find(p=>p.id==='position-us-woods-brigade').state='ended']){const r=structuredClone(good);change(r);assert.equal(a.lookoutOrders(t,r,801),false,'lookout-orders-refusal: changed native path, omitted Move or failed cleanup');}}],
+ ['lookout-required-hold',a=>{const t=authoredLookout(a,'orchard-knob'),r=lookoutReceipt(t),h=r.stages.find(p=>p.id==='hold-us-fort-wood-guns');h.state='expired';h.trace=null;assert.equal(a.lookoutOrders(t,r,801),false,'lookout-required-hold: immediate gun Hold must succeed');}],
+ ['lookout-order-chronology',a=>{const t=authoredLookout(a,'lookout-mountain'),good=lookoutReceipt(t);for(const change of [r=>{const run=r.stages.find(p=>p.id==='run-us-ammen-brigade');run.at=420;run.trace.at=420;},r=>r.stages.reverse()]){const r=structuredClone(good);change(r);assert.equal(a.lookoutOrders(t,r,801),false,'lookout-order-chronology: Run prerequisite and exact stage identity order');}}],
+ ['through-points-copy',a=>{const g=nativeStages(),row=stage('road',{command:{type:'move',unitId:'a',path:{kind:'actor-through-points',points:[[10,20],[30,40]]}}}),p=a.stages([row],1,['a','b']);row.command.path.points[0][0]=999;g.units[0].x=7;g.units[0].z=9;p.advance(g);const trace=p.receipt().stages[0].trace;assert.deepEqual(trace.resolvedInputs,{actor:[7,9],points:[[10,20],[30,40]]},'through-points-copy: copied anchors with current native start');assert.deepEqual(g.calls[0].spec.points,[[7,9],[10,20],[30,40]],'through-points-copy: sole finite native Move');g.simTime=1;p.advance(g);assert.equal(g.calls.length,1,'through-points-copy: never repeated');}],
+ ['through-points-refusal',a=>{for(const command of [{type:'charge',unitId:'a',targetId:'b',path:{kind:'actor-through-points',points:[[1,2]]}},{type:'move',unitId:'a',targetId:'b',path:{kind:'actor-through-points',points:[[1,2]]}},{type:'move',unitId:'a',path:{kind:'actor-through-points',points:Array(17).fill([1,2])}},{type:'move',unitId:'a',path:{kind:'actor-through-points',points:[,[1,2]]}}])rejects('through-points-refusal',()=>a.stages([stage('bad',{command})],1,['a','b']));}],
+ ['lookout-readiness',a=>{const {o,native}=readinessFixture(a),r=o.receipt();assert.equal(a.readinessValid(r,native),true,'lookout-readiness: observed counters bind native final report');assert.deepEqual([r.rows[0].samples,r.rows[0].firstArrival.at,r.rows[0].firstReturnFire.at,r.rows[0].positiveHoldingLoss],[2,0,0,3],'lookout-readiness: bounded separate arrival/fire/loss observations');r.rows[0].endpoint[0]=999;assert.equal(o.receipt().rows[0].endpoint[0],-100,'lookout-readiness: immutable receipt copies');}],
+ ['lookout-readiness-refusal',a=>{const {o,native}=readinessFixture(a);for(const change of [r=>r.rows[0].finalHoldingLoss++,r=>r.rows[0].endpoint[0]++,r=>r.rows[0].firstIncrease.delta=0,r=>r.rows[0].firstArrival.position[0]++]){const r=o.receipt();change(r);rejects('lookout-readiness-refusal',()=>a.readinessValid(r,native));}}],
+ ['lookout-support-identity',a=>{const {o,native}=readinessFixture(a);for(const change of [r=>r.rows[0].firstArrival.support.push({id:'invented',side:'US',type:'infantry',alive:true,orderable:true,position:[-100,470],distance:0}),r=>r.rows[0].firstArrival.target.id='us-ammen-brigade',r=>r.rows[0].firstArrival.target.los=1]){const r=o.receipt();change(r);rejects('lookout-support-identity',()=>a.readinessValid(r,native));}}],
+ ['lookout-readiness-failure',a=>{const {g,feats,o}=readinessFixture(a);g.simTime=2;feats['us-ammen-brigade'].holdingLoss=2;rejects('lookout-readiness-failure',()=>o.sample(g,2,feats));assert.ok(o.receipt().failure,'lookout-readiness-failure: counter regression sticky');}],
+ ['lookout-complete',a=>assert.equal(a.lookoutComplete([{id:'orchard-knob',complete:true},{id:'lookout-mountain',complete:true}],{achieved:true,stopReason:null}),true,'lookout-complete: ordered actual two-phase completion')],
+ ['lookout-phase-stop',a=>{for(const reason of ['actual Lookout orders refused or expired','actual Lookout ended before required reinforcement orders','actual Lookout did not persist Silver-to-Gold'])assert.equal(a.lookoutComplete([{id:'orchard-knob',complete:true}],{achieved:false,stopReason:reason}),false,'lookout-phase-stop: Lookout cannot complete before its actual case');assert.equal(a.lookoutComplete([{id:'orchard-knob',complete:true}],{achieved:false,stopReason:'actual Orchard orders refused or expired'}),true,'lookout-phase-stop: genuine Orchard shortfall retained');}],
+ ['lookout-incomplete',a=>{for(const rows of [[{id:'lookout-mountain',complete:true}],[{id:'orchard-knob',complete:true}],[{id:'orchard-knob',complete:true},{id:'lookout-mountain',complete:false}]])assert.equal(a.lookoutComplete(rows,{achieved:true,stopReason:null}),false,'lookout-incomplete: missing predecessor, Gold phase or completed receipt');}],
  ['lookout-origin',a=>assert.equal(a.lookoutOrigin({...BADGE_LOOKOUT_ORIGIN}),true,'lookout-origin: completed actual surviving forward-defence source')],
  ['lookout-origin-refusal',a=>{for(const k of Object.keys(BADGE_LOOKOUT_ORIGIN))rejects('lookout-origin-refusal',()=>a.lookoutOrigin({...BADGE_LOOKOUT_ORIGIN,[k]:null}));rejects('lookout-origin-refusal',()=>a.lookoutOrigin({...BADGE_LOOKOUT_ORIGIN,extra:true}));}],
  ['lookout-checkpoint-refusal',a=>{for(const raw of['',' '.repeat(BADGE_LOOKOUT_ORIGIN.saveBytes)]){let error;try{a.lookoutCheckpoint(raw);}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&/lookout checkpoint/.test(error.message),'lookout-checkpoint-refusal: construction cannot replace actual carried Silver899');}}],
@@ -297,6 +325,18 @@ if(process.argv.includes('--prove-fail')){
   });
   const changeClock=change=>(...args)=>{const t=badgeClockReliefTactic(...args);change(t);return t;};
   const changeForward=change=>(...args)=>{const t=badgeForwardDefenceTactic(...args);change(t);return t;};
+  Object.assign(mutants,{
+    'lookout-mode':{selection:()=>null},'lookout-mode-refusal':{selection:()=>({})},
+    'lookout-plan':{lookout:(...args)=>{const t=badgeLookoutTactic(...args);t.plan.pop();return t;}},
+    'lookout-orders':{lookoutOrders:()=>false},'lookout-orders-refusal':{lookoutOrders:()=>true},
+    'lookout-required-hold':{lookoutOrders:()=>true},'lookout-order-chronology':{lookoutOrders:()=>true},
+    'through-points-copy':{stages:(...args)=>{const p=createBadgeStages(...args);return {...p,receipt:()=>{const r=p.receipt();r.stages[0].trace.resolvedInputs.actor=[0,0];return r;}};}},
+    'through-points-refusal':{stages:()=>({})},
+    'lookout-readiness':{readinessValid:()=>false},'lookout-readiness-refusal':{readinessValid:()=>true},
+    'lookout-support-identity':{readinessValid:()=>true},'lookout-phase-stop':{lookoutComplete:()=>true},
+    'lookout-readiness-failure':{readiness:()=>{const p=createBadgeLookoutReadiness();return {...p,sample:(g,at,f)=>{if(at<2)p.sample(g,at,f);}};}},
+    'lookout-complete':{lookoutComplete:()=>false},'lookout-incomplete':{lookoutComplete:()=>true},
+  });
   Object.assign(mutants,{
     'lookout-origin':{lookoutOrigin:()=>false},'lookout-origin-refusal':{lookoutOrigin:()=>true},'lookout-checkpoint-refusal':{lookoutCheckpoint:()=>true},
     'forward-mode':{selection:()=>null},'forward-mode-refusal':{selection:()=>({})},'silver-origin':{silverOrigin:()=>false},'silver-origin-refusal':{silverOrigin:()=>true},'silver-checkpoint-refusal':{silverCheckpoint:()=>true},

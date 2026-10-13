@@ -87,6 +87,102 @@ export function validateBadgeLookoutOrigin(o){
   return true;
 }
 
+export const BADGE_LOOKOUT_PHASES=Object.freeze([
+  ['orchard-knob',8,[['ch1-recon','attack'],['ch1-hold','hold']]],
+  ['lookout-mountain',9,[['ch2-crossing','upstream'],['ch2-relief','rotate']]],
+].map(([phaseId,index,choices])=>Object.freeze({phaseId,packId:'chattanooga',index,choices:Object.freeze(choices.map(c=>Object.freeze(c)))})));
+
+/** One finite ordinary campaign continuation; no feat value participates in order conditions. */
+export function badgeLookoutTactic(game,phaseId){
+  const spec=BADGE_LOOKOUT_PHASES.find(p=>p.phaseId===phaseId),s=game?.scenario,orchard=phaseId==='orchard-knob';
+  if(!spec||game.simTime!==0||game.playerSide!=='US'||s?.id!=='chattanooga-'+phaseId||s.seed!==(orchard?18631123:18631124)||s.start!==(orchard?'13:30':'08:30')||s.end!==(orchard?'15:30':'15:00')||s.clockRatio!==(orchard?7:22))fail('lookout authored initial phase/time/side/clock');
+  const roster=[...new Set([...s.units,...(s.reinforcements||[])].map(u=>u.id))],plan=[],success=id=>({id,require:'success'}),terminal=id=>({id,require:'terminal'}),
+    add=(id,type,unitId,{end,start=0,after=[],condition=[],...extra})=>plan.push({id,notBefore:start,expires:end,after,condition:[{kind:'actor-orderable'},...condition],command:{type,unitId,...extra}}),
+    points=orchard?[['us-hazen-brigade',[-1200,800]],['us-gibson-brigade',[-1160,470]],['us-boyle-brigade',[-1260,220]],['us-wagner-brigade',[-1430,800]],['us-roberts-brigade',[-1430,1030]]]:[['us-cobham-brigade',[-700,550]],['us-ireland-brigade',[-650,300]],['us-candy-brigade',[-650,50]],['us-price-brigade',[-700,800]]],
+    guns=orchard?['us-fort-wood-guns']:['us-sahm-battery','us-wiedrich-battery'];
+  if(points.some(([id])=>!s.units.some(u=>u.id===id&&u.side==='US'))||guns.some(id=>!s.units.some(u=>u.id===id&&u.side==='US')))fail('lookout required initial actor');
+  for(const[id,point]of points){add('position-'+id,'move',id,{end:1,path:{kind:'actor-to-point',point}});add('hold-'+id,'hold',id,{start:1,end:orchard?1000:400,after:[success('position-'+id)],condition:[{kind:'arrived',point,radius:25}]});}
+  for(const id of guns)add('hold-'+id,'hold',id,{end:1});
+  if(!orchard){
+    const reinforcements=[['us-ammen-brigade',409.1],['us-woods-brigade',409.1],['us-williamson-brigade',654.5],['cs-pettus-brigade',777.3]];
+    if(reinforcements.some(([id,at])=>!s.reinforcements?.some(u=>u.id===id&&u.atSec===at)))fail('lookout required native reinforcement schedule');
+    for(const [id,anchors]of [['us-ammen-brigade',[[-418.8,18.7],[-197.1,44.2],[-134.8,181.1],[-100,470]]],['us-woods-brigade',[[-418.8,18.7],[-197.1,44.2],[-150,260]]]]){
+      add('run-'+id,'run',id,{start:410,end:440,enabled:true});add('position-'+id,'move',id,{start:410,end:440,after:[success('run-'+id)],path:{kind:'actor-through-points',points:anchors}});
+      add('run-cleanup-'+id,'run',id,{start:600,end:601,after:[terminal('position-'+id)],enabled:false});
+    }
+    const id='us-williamson-brigade',point=[-100,250];add('position-'+id,'move',id,{start:655,end:685,path:{kind:'actor-through-points',points:[[-418.8,18.7],[-197.1,44.2],point]}});
+    add('hold-'+id,'hold',id,{start:656,end:1000,after:[success('position-'+id)],condition:[{kind:'arrived',point,radius:25}]});
+    add('ammen-withdraw','fallback','us-ammen-brigade',{start:410,end:1000,after:[success('position-us-ammen-brigade')],condition:[{kind:'pressure',moraleMax:45}]});
+    add('ammen-recover','hold','us-ammen-brigade',{end:1050,after:[success('ammen-withdraw')],condition:[{kind:'recovery',moraleMin:55,requirePriorRouting:false},{kind:'separated',minDistance:220}]});
+  }
+  if(plan.length!==(orchard?11:20))fail('lookout finite stage count');createBadgeStages(plan,1,roster);
+  return {kind:'authorized ordinary Orchard then road-anchor Lookout witness; actual position/contact/Gold unproved',recipe:{id:'lookout-continuation-'+phaseId,packId:'chattanooga',phaseId},revision:0,plan,cadence:1,roster};
+}
+
+/** Read-only bounded post-tick observations. These values never enter an order condition. */
+export function createBadgeLookoutReadiness(){
+  const rows=[['us-ammen-brigade',[-100,470]],['us-woods-brigade',[-150,260]]].map(([id,endpoint])=>({id,endpoint,firstSeen:null,samples:0,minEndpointDistance:null,firstArrival:null,lastArrival:null,firstReturnFire:null,lastReturnFire:null,initialHoldingLoss:0,finalHoldingLoss:0,positiveHoldingLoss:0,firstIncrease:null,lastIncrease:null}));
+  let lastTime=-1,failure=null;
+  return {sample(game,at,feats){
+    if(failure)fail('lookout readiness already failed');
+    try{if(!Number.isFinite(at)||at!==game.simTime||at<lastTime||!Array.isArray(game.units)||typeof game.combat?.los!=='function'||typeof game.combat?.masks!=='function')fail('lookout readiness native clock/API');if(at===lastTime)return;lastTime=at;
+      for(const r of rows){const u=game.units.find(u=>u.id===r.id);if(!u){if(feats[r.id]!==undefined||r.firstSeen!==null)fail('lookout readiness missing native actor');continue;}
+        const holding=feats[r.id]?.holdingLoss;if(![u.x,u.z,u.men,u.morale,holding].every(Number.isFinite)||u.fireT!==undefined&&!Number.isFinite(u.fireT)||holding<r.finalHoldingLoss||typeof u.follow?.active!=='boolean'||typeof u.firing!=='boolean'||typeof u.engaged!=='boolean'||typeof u.order?.type!=='string')fail('lookout readiness malformed native actor/counter');
+        if(r.firstSeen===null)r.firstSeen=at;r.samples++;const distance=Math.hypot(u.x-r.endpoint[0],u.z-r.endpoint[1]);r.minEndpointDistance=r.minEndpointDistance===null?distance:Math.min(r.minEndpointDistance,distance);
+        const delta=holding-r.finalHoldingLoss,arrived=distance<=25,stationaryFire=u.alive&&u.men>0&&u.state!=='routing'&&!u.follow.active&&u.firing;
+        if(delta>0||arrived||stationaryFire){
+          const target=game.units.includes(u.target)?u.target:null,support=game.units.filter(v=>v!==u&&v.side===u.side&&v.type==='infantry'&&v.alive&&v.canTakeOrders()).map(v=>({id:v.id,side:v.side,type:v.type,alive:v.alive,orderable:true,position:[v.x,v.z],distance:Math.hypot(v.x-u.x,v.z-u.z)})).filter(v=>v.distance<=250).sort((a,b)=>a.id.localeCompare(b.id));
+          const snapshot={at,position:[u.x,u.z],endpointDistance:distance,men:u.men,alive:u.alive,state:u.state,morale:u.morale,order:u.order.type,following:u.follow.active,engaged:u.engaged,firing:u.firing,fireT:u.fireT??null,holdingLoss:holding,delta,support,target:target?{id:target.id,position:[target.x,target.z],distance:Math.hypot(target.x-u.x,target.z-u.z),los:game.combat.los(u,target),masked:game.combat.masks(u,target)}:null};
+          if(arrived){r.firstArrival??=snapshot;r.lastArrival=snapshot;}if(stationaryFire){r.firstReturnFire??=snapshot;r.lastReturnFire=snapshot;}if(delta>0){r.positiveHoldingLoss+=delta;r.firstIncrease??=snapshot;r.lastIncrease=snapshot;}
+        }
+        r.finalHoldingLoss=holding;
+      }
+    }catch(error){failure={at,message:String(error?.message??error)};throw error;}
+  },receipt:()=>({kind:'read-only post-tick observations; no exact casualty-call state or command authority',lastTime,rows:structuredClone(rows),failure:structuredClone(failure)})};
+}
+
+/** Accepted paths are distinct from observed endpoint arrival or contact. */
+export function badgeLookoutOrders(tactic,receipt,endAt){
+  const orchard=tactic?.recipe?.phaseId==='orchard-knob',expected=orchard?11:20;
+  if(!BADGE_LOOKOUT_PHASES.some(p=>p.phaseId===tactic?.recipe?.phaseId)||tactic.recipe.id!=='lookout-continuation-'+tactic.recipe.phaseId||!dense(tactic?.plan)||tactic.plan.length!==expected||!dense(receipt?.stages)||receipt.stages.length!==expected||receipt.failure||receipt.cadence!==1||!Number.isFinite(endAt))return false;
+  if(JSON.stringify(receipt.stages.map(r=>r.id))!==JSON.stringify(tactic.plan.map(p=>p.id)))return false;
+  const byId=new Map(receipt.stages.map(r=>[r.id,r]));
+  if(receipt.stages.some((r,i)=>['command','after','condition','notBefore','expires'].some(k=>JSON.stringify(r[k])!==JSON.stringify(tactic.plan[i][k]))||r.trace&&r.after.some(d=>{const dep=byId.get(d.id);return !dep||!Number.isFinite(dep.at)||dep.at>r.at||(d.require==='success'?!['accepted','already-satisfied'].includes(dep.state):['pending'].includes(dep.state));})))return false;
+  if(receipt.stages.some(r=>r.state==='refused'||r.state==='error'))return false;
+  const required=tactic.plan.filter(p=>p.command.type==='move'||p.command.type==='run'||p.command.type==='hold'&&p.notBefore===0&&p.expires===1);
+  return required.every(p=>{const matches=receipt.stages.filter(r=>r.id===p.id);if(matches.length!==1)return false;const r=matches[0],t=r.trace;
+    if(p.command.type==='run'&&p.command.enabled===false&&endAt<p.notBefore)return r.state==='ended'&&t===null;
+    if(!['accepted','already-satisfied'].includes(r.state)||!t||['command','after','condition','notBefore','expires'].some(k=>JSON.stringify(r[k])!==JSON.stringify(p[k])))return false;
+    if(!Number.isFinite(r.at)||r.at<p.notBefore||r.at>p.expires||r.at>endAt||t.at!==r.at)return false;
+    if(p.command.type==='hold')return r.state==='accepted'&&t.accepted===true&&t.invoked===true&&JSON.stringify(t.command)===JSON.stringify(p.command);
+    if(p.command.type==='run')return t.result?.run===p.command.enabled&&JSON.stringify(t.command)===JSON.stringify(p.command)&&(r.state==='accepted'?t.accepted===true&&t.invoked===true:t.accepted===null&&t.invoked===false&&t.reason==='already in requested state');
+    const anchors=p.command.path.kind==='actor-through-points'?p.command.path.points:[p.command.path.point],actor=t.resolvedInputs?.actor;
+    return r.state==='accepted'&&t.accepted===true&&t.invoked===true&&finitePoint(actor)&&JSON.stringify(t.command)===JSON.stringify({type:'move',unitId:p.command.unitId,points:[actor,...anchors]})
+      &&JSON.stringify(t.resolvedInputs)===JSON.stringify(p.command.path.kind==='actor-through-points'?{actor,points:anchors}:{actor,point:anchors[0]});
+  });
+}
+export function validateBadgeLookoutReadiness(receipt,native){
+  if(receipt?.failure||receipt?.lastTime!==native?.simTime||!dense(receipt?.rows)||JSON.stringify(receipt.rows.map(r=>r.id))!==JSON.stringify(['us-ammen-brigade','us-woods-brigade']))fail('lookout readiness final native bind');
+  const deployment=[...(native.deployment?.units||[]),...(native.deployment?.reinforcements||[])];
+  if(!deployment.length||new Set(deployment.map(d=>d.id)).size!==deployment.length)fail('lookout readiness actual deployment required');
+  const defs=new Map(deployment.map(d=>[d.id,d]));
+  for(const [i,r]of receipt.rows.entries()){if(JSON.stringify(r.endpoint)!==JSON.stringify(i?[-150,260]:[-100,470]))fail('lookout readiness endpoint bind');const f=native.feats?.[r.id];if(r.firstSeen===null){if(f!==undefined||r.samples!==0||r.finalHoldingLoss!==0||r.positiveHoldingLoss!==0)fail('lookout readiness absent actor');continue;}
+    if(!f||defs.get(r.id)?.side!=='US'||r.initialHoldingLoss!==0||!Number.isSafeInteger(r.samples)||r.samples<1||!Number.isFinite(r.firstSeen)||r.firstSeen<0||r.firstSeen+1e-6<(defs.get(r.id).atSec||0)||r.firstSeen>native.simTime||!Number.isFinite(r.minEndpointDistance)||r.minEndpointDistance<0||r.finalHoldingLoss!==f.holdingLoss||!Number.isFinite(r.positiveHoldingLoss)||Math.abs(r.positiveHoldingLoss-f.holdingLoss)>1e-8)fail('lookout readiness qualifying loss bind');
+    for(const [key,predicate]of [['firstArrival',s=>s.endpointDistance<=25],['lastArrival',s=>s.endpointDistance<=25],['firstReturnFire',s=>s.alive&&s.men>0&&!s.following&&s.firing],['lastReturnFire',s=>s.alive&&s.men>0&&!s.following&&s.firing],['firstIncrease',s=>s.delta>0],['lastIncrease',s=>s.delta>0]]){
+      const s=r[key];if(s===null)continue;if(!Number.isFinite(s.at)||s.at<r.firstSeen||s.at>native.simTime||!finitePoint(s.position)||!Number.isFinite(s.endpointDistance)||Math.abs(s.endpointDistance-Math.hypot(s.position[0]-r.endpoint[0],s.position[1]-r.endpoint[1]))>1e-8||!predicate(s)||!dense(s.support)||s.support.some(v=>!finitePoint(v.position)||!Number.isFinite(v.distance)||v.distance>250||Math.abs(v.distance-Math.hypot(v.position[0]-s.position[0],v.position[1]-s.position[1]))>1e-8))fail('lookout readiness observed snapshot');
+      if(!Number.isFinite(s.holdingLoss)||s.holdingLoss<0||s.holdingLoss>r.finalHoldingLoss||!Number.isFinite(s.delta)||s.delta<0||s.delta>s.holdingLoss||!Number.isFinite(s.men)||s.men<0||!Number.isFinite(s.morale)||typeof s.state!=='string'||typeof s.order!=='string'||['alive','following','engaged','firing'].some(k=>typeof s[k]!=='boolean')||s.fireT!==null&&!Number.isFinite(s.fireT)||s.endpointDistance+1e-8<r.minEndpointDistance)fail('lookout readiness snapshot native state');
+      if(new Set(s.support.map(v=>v.id)).size!==s.support.length||s.support.some(v=>v.id===r.id||defs.get(v.id)?.side!=='US'||(defs.get(v.id)?.type||'infantry')!=='infantry'||v.side!=='US'||v.type!=='infantry'||v.alive!==true||v.orderable!==true||s.at+1e-6<(defs.get(v.id)?.atSec||0)))fail('lookout readiness actual eligible support identity');
+      if(s.target!==null){const t=s.target;if(defs.get(t.id)?.side!=='CS'||s.at+1e-6<(defs.get(t.id)?.atSec||0)||!finitePoint(t.position)||!Number.isFinite(t.distance)||t.distance<0||Math.abs(t.distance-Math.hypot(t.position[0]-s.position[0],t.position[1]-s.position[1]))>1e-8||typeof t.los!=='boolean'||typeof t.masked!=='boolean')fail('lookout readiness actual enemy target geometry');}
+    }
+    if(r.positiveHoldingLoss>0&&(!r.firstIncrease||!r.lastIncrease))fail('lookout readiness missing increase snapshots');
+  }
+  return true;
+}
+export function badgeLookoutComplete(rows,promotion){
+  if(!dense(rows)||![1,2].includes(rows.length)||JSON.stringify(rows.map(r=>r.id))!==JSON.stringify(BADGE_LOOKOUT_PHASES.slice(0,rows.length).map(p=>p.phaseId))||rows.some(r=>r.complete!==true))return false;
+  return rows.length===2&&promotion?.achieved===true&&promotion.stopReason===null||promotion?.achieved===false&&(rows.length===1?promotion.stopReason==='actual Orchard orders refused or expired':['actual Lookout orders refused or expired','actual Lookout ended before required reinforcement orders','actual Lookout did not persist Silver-to-Gold'].includes(promotion?.stopReason));
+}
+
 /** One distinct McFadden defence from the genuinely saved Silver brigade. */
 export function badgeForwardDefenceTactic(game,phaseId){
   const s=game?.scenario;
@@ -371,6 +467,7 @@ export function badgeObservationSelection(args){
   if(args.length===1&&args[0]==='--badge-promotion-open-line')return {mode:'promotion-open-line',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion-clock-relief')return {mode:'promotion-clock-relief',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion-forward-defence')return {mode:'promotion-forward-defence',shard:1};
+  if(args.length===1&&args[0]==='--badge-promotion-lookout')return {mode:'promotion-lookout',shard:1};
   const shards=args.filter(a=>/^--badge-shard=[123]$/.test(a));
   if(args.length===2&&args.includes('--badge-observations')&&shards.length===1)return {mode:'observations',shard:Number(shards[0].slice(-1))};
   if(args.length===2&&args.includes('--badge-revisions')&&shards.length===1)return {mode:'revisions',shard:Number(shards[0].slice(-1))};
@@ -575,10 +672,12 @@ export function createBadgeStages(plan,cadence,roster){
     if(!plain(command,['type','unitId','targetId','path','points','endFacing','enabled']))fail('stage command data required');
     if(command.path!==undefined){
       if(!plain(command,['type','unitId','targetId','path','endFacing'])||!['move','charge'].includes(command.type)
-        ||!plain(command.path,['kind','standOff','point'])
+        ||!plain(command.path,['kind','standOff','point','points'])
         ||!(command.path.kind==='actor-to-target'&&plain(command.path,['kind','standOff'])&&Number.isFinite(command.path.standOff)
           &&command.path.standOff>=0&&command.path.standOff<=10000&&known.has(command.targetId)
           ||command.path.kind==='actor-to-point'&&plain(command.path,['kind','point'])&&finitePoint(command.path.point)
+          &&command.type==='move'&&command.targetId===undefined
+          ||command.path.kind==='actor-through-points'&&plain(command.path,['kind','points'])&&dense(command.path.points)&&command.path.points.length>=1&&command.path.points.length<=16&&command.path.points.every(finitePoint)
           &&command.type==='move'&&command.targetId===undefined))fail('stage path resolver');
       const {path,targetId,...base}=command;validateBadgeCommand({...base,...(command.type==='charge'?{targetId}:{}),points:[[0,0],[1,1]]});
     }else validateBadgeCommand(command);
@@ -657,6 +756,11 @@ export function createBadgeStages(plan,cadence,roster){
   const resolve=(g,row)=>{
     if(!row.command.path)return {command:validateBadgeCommand(row.command),inputs:null};
     const u=g.units.find(v=>v.id===row.command.unitId),t=g.units.find(v=>v.id===row.command.targetId);
+    if(row.command.path.kind==='actor-through-points'){
+      if(!u)return {command:null,inputs:{actorPresent:false}};
+      const a=point(u),anchors=structuredClone(row.command.path.points),{path,...base}=row.command;
+      return {command:validateBadgeCommand({...base,points:[a,...anchors]}),inputs:{actor:a,points:anchors}};
+    }
     if(row.command.path.kind==='actor-to-point'){
       if(!u)return {command:null,inputs:{actorPresent:false}};
       const a=point(u),b=row.command.path.point,{path,...base}=row.command;
