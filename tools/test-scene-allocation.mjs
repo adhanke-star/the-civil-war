@@ -235,7 +235,17 @@ function transportProfile(route,fault=null){
  capture('restored-native-pending');finish();capture('restored-native-settled');
  return {raw,context:{history,states:compact,kind:'constructed CPU transport profile; native whole-scene matrix UNRUN'}};
 }
+function retainedArrayFixture(sampler){
+ const visible=new Float32Array(4),detached=new Uint32Array(3),node={type:'Mesh',name:'visible',visible:true,geometry:{attributes:{position:{array:visible}},morphAttributes:{}},material:{}},
+  gl={getError:()=>0},scope={__game:{scene:{traverse(fn){fn(node);}},post:{renderer:{getContext:()=>gl}},game:{}},
+   __allocation:{labelBufferOwners:()=>[],snapshot:()=>({peak:0,defaultPeak:0,gpuPeak:0,bufferSlots:[],byKind:{buffer:0}})},
+   __sceneTerrainPartition:{retainedArrays:[{array:visible,owner:'source/visible'},{array:detached,owner:'source/detached'},{array:detached,owner:'source/alias'}]}};
+ return sampler(scope);
+}
+api.sampler=sampleSceneAllocations;
 const checks=[
+ ['retained-cpu-accounting',a=>{const r=retainedArrayFixture(a.sampler);assert.equal(r.declaredArrayBytes,28,'retained-cpu-accounting: detached backing bytes included exactly once');assert.equal(r.retainedTerrainArrayBytes,12,'retained-cpu-accounting: visible aliases are not additional storage');assert.equal(r.conservativeReservation,28,'retained-cpu-accounting: actual retained arrays reach conservative total');}],
+ ['retained-cpu-observation',a=>{const r=retainedArrayFixture(a.sampler);assert.ok(r.unuploadedArrays.some(x=>x.bytes===12&&x.owners.includes('source/detached')&&x.owners.includes('source/alias')),'retained-cpu-observation: detached aliases retained without inventing native upload');assert.equal(r.unmappedBufferBytes,0,'retained-cpu-observation: no fabricated native bytes');}],
  ['native-texture-identity',a=>{const o=a.observe();assert(o.textureIdentity?.id===o.rgba.textureSlots[0]?.texture&&o.textureIdentity.bytes===o.rgba.bytes&&!o.textureIdentity.pendingDelete&&o.foreignTextureIdentity===null,'native-texture-identity: actual pointer binds exact observer ID/bytes, no foreign inference');}],
  ['native-texture-retirement',a=>{const o=a.observe();assert(o.pendingTextureIdentity?.id===o.textureIdentity.id&&o.pendingTextureIdentity.pendingDelete&&o.retiredTextureIdentity===null,'native-texture-retirement: owned pending pointer remains until actual completion');}],
 
@@ -501,6 +511,8 @@ const mutants={
   'qualified-invalid-mode-maximum':{reduce:(r,p)=>({...reduceSceneObservations(r,p),maxGpuReservation:100000000})},
   'qualified-legacy-maximum':{reduce:(r,p)=>({...reduceSceneObservations(r,p),maxGpuReservation:100000000})},
 };
+mutants['retained-cpu-accounting']={sampler:scope=>sampleSceneAllocations({...scope,__sceneTerrainPartition:undefined})};
+mutants['retained-cpu-observation']={sampler:scope=>({...sampleSceneAllocations(scope),unuploadedArrays:[]})};
 mutants['native-texture-identity']={observe:()=>({...observed(),textureIdentity:{id:-1,bytes:0,pendingDelete:false}})};
 mutants['native-texture-retirement']={observe:()=>({...observed(),pendingTextureIdentity:null})};
 for(const [,check]of checks)await check(api);

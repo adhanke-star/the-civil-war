@@ -179,7 +179,8 @@ function restoreNativeBadgeContext(){
 }
 
 /** Six first-tactic observations, two fresh native contexts per explicitly selected Actions shard. */
-export async function nativeBadgeObservations({browser,url,check,result,watchErrors,shard,persist,missionaryOnly=false,revision=0,promotion=false,relief=false,openLine=false}){
+export async function nativeBadgeObservations({browser,url,check,result,watchErrors,shard,persist,missionaryOnly=false,revision=0,promotion=false,relief=false,openLine=false,clockRelief=false}){
+  if(typeof clockRelief!=='boolean'||clockRelief&&(!relief||!promotion||openLine))throw Error('badge clock relief: isolated authorized witness');
   if(typeof openLine!=='boolean'||openLine&&(!relief||!promotion))throw Error('badge open line: isolated authorized witness');
   if(typeof relief!=='boolean'||relief&&!promotion)throw Error('badge relief: isolated authorized promotion witness');
   if(promotion&&(shard!==1||revision!==0||missionaryOnly))throw Error('badge promotion: isolated sequential continuation');
@@ -196,7 +197,8 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
     output.kind='actual Buell Bronze save continued through ordinary Camp, decisions and native battles; its earlier three Draw prefix records were constructed';
     if(relief)output.kind='one additional authorized front-line relief witness from actual pre-Round checkpoint; original failed Round retained; earlier three Draw prefix records constructed';
     if(openLine)output.kind='authorized forward open-ground defensive witness from actual pre-Round checkpoint; both failed Round observations retained; earlier three Draw prefix records constructed';
-    output.promotion={achieved:false,stopReason:null,...(relief?{witness:openLine?'forward-open-line':'front-line-relief',checkpointBranch:'actual post-Slaughter; distinct from preserved failed post-Round'}:{})};await persist();
+    if(clockRelief)output.kind='authorized battle-clock relief witness from actual pre-Round checkpoint; preceding Round observations retained; earlier three Draw prefix records constructed';
+    output.promotion={achieved:false,stopReason:null,...(relief?{witness:clockRelief?'battle-clock-relief':openLine?'forward-open-line':'front-line-relief',checkpointBranch:'actual post-Slaughter; distinct from preserved failed post-Round'}:{})};await persist();
     try{continuation=await acquireBadgePromotionSave({relief});output.promotion.origin=continuation.origin;await persist();}
     catch(error){output.promotion.acquisitionError=String(error?.message??error);await persist();throw error;}
   }
@@ -248,8 +250,8 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
       await page.waitForFunction(()=>window.__ready&&window.__game?.game&&document.getElementById('briefing')?.open,null,{timeout:180000,polling:250});
       }
       await page.locator('#briefing-begin').click();await page.waitForFunction(()=>window.__badgeStartGate?.first?.simTime===0&&window.__game.game.paused);
-      row.initial=await page.evaluate(async({id,revision,promotion,relief,openLine})=>{
-        const B=await import('./tools/observe-badges.mjs'),G=await import('./src/game.js'),g=window.__game.game,tactic=promotion?(relief?(openLine?B.badgeOpenLineTactic(g,id):B.badgeReliefTactic(g,id)):B.badgePromotionTactic(g,id)):B.badgeTactic(g,id,revision),crossings=B.createBadgeCrossings(),policy=B.createBadgeStages(tactic.plan,tactic.cadence,tactic.roster);
+      row.initial=await page.evaluate(async({id,revision,promotion,relief,openLine,clockRelief})=>{
+        const B=await import('./tools/observe-badges.mjs'),G=await import('./src/game.js'),g=window.__game.game,tactic=promotion?(relief?(clockRelief?B.badgeClockReliefTactic(g,id):openLine?B.badgeOpenLineTactic(g,id):B.badgeReliefTactic(g,id)):B.badgePromotionTactic(g,id)):B.badgeTactic(g,id,revision),crossings=B.createBadgeCrossings(),policy=B.createBadgeStages(tactic.plan,tactic.cadence,tactic.roster);
         if(G.difficultyOf(g)!=='veteran')throw Error('badge observations: actual difficulty drift');
         const beforeTick={native:g.tick,descriptor:Object.getOwnPropertyDescriptor(g,'tick')},methods=['volleyAt','chargeFeat','routFeat','moraleStep'].map(name=>({name,native:g.combat[name],descriptor:Object.getOwnPropertyDescriptor(g.combat,name)}));
         const owner={tactic,crossings,policy,beforeTick,methods,combat:null,tick:null,samples:0,lastTime:null,initialTime:null,largestDelta:0,fullReports:true};window.__badgeObservation=owner;
@@ -265,7 +267,7 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
           ...(promotion?{deployment:{units:g.scenario.units,reinforcements:g.scenario.reinforcements||[]},
             live:g.units.map(u=>({id:u.id,side:u.side,type:u.type,men:u.men,menMax:u.menMax,guns:u.guns,xp:u.xp,weapon:u.weapon,equipment:u.equipment??null,
               def:u.def,moraleMax:u.moraleMax,fatigue:u.fatigue,ammo:u.ammo}))}:{})};
-      },{id,revision,promotion,relief,openLine});
+      },{id,revision,promotion,relief,openLine,clockRelief});
       const seeds={'dawn-on-the-right':18621231,'slaughter-pen':18621232,'round-forest':18621233,'mcfaddens-ford':18630102,'slaughter-fire':18621232,'slaughter-defence':18621232,'slaughter-recovery':18621232,'mcfadden-assault':18630102,'missionary-assault':18631125,'buell-capture':18620409};
       if(row.initial.tactic.revision!==revision||row.initial.seed!==seeds[id]||!Number.isFinite(row.initial.horizon)||row.initial.horizon<=0)throw Error('badge observations: authored seed/horizon/revision drift');
       if(promotion){
@@ -369,7 +371,7 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
     }
     if(promotion){
       if(!row.complete)break;
-      if(relief){const {badgeReliefPositions}=await import('./observe-badges.mjs');row.promotion.positionsAccepted=badgeReliefPositions(row.initial.tactic,row.native.stages);if(!row.promotion.positionsAccepted){output.promotion.stopReason='actual relief positioning refused or expired';break;}}
+      if(relief){const {badgeReliefPositions,badgeClockReliefPositions}=await import('./observe-badges.mjs');row.promotion.positionsAccepted=(clockRelief?badgeClockReliefPositions:badgeReliefPositions)(row.initial.tactic,row.native.stages);if(!row.promotion.positionsAccepted){output.promotion.stopReason='actual relief positioning refused or expired';break;}}
       if(id==='round-forest'){
         const e=row.promotion.earned,kept=row.promotion.saved.badges?.find(b=>b.id==='coolUnderFire');
         if(e?.from!=='bronze'||e?.tier!=='silver'||kept?.tier!=='silver'||row.promotion.saved.men<=0){output.promotion.stopReason='actual Round Forest did not persist a living Bronze-to-Silver candidate';break;}

@@ -10,7 +10,7 @@ import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDia
 import {acquireQualifiedHybrid,materializeQualifiedSceneInput,QUALIFIED_HYBRID,installQualifiedSceneRoutes,sceneMatrixGroups} from './review-current-compression.mjs';
 import {preparePhase,prepareFieldScenario} from '../../src/sim/phase.js';
 import {PNG} from 'pngjs';
-import {partitionTerrain,installTerrainPartition} from './partition-terrain.mjs';
+import {partitionTerrain,installTerrainPartition,registerTerrainPartition} from './partition-terrain.mjs';
 
 const inventory=sampleSceneAllocations;
 async function qualifiedFaultContext({browser,url,tuple,input,transport,source,phases,report,save}){
@@ -60,8 +60,7 @@ async function qualifiedFaultContext({browser,url,tuple,input,transport,source,p
         snapshot(){return {states,events,candidateRequests,poolCount:atlas.pools.length,...(this.stress?{stress:this.stress}:{})};}};window.__qualifiedFault=owner;
       const gate=I.installRenderGate(post);window.__sceneRenderGate=gate;
       gate.renderOnce(scene,camera);take('prepartition-native-bind'); // Retain native error/peaks and source array bindings before partition disposes them.
-      const terrain=P.installTerrainPartition(world,THREE,P.partitionTerrain,{reversible:true}),registration={restore(){let error;try{terrain.restore();}catch(e){error=e;}
-        if(window.__sceneTerrainPartition!==registration)throw Error('fault terrain scope ownership changed');delete window.__sceneTerrainPartition;if(error)throw error;}};window.__sceneTerrainPartition=registration;
+      const terrain=P.installTerrainPartition(world,THREE,P.partitionTerrain,{reversible:true});P.registerTerrainPartition(window,terrain);
       game.__inactiveStats=I.installInactiveFigures(game);game.animate(0);
       const expected=I.deriveSceneStressContract(game.scenario,{US:{field:2,close:3},CS:{field:4,close:5}}),combat=()=>JSON.stringify({time:game.simTime,units:game.units.map(u=>({id:u.id,men:u.men,morale:u.morale,ammo:u.ammo,order:u.order,x:u.x,z:u.z}))}),
         roster=()=>game.units.map(u=>({id:u.id,side:u.side,type:u.type,men:u.men,x:u.x,z:u.z,order:u.order}));
@@ -295,14 +294,10 @@ async function main(){
         await capture('field');
         if(partition){
           if(entry.phaseId==='lookout-mountain')await canvasShot('terrain-partition-01-before.png');
-          row.partition=await page.evaluate(async source=>{const THREE=await import('three'),P=(0,eval)('('+source.partition+')'),install=(0,eval)('('+source.install+')');
+          row.partition=await page.evaluate(async source=>{const THREE=await import('three'),P=(0,eval)('('+source.partition+')'),install=(0,eval)('('+source.install+')'),register=(0,eval)('('+source.register+')');
             if(Object.hasOwn(window,'__sceneTerrainPartition'))throw new Error('terrain partition: diagnostic scope already owned');
-            const owner=install(window.__game.world,THREE,P,{reversible:true}),registration={restore(){
-              let error;try{owner.restore();}catch(e){error=e;}
-              if(window.__sceneTerrainPartition!==registration)throw new Error('terrain partition: diagnostic registration changed');
-              delete window.__sceneTerrainPartition;if(error)throw error;
-            }};window.__sceneTerrainPartition=registration;return {...owner};
-          },{partition:partitionTerrain.toString(),install:installTerrainPartition.toString()});
+            const owner=install(window.__game.world,THREE,P,{reversible:true});register(window,owner);return {...owner};
+          },{partition:partitionTerrain.toString(),install:installTerrainPartition.toString(),register:registerTerrainPartition.toString()});
           if(!row.partition.materialShared||row.partition.triangles!==row.partition.statTriangles)throw new Error('terrain partition: material/stat seam changed');
           await capture('partition-field');
           if(entry.phaseId==='lookout-mountain'){

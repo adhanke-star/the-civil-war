@@ -1,3 +1,13 @@
+// Diagnostic ownership stays registered while failed cleanup retains CPU backing arrays.
+export function registerTerrainPartition(scope,owner){
+  if(Object.hasOwn(scope,'__sceneTerrainPartition')||typeof owner?.restore!=='function')throw Error('terrain partition: diagnostic scope already owned or unrestorable');
+  const registration={get retainedArrays(){return owner.retainedArrays;},restore(){
+    if(scope.__sceneTerrainPartition!==registration)throw Error('terrain partition: diagnostic registration changed');
+    let error,failed=false;try{owner.restore();}catch(e){error=e;failed=true;}
+    if(scope.__sceneTerrainPartition!==registration)throw Error('terrain partition: diagnostic registration changed');
+    if(failed)throw error;delete scope.__sceneTerrainPartition;
+  }};scope.__sceneTerrainPartition=registration;return registration;
+}
 // Diagnostic-only lossless indexed geometry partition. Index65535 stays reserved for primitive restart.
 export function partitionTerrain({position,uv,index},limit=65535) {
   const vertices=position.length/3;
@@ -21,17 +31,25 @@ export function installTerrainPartition(world,THREE,partition,{reversible=false}
   if(root.children.length||Object.keys(source.attributes).sort().join(',')!=='position,uv'||!source.index)throw new Error('terrain partition: unexpected root geometry');
   const result=partition({position:source.attributes.position.array,uv:source.attributes.uv.array,index:source.index.array});
   const empty=new THREE.BufferGeometry();empty.boundingBox=source.boundingBox.clone();empty.boundingSphere=source.boundingSphere.clone();
-  const children=[],geometries=[],material=root.material,attributes={...source.attributes},index=source.index,
+  const children=[],geometries=[],chunkArrays=[],material=root.material,attributes={...source.attributes},index=source.index,
     box=source.boundingBox,sphere=source.boundingSphere;
   for(const [i,chunk]of result.chunks.entries()){
     const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(chunk.position,3));geo.setAttribute('uv',new THREE.BufferAttribute(chunk.uv,2));geo.setIndex(new THREE.BufferAttribute(chunk.index,1));geo.computeBoundingBox();geo.computeBoundingSphere();
     const mesh=new THREE.Mesh(geo,root.material);mesh.name=`terrain-chunk-${i+1}`;root.add(mesh);children.push(mesh);geometries.push(geo);
+    for(const [key,a]of [...Object.entries(geo.attributes),['index',geo.index]])chunkArrays.push({array:a.array,owner:`terrain-retained-chunk-${i+1}/${key}`});
   }
+  // The publication owns geometry arrays; reconstruction maps are no longer needed.
+  result.chunks.length=0;
   root.geometry=empty;source.dispose();
-  const receipt={triangles:result.triangles,chunks:result.chunks.length,sourceBytes:result.sourceBytes,bytes:result.bytes,savedBytes:result.sourceBytes-result.bytes,
+  const receipt={triangles:result.triangles,chunks:children.length,sourceBytes:result.sourceBytes,bytes:result.bytes,savedBytes:result.sourceBytes-result.bytes,
     materialShared:root.children.every(c=>c.material===root.material),rootName:root.name,statTriangles:root.userData.triangles};
   if(reversible){
     let restored=false,failure;
+    const sourceArrays=[...Object.entries(attributes).map(([key,a])=>({array:a.array,owner:`terrain-retained-source/${key}`})),{array:index.array,owner:'terrain-retained-source/index'}];
+    Object.defineProperty(receipt,'retainedArrays',{get:()=>[
+      ...sourceArrays.map(r=>({...r})),
+      ...chunkArrays.map(r=>({...r})),
+    ]});
     Object.defineProperty(receipt,'restore',{value:()=>{
       if(restored){if(failure)throw failure;return;}
       if(world.terrainMesh!==root||root.geometry!==empty||root.material!==material
@@ -52,6 +70,9 @@ export function installTerrainPartition(world,THREE,partition,{reversible=false}
         ||Object.keys(source.attributes).length!==Object.keys(attributes).length
         ||Object.entries(attributes).some(([key,value])=>source.attributes[key]!==value))errors.push('restoration callback changed ownership');
       if(errors.length){failure=new Error(`terrain partition: restoration failed: ${errors.join(', ')}`);throw failure;}
+      // Successful restoration no longer needs detached meshes or their CPU backing arrays.
+      // Failed cleanup keeps its owned objects and sticky error for diagnosis.
+      children.length=0;geometries.length=0;chunkArrays.length=0;
     }});
   }
   return receipt;

@@ -119,10 +119,12 @@ async function sceneLifetimeControls({browser,url,check,result,watchErrors}){
     lifetime.restore();post.setSize(32,32);draw();gl.finish();post.setSize(48,48);draw();gl.finish();sample('lifetime-native-control');const control=pixels();
     rows.push({name:'native-render-identical',ok:control.length===candidate.length&&control.every((b,i)=>b===candidate[i])&&candidate.some((b,i)=>i%4<3&&b!==candidate[i%4])&&candidate.every((b,i)=>i%4!==3||b===255)&&gl.getError()===0});
     rows.push({name:'native-descriptors',ok:post._apply===native&&same(Object.getOwnPropertyDescriptor(post,'_apply'),descriptor)});
-    lifetime=installSceneLifetimeGate(scope,{sample});receipt.terrainCycles=lifetime.cycles;terrain=installTerrainPartition({terrainMesh:root},THREE,a=>partitionTerrain(a,3),{reversible:true});draw();gl.finish();const partitioned=sample('lifetime-partitioned'),chunkIds=partitioned.bufferOwnership.filter(r=>r.owners.some(o=>o.includes('terrain-chunk-'))).map(r=>r.id);
+    lifetime=installSceneLifetimeGate(scope,{sample});receipt.terrainCycles=lifetime.cycles;terrain=installTerrainPartition({terrainMesh:root},THREE,a=>partitionTerrain(a,3),{reversible:true});scope.__sceneTerrainPartition=terrain;draw();gl.finish();const partitioned=sample('lifetime-partitioned'),chunkIds=partitioned.bufferOwnership.filter(r=>r.owners.some(o=>o.includes('terrain-chunk-'))).map(r=>r.id);
     lifetime.completeTerrainRetirement(()=>terrain.restore());const terrainCycle=lifetime.cycles[0],pending=terrainCycle.samples.find(r=>r.label==='terrain-retired')?.observation,complete=terrainCycle.samples.find(r=>r.label==='terrain-retired-settled')?.observation;
     rows.push({name:'native-terrain-retirement',ok:terrainCycle.complete&&chunkIds.length===6&&chunkIds.every(id=>pending.bufferOwnership.some(r=>r.id===id&&r.pendingDelete)&&!complete.bufferOwnership.some(r=>r.id===id))});
     draw();gl.finish();const restored=sample('lifetime-original-reupload');
+    rows.push({name:'native-retained-cpu',ok:partitioned.retainedTerrainArrayBytes===sourceArrays.reduce((n,a)=>n+a.array.byteLength,0)
+      &&partitioned.declaredArrayBytes-original.declaredArrayBytes===terrain.bytes&&restored.retainedTerrainArrayBytes===0&&terrain.retainedArrays.length===3});
     rows.push({name:'native-terrain-exact',ok:root.geometry===geometry&&!root.children.length&&sourceArrays.every(a=>scope.__allocation.bufferReservations(gl,a.array).some(r=>!r.pendingDelete&&r.bytes===a.array.byteLength))
       &&JSON.stringify(sourceArrays.map(a=>Array.from(new Uint8Array(a.array.buffer,a.array.byteOffset,a.array.byteLength))))===JSON.stringify(sourceBytes)
       &&restored.bufferOwnership.every(r=>!chunkIds.includes(r.id))&&pixels().every((b,i)=>b===control[i])});
@@ -135,7 +137,7 @@ async function sceneLifetimeControls({browser,url,check,result,watchErrors}){
    receipt.cycles=lifetime?.cycles||[];return receipt;
   });
   result.sceneLifetime=report;
-  check('scene-lifetime-complete',!report.primary&&report.cleanup.length===0&&report.rows.length===8,JSON.stringify({primary:report.primary,cleanup:report.cleanup}));
+  check('scene-lifetime-complete',!report.primary&&report.cleanup.length===0&&report.rows.length===9,JSON.stringify({primary:report.primary,cleanup:report.cleanup}));
   check('scene-lifetime-accounting',report.samples.length>0&&report.samples.every(s=>s.glError===0&&s.allocation.unknown.length===0&&s.unmappedBufferBytes===0),'all retained samples, including pending lifetimes');for(const row of report.rows)check('scene-lifetime-'+row.name,row.ok,JSON.stringify(report.rows));
   check('scene-lifetime-errors',errors.length===0,errors.join('; '));
  }finally{await ctx.close();}

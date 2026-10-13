@@ -112,12 +112,34 @@ export function badgeOpenLineTactic(game,phaseId){
   return {...tactic,kind:'authorized forward open-ground defensive witness; genuine saved upgrades unproved',recipe:{...tactic.recipe,id:'open-line-'+phaseId},plan};
 }
 
+/** Planned 12:15 relief after Bruce's noon arrival; clocks never inspect badge counters. */
+export function badgeClockReliefTactic(game,phaseId){
+  const tactic=badgeOpenLineTactic(game,phaseId),s=game.scenario;
+  let plan=tactic.plan.map(r=>structuredClone(r));
+  if(phaseId==='round-forest'){
+    if(s.start!=='10:00'||s.clockRatio!==22||JSON.stringify(s.retreat?.US)!=='[-18,-1323]')fail('clock relief authored clock/retreat drift');
+    plan=plan.filter(r=>!['ammen-hold','ammen-withdraw','ammen-recover'].includes(r.id));
+    const actor='us-ammen-brigade',success=id=>({id,require:'success'}),terminal=id=>({id,require:'terminal'}),
+      add=(id,type,options)=>plan.push({id,notBefore:369,expires:370,after:[],condition:[{kind:'actor-orderable'}],command:{type,unitId:actor},...options});
+    add('ammen-relief-run','run',{after:['ammen-position','relief-hold-us-hazen-brigade','arrival-us-bruce-brigade'].map(success),command:{type:'run',unitId:actor,enabled:true}});
+    add('ammen-relief-move','move',{after:[success('ammen-relief-run')],command:{type:'move',unitId:actor,path:{kind:'actor-to-point',point:s.retreat.US.slice()}}});
+    add('ammen-reserve-hold','hold',{expires:1040,after:[success('ammen-relief-move')],condition:[{kind:'actor-orderable'},{kind:'arrived',point:s.retreat.US.slice(),radius:25},{kind:'recovery',moraleMin:55,requirePriorRouting:false},{kind:'separated',minDistance:220}]});
+    add('ammen-relief-cleanup','run',{notBefore:1050,expires:1051,after:['ammen-relief-run','ammen-relief-move','ammen-reserve-hold'].map(terminal),command:{type:'run',unitId:actor,enabled:false}});
+    if(plan.length!==14)fail('clock relief stage count');
+  }
+  createBadgeStages(plan,1,tactic.roster);
+  return {...tactic,kind:'authorized battle-clock relief witness; genuine saved upgrades unproved',recipe:{...tactic.recipe,id:'clock-relief-'+phaseId},plan};
+}
+
 
 /** Positioning is a prerequisite for the next witness phase, never a badge-counter trigger. */
 export function badgeReliefPositions(tactic,receipt){
   const phase=tactic?.recipe?.phaseId,ids=phase==='round-forest'?['us-hazen-brigade']:phase==='mcfaddens-ford'?['us-price-brigade','us-fyffe-brigade']:null;
   if(!ids||!dense(tactic?.plan)||!dense(receipt?.stages)||receipt.failure||receipt.cadence!==1)return false;
   const wanted=['ammen-position','ammen-hold',...ids.flatMap(id=>['relief-position-'+id,'relief-hold-'+id])];
+  return acceptedBadgeStages(tactic,receipt,wanted);
+}
+function acceptedBadgeStages(tactic,receipt,wanted){
   return wanted.every(id=>{
     const rows=receipt.stages.filter(r=>r?.id===id),plans=tactic.plan.filter(r=>r?.id===id);
     if(rows.length!==1||plans.length!==1)return false;
@@ -127,6 +149,25 @@ export function badgeReliefPositions(tactic,receipt){
       &&trace.command?.type===plan.command.type&&trace.command.unitId===plan.command.unitId
       &&(plan.command.type!=='move'||dense(trace.command.points)&&JSON.stringify(trace.command.points.at(-1))===JSON.stringify(plan.command.path.point));
   });
+}
+export function badgeClockReliefPositions(tactic,receipt){
+  if(tactic?.recipe?.phaseId==='mcfaddens-ford')return badgeReliefPositions(tactic,receipt);
+  if(tactic?.recipe?.id!=='clock-relief-round-forest'||!dense(tactic.plan)||!dense(receipt?.stages)||receipt.failure||receipt.cadence!==1)return false;
+  const wanted=['ammen-position','relief-position-us-hazen-brigade','relief-hold-us-hazen-brigade','arrival-us-bruce-brigade','ammen-relief-run','ammen-relief-move','ammen-reserve-hold'];
+  if(!acceptedBadgeStages(tactic,receipt,wanted))return false;
+  const cleanupRows=receipt.stages.filter(r=>r.id==='ammen-relief-cleanup'),cleanupPlans=tactic.plan.filter(r=>r.id==='ammen-relief-cleanup');
+  if(cleanupRows.length!==1||cleanupPlans.length!==1)return false;
+  const cleanup=cleanupRows[0],cleanupPlan=cleanupPlans[0],trace=cleanup.trace;
+  if(!['command','after','condition','notBefore','expires'].every(k=>JSON.stringify(cleanup[k])===JSON.stringify(cleanupPlan[k]))
+    ||JSON.stringify(trace?.command)!==JSON.stringify(cleanupPlan.command)||trace?.result?.run!==false
+    ||!(cleanup.state==='accepted'&&trace.accepted===true&&trace.invoked===true
+      ||cleanup.state==='already-satisfied'&&trace.accepted===null&&trace.invoked===false&&trace.reason==='already in requested state'))return false;
+  const move=receipt.stages.find(r=>r.id==='ammen-relief-move'),point=move.trace?.resolvedInputs?.actor;
+  return finitePoint(point)&&Math.hypot(point[0]-940,point[1]+230)<=25
+    &&JSON.stringify(move.trace.command.points[0])===JSON.stringify(point)
+    &&JSON.stringify(move.trace.command.points.at(-1))==='[-18,-1323]'
+    &&receipt.stages.find(r=>r.id==='ammen-relief-run').trace.command.enabled===true
+    &&receipt.stages.find(r=>r.id==='ammen-relief-run').trace.result?.run===true&&trace.command.enabled===false;
 }
 /** A natural shortfall completes an observation; a missing or failed native case cannot. */
 export function badgeReliefComplete(rows,promotion){
@@ -211,6 +252,7 @@ export function executeBadgeCommand(game,input){
   if(!unit||unit.side!==game.playerSide||!game.controls(unit)){receipt.reason='unknown or uncontrolled actor';return receipt;}
   if(['attack','charge'].includes(command.type)&&(!target||target.side===unit.side||!target.alive)){receipt.reason='unknown or unavailable enemy target';return receipt;}
   if(['holdfire','run'].includes(command.type)&&unit[command.type==='holdfire'?'holdFire':'run']===command.enabled){
+    receipt.result={type:unit.order.type,targetId:unit.order.target?.id||null,destination:unit.order.dest?Array.from(unit.order.dest):null,holdFire:unit.holdFire,run:unit.run};
     receipt.accepted=null;receipt.reason='already in requested state';return receipt;
   }
   receipt.invoked=true;
@@ -281,6 +323,7 @@ export function badgeObservationSelection(args){
   if(args.length===1&&args[0]==='--badge-promotion')return {mode:'promotion',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion-relief')return {mode:'promotion-relief',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion-open-line')return {mode:'promotion-open-line',shard:1};
+  if(args.length===1&&args[0]==='--badge-promotion-clock-relief')return {mode:'promotion-clock-relief',shard:1};
   const shards=args.filter(a=>/^--badge-shard=[123]$/.test(a));
   if(args.length===2&&args.includes('--badge-observations')&&shards.length===1)return {mode:'observations',shard:Number(shards[0].slice(-1))};
   if(args.length===2&&args.includes('--badge-revisions')&&shards.length===1)return {mode:'revisions',shard:Number(shards[0].slice(-1))};

@@ -58,6 +58,11 @@ export function sampleSceneAllocations(scope=globalThis.window) {
     }
   });
   for(const atlas of Object.values(game.baked?.atlases||{}))for(const pages of Object.values(atlas.textures))pages.forEach(texture);
+  const sceneArrayBytes=declaredArrayBytes;
+  for(const retained of scope.__sceneTerrainPartition?.retainedArrays||[]){
+    if(!ArrayBuffer.isView(retained?.array)||typeof retained.owner!=='string'||!retained.owner)throw Error('allocation: invalid retained terrain array');
+    array(retained.array,retained.owner);
+  }
   const renderer=post.renderer,gl=renderer.getContext(),unuploaded=[];
   for(const [array,labels]of arrays){
     const records=scope.__allocation.labelBufferOwners(gl,array,[...labels]);
@@ -65,7 +70,7 @@ export function sampleSceneAllocations(scope=globalThis.window) {
   }
   const allocation=scope.__allocation.snapshot(gl),bufferOwnership=allocation.bufferSlots;
   const mappedBufferBytes=bufferOwnership.filter(r=>r.owners.length).reduce((n,r)=>n+r.bytes,0);
-  return {allocation,declaredArrayBytes,textureObjects:textures.size,glError:gl.getError(),
+  return {allocation,declaredArrayBytes,retainedTerrainArrayBytes:declaredArrayBytes-sceneArrayBytes,textureObjects:textures.size,glError:gl.getError(),
     bufferOwnership,mappedBufferBytes,unmappedBufferBytes:allocation.byKind.buffer-mappedBufferBytes,unuploadedArrays:unuploaded,
     conservativeReservation:allocation.peak+allocation.defaultPeak+declaredArrayBytes,
     gpuReservation:allocation.gpuPeak,cpuDeclaredArrayBytes:declaredArrayBytes,
