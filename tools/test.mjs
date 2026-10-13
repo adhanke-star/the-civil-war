@@ -1787,13 +1787,14 @@ async function browserChecks(server, url) {
       const {nativeBadgeObserverControls}=await import('./test-badges-ui.mjs');
       await nativeBadgeObserverControls({browser,url,check,result,watchErrors});return;
     }
-    if(['observations','missionary','revisions','promotion'].includes(BADGE_SELECTION?.mode)){
+    if(['observations','missionary','missionary-revision','revisions','promotion'].includes(BADGE_SELECTION?.mode)){
       result.mode=BADGE_SELECTION.mode==='missionary'?'actual Missionary-only terminal-step repair':(BADGE_SELECTION.mode==='revisions'?'actual single legal tactic revision':'actual first native badge tactics')+' shard '+BADGE_SELECTION.shard+' of3';
       const {nativeBadgeObservations}=await import('./test-badges-ui.mjs');
       const persist=async()=>{const target=path.join(OUT_DIR,'badge-observations.json'),temporary=target+'.pending';
         await fs.writeFile(temporary,JSON.stringify(result));await fs.rename(temporary,target);};
       if(BADGE_SELECTION.mode==='promotion')result.mode='actual original Bronze brigade sequential Camp and native battle continuation';
-      await nativeBadgeObservations({browser,url,check,result,watchErrors,shard:BADGE_SELECTION.shard,persist,missionaryOnly:BADGE_SELECTION.mode==='missionary',revision:BADGE_SELECTION.mode==='revisions'?1:0,promotion:BADGE_SELECTION.mode==='promotion'});return;
+      if(BADGE_SELECTION.mode==='missionary-revision')result.mode='actual single approved Missionary revision after completed first observation';
+      await nativeBadgeObservations({browser,url,check,result,watchErrors,shard:BADGE_SELECTION.shard,persist,missionaryOnly:['missionary','missionary-revision'].includes(BADGE_SELECTION.mode),revision:['revisions','missionary-revision'].includes(BADGE_SELECTION.mode)?1:0,promotion:BADGE_SELECTION.mode==='promotion'});return;
     }
     if(BADGE_SELECTION?.mode==='level10'){
       result.mode='actual played-save legal level10 continuation';

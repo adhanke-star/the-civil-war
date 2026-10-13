@@ -206,6 +206,7 @@ export function badgeObservationSelection(args){
   if(args.length===1&&args[0]==='--badge-observer')return {mode:'prerequisite',shard:null};
   if(args.length===1&&args[0]==='--badge-level10')return {mode:'level10',shard:null};
   if(args.length===1&&args[0]==='--badge-missionary')return {mode:'missionary',shard:1};
+  if(args.length===1&&args[0]==='--badge-missionary-revision')return {mode:'missionary-revision',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion')return {mode:'promotion',shard:1};
   const shards=args.filter(a=>/^--badge-shard=[123]$/.test(a));
   if(args.length===2&&args.includes('--badge-observations')&&shards.length===1)return {mode:'observations',shard:Number(shards[0].slice(-1))};
@@ -224,7 +225,7 @@ export function badgeObservationComplete(selected,rows){
 export function badgeTactic(game,observation,revision=0){
   const recipe=BADGE_OBSERVATIONS.find(r=>r.id===observation),s=game.scenario;
   if(!recipe||game.simTime!==0||game.playerSide!=='US'||s?.id!==recipe.packId+'-'+recipe.phaseId)fail('tactic initial phase/time/side');
-  if(![0,1].includes(revision)||revision===1&&observation==='missionary-assault')fail('one approved revision; Missionary repair is separate');
+  if(![0,1].includes(revision))fail('one approved revision; no second tactic revision');
   const roster=[...new Set([...s.units,...(s.reinforcements||[])].map(u=>u.id))],plan=[];
   const unit=(name,side='US',type='brigade')=>side.toLowerCase()+'-'+name+'-'+type;
   const us=name=>unit(name),cs=name=>unit(name,'CS'),battery=name=>unit(name,'US','battery');
@@ -337,6 +338,22 @@ export function badgeTactic(game,observation,revision=0){
           row.after=[successDep(support)];previous=name+'-charge';previousTarget=target;
         }plan.push(row);
       }
+    }else if(observation==='missionary-assault'){
+      plan.splice(0);move('carlin-support',us('carlin-1st'),[-700,2780],{end:1});
+      move('roberts-flank',r,[-1150,2600],{end:250});
+      let previous=null,previousTarget=null,previousStop=null;
+      for(const [name,end]of [['finley',350],['bate',600],['tucker',850],['manigault',1040]]){
+        const target=cs(name),support=name+'-support',walk=name+'-walk',run=name+'-run',approach=name+'-approach',attack=name+'-charge',stop=name+'-stop-run';
+        toward(support,g,target,180,{end,after:previous?[successDep(previous),successDep(previousStop)]:[],condition:previous?[ended(r,previousTarget,previous)]:[]});
+        toward(walk,r,target,230,{end,after:[successDep(support),successDep(previousStop||'roberts-flank')],condition:previous?[]:[{kind:'arrived',point:[-1150,2600],radius:20}]});
+        add(run,'run',r,{end,after:[successDep(walk)],condition:[{kind:'target-unbroken',targetId:target},{kind:'distance',targetId:target,max:250}],enabled:true});
+        toward(approach,r,target,120,{end,after:[successDep(run)]});
+        charge(attack,r,target,{end,after:[successDep(approach)],condition:name==='tucker'?[{kind:'target-cover',targetId:target}]:[]});
+        add(stop,'run',r,{end,after:[successDep(attack)],enabled:false});previous=attack;previousTarget=target;previousStop=stop;
+      }
+      add('cleanup-run','run',r,{start:1050,end:1052,enabled:false});
+      add('cleanup-roberts','hold',r,{start:1050,end:1052,after:[terminalDep(previous)]});
+      add('cleanup-greusel','hold',g,{start:1050,end:1052,after:[terminalDep(previous)]});
     }else if(observation==='buell-capture'){
       const kept=plan.splice(0),hazen=us('hazen'),bruce=us('bruce');
       for(const row of kept){
@@ -349,7 +366,7 @@ export function badgeTactic(game,observation,revision=0){
       }
       add('bruce-second-cleanup','run',bruce,{start:601,end:602,after:[terminalDep('bruce-second-stop')],enabled:false});
     }
-    const counts={'slaughter-fire':12,'slaughter-defence':14,'slaughter-recovery':11,'mcfadden-assault':18,'buell-capture':22};
+    const counts={'slaughter-fire':12,'slaughter-defence':14,'slaughter-recovery':11,'mcfadden-assault':18,'missionary-assault':29,'buell-capture':22};
     if(plan.length!==counts[observation])fail('revised tactic count drift');
   }
   // Validate all identities and atoms before any native order can be attempted.

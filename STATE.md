@@ -1,5 +1,5 @@
 # STATE
-2026-10-13 — v1 released558456f; ACTIVE0177 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
+2026-10-13 — v1 released558456f; ACTIVE0178 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
 Branch v1-1-gaps-20261012; light loop0108; Astra judge; COORDINATION absent; v1.1 then approved v2, unreleased.
 Accepted remote main9e72079; sourceCI38346843720 all9/full own251/365/171/159+201+three6smokes/digests clean.
 Main9eCI38349763169 all9/fullown/digests/rawprobe clear; Pages38349763192 exact9e/livev68 clear.
@@ -14,6 +14,6 @@ Mixed38282452947/9d60c12 qualified; root+Astra viewed001–076; exact11files/576
 0167 matrix38343715785 failed transport90,068,783B report; original631MB artifact11789877172 retained.
 0172 transport38352343371 complete146original members/144PNG/22ordinary+45fault;43faultsUNRUN.
 0173 actualnative prerequisite own11791200565/41fullsamples/19IDs/Veteran/cleanup clear; source0c38350032246 all9/fullown251/365/171/166 clear.
-0177 actual L10 once38358752604 complete/whole eight-sale/reload/export/import/duplicate clear; source31CI all9/fullown clear; singleton38361828395+5revision38361855888 running/queued exact31; promotion106+106 root+Astra source-clear/nativeUNRUN.
+0178 L10native complete; original6+revised5 fullnative/store/cleanup clear with genuine shortfalls; Missionary29stage114+114 sourceclear/nativeUNRUN; promotion499CI38362130562 all9/fullown clear/once38365651410 running.
 .out297,938,617B/300M preserved; unintended local npm browser run interrupted130/unaccepted; CPU-only resumed.
 Native UHD617/iPad fps/sound UNMEASURED; no spending/accounts/recurring device requests.

@@ -162,13 +162,14 @@ function restoreNativeBadgeContext(){
 /** Six first-tactic observations, two fresh native contexts per explicitly selected Actions shard. */
 export async function nativeBadgeObservations({browser,url,check,result,watchErrors,shard,persist,missionaryOnly=false,revision=0,promotion=false}){
   if(promotion&&(shard!==1||revision!==0||missionaryOnly))throw Error('badge promotion: isolated sequential continuation');
-  if(![0,1].includes(revision)||missionaryOnly&&revision!==0)throw Error('badge observations: exactly first tactic or one approved revision');
+  if(![0,1].includes(revision))throw Error('badge observations: exactly first tactic or one approved revision');
   if(missionaryOnly&&shard!==1)throw Error('badge observations: missionary repair is exactly shard1');
   const cases=promotion?BADGE_PROMOTION_PHASES.map(p=>p.phaseId):missionaryOnly?['missionary-assault']:revision===1&&shard===1?['slaughter-fire']:[['slaughter-fire','missionary-assault'],['slaughter-defence','mcfadden-assault'],['slaughter-recovery','buell-capture']][shard-1];
   if(!cases)throw Error('badge observations: shard must be 1, 2 or 3');
   const output={kind:'actual first native tactics; constructed earlier Draw prefixes; numeric tiers are not separate saved upgrades',
     sourceSha:process.env.GITHUB_SHA,run:process.env.GITHUB_RUN_ID,shard,revision,cases:[],complete:false};
   if(revision===1)output.kind='actual single approved legal tactic revision; original five successful observations retained; constructed prefixes';result.badgeObservations=output;
+  if(missionaryOnly&&revision===1)output.kind='actual single Missionary revision after completed original; Tucker native fence cover, no Stormers Gold claim';
   let continuation;
   if(promotion){
     output.kind='actual Buell Bronze save continued through ordinary Camp, decisions and native battles; its earlier three Draw prefix records were constructed';
