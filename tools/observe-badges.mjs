@@ -65,6 +65,60 @@ export function badgePromotionTactic(game,phaseId){
   return {kind:'ordinary defensive continuation; genuine Silver/Gold unproved',recipe:{id:'promotion-'+phaseId,packId:'stones-river',phaseId},revision:0,plan,cadence:1,roster};
 }
 
+
+
+export const BADGE_RELIEF_ORIGIN=Object.freeze({run:38365651410,sha:'499ffbdd8b7bd2f8c7141b1daf23c04cefb13d5f',artifact:11796878538,name:'badge-observations-1',zipBytes:698428,zipSha:'a03291a24fbd7e5aa0845db5828b2d60ae3a5aeaf9c111e936da25f1e9916b81',saveBytes:36056,saveSha:'50b0750a1ec48d45d01c9561e2f012dc1bf322f7371ece7cfc7673f77f587438'});
+export function validateBadgeReliefOrigin(o){
+  if(!plain(o,Object.keys(BADGE_RELIEF_ORIGIN))||Object.keys(o).length!==Object.keys(BADGE_RELIEF_ORIGIN).length||Object.keys(BADGE_RELIEF_ORIGIN).some(k=>o[k]!==BADGE_RELIEF_ORIGIN[k]))fail('relief exact completed source/checkpoint origin');
+  return true;
+}
+
+/** One separately authorized relief witness; no replay, repeated assault or counter-triggered action. */
+export function badgeReliefTactic(game,phaseId){
+  if(!['round-forest','mcfaddens-ford'].includes(phaseId)||game.simTime!==0||game.playerSide!=='US'||game.scenario?.id!=='stones-river-'+phaseId)fail('relief initial phase/time/side');
+  const s=game.scenario,roster=[...new Set([...s.units,...(s.reinforcements||[])].map(u=>u.id))],actor='us-ammen-brigade';
+  const points=phaseId==='round-forest'?[['us-hazen-brigade',[750,-450]],[actor,[935,-300]]]:
+    [['us-price-brigade',[1730,-1500]],['us-fyffe-brigade',[2120,-1470]],[actor,[1910,-1360]]];
+  if(points.some(([id])=>!s.units.some(u=>u.id===id&&u.side==='US')))fail('relief required initial actor unavailable');
+  const plan=[],success=id=>({id,require:'success'}),add=(id,type,unitId,{end,start=0,after=[],condition=[],...extra})=>plan.push({id,notBefore:start,expires:end,after,condition:[{kind:'actor-orderable'},...condition],command:{type,unitId,...extra}});
+  for(const u of s.units.filter(u=>u.side==='US'&&!points.some(([id])=>id===u.id)))add('hold-'+u.id,'hold',u.id,{end:1});
+  for(const[id,point]of points){
+    const move=id===actor?'ammen-position':'relief-position-'+id,hold=id===actor?'ammen-hold':'relief-hold-'+id;
+    add(move,'move',id,{end:1,path:{kind:'actor-to-point',point}});
+    add(hold,'hold',id,{start:120,end:240,after:[success(move)],condition:[{kind:'arrived',point,radius:25}]});
+  }
+  add('ammen-withdraw','fallback',actor,{end:950,after:[success('ammen-hold')],condition:[{kind:'pressure',moraleMax:35}]});
+  add('ammen-recover','hold',actor,{end:phaseId==='round-forest'?1050:1000,after:[success('ammen-withdraw')],condition:[{kind:'recovery',moraleMin:55,requirePriorRouting:false},{kind:'separated',minDistance:220}]});
+  const arrivals=phaseId==='round-forest'?[['us-bruce-brigade',328,358]]:[['us-estep-battery',258,288],['us-board-of-trade-battery',258,288],['us-standart-battery',258,288],['us-miller-brigade',515,545],['us-stanley-brigade',515,545]];
+  for(const[id,start,end]of arrivals)if(roster.includes(id))add('arrival-'+id,'hold',id,{start,end});
+  createBadgeStages(plan,1,roster);
+  return {kind:'one authorized front-line relief witness; genuine saved upgrades unproved',recipe:{id:'relief-'+phaseId,packId:'stones-river',phaseId},revision:0,plan,cadence:1,roster};
+}
+
+
+/** Positioning is a prerequisite for the next witness phase, never a badge-counter trigger. */
+export function badgeReliefPositions(tactic,receipt){
+  const phase=tactic?.recipe?.phaseId,ids=phase==='round-forest'?['us-hazen-brigade']:phase==='mcfaddens-ford'?['us-price-brigade','us-fyffe-brigade']:null;
+  if(!ids||!dense(tactic?.plan)||!dense(receipt?.stages)||receipt.failure||receipt.cadence!==1)return false;
+  const wanted=['ammen-position','ammen-hold',...ids.flatMap(id=>['relief-position-'+id,'relief-hold-'+id])];
+  return wanted.every(id=>{
+    const rows=receipt.stages.filter(r=>r?.id===id),plans=tactic.plan.filter(r=>r?.id===id);
+    if(rows.length!==1||plans.length!==1)return false;
+    const row=rows[0],plan=plans[0],trace=row.trace;
+    return row.state==='accepted'&&trace?.accepted===true&&trace.invoked===true
+      &&['command','after','condition','notBefore','expires'].every(k=>JSON.stringify(row[k])===JSON.stringify(plan[k]))
+      &&trace.command?.type===plan.command.type&&trace.command.unitId===plan.command.unitId
+      &&(plan.command.type!=='move'||dense(trace.command.points)&&JSON.stringify(trace.command.points.at(-1))===JSON.stringify(plan.command.path.point));
+  });
+}
+/** A natural shortfall completes an observation; a missing or failed native case cannot. */
+export function badgeReliefComplete(rows,promotion){
+  if(!dense(rows)||!rows.length||rows.length>2||rows.some(r=>r?.complete!==true)||rows[0].id!=='round-forest'||rows.length===2&&rows[1].id!=='mcfaddens-ford')return false;
+  const positioning='actual relief positioning refused or expired';
+  if(rows.length===1)return promotion?.achieved===false&&[positioning,'actual Round Forest did not persist a living Bronze-to-Silver candidate'].includes(promotion?.stopReason);
+  return promotion?.achieved===true&&promotion.stopReason===null||promotion?.achieved===false&&[positioning,'actual McFadden did not persist Silver-to-Gold'].includes(promotion?.stopReason);
+}
+
 /** Exact authorized Draw/null/empty prefix. All income/joins/cards are kept, never spent or equipped. */
 export function badgePrefix(campaign,observation,{slot=1,seed=1861,at='2026-10-12T12:00:00Z'}={}){
   const def=validateCampaign(campaign),recipe=BADGE_OBSERVATIONS.find(r=>r.id===observation);
@@ -208,6 +262,7 @@ export function badgeObservationSelection(args){
   if(args.length===1&&args[0]==='--badge-missionary')return {mode:'missionary',shard:1};
   if(args.length===1&&args[0]==='--badge-missionary-revision')return {mode:'missionary-revision',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion')return {mode:'promotion',shard:1};
+  if(args.length===1&&args[0]==='--badge-promotion-relief')return {mode:'promotion-relief',shard:1};
   const shards=args.filter(a=>/^--badge-shard=[123]$/.test(a));
   if(args.length===2&&args.includes('--badge-observations')&&shards.length===1)return {mode:'observations',shard:Number(shards[0].slice(-1))};
   if(args.length===2&&args.includes('--badge-revisions')&&shards.length===1)return {mode:'revisions',shard:Number(shards[0].slice(-1))};
