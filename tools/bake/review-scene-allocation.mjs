@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {gzipSync} from 'node:zlib';
 import { chromium } from 'playwright';
 import { startServer, ROOT } from '../serve.mjs';
-import { failPaintedComparison, collectPaintedIsolation, AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation, reduceSceneObservations, reduceFocusedLookoutObservations, sampleSceneAllocations, initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,sceneReportEnvelope,scenePartHeader,createSceneMatrixMerger } from './scene-allocation.mjs';
+import { failPaintedComparison, collectPaintedIsolation, AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation, reduceSceneObservations, reduceFocusedLookoutObservations, reduceFocusedFloat32LookoutObservations, sampleSceneAllocations, initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,sceneReportEnvelope,scenePartHeader,createSceneMatrixMerger } from './scene-allocation.mjs';
 import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDiagnostics,installSceneStartGate} from './inactive-figures.mjs';
 import {acquireQualifiedHybrid,materializeQualifiedSceneInput,QUALIFIED_HYBRID,installQualifiedSceneRoutes,sceneMatrixGroups} from './review-current-compression.mjs';
 import {preparePhase,prepareFieldScenario} from '../../src/sim/phase.js';
@@ -29,7 +29,10 @@ async function focusedSceneBootstrap(ctx,page,url,entry){
     const owner={samples:[],postTextures:[],postRenderbuffers:[],serial:0,clock:0,bootstrapDraws:0},textureIds=new Set(),bufferIds=new Set();window.__focusedScene=owner;
     owner.sample=(label,sequence=null)=>{
       const post=window.__game?.post||owner.post,renderer=post.renderer,gl=renderer.getContext(),shell={__game:{post,scene:owner.emptyScene,game:{baked:{atlases:{}}}},__allocation:window.__allocation,innerWidth,innerHeight,devicePixelRatio};
-      const serial=++owner.serial,sample={label:`focused-${serial}-${label}`,captureId:serial,sequence:sequence??++owner.clock,...A.sampleSceneAllocations(window.__game?window:shell)};
+      const live=window.__game&&owner.originalProof?{__game:window.__game,__allocation:window.__allocation,innerWidth,innerHeight,devicePixelRatio,
+        __sceneTerrainPartition:{retainedArrays:[...(window.__sceneTerrainPartition?.retainedArrays||[]),...owner.originalProof.retainedArrays,...(owner.controlArrays||[])]}}:window.__game?window:shell;
+      const serial=++owner.serial,sample={label:`focused-${serial}-${label}`,captureId:serial,sequence:sequence??++owner.clock,...A.sampleSceneAllocations(live)};
+      if(owner.originalProof)sample.float32Original=owner.originalProof.receipt();
       for(const [key,target]of ['rtScene','rtSmall','rtBlur'].map(k=>[k,post[k]])){
         for(const [kind,texture]of [['color',target.texture],['depth',target.depthTexture]]){if(!texture)continue;
           const native=renderer.properties.get(texture).__webglTexture,record=native&&window.__allocation.textureReservation(gl,native);
@@ -67,6 +70,32 @@ async function focusedCanonicalInstall(page){
   });
 }
 
+async function focusedFloat32Install(page){
+  return page.evaluate(async()=>{
+    const THREE=await import('three'),P=await import('./tools/bake/partition-terrain.mjs'),f=window.__focusedScene,{world,post}=window.__game,root=world.terrainMesh,gl=post.renderer.getContext();
+    if(Object.hasOwn(window,'__sceneTerrainPartition'))throw Error('Float32 scene: diagnostic registration already owned');
+    if(!f.originalProof){f.originalProof=P.captureFloat32TerrainOriginal(world);f.original={root,geometry:root.geometry,material:root.material,position:root.geometry.attributes.position,uv:root.geometry.attributes.uv,index:root.geometry.index};f.terrainRetirements=[];}
+    f.originalProof.verify();
+    const retire=(operation,callback)=>{
+      const meshes=operation==='install-original'?[root]:[...root.children],arrays=meshes.flatMap((m,i)=>[...Object.entries(m.geometry.attributes),['index',m.geometry.index]].map(([key,a])=>({mesh:i,key,arrayType:a.array.constructor.name,itemSize:a.itemSize,count:a.count,bytes:a.array.byteLength,reservations:window.__allocation.bufferReservations(gl,a.array)})));
+      const receipt={operation,nativeFrame:post.renderer.info.render.frame,nativeRenders:window.__sceneRenderGate.count,arrays,original:f.originalProof.receipt(),cycleIndex:f.lifetime.cycles.length+1};f.terrainRetirements.push(receipt);
+      return f.lifetime.completeTerrainRetirement(callback);
+    };
+    let owner;
+    retire('install-original',()=>{owner=P.installTerrainPartition(world,THREE,P.partitionTerrain,{reversible:true});f.rawOwner=owner;
+      const wrapped={...owner,kind:'Float32 with retained exact original',get retainedArrays(){return owner.retainedArrays;},restore(){
+        const errors=[];try{f.originalProof.verify();}catch(e){errors.push(e);}
+        try{retire('restore-partition',()=>owner.restore());}catch(e){errors.push(e);try{owner.restore();}catch(cleanup){errors.push(cleanup);}}
+        try{f.originalProof.verify();}catch(e){errors.push(e);}
+        if(errors.length)throw new AggregateError(errors,'Float32 original: checked restoration failed');
+      }};
+      try{f.owner=wrapped;P.registerTerrainPartition(window,wrapped);}catch(error){const errors=[error];try{owner.restore();}catch(cleanup){errors.push(cleanup);}throw new AggregateError(errors,'Float32 scene: registration failed with independent rollback');}
+    });
+    f.originalProof.verify();f.sample('float32-source-settled');
+    return {kind:f.owner.kind,triangles:owner.triangles,chunks:owner.chunks,sourceBytes:owner.sourceBytes,bytes:owner.bytes,materialShared:owner.materialShared};
+  });
+}
+
 async function focusedSceneCleanup(page){
   return page.evaluate(()=>{const f=window.__focusedScene;if(!f)return {ok:false,errors:['focused owner missing'],samples:[]};const errors=[];
     // The common restore has already retired canonical storage, drawn the original,
@@ -76,7 +105,9 @@ async function focusedSceneCleanup(page){
     const exactOriginal=!!o&&root===o.root&&root.geometry===o.geometry&&root.material===o.material&&root.children.length===0&&root.geometry.attributes.position===o.position&&root.geometry.attributes.uv===o.uv&&root.geometry.index===o.index;
     if(!exactOriginal)errors.push('focused original terrain identities not restored');
     if(f.isolationClone)errors.push('painted isolation cloned material cleanup incomplete');
-    return {ok:!errors.length,errors,exactOriginal,bootstrapDraws:f.bootstrapDraws,pixelBytes:f.post?.diagnosticPixelBytes,preparedReleased:f.prepared==null,terrain:f.owner&&{kind:f.owner.kind,bytes:f.owner.bytes,sourceBytes:f.owner.sourceBytes},
+    let originalProof;if(f.originalProof){try{originalProof=f.originalProof.receipt();if(exactOriginal&&!errors.length)f.originalProof.release();}catch(e){errors.push(String(e?.message??e));}}
+    return {ok:!errors.length,errors,exactOriginal,bootstrapDraws:f.bootstrapDraws,pixelBytes:f.post?.diagnosticPixelBytes,preparedReleased:f.prepared==null,terrain:f.owner&&{kind:f.owner.kind,bytes:f.owner.bytes,sourceBytes:f.owner.sourceBytes,...(f.originalProof?{triangles:f.owner.triangles,chunks:f.owner.chunks,materialShared:f.owner.materialShared}:{})},
+      ...(f.originalProof?{originalProof,originalProofReleased:f.originalProof.released,terrainRetirements:f.terrainRetirements}:{}),
       postTextures:f.postTextures,postRenderbuffers:f.postRenderbuffers,samples:f.samples,cycles:(f.lifetime?.cycles||[]).map(c=>({kind:c.kind,index:c.index,complete:c.complete,errors:c.errors,checks:c.checks,sampleLabels:c.samples.map(s=>s.observation.label),sampleIds:c.samples.map(s=>s.observation.captureId)}))};
   });
 }
@@ -93,7 +124,7 @@ function appendFocusedSamples(row,resource){
   const bound=new Set([...row.states,...(row.restoration?.samples||[]),...(row.stress?.transaction?.samples||[]).map(s=>s.observation)].map(s=>s.captureId));
   for(const sample of resource.samples)if(!bound.has(sample.captureId)){row.states.push(sample);bound.add(sample.captureId);}delete resource.samples;
 }
-async function qualifiedFaultContext({browser,url,tuple,input,transport,source,phases,report,save,focused=false}){
+async function qualifiedFaultContext({browser,url,tuple,input,transport,source,phases,report,save,focused=false,float32=false}){
   const row={...tuple,contextId:`${tuple.packId}/${tuple.phaseId}/${tuple.route}/${tuple.fault}`,states:[],errors:[],history:createSceneHistory(),
     scenario:phases.find(p=>p.packId===tuple.packId&&p.phaseId===tuple.phaseId).scenario,complete:false,contextClosed:false};report.faults.push(row);
   const ctx=await browser.newContext({viewport:{width:1024,height:768},deviceScaleFactor:2,reducedMotion:'no-preference'});let page,routes,primary,faultHTTPHandler,bootstrap;
@@ -115,7 +146,7 @@ async function qualifiedFaultContext({browser,url,tuple,input,transport,source,p
     if(await page.evaluate(()=>document.getElementById('briefing')?.open))await page.locator('#briefing-begin').click();
     await page.evaluate(async()=>{const S=await import('./src/settings.js'),{LOOK}=await import('./src/ui/look.js');window.__qualifiedSettings={values:S.all().map(({key,value,locked})=>({key,value,locked})),look:JSON.stringify(LOOK)};window.__game.game.ensureBaked();});
     await page.waitForFunction(()=>window.__game.game.baked.state==='ready',null,{timeout:120000,polling:250});
-    if(focused){await page.evaluate(async()=>{const I=await import('./tools/bake/inactive-figures.mjs');const g=window.__game.game;g.__inactiveStats=I.installInactiveFigures(g);g.animate(0);});row.canonical=await focusedCanonicalInstall(page);}
+    if(focused){await page.evaluate(async()=>{const I=await import('./tools/bake/inactive-figures.mjs');const g=window.__game.game;g.__inactiveStats=I.installInactiveFigures(g);g.animate(0);});if(float32)row.partition=await focusedFloat32Install(page);else row.canonical=await focusedCanonicalInstall(page);}
     const admitted=await page.evaluate(async({manifest,sourceManifest,base,tuple,target,completionBeforeFallback,focused})=>{
       const I=await import('./tools/bake/inactive-figures.mjs'),A=await import('./tools/bake/scene-allocation.mjs'),P=await import('./tools/bake/partition-terrain.mjs'),THREE=await import('three'),{COMMAND}=await import('./src/game.js'),
         scope=window.__game,{game,post,scene,camera,effects,world}=scope,gl=post.renderer.getContext(),atlas=game.baked.atlases.CS;
@@ -257,11 +288,11 @@ async function main(){
   fs.mkdirSync(out);
   const campaign=JSON.parse(fs.readFileSync(path.join(ROOT,'assets/campaign.json')));
   const inactive=process.env.SCENE_INACTIVE==='true',partition=process.env.SCENE_PARTITION==='true';
-  const sceneRoutes=process.env.SCENE_ROUTES||'current-png',qualified=sceneRoutes==='qualified-both',focus=process.env.SCENE_FOCUS||'full',focused=focus==='canonical-lookout';
+  const sceneRoutes=process.env.SCENE_ROUTES||'current-png',qualified=sceneRoutes==='qualified-both',focus=process.env.SCENE_FOCUS||'full',float32=focus==='float32-lookout',focused=float32||focus==='canonical-lookout';
   const completion=process.env.SCENE_COMPLETION||'no-finish';
   if(!['no-finish','native-finish'].includes(completion)||completion==='native-finish'&&!qualified)throw Error('scene allocation: completion experiment requires explicit qualified routes');
   if(!['current-png','qualified-both'].includes(sceneRoutes)||qualified&&(!inactive||!partition))throw Error('scene allocation: explicit routes require both prototypes');
-  if(!['full','canonical-lookout'].includes(focus)||focused&&(!qualified||completion!=='native-finish'))throw Error('scene allocation: focused canonical policy requires qualified routes and native completion');
+  if(!['full','canonical-lookout','float32-lookout'].includes(focus)||focused&&(!qualified||completion!=='native-finish'))throw Error('scene allocation: focused policy requires qualified routes and native completion');
   const phases=campaign.phases.map(entry=>{const pack=JSON.parse(fs.readFileSync(path.join(ROOT,`assets/packs/${entry.packId}.json`)));return {...entry,scenario:prepareFieldScenario(preparePhase(pack,entry.phaseId).scenario,'pack')};});
   // Immutable acquisition and fresh runner-only materialization precede browser launch.
   const input=qualified?await acquireQualifiedHybrid(JSON.parse(fs.readFileSync(path.join(ROOT,'assets/figures/confederate-infantry/soldier.json')))):null,
@@ -273,7 +304,7 @@ async function main(){
     limits:{gpuBytes:250000000},nativeDriverMemory:'UNRUN',cpuDecodePeak:'UNRUN',
     unverified:['native driver storage/pools and deferred releases after context destruction','whole-fight effect maximum beyond exercised frames','future sandbox spawns beyond declared pools','CPU image decode/upload-copy peaks']};
   if(qualified)Object.assign(report,{sceneRoutes,...(completion==='native-finish'?{fallbackCompletion:'native-finish-after-candidate-disposal'}:{}),normalMotion:true,nativeHistoryRequired:true,qualification:{...QUALIFIED_HYBRID,members:[...transport.files].map(([name,file])=>({name,bytes:file.bytes.length,sha256:file.sha256}))},faults:[]});
-  if(focused)Object.assign(report,{resourceFocus:'canonical-lookout',terrainPartitionPrototype:false,canonicalTerrainRepresentation:'canonical with retained exact original',postPixelBytes:3639218,mipPolicy:'full-original',focusedComplete:false,fullMatrixComplete:false});
+  if(focused)Object.assign(report,{resourceFocus:focus,terrainPartitionPrototype:float32,...(float32?{float32TerrainRepresentation:'Float32 with retained exact original'}:{canonicalTerrainRepresentation:'canonical with retained exact original'}),postPixelBytes:3639218,mipPolicy:'full-original',focusedComplete:false,fullMatrixComplete:false});
   let evidenceRoot=out,phaseCursor=0,transportFailure=null;
   const phaseNames=Array.from({length:11},(_,i)=>'phase-'+String(i+1).padStart(2,'0')+'.json'),members=new Map(),partFiles=new Map(),captures=new Map();
   if(qualified){const temp=process.env.RUNNER_TEMP;if(!temp||fs.realpathSync(temp)!==temp||!fs.lstatSync(temp).isDirectory())throw Error('scene parts: real runner temp required');evidenceRoot=fs.mkdtempSync(path.join(temp,'cw-scene-matrix-'));}
@@ -383,7 +414,34 @@ async function main(){
         },installRenderGate.toString());
         if(focused)await page.evaluate(async()=>{const I=await import('./tools/bake/inactive-figures.mjs'),g=window.__game.game;g.__inactiveStats=I.installInactiveFigures(g);g.animate(0);});
         await capture('field');
-        if(focused){
+        if(float32){
+          await page.evaluate(async()=>{await Promise.all(Object.values(window.__game.game.baked.atlases).map(a=>a.load('close')));});
+          row.float32Views=await page.evaluate(async()=>{
+            const P=await import('./tools/bake/partition-terrain.mjs'),{world,terrain,rts}=window.__game,g=world.terrainMesh.geometry,
+              p=P.partitionTerrain({position:g.attributes.position.array,uv:g.attributes.uv.array,index:g.index.array}),seen=new Set();let boundary,distance=Infinity;
+            for(const c of p.chunks){for(let i=0;i<c.sourceVertices.length;i++){const point=[c.position[i*3],c.position[i*3+2]],d=(point[0]-rts.goal.x)**2+(point[1]-rts.goal.z)**2;
+              if(seen.has(c.sourceVertices[i])&&point.every(v=>Math.abs(v)<terrain.half-terrain.cell*8)&&d<distance){boundary=point;distance=d;}}
+              for(const id of c.sourceVertices)seen.add(id);}
+            if(!boundary)throw Error('Float32 scene: actual shared chunk boundary required');
+            return [{label:'overview',goal:{...rts.goal}},{label:'near',goal:{...rts.goal,x:0,z:0,dist:200}},{label:'boundary',goal:{...rts.goal,x:boundary[0],z:boundary[1],dist:100},sharedChunkBoundary:boundary}];
+          });
+          const viewFrames=async kind=>{for(const view of row.float32Views){await page.evaluate(goal=>{const {rts,game,camera,post}=window.__game;Object.assign(rts.goal,goal);rts.snap();rts.update(1);game.setView(camera,innerHeight*post.scale);game.animate(0);},view.goal);
+            await capture(`float32-${kind}-${view.label}`);await canvasShot(`float32-${kind}-${view.label}.png`,`float32-${kind}-${view.label}`);}};
+          await viewFrames('original');row.partition=await focusedFloat32Install(page);await capture('float32-field');await viewFrames('partition');
+          await page.evaluate(()=>window.__sceneTerrainPartition.restore());await viewFrames('restored');
+          for(const view of row.float32Views){const frames=['original','partition','restored'].map(kind=>row.canvasCaptures.find(c=>c.label===`float32-${kind}-${view.label}`));
+            if(frames.some(c=>c.pixelSha256!==frames[0].pixelSha256||JSON.stringify(c.camera)!==JSON.stringify(frames[0].camera)||JSON.stringify(c.roster)!==JSON.stringify(frames[0].roster)||JSON.stringify(c.figurePublication)!==JSON.stringify(frames[0].figurePublication)||c.width!==frames[0].width||c.height!==frames[0].height))throw Error('Float32 scene: original/partition/restored whole painted frames differ');}
+          row.partition=await focusedFloat32Install(page);await capture('float32-native-zoom');
+          await page.evaluate(()=>{const f=window.__focusedScene,root=window.__game.world.terrainMesh;f.controlArrays=root.children.flatMap((c,i)=>['position','uv'].map(k=>({array:c.geometry.attributes[k].array.slice(),owner:`terrain-float32-control-${i}/${k}`,attribute:c.geometry.attributes[k]})));
+            for(const c of root.children){const a=c.geometry.attributes.position;for(let i=0;i<a.count;i++)a.array[i*3+1]+=30;a.needsUpdate=true;}});
+          await capture('float32-height-control');await canvasShot('float32-height-control.png','float32-height-control');
+          await page.evaluate(()=>{const f=window.__focusedScene;for(const r of f.controlArrays){r.attribute.array.set(r.array);r.attribute.needsUpdate=true;}for(const c of window.__game.world.terrainMesh.children){const a=c.geometry.attributes.uv;for(let i=0;i<a.array.length;i++)a.array[i]*=.5;a.needsUpdate=true;}});
+          await capture('float32-uv-control');await canvasShot('float32-uv-control.png','float32-uv-control');
+          await page.evaluate(()=>{const f=window.__focusedScene;for(const r of f.controlArrays){r.attribute.array.set(r.array);r.attribute.needsUpdate=true;}f.controlArrays=null;});
+          await capture('float32-controls-repaired');await canvasShot('float32-controls-repaired.png','float32-controls-repaired');
+          const baseline=row.canvasCaptures.find(c=>c.label==='float32-partition-boundary'),height=row.canvasCaptures.find(c=>c.label==='float32-height-control'),uv=row.canvasCaptures.find(c=>c.label==='float32-uv-control'),repair=row.canvasCaptures.find(c=>c.label==='float32-controls-repaired');
+          if(height.pixelSha256===baseline.pixelSha256||uv.pixelSha256===baseline.pixelSha256||repair.pixelSha256!==baseline.pixelSha256)throw Error('Float32 scene: healthy height/UV controls and exact repair required');
+        }else if(focused){
           // Near cameras can request a close tier. Settle the already configured
           // genuine route once so a terrain comparison cannot change figure art.
           await page.evaluate(async()=>{await Promise.all(Object.values(window.__game.game.baked.atlases).map(a=>a.load('close')));});
@@ -577,9 +635,9 @@ async function main(){
       console.log(`SCENE ${index+1}/${campaign.phases.length} complete`);
       if(qualified&&index%2===1){
         const faults=matrix.faults.filter(f=>f.packId===entry.packId&&f.phaseId===entry.phaseId);
-        for(const tuple of faults){await qualifiedFaultContext({browser,url,tuple,input,transport,source,phases,report,save,focused});console.log('SCENE FAULT',tuple.packId,tuple.phaseId,tuple.fault,'complete');}
+        for(const tuple of faults){await qualifiedFaultContext({browser,url,tuple,input,transport,source,phases,report,save,focused,float32});console.log('SCENE FAULT',tuple.packId,tuple.phaseId,tuple.fault,'complete');}
         report.complete=report.cases.every(r=>r.complete)&&report.faults.every(r=>r.complete);
-        const part=focused?{...reduceFocusedLookoutObservations(report,phases.find(p=>p.packId==='chattanooga'&&p.phaseId==='lookout-mountain')),partComplete:false}:merger.add(report);
+        const part=focused?{...(float32?reduceFocusedFloat32LookoutObservations:reduceFocusedLookoutObservations)(report,phases.find(p=>p.packId==='chattanooga'&&p.phaseId==='lookout-mountain')),partComplete:false}:merger.add(report);
         if(focused){part.partComplete=part.focusedComplete;Object.assign(report,part,{complete:false,fullMatrixComplete:false});}save();console.log('SCENE PHASE',JSON.stringify(part));
         if(!part.partComplete)throw Error('scene parts: phase gate rejected; complete evidence retained');
         if(index<matrix.cases.length-1){report.cases=[];report.faults=[];report.complete=false;}
@@ -607,7 +665,7 @@ async function main(){
       await ctx.close();save();
     }
     }
-    const verdict=focused?reduceFocusedLookoutObservations({...report,complete:true},phases.find(p=>p.packId==='chattanooga'&&p.phaseId==='lookout-mountain')):qualified?merger.finalize():reduceSceneObservations(report,campaign.phases);
+    const verdict=focused?(float32?reduceFocusedFloat32LookoutObservations:reduceFocusedLookoutObservations)({...report,complete:true},phases.find(p=>p.packId==='chattanooga'&&p.phaseId==='lookout-mountain')):qualified?merger.finalize():reduceSceneObservations(report,campaign.phases);
     if(focused)Object.assign(report,verdict,{complete:false,fullMatrixComplete:false});
     if(!qualified)Object.assign(report,verdict);
     save();console.log('SCENE-ALLOCATION COMPLETE',JSON.stringify({...verdict,fieldable:false}));

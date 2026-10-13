@@ -53,12 +53,13 @@ on:
           - no-finish
           - native-finish
       scene_focus:
-        description: Scene mode only; explicit ten-context canonical Lookout prerequisite
+        description: Scene mode only; explicit ten-context Lookout prerequisite
         type: choice
         default: full
         options:
           - full
           - canonical-lookout
+          - float32-lookout
 permissions:
   contents: read
   actions: read

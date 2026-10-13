@@ -177,6 +177,52 @@ export function partitionTerrain({position,uv,index},limit=65535) {
   const bytes=chunks.reduce((n,c)=>n+c.position.byteLength+c.uv.byteLength+c.index.byteLength,0);
   return {chunks,triangles:index.length/3,sourceBytes:position.byteLength+uv.byteLength+index.byteLength,bytes};
 }
+/** Diagnostic original owners and byte oracle; never alters a shader, material or geometry. */
+export function captureFloat32TerrainOriginal(world){
+  const root=world.terrainMesh,geometry=root.geometry,material=root.material,uniforms=material.uniforms,
+    keys=Object.keys(uniforms).sort(),records=keys.map(k=>uniforms[k]),
+    textures=records.filter(r=>r.value?.isTexture).map(r=>({record:r,texture:r.value,uuid:r.value.uuid})),
+    shader={vertexShader:material.vertexShader,fragmentShader:material.fragmentShader},
+    attributes=[geometry.attributes.position,geometry.attributes.uv,geometry.index],
+    arrays=attributes.map(a=>a.array),oracles=arrays.map(a=>a.slice());let released=false;
+  if(!Array.isArray(root.children)||root.children.length||typeof shader.vertexShader!=='string'||typeof shader.fragmentShader!=='string'
+    ||arrays.some(a=>!ArrayBuffer.isView(a)))throw Error('Float32 original: actual untouched source required');
+  const uniformValues=records.map(r=>({value:r.value,contents:r.value?.isTexture?null:r.value?.toArray?.()??r.value})),
+    shapes=attributes.map(a=>Object.fromEntries(['itemSize','count','normalized','gpuType','usage'].map(k=>[k,a[k]]))),
+    box=geometry.boundingBox,sphere=geometry.boundingSphere,range=geometry.drawRange,
+    bounds={min:box.min.toArray(),max:box.max.toArray(),center:sphere.center.toArray(),radius:sphere.radius},
+    draw={start:range.start,count:range.count},
+    rootState=Object.fromEntries(['visible','frustumCulled','renderOrder'].map(k=>[k,root[k]])),
+    materialState=Object.fromEntries(['side','transparent','blending','depthWrite','depthTest','depthFunc','polygonOffset','polygonOffsetFactor','polygonOffsetUnits','flatShading','vertexColors','alphaTest','toneMapped','fog','premultipliedAlpha','visible','glslVersion','wireframe'].map(k=>[k,material[k]])),
+    defines=material.defines,defineState={...defines};
+  const equal=(a,b)=>Array.isArray(a)&&Array.isArray(b)&&a.length===b.length&&a.every((v,i)=>Object.is(v,b[i]));
+  const verify=()=>{
+    if(released)throw Error('Float32 original: proof already released');
+    if(world.terrainMesh!==root||root.material!==material||root.children.some(c=>c.material!==material)
+      ||material.vertexShader!==shader.vertexShader||material.fragmentShader!==shader.fragmentShader
+      ||material.uniforms!==uniforms||JSON.stringify(Object.keys(uniforms).sort())!==JSON.stringify(keys)
+      ||keys.some((k,i)=>uniforms[k]!==records[i])||textures.some(t=>t.record.value!==t.texture||t.texture.uuid!==t.uuid)
+      ||records.some((r,i)=>r.value!==uniformValues[i].value||uniformValues[i].contents!==null&&(Array.isArray(uniformValues[i].contents)?!equal(r.value.toArray(),uniformValues[i].contents):!Object.is(r.value,uniformValues[i].contents)))
+      ||Object.entries(rootState).some(([k,v])=>!Object.is(root[k],v))||Object.entries(materialState).some(([k,v])=>!Object.is(material[k],v))
+      ||material.defines!==defines||Object.keys(defines).length!==Object.keys(defineState).length||Object.entries(defineState).some(([k,v])=>!Object.is(defines[k],v))
+      ||Object.keys(geometry.attributes).sort().join(',')!=='position,uv'||geometry.attributes.position!==attributes[0]||geometry.attributes.uv!==attributes[1]||geometry.index!==attributes[2]
+      ||attributes.some((a,i)=>Object.entries(shapes[i]).some(([k,v])=>!Object.is(a[k],v)))
+      ||geometry.boundingBox!==box||geometry.boundingSphere!==sphere||!equal(box.min.toArray(),bounds.min)||!equal(box.max.toArray(),bounds.max)||!equal(sphere.center.toArray(),bounds.center)||!Object.is(sphere.radius,bounds.radius)
+      ||geometry.drawRange!==range||!Object.is(range.start,draw.start)||!Object.is(range.count,draw.count))throw Error('Float32 original: source shader/uniform/material/attribute owner changed');
+    for(let i=0;i<arrays.length;i++){
+      if(attributes[i].array!==arrays[i])throw Error('Float32 original: source backing array changed');
+      const actual=new Uint8Array(arrays[i].buffer,arrays[i].byteOffset,arrays[i].byteLength),expected=new Uint8Array(oracles[i].buffer,oracles[i].byteOffset,oracles[i].byteLength);
+      if(actual.length!==expected.length||actual.some((v,j)=>v!==expected[j]))throw Error('Float32 original: source bytes changed');
+    }
+    return true;
+  };
+  return {verify,get retainedArrays(){return released?[]:oracles.map((array,i)=>({array,owner:'terrain-float32-original-oracle/'+i}));},
+    receipt(){verify();return {kind:'unchanged original Float32 terrain owners',materialId:material.id,materialUuid:material.uuid,
+      vertexShader:shader.vertexShader,fragmentShader:shader.fragmentShader,uniformKeys:keys.slice(),textureUuids:textures.map(t=>t.uuid),
+      sourceBytes:arrays.reduce((n,a)=>n+a.byteLength,0),sourceBytesExact:true,uniformRecordsExact:true,uniformValuesExact:true,sourceLayoutExact:true,sourceBoundsExact:true,drawStateExact:true,
+      children:root.children.map(c=>({materialId:c.material.id,materialUuid:c.material.uuid,originalMaterialShared:c.material===material}))};},
+    release(){verify();oracles.length=0;released=true;},get released(){return released;}};
+}
 export function installTerrainPartition(world,THREE,partition,{reversible=false}={}) {
   const root=world.terrainMesh,source=root.geometry;
   if(root.children.length||Object.keys(source.attributes).sort().join(',')!=='position,uv'||!source.index)throw new Error('terrain partition: unexpected root geometry');

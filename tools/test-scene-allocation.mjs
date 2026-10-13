@@ -1,7 +1,7 @@
 // Pure CPU controls: fake native GL records unchanged calls; no browser or renderer is launched.
 import assert from 'node:assert/strict';
 import {isDeepStrictEqual} from 'node:util';
-import {failPaintedComparison,collectPaintedIsolation,AllocationLedger,mipSizes,installAllocationObserver,ReservationPeak,rejectionObservation,reduceSceneObservations,reduceFocusedLookoutObservations,focusedSceneResourceErrors,sampleSceneAllocations,initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,expandSceneContext,sceneReportEnvelope,scenePartHeader,createSceneMatrixMerger} from './bake/scene-allocation.mjs';
+import {float32TerrainRetirementErrors,float32OriginalReceiptValid,reduceFocusedFloat32LookoutObservations,failPaintedComparison,collectPaintedIsolation,AllocationLedger,mipSizes,installAllocationObserver,ReservationPeak,rejectionObservation,reduceSceneObservations,reduceFocusedLookoutObservations,focusedSceneResourceErrors,sampleSceneAllocations,initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,expandSceneContext,sceneReportEnvelope,scenePartHeader,createSceneMatrixMerger} from './bake/scene-allocation.mjs';
 import {deriveSceneStressContract} from './bake/inactive-figures.mjs';
 import {QUALIFIED_HYBRID} from './bake/review-current-compression.mjs';
 
@@ -596,6 +596,69 @@ for(const failAt of [1,2]){
    assert.ok(error?.message==='focused scene: original/compact/restored whole painted frames differ'&&row.paintedIsolationFailure==='0'&&row.paintedIsolation.length===1
      &&(failAt===1?calls.length===0:calls.join(',')==='install-clone,capture-clone,restore-clone,verify-clone'),name+': original mismatch remains primary while save failure/independent cleanup retained');}]);mutants[name]={paintedFailure:async()=>{}};
 }
+function float32RetirementFixture(zero=false){
+ const original={kind:'unchanged original Float32 terrain owners',materialId:7,materialUuid:'original-material',vertexShader:'original vertex',fragmentShader:'original fragment',uniformKeys:['uGround'],textureUuids:['original-texture'],sourceBytes:12750024,sourceBytesExact:true,uniformRecordsExact:true,uniformValuesExact:true,sourceLayoutExact:true,sourceBoundsExact:true,drawStateExact:true,children:[]};
+ const rows=[],cycles=[],states=[];let next=1,events=[];
+ for(const [i,operation]of ['install-original','restore-partition'].entries()){
+   const arrays=[],chunks=i?5:1;
+   for(let mesh=0;mesh<chunks;mesh++)for(const key of ['position','uv','index']){
+     const vertices=i?(mesh===4?58843:58841):290157,triangles=i?(mesh===4?115783:115781):578907,itemSize=key==='position'?3:key==='uv'?2:1,count=key==='index'?triangles*3:vertices,bpp=key==='index'&&i?2:4,bytes=count*itemSize*bpp,id=next++;
+     arrays.push({mesh,key,itemSize,count,bytes,arrayType:key==='index'?(i?'Uint16Array':'Uint32Array'):'Float32Array',reservations:zero&&i===0?[]:[{id,bytes,pendingDelete:false}]});
+   }
+   const slots=arrays.flatMap(a=>a.reservations),base=states.length+1;
+   states.push({sequence:base,captureId:base,allocation:{bufferSlots:structuredClone(slots),nativeEvents:structuredClone(events)}});
+   events.push(...slots.map(p=>({kind:'buffer',id:p.id,operation:'retire'})));
+   states.push({sequence:base+1,captureId:base+1,allocation:{bufferSlots:slots.map(p=>({...p,pendingDelete:true})),nativeEvents:structuredClone(events)}});
+   events.push({operation:'finish',kind:null,id:null},...slots.map(p=>({operation:'release',kind:'buffer',id:p.id})));
+   states.push({sequence:base+2,captureId:base+2,allocation:{bufferSlots:[],nativeEvents:structuredClone(events)}});
+   cycles.push({kind:'terrain',index:i+1,sampleIds:[base,base+1,base+2]});
+   rows.push({operation,cycleIndex:i+1,nativeFrame:zero&&!i?0:7,nativeRenders:zero&&!i?0:7,arrays,original:{...original,children:i?Array.from({length:5},()=>({materialId:7,materialUuid:'original-material',originalMaterialShared:true})):[]}});
+ }
+ return {fault:'candidate-http',states,resource:{cycles,terrainRetirements:rows}};
+}
+api.float32Retire=float32TerrainRetirementErrors;api.float32Focused=reduceFocusedFloat32LookoutObservations;api.float32Proof=float32OriginalReceiptValid;
+function float32ResourceFixture(){
+ const r=focusedResourceFixture(),p=float32RetirementFixture(true),base=r.states[0].allocation,original=p.resource.terrainRetirements[0].original;
+ r.fault=p.fault;r.states=p.states.map(s=>({...s,glError:0,unmappedBufferBytes:0,float32Original:original,focusedPixel:r.states[0].focusedPixel,allocation:{...base,...s.allocation,nativeEvents:[...base.nativeEvents,...s.allocation.nativeEvents]}}));
+ r.resource.cycles=[r.resource.cycles[0],...p.resource.cycles.map(c=>({...c,index:c.index+1,complete:true,errors:[],checks:[{lost:false,error:0}]}))];
+ r.resource.terrainRetirements=p.resource.terrainRetirements.map(t=>({...t,cycleIndex:t.cycleIndex+1}));r.resource.originalProof=original;r.resource.originalProofReleased=true;
+ r.partition={kind:'Float32 with retained exact original',bytes:9357582,sourceBytes:12750024,triangles:578907,chunks:5,materialShared:true};r.resource.terrain={...r.partition};return r;
+}
+checks.push(['float32-resource-valid',a=>assert.deepEqual(a.resource(float32ResourceFixture(),{float32:true}),[],'float32-resource-valid: separate source-bound bookkeeping policy')]);
+mutants['float32-resource-valid']={resource:()=>['invented failure']};
+for(const [name,mutate]of [
+ ['float32-resource-canonical-label',r=>r.resource.terrain.kind='canonical with retained exact original'],
+ ['float32-resource-wrong-size',r=>r.partition.bytes=5827098],
+ ['float32-resource-wrong-triangles',r=>r.partition.triangles--],
+ ['float32-resource-cloned-material',r=>r.partition.materialShared=false],
+ ['float32-resource-unreleased-proof',r=>r.resource.originalProofReleased=false],
+ ['float32-resource-changed-uniform',r=>r.states[0].float32Original={...r.states[0].float32Original,uniformValuesExact:false}],
+ ['float32-resource-changed-shader',r=>r.states[0].float32Original={...r.states[0].float32Original,vertexShader:'mutated source'}],
+ ]){checks.push([name,a=>{const r=float32ResourceFixture();mutate(r);assert.ok(a.resource(r,{float32:true}).length,name+': isolated actual source/layout/lifetime evidence refused');}]);mutants[name]={resource:()=>[]};}
+checks.push(['float32-retirement-valid',a=>{assert.deepEqual(a.float32Retire(float32RetirementFixture()),[],'float32-retirement-valid: full actual array-ID lifecycle');assert.deepEqual(a.float32Retire(float32RetirementFixture(true)),[],'float32-retirement-valid: only fresh unrendered first fault source may lack native IDs');}]);
+mutants['float32-retirement-valid']={float32Retire:()=>['invented failure']};
+for(const[name,mutate,zero]of [
+ ['float32-retirement-zero-rendered',r=>r.resource.terrainRetirements[0].nativeFrame=1,true],
+ ['float32-retirement-missing-final-restore',r=>{r.resource.terrainRetirements.pop();r.resource.cycles.pop();}],
+ ['float32-retirement-false-zero-inventory',r=>{const t=r.resource.terrainRetirements[0];t.nativeFrame=0;t.nativeRenders=0;for(const a of t.arrays)a.reservations=[];}],
+ ['float32-retirement-early-finish',r=>r.states[1].allocation.nativeEvents.push({operation:'finish',kind:null,id:null})],
+ ['float32-retirement-zero-ordinary',r=>delete r.fault,true],
+ ['float32-retirement-zero-later',r=>{for(const a of r.resource.terrainRetirements[1].arrays)a.reservations=[];}],
+ ['float32-retirement-omitted-index',r=>r.resource.terrainRetirements[0].arrays.pop()],
+ ['float32-retirement-missing-chunk',r=>r.resource.terrainRetirements[1].arrays[0].reservations=[]],
+ ['float32-retirement-wrong-bytes',r=>r.resource.terrainRetirements[0].arrays[0].reservations[0].bytes++],
+ ['float32-retirement-missing-pending',r=>r.states[1].allocation.bufferSlots.shift()],
+ ['float32-retirement-surviving-id',r=>r.states[2].allocation.bufferSlots.push(r.states[0].allocation.bufferSlots[0])],
+ ['float32-retirement-early-upload',r=>r.states[1].allocation.nativeEvents.push({operation:'reserve',kind:'buffer',id:999})],
+ ['float32-retirement-no-finish',r=>r.states[2].allocation.nativeEvents=r.states[2].allocation.nativeEvents.filter(e=>e.operation!=='finish')],
+ ['float32-retirement-no-release',r=>r.states[2].allocation.nativeEvents=r.states[2].allocation.nativeEvents.filter(e=>e.operation!=='release')],
+ ['float32-retirement-child-clone',r=>r.resource.terrainRetirements[1].original.children[0].materialUuid='clone'],
+ ['float32-retirement-uniform-proof',r=>r.resource.terrainRetirements[0].original.uniformValuesExact=false],
+ ]){checks.push([name,a=>{const r=float32RetirementFixture(zero);mutate(r);assert.ok(a.float32Retire(r).length,name+': source-specific native refusal');}]);mutants[name]={float32Retire:()=>[]};}
+checks.push(['float32-never-full',a=>{const r=a.float32Focused({resourceFocus:'float32-lookout',cases:[{states:[{gpuReservation:270000000,conservativeReservation:270000001}]}]},{packId:'chattanooga',phaseId:'lookout-mountain'});assert.deepEqual([r.complete,r.fullMatrixComplete,r.fieldable,r.maxGpuReservation],[false,false,false,270000000],'float32-never-full: prerequisite cannot claim full acceptance');}]);
+mutants['float32-never-full']={float32Focused:()=>({complete:true})};
+checks.push(['float32-full-header-refusal',a=>{const r=qualifiedObservations();r.float32TerrainRepresentation='Float32 with retained exact original';assert.equal(a.reduce(r,phases).complete,false,'float32-full-header-refusal: full reducer rejects isolated representation');let rejected=false;try{a.merge(phases,r);}catch{rejected=true;}assert.ok(rejected,'float32-full-header-refusal: full merger rejects isolated representation');}]);
+mutants['float32-full-header-refusal']={reduce:()=>({complete:true}),merge:()=>({})};
 for(const [,check]of checks)await check(api);
 console.log(`SCENE-ALLOCATION OK (${checks.length}/${checks.length})`);
 if(process.argv.includes('--prove-fail')){

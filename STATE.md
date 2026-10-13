@@ -1,10 +1,10 @@
 # STATE
-2026-10-13 — v1 released558456f; ACTIVE0196 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
-Branch v1-1-gaps-20261012/source4675f8f pushed; ownCI38454248343 all9/fullroots/raw236+69CLEAR; ONCE causal38457785401 bound4675queued/nativeUNRUN; parent38451236734 all9/fullrootCLEAR. ONCE Gibson38454126921/cf46 whole11841986969/255969B/88bc7de4 rootCLEAR:1342m/1704living/Bronzeretained/SilverUNPROVED/next2UNRUN.0195 terrain69+69/scene236+236/Astra sourceCLEAR/nativeUNRUN. FirstpaintedRED38448190687 retained; nativecausalprobeUNRUN. COORDINATION absent; v1.1/v2 unreleased.
+2026-10-13 — v1 released558456f; ACTIVE0197 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
+Branch v1-1-gaps-20261012/source6773771; ownCI38457920213 all9/fullroots/raw242+236+69/native214CLEAR; ONCE northern38461620307/exact677 RUNNING/nativeROOTUNRUN.0197 explicitFloat32/source263+263/terrain80+80/UNIT/YAML31/Astra scopedCLEAR/nativeUNRUN; tenownedpathsWIP. Causal38457785401/exact4675 complete root:canonical+clone112max1/Float32exact0/allrestored0/GPU211271006/nineUNRUN; firstRED preserved. COORDINATION absent; v1.1/v2 unreleased.
 Accepted remote main9e72079; sourceCI38346843720 all9/full own251/365/171/159+201+three6smokes/digests clean.
 Main9eCI38349763169 all9/fullown/digests/rawprobe clear; Pages38349763192 exact9e/livev68 clear.
 MAIN13a7b136 exact protected11 dirty paths untouched; c328 failedmainCI38298643624 retained.
-Resource old38374246655/d333 full110+144PNG capFAIL493858706B/GPU470232876B. Restoration-inclusive conditional fixed246360782B/pixel3639218B; focused ten-native/full110 newcap UNRUN. Actual Post prerequisite10560740B native214 clear; original-identity terrain67+67 source clear.250MB/CPUcategories/art unchanged; no adoption.
+Resource old38374246655/d333 full110+144PNG capFAIL493858706B/GPU470232876B. All5Float32<=original conditional246360782B/pixel3639218B onlyifretirednonoverlap; native ten/full110 UNRUN. Actual Post10560740B native214 clear; exactmaterial/source80+80 guards clear.250MB/CPUcategories/art unchanged; no adoption.
 Progression[0,30,75,135,210,300,405,525,660,800]; capacity-bounded atomic level rewards unchanged.
 Mixed38282452947/9d60c12 qualified; root+Astra viewed001–076; exact11files/576frames/digests pass.
 8ASTC+2originalPNG close48,996,984B; diagnostic only; no runtime asset adoption.

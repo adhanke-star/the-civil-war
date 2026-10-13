@@ -275,11 +275,60 @@ export function reduceFocusedLookoutObservations(report,phase){
   const result=reduceSceneScope(report,[phase],1,true);
   return {...result,focusedComplete:result.complete,complete:false,fullMatrixComplete:false,fieldable:false};
 }
+export function reduceFocusedFloat32LookoutObservations(report,phase){
+  const result=reduceSceneScope(report,[phase],1,'float32');
+  return {...result,focusedComplete:result.complete,complete:false,fullMatrixComplete:false,fieldable:false};
+}
+export function float32OriginalReceiptValid(p){
+  return p?.kind==='unchanged original Float32 terrain owners'&&Number.isSafeInteger(p.materialId)&&p.materialId>=0&&typeof p.materialUuid==='string'&&!!p.materialUuid
+    &&typeof p.vertexShader==='string'&&!!p.vertexShader&&typeof p.fragmentShader==='string'&&!!p.fragmentShader
+    &&Array.isArray(p.uniformKeys)&&p.uniformKeys.length>0&&new Set(p.uniformKeys).size===p.uniformKeys.length&&p.uniformKeys.every(k=>typeof k==='string')
+    &&Array.isArray(p.textureUuids)&&p.textureUuids.every(k=>typeof k==='string'&&!!k)&&p.sourceBytes===12750024
+    &&['sourceBytesExact','uniformRecordsExact','uniformValuesExact','sourceLayoutExact','sourceBoundsExact','drawStateExact'].every(k=>p[k]===true)
+    &&Array.isArray(p.children)&&p.children.every(c=>c?.materialId===p.materialId&&c.materialUuid===p.materialUuid&&c.originalMaterialShared===true);
+}
+/** Real backing-array reservations, not owner-prefix guesses, bind each native retirement. */
+export function float32TerrainRetirementErrors(row){
+  const errors=[],fail=s=>errors.push(s),r=row?.resource,states=Array.isArray(row?.states)?row.states:[],cycles=Array.isArray(r?.cycles)?r.cycles.filter(c=>c?.kind==='terrain'):[],receipts=r?.terrainRetirements;
+  if(!Array.isArray(receipts)||receipts.length!==cycles.length||cycles.length!==(row?.fault===undefined?4:2)||receipts.at(-1)?.operation!=='restore-partition')return ['Float32 retirement inventory'];
+  let installs=0;
+  for(const [i,c]of cycles.entries()){
+    const t=receipts[i],ss=(Array.isArray(c.sampleIds)?c.sampleIds:[]).map(id=>states.find(s=>s?.captureId===id)),[before,pending,settled]=ss;
+    if(!t||t.cycleIndex!==c.index||!['install-original','restore-partition'].includes(t.operation)||t.operation!==(i%2?'restore-partition':'install-original')
+      ||!Number.isSafeInteger(t.nativeFrame)||t.nativeFrame<0||!Number.isSafeInteger(t.nativeRenders)||t.nativeRenders<0
+      ||!float32OriginalReceiptValid(t.original)||t.original.children.length!==(t.operation==='install-original'?0:5)||!Array.isArray(t.arrays)||!t.arrays.length||ss.length!==3||ss.some(s=>!s)
+      ||!(before?.sequence<pending?.sequence&&pending?.sequence<settled?.sequence)){fail('Float32 retirement source/capture chronology');continue;}
+    if(t.operation==='install-original')installs++;
+    const meshCount=t.operation==='install-original'?1:5,expectedBytes=t.operation==='install-original'?12750024:9357582,ids=new Map();
+    if(t.arrays.length!==meshCount*3||t.arrays.reduce((n,a)=>n+(a?.bytes||0),0)!==expectedBytes)fail('Float32 complete retiring arrays');
+    for(let mesh=0;mesh<meshCount;mesh++)for(const key of ['position','uv','index']){
+      const a=t.arrays.filter(a=>a?.mesh===mesh&&a.key===key);
+      if(a.length!==1){fail('Float32 omitted/duplicate source array');continue;}const x=a[0],stride=key==='position'?3:key==='uv'?2:1,bpp=key==='index'&&t.operation==='restore-partition'?2:4;
+      if(x.itemSize!==stride||!Number.isSafeInteger(x.count)||x.count<1||x.bytes!==x.count*stride*bpp||x.arrayType!==(key==='index'?(bpp===2?'Uint16Array':'Uint32Array'):'Float32Array')||!Array.isArray(x.reservations))fail('Float32 retiring array layout');
+      for(const p of Array.isArray(x.reservations)?x.reservations:[]){if(!Number.isSafeInteger(p?.id)||p.id<1||p.bytes!==x.bytes||p.pendingDelete!==false||ids.has(p.id))fail('Float32 actual array reservation');ids.set(p?.id,p?.bytes);}
+    }
+    const zero=ids.size===0,firstUnrendered=i===0&&installs===1&&row?.fault!==undefined&&t.operation==='install-original'&&t.nativeFrame===0&&t.nativeRenders===0;
+    if(zero&&!firstUnrendered||!zero&&t.arrays.some(a=>!a?.reservations?.length))fail('Float32 missing native backing-array IDs');
+    const slots=s=>Array.isArray(s?.allocation?.bufferSlots)?s.allocation.bufferSlots:[];
+    for(const [id,bytes]of ids){if(!slots(before).some(p=>p.id===id&&p.bytes===bytes&&p.pendingDelete===false)||!slots(pending).some(p=>p.id===id&&p.bytes===bytes&&p.pendingDelete===true)||slots(settled).some(p=>p.id===id))fail('Float32 native IDs not retired before replacement');}
+    const ev=s=>Array.isArray(s?.allocation?.nativeEvents)?s.allocation.nativeEvents:[],retired=ev(pending).slice(ev(before).length),completed=ev(settled).slice(ev(pending).length);
+    if(retired.some(e=>e.operation==='finish')||completed.filter(e=>e.operation==='finish').length!==1||[...retired,...completed].some(e=>e.kind==='buffer'&&e.operation==='reserve'))fail('Float32 finish before replacement upload');
+    if(zero&&(slots(before).some(b=>!Array.isArray(b?.owners)||b.owners.some(o=>typeof o==='string'&&(/(^scene\/terrain\b)|(^terrain-retained-source\/)/.test(o))))
+      ||[...retired,...completed].some(e=>e.kind==='buffer'&&['retire','release'].includes(e.operation))))fail('Float32 zero-ID source contradicts actual native inventory');
+    for(const [id]of ids)if(retired.filter(e=>e.kind==='buffer'&&e.id===id&&e.operation==='retire').length!==1||completed.filter(e=>e.kind==='buffer'&&e.id===id&&e.operation==='release').length!==1)fail('Float32 native retire/release journal');
+  }
+  return errors;
+}
 /** Source-specific resource prerequisite, called on a fully replayed native context. */
-export function focusedSceneResourceErrors(row){
+export function focusedSceneResourceErrors(row,{float32=false}={}){
   const errors=[],fail=s=>errors.push(s),r=row?.resource,states=Array.isArray(row?.states)?row.states:[],boot=row?.bootstrap;
   if(r?.ok!==true||r.exactOriginal!==true||r.bootstrapDraws!==0||r.pixelBytes!==3639218||r.preparedReleased!==true
-    ||r.terrain?.kind!=='canonical with retained exact original'||r.terrain.bytes!==5827098||r.terrain.sourceBytes!==12750024)fail('canonical native owner/restoration');
+    ||r.terrain?.kind!==(float32?'Float32 with retained exact original':'canonical with retained exact original')||r.terrain.bytes!==(float32?9357582:5827098)||r.terrain.sourceBytes!==12750024)fail('canonical native owner/restoration');
+  if(float32){if(!float32OriginalReceiptValid(r?.originalProof)||r.originalProof.children.length!==0||r.originalProofReleased!==true)fail('Float32 exact original source proof');
+    if(r?.terrain?.triangles!==578907||r.terrain.chunks!==5||r.terrain.materialShared!==true||row?.partition?.kind!=='Float32 with retained exact original'
+      ||row.partition.triangles!==578907||row.partition.chunks!==5||row.partition.materialShared!==true||row.partition.bytes!==9357582||row.partition.sourceBytes!==12750024)fail('Float32 actual partition publication');
+    for(const s of states.filter(s=>s?.float32Original)){if(!float32OriginalReceiptValid(s.float32Original)||JSON.stringify({...s.float32Original,children:[]})!==JSON.stringify({...r.originalProof,children:[]}))fail('Float32 unchanged original material/source');}
+    errors.push(...float32TerrainRetirementErrors(row));}
   if(!Array.isArray(boot)||boot.length!==1||boot[0]?.method!=='GET'||boot[0].removedEntryModules!==1
     ||![boot[0]?.originalSha256,boot[0]?.servedSha256].every(s=>/^[a-f0-9]{64}$/.test(s||''))||boot[0]?.originalSha256===boot[0]?.servedSha256)fail('original document bootstrap');
   try{const u=new URL(boot?.[0]?.url);if(u.searchParams.get('battle')!=='chattanooga'||u.searchParams.get('phase')!=='lookout-mountain'
@@ -315,7 +364,7 @@ export function focusedSceneResourceErrors(row){
   for(const [i,input]of (Array.isArray(cycles)?cycles:[]).entries()){const c=input||{};
     if(c.index!==i+1||c.complete!==true||!Array.isArray(c.errors)||c.errors.length||!Array.isArray(c.checks)||!c.checks.length||c.checks.some(x=>x?.lost!==false||x?.error!==0)
       ||!Array.isArray(c.sampleIds)||!c.sampleIds.length||c.sampleIds.some(id=>!states.some(s=>s?.captureId===id)))fail('checked native retirement cycle');
-    if(c.kind==='terrain'){const samples=(Array.isArray(c.sampleIds)?c.sampleIds:[]).map(id=>states.find(s=>s?.captureId===id));if(samples.length!==3)fail('terrain retirement chronology');
+    if(c.kind==='terrain'&&!float32){const samples=(Array.isArray(c.sampleIds)?c.sampleIds:[]).map(id=>states.find(s=>s?.captureId===id));if(samples.length!==3)fail('terrain retirement chronology');
       const owned=array(samples[0]?.allocation?.bufferSlots,'terrain buffers').filter(b=>Array.isArray(b?.owners)&&b.owners.some(o=>typeof o==='string'&&o.startsWith('terrain-canonical-'))).map(b=>b.id);
       if(!owned.length||owned.some(id=>!array(samples[1]?.allocation?.bufferSlots,'pending terrain buffers').some(b=>b?.id===id&&b.pendingDelete)||array(samples[2]?.allocation?.bufferSlots,'settled terrain buffers').some(b=>b?.id===id)))fail('canonical buffers retired before original upload');}
   }
@@ -325,14 +374,14 @@ export function focusedSceneResourceErrors(row){
 export function scenePartHeader(report){
   return Object.fromEntries(['diagnosticOnly','fieldable','toolSha','run','route','sceneRoutes','fallbackCompletion','normalMotion','nativeHistoryRequired',
     'inactivePrototype','terrainPartitionPrototype','terrainRestorationObserved','limits','qualification','nativeDriverMemory','cpuDecodePeak','unverified',
-    'resourceFocus','canonicalTerrainRepresentation','postPixelBytes','mipPolicy']
+    'resourceFocus','canonicalTerrainRepresentation','float32TerrainRepresentation','postPixelBytes','mipPolicy']
     .filter(k=>Object.hasOwn(report||{},k)).map(k=>[k,structuredClone(report[k])]));
 }
 /** Consume eleven bounded phase parts; never reconstruct the aggregate JSON or retain previous rows. */
 export function createSceneMatrixMerger(phases,header){
   const matrix=sceneMatrixContract(phases),expected=phases.map(p=>p.packId+'/'+p.phaseId),common=scenePartHeader(header),errors=[],parts=[],contexts=new Set(),tuples=new Set();
   let maxReservation=null,maxGpuReservation=null,closed=false;
-  if(common.sceneRoutes!=='qualified-both'||common.resourceFocus!==undefined)throw Error('scene parts: full qualified header required');
+  if(common.sceneRoutes!=='qualified-both'||common.resourceFocus!==undefined||common.float32TerrainRepresentation!==undefined)throw Error('scene parts: full qualified header required');
   const rowKey=(r,fault)=>r?.packId+'/'+r?.phaseId+'/'+r?.route+'/'+(fault?r?.fault:'ordinary');
   const required=new Set([...matrix.cases.map(r=>rowKey(r,false)),...matrix.faults.map(r=>rowKey(r,true))]);
   const mergePeak=(value,current)=>Number.isSafeInteger(value)&&value>=0?current===null?value:Math.max(value,current):current;
@@ -388,6 +437,7 @@ export async function collectPaintedIsolation({rows,install,capture,restore,veri
 }
 
 function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) {
+  const float32Policy=canonicalPolicy==='float32',prefix=float32Policy?'float32':'canonical',partitionKind=float32Policy?'partition':'compact';
   const errors=[], expected=(Array.isArray(phases)?phases:[]).map(p=>`${p?.packId}/${p?.phaseId}`), seen=new Set(), samples=[];
   const fail=message=>errors.push(message);
   const keep=s=>samples.push({gpuReservation:s?.gpuReservation,conservativeReservation:s?.conservativeReservation});
@@ -401,10 +451,10 @@ function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) 
     for(const s of Array.isArray(row?.preload?.transaction?.samples)?row.preload.transaction.samples:[])keep(s?.observation);
   }
   if(report.sceneRoutes!==undefined&&!['current-png','qualified-both'].includes(report.sceneRoutes))fail('unknown scene route mode');
-  if(canonicalPolicy){if(expected.length!==1||expected[0]!=='chattanooga/lookout-mountain'||report.resourceFocus!=='canonical-lookout'
-    ||report.canonicalTerrainRepresentation!=='canonical with retained exact original'||report.postPixelBytes!==3639218||report.mipPolicy!=='full-original'
+  if(canonicalPolicy){if(expected.length!==1||expected[0]!=='chattanooga/lookout-mountain'||report.resourceFocus!==`${prefix}-lookout`
+    ||(float32Policy?report.float32TerrainRepresentation!=='Float32 with retained exact original'||report.canonicalTerrainRepresentation!==undefined:report.canonicalTerrainRepresentation!=='canonical with retained exact original'||report.float32TerrainRepresentation!==undefined)||report.postPixelBytes!==3639218||report.mipPolicy!=='full-original'
     ||report.nativeHistoryRequired!==true||report.fallbackCompletion!=='native-finish-after-candidate-disposal')fail('focused canonical Lookout contract');
-  }else if(report.resourceFocus!==undefined||report.canonicalTerrainRepresentation!==undefined||report.postPixelBytes!==undefined||report.mipPolicy!==undefined)fail('focused evidence cannot qualify full matrix');
+  }else if(report.resourceFocus!==undefined||report.canonicalTerrainRepresentation!==undefined||report.float32TerrainRepresentation!==undefined||report.postPixelBytes!==undefined||report.mipPolicy!==undefined)fail('focused evidence cannot qualify full matrix');
   if(report.fallbackCompletion!==undefined&&(report.sceneRoutes!=='qualified-both'||report.fallbackCompletion!=='native-finish-after-candidate-disposal'))fail('unknown fallback completion contract');
   if(report.sceneRoutes!=='qualified-both'&&(report.qualification!==undefined||report.faults!==undefined))fail('qualified evidence requires explicit qualified mode');
   if(new Set(expected).size!==expected.length||expected.length!==requiredPhases)fail('phase contract');
@@ -433,7 +483,7 @@ function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) 
     const candidateNames=Array.from({length:2},(_,look)=>Array.from({length:5},(_,i)=>`cs-close-${look?'h2_slouch_roll_butternut':'base'}-${i}-${i===4?'original.png':'astc.ktx2'}`)).flat();
     const q=report.qualification;
     if(report.diagnosticOnly!==true||report.fieldable!==false||report.normalMotion!==true||report.limits?.gpuBytes!==250000000
-      ||report.inactivePrototype!==true||report.terrainPartitionPrototype!==(canonicalPolicy?false:true)||report.terrainRestorationObserved!==true||report.failure!==undefined)fail('qualified report contract');
+      ||report.inactivePrototype!==true||report.terrainPartitionPrototype!==(canonicalPolicy&&!float32Policy?false:true)||report.terrainRestorationObserved!==true||report.failure!==undefined)fail('qualified report contract');
     if(q?.run!==38282452947||q.sha!=='9d60c12cfddadac7c74e7126b33ba568071c2066'||q.closeGpuBytes!==48996984
       ||q.optimized?.id!==11762770795||q.optimized.name!=='cs-close-qualified-hybrid'||q.optimized.size!==41324044
       ||q.optimized.digest!=='278f619d48f77a22ce9be20ea3f0461e0e5e933960fa14953a02a9664194b60b'
@@ -491,7 +541,7 @@ function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) 
       if(row?.complete!==true||row.contextClosed!==true||!Array.isArray(row.errors)||row.errors.length)fail(label+': completed context');
       admission(row,label);
       if(report.nativeHistoryRequired===true&&!row?.history)fail(label+': mandatory native allocation history');
-      if(canonicalPolicy)for(const error of focusedSceneResourceErrors(row))fail(label+': '+error);
+      if(canonicalPolicy)for(const error of focusedSceneResourceErrors(row,{float32:float32Policy}))fail(label+': '+error);
     };
     const chronology=(list,label)=>{
       const ordered=list.filter(Boolean).slice().sort((a,b)=>a.sequence-b.sequence),seq=new Set();let peak=-1,finish=0;
@@ -556,13 +606,13 @@ function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) 
       nativeRestore(row,label); // Collect every peak before rejecting malformed/duplicate identity.
       if(!expected.includes(`${row?.packId}/${row?.phaseId}`)||!SCENE_ROUTES.includes(row?.route)||ordinary.has(label))fail(label+': ordinary tuple');
       ordinary.set(label,{ordinaryRoster:row?.ordinaryRoster,warm:{retainedRoster:row?.warm?.retainedRoster,spawned:row?.warm?.spawned}});context(row,label);
-      const labels=states.map(s=>s?.label),required=['field',canonicalPolicy?'canonical-field':'partition-field','inactive-field','both-close-tiers','lens-depth','lens-resize','lens-retired','narrow-resize',
+      const labels=states.map(s=>s?.label),required=['field',canonicalPolicy?`${prefix}-field`:'partition-field','inactive-field','both-close-tiers','lens-depth','lens-resize','lens-retired','narrow-resize',
         'rigged-reactivation','near-lod-reupload','baked-reclamation','compare-rigged-left','compare-baked-left','baked-restored',
-        ...(row?.phaseId==='lookout-mountain'?[canonicalPolicy?'canonical-native-zoom':'partition-native-zoom','framed-compare-rigged-left','framed-compare-baked-left','framed-baked-restored']:[])];
+        ...(row?.phaseId==='lookout-mountain'?[canonicalPolicy?`${prefix}-native-zoom`:'partition-native-zoom','framed-compare-rigged-left','framed-compare-baked-left','framed-baked-restored']:[])];
       if(new Set(labels).size!==labels.length||required.some(l=>!labels.includes(l)))fail(label+': required ordinary/transition states');
       if(row?.phaseId==='lookout-mountain'){
         const captures=array(row?.canvasCaptures,label+'/canvas captures'),captureLabels=[...(canonicalPolicy?
-          [...['original','compact','restored'].flatMap(kind=>['overview','near','boundary'].map(view=>`canonical-${kind}-${view}`)),'canonical-height-control','canonical-uv-control','canonical-controls-repaired']:
+          [...['original',partitionKind,'restored'].flatMap(kind=>['overview','near','boundary'].map(view=>`${prefix}-${kind}-${view}`)),`${prefix}-height-control`,`${prefix}-uv-control`,`${prefix}-controls-repaired`]:
           ['terrain-partition-01-before.png','terrain-partition-02-after.png','terrain-partition-03-zoom.png']),
           'rigged-reactivation','near-lod-reupload','baked-reclamation','compare-rigged-left','compare-baked-left','baked-restored','framed-compare-rigged-left','framed-compare-baked-left','framed-baked-restored'];
         if(captures.length!==captureLabels.length||new Set(captures.map(c=>c?.label)).size!==captureLabels.length||captureLabels.some(l=>!captures.some(c=>c?.label===l)))fail(label+': complete numbered Lookout canvas captures');
@@ -586,7 +636,8 @@ function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) 
             const world=c?.world?.[kind],owners=Array.isArray(world?.owners)?world.owners:[];
             if(typeof world?.root!=='string'||!world.root||!owners.length||owners.some(o=>typeof o?.mesh!=='string'||!o.mesh||typeof o.geometry!=='string'||!o.geometry
               ||!Array.isArray(o.arrays)||!o.arrays.length||o.arrays.some(a=>typeof a?.key!=='string'||!safe(a.bytes)||a.bytes===0||!/^[a-f0-9]{64}$/.test(a.sha256||''))
-              ||kind==='terrain'&&!(canonicalPolicy&&!/^canonical-(original|restored)-/.test(c.label)?
+              ||kind==='terrain'&&!(float32Policy?
+                owners.length===(/^float32-(original|restored)-/.test(c.label)?1:5)&&o.material===row.resource?.originalProof?.materialUuid&&o.arrays.length===3&&['position','uv','index'].every(k=>o.arrays.some(a=>a.key===k&&a.arrayType===(k==='index'?(/^float32-(original|restored)-/.test(c.label)?'Uint32Array':'Uint16Array'):'Float32Array')&&a.itemSize===(k==='position'?3:k==='uv'?2:1)&&a.normalized===false&&Number.isSafeInteger(a.count)&&a.count>0&&a.bytes===a.count*a.itemSize*(k==='index'&&!/^float32-(original|restored)-/.test(c.label)?2:4))):canonicalPolicy&&!float32Policy&&!/^canonical-(original|restored)-/.test(c.label)?
                 o.arrays.length===3&&['aGrid','aHeight','index'].every(k=>o.arrays.some(a=>a.key===k&&a.arrayType===(k==='aHeight'?'Float32Array':'Uint16Array')&&a.itemSize===(k==='aGrid'?2:1)&&a.normalized===false&&Number.isSafeInteger(a.count)&&a.count>0&&a.bytes===a.count*a.itemSize*(k==='aHeight'?4:2))):
                 o.arrays.some(a=>a.key==='position'&&a.bytes>0)))
               ||kind==='trees'&&!owners.some(o=>Array.isArray(o.arrays)&&o.arrays.some(a=>a.key==='instanceMatrix'&&a.bytes>0)))fail(label+': actual '+kind+' array bindings');
@@ -594,16 +645,17 @@ function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) 
           if(!safe(c?.world?.trees?.count)||!c.world.trees.count||!Array.isArray(c?.roster)||!c.roster.length||JSON.stringify(c.roster)!==JSON.stringify(row.ordinaryRoster))fail(label+': actual trees and ordinary roster');
         }
         if(canonicalPolicy){
-          for(const view of ['overview','near','boundary']){const frames=['original','compact','restored'].map(kind=>captures.find(c=>c.label===`canonical-${kind}-${view}`)),first=frames[0];
+          for(const view of ['overview','near','boundary']){const frames=['original',partitionKind,'restored'].map(kind=>captures.find(c=>c.label===`${prefix}-${kind}-${view}`)),first=frames[0];
             if(frames.some(c=>!c||!/^[a-f0-9]{64}$/.test(c.pixelSha256||'')||c.pixelSha256!==first?.pixelSha256||c.width!==first?.width||c.height!==first?.height||c.simTime!==0
               ||JSON.stringify(c.camera)!==JSON.stringify(first?.camera)||JSON.stringify(c.roster)!==JSON.stringify(first?.roster)||JSON.stringify(c.world?.trees)!==JSON.stringify(first?.world?.trees)
               ||!c.figurePublication||JSON.stringify(c.figurePublication)!==JSON.stringify(first?.figurePublication))
               ||JSON.stringify(frames[0]?.world?.terrain)!==JSON.stringify(frames[2]?.world?.terrain))fail(label+': exact whole original/canonical/restored painted frames');}
-          const baseline=captures.find(c=>c.label==='canonical-compact-boundary'),height=captures.find(c=>c.label==='canonical-height-control'),uv=captures.find(c=>c.label==='canonical-uv-control'),repair=captures.find(c=>c.label==='canonical-controls-repaired');
+          const baseline=captures.find(c=>c.label===`${prefix}-${partitionKind}-boundary`),height=captures.find(c=>c.label===`${prefix}-height-control`),uv=captures.find(c=>c.label===`${prefix}-uv-control`),repair=captures.find(c=>c.label===`${prefix}-controls-repaired`);
           if(!baseline||[height,uv,repair].some(c=>!c||!/^[a-f0-9]{64}$/.test(c.pixelSha256||'')||JSON.stringify(c.camera)!==JSON.stringify(baseline.camera)||JSON.stringify(c.roster)!==JSON.stringify(baseline.roster))
             ||height?.pixelSha256===baseline?.pixelSha256||uv?.pixelSha256===baseline?.pixelSha256||repair?.pixelSha256!==baseline?.pixelSha256)fail(label+': healthy height/UV controls and exact repair');
-          if(!Array.isArray(row.canonicalViews)||row.canonicalViews.length!==3||JSON.stringify(row.canonicalViews.map(v=>v.label))!==JSON.stringify(['overview','near','boundary'])
-            ||!Array.isArray(row.canonicalViews[2]?.sharedChunkBoundary)||row.canonicalViews[2].sharedChunkBoundary.length!==2||!row.canonicalViews[2].sharedChunkBoundary.every(Number.isFinite))fail(label+': actual shared chunk boundary');
+          const views=float32Policy?row.float32Views:row.canonicalViews;
+          if(!Array.isArray(views)||views.length!==3||JSON.stringify(views.map(v=>v.label))!==JSON.stringify(['overview','near','boundary'])
+            ||!Array.isArray(views[2]?.sharedChunkBoundary)||views[2].sharedChunkBoundary.length!==2||!views[2].sharedChunkBoundary.every(Number.isFinite))fail(label+': actual shared chunk boundary');
         }
         const frames=['framed-compare-rigged-left','framed-compare-baked-left','framed-baked-restored'].map(l=>captures.find(c=>c?.label===l)),framed=row?.framedComparison;
         if(!framed||!Array.isArray(framed.position)||framed.position.length!==2||framed.simTime!==0||framed.goal?.dist!==200

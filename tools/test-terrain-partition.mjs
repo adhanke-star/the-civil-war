@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';import * as THREE from 'three';
 import fs from 'node:fs';import {gunzipSync} from 'node:zlib';import Martini from '../vendor/@mapbox/martini/index.js';
-import {partitionTerrain,installTerrainPartition,registerTerrainPartition,prepareCanonicalTerrain,createCanonicalTerrainMesh,installCanonicalTerrain} from './bake/partition-terrain.mjs';
+import {captureFloat32TerrainOriginal,partitionTerrain,installTerrainPartition,registerTerrainPartition,prepareCanonicalTerrain,createCanonicalTerrainMesh,installCanonicalTerrain} from './bake/partition-terrain.mjs';
 import {TerrainData,buildTerrainMesh} from '../src/world/terrain.js';
 const size=257,position=new Float32Array(size*size*3),uv=new Float32Array(size*size*2),indices=[];
 for(let z=0;z<size;z++)for(let x=0;x<size;x++){const i=z*size+x;position.set([x,x===0&&z===0?-0:Math.sin(x+z),z],i*3);uv.set([x/(size-1),z/(size-1)],i*2);if(x<size-1&&z<size-1)indices.push(i,i+size,i+1,i+1,i+size,i+size+1);}
 const source={position,uv,index:new Uint32Array(indices)},api={partition:partitionTerrain,install:installTerrainPartition,register:registerTerrainPartition,canonical:prepareCanonicalTerrain,canonicalMesh:createCanonicalTerrainMesh};
 api.build=buildTerrainMesh;
 api.replaceCanonical=installCanonicalTerrain;
+api.originalProof=captureFloat32TerrainOriginal;
 function retainedFixture(a){
  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array([0,0,0,1,0,0,0,0,1]),3));geo.setAttribute('uv',new THREE.BufferAttribute(new Float32Array([0,0,1,0,0,1]),2));geo.setIndex(new THREE.BufferAttribute(new Uint16Array([0,1,2]),1));geo.computeBoundingBox();geo.computeBoundingSphere();
  const root=new THREE.Mesh(geo,new THREE.MeshBasicMaterial()),receipt=a.install({terrainMesh:root},THREE,partitionTerrain,{reversible:true});return {geo,root,receipt};
@@ -173,5 +174,26 @@ checks.push(
  ['partition-publish-add',a=>{const f=publicationFixture(a,'add');assert.ok(f.error instanceof AggregateError&&f.error.errors.includes(0)&&f.root.geometry===f.geo&&!f.root.children.length&&f.owned.every(g=>f.disposed.has(g)),'partition-publish-add: after-add exception rolls back captured owned mesh/geometry');}],
 );
 for(const name of ['partition-publish-falsy','partition-publish-add'])mutants[name]={install:()=>({})};
+function originalProofFixture(){
+ const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array([-0,0,0,1,0,0,0,0,1]),3));geo.setAttribute('uv',new THREE.BufferAttribute(new Float32Array([0,0,1,0,0,1]),2));geo.setIndex(new THREE.BufferAttribute(new Uint16Array([0,1,2]),1));geo.computeBoundingBox();geo.computeBoundingSphere();
+ const mat=new THREE.ShaderMaterial({uniforms:{uLit:{value:1.15},uSun:{value:new THREE.Vector3(1,2,3)},uGround:{value:new THREE.Texture()}}}),root=new THREE.Mesh(geo,mat);return {world:{terrainMesh:root},root,geo,mat};
+}
+for(const [name,mutate]of [
+ ['float32-original-scalar',f=>f.mat.uniforms.uLit.value=0],
+ ['float32-original-vector',f=>f.mat.uniforms.uSun.value.x=99],
+ ['float32-original-layout',f=>f.geo.attributes.position.itemSize=2],
+ ['float32-original-bounds',f=>f.geo.boundingSphere.radius=0],
+ ['float32-original-draw-order',f=>f.root.renderOrder=99],
+ ['float32-original-shader',f=>f.mat.vertexShader+='\n// changed'],
+ ['float32-original-texture',f=>f.mat.uniforms.uGround.value=new THREE.Texture()],
+ ['float32-original-source-bits',f=>f.geo.attributes.position.array[0]=0],
+ ['float32-original-child-material',f=>f.root.children[0].material=f.mat.clone()],
+ ['float32-original-depth',f=>f.mat.depthWrite=false],
+ ]){
+ checks.push([name,a=>{const f=originalProofFixture(),proof=a.originalProof(f.world);assert.equal(proof.verify(),true,name+': intact source');const partition=installTerrainPartition(f.world,THREE,partitionTerrain,{reversible:true});assert.equal(proof.verify(),true,name+': real replacement retains source');mutate(f);let error;try{proof.verify();}catch(e){error=e;}assert.ok(error?.message.startsWith('Float32 original:'),name+': actual mutation refused');}]);
+ mutants[name]={originalProof:()=>({verify:()=>true})};
+}
+checks.push(['float32-original-release',a=>{const f=originalProofFixture(),proof=a.originalProof(f.world),partition=installTerrainPartition(f.world,THREE,partitionTerrain,{reversible:true});assert.equal(proof.retainedArrays.reduce((n,r)=>n+r.array.byteLength,0),66,'float32-original-release: byte oracle declared');partition.restore();const r=proof.receipt();assert.ok(r.sourceBytesExact&&r.uniformValuesExact&&r.sourceBoundsExact&&r.drawStateExact&&r.materialId===f.mat.id&&!r.children.length,'float32-original-release: exact original receipt');proof.release();assert.ok(proof.released&&!proof.retainedArrays.length,'float32-original-release: successful oracle release');let error;try{proof.verify();}catch(e){error=e;}assert.ok(error,'float32-original-release: stale proof refused');}]);
+mutants['float32-original-release']={originalProof:()=>({retainedArrays:[],verify:()=>true,receipt:()=>({}),release(){}})};
 for(const [,check]of checks)await check(api);console.log(`TERRAIN-PARTITION OK (${checks.length}/${checks.length})`);
 if(process.argv.includes('--prove-fail')){for(const [name,check]of checks){let error;try{await check({...api,...mutants[name]});}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&error.message.startsWith(name),`${name}: mutant must fail its own assertion`);console.log(`CAUGHT ${name}`);}console.log(`TERRAIN-PARTITION CONTROLS OK (${checks.length}/${checks.length})`);}
