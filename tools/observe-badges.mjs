@@ -148,6 +148,95 @@ const finitePoint=p=>dense(p)&&p.length===2&&p.every(Number.isFinite);
 const terminal=s=>s!=='pending';
 const success=s=>['accepted','already-satisfied'].includes(s);
 
+/** First finite tactics approved by Astra. These are hypotheses, never promised badge outcomes. */
+export function badgeTactic(game,observation){
+  const recipe=BADGE_OBSERVATIONS.find(r=>r.id===observation),s=game.scenario;
+  if(!recipe||game.simTime!==0||game.playerSide!=='US'||s?.id!==recipe.packId+'-'+recipe.phaseId)fail('tactic initial phase/time/side');
+  const roster=[...new Set([...s.units,...(s.reinforcements||[])].map(u=>u.id))],plan=[];
+  const unit=(name,side='US',type='brigade')=>side.toLowerCase()+'-'+name+'-'+type;
+  const us=name=>unit(name),cs=name=>unit(name,'CS'),battery=name=>unit(name,'US','battery');
+  const orderable={kind:'actor-orderable'},successDep=id=>({id,require:'success'}),terminalDep=id=>({id,require:'terminal'});
+  const add=(id,type,unitId,{start=0,end,after=[],condition=[],...extra}={})=>{
+    plan.push({id,notBefore:start,expires:end,after,condition:[orderable,...condition],command:{type,unitId,...extra}});return id;
+  };
+  const move=(id,actor,point,options)=>add(id,'move',actor,{...options,path:{kind:'actor-to-point',point}});
+  const toward=(id,actor,targetId,standOff,options)=>add(id,'move',actor,{...options,targetId,path:{kind:'actor-to-target',standOff}});
+  const charge=(id,actor,targetId,options={})=>add(id,'charge',actor,{...options,targetId,path:{kind:'actor-to-target',standOff:0},condition:[
+    ...(options.condition||[]),{kind:'target-unbroken',targetId},{kind:'distance',targetId,max:180},{kind:'support',radius:250,min:1,types:['infantry']}]});
+  const ended=(actorId,targetId,afterStage)=>({kind:'native-engagement-ended',actorId,targetId,afterStage,quietSeconds:10});
+  const r=us('roberts'),g=us('greusel'),m=cs('manigault');
+  if(observation==='slaughter-fire'){
+    move('roberts-cedars',r,[310,800],{end:120});
+    add('roberts-hold','hold',r,{end:120,after:[successDep('roberts-cedars')],condition:[{kind:'arrived',point:[310,800],radius:20}]});
+    add('stanley-hold','hold',us('stanley'),{end:1});
+    const near=[{kind:'target-unbroken',targetId:m},{kind:'distance',targetId:m,max:220}];
+    add('greusel-holdfire','holdfire',g,{end:400,condition:near,enabled:true});
+    add('greusel-run','run',g,{end:400,after:[successDep('greusel-holdfire')],enabled:true});
+    toward('greusel-approach',g,m,45,{end:400,after:[successDep('greusel-run')]});
+    add('greusel-fire-hold','hold',g,{end:599,after:[successDep('greusel-approach')],condition:[{kind:'fire-ready',maxDistance:55}]});
+    add('greusel-stop-run','run',g,{end:599,after:[successDep('greusel-fire-hold')],enabled:false});
+    add('greusel-release','holdfire',g,{end:599,after:[successDep('greusel-stop-run')],enabled:false});
+    add('cleanup-run','run',g,{start:600,end:601,after:[terminalDep('greusel-release')],enabled:false});
+    add('cleanup-fire','holdfire',g,{start:600,end:601,after:[terminalDep('greusel-release')],enabled:false});
+  }else if(observation==='slaughter-defence'){
+    for(const actor of [r,g,us('schaefer'),us('stanley'),us('miller'),...['houghtaling','bush','hescock','bartlett'].map(battery)])add('hold-'+actor,'hold',actor,{end:1});
+    for(const actor of [us('shepherd'),us('j-beatty'),battery('terrill')])add('arrival-'+actor,'hold',actor,{start:450,end:480});
+  }else if(observation==='slaughter-recovery'){
+    add('roberts-hold','hold',r,{end:1});add('greusel-hold','hold',g,{end:1});
+    add('greusel-fallback','fallback',g,{end:450,condition:[{kind:'pressure',moraleMax:60}]});
+    add('greusel-recovered','hold',g,{end:700,after:[successDep('greusel-fallback')],condition:[{kind:'recovery',moraleMin:60,requirePriorRouting:false}]});
+    charge('roberts-charge',r,m,{end:350});
+    add('roberts-fallback','fallback',r,{end:650,after:[successDep('roberts-charge')],condition:[{kind:'native-contact',targetId:m,afterStage:'roberts-charge'},{kind:'pressure',moraleMax:45}]});
+    add('roberts-recovered','hold',r,{end:850,after:[successDep('roberts-fallback')],condition:[{kind:'recovery',moraleMin:60,requirePriorRouting:false},{kind:'separated',minDistance:80}]});
+    charge('roberts-renewed',r,m,{end:950,after:[successDep('roberts-recovered')]});
+    add('cleanup','hold',r,{start:1000,end:1001,after:[terminalDep('roberts-renewed')]});
+  }else if(observation==='mcfadden-assault'){
+    const b=us('bruce');move('bruce-position',b,[1540,-1490],{end:300});
+    add('bruce-hold','hold',b,{end:300,after:[successDep('bruce-position')],condition:[{kind:'arrived',point:[1540,-1490],radius:25}]});
+    for(const name of ['price','fyffe','boyle','ammen'])add(name+'-hold','hold',us(name),{end:1});
+    let previous=null,previousTarget=null;
+    for(const [name,end]of [['hanson',400],['palmer',600],['adams',800],['preston',975]]){
+      const target=cs(name),approach=name+'-approach',attack=name+'-charge';
+      toward(approach,b,target,160,{end,after:[successDep(previous||'bruce-hold')],condition:previous?[ended(b,previousTarget,previous)]:[]});
+      charge(attack,b,target,{end,after:[successDep(approach)],condition:[{kind:'target-larger',targetId:target}]});previous=attack;previousTarget=target;
+    }
+    add('cleanup','hold',b,{start:1000,end:1001,after:[terminalDep(previous)]});
+  }else if(observation==='missionary-assault'){
+    move('carlin-support',us('carlin-1st'),[-700,2780],{end:1});let previous=null,previousTarget=null;
+    for(const [name,end]of [['finley',350],['bate',600],['strahl',850],['stovall',1040]]){
+      const target=cs(name),support=name+'-support',approach=name+'-approach',attack=name+'-charge';
+      toward(support,g,target,180,{end,after:previous?[successDep(previous)]:[],condition:previous?[ended(r,previousTarget,previous)]:[]});
+      toward(approach,r,target,160,{end,after:[successDep(support)]});
+      charge(attack,r,target,{end,after:[successDep(approach)],condition:[{kind:'target-cover',targetId:target}]});previous=attack;previousTarget=target;
+    }
+    add('cleanup','hold',r,{start:1050,end:1051,after:[terminalDep(previous)]});
+  }else if(observation==='buell-capture'){
+    const actor=us('rousseau'),owned=n=>({kind:'crate-owned',crateId:'buell-game-supply-'+n,side:'US'});
+    move('cache-1',actor,[-170,-650],{end:300});
+    move('cache-2',actor,[-100,-390],{end:550,after:[successDep('cache-1')],condition:[owned(1)]});
+    move('cache-3',actor,[-100,-150],{end:800,after:[successDep('cache-2')],condition:[owned(2)]});
+    add('cache-run','run',actor,{end:1100,after:[successDep('cache-3')],condition:[owned(3)],enabled:true});
+    move('cache-4',actor,[-180,170],{end:1100,after:[successDep('cache-run')]});
+    add('cache-stop','run',actor,{end:1180,after:[successDep('cache-4')],condition:[owned(4)],enabled:false});
+    add('cache-hold','hold',actor,{end:1180,after:[successDep('cache-stop')]});
+    move('bruce-support',us('bruce'),[450,-100],{end:1});move('ammen-support',us('ammen'),[700,-100],{end:1});
+    let previous=null,previousTarget=null;const hazen=us('hazen');
+    for(const [name,end]of [['hodgson',650],['mcclung',1100]]){
+      const target=unit(name,'CS','battery'),approach=name+'-approach',attack=name+'-charge';
+      toward(approach,hazen,target,160,{end,after:previous?[successDep(previous)]:[],condition:previous?[ended(hazen,previousTarget,previous)]:[]});
+      charge(attack,hazen,target,{end,after:[successDep(approach)]});previous=attack;previousTarget=target;
+    }
+    for(const actor of [us('wsmith'),us('boyle'),us('kirk'),unit('wallace','US','division')])move('objective-'+actor,actor,[-292,122],{end:1});
+    move('gibson-arrival',us('gibson'),[-292,122],{start:836,end:866});
+    add('hazen-cleanup','hold',hazen,{start:1180,end:1181,after:[terminalDep(previous)]});
+  }
+  const expected={'slaughter-fire':11,'slaughter-defence':12,'slaughter-recovery':9,'mcfadden-assault':15,'missionary-assault':14,'buell-capture':19};
+  if(plan.length!==expected[observation])fail('tactic count drift');
+  // Validate all identities and atoms before any native order can be attempted.
+  createBadgeStages(plan,1,roster);
+  return {kind:'Astra-approved first finite tactic; natural results unproved',recipe,plan,cadence:1,roster};
+}
+
 /** Finite data-only conditional stages. Facts are read from native units, never badge counters. */
 export function createBadgeStages(plan,cadence,roster){
   if(!dense(plan)||!plan.length||plan.length>128||!Number.isFinite(cadence)||cadence<=0||cadence>20
@@ -155,7 +244,8 @@ export function createBadgeStages(plan,cadence,roster){
   const known=new Set(roster),seen=new Set(),ids=new Set(),history=new Map();
   const atomKeys={
     'actor-orderable':[],'target-unbroken':['targetId'],distance:['targetId','max'],'target-larger':['targetId'],
-    'target-cover':['targetId'],'native-contact':['targetId','afterStage'],support:['radius','min','types'],'fire-ready':['maxDistance'],pressure:['moraleMax'],
+    'target-cover':['targetId'],'native-contact':['targetId','afterStage'],
+    'native-engagement-ended':['actorId','targetId','afterStage','quietSeconds'],support:['radius','min','types'],'fire-ready':['maxDistance'],pressure:['moraleMax'],
     recovery:['moraleMin','requirePriorRouting'],'engagement-ended':['targetId','quietSeconds'],separated:['minDistance'],arrived:['point','radius'],'crate-owned':['crateId','side'],
   };
   const positive=n=>Number.isFinite(n)&&n>0;
@@ -166,7 +256,7 @@ export function createBadgeStages(plan,cadence,roster){
     for(const dep of row.after)if(!plain(dep,['id','require'])||!ids.has(dep.id)||!['success','terminal'].includes(dep.require))fail('earlier stage dependency required');
     if(new Set(row.after.map(d=>d.id)).size!==row.after.length)fail('duplicate stage dependency');
     for(const c of row.condition){
-      if(!plain(c,['kind','targetId','afterStage','max','radius','min','types','maxDistance','moraleMax','moraleMin','requirePriorRouting','quietSeconds','minDistance','point','crateId','side'])
+      if(!plain(c,['kind','actorId','targetId','afterStage','max','radius','min','types','maxDistance','moraleMax','moraleMin','requirePriorRouting','quietSeconds','minDistance','point','crateId','side'])
         ||!Object.hasOwn(atomKeys,c.kind)||!plain(c,['kind',...atomKeys[c.kind]])
         ||atomKeys[c.kind].some(k=>!Object.hasOwn(c,k))||c.targetId!==undefined&&!known.has(c.targetId))fail('stage condition schema/identity');
       if(c.kind==='distance'&&!positive(c.max)||c.kind==='support'&&(!positive(c.radius)||!Number.isSafeInteger(c.min)||c.min<1
@@ -176,7 +266,8 @@ export function createBadgeStages(plan,cadence,roster){
         ||c.kind==='recovery'&&(!Number.isFinite(c.moraleMin)||c.moraleMin<0||c.moraleMin>100||typeof c.requirePriorRouting!=='boolean')
         ||c.kind==='engagement-ended'&&!positive(c.quietSeconds)
         ||c.kind==='separated'&&!positive(c.minDistance)
-        ||c.kind==='native-contact'&&!ids.has(c.afterStage)
+        ||['native-contact','native-engagement-ended'].includes(c.kind)&&!ids.has(c.afterStage)
+        ||c.kind==='native-engagement-ended'&&(!known.has(c.actorId)||!positive(c.quietSeconds))
         ||c.kind==='arrived'&&(!finitePoint(c.point)||!positive(c.radius))
         ||c.kind==='crate-owned'&&(typeof c.crateId!=='string'||!c.crateId||c.side!=='US'))fail('stage condition bounds');
     }
@@ -184,17 +275,20 @@ export function createBadgeStages(plan,cadence,roster){
     if(!plain(command,['type','unitId','targetId','path','points','endFacing','enabled']))fail('stage command data required');
     if(command.path!==undefined){
       if(!plain(command,['type','unitId','targetId','path','endFacing'])||!['move','charge'].includes(command.type)
-        ||!plain(command.path,['kind','standOff'])||command.path.kind!=='actor-to-target'||!Number.isFinite(command.path.standOff)
-        ||command.path.standOff<0||command.path.standOff>10000||!known.has(command.targetId))fail('stage path resolver');
+        ||!plain(command.path,['kind','standOff','point'])
+        ||!(command.path.kind==='actor-to-target'&&plain(command.path,['kind','standOff'])&&Number.isFinite(command.path.standOff)
+          &&command.path.standOff>=0&&command.path.standOff<=10000&&known.has(command.targetId)
+          ||command.path.kind==='actor-to-point'&&plain(command.path,['kind','point'])&&finitePoint(command.path.point)
+          &&command.type==='move'&&command.targetId===undefined))fail('stage path resolver');
       const {path,targetId,...base}=command;validateBadgeCommand({...base,...(command.type==='charge'?{targetId}:{}),points:[[0,0],[1,1]]});
     }else validateBadgeCommand(command);
     if(!known.has(command.unitId)||command.targetId!==undefined&&!known.has(command.targetId))fail('stage command identity');
     ids.add(row.id);return {...structuredClone(row),state:'pending',evaluations:0,lastFacts:[],unmet:[],trace:null,at:null};
   });
   const byId=new Map(rows.map(r=>[r.id,r]));let last=-1,lastObserved=-1,failure=null,activeRow=null,contactSequence=0;
-  for(const row of rows)for(const c of row.condition)if(c.kind==='native-contact'){
+  for(const row of rows)for(const c of row.condition)if(['native-contact','native-engagement-ended'].includes(c.kind)){
     const prior=byId.get(c.afterStage).command;
-    if(prior.type!=='charge'||prior.unitId!==row.command.unitId||prior.targetId!==c.targetId)fail('native contact must bind preceding same-actor charge');
+    if(prior.type!=='charge'||prior.unitId!==(c.kind==='native-contact'?row.command.unitId:c.actorId)||prior.targetId!==c.targetId)fail('native contact must bind preceding same-actor charge');
   }
   const refuse=(message,at)=>{failure={message,at:Number.isFinite(at)?at:null};fail(message);};
   const record=(g)=>{
@@ -233,6 +327,9 @@ export function createBadgeStages(plan,cadence,roster){
         return {...base,afterStage:c.afterStage,chargeAcceptedAt:prior.state==='accepted'?prior.at:null,nativePair:structuredClone(native||null),
           contactSequenceAfterCharge:prior.contactSequenceAfterAttempt??null,
           ok:prior.state==='accepted'&&!!native&&native.last>=prior.at&&native.lastSequence>prior.contactSequenceAfterAttempt};}
+      case 'native-engagement-ended':{const actor=g.units.find(v=>v.id===c.actorId);if(!actor)return {...base,actorId:c.actorId,reason:'named actor absent'};
+        const contact=fact(g,actor,{kind:'native-contact',targetId:c.targetId,afterStage:c.afterStage}),ending=fact(g,actor,{kind:'engagement-ended',targetId:c.targetId,quietSeconds:c.quietSeconds});
+        return {...base,actorId:c.actorId,contact,ending,ok:contact.ok&&ending.ok};}
       case 'support':{const support=g.units.filter(v=>v!==u&&v.side===u.side&&c.types.includes(v.type)&&orderable(g,v)&&distance(u,v)<=c.radius).map(v=>v.id);
         return {...base,support,radius:c.radius,min:c.min,ok:support.length>=c.min};}
       case 'fire-ready':{const target=u.target;if(!Number.isFinite(u.reload)||typeof g.combat?.masks!=='function')fail('malformed native fire readiness');
@@ -260,6 +357,11 @@ export function createBadgeStages(plan,cadence,roster){
   const resolve=(g,row)=>{
     if(!row.command.path)return {command:validateBadgeCommand(row.command),inputs:null};
     const u=g.units.find(v=>v.id===row.command.unitId),t=g.units.find(v=>v.id===row.command.targetId);
+    if(row.command.path.kind==='actor-to-point'){
+      if(!u)return {command:null,inputs:{actorPresent:false}};
+      const a=point(u),b=row.command.path.point,{path,...base}=row.command;
+      return {command:validateBadgeCommand({...base,points:[a,b]}),inputs:{actor:a,point:structuredClone(b)}};
+    }
     if(!u||!t)return {command:null,inputs:{actorPresent:!!u,targetPresent:!!t}};
     const a=point(u),b=point(t),d=distance(u,t),offset=Math.min(d,row.command.path.standOff),scale=d?(d-offset)/d:0;
     const {path,targetId,...base}=row.command,command=validateBadgeCommand({...base,...(base.type==='charge'?{targetId}:{}),points:[a,[a[0]+(b[0]-a[0])*scale,a[1]+(b[1]-a[1])*scale]]});

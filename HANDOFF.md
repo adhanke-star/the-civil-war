@@ -1,5 +1,7 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0175 — root ACTIVE same-session sole writer, no transfer. First six finite tactics root+Astra80+80/CPU UNIT OK/syntaxdiff clear. Native harness remains UNRUN; no runtime or balance adoption. Branch source9e72079 CI38346843720 pending;7cfCI38345649171 all9/own251/365/171/159+campaign201/directprobe5,716,980B clear; nested smokes read pending after wrong reader errors-field assertion. Acceptedmainb0CI38346803584 pending; Pages38346803575 exactb0 success/livefetch pending. Matrix38343715785 failed report margin90,068,783B; original complete gzip/reportstub+images retained in11789877172/631,415,498B/digestb160db4f38c31d6eaf93d33e42c5b999e38a9df7b0f025f398ed81836fcdcdab. Rawlog137,657B read. No ZIP download/no verdict/no rerun; reviewed Actions-only original-byte split transport next, all reader bounds unchanged. Continue actual native prerequisite and full six-case flag/shard/harness; cleanup remains finite and may expire. MAIN11 and near-cap .out unchanged.
+
 LATEST0174 — root ACTIVE same-session sole writer, no transfer. Branch7cf25108f6f5ca84a0f2c4aca940716a55dcc50e;
 Acceptedremote mainb0ad719968ec6e5ccbcb30477deb7c6e19c84a45; new mainCI/Pages pending.
 its CI38345649171 running; own canonical/probe receipts pending. 0170 native-call observer root+Astra69+69,
