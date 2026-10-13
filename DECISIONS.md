@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0198 — Preserve genuine Hard Marchers Silver before one distinct ridge design (2026-10-13)
+
+Final local source264+264/CPU-onlyUNIT/syntax/diff/YAML32/actualconflictingCLI/exact original acquisition/fulltwo-prefix replay and Astra independent scopedSOURCE CLEAR. All242 preceding paired controls retained. NewnativeGold and own0198nineCI UNRUN;0197focusedmustbind before0198commit. No acceptance or release claim from sourcecontrols.
+
+SourceWIP: isolated Missionary-only29 stages from cryptographically pinned actualLookout Silver1625, full precedingOrchard B→S and absentLookout preservation carried/recomputed.264+264 paired CPU controls retainall242; exactoriginal source-acquisition/prefix replay CLEAR, syntax/YAML32/conflictingactualCLI/diff CLEAR. CPU-onlyUNIT and boundedAstra source audit pending; own0198CI/newnative UNRUN. BindpendingfocusedFloat32 to0197exact3d BEFORE0198commit; no unchangedproducerrepeat.
+
+Northern38461620307/exact677 full original11846770963 ZIP914037B/813719f7beb6b7c15b8d0637aa82be1e40ba30c33a7f4757421cda865067a56a rootCLEAR: actualOrchard2238marched/keptSilverfromBronze/living1625, Lookoutsame1625/Silver/lineage/gear, Missionary1421marched/living1506/Silver/noGold. ActualMove cancellation supported by nativewaveringHold394/rout397.95+505.9, no mechanicsdefectclaim. Retainactualcheckpoint/fullproof, no unchangedproducer repeats; Astra one finite coordinated rested/screened ascent and north exploitation design active, source/newnativeUNRUN.0197pushed3d1024b ownCI38462474249 pending beforeONCEfocusedFloat32.250MB/art/all20/fullgates unchanged; ACTIVE same session/objectiveINCOMPLETE/no adoption/release.
+
 ## 0197 — Preserve original material in a separate Float32 focused proof (2026-10-13)
 
 Source gates:263+263 scene/80+80 terrain/CPU-onlyUNIT/syntax/diff/YAML31/default/env/Astra scopedCLEAR. Astra actualCPU reproduced three retirementfalseaccepts and lostregistration cleanup; complete4ordinary/2faultpairedcycles/finalrestore/nohiddenIDs/noearlyfinish and preflight/rawowner/independentrollback close them, pairedcontrols andindependentreproductionsCLEAR. Parent677 own9CI/fullroots/raw242+236+69/native214CLEAR; ONCE northern38461620307 bound677 running before nextcommit. Tenownedpaths WIP; newsourceownCI/native focusedUNRUN; ACTIVE same session/no transfer.

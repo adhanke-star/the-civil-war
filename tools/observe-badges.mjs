@@ -94,8 +94,13 @@ export const BADGE_LOOKOUT_PHASES=Object.freeze([
 // Same genuine saved brigade slot, deployed as Willich in the authored Chattanooga phases.
 export const BADGE_MARCH_PHASES=Object.freeze([...BADGE_LOOKOUT_PHASES,
   Object.freeze({phaseId:'missionary-ridge',packId:'chattanooga',index:10,choices:Object.freeze([Object.freeze(['ch3-climb','climb']),Object.freeze(['ch3-commit','both-ways'])])})]);
-export function badgeMarchTactic(game,phaseId,{flank=false}={}){
+export const BADGE_RIDGE_ORIGIN=Object.freeze({run:38461620307,sha:'677377181057e6fd98be1a61c51f077b97cfad1e',artifact:11846770963,name:'badge-observations-1',zipBytes:914037,zipSha:'813719f7beb6b7c15b8d0637aa82be1e40ba30c33a7f4757421cda865067a56a',saveBytes:59272,saveSha:'6a51a6cd708acf0056caefe2c01cbda21debc5916ba6a2624c7114ac17a1207d'});
+export function validateBadgeRidgeOrigin(o){
+  if(!plain(o,Object.keys(BADGE_RIDGE_ORIGIN))||Object.keys(o).length!==Object.keys(BADGE_RIDGE_ORIGIN).length||Object.keys(BADGE_RIDGE_ORIGIN).some(k=>o[k]!==BADGE_RIDGE_ORIGIN[k]))fail('ridge exact actual persisted Silver origin');return {...o};
+}
+export function badgeMarchTactic(game,phaseId,{flank=false,ridge=false}={}){
   if(typeof flank!=='boolean')fail('march explicit flank scope');
+  if(typeof ridge!=='boolean'||ridge&&(flank||phaseId!=='missionary-ridge'))fail('march explicit isolated ridge scope');
   if(phaseId==='lookout-mountain')return badgeLookoutTactic(game,phaseId);
   const s=game?.scenario,orchard=phaseId==='orchard-knob',actor='us-gibson-brigade';
   if(!['orchard-knob','missionary-ridge'].includes(phaseId)||game.simTime!==0||game.playerSide!=='US'||s?.id!=='chattanooga-'+phaseId
@@ -104,6 +109,24 @@ export function badgeMarchTactic(game,phaseId,{flank=false}={}){
   const roster=[...new Set([...s.units,...(s.reinforcements||[])].map(u=>u.id))],plan=[],success=id=>({id,require:'success'}),
     add=(id,type,unitId,{start=0,end,after=[],condition=[],...extra})=>plan.push({id,notBefore:start,expires:end,after,condition:[{kind:'actor-orderable'},...condition],command:{type,unitId,...extra}}),
     stop=point=>({kind:'march-stop',point,radius:30,enemyRadius:250});
+  if(ridge){
+    const actors=[{id:actor,assembly:[-250,1300],ascent:[600,1750]},{id:'us-boyle-brigade',assembly:[-250,1050],ascent:[600,1350]},{id:'us-hazen-brigade',assembly:[-400,1550],ascent:[500,1600]}],
+      ready={kind:'march-ready',moraleMin:65,fatigueMax:40},north=[850,-100];
+    if(actors.some(a=>!s.units.some(u=>u.id===a.id&&u.side==='US'))||s.units.filter(u=>u.side==='US').length!==10)fail('ridge actual three initial actors and ten-unit roster');
+    for(const u of s.units.filter(u=>u.side==='US'&&!actors.some(a=>a.id===u.id)))add('ridge-screen-'+u.id,'move',u.id,{end:1,path:{kind:'actor-to-point',point:[s.objective.x,s.objective.z]}});
+    for(const a of actors)add('ridge-assembly-'+a.id,'move',a.id,{end:1,path:{kind:'actor-to-point',point:a.assembly}});
+    for(const a of actors)add('ridge-rest-'+a.id,'hold',a.id,{start:1,end:300,after:[success('ridge-assembly-'+a.id)],condition:[{kind:'arrived',point:a.assembly,radius:30},ready]});
+    for(const a of actors)add('ridge-ascent-run-'+a.id,'run',a.id,{start:1,end:400,after:actors.map(a=>success('ridge-rest-'+a.id)),condition:[ready,{kind:'separated',minDistance:250}],enabled:true});
+    for(const a of actors)add('ridge-ascent-'+a.id,'move',a.id,{start:1,end:400,after:actors.map(a=>success('ridge-ascent-run-'+a.id)),path:{kind:'actor-to-point',point:a.ascent}});
+    for(const a of actors)add('ridge-ascent-walk-'+a.id,'run',a.id,{start:1,end:850,after:[success('ridge-ascent-'+a.id)],condition:[stop(a.ascent)],enabled:false});
+    add('ridge-exploit-run','run',actor,{start:1,end:650,after:actors.map(a=>success('ridge-ascent-walk-'+a.id)),condition:[{kind:'arrived',point:actors[0].ascent,radius:30},ready,{kind:'separated',minDistance:250},{kind:'support',radius:250,min:1,types:['infantry']}],enabled:true});
+    add('ridge-exploit','move',actor,{start:1,end:650,after:[success('ridge-exploit-run')],path:{kind:'actor-to-point',point:north}});
+    add('ridge-exploit-walk','run',actor,{start:1,end:1080,after:[success('ridge-exploit')],condition:[stop(north)],enabled:false});
+    add('ridge-exploit-hold','hold',actor,{start:1,end:1080,after:[success('ridge-exploit-walk')],condition:[{kind:'arrived',point:north,radius:30}]});
+    for(const a of actors)add('ridge-independent-cleanup-'+a.id,'run',a.id,{start:1081,end:1082,enabled:false});
+    createBadgeStages(plan,1,roster);
+    return {kind:'finite coordinated rested Bird\'s Mill ascent and northern exploitation; genuine Gold unproved',recipe:{id:'march-ridge-'+phaseId,packId:'chattanooga',phaseId},revision:0,plan,cadence:1,roster};
+  }
   if(orchard&&flank){
     if(!s.units.some(u=>u.id==='us-boyle-brigade'&&u.side==='US'))fail('march authored paired flank brigade');
     const flankers=[{id:actor,corners:[[-1450,-150],[-700,150]],end:[-950,520]},
@@ -149,8 +172,8 @@ export function badgeMarchTactic(game,phaseId,{flank=false}={}){
   return {kind:'finite direct consolidation or crest-to-northern-flank march; genuine promotion unproved',recipe:{id:'march-'+phaseId,packId:'chattanooga',phaseId},revision:0,plan,cadence:1,roster};
 }
 /** The Node caller supplies the independently prepared actual campaign scenario. */
-export function badgeMarchOrders(tactic,receipt,endAt,scenario,{flank=false}={}){
-  let expected;try{expected=badgeMarchTactic({scenario,playerSide:'US',simTime:0},tactic?.recipe?.phaseId,{flank});}catch{return false;}
+export function badgeMarchOrders(tactic,receipt,endAt,scenario,{flank=false,ridge=false}={}){
+  let expected;try{expected=badgeMarchTactic({scenario,playerSide:'US',simTime:0},tactic?.recipe?.phaseId,{flank,ridge});}catch{return false;}
   if(JSON.stringify(tactic)!==JSON.stringify(expected)||!dense(receipt?.stages)||receipt.stages.length!==expected.plan.length||receipt.failure||receipt.cadence!==1||!Number.isFinite(endAt))return false;
   if(tactic.recipe.phaseId==='lookout-mountain')return badgeLookoutOrders(tactic,receipt,endAt);
   const byId=new Map(receipt.stages.map(r=>[r.id,r]));if(byId.size!==expected.plan.length)return false;
@@ -197,6 +220,12 @@ export function badgeMarchComplete(rows,promotion){
     rows.length===1&&['actual Orchard march orders refused or expired','actual Orchard did not persist living Bronze-to-Silver'].includes(promotion.stopReason)
     ||rows.length===2&&['actual Lookout march continuation orders refused or expired','actual Lookout did not retain living Silver'].includes(promotion.stopReason)
     ||rows.length===3&&['actual Missionary march orders refused or expired','actual Missionary did not persist Silver-to-Gold'].includes(promotion.stopReason));
+}
+export function badgeRidgeComplete(rows,promotion){
+  try{validateBadgeRidgeOrigin(promotion?.origin);}catch{return false;}
+  if(!dense(rows)||rows.length!==1||rows[0]?.id!=='missionary-ridge'||rows[0].complete!==true||promotion?.witness!=='rested-supported-ridge')return false;
+  if(promotion.achieved===true)return promotion.stopReason===null&&rows[0].promotion?.ordersAccepted===true&&rows[0].promotion.goldPersisted===true;
+  return promotion.achieved===false&&['actual Missionary march orders refused or expired','actual Missionary did not persist Silver-to-Gold'].includes(promotion.stopReason);
 }
 export const BADGE_LOOKOUT_WEST_ORIGIN=Object.freeze({run:38423872892,sha:'8b113172cbfd49a5a53edcdff9e75b3b7b2de73d',artifact:11828606320,name:'badge-observations-1',zipBytes:497536,zipSha:'be4a9798cfef2e0fd39b44d3d8b597a17affd86080443c885ac738efc82c2cf7',saveBytes:52966,saveSha:'acb576e192fb7af68d8a0af1ae25f5de464d249339fdb8c00b5bda0c00bc2acb'});
 export function validateBadgeLookoutWestOrigin(o){
@@ -601,6 +630,7 @@ export function badgeObservationSelection(args){
   if(args.length===1&&args[0]==='--badge-promotion-lookout-west')return {mode:'promotion-lookout-west',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion-march')return {mode:'promotion-march',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion-flank')return {mode:'promotion-flank',shard:1};
+  if(args.length===1&&args[0]==='--badge-promotion-ridge')return {mode:'promotion-ridge',shard:1};
   const shards=args.filter(a=>/^--badge-shard=[123]$/.test(a));
   if(args.length===2&&args.includes('--badge-observations')&&shards.length===1)return {mode:'observations',shard:Number(shards[0].slice(-1))};
   if(args.length===2&&args.includes('--badge-revisions')&&shards.length===1)return {mode:'revisions',shard:Number(shards[0].slice(-1))};

@@ -1,6 +1,6 @@
 # STATE
-2026-10-13 — v1 released558456f; ACTIVE0197 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
-Branch v1-1-gaps-20261012/source6773771; ownCI38457920213 all9/fullroots/raw242+236+69/native214CLEAR; ONCE northern38461620307/exact677 RUNNING/nativeROOTUNRUN.0197 explicitFloat32/source263+263/terrain80+80/UNIT/YAML31/Astra scopedCLEAR/nativeUNRUN; tenownedpathsWIP. Causal38457785401/exact4675 complete root:canonical+clone112max1/Float32exact0/allrestored0/GPU211271006/nineUNRUN; firstRED preserved. COORDINATION absent; v1.1/v2 unreleased.
+2026-10-13 — v1 released558456f; ACTIVE0198 source/0197CI Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
+Branch v1-1-gaps-20261012/source3d1024b pushed; ownCI38462474249 RUNNING/fullrootUNRUN;Float32263+263/terrain80+80/UNIT/YAML31/Astra sourceCLEAR/nativeUNRUN. Northern38461620307/exact677 whole11846770963 rootCLEAR:Orchard2238/1625living/earnedkeptB→S; Lookout1625Silverretained; Missionary1421/1506Silverretained/noGold/nativewaver394/rout397.95+505.9.0198 distinct supportedascent design/docWIP. Causal38457785401 strictmismatch complete root preserved; no unchangedrepeats. COORDINATION absent; v1.1/v2 unreleased.
 Accepted remote main9e72079; sourceCI38346843720 all9/full own251/365/171/159+201+three6smokes/digests clean.
 Main9eCI38349763169 all9/fullown/digests/rawprobe clear; Pages38349763192 exact9e/livev68 clear.
 MAIN13a7b136 exact protected11 dirty paths untouched; c328 failedmainCI38298643624 retained.
