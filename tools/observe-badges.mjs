@@ -91,9 +91,14 @@ export const BADGE_LOOKOUT_PHASES=Object.freeze([
   ['orchard-knob',8,[['ch1-recon','attack'],['ch1-hold','hold']]],
   ['lookout-mountain',9,[['ch2-crossing','upstream'],['ch2-relief','rotate']]],
 ].map(([phaseId,index,choices])=>Object.freeze({phaseId,packId:'chattanooga',index,choices:Object.freeze(choices.map(c=>Object.freeze(c)))})));
+export const BADGE_LOOKOUT_WEST_ORIGIN=Object.freeze({run:38423872892,sha:'8b113172cbfd49a5a53edcdff9e75b3b7b2de73d',artifact:11828606320,name:'badge-observations-1',zipBytes:497536,zipSha:'be4a9798cfef2e0fd39b44d3d8b597a17affd86080443c885ac738efc82c2cf7',saveBytes:52966,saveSha:'acb576e192fb7af68d8a0af1ae25f5de464d249339fdb8c00b5bda0c00bc2acb'});
+export function validateBadgeLookoutWestOrigin(o){
+  if(!plain(o,Object.keys(BADGE_LOOKOUT_WEST_ORIGIN))||Object.keys(o).length!==Object.keys(BADGE_LOOKOUT_WEST_ORIGIN).length||Object.keys(BADGE_LOOKOUT_WEST_ORIGIN).some(k=>o[k]!==BADGE_LOOKOUT_WEST_ORIGIN[k]))fail('western Lookout exact completed source/checkpoint origin');return {...o};
+}
 
 /** One finite ordinary campaign continuation; no feat value participates in order conditions. */
-export function badgeLookoutTactic(game,phaseId){
+export function badgeLookoutTactic(game,phaseId,{western=false}={}){
+  if(typeof western!=='boolean'||western&&phaseId!=='lookout-mountain')fail('western Lookout isolated phase');
   const spec=BADGE_LOOKOUT_PHASES.find(p=>p.phaseId===phaseId),s=game?.scenario,orchard=phaseId==='orchard-knob';
   if(!spec||game.simTime!==0||game.playerSide!=='US'||s?.id!=='chattanooga-'+phaseId||s.seed!==(orchard?18631123:18631124)||s.start!==(orchard?'13:30':'08:30')||s.end!==(orchard?'15:30':'15:00')||s.clockRatio!==(orchard?7:22))fail('lookout authored initial phase/time/side/clock');
   const roster=[...new Set([...s.units,...(s.reinforcements||[])].map(u=>u.id))],plan=[],success=id=>({id,require:'success'}),terminal=id=>({id,require:'terminal'}),
@@ -106,6 +111,18 @@ export function badgeLookoutTactic(game,phaseId){
   if(!orchard){
     const reinforcements=[['us-ammen-brigade',409.1],['us-woods-brigade',409.1],['us-williamson-brigade',654.5],['cs-pettus-brigade',777.3]];
     if(reinforcements.some(([id,at])=>!s.reinforcements?.some(u=>u.id===id&&u.atSec===at)))fail('lookout required native reinforcement schedule');
+    if(western){
+      const actor='us-ammen-brigade',targetId='cs-walthall-brigade';if(!s.units.some(u=>u.id===targetId&&u.side==='CS'))fail('western Lookout actual western opponent');
+      add('run-'+actor,'run',actor,{start:410,end:440,enabled:true});
+      add('attack-'+actor,'attack',actor,{start:410,end:440,after:[success('run-'+actor)],condition:[{kind:'target-unbroken',targetId},{kind:'support',radius:250,min:1,types:['infantry']}],targetId});
+      add('run-approach-'+actor,'run',actor,{start:410,end:850,after:[success('attack-'+actor)],condition:[{kind:'target-unbroken',targetId},{kind:'distance',targetId,max:180}],enabled:false});
+      add('run-cleanup-'+actor,'run',actor,{start:851,end:852,after:[terminal('attack-'+actor)],enabled:false});
+      for(const [id,point,start,end]of [['us-woods-brigade',[-1000,200],410,440],['us-williamson-brigade',[-1070,0],655,685]]){
+        add('position-'+id,'move',id,{start,end,path:{kind:'actor-to-point',point}});add('hold-'+id,'hold',id,{start:start+1,end:1000,after:[success('position-'+id)],condition:[{kind:'arrived',point,radius:25}]});
+      }
+      add('ammen-withdraw','fallback',actor,{start:410,end:1000,after:[success('attack-'+actor)],condition:[{kind:'pressure',moraleMax:45}]});
+      add('ammen-recover','hold',actor,{end:1050,after:[success('ammen-withdraw')],condition:[{kind:'recovery',moraleMin:55,requirePriorRouting:false},{kind:'separated',minDistance:220}]});
+    }else{
     for(const [id,anchors]of [['us-ammen-brigade',[[-418.8,18.7],[-197.1,44.2],[-134.8,181.1],[-100,470]]],['us-woods-brigade',[[-418.8,18.7],[-197.1,44.2],[-150,260]]]]){
       add('run-'+id,'run',id,{start:410,end:440,enabled:true});add('position-'+id,'move',id,{start:410,end:440,after:[success('run-'+id)],path:{kind:'actor-through-points',points:anchors}});
       add('run-cleanup-'+id,'run',id,{start:600,end:601,after:[terminal('position-'+id)],enabled:false});
@@ -114,14 +131,16 @@ export function badgeLookoutTactic(game,phaseId){
     add('hold-'+id,'hold',id,{start:656,end:1000,after:[success('position-'+id)],condition:[{kind:'arrived',point,radius:25}]});
     add('ammen-withdraw','fallback','us-ammen-brigade',{start:410,end:1000,after:[success('position-us-ammen-brigade')],condition:[{kind:'pressure',moraleMax:45}]});
     add('ammen-recover','hold','us-ammen-brigade',{end:1050,after:[success('ammen-withdraw')],condition:[{kind:'recovery',moraleMin:55,requirePriorRouting:false},{kind:'separated',minDistance:220}]});
+    }
   }
   if(plan.length!==(orchard?11:20))fail('lookout finite stage count');createBadgeStages(plan,1,roster);
-  return {kind:'authorized ordinary Orchard then road-anchor Lookout witness; actual position/contact/Gold unproved',recipe:{id:'lookout-continuation-'+phaseId,packId:'chattanooga',phaseId},revision:0,plan,cadence:1,roster};
+  return {kind:western?'authorized distinct western Attack from actual post-Orchard899; native contact/Gold unproved':'authorized ordinary Orchard then road-anchor Lookout witness; actual position/contact/Gold unproved',recipe:{id:(western?'lookout-west-':'lookout-continuation-')+phaseId,packId:'chattanooga',phaseId,...(western?{western:true}:{})},revision:0,plan,cadence:1,roster};
 }
 
 /** Read-only bounded post-tick observations. These values never enter an order condition. */
-export function createBadgeLookoutReadiness(){
-  const rows=[['us-ammen-brigade',[-100,470]],['us-woods-brigade',[-150,260]]].map(([id,endpoint])=>({id,endpoint,firstSeen:null,samples:0,minEndpointDistance:null,firstArrival:null,lastArrival:null,firstReturnFire:null,lastReturnFire:null,initialHoldingLoss:0,finalHoldingLoss:0,positiveHoldingLoss:0,firstIncrease:null,lastIncrease:null}));
+export function createBadgeLookoutReadiness({western=false}={}){
+  if(typeof western!=='boolean')fail('lookout readiness witness boolean');
+  const rows=[['us-ammen-brigade',western?[-866.308513,177.909042]:[-100,470]],['us-woods-brigade',western?[-1000,200]:[-150,260]]].map(([id,endpoint])=>({id,endpoint,firstSeen:null,samples:0,minEndpointDistance:null,firstArrival:null,lastArrival:null,firstReturnFire:null,lastReturnFire:null,initialHoldingLoss:0,finalHoldingLoss:0,positiveHoldingLoss:0,firstIncrease:null,lastIncrease:null}));
   let lastTime=-1,failure=null;
   return {sample(game,at,feats){
     if(failure)fail('lookout readiness already failed');
@@ -143,30 +162,32 @@ export function createBadgeLookoutReadiness(){
 
 /** Accepted paths are distinct from observed endpoint arrival or contact. */
 export function badgeLookoutOrders(tactic,receipt,endAt){
-  const orchard=tactic?.recipe?.phaseId==='orchard-knob',expected=orchard?11:20;
-  if(!BADGE_LOOKOUT_PHASES.some(p=>p.phaseId===tactic?.recipe?.phaseId)||tactic.recipe.id!=='lookout-continuation-'+tactic.recipe.phaseId||!dense(tactic?.plan)||tactic.plan.length!==expected||!dense(receipt?.stages)||receipt.stages.length!==expected||receipt.failure||receipt.cadence!==1||!Number.isFinite(endAt))return false;
+  const orchard=tactic?.recipe?.phaseId==='orchard-knob',western=tactic?.recipe?.western===true,expected=orchard?11:20;
+  if(western&&orchard||!BADGE_LOOKOUT_PHASES.some(p=>p.phaseId===tactic?.recipe?.phaseId)||tactic.recipe.id!==(western?'lookout-west-':'lookout-continuation-')+tactic.recipe.phaseId||!dense(tactic?.plan)||tactic.plan.length!==expected||!dense(receipt?.stages)||receipt.stages.length!==expected||receipt.failure||receipt.cadence!==1||!Number.isFinite(endAt))return false;
   if(JSON.stringify(receipt.stages.map(r=>r.id))!==JSON.stringify(tactic.plan.map(p=>p.id)))return false;
   const byId=new Map(receipt.stages.map(r=>[r.id,r]));
   if(receipt.stages.some((r,i)=>['command','after','condition','notBefore','expires'].some(k=>JSON.stringify(r[k])!==JSON.stringify(tactic.plan[i][k]))||r.trace&&r.after.some(d=>{const dep=byId.get(d.id);return !dep||!Number.isFinite(dep.at)||dep.at>r.at||(d.require==='success'?!['accepted','already-satisfied'].includes(dep.state):['pending'].includes(dep.state));})))return false;
   if(receipt.stages.some(r=>r.state==='refused'||r.state==='error'))return false;
-  const required=tactic.plan.filter(p=>p.command.type==='move'||p.command.type==='run'||p.command.type==='hold'&&p.notBefore===0&&p.expires===1);
+  const required=tactic.plan.filter(p=>p.command.type==='move'||p.command.type==='run'||western&&p.command.type==='attack'||p.command.type==='hold'&&p.notBefore===0&&p.expires===1);
   return required.every(p=>{const matches=receipt.stages.filter(r=>r.id===p.id);if(matches.length!==1)return false;const r=matches[0],t=r.trace;
     if(p.command.type==='run'&&p.command.enabled===false&&endAt<p.notBefore)return r.state==='ended'&&t===null;
     if(!['accepted','already-satisfied'].includes(r.state)||!t||['command','after','condition','notBefore','expires'].some(k=>JSON.stringify(r[k])!==JSON.stringify(p[k])))return false;
     if(!Number.isFinite(r.at)||r.at<p.notBefore||r.at>p.expires||r.at>endAt||t.at!==r.at)return false;
     if(p.command.type==='hold')return r.state==='accepted'&&t.accepted===true&&t.invoked===true&&JSON.stringify(t.command)===JSON.stringify(p.command);
     if(p.command.type==='run')return t.result?.run===p.command.enabled&&JSON.stringify(t.command)===JSON.stringify(p.command)&&(r.state==='accepted'?t.accepted===true&&t.invoked===true:t.accepted===null&&t.invoked===false&&t.reason==='already in requested state');
+    if(p.command.type==='attack')return r.state==='accepted'&&t.accepted===true&&t.invoked===true&&JSON.stringify(t.command)===JSON.stringify(p.command)&&t.result?.type==='attack'&&t.result.targetId===p.command.targetId;
     const anchors=p.command.path.kind==='actor-through-points'?p.command.path.points:[p.command.path.point],actor=t.resolvedInputs?.actor;
     return r.state==='accepted'&&t.accepted===true&&t.invoked===true&&finitePoint(actor)&&JSON.stringify(t.command)===JSON.stringify({type:'move',unitId:p.command.unitId,points:[actor,...anchors]})
       &&JSON.stringify(t.resolvedInputs)===JSON.stringify(p.command.path.kind==='actor-through-points'?{actor,points:anchors}:{actor,point:anchors[0]});
   });
 }
-export function validateBadgeLookoutReadiness(receipt,native){
+export function validateBadgeLookoutReadiness(receipt,native,{western=false}={}){
+  if(typeof western!=='boolean')fail('lookout readiness witness boolean');
   if(receipt?.failure||receipt?.lastTime!==native?.simTime||!dense(receipt?.rows)||JSON.stringify(receipt.rows.map(r=>r.id))!==JSON.stringify(['us-ammen-brigade','us-woods-brigade']))fail('lookout readiness final native bind');
   const deployment=[...(native.deployment?.units||[]),...(native.deployment?.reinforcements||[])];
   if(!deployment.length||new Set(deployment.map(d=>d.id)).size!==deployment.length)fail('lookout readiness actual deployment required');
   const defs=new Map(deployment.map(d=>[d.id,d]));
-  for(const [i,r]of receipt.rows.entries()){if(JSON.stringify(r.endpoint)!==JSON.stringify(i?[-150,260]:[-100,470]))fail('lookout readiness endpoint bind');const f=native.feats?.[r.id];if(r.firstSeen===null){if(f!==undefined||r.samples!==0||r.finalHoldingLoss!==0||r.positiveHoldingLoss!==0)fail('lookout readiness absent actor');continue;}
+  for(const [i,r]of receipt.rows.entries()){if(JSON.stringify(r.endpoint)!==JSON.stringify(western?(i?[-1000,200]:[-866.308513,177.909042]):(i?[-150,260]:[-100,470])))fail('lookout readiness endpoint bind');const f=native.feats?.[r.id];if(r.firstSeen===null){if(f!==undefined||r.samples!==0||r.finalHoldingLoss!==0||r.positiveHoldingLoss!==0)fail('lookout readiness absent actor');continue;}
     if(!f||defs.get(r.id)?.side!=='US'||r.initialHoldingLoss!==0||!Number.isSafeInteger(r.samples)||r.samples<1||!Number.isFinite(r.firstSeen)||r.firstSeen<0||r.firstSeen+1e-6<(defs.get(r.id).atSec||0)||r.firstSeen>native.simTime||!Number.isFinite(r.minEndpointDistance)||r.minEndpointDistance<0||r.finalHoldingLoss!==f.holdingLoss||!Number.isFinite(r.positiveHoldingLoss)||Math.abs(r.positiveHoldingLoss-f.holdingLoss)>1e-8)fail('lookout readiness qualifying loss bind');
     for(const [key,predicate]of [['firstArrival',s=>s.endpointDistance<=25],['lastArrival',s=>s.endpointDistance<=25],['firstReturnFire',s=>s.alive&&s.men>0&&!s.following&&s.firing],['lastReturnFire',s=>s.alive&&s.men>0&&!s.following&&s.firing],['firstIncrease',s=>s.delta>0],['lastIncrease',s=>s.delta>0]]){
       const s=r[key];if(s===null)continue;if(!Number.isFinite(s.at)||s.at<r.firstSeen||s.at>native.simTime||!finitePoint(s.position)||!Number.isFinite(s.endpointDistance)||Math.abs(s.endpointDistance-Math.hypot(s.position[0]-r.endpoint[0],s.position[1]-r.endpoint[1]))>1e-8||!predicate(s)||!dense(s.support)||s.support.some(v=>!finitePoint(v.position)||!Number.isFinite(v.distance)||v.distance>250||Math.abs(v.distance-Math.hypot(v.position[0]-s.position[0],v.position[1]-s.position[1]))>1e-8))fail('lookout readiness observed snapshot');
@@ -178,7 +199,9 @@ export function validateBadgeLookoutReadiness(receipt,native){
   }
   return true;
 }
-export function badgeLookoutComplete(rows,promotion){
+export function badgeLookoutComplete(rows,promotion,{western=false}={}){
+  if(typeof western!=='boolean')return false;
+  if(western)return dense(rows)&&rows.length===1&&rows[0].id==='lookout-mountain'&&rows[0].complete===true&&(promotion?.achieved===true&&promotion.stopReason===null||promotion?.achieved===false&&['actual Lookout orders refused or expired','actual Lookout ended before required reinforcement orders','actual Lookout did not persist Silver-to-Gold'].includes(promotion.stopReason));
   if(!dense(rows)||![1,2].includes(rows.length)||JSON.stringify(rows.map(r=>r.id))!==JSON.stringify(BADGE_LOOKOUT_PHASES.slice(0,rows.length).map(p=>p.phaseId))||rows.some(r=>r.complete!==true))return false;
   return rows.length===2&&promotion?.achieved===true&&promotion.stopReason===null||promotion?.achieved===false&&(rows.length===1?promotion.stopReason==='actual Orchard orders refused or expired':['actual Lookout orders refused or expired','actual Lookout ended before required reinforcement orders','actual Lookout did not persist Silver-to-Gold'].includes(promotion?.stopReason));
 }
@@ -468,6 +491,7 @@ export function badgeObservationSelection(args){
   if(args.length===1&&args[0]==='--badge-promotion-clock-relief')return {mode:'promotion-clock-relief',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion-forward-defence')return {mode:'promotion-forward-defence',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion-lookout')return {mode:'promotion-lookout',shard:1};
+  if(args.length===1&&args[0]==='--badge-promotion-lookout-west')return {mode:'promotion-lookout-west',shard:1};
   const shards=args.filter(a=>/^--badge-shard=[123]$/.test(a));
   if(args.length===2&&args.includes('--badge-observations')&&shards.length===1)return {mode:'observations',shard:Number(shards[0].slice(-1))};
   if(args.length===2&&args.includes('--badge-revisions')&&shards.length===1)return {mode:'revisions',shard:Number(shards[0].slice(-1))};
