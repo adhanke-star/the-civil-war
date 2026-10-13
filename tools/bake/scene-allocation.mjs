@@ -288,6 +288,40 @@ export function expandSceneContext(input){
 export function reduceSceneObservations(report, phases) {
   return reduceSceneScope(report,phases,11);
 }
+export function reduceFullFloat32SceneObservations(report,phases){
+  return reduceSceneScope(report,phases,11,'float32-full');
+}
+export function sceneFullFloat32HeaderValid(report){
+  return report?.sceneResourcePolicy==='float32-lifetime-v1'&&report.resourceFocus===undefined&&report.canonicalTerrainRepresentation===undefined
+    &&report.float32TerrainRepresentation==='Float32 with retained exact original'&&report.postPixelBytes===3639218&&report.mipPolicy==='full-original'
+    &&report.sceneRoutes==='qualified-both'&&report.nativeHistoryRequired===true&&report.fallbackCompletion==='native-finish-after-candidate-disposal';
+}
+export function sceneTerrainContractValid(c){
+  const hash=s=>typeof s==='string'&&/^[a-f0-9]{64}$/.test(s),positive=n=>Number.isSafeInteger(n)&&n>0;
+  const arrays=(rows,indexType)=>Array.isArray(rows)&&rows.length===3&&rows.map(r=>r?.key).join(',')==='position,uv,index'
+    &&rows.every(r=>r.arrayType===(r.key==='index'?indexType:'Float32Array')&&r.itemSize===(r.key==='position'?3:r.key==='uv'?2:1)
+      &&positive(r.count)&&r.bytes===r.count*r.itemSize*(r.arrayType==='Uint16Array'?2:4)&&hash(r.sha256))&&rows[0].count===rows[1].count;
+  return !!c&&['henry-hill','shiloh','stones-river','chattanooga','lookout-mountain'].includes(c.terrain)&&hash(c.metadataSha256)&&hash(c.heightSha256)
+    &&positive(c.sourceBytes)&&positive(c.partitionBytes)&&c.partitionBytes<=c.sourceBytes&&positive(c.triangles)&&arrays(c.sourceArrays,'Uint32Array')
+    &&c.sourceArrays[2].count===c.triangles*3&&c.sourceArrays.reduce((n,a)=>n+a.bytes,0)===c.sourceBytes
+    &&Array.isArray(c.chunks)&&c.chunks.length>0&&c.chunks.every(a=>arrays(a,'Uint16Array')&&a[0].count<=65535&&a[2].count%3===0)
+    &&c.chunks.reduce((n,rows)=>n+rows.reduce((n,a)=>n+a.bytes,0),0)===c.partitionBytes&&c.chunks.reduce((n,a)=>n+a[2].count,0)===c.triangles*3;
+}
+export function scenePostAdmissionSnapshot(post,dimensions){
+  const admission=post.resourceAdmission;
+  if(admission&&!dimensions.has(admission))dimensions.set(admission,[post.width,post.height]);
+  return {admission:admission?structuredClone(admission):null,logical:admission?[...dimensions.get(admission)]:[post.width,post.height]};
+}
+export function scenePostAdmissionValid(p){
+  const a=p?.admission,positivePair=v=>Array.isArray(v)&&v.length===2&&v.every(n=>Number.isSafeInteger(n)&&n>0);
+  if(!a||!positivePair(p.logical)||!positivePair(a.target)||!positivePair(a.canvas)||!positivePair(a.intermediate)
+    ||!Number.isFinite(a.scale)||a.scale<=0||!Number.isFinite(a.requestedScale)||a.scale>a.requestedScale||a.pixelBytes!==3639218)return false;
+  const [w,h]=p.logical,target=[Math.max(1,Math.round(w*a.scale)),Math.max(1,Math.round(h*a.scale))],canvas=[Math.floor(w*a.scale),Math.floor(h*a.scale)],
+    R=target[0]*target[1],Q=Math.max(1,Math.floor(target[0]/4))*Math.max(1,Math.floor(target[1]/4)),D=canvas[0]*canvas[1],I=a.intermediate[0]*a.intermediate[1];
+  return JSON.stringify(a.target)===JSON.stringify(target)&&JSON.stringify(a.canvas)===JSON.stringify(canvas)
+    &&a.renderPixels===R&&a.quarterPixels===Q&&a.defaultPixels===D&&a.intermediatePixels===I&&a.lensBytes===16*R+16*Q+12*D&&a.resizeBytes===24*Math.max(D,I)
+    &&[a.lensBytes,a.resizeBytes].every(n=>Number.isSafeInteger(n)&&n<=3639218);
+}
 /** A ten-context prerequisite can never stand in for the complete eleven-phase matrix. */
 export function reduceFocusedLookoutObservations(report,phase){
   const result=reduceSceneScope(report,[phase],1,true);
@@ -297,31 +331,34 @@ export function reduceFocusedFloat32LookoutObservations(report,phase){
   const result=reduceSceneScope(report,[phase],1,'float32');
   return {...result,focusedComplete:result.complete,complete:false,fullMatrixComplete:false,fieldable:false};
 }
-export function float32OriginalReceiptValid(p){
+export function float32OriginalReceiptValid(p,{sourceBytes=12750024}={}){
   return p?.kind==='unchanged original Float32 terrain owners'&&Number.isSafeInteger(p.materialId)&&p.materialId>=0&&typeof p.materialUuid==='string'&&!!p.materialUuid
     &&typeof p.vertexShader==='string'&&!!p.vertexShader&&typeof p.fragmentShader==='string'&&!!p.fragmentShader
     &&Array.isArray(p.uniformKeys)&&p.uniformKeys.length>0&&new Set(p.uniformKeys).size===p.uniformKeys.length&&p.uniformKeys.every(k=>typeof k==='string')
-    &&Array.isArray(p.textureUuids)&&p.textureUuids.every(k=>typeof k==='string'&&!!k)&&p.sourceBytes===12750024
+    &&Array.isArray(p.textureUuids)&&p.textureUuids.every(k=>typeof k==='string'&&!!k)&&p.sourceBytes===sourceBytes
     &&['sourceBytesExact','uniformRecordsExact','uniformValuesExact','sourceLayoutExact','sourceBoundsExact','drawStateExact'].every(k=>p[k]===true)
     &&Array.isArray(p.children)&&p.children.every(c=>c?.materialId===p.materialId&&c.materialUuid===p.materialUuid&&c.originalMaterialShared===true);
 }
 /** Real backing-array reservations, not owner-prefix guesses, bind each native retirement. */
-export function float32TerrainRetirementErrors(row){
+export function float32TerrainRetirementErrors(row,{terrainContract=null}={}){
   const errors=[],fail=s=>errors.push(s),r=row?.resource,states=Array.isArray(row?.states)?row.states:[],cycles=Array.isArray(r?.cycles)?r.cycles.filter(c=>c?.kind==='terrain'):[],receipts=r?.terrainRetirements;
-  if(!Array.isArray(receipts)||receipts.length!==cycles.length||cycles.length!==(row?.fault===undefined?4:2)||receipts.at(-1)?.operation!=='restore-partition')return ['Float32 retirement inventory'];
+  const sourceBytes=terrainContract?.sourceBytes??12750024,partitionBytes=terrainContract?.partitionBytes??9357582,chunks=terrainContract?.chunks?.length??5;
+  if(!Array.isArray(receipts)||receipts.length!==cycles.length||cycles.length!==(row?.fault===undefined&&(!terrainContract||row.phaseId==='lookout-mountain')?4:2)||receipts.at(-1)?.operation!=='restore-partition')return ['Float32 retirement inventory'];
   let installs=0;
   for(const [i,c]of cycles.entries()){
     const t=receipts[i],ss=(Array.isArray(c.sampleIds)?c.sampleIds:[]).map(id=>states.find(s=>s?.captureId===id)),[before,pending,settled]=ss;
     if(!t||t.cycleIndex!==c.index||!['install-original','restore-partition'].includes(t.operation)||t.operation!==(i%2?'restore-partition':'install-original')
       ||!Number.isSafeInteger(t.nativeFrame)||t.nativeFrame<0||!Number.isSafeInteger(t.nativeRenders)||t.nativeRenders<0
-      ||!float32OriginalReceiptValid(t.original)||t.original.children.length!==(t.operation==='install-original'?0:5)||!Array.isArray(t.arrays)||!t.arrays.length||ss.length!==3||ss.some(s=>!s)
+      ||!float32OriginalReceiptValid(t.original,{sourceBytes})||t.original.children.length!==(t.operation==='install-original'?0:chunks)||!Array.isArray(t.arrays)||!t.arrays.length||ss.length!==3||ss.some(s=>!s)
       ||!(before?.sequence<pending?.sequence&&pending?.sequence<settled?.sequence)){fail('Float32 retirement source/capture chronology');continue;}
     if(t.operation==='install-original')installs++;
-    const meshCount=t.operation==='install-original'?1:5,expectedBytes=t.operation==='install-original'?12750024:9357582,ids=new Map();
+    const meshCount=t.operation==='install-original'?1:chunks,expectedBytes=t.operation==='install-original'?sourceBytes:partitionBytes,ids=new Map();
     if(t.arrays.length!==meshCount*3||t.arrays.reduce((n,a)=>n+(a?.bytes||0),0)!==expectedBytes)fail('Float32 complete retiring arrays');
     for(let mesh=0;mesh<meshCount;mesh++)for(const key of ['position','uv','index']){
       const a=t.arrays.filter(a=>a?.mesh===mesh&&a.key===key);
       if(a.length!==1){fail('Float32 omitted/duplicate source array');continue;}const x=a[0],stride=key==='position'?3:key==='uv'?2:1,bpp=key==='index'&&t.operation==='restore-partition'?2:4;
+      if(terrainContract){const expected=(t.operation==='install-original'?terrainContract.sourceArrays:terrainContract.chunks[mesh])?.find(a=>a.key===key);
+        if(!expected||['arrayType','itemSize','count','bytes'].some(k=>x[k]!==expected[k]))fail('Float32 trusted source array layout');}
       if(x.itemSize!==stride||!Number.isSafeInteger(x.count)||x.count<1||x.bytes!==x.count*stride*bpp||x.arrayType!==(key==='index'?(bpp===2?'Uint16Array':'Uint32Array'):'Float32Array')||!Array.isArray(x.reservations))fail('Float32 retiring array layout');
       for(const p of Array.isArray(x.reservations)?x.reservations:[]){if(!Number.isSafeInteger(p?.id)||p.id<1||p.bytes!==x.bytes||p.pendingDelete!==false||ids.has(p.id))fail('Float32 actual array reservation');ids.set(p?.id,p?.bytes);}
     }
@@ -338,18 +375,26 @@ export function float32TerrainRetirementErrors(row){
   return errors;
 }
 /** Source-specific resource prerequisite, called on a fully replayed native context. */
-export function focusedSceneResourceErrors(row,{float32=false}={}){
+export function focusedSceneResourceErrors(row,{float32=false,phase=null}={}){
   const errors=[],fail=s=>errors.push(s),r=row?.resource,states=Array.isArray(row?.states)?row.states:[],boot=row?.bootstrap;
+  const contract=phase?.terrainContract,sourceBytes=contract?.sourceBytes??12750024,partitionBytes=contract?.partitionBytes??9357582,chunks=contract?.chunks?.length??5,triangles=contract?.triangles??578907;
+  if(phase&&(!sceneTerrainContractValid(contract)||r?.terrainContractSourceExact!==true||r?.terrainContractProofReleased!==true
+    ||JSON.stringify(r?.terrainContract)!==JSON.stringify(contract)))fail('trusted phase terrain source contract');
+  if(phase){
+    const installs=Array.isArray(r?.terrainRetirements)?r.terrainRetirements.filter(t=>t.operation==='install-original'):[],published=r?.terrainPublications;
+    if(!Array.isArray(published)||published.length!==installs.length||!installs.length||published.some((p,i)=>p?.cycleIndex!==installs[i].cycleIndex
+      ||JSON.stringify(p?.chunks)!==JSON.stringify(contract?.chunks)))fail('actual published terrain chunk hashes');
+  }
   if(r?.ok!==true||r.exactOriginal!==true||r.bootstrapDraws!==0||r.pixelBytes!==3639218||r.preparedReleased!==true
-    ||r.terrain?.kind!==(float32?'Float32 with retained exact original':'canonical with retained exact original')||r.terrain.bytes!==(float32?9357582:5827098)||r.terrain.sourceBytes!==12750024)fail('canonical native owner/restoration');
-  if(float32){if(!float32OriginalReceiptValid(r?.originalProof)||r.originalProof.children.length!==0||r.originalProofReleased!==true)fail('Float32 exact original source proof');
-    if(r?.terrain?.triangles!==578907||r.terrain.chunks!==5||r.terrain.materialShared!==true||row?.partition?.kind!=='Float32 with retained exact original'
-      ||row.partition.triangles!==578907||row.partition.chunks!==5||row.partition.materialShared!==true||row.partition.bytes!==9357582||row.partition.sourceBytes!==12750024)fail('Float32 actual partition publication');
-    for(const s of states.filter(s=>s?.float32Original)){if(!float32OriginalReceiptValid(s.float32Original)||JSON.stringify({...s.float32Original,children:[]})!==JSON.stringify({...r.originalProof,children:[]}))fail('Float32 unchanged original material/source');}
-    errors.push(...float32TerrainRetirementErrors(row));}
+    ||r.terrain?.kind!==(float32?'Float32 with retained exact original':'canonical with retained exact original')||r.terrain.bytes!==(float32?partitionBytes:5827098)||r.terrain.sourceBytes!==sourceBytes)fail('canonical native owner/restoration');
+  if(float32){if(!float32OriginalReceiptValid(r?.originalProof,{sourceBytes})||r.originalProof.children.length!==0||r.originalProofReleased!==true)fail('Float32 exact original source proof');
+    if(r?.terrain?.triangles!==triangles||r.terrain.chunks!==chunks||r.terrain.materialShared!==true||row?.partition?.kind!=='Float32 with retained exact original'
+      ||row.partition.triangles!==triangles||row.partition.chunks!==chunks||row.partition.materialShared!==true||row.partition.bytes!==partitionBytes||row.partition.sourceBytes!==sourceBytes)fail('Float32 actual partition publication');
+    for(const s of states.filter(s=>s?.float32Original)){if(!float32OriginalReceiptValid(s.float32Original,{sourceBytes})||JSON.stringify({...s.float32Original,children:[]})!==JSON.stringify({...r.originalProof,children:[]}))fail('Float32 unchanged original material/source');}
+    errors.push(...float32TerrainRetirementErrors(row,{terrainContract:contract??null}));}
   if(!Array.isArray(boot)||boot.length!==1||boot[0]?.method!=='GET'||boot[0].removedEntryModules!==1
     ||![boot[0]?.originalSha256,boot[0]?.servedSha256].every(s=>/^[a-f0-9]{64}$/.test(s||''))||boot[0]?.originalSha256===boot[0]?.servedSha256)fail('original document bootstrap');
-  try{const u=new URL(boot?.[0]?.url);if(u.searchParams.get('battle')!=='chattanooga'||u.searchParams.get('phase')!=='lookout-mountain'
+  try{const u=new URL(boot?.[0]?.url);if(u.searchParams.get('battle')!==(phase?.packId??'chattanooga')||u.searchParams.get('phase')!==(phase?.phaseId??'lookout-mountain')
     ||u.searchParams.get('quality')!=='high'||u.searchParams.get('figures')!=='rigged'||!u.searchParams.has('nosw'))fail('bootstrap field route');}catch{fail('bootstrap URL');}
   const textures=new Set(),renderbuffers=new Set();
   for(const [kind,records,ids]of [['texture',r?.postTextures,textures],['renderbuffer',r?.postRenderbuffers,renderbuffers]]){
@@ -361,6 +406,12 @@ export function focusedSceneResourceErrors(row,{float32=false}={}){
   const all=[...states,...array(row?.restoration?.samples,'restoration'),...array(row?.stress?.transaction?.samples,'stress').map(s=>s?.observation)];
   if(all.some(s=>!s||!Number.isSafeInteger(s.sequence)))fail('native observation sequence');
   const ordered=all.filter(s=>s&&Number.isSafeInteger(s.sequence)).sort((a,b)=>a.sequence-b.sequence),last=ordered.at(-1);
+  if(phase&&sceneTerrainContractValid(contract)){
+    const owned=states.filter(s=>s?.label?.endsWith('terrain-contract-proof-owned')),released=states.filter(s=>s?.label?.endsWith('terrain-contract-proof-released')),
+      proofBytes=contract.partitionBytes+contract.chunks.reduce((n,a)=>n+a[0].count*4,0);
+    if(owned.length!==1||released.length!==1||owned[0].sequence>=released[0].sequence
+      ||owned[0].declaredArrayBytes-released[0].declaredArrayBytes!==proofBytes)fail('complete declared terrain contract proof lifetime');
+  }
   const signatures=array(last?.allocation?.signatures,'signatures'),events=array(last?.allocation?.nativeEvents,'native events');
   for(const id of textures)if(!signatures.some(s=>s?.texture===id))fail('unbound Post texture');
   for(const id of renderbuffers)if(!events.some(e=>e?.kind==='renderbuffer'&&e.id===id&&e.operation==='reserve'&&e.detail?.samples===1&&[33189,33190,36012].includes(e.detail.format)))fail('unbound Post depth buffer');
@@ -368,6 +419,7 @@ export function focusedSceneResourceErrors(row,{float32=false}={}){
     if(s?.focusedPixel&&a){const p=s.focusedPixel,ad=p.admission;
       if(!Array.isArray(p.canvas)||p.canvas.length!==2||p.canvas.some(n=>!Number.isSafeInteger(n)||n<1)||JSON.stringify(p.canvas)!==JSON.stringify(a?.dimensions))fail('actual positive Post canvas');
       if(ad&&(!Number.isSafeInteger(ad.lensBytes)||!Number.isSafeInteger(ad.resizeBytes)||ad.pixelBytes!==3639218||ad.lensBytes>3639218||ad.resizeBytes>3639218||ad.scale<=0))fail('rounded Post source envelope');
+      if(phase&&ad&&!scenePostAdmissionValid(p))fail('independent rounded Post arithmetic');
       let pixel=a.gpuCurrent-a.bytes;
       for(const t of array(a.textureSlots,'texture slots'))if(textures.has(t?.texture)){
         if(!t.slots||typeof t.slots!=='object'||Array.isArray(t.slots))fail('texture slots shape');else pixel+=Object.values(t.slots).reduce((n,b)=>n+b,0);}
@@ -392,14 +444,16 @@ export function focusedSceneResourceErrors(row,{float32=false}={}){
 export function scenePartHeader(report){
   return Object.fromEntries(['diagnosticOnly','fieldable','toolSha','run','route','sceneRoutes','fallbackCompletion','normalMotion','nativeHistoryRequired',
     'inactivePrototype','terrainPartitionPrototype','terrainRestorationObserved','limits','qualification','nativeDriverMemory','cpuDecodePeak','unverified',
-    'resourceFocus','canonicalTerrainRepresentation','float32TerrainRepresentation','postPixelBytes','mipPolicy']
+    'resourceFocus','sceneResourcePolicy','canonicalTerrainRepresentation','float32TerrainRepresentation','postPixelBytes','mipPolicy']
     .filter(k=>Object.hasOwn(report||{},k)).map(k=>[k,structuredClone(report[k])]));
 }
 /** Consume eleven bounded phase parts; never reconstruct the aggregate JSON or retain previous rows. */
 export function createSceneMatrixMerger(phases,header){
   const matrix=sceneMatrixContract(phases),expected=phases.map(p=>p.packId+'/'+p.phaseId),common=scenePartHeader(header),errors=[],parts=[],contexts=new Set(),tuples=new Set();
   let maxReservation=null,maxGpuReservation=null,closed=false;
-  if(common.sceneRoutes!=='qualified-both'||common.resourceFocus!==undefined||common.float32TerrainRepresentation!==undefined)throw Error('scene parts: full qualified header required');
+  const fullFloat32=common.sceneResourcePolicy!==undefined;
+  if(common.sceneRoutes!=='qualified-both'||common.resourceFocus!==undefined||(fullFloat32?!sceneFullFloat32HeaderValid(common):common.float32TerrainRepresentation!==undefined))throw Error('scene parts: full qualified header required');
+  if(fullFloat32&&phases.some(p=>!sceneTerrainContractValid(p.terrainContract)||p.terrainContract.terrain!==(p.scenario?.terrain??'henry-hill')))throw Error('scene parts: trusted phase terrain contracts required');
   const rowKey=(r,fault)=>r?.packId+'/'+r?.phaseId+'/'+r?.route+'/'+(fault?r?.fault:'ordinary');
   const required=new Set([...matrix.cases.map(r=>rowKey(r,false)),...matrix.faults.map(r=>rowKey(r,true))]);
   const mergePeak=(value,current)=>Number.isSafeInteger(value)&&value>=0?current===null?value:Math.max(value,current):current;
@@ -411,7 +465,7 @@ export function createSceneMatrixMerger(phases,header){
     const at=parts.length,phase=phases[at],key=expected[at],localErrors=[];
     const fail=message=>localErrors.push(message);let result;
     // Readable maxima survive even a duplicate, foreign, failed or mixed-header part.
-    try{result=reduceSceneScope(part,phase?[phase]:[],1);}catch(error){result={complete:false,errors:[String(error?.message??error)],maxReservation:null,maxGpuReservation:null};}
+    try{result=reduceSceneScope(part,phase?[phase]:[],1,fullFloat32?'float32-full':false);}catch(error){result={complete:false,errors:[String(error?.message??error)],maxReservation:null,maxGpuReservation:null};}
     maxReservation=mergePeak(result.maxReservation,maxReservation);maxGpuReservation=mergePeak(result.maxGpuReservation,maxGpuReservation);
     if(JSON.stringify(scenePartHeader(part))!==JSON.stringify(common))fail('mixed semantic/source header');
     if(!phase||part?.phaseKey!==key||part?.complete!==true)fail('ordered complete phase part');
@@ -455,7 +509,7 @@ export async function collectPaintedIsolation({rows,install,capture,restore,veri
 }
 
 function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) {
-  const float32Policy=canonicalPolicy==='float32',prefix=float32Policy?'float32':'canonical',partitionKind=float32Policy?'partition':'compact';
+  const fullFloat32=canonicalPolicy==='float32-full',float32Policy=fullFloat32||canonicalPolicy==='float32',prefix=float32Policy?'float32':'canonical',partitionKind=float32Policy?'partition':'compact';
   const errors=[], expected=(Array.isArray(phases)?phases:[]).map(p=>`${p?.packId}/${p?.phaseId}`), seen=new Set(), samples=[];
   const fail=message=>errors.push(message);
   const keep=s=>samples.push({gpuReservation:s?.gpuReservation,conservativeReservation:s?.conservativeReservation});
@@ -469,10 +523,11 @@ function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) 
     for(const s of Array.isArray(row?.preload?.transaction?.samples)?row.preload.transaction.samples:[])keep(s?.observation);
   }
   if(report.sceneRoutes!==undefined&&!['current-png','qualified-both'].includes(report.sceneRoutes))fail('unknown scene route mode');
-  if(canonicalPolicy){if(expected.length!==1||expected[0]!=='chattanooga/lookout-mountain'||report.resourceFocus!==`${prefix}-lookout`
+  if(fullFloat32){if(!sceneFullFloat32HeaderValid(report)||!Array.isArray(phases)||phases.some(p=>!sceneTerrainContractValid(p?.terrainContract)||p.terrainContract.terrain!==(p.scenario?.terrain??'henry-hill')))fail('full Float32 phase/resource contract');
+  }else if(canonicalPolicy){if(report.sceneResourcePolicy!==undefined||expected.length!==1||expected[0]!=='chattanooga/lookout-mountain'||report.resourceFocus!==`${prefix}-lookout`
     ||(float32Policy?report.float32TerrainRepresentation!=='Float32 with retained exact original'||report.canonicalTerrainRepresentation!==undefined:report.canonicalTerrainRepresentation!=='canonical with retained exact original'||report.float32TerrainRepresentation!==undefined)||report.postPixelBytes!==3639218||report.mipPolicy!=='full-original'
     ||report.nativeHistoryRequired!==true||report.fallbackCompletion!=='native-finish-after-candidate-disposal')fail('focused canonical Lookout contract');
-  }else if(report.resourceFocus!==undefined||report.canonicalTerrainRepresentation!==undefined||report.float32TerrainRepresentation!==undefined||report.postPixelBytes!==undefined||report.mipPolicy!==undefined)fail('focused evidence cannot qualify full matrix');
+  }else if(report.sceneResourcePolicy!==undefined||report.resourceFocus!==undefined||report.canonicalTerrainRepresentation!==undefined||report.float32TerrainRepresentation!==undefined||report.postPixelBytes!==undefined||report.mipPolicy!==undefined)fail('focused evidence cannot qualify full matrix');
   if(report.fallbackCompletion!==undefined&&(report.sceneRoutes!=='qualified-both'||report.fallbackCompletion!=='native-finish-after-candidate-disposal'))fail('unknown fallback completion contract');
   if(report.sceneRoutes!=='qualified-both'&&(report.qualification!==undefined||report.faults!==undefined))fail('qualified evidence requires explicit qualified mode');
   if(new Set(expected).size!==expected.length||expected.length!==requiredPhases)fail('phase contract');
@@ -559,7 +614,7 @@ function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) 
       if(row?.complete!==true||row.contextClosed!==true||!Array.isArray(row.errors)||row.errors.length)fail(label+': completed context');
       admission(row,label);
       if(report.nativeHistoryRequired===true&&!row?.history)fail(label+': mandatory native allocation history');
-      if(canonicalPolicy)for(const error of focusedSceneResourceErrors(row,{float32:float32Policy}))fail(label+': '+error);
+      if(canonicalPolicy)for(const error of focusedSceneResourceErrors(row,{float32:float32Policy,...(fullFloat32?{phase:phases.find(p=>p.packId===row.packId&&p.phaseId===row.phaseId)??{}}:{})}))fail(label+': '+error);
     };
     const chronology=(list,label)=>{
       const ordered=list.filter(Boolean).slice().sort((a,b)=>a.sequence-b.sequence),seq=new Set();let peak=-1,finish=0;
@@ -629,12 +684,13 @@ function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) 
         ...(row?.phaseId==='lookout-mountain'?[canonicalPolicy?`${prefix}-native-zoom`:'partition-native-zoom','framed-compare-rigged-left','framed-compare-baked-left','framed-baked-restored']:[])];
       if(new Set(labels).size!==labels.length||required.some(l=>!labels.includes(l)))fail(label+': required ordinary/transition states');
       if(row?.phaseId==='lookout-mountain'){
-        const captures=array(row?.canvasCaptures,label+'/canvas captures'),captureLabels=[...(canonicalPolicy?
+        const captures=array(row?.canvasCaptures,label+'/canvas captures'),captureLabels=[...(fullFloat32?['terrain-partition-01-before.png','terrain-partition-02-after.png','terrain-partition-03-zoom.png']:[]),...(canonicalPolicy?
           [...['original',partitionKind,'restored'].flatMap(kind=>['overview','near','boundary'].map(view=>`${prefix}-${kind}-${view}`)),`${prefix}-height-control`,`${prefix}-uv-control`,`${prefix}-controls-repaired`]:
           ['terrain-partition-01-before.png','terrain-partition-02-after.png','terrain-partition-03-zoom.png']),
           'rigged-reactivation','near-lod-reupload','baked-reclamation','compare-rigged-left','compare-baked-left','baked-restored','framed-compare-rigged-left','framed-compare-baked-left','framed-baked-restored'];
         if(captures.length!==captureLabels.length||new Set(captures.map(c=>c?.label)).size!==captureLabels.length||captureLabels.some(l=>!captures.some(c=>c?.label===l)))fail(label+': complete numbered Lookout canvas captures');
         for(const c of captures){
+          const originalFloat32Frame=/^float32-(original|restored)-/.test(c?.label)||(fullFloat32&&c?.label==='terrain-partition-01-before.png');
           if(c?.phase!==row.phaseId||c.toolSha!==report.toolSha||typeof c.filename!=='string'||!c.filename.startsWith(`${row.packId}-${row.phaseId}-${row.route}-`)
             ||!/^[-a-zA-Z0-9_.]+\.png$/.test(c.filename)||!safe(c.bytes)||!c.bytes||!/^[a-f0-9]{64}$/.test(c.sha256||'')
             ||!Number.isSafeInteger(c.width)||c.width<1||!Number.isSafeInteger(c.height)||c.height<1||c.width!==c.drawingWidth||c.height!==c.drawingHeight
@@ -655,7 +711,7 @@ function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) 
             if(typeof world?.root!=='string'||!world.root||!owners.length||owners.some(o=>typeof o?.mesh!=='string'||!o.mesh||typeof o.geometry!=='string'||!o.geometry
               ||!Array.isArray(o.arrays)||!o.arrays.length||o.arrays.some(a=>typeof a?.key!=='string'||!safe(a.bytes)||a.bytes===0||!/^[a-f0-9]{64}$/.test(a.sha256||''))
               ||kind==='terrain'&&!(float32Policy?
-                owners.length===(/^float32-(original|restored)-/.test(c.label)?1:5)&&o.material===row.resource?.originalProof?.materialUuid&&o.arrays.length===3&&['position','uv','index'].every(k=>o.arrays.some(a=>a.key===k&&a.arrayType===(k==='index'?(/^float32-(original|restored)-/.test(c.label)?'Uint32Array':'Uint16Array'):'Float32Array')&&a.itemSize===(k==='position'?3:k==='uv'?2:1)&&a.normalized===false&&Number.isSafeInteger(a.count)&&a.count>0&&a.bytes===a.count*a.itemSize*(k==='index'&&!/^float32-(original|restored)-/.test(c.label)?2:4))):canonicalPolicy&&!float32Policy&&!/^canonical-(original|restored)-/.test(c.label)?
+                owners.length===(originalFloat32Frame?1:5)&&o.material===row.resource?.originalProof?.materialUuid&&o.arrays.length===3&&['position','uv','index'].every(k=>o.arrays.some(a=>a.key===k&&a.arrayType===(k==='index'?(originalFloat32Frame?'Uint32Array':'Uint16Array'):'Float32Array')&&a.itemSize===(k==='position'?3:k==='uv'?2:1)&&a.normalized===false&&Number.isSafeInteger(a.count)&&a.count>0&&a.bytes===a.count*a.itemSize*(k==='index'&&!originalFloat32Frame?2:4))):canonicalPolicy&&!float32Policy&&!/^canonical-(original|restored)-/.test(c.label)?
                 o.arrays.length===3&&['aGrid','aHeight','index'].every(k=>o.arrays.some(a=>a.key===k&&a.arrayType===(k==='aHeight'?'Float32Array':'Uint16Array')&&a.itemSize===(k==='aGrid'?2:1)&&a.normalized===false&&Number.isSafeInteger(a.count)&&a.count>0&&a.bytes===a.count*a.itemSize*(k==='aHeight'?4:2))):
                 o.arrays.some(a=>a.key==='position'&&a.bytes>0)))
               ||kind==='trees'&&!owners.some(o=>Array.isArray(o.arrays)&&o.arrays.some(a=>a.key==='instanceMatrix'&&a.bytes>0)))fail(label+': actual '+kind+' array bindings');

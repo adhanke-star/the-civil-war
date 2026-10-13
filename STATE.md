@@ -1,6 +1,6 @@
 # STATE
-2026-10-13 — v1 released558456f; ACTIVE0199 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
-Branch v1-1-gaps-20261012/fdeadc5 pushed; ownCI38466690212 all9/sevenroots/raw264+scene263+terrain80 CLEAR/native214 CLEAR.0197CI38462474249 all9/fullroots CLEAR. Float32 FIRSTRED38466534181 all3 originals/42PNG/10native contexts read:GPU248944050B; strict four hidden-tree/100m-frame errors preserved.0199 producer repair root+Astra270+270 CLEAR; native repaired UNRUN. ONCEridge38470321986 bound qualifiedfde BEFORE0199commit. Northern38461620307 exact677 B→S saved1625/LookoutSilverretained/MissionarynoGold; GoldUNRUN. COORDINATION absent; v1.1/v2 unreleased.
+2026-10-13 — v1 released558456f; ACTIVE0200 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
+Branch v1-1-gaps-20261012/0d205e3 parent pushed; ownCI38470410155 all9/full roots/native214/raw1155476898705736365B badge264+scene270+terrain80 CLEAR. Repaired focused38473779151 bound0d BEFORE0200 commit/native running. Full-float32 eleven-phase110/168-image source310+310/UNIT/YAML32/syntax/diff/Astra fixes CLEAR; own0200CI/fullnative pending. FIRSTRED38466534181 all3 originals/42PNG/10nativecontexts read:GPU248944050B/four strict errors preserved. Ridge38470321986 full original Decisive/living1625/Silver retained/noGold; northern finite witness plausible/source/native UNRUN. COORDINATION absent; v1.1/v2 unreleased.
 Accepted remote main9e72079; sourceCI38346843720 all9/full own251/365/171/159+201+three6smokes/digests clean.
 Main9eCI38349763169 all9/fullown/digests/rawprobe clear; Pages38349763192 exact9e/livev68 clear.
 MAIN13a7b136 exact protected11 dirty paths untouched; c328 failedmainCI38298643624 retained.

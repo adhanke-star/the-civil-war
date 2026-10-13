@@ -5,12 +5,13 @@ import {createHash} from 'node:crypto';
 import {gzipSync} from 'node:zlib';
 import { chromium } from 'playwright';
 import { startServer, ROOT } from '../serve.mjs';
-import { failPaintedComparison, collectPaintedIsolation, AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation, reduceSceneObservations, reduceFocusedLookoutObservations, reduceFocusedFloat32LookoutObservations, sampleSceneAllocations, initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,sceneReportEnvelope,scenePartHeader,createSceneMatrixMerger } from './scene-allocation.mjs';
+import { failPaintedComparison, collectPaintedIsolation, AllocationLedger, mipSizes, installAllocationObserver, ReservationPeak, rejectionObservation, reduceSceneObservations, reduceFullFloat32SceneObservations, reduceFocusedLookoutObservations, reduceFocusedFloat32LookoutObservations, sampleSceneAllocations, initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,sceneReportEnvelope,scenePartHeader,createSceneMatrixMerger } from './scene-allocation.mjs';
 import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDiagnostics,installSceneStartGate} from './inactive-figures.mjs';
 import {acquireQualifiedHybrid,materializeQualifiedSceneInput,QUALIFIED_HYBRID,installQualifiedSceneRoutes,sceneMatrixGroups} from './review-current-compression.mjs';
 import {preparePhase,prepareFieldScenario} from '../../src/sim/phase.js';
 import {PNG} from 'pngjs';
 import {partitionTerrain,installTerrainPartition,registerTerrainPartition} from './partition-terrain.mjs';
+import {readSceneTerrainContracts} from './scene-terrain-contract.mjs';
 
 const inventory=sampleSceneAllocations;
 // Explicit runner-only bootstrap. The real document/DOM/import map remain intact;
@@ -26,11 +27,11 @@ async function focusedSceneBootstrap(ctx,page,url,entry){
   await ctx.route(target,handler);await page.goto(target);
   await page.evaluate(async()=>{
     const THREE=await import('three'),I=await import('./tools/bake/inactive-figures.mjs'),A=await import('./tools/bake/scene-allocation.mjs'),M=await import('./src/main.js');
-    const owner={samples:[],postTextures:[],postRenderbuffers:[],serial:0,clock:0,bootstrapDraws:0},textureIds=new Set(),bufferIds=new Set();window.__focusedScene=owner;
+    const owner={samples:[],postTextures:[],postRenderbuffers:[],serial:0,clock:0,bootstrapDraws:0},textureIds=new Set(),bufferIds=new Set(),admissionDimensions=new WeakMap();window.__focusedScene=owner;
     owner.sample=(label,sequence=null)=>{
       const post=window.__game?.post||owner.post,renderer=post.renderer,gl=renderer.getContext(),shell={__game:{post,scene:owner.emptyScene,game:{baked:{atlases:{}}}},__allocation:window.__allocation,innerWidth,innerHeight,devicePixelRatio};
       const live=window.__game&&owner.originalProof?{__game:window.__game,__allocation:window.__allocation,innerWidth,innerHeight,devicePixelRatio,
-        __sceneTerrainPartition:{retainedArrays:[...(window.__sceneTerrainPartition?.retainedArrays||[]),...owner.originalProof.retainedArrays,...(owner.controlArrays||[])]}}:window.__game?window:shell;
+        __sceneTerrainPartition:{retainedArrays:[...(window.__sceneTerrainPartition?.retainedArrays||[]),...owner.originalProof.retainedArrays,...(owner.controlArrays||[]),...(owner.contractProofArrays||[])]}}:window.__game?window:shell;
       const serial=++owner.serial,sample={label:`focused-${serial}-${label}`,captureId:serial,sequence:sequence??++owner.clock,...A.sampleSceneAllocations(live)};
       if(owner.originalProof)sample.float32Original=owner.originalProof.receipt();
       for(const [key,target]of ['rtScene','rtSmall','rtBlur'].map(k=>[k,post[k]])){
@@ -41,7 +42,7 @@ async function focusedSceneBootstrap(ctx,page,url,entry){
         for(const native of Array.isArray(depth)?depth:[depth]){if(!native)continue;const record=window.__allocation.renderbufferReservation(gl,native);
           if(record&&!bufferIds.has(record.id)){bufferIds.add(record.id);owner.postRenderbuffers.push({key,...record});}}
       }
-      sample.focusedPixel={admission:post.resourceAdmission?structuredClone(post.resourceAdmission):null,
+      sample.focusedPixel={...A.scenePostAdmissionSnapshot(post,admissionDimensions),
         targets:[post.rtScene,post.rtSmall,post.rtBlur].map(t=>[t.width,t.height]),canvas:[gl.drawingBufferWidth,gl.drawingBufferHeight],
         textureIds:[...textureIds],renderbufferIds:[...bufferIds]};
       owner.samples.push(sample);return sample;
@@ -70,12 +71,30 @@ async function focusedCanonicalInstall(page){
   });
 }
 
-async function focusedFloat32Install(page){
-  return page.evaluate(async()=>{
+async function focusedFloat32Install(page,terrainContract=null){
+  return page.evaluate(async terrainContract=>{
     const THREE=await import('three'),P=await import('./tools/bake/partition-terrain.mjs'),f=window.__focusedScene,{world,post}=window.__game,root=world.terrainMesh,gl=post.renderer.getContext();
     if(Object.hasOwn(window,'__sceneTerrainPartition'))throw Error('Float32 scene: diagnostic registration already owned');
     if(!f.originalProof){f.originalProof=P.captureFloat32TerrainOriginal(world);f.original={root,geometry:root.geometry,material:root.material,position:root.geometry.attributes.position,uv:root.geometry.attributes.uv,index:root.geometry.index};f.terrainRetirements=[];}
     f.originalProof.verify();
+    if(terrainContract&&!f.terrainContractSourceExact){
+      const source={position:root.geometry.attributes.position.array,uv:root.geometry.attributes.uv.array,index:root.geometry.index.array},proof=P.partitionTerrain(source);
+      f.contractProofArrays=proof.chunks.flatMap((c,i)=>['position','uv','index','sourceVertices'].map(key=>({array:c[key],owner:`terrain-contract-proof-${i}/${key}`})));
+      const hash=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
+      const describe=async(key,a)=>({key,arrayType:a.constructor.name,itemSize:key==='position'?3:key==='uv'?2:1,count:a.length/(key==='position'?3:key==='uv'?2:1),bytes:a.byteLength,sha256:await hash(new Uint8Array(a.buffer,a.byteOffset,a.byteLength))});
+      try{
+        f.sample('terrain-contract-proof-owned');
+        const settled=await Promise.allSettled([...Object.entries(source).map(([key,a])=>describe(key,a)),...proof.chunks.flatMap(c=>['position','uv','index'].map(key=>describe(key,c[key])))]);
+        const failures=settled.filter(r=>r.status==='rejected').map(r=>r.reason);if(failures.length)throw new AggregateError(failures,'full Float32: source digest failed');
+        const sourceArrays=settled.slice(0,3).map(r=>r.value),chunks=Array.from({length:proof.chunks.length},(_,i)=>settled.slice(3+i*3,6+i*3).map(r=>r.value));
+        const terrain=window.__game.game.scenario.terrain??'henry-hill',metaURL=`./assets/terrain/${terrain}.json`,heightURL=`./assets/terrain/${terrain}.bin`;
+        const responses=await Promise.all([fetch(metaURL),fetch(heightURL)]);if(responses.some(r=>!r.ok))throw Error('full Float32: actual terrain source unavailable');
+        const [metadataSha256,heightSha256]=await Promise.all(responses.map(async r=>hash(await r.arrayBuffer())));
+        const actual={terrain,metadataSha256,heightSha256,sourceBytes:proof.sourceBytes,partitionBytes:proof.bytes,triangles:proof.triangles,sourceArrays,chunks};
+        if(JSON.stringify(actual)!==JSON.stringify(terrainContract))throw Error('full Float32: actual source/chunk contract differs from trusted dataset');
+        f.terrainContract=actual;f.terrainContractSourceExact=true;
+      }finally{proof.chunks.length=0;f.contractProofArrays=[];f.terrainContractProofReleased=true;f.sample('terrain-contract-proof-released');}
+    }
     const retire=(operation,callback)=>{
       const meshes=operation==='install-original'?[root]:[...root.children],arrays=meshes.flatMap((m,i)=>[...Object.entries(m.geometry.attributes),['index',m.geometry.index]].map(([key,a])=>({mesh:i,key,arrayType:a.array.constructor.name,itemSize:a.itemSize,count:a.count,bytes:a.array.byteLength,reservations:window.__allocation.bufferReservations(gl,a.array)})));
       const receipt={operation,nativeFrame:post.renderer.info.render.frame,nativeRenders:window.__sceneRenderGate.count,arrays,original:f.originalProof.receipt(),cycleIndex:f.lifetime.cycles.length+1};f.terrainRetirements.push(receipt);
@@ -91,9 +110,20 @@ async function focusedFloat32Install(page){
       }};
       try{f.owner=wrapped;P.registerTerrainPartition(window,wrapped);}catch(error){const errors=[error];try{owner.restore();}catch(cleanup){errors.push(cleanup);}throw new AggregateError(errors,'Float32 scene: registration failed with independent rollback');}
     });
+    if(terrainContract){
+      const hash=async a=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new Uint8Array(a.buffer,a.byteOffset,a.byteLength))),b=>b.toString(16).padStart(2,'0')).join('');
+      const settled=await Promise.allSettled(root.children.flatMap(mesh=>['position','uv','index'].map(async key=>{
+        const a=key==='index'?mesh.geometry.index:mesh.geometry.attributes[key];
+        return {key,arrayType:a.array.constructor.name,itemSize:a.itemSize,count:a.count,bytes:a.array.byteLength,sha256:await hash(a.array)};
+      })));
+      const failures=settled.filter(r=>r.status==='rejected').map(r=>r.reason);if(failures.length)throw new AggregateError(failures,'full Float32: published digest failed');
+      const chunks=Array.from({length:root.children.length},(_,i)=>settled.slice(i*3,i*3+3).map(r=>r.value));
+      if(JSON.stringify(chunks)!==JSON.stringify(terrainContract.chunks))throw Error('full Float32: actual published chunk bytes differ from trusted source');
+      (f.terrainPublications??=[]).push({cycleIndex:f.lifetime.cycles.length,chunks});
+    }
     f.originalProof.verify();f.sample('float32-source-settled');
     return {kind:f.owner.kind,triangles:owner.triangles,chunks:owner.chunks,sourceBytes:owner.sourceBytes,bytes:owner.bytes,materialShared:owner.materialShared};
-  });
+  },terrainContract);
 }
 
 async function focusedSceneCleanup(page){
@@ -108,6 +138,7 @@ async function focusedSceneCleanup(page){
     let originalProof;if(f.originalProof){try{originalProof=f.originalProof.receipt();if(exactOriginal&&!errors.length)f.originalProof.release();}catch(e){errors.push(String(e?.message??e));}}
     return {ok:!errors.length,errors,exactOriginal,bootstrapDraws:f.bootstrapDraws,pixelBytes:f.post?.diagnosticPixelBytes,preparedReleased:f.prepared==null,terrain:f.owner&&{kind:f.owner.kind,bytes:f.owner.bytes,sourceBytes:f.owner.sourceBytes,...(f.originalProof?{triangles:f.owner.triangles,chunks:f.owner.chunks,materialShared:f.owner.materialShared}:{})},
       ...(f.originalProof?{originalProof,originalProofReleased:f.originalProof.released,terrainRetirements:f.terrainRetirements}:{}),
+      ...(f.terrainContract?{terrainContract:f.terrainContract,terrainContractSourceExact:f.terrainContractSourceExact,terrainContractProofReleased:f.terrainContractProofReleased===true&&f.contractProofArrays?.length===0,terrainPublications:f.terrainPublications}:{}),
       postTextures:f.postTextures,postRenderbuffers:f.postRenderbuffers,samples:f.samples,cycles:(f.lifetime?.cycles||[]).map(c=>({kind:c.kind,index:c.index,complete:c.complete,errors:c.errors,checks:c.checks,sampleLabels:c.samples.map(s=>s.observation.label),sampleIds:c.samples.map(s=>s.observation.captureId)}))};
   });
 }
@@ -146,7 +177,7 @@ async function qualifiedFaultContext({browser,url,tuple,input,transport,source,p
     if(await page.evaluate(()=>document.getElementById('briefing')?.open))await page.locator('#briefing-begin').click();
     await page.evaluate(async()=>{const S=await import('./src/settings.js'),{LOOK}=await import('./src/ui/look.js');window.__qualifiedSettings={values:S.all().map(({key,value,locked})=>({key,value,locked})),look:JSON.stringify(LOOK)};window.__game.game.ensureBaked();});
     await page.waitForFunction(()=>window.__game.game.baked.state==='ready',null,{timeout:120000,polling:250});
-    if(focused){await page.evaluate(async()=>{const I=await import('./tools/bake/inactive-figures.mjs');const g=window.__game.game;g.__inactiveStats=I.installInactiveFigures(g);g.animate(0);});if(float32)row.partition=await focusedFloat32Install(page);else row.canonical=await focusedCanonicalInstall(page);}
+    if(focused){await page.evaluate(async()=>{const I=await import('./tools/bake/inactive-figures.mjs');const g=window.__game.game;g.__inactiveStats=I.installInactiveFigures(g);g.animate(0);});if(float32)row.partition=await focusedFloat32Install(page,report.sceneResourcePolicy?phases.find(p=>p.packId===tuple.packId&&p.phaseId===tuple.phaseId).terrainContract:null);else row.canonical=await focusedCanonicalInstall(page);}
     const admitted=await page.evaluate(async({manifest,sourceManifest,base,tuple,target,completionBeforeFallback,focused})=>{
       const I=await import('./tools/bake/inactive-figures.mjs'),A=await import('./tools/bake/scene-allocation.mjs'),P=await import('./tools/bake/partition-terrain.mjs'),THREE=await import('three'),{COMMAND}=await import('./src/game.js'),
         scope=window.__game,{game,post,scene,camera,effects,world}=scope,gl=post.renderer.getContext(),atlas=game.baked.atlases.CS;
@@ -288,12 +319,13 @@ async function main(){
   fs.mkdirSync(out);
   const campaign=JSON.parse(fs.readFileSync(path.join(ROOT,'assets/campaign.json')));
   const inactive=process.env.SCENE_INACTIVE==='true',partition=process.env.SCENE_PARTITION==='true';
-  const sceneRoutes=process.env.SCENE_ROUTES||'current-png',qualified=sceneRoutes==='qualified-both',focus=process.env.SCENE_FOCUS||'full',float32=focus==='float32-lookout',focused=float32||focus==='canonical-lookout';
+  const sceneRoutes=process.env.SCENE_ROUTES||'current-png',qualified=sceneRoutes==='qualified-both',focus=process.env.SCENE_FOCUS||'full',fullFloat32=focus==='full-float32',float32=fullFloat32||focus==='float32-lookout',focused=focus==='float32-lookout'||focus==='canonical-lookout',boundedResources=focused||fullFloat32;
   const completion=process.env.SCENE_COMPLETION||'no-finish';
   if(!['no-finish','native-finish'].includes(completion)||completion==='native-finish'&&!qualified)throw Error('scene allocation: completion experiment requires explicit qualified routes');
   if(!['current-png','qualified-both'].includes(sceneRoutes)||qualified&&(!inactive||!partition))throw Error('scene allocation: explicit routes require both prototypes');
-  if(!['full','canonical-lookout','float32-lookout'].includes(focus)||focused&&(!qualified||completion!=='native-finish'))throw Error('scene allocation: focused policy requires qualified routes and native completion');
-  const phases=campaign.phases.map(entry=>{const pack=JSON.parse(fs.readFileSync(path.join(ROOT,`assets/packs/${entry.packId}.json`)));return {...entry,scenario:prepareFieldScenario(preparePhase(pack,entry.phaseId).scenario,'pack')};});
+  if(!['full','canonical-lookout','float32-lookout','full-float32'].includes(focus)||boundedResources&&(!qualified||completion!=='native-finish'))throw Error('scene allocation: focused policy requires qualified routes and native completion');
+  let phases=campaign.phases.map(entry=>{const pack=JSON.parse(fs.readFileSync(path.join(ROOT,`assets/packs/${entry.packId}.json`)));return {...entry,scenario:prepareFieldScenario(preparePhase(pack,entry.phaseId).scenario,'pack')};});
+  if(fullFloat32)phases=readSceneTerrainContracts(phases);
   // Immutable acquisition and fresh runner-only materialization precede browser launch.
   const input=qualified?await acquireQualifiedHybrid(JSON.parse(fs.readFileSync(path.join(ROOT,'assets/figures/confederate-infantry/soldier.json')))):null,
     transport=qualified?materializeQualifiedSceneInput(input):null,matrix=qualified?sceneMatrixContract(phases):null;
@@ -305,6 +337,7 @@ async function main(){
     unverified:['native driver storage/pools and deferred releases after context destruction','whole-fight effect maximum beyond exercised frames','future sandbox spawns beyond declared pools','CPU image decode/upload-copy peaks']};
   if(qualified)Object.assign(report,{sceneRoutes,...(completion==='native-finish'?{fallbackCompletion:'native-finish-after-candidate-disposal'}:{}),normalMotion:true,nativeHistoryRequired:true,qualification:{...QUALIFIED_HYBRID,members:[...transport.files].map(([name,file])=>({name,bytes:file.bytes.length,sha256:file.sha256}))},faults:[]});
   if(focused)Object.assign(report,{resourceFocus:focus,terrainPartitionPrototype:float32,...(float32?{float32TerrainRepresentation:'Float32 with retained exact original'}:{canonicalTerrainRepresentation:'canonical with retained exact original'}),postPixelBytes:3639218,mipPolicy:'full-original',focusedComplete:false,fullMatrixComplete:false});
+  if(fullFloat32)Object.assign(report,{sceneResourcePolicy:'float32-lifetime-v1',float32TerrainRepresentation:'Float32 with retained exact original',postPixelBytes:3639218,mipPolicy:'full-original'});
   let evidenceRoot=out,phaseCursor=0,transportFailure=null;
   const phaseNames=Array.from({length:11},(_,i)=>'phase-'+String(i+1).padStart(2,'0')+'.json'),members=new Map(),partFiles=new Map(),captures=new Map();
   if(qualified){const temp=process.env.RUNNER_TEMP;if(!temp||fs.realpathSync(temp)!==temp||!fs.lstatSync(temp).isDirectory())throw Error('scene parts: real runner temp required');evidenceRoot=fs.mkdtempSync(path.join(temp,'cw-scene-matrix-'));}
@@ -320,7 +353,7 @@ async function main(){
     ...(merger?merger.snapshot():{}),...(focused?{focusedComplete:report.focusedComplete,complete:false,fullMatrixComplete:false,withinLimit:report.withinLimit??false,errors:report.errors||[],maxGpuReservation:report.maxGpuReservation??null,maxReservation:report.maxReservation??null}:{}),...(transportFailure?{transportFailure,complete:false,withinLimit:false}:{}),fieldable:false});
   const source={ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),...(qualified?{nativeJournal:true}:{})};
   const {server,url}=await startServer({port:0});let browser;
-  const save=(force=false)=>{if(focused&&!force&&[...report.cases,...report.faults].some(r=>!r.contextClosed))return;const envelope=sceneReportEnvelope(report);if(qualified){
+  const save=(force=false)=>{if(boundedResources&&!force&&[...report.cases,...report.faults].some(r=>!r.contextClosed))return;const envelope=sceneReportEnvelope(report);if(qualified){
     const name=phaseNames[Math.min(phaseCursor,10)];
     if(!envelope.withinLimit){writeEvidence(name.replace('.json','.json.gz'),gzipSync(envelope.json));transportFailure={phaseKey:report.phaseKey,bytes:envelope.bytes,limit:envelope.limit,sha256:digest(envelope.json)};fs.writeFileSync(path.join(out,'report.json'),JSON.stringify(manifest()));throw Error('scene parts: bounded phase overflow retained; no truncation');}
     const member=writeEvidence(name,Buffer.from(envelope.json));partFiles.set(name,{...member,phaseKey:report.phaseKey??null,complete:report.complete===true});
@@ -339,14 +372,14 @@ async function main(){
       if(qualified){phaseCursor=Math.floor(index/2);report.phaseKey=entry.packId+'/'+entry.phaseId;}
       const ctx=await browser.newContext({viewport:{width:1024,height:768},deviceScaleFactor:2,reducedMotion:qualified?'no-preference':'reduce'});
       const errors=[],row={...entry,states:[],errors,...(qualified?{contextId:`${entry.packId}/${entry.phaseId}/${entry.route}/ordinary`,history:createSceneHistory(),scenario:phases.find(p=>p.packId===entry.packId&&p.phaseId===entry.phaseId).scenario}:{})};report.cases.push(row);let sequence=0,page,routes,primary,bootstrap;
-      const observation=data=>qualified&&!focused?compactSceneSample(row.history,{...data,sequence:++sequence}):data;
+      const observation=data=>qualified&&!boundedResources?compactSceneSample(row.history,{...data,sequence:++sequence}):data;
       try{
       await ctx.addInitScript(installAllocationObserver,source);
       if(qualified)await ctx.addInitScript(source=>{window.__sceneStartNative={native:window.requestAnimationFrame,descriptor:Object.getOwnPropertyDescriptor(window,'requestAnimationFrame')};window.__sceneStartGate=(0,eval)('('+source+')')();},installSceneStartGate.toString());
       routes=qualified?await installQualifiedSceneRoutes(ctx,new URL(url).origin,transport.files):null;
       page=await ctx.newPage();page.on('pageerror',e=>errors.push(e.message));
       page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
-        if(focused)bootstrap=await focusedSceneBootstrap(ctx,page,url,entry);
+        if(boundedResources)bootstrap=await focusedSceneBootstrap(ctx,page,url,entry);
         else await page.goto(`${url}?battle=${entry.packId}&phase=${entry.phaseId}&quality=high&nosw${qualified?'&figures=rigged':''}`);
         await page.waitForFunction(()=>window.__ready&&window.__game?.game,null,{timeout:180000,polling:250});
         if(await page.evaluate(()=>document.getElementById('briefing')?.open))await page.locator('#briefing-begin').click();
@@ -368,7 +401,7 @@ async function main(){
             atlas.io=io;window.__qualifiedInstalledIO=io;if(!focused)window.__sceneRenderGate=installRenderGate(post);
             return {preclose,configuration:{fieldUnchanged:owner.fieldUnchanged(),baseUnchanged:owner.fieldUnchanged(),nativeUSLoading:!game.baked.atlases.US.diagnosticClose,
               genuineCapability:route==='capable'&&owner.nativeCapability,maskedOnlyAstc:route==='unsupported'},scenario:game.scenario,ordinaryRoster:game.units.map(u=>({id:u.id,side:u.side,type:u.type,men:u.men,x:u.x,z:u.z,order:u.order}))};
-          },{manifest:input.manifest,sourceManifest:input.source,base:routes.base,route:entry.route,focused});
+          },{manifest:input.manifest,sourceManifest:input.source,base:routes.base,route:entry.route,focused:boundedResources});
           if(JSON.stringify(configured.scenario)!==JSON.stringify(row.scenario))throw Error('qualified scene: live scenario differs from trusted authored preparation');Object.assign(row,configured);
           await page.evaluate(async()=>{const S=await import('./src/settings.js');S.set('look.figureStyle','baked');window.__game.game.animate(0);});
         }
@@ -377,7 +410,7 @@ async function main(){
           const drawing=await page.evaluate(async()=>{const {post,scene,camera}=window.__game,r=post.renderer,prior=r.info.autoReset;
             const {settleSceneCapture}=await import('./tools/bake/scene-allocation.mjs');settleSceneCapture(window);
             r.info.autoReset=false;r.info.reset();try{if(window.__sceneRenderGate)window.__sceneRenderGate.renderOnce(scene,camera);else post.render(scene,camera);r.getContext().finish();return {drawCalls:r.info.render.calls,nativeRenders:window.__sceneRenderGate?.count??null};}finally{r.info.autoReset=prior;}});
-          const data=focused?await page.evaluate(label=>window.__focusedScene.sample(label),label):await page.evaluate(inventory);row.states.push(observation({...data,label,...drawing}));save();
+          const data=boundedResources?await page.evaluate(label=>window.__focusedScene.sample(label),label):await page.evaluate(inventory);row.states.push(observation({...data,label,...drawing}));save();
           if(data.glError||data.allocation.unknown.length||data.unmappedBufferBytes!==0||errors.length)throw new Error(`scene allocation: ${entry.phaseId}/${label} incomplete: GL${data.glError}, unmapped ${data.unmappedBufferBytes}, ${data.allocation.unknown.join(',')}, ${errors.join(',')}`);
           console.log(entry.phaseId,label,JSON.stringify({reservation:data.conservativeReservation,...data.allocation.byKind,arrays:data.declaredArrayBytes,pages:data.atlasPages}));
         };
@@ -415,9 +448,9 @@ async function main(){
           const {post,rts,game,camera}=window.__game;if(!window.__sceneRenderGate)window.__sceneRenderGate=(0,eval)('('+source+')')(post);
           for(let i=0;i<12;i++)rts.update(1);game.setView(camera,innerHeight*post.scale);game.animate(0);
         },installRenderGate.toString());
-        if(focused)await page.evaluate(async()=>{const I=await import('./tools/bake/inactive-figures.mjs'),g=window.__game.game;g.__inactiveStats=I.installInactiveFigures(g);g.animate(0);});
+        if(boundedResources)await page.evaluate(async()=>{const I=await import('./tools/bake/inactive-figures.mjs'),g=window.__game.game;g.__inactiveStats=I.installInactiveFigures(g);g.animate(0);});
         await capture('field');
-        if(float32){
+        if(float32&&entry.phaseId==='lookout-mountain'){
           await page.evaluate(async()=>{await Promise.all(Object.values(window.__game.game.baked.atlases).map(a=>a.load('close')));});
           row.float32Views=await page.evaluate(async()=>{
             const P=await import('./tools/bake/partition-terrain.mjs'),{world,terrain,rts}=window.__game,g=world.terrainMesh.geometry,
@@ -430,11 +463,11 @@ async function main(){
           });
           const viewFrames=async kind=>{for(const view of row.float32Views){await page.evaluate(goal=>{const {rts,game,camera,post}=window.__game;Object.assign(rts.goal,goal);rts.snap();rts.update(1);game.setView(camera,innerHeight*post.scale);game.animate(0);},view.goal);
             await capture(`float32-${kind}-${view.label}`);await canvasShot(`float32-${kind}-${view.label}.png`,`float32-${kind}-${view.label}`);}};
-          await viewFrames('original');row.partition=await focusedFloat32Install(page);await capture('float32-field');await viewFrames('partition');
+          await viewFrames('original');if(fullFloat32)await canvasShot('terrain-partition-01-before.png');row.partition=await focusedFloat32Install(page,fullFloat32?phases.find(p=>p.packId===entry.packId&&p.phaseId===entry.phaseId).terrainContract:null);await capture('float32-field');if(fullFloat32)await canvasShot('terrain-partition-02-after.png');await viewFrames('partition');
           await page.evaluate(()=>window.__sceneTerrainPartition.restore());await viewFrames('restored');
           for(const view of row.float32Views){const frames=['original','partition','restored'].map(kind=>row.canvasCaptures.find(c=>c.label===`float32-${kind}-${view.label}`));
             if(frames.some(c=>c.pixelSha256!==frames[0].pixelSha256||JSON.stringify(c.camera)!==JSON.stringify(frames[0].camera)||JSON.stringify(c.roster)!==JSON.stringify(frames[0].roster)||JSON.stringify(c.figurePublication)!==JSON.stringify(frames[0].figurePublication)||c.width!==frames[0].width||c.height!==frames[0].height))throw Error('Float32 scene: original/partition/restored whole painted frames differ');}
-          row.partition=await focusedFloat32Install(page);await capture('float32-native-zoom');
+          row.partition=await focusedFloat32Install(page,fullFloat32?phases.find(p=>p.packId===entry.packId&&p.phaseId===entry.phaseId).terrainContract:null);await capture('float32-native-zoom');if(fullFloat32)await canvasShot('terrain-partition-03-zoom.png');
           await page.evaluate(()=>{const f=window.__focusedScene,root=window.__game.world.terrainMesh;f.controlArrays=root.children.flatMap((c,i)=>['position','uv'].map(k=>({array:c.geometry.attributes[k].array.slice(),owner:`terrain-float32-control-${i}/${k}`,attribute:c.geometry.attributes[k]})));
             for(const c of root.children){const a=c.geometry.attributes.position;for(let i=0;i<a.count;i++)a.array[i*3+1]+=30;a.needsUpdate=true;}});
           await capture('float32-height-control');await canvasShot('float32-height-control.png','float32-height-control');
@@ -508,6 +541,7 @@ async function main(){
           const before=row.canvasCaptures.find(c=>c.label==='canonical-compact-boundary'),height=row.canvasCaptures.find(c=>c.label==='canonical-height-control'),uv=row.canvasCaptures.find(c=>c.label==='canonical-uv-control'),repaired=row.canvasCaptures.find(c=>c.label==='canonical-controls-repaired');
           if(height.pixelSha256===before.pixelSha256||uv.pixelSha256===before.pixelSha256||repaired.pixelSha256!==before.pixelSha256)throw Error('focused scene: healthy height/UV sensitivity or exact repair missing');
           await page.evaluate(goal=>{const {rts,game,camera,post}=window.__game;Object.assign(rts.goal,goal);for(let i=0;i<12;i++)rts.update(1);game.setView(camera,innerHeight*post.scale);game.animate(0);},row.canonicalViews[0].goal);
+        }else if(fullFloat32){row.partition=await focusedFloat32Install(page,phases.find(p=>p.packId===entry.packId&&p.phaseId===entry.phaseId).terrainContract);await capture('float32-field');
         }else if(partition){
           if(entry.phaseId==='lookout-mountain')await canvasShot('terrain-partition-01-before.png');
           row.partition=await page.evaluate(async source=>{const THREE=await import('three'),P=(0,eval)('('+source.partition+')'),install=(0,eval)('('+source.install+')'),register=(0,eval)('('+source.register+')');
@@ -522,7 +556,7 @@ async function main(){
             await canvasShot('terrain-partition-03-zoom.png');
           }
         }
-        if(inactive){if(!focused)await page.evaluate(source=>{const g=window.__game.game;g.__inactiveStats=(0,eval)('('+source+')')(g);g.animate(0);},installInactiveFigures.toString());await capture('inactive-field');}
+        if(inactive){if(!boundedResources)await page.evaluate(source=>{const g=window.__game.game;g.__inactiveStats=(0,eval)('('+source+')')(g);g.animate(0);},installInactiveFigures.toString());await capture('inactive-field');}
         await page.evaluate(async()=>{await Promise.all(Object.values(window.__game.game.baked.atlases).map(a=>a.load('close')));});
         if(qualified)row.publication=await page.evaluate(()=>({...window.__qualifiedConfiguration.assertPublication(),failure:window.__game.game.baked.atlases.CS.closeDiagnosticFailure||null}));
         await capture('both-close-tiers');
@@ -621,7 +655,7 @@ async function main(){
             const pending={...sample('restored-native-pending'),label:'restored-native-pending'};post.renderer.getContext().finish();
             return [pending,{...sample('restored-native-settled'),label:'restored-native-settled'}];
           }});
-        },{restore:restoreSceneDiagnostics.toString(),sample:inventory.toString(),focused});}
+        },{restore:restoreSceneDiagnostics.toString(),sample:inventory.toString(),focused:boundedResources});}
         catch(error){row.restoration={ok:false,errors:[error.message]};}
         try{if(qualified){
           try{await page.evaluate(()=>{window.__sceneStartGate.restore();const prior=window.__sceneStartNative,after=Object.getOwnPropertyDescriptor(window,'requestAnimationFrame');if(window.requestAnimationFrame!==prior.native||!['value','writable','enumerable','configurable','get','set'].every(k=>after?.[k]===prior.descriptor?.[k]))throw Error('qualified startup descriptor restore failed');});}catch(e){hooks={ok:false,errors:[...(hooks.errors||[]),e.message]};}
@@ -629,7 +663,7 @@ async function main(){
           try{await bootstrap?.restore();}catch(e){routeRestoration={ok:false,errors:[...(routeRestoration.errors||[]),e.message]};}
           Object.assign(row.restoration,{configuration,hooks,settings,routes:routeRestoration});
           if(![configuration,hooks,settings,routeRestoration].every(r=>r.ok))row.restoration.ok=false;
-          if(focused){const resource=await focusedSceneCleanup(page);appendFocusedSamples(row,resource);row.resource=resource;row.bootstrap=bootstrap?.requests||[];
+          if(boundedResources){const resource=await focusedSceneCleanup(page);appendFocusedSamples(row,resource);row.resource=resource;row.bootstrap=bootstrap?.requests||[];
             if(!resource.ok)row.restoration.ok=false;compactFocusedContext(row);
           }else row.restoration.samples=(row.restoration.samples||[]).map(observation);row.routeRequests=routes?.requests||[];
         }}finally{await ctx.close();if(qualified)row.contextClosed=true;save();}
@@ -638,7 +672,7 @@ async function main(){
       console.log(`SCENE ${index+1}/${campaign.phases.length} complete`);
       if(qualified&&index%2===1){
         const faults=matrix.faults.filter(f=>f.packId===entry.packId&&f.phaseId===entry.phaseId);
-        for(const tuple of faults){await qualifiedFaultContext({browser,url,tuple,input,transport,source,phases,report,save,focused,float32});console.log('SCENE FAULT',tuple.packId,tuple.phaseId,tuple.fault,'complete');}
+        for(const tuple of faults){await qualifiedFaultContext({browser,url,tuple,input,transport,source,phases,report,save,focused:boundedResources,float32});console.log('SCENE FAULT',tuple.packId,tuple.phaseId,tuple.fault,'complete');}
         report.complete=report.cases.every(r=>r.complete)&&report.faults.every(r=>r.complete);
         const part=focused?{...(float32?reduceFocusedFloat32LookoutObservations:reduceFocusedLookoutObservations)(report,phases.find(p=>p.packId==='chattanooga'&&p.phaseId==='lookout-mountain')),partComplete:false}:merger.add(report);
         if(focused){part.partComplete=part.focusedComplete;Object.assign(report,part,{complete:false,fullMatrixComplete:false});}save();console.log('SCENE PHASE',JSON.stringify(part));

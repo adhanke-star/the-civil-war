@@ -54,13 +54,14 @@ on:
           - no-finish
           - native-finish
       scene_focus:
-        description: Scene mode only; explicit ten-context Lookout prerequisite
+        description: Scene mode only; explicit resource prerequisite or complete policy
         type: choice
         default: full
         options:
           - full
           - canonical-lookout
           - float32-lookout
+          - full-float32
 permissions:
   contents: read
   actions: read

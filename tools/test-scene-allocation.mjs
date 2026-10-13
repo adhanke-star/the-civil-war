@@ -8,6 +8,9 @@ import {settleSceneCapture} from './bake/scene-allocation.mjs';
 import * as THREE from 'three';
 import {buildTrees} from '../src/world/props.js';
 import {RtsCamera} from '../src/render/rts-camera.js';
+import {scenePostAdmissionSnapshot,scenePostAdmissionValid,sceneTerrainContractValid,sceneFullFloat32HeaderValid,reduceFullFloat32SceneObservations} from './bake/scene-allocation.mjs';
+import {Post} from '../src/render/post.js';
+import {readSceneTerrainContracts} from './bake/scene-terrain-contract.mjs';
 
 function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,sampler=sampleSceneAllocations,forgetOwners=false,nativeJournal=false) {
   const saved={window:globalThis.window,WebGLRenderingContext:globalThis.WebGLRenderingContext,WebGL2RenderingContext:globalThis.WebGL2RenderingContext};
@@ -691,6 +694,82 @@ mutants['capture-native-visibility']={settleCapture:scope=>{const g=scope.__game
 mutants['capture-native-order']={settleCapture:scope=>{const g=scope.__game;g.world.trees.userData.updateLod(g.camera,g.rts.dist+200);g.world.trees.userData.updateLod(g.camera,g.rts.dist+200,Infinity);}};
 mutants['capture-preserves-world']={settleCapture:scope=>{settleSceneCapture(scope);scope.__game.world.trees.children[0].instanceMatrix.array[0]++;}};
 mutants['capture-owner-refusal']={settleCapture:()=>{}};mutants['capture-framed-refusal']={settleCapture:()=>{}};
+
+// Actual repository sources establish layouts; constructed samples below test admission only.
+api.postSnapshot=scenePostAdmissionSnapshot;api.postAdmission=scenePostAdmissionValid;api.terrainContract=sceneTerrainContractValid;api.fullHeader=sceneFullFloat32HeaderValid;api.fullReduce=reduceFullFloat32SceneObservations;
+let trustedTerrainFixtures;
+function trustedTerrains(){return trustedTerrainFixtures??=readSceneTerrainContracts(['henry-hill','shiloh','stones-river','chattanooga','lookout-mountain'].map(name=>({packId:'cpu-source',phaseId:name,scenario:{terrain:name}})));}
+function fullResourceFixture(phase){
+ const r=float32ResourceFixture(),contract=phase.terrainContract;Object.assign(r,{packId:phase.packId,phaseId:phase.phaseId});
+ r.resource.terrainContract=structuredClone(contract);r.resource.terrainContractSourceExact=true;r.resource.terrainContractProofReleased=true;
+ r.resource.terrainPublications=r.resource.terrainRetirements.filter(t=>t.operation==='install-original').map(t=>({cycleIndex:t.cycleIndex,chunks:structuredClone(contract.chunks)}));
+ Object.assign(r.partition,{sourceBytes:contract.sourceBytes,bytes:contract.partitionBytes,triangles:contract.triangles,chunks:contract.chunks.length});r.resource.terrain={...r.partition};r.resource.originalProof.sourceBytes=contract.sourceBytes;
+ r.bootstrap[0].url='http://localhost/?battle='+phase.packId+'&phase='+phase.phaseId+'&quality=high&figures=rigged&nosw';
+ let next=1,events=r.states[0].allocation.nativeEvents.filter(e=>e.kind!=='buffer'&&e.operation!=='finish');
+ for(const [i,t]of r.resource.terrainRetirements.entries()){
+  t.original.sourceBytes=contract.sourceBytes;t.original.children=i?Array.from({length:contract.chunks.length},()=>({materialId:7,materialUuid:'original-material',originalMaterialShared:true})):[];
+  t.arrays=(i?contract.chunks:[contract.sourceArrays]).flatMap((rows,mesh)=>rows.map(layout=>({...layout,mesh,reservations:i?[{id:next++,bytes:layout.bytes,pendingDelete:false}]:[]})));
+  const slots=t.arrays.flatMap(a=>a.reservations),ss=r.states.slice(i*3,i*3+3);
+  ss[0].allocation.bufferSlots=structuredClone(slots);ss[0].allocation.nativeEvents=structuredClone(events);
+  events.push(...slots.map(p=>({kind:'buffer',id:p.id,operation:'retire'})));
+  ss[1].allocation.bufferSlots=slots.map(p=>({...p,pendingDelete:true}));ss[1].allocation.nativeEvents=structuredClone(events);
+  events.push({operation:'finish',kind:null,id:null},...slots.map(p=>({kind:'buffer',id:p.id,operation:'release'})));
+  ss[2].allocation.bufferSlots=[];ss[2].allocation.nativeEvents=structuredClone(events);
+ }
+ for(const s of r.states){s.focusedPixel={...s.focusedPixel,logical:[1,1],admission:{scale:1,requestedScale:1,pixelBytes:3639218,target:[1,1],canvas:[1,1],intermediate:[1,1],renderPixels:1,quarterPixels:1,defaultPixels:1,intermediatePixels:1,lensBytes:44,resizeBytes:24}};s.sequence+=2;s.captureId+=2;s.float32Original=r.resource.originalProof;}
+ for(const cycle of r.resource.cycles)cycle.sampleIds=cycle.sampleIds.map(id=>id+2);
+ const proofBytes=contract.partitionBytes+contract.chunks.reduce((n,a)=>n+a[0].count*4,0),base=structuredClone(r.states[0]);
+ r.states.unshift({...structuredClone(base),sequence:1,captureId:1,label:'focused-contract-terrain-contract-proof-owned',declaredArrayBytes:10+proofBytes},
+  {...structuredClone(base),sequence:2,captureId:2,label:'focused-contract-terrain-contract-proof-released',declaredArrayBytes:10});
+ return r;
+}
+const fullHeader={sceneResourcePolicy:'float32-lifetime-v1',float32TerrainRepresentation:'Float32 with retained exact original',postPixelBytes:3639218,mipPolicy:'full-original',nativeHistoryRequired:true,sceneRoutes:'qualified-both',fallbackCompletion:'native-finish-after-candidate-disposal'};
+checks.push(['full-policy-header',a=>assert.equal(a.fullHeader(fullHeader),true,'full-policy-header: explicit full policy remains distinct from focused evidence')]);mutants['full-policy-header']={fullHeader:()=>false};
+for(const [suffix,mutate]of [['focused',h=>h.resourceFocus='float32-lookout'],['pixels',h=>h.postPixelBytes++],['mips',h=>h.mipPolicy='limited'],['completion',h=>delete h.fallbackCompletion],['history',h=>h.nativeHistoryRequired=false],['unknown',h=>h.sceneResourcePolicy='other']]){
+ const name='full-policy-'+suffix;checks.push([name,a=>{const h=structuredClone(fullHeader);mutate(h);assert.equal(a.fullHeader(h),false,name+': incomplete or mixed policy refused');}]);mutants[name]={fullHeader:()=>true};
+}
+checks.push(['full-policy-five-sources',a=>{const expected=[[1579116,1149738],[9138428,6696464],[8337940,6103450],[12279268,9004734],[12750024,9357582]];for(const [i,phase]of trustedTerrains().entries()){assert.equal(a.terrainContract(phase.terrainContract),true,'full-policy-five-sources: actual source contract');assert.deepEqual([phase.terrainContract.sourceBytes,phase.terrainContract.partitionBytes],expected[i],'full-policy-five-sources: retained actual source geometry bytes');}}]);mutants['full-policy-five-sources']={terrainContract:()=>false};
+checks.push(['full-policy-phase-resource',a=>{for(const phase of trustedTerrains())assert.deepEqual(a.resource(fullResourceFixture(phase),{float32:true,phase}),[],'full-policy-phase-resource: trusted dataset and complete two-cycle fault bookkeeping');}]);mutants['full-policy-phase-resource']={resource:()=>['invented failure']};
+for(const [suffix,mutate]of [
+ ['source-hash',r=>r.resource.terrainContract.heightSha256='0'.repeat(64)],
+ ['terrain-name',r=>r.resource.terrainContract.terrain='other'],
+ ['array-layout',r=>r.resource.terrainRetirements[1].arrays[0].count--],
+ ['chunk-array',r=>r.resource.terrainRetirements[1].arrays.pop()],
+ ['proof-release',r=>r.resource.terrainContractProofReleased=false],
+ ['publication-missing',r=>delete r.resource.terrainPublications],
+ ['publication-hash',r=>r.resource.terrainPublications[0].chunks[0][0].sha256='0'.repeat(64)],
+ ['publication-cycle',r=>r.resource.terrainPublications[0].cycleIndex++],
+ ['proof-owned',r=>r.states.shift()],
+ ['proof-bytes',r=>r.states[0].declaredArrayBytes--],
+ ['wrong-route',r=>r.bootstrap[0].url=r.bootstrap[0].url.replace('cpu-source','foreign')],
+ ['restore-last',r=>{r.resource.terrainRetirements.pop();r.resource.cycles.pop();}],
+ ['overlap',r=>{const id=r.resource.terrainRetirements[1].arrays[0].reservations[0];r.states.at(-1).allocation.bufferSlots.push(id);}]
+]){const name='full-policy-'+suffix;checks.push([name,a=>{const phase=trustedTerrains()[0],r=fullResourceFixture(phase);mutate(r);assert.ok(a.resource(r,{float32:true,phase}).length,name+': changed source/lifetime cannot be admitted');}]);mutants[name]={resource:()=>[]};}
+for(const [suffix,mutate]of [['array-sum',c=>c.sourceBytes++],['wrong-stride',c=>c.chunks[0][0].itemSize=2],['wrong-index',c=>c.chunks[0][2].arrayType='Uint32Array'],['missing-array',c=>c.sourceArrays.pop()],['bad-digest',c=>c.sourceArrays[0].sha256='x'],['overflow',c=>c.partitionBytes=Number.MAX_SAFE_INTEGER]]){
+ const name='full-policy-contract-'+suffix;checks.push([name,a=>{const c=structuredClone(trustedTerrains()[0].terrainContract);mutate(c);assert.equal(a.terrainContract(c),false,name+': independently derived source layout required');}]);mutants[name]={terrainContract:()=>true};
+}
+checks.push(['full-policy-never-ten',a=>{const r={...qualifiedObservations(phases,true),...fullHeader,focusedComplete:true};r.cases=r.cases.slice(0,2);r.faults=r.faults.slice(0,8);assert.equal(a.fullReduce(r,trustedTerrains()).complete,false,'full-policy-never-ten: complete110 union remains mandatory');}]);mutants['full-policy-never-ten']={fullReduce:()=>({complete:true})};
+checks.push(['full-policy-merger-admission',a=>{const source=trustedTerrains()[0],phases=Array.from({length:11},(_,i)=>({...source,phaseId:String(i)}));let error;try{a.merge(phases,fullHeader);}catch(e){error=e;}assert.equal(error,undefined,'full-policy-merger-admission: trusted eleven-phase full owner can be created');}]);mutants['full-policy-merger-admission']={merge:()=>{throw Error('mutant');}};
+checks.push(['full-policy-merger-untrusted',a=>{const phases=Array.from({length:11},(_,i)=>({packId:'cpu-source',phaseId:String(i),scenario:{terrain:'henry-hill'}}));let error;try{a.merge(phases,fullHeader);}catch(e){error=e;}assert.ok(error?.message.includes('trusted phase terrain'),'full-policy-merger-untrusted: report-derived/absent source expectation refused');}]);mutants['full-policy-merger-untrusted']={merge:()=>({})};
+
+
+checks.push(['full-policy-post-rounding',a=>{const p=fullResourceFixture(trustedTerrains()[0]).states[0].focusedPixel;assert.equal(a.postAdmission(p),true,'full-policy-post-rounding: independent native Post arithmetic');}]);mutants['full-policy-post-rounding']={postAdmission:()=>false};
+for(const [suffix,mutate]of [['lens',p=>p.admission.lensBytes--],['resize',p=>p.admission.resizeBytes--],['target',p=>p.admission.target[0]++],['canvas',p=>p.admission.canvas[0]++],['quarter',p=>p.admission.quarterPixels++],['intermediate',p=>p.admission.intermediatePixels++],['requested',p=>p.admission.requestedScale=.5]]){
+ const name='full-policy-post-'+suffix;checks.push([name,a=>{const p=structuredClone(fullResourceFixture(trustedTerrains()[0]).states[0].focusedPixel);mutate(p);assert.equal(a.postAdmission(p),false,name+': altered rounded footprint refused');}]);mutants[name]={postAdmission:()=>true};
+}
+
+checks.push(['full-policy-resize-admission',a=>{
+ const dimensions=new WeakMap(),size=new THREE.Vector2(1024,768),post={width:1024,height:768,requestedScale:1,diagnosticPixelBytes:3639218,samples:0,
+  renderer:{getSize:v=>v.copy(size),setPixelRatio(){},setSize:(w,h)=>size.set(w,h)},_samplesFor:()=>0,_alloc(){}};
+ Post.prototype._apply.call(post);const before=a.postSnapshot(post,dimensions);assert.equal(scenePostAdmissionValid(before),true,'full-policy-resize-admission: initial actual Post admission');
+ let retained,fresh;post._apply=function(){retained=a.postSnapshot(this,dimensions);Post.prototype._apply.call(this);fresh=a.postSnapshot(this,dimensions);};
+ Post.prototype.setSize.call(post,1366,1024);
+ assert.deepEqual(retained.logical,[1024,768],'full-policy-resize-admission: old admission keeps old dimensions before native delegation');
+ assert.equal(scenePostAdmissionValid(retained),true,'full-policy-resize-admission: old resize sample arithmetic');
+ assert.deepEqual(fresh.logical,[1366,1024],'full-policy-resize-admission: new native admission binds incoming dimensions');
+ assert.equal(scenePostAdmissionValid(fresh),true,'full-policy-resize-admission: new resize sample arithmetic');
+}]);mutants['full-policy-resize-admission']={postSnapshot:p=>({admission:structuredClone(p.resourceAdmission),logical:[p.width,p.height]})};
+
 for(const [,check]of checks)await check(api);
 console.log(`SCENE-ALLOCATION OK (${checks.length}/${checks.length})`);
 if(process.argv.includes('--prove-fail')){
