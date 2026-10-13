@@ -1,5 +1,18 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+ACTIVE0162 — Aaron corrected premature session endings. Sol resumes sole writing in this same
+session; routine commits/pending CI are continuation points, not reasons for another handoff.
+No evidence of provider capacity exhaustion. Prior TRANSFER0161 is superseded for ownership.
+Owned b7a81e8 clean at resume; SOURCE3ad8 CI38323883661 and main68 CI38323648533 now all9green.
+Both own four-shard/campaign canonical readbacks complete,251/365/148/159+201 clean; three smoke6each.
+Remote main fast-forwarded acceptedSOURCE3ad8 only. Pages38326405781 success/cw-v67 live;
+mainCI38326405764 running, to read independently. Actual acquisition remains UNRUN.
+Current source0158 combines existing inactive-figures synchronous transaction primitive33+33 controls
+with four Actions-only native hidden-upload fixture rows (expected shard3 152). Unit/syntax/diff pass.
+Astra approves after exact byte/descriptor/material/bounds/shape/scalar and native repair evidence fixes.
+Actual discovery/warming/full22+88 completeness remain subsequent authorized work; no matrix dispatch.
+ProtectedMAIN11 untouched; no simultaneous edits; root remains active through routine greens.
+
 TRANSFER0161 — context transfer before native maximum-stress/fault matrix implementation. Root releases
 sole writing at this docs-only skipCI relay; fresh ChatGPT/Codex Sol retains Aaron's selected main
 model/effort. Astra gpt-6-astra/high is read-only uncertainty judge, max ONE helper; prior helper must

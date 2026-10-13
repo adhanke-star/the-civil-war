@@ -1,14 +1,49 @@
 // CPU object/record lifecycle only. Actual GPU deletion/reupload/savings are Actions observations.
 import assert from 'node:assert/strict';
 import {SoldierPool,FallenPool,UNIFORMS,FALLEN} from '../src/units/soldier-mesh.js';
-import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDiagnostics} from './bake/inactive-figures.mjs';
-const api={install:installInactiveFigures,gate:installRenderGate,png:renderCanvasPng,restore:restoreSceneDiagnostics};
+import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDiagnostics,runSceneAllocationTransaction} from './bake/inactive-figures.mjs';
+import * as THREE from 'three';
+const api={install:installInactiveFigures,gate:installRenderGate,png:renderCanvasPng,restore:restoreSceneDiagnostics,transaction:runSceneAllocationTransaction};
+function transactionFixture(){
+ const storage=new ArrayBuffer(32),array=new Float32Array(storage,8,4),bits=new Uint32Array(storage,8,4);bits.set([0x7fa12345,0x80000000,0x3f800000,0x40000000]);
+ const attr=new THREE.BufferAttribute(array,2),geo=new THREE.BufferGeometry();geo.setAttribute('position',attr);geo.setDrawRange(1,2);
+ const parent=new THREE.Group(),mesh=new THREE.Mesh(geo,new THREE.MeshBasicMaterial());parent.add(mesh);parent.visible=false;mesh.visible=false;mesh.frustumCulled=true;mesh.count=0;
+ const range={start:1,count:2};attr.updateRanges.push(range);const record={n:7},events=[],bytes=Buffer.from(new Uint8Array(storage)),version=attr.version;
+ const args={meshes:[mesh],attributes:[attr,attr],records:[{object:record,keys:['n']}],
+  mutate(){array.fill(3);parent.visible=mesh.visible=true;mesh.count=4;mesh.frustumCulled=false;geo.drawRange.start=0;geo.drawRange.count=9;attr.clearUpdateRanges();attr.addUpdateRange(0,4);attr.needsUpdate=true;record.n=99;events.push('mutate');},
+  render(label){events.push(label);if(label==='restore-upload'||label==='restored-scene')assert.deepEqual(Buffer.from(new Uint8Array(storage)),bytes,'fixture: exact original bits precede native restored upload/render');},
+  sample(label){events.push('sample:'+label);return {bytes:16,label};},verifyBaseline(){return record.n===7;}};
+ return {args,attr,geo,parent,mesh,record,array,bits,events,bytes,storage,version,range};
+}
 function fixture(install){
   const standing=new SoldierPool(4,UNIFORMS.US,{kit:'US'}),fallen=new FallenPool(4,UNIFORMS.US,{kit:'US'}),game={pools:{US:standing},fallen:{US:fallen}},refs=standing.buckets.map(b=>({mesh:b.mesh,geo:b.mesh.geometry,matrix:b.mesh.instanceMatrix,anim:b.anim.array,tint:b.tint.array,clip:b.clip.array}));
   const stats=install(game);return {standing,fallen,game,refs,stats};
 }
 const push=p=>p.push(0,0,0,0,1,0,0,0,0,0,0,0,true);
 const checks=[
+ ['transaction-byte-restore',a=>{const f=transactionFixture(),r=a.transaction(f.args);assert.ok(r.ok,'transaction-byte-restore: synchronous transaction complete');assert.deepEqual(Buffer.from(new Uint8Array(f.storage)),f.bytes,'transaction-byte-restore: NaN bits, negative zero and nonzero byte offset exact');assert.equal(r.restoration.arrays,1,'transaction-byte-restore: shared attribute captured once');assert.ok(f.attr.version>f.version,'transaction-byte-restore: genuine upload version advances');}],
+ ['transaction-draw-order',a=>{const f=transactionFixture(),r=a.transaction(f.args);assert.deepEqual(f.events,['mutate','stress','sample:stress','restore-upload','sample:restore-upload','restored-scene','sample:restored-scene'],'transaction-draw-order: upload and exact scene restored synchronously');assert.deepEqual(r.samples.map(s=>s.label),['stress','restore-upload','restored-scene'],'transaction-draw-order: every peak retained');}],
+ ['transaction-state-restore',a=>{const f=transactionFixture(),r=a.transaction(f.args);assert.ok(r.ok&&!f.parent.visible&&!f.mesh.visible&&f.mesh.count===0&&f.mesh.frustumCulled&&f.geo.drawRange.start===1&&f.geo.drawRange.count===2&&f.record.n===7,'transaction-state-restore: ancestors/counts/frustum/ranges/counters restored');assert.ok(f.attr.updateRanges.length===1&&f.attr.updateRanges[0]===f.range&&f.range.start===1&&f.range.count===2,'transaction-state-restore: exact update-range entries restored');}],
+ ['transaction-full-upload',a=>{const f=transactionFixture(),native=f.args.render;let full=false;f.args.render=label=>{native(label);if(label==='restore-upload'){full=f.attr.updateRanges.length===0;f.attr.clearUpdateRanges();}if(label==='restored-scene')f.attr.clearUpdateRanges();};const r=a.transaction(f.args);assert.ok(r.ok&&full&&f.attr.updateRanges[0]===f.range,'transaction-full-upload: restored bytes upload fully before exact consumed ranges are recovered');}],
+ ['transaction-interleaved',a=>{const f=transactionFixture(),data=new THREE.InterleavedBuffer(f.array,4),one=new THREE.InterleavedBufferAttribute(data,2,0),two=new THREE.InterleavedBufferAttribute(data,2,2);f.geo.setAttribute('position',one);f.geo.setAttribute('uv',two);f.args.attributes=[one,two];const r=a.transaction(f.args);assert.ok(r.ok&&r.restoration.attributes===1&&r.restoration.arrays===1&&one.data===data&&two.data===data,'transaction-interleaved: shared native owner restored once');assert.deepEqual(Buffer.from(new Uint8Array(f.storage)),f.bytes,'transaction-interleaved: backing bytes exact');}],
+ ['transaction-independent-cleanup',a=>{for(const stage of ['mutate','stress','sample']){const f=transactionFixture();if(stage==='mutate'){const native=f.args.mutate;f.args.mutate=()=>{native();throw Error('original mutation failure');};}else if(stage==='stress'){const native=f.args.render;f.args.render=label=>{native(label);if(label==='stress')throw Error('original draw failure');};}else f.args.sample=label=>{if(label==='stress')throw Error('original sample failure');return {label};};const r=a.transaction(f.args);assert.ok(!r.ok&&r.restoration.restored&&r.errors.some(e=>e.includes('original'))&&f.events.includes('restored-scene')&&f.record.n===7,'transaction-independent-cleanup: original failure retained and every cleanup attempted');assert.deepEqual(Buffer.from(new Uint8Array(f.storage)),f.bytes,'transaction-independent-cleanup: arrays restored after failure');}}],
+ ['transaction-cleanup-failure',a=>{const f=transactionFixture(),native=f.args.render;f.args.render=label=>{native(label);if(label==='restore-upload')throw Error('owned upload failure');};const r=a.transaction(f.args);assert.ok(!r.ok&&r.errors.some(e=>e.includes('owned upload failure'))&&f.events.includes('restored-scene')&&f.record.n===7,'transaction-cleanup-failure: upload error cannot hide or skip independent final draw');}],
+ ...Object.entries({
+  'transaction-geometry-owner':f=>f.mesh.geometry=new THREE.BufferGeometry(),
+  'transaction-array-owner':f=>f.attr.array=new Float32Array(4),
+  'transaction-attribute-owner':f=>f.geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array(4),2)),
+  'transaction-parent-owner':f=>new THREE.Group().add(f.mesh),
+  'transaction-attribute-shape':f=>f.attr.itemSize=1,
+  'transaction-material-members':f=>{f.mesh.material.push(new THREE.MeshBasicMaterial());},
+ }).map(([name,change])=>[name,a=>{const f=transactionFixture(),native=f.args.mutate;if(name==='transaction-material-members')f.mesh.material=[f.mesh.material];f.args.mutate=()=>{native();change(f);};const r=a.transaction(f.args);assert.ok(!r.ok&&r.errors.length>0&&f.record.n===7,`${name}: foreign ownership prevents acceptance while independent records restore`);}]),
+ ['transaction-bounds',a=>{const f=transactionFixture();f.geo.boundingBox=new THREE.Box3(new THREE.Vector3(1,2,3),new THREE.Vector3(4,5,6));f.geo.boundingSphere=new THREE.Sphere(new THREE.Vector3(7,8,9),10);const native=f.args.mutate;f.args.mutate=()=>{native();f.geo.boundingBox.min.x=999;f.geo.boundingSphere.radius=999;};const r=a.transaction(f.args);assert.ok(r.ok&&f.geo.boundingBox.min.x===1&&f.geo.boundingSphere.radius===10,'transaction-bounds: exact bounds content restored without replacing identities');}],
+ ['transaction-object-bounds',a=>{const f=transactionFixture();f.mesh.boundingSphere=new THREE.Sphere(new THREE.Vector3(7,8,9),10);const native=f.args.mutate;f.args.mutate=()=>{native();f.mesh.boundingSphere.center.x=999;f.mesh.boundingSphere.radius=999;};const r=a.transaction(f.args);assert.ok(r.ok&&f.mesh.boundingSphere.center.x===7&&f.mesh.boundingSphere.radius===10,'transaction-object-bounds: object-level instance bounds restored');}],
+ ['transaction-null-colour',a=>{const f=transactionFixture();f.mesh.instanceColor=null;const native=f.args.mutate;f.args.mutate=()=>{native();f.mesh.instanceColor=new THREE.BufferAttribute(new Float32Array(3),3);};const r=a.transaction(f.args);assert.ok(!r.ok&&r.errors.length&&f.record.n===7,'transaction-null-colour: initial null instance-colour binding cannot silently gain an owner');}],
+ ['transaction-final-descriptor',a=>{const f=transactionFixture(),d=Object.getOwnPropertyDescriptor(f.mesh,'visible'),native=f.args.render;f.args.render=label=>{native(label);if(label==='restored-scene')Object.defineProperty(f.mesh,'visible',{...d,writable:false});};const r=a.transaction(f.args);assert.ok(r.ok,'transaction-final-descriptor: final native callback is restored');assert.deepEqual(Object.getOwnPropertyDescriptor(f.mesh,'visible'),d,'transaction-final-descriptor: exact original property flags');}],
+ ['transaction-scalar-bits',a=>{const f=transactionFixture();f.record.nan=NaN;f.record.zero=-0;f.args.records[0].keys.push('nan','zero');const native=f.args.mutate;f.args.mutate=()=>{native();f.record.zero=0;};const r=a.transaction(f.args);assert.ok(r.ok&&Number.isNaN(f.record.nan)&&Object.is(f.record.zero,-0),'transaction-scalar-bits: NaN and signed zero scalar bindings preserved');}],
+ ['transaction-invalid-sample',a=>{const f=transactionFixture();f.args.sample=()=>undefined;const r=a.transaction(f.args);assert.ok(!r.ok&&r.errors.some(e=>e.includes('sample container'))&&f.record.n===7,'transaction-invalid-sample: malformed observations prevent completeness');}],
+ ['transaction-async',a=>{const f=transactionFixture();let called=false;f.args.mutate=async()=>{called=true;};const r=a.transaction(f.args);assert.ok(!r.ok&&!r.restoration.started&&!called,'transaction-async: async function rejected before mutation');}],
+ ['transaction-baseline',a=>{const f=transactionFixture();let changed=false;const native=f.args.mutate;f.args.mutate=()=>{native();changed=true;};f.args.verifyBaseline=()=>!changed;const r=a.transaction(f.args);assert.ok(!r.ok&&r.errors.some(e=>e.includes('baseline verification failed'))&&f.record.n===7,'transaction-baseline: independent gameplay drift prevents acceptance');}],
  ['restore-owners',a=>{const calls=[],owner=name=>({restore(){calls.push(name);if(name==='render')throw new Error('controlled restore failure');}});
    const r=a.restore({__sceneRenderGate:owner('render'),__game:{game:{__inactiveStats:owner('inactive')}},__sceneTerrainPartition:owner('terrain'),__allocation:owner('allocation')});
    assert.equal(r.ok,false,'restore-owners: owner failure prevents completeness');assert.deepEqual(calls,['inactive','terrain','render','allocation'],'restore-owners: every independent owner still restored');assert.equal(r.errors.length,1,'restore-owners: exact failure retained');}],
@@ -33,6 +68,21 @@ const checks=[
  ['hidden-gore-restore',a=>{const saved={gore:FALLEN.gore,clock:FALLEN.clock};try{let now=0;FALLEN.gore=true;FALLEN.clock=()=>now;const f=fixture(a.install),p=f.fallen,i=p.alloc();p.set(i,1,2,3,0,1,false,0,0,true);p.setBakedClip(2);p.flush();assert.equal(p.mesh.visible,false,'hidden-gore-restore: entirely clipped casualties retired');FALLEN.gore=false;now=1000;p.setBakedClip(0);p.flush();assert.equal(p.hiddenTo,1,'hidden-gore-restore: CPU fade continues while hidden');FALLEN.gore=true;p.setBakedClip(0);p.flush();assert.ok(p.mesh.visible,'hidden-gore-restore: rigged casualty restores');assert.equal(p.hiddenTo,0,'hidden-gore-restore: gore restoration preserved');assert.equal(p.mesh.instanceMatrix.array[13],2,'hidden-gore-restore: original ground restored');}finally{Object.assign(FALLEN,saved);}}],
 ];
 const mutants={
+ 'transaction-byte-restore':{transaction:args=>{const r=runSceneAllocationTransaction(args);new Uint32Array(args.attributes[0].array.buffer,args.attributes[0].array.byteOffset,1)[0]=0x7fc00000;return r;}},
+ 'transaction-draw-order':{transaction:args=>runSceneAllocationTransaction({...args,render:label=>{if(label!=='restore-upload')args.render(label);}})},
+ 'transaction-state-restore':{transaction:args=>{const r=runSceneAllocationTransaction(args);args.meshes[0].parent.visible=true;return r;}},
+ 'transaction-full-upload':{transaction:args=>runSceneAllocationTransaction({...args,render:label=>{if(label==='restore-upload')args.attributes[0].addUpdateRange(0,1);args.render(label);}})},
+ 'transaction-interleaved':{transaction:args=>({...runSceneAllocationTransaction(args),restoration:{attributes:2,arrays:2}})},
+ 'transaction-independent-cleanup':{transaction:()=>({ok:false,errors:['original'],restoration:{restored:false}})},
+ 'transaction-cleanup-failure':{transaction:args=>({...runSceneAllocationTransaction(args),ok:true,errors:[]})},
+ 'transaction-async':{transaction:args=>{args.mutate();return {ok:true,restoration:{started:true}};}},
+ 'transaction-baseline':{transaction:args=>runSceneAllocationTransaction({...args,verifyBaseline:()=>true})},
+ 'transaction-bounds':{transaction:args=>{const r=runSceneAllocationTransaction(args);args.meshes[0].geometry.boundingSphere.radius=999;return r;}},
+ 'transaction-object-bounds':{transaction:args=>{const r=runSceneAllocationTransaction(args);args.meshes[0].boundingSphere.radius=999;return r;}},
+ 'transaction-null-colour':{transaction:args=>({...runSceneAllocationTransaction(args),ok:true})},
+ 'transaction-final-descriptor':{transaction:args=>{const r=runSceneAllocationTransaction(args);Object.defineProperty(args.meshes[0],'visible',{writable:false});return r;}},
+ 'transaction-scalar-bits':{transaction:args=>{const r=runSceneAllocationTransaction(args);args.records[0].object.zero=0;return r;}},
+ 'transaction-invalid-sample':{transaction:args=>runSceneAllocationTransaction({...args,sample:()=>({})})},
  'restore-owners':{restore:()=>({ok:true,calls:[],errors:[]})},
  'restoration-capture':{restore:(scope)=>restoreSceneDiagnostics(scope)},
  'restoration-capture-failure':{restore:(scope)=>restoreSceneDiagnostics(scope)},
@@ -46,5 +96,6 @@ const mutants={
  'mixed-casualties':{install:g=>{const s=installInactiveFigures(g);const p=g.fallen.US,native=p.flush;p.flush=function(){native.call(this);this.mesh.visible=false;};return s;}},
  'hidden-gore-restore':{install:g=>{const s=installInactiveFigures(g);const p=g.fallen.US,native=p.flush;p.flush=function(){if(this.mesh.visible)native.call(this);};return s;}},
 };
+for(const name of ['transaction-geometry-owner','transaction-array-owner','transaction-attribute-owner','transaction-parent-owner','transaction-attribute-shape','transaction-material-members'])mutants[name]={transaction:args=>({...runSceneAllocationTransaction(args),ok:true})};
 for(const [,check]of checks)check(api);console.log(`INACTIVE-FIGURES OK (${checks.length}/${checks.length})`);
 if(process.argv.includes('--prove-fail')){for(const [name,check]of checks){let error;try{check({...api,...mutants[name]});}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&error.message.startsWith(name),`${name}: mutant must fail its own assertion`);console.log(`CAUGHT ${name}`);}console.log(`INACTIVE-FIGURES CONTROLS OK (${checks.length}/${checks.length})`);}

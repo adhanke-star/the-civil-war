@@ -59,4 +59,98 @@ export async function sceneAllocationControls({browser,url,check,result,watchErr
     for(const row of report.rows)check(`scene-allocation-${row.name}`,row.ok,JSON.stringify(report.restoration));
     check('scene-allocation-errors',errors.length===0,errors.join('; '));
   } finally {await ctx.close();}
+  await sceneTransactionControls({browser,url,check,result,watchErrors});
+}
+
+// getBufferSubData intentionally synchronizes this tiny correctness fixture only.
+// Never place it in the scene matrix's no-finish failure-overlap observation hooks.
+async function sceneTransactionControls({browser,url,check,result,watchErrors}){
+  const ctx=await browser.newContext({viewport:{width:320,height:240}});
+  await ctx.addInitScript(installAllocationObserver,{ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString()});
+  const page=await ctx.newPage(),errors=[];watchErrors(page,url,errors);
+  try{
+    await page.goto(url+'?nosw');await page.waitForFunction(()=>window.__entry&&!window.__entry.importing,null,{timeout:60000});
+    const report=await page.evaluate(async()=>{
+      const THREE=await import('three'),{runSceneAllocationTransaction,installRenderGate,restoreSceneDiagnostics}=await import('./tools/bake/inactive-figures.mjs'),
+        {sampleSceneAllocations}=await import('./tools/bake/scene-allocation.mjs');
+      const renderer=new THREE.WebGLRenderer({antialias:false});renderer.setSize(32,32);
+      const scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,10);camera.position.z=2;
+      const geometry=new THREE.PlaneGeometry(.2,.2);geometry.deleteAttribute('normal');geometry.deleteAttribute('uv');
+      const data=new THREE.InstancedInterleavedBuffer(new Float32Array([.2,.3,.4,0,0,0,.4,.3,.2,0,0,0]),6),
+        tint=new THREE.InterleavedBufferAttribute(data,3,0),shift=new THREE.InterleavedBufferAttribute(data,3,3);
+      geometry.setAttribute('iTint',tint);geometry.setAttribute('iShift',shift);geometry.computeBoundingBox();geometry.computeBoundingSphere();
+      const material=new THREE.ShaderMaterial({vertexShader:'attribute vec3 iTint; attribute vec3 iShift; varying vec3 colour; void main(){colour=iTint;gl_Position=projectionMatrix*modelViewMatrix*instanceMatrix*vec4(position+iShift*.001,1.0);}',fragmentShader:'varying vec3 colour; void main(){gl_FragColor=vec4(colour,1.0);}'});
+      const mesh=new THREE.InstancedMesh(geometry,material,2),parent=new THREE.Group();parent.add(mesh);scene.add(parent);
+      mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);data.setUsage(THREE.DynamicDrawUsage);
+      const matrix=new THREE.Matrix4();mesh.setMatrixAt(0,matrix.makeTranslation(-.2,0,0));mesh.setMatrixAt(1,matrix.makeTranslation(.2,0,0));
+      mesh.computeBoundingBox();mesh.computeBoundingSphere();mesh.frustumCulled=false;
+      const arrays=[mesh.instanceMatrix.array,data.array],bytes=a=>new Uint8Array(a.buffer,a.byteOffset,a.byteLength),original=arrays.map(a=>Array.from(bytes(a))),
+        gl=renderer.getContext(),buffers=new Map(),descriptor=Object.getOwnPropertyDescriptor(gl,'bufferData'),native=gl.bufferData;
+      const wrapped=function(...args){const value=native.apply(this,args);if(arrays.includes(args[1]))buffers.set(args[1],this.getParameter(this.ARRAY_BUFFER_BINDING));return value;};
+      Object.defineProperty(gl,'bufferData',{value:wrapped,writable:descriptor?.writable??true,enumerable:descriptor?.enumerable??false,configurable:descriptor?.configurable??true});
+      const post={renderer,render(s,c){renderer.render(s,c);}},gate=installRenderGate(post),scope={__game:{scene,post,game:{baked:{atlases:{}}}},__sceneRenderGate:gate,__allocation:window.__allocation,innerWidth:32,innerHeight:32,devicePixelRatio:1};
+      const draw=()=>gate.renderOnce(scene,camera),sample=()=>sampleSceneAllocations(scope);
+      const read=a=>{
+        const buffer=buffers.get(a),prior=gl.getParameter(gl.COPY_READ_BUFFER_BINDING);
+        try{
+          if(!buffer||!gl.isBuffer(buffer))throw Error('actual native buffer required');gl.bindBuffer(gl.COPY_READ_BUFFER,buffer);
+          if(gl.getBufferParameter(gl.COPY_READ_BUFFER,gl.BUFFER_SIZE)!==a.byteLength)throw Error('native full-array byte length required');
+          const out=new Uint8Array(a.byteLength);gl.getBufferSubData(gl.COPY_READ_BUFFER,0,out);return Array.from(out);
+        }finally{gl.bindBuffer(gl.COPY_READ_BUFFER,prior);}
+      };
+      const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b),captures=[];let cleanup;
+      try{
+        draw();const warmed=sample(),nativeOriginal=arrays.map(read);
+        parent.visible=mesh.visible=false;mesh.count=0;mesh.frustumCulled=true;
+        mesh.instanceMatrix.addUpdateRange(0,1);data.addUpdateRange(0,1);
+        const ranges=[mesh.instanceMatrix,data].map(a=>({array:a.updateRanges,entry:a.updateRanges[0]})),refs={geometry,material,matrix:mesh.instanceMatrix,data,tint,shift};
+        const transaction=skipUpload=>{
+          const observed={stress:false,stressBytes:null,upload:false,fullRange:false};
+          const r=runSceneAllocationTransaction({meshes:[mesh],attributes:[mesh.instanceMatrix,tint,shift],records:[],
+            mutate(){
+              mesh.setMatrixAt(0,matrix.makeScale(.7,.8,.9));mesh.setMatrixAt(1,matrix.makeTranslation(.5,.6,.1));
+              data.array.fill(.7);mesh.instanceMatrix.clearUpdateRanges();data.clearUpdateRanges();mesh.instanceMatrix.needsUpdate=true;data.needsUpdate=true;
+              parent.visible=mesh.visible=true;mesh.count=2;mesh.frustumCulled=false;
+            },render(label){
+              if(label==='restore-upload'){
+                observed.fullRange=mesh.instanceMatrix.updateRanges.length===0&&data.updateRanges.length===0;
+                if(!skipUpload){parent.visible=mesh.visible=true;mesh.count=0;mesh.frustumCulled=false;draw();}
+                observed.upload=equal(arrays.map(read),original);
+              }else{draw();if(label==='stress'){observed.stressBytes=arrays.map(read);observed.stress=!equal(observed.stressBytes,original)&&equal(observed.stressBytes,arrays.map(a=>Array.from(bytes(a))));}}
+            },sample(label){const s=sample();captures.push({label,skipUpload,...s});return s;},
+            verifyBaseline(){return !parent.visible&&!mesh.visible&&mesh.count===0&&mesh.frustumCulled;},
+          });
+          return {result:r,observed,nativeFinal:arrays.map(read),cpuFinal:arrays.map(a=>Array.from(bytes(a)))};
+        };
+        const positive=transaction(false),negative=transaction(true),negativeRejected=negative.result.ok&&negative.observed.stress&&equal(negative.cpuFinal,original)&&equal(negative.nativeFinal,negative.observed.stressBytes)&&!equal(negative.nativeFinal,original)&&!negative.observed.upload;
+        // Repair the deliberately omitted native upload before cleanup; preserve original range objects.
+        for(const a of [mesh.instanceMatrix,data]){a.clearUpdateRanges();a.needsUpdate=true;}
+        parent.visible=mesh.visible=true;mesh.count=0;mesh.frustumCulled=false;draw();const repaired=arrays.map(read);
+        parent.visible=mesh.visible=false;mesh.count=0;mesh.frustumCulled=true;
+        [mesh.instanceMatrix,data].forEach((a,i)=>{a.clearUpdateRanges();a.updateRanges.push(ranges[i].entry);});
+        captures.push({label:'repaired',...sample()});
+        const reservations=arrays.map(a=>scope.__allocation.bufferReservations(gl,a)),clean=s=>!s.glError&&!s.allocation.unknown.length&&!s.unmappedBufferBytes;
+        const identities=mesh.geometry===refs.geometry&&mesh.material===refs.material&&mesh.instanceMatrix===refs.matrix&&tint.data===refs.data&&shift.data===refs.data
+          &&geometry.attributes.iTint===refs.tint&&geometry.attributes.iShift===refs.shift&&[mesh.instanceMatrix,data].every((a,i)=>a.updateRanges===ranges[i].array&&a.updateRanges[0]===ranges[i].entry);
+        cleanup=restoreSceneDiagnostics(scope);
+        return {kind:'small actual native hidden-buffer transaction; whole-pool coverage UNRUN',positive,negative,negativeRejected,original,nativeOriginal,repaired,reservations,
+          distinctNativeBuffers:buffers.get(arrays[0])!==buffers.get(arrays[1]),identities,clean:warmed&&clean(warmed)&&captures.every(clean),cleanup,
+          rows:[
+            {name:'transaction-bytes',ok:positive.result.ok&&equal(nativeOriginal,original)&&equal(positive.nativeFinal,original)&&equal(positive.cpuFinal,original)&&equal(repaired,original)},
+            {name:'transaction-native-upload',ok:positive.observed.stress&&positive.observed.fullRange&&positive.observed.upload&&negativeRejected&&reservations.every((r,i)=>r.length===1&&r[0].bytes===arrays[i].byteLength)&&buffers.get(arrays[0])!==buffers.get(arrays[1])},
+            {name:'transaction-state',ok:identities&&!parent.visible&&!mesh.visible&&mesh.count===0&&mesh.frustumCulled&&cleanup.ok&&clean(warmed)&&captures.every(clean)},
+          ],captures};
+      }finally{
+        const failures=[],attempt=fn=>{try{fn();}catch(e){failures.push(e.message);}};
+        attempt(()=>{if(Object.getOwnPropertyDescriptor(gl,'bufferData')?.value!==wrapped)throw Error('native fixture buffer wrapper ownership changed');
+          if(descriptor)Object.defineProperty(gl,'bufferData',descriptor);else delete gl.bufferData;});
+        if(!cleanup)attempt(()=>{const r=restoreSceneDiagnostics(scope);if(!r.ok)throw Error(r.errors.join('; '));});
+        for(const release of [()=>geometry.dispose(),()=>material.dispose(),()=>renderer.dispose(),()=>renderer.forceContextLoss()])attempt(release);
+        if(failures.length)throw Error('native transaction cleanup: '+failures.join('; '));
+      }
+    });
+    result.sceneTransaction=report;
+    for(const row of report.rows)check(`scene-allocation-${row.name}`,row.ok,JSON.stringify(report));
+    check('scene-allocation-transaction-errors',errors.length===0,errors.join('; '));
+  }finally{await ctx.close();}
 }
