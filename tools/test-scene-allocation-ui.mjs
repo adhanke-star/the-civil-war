@@ -1,6 +1,7 @@
 // Actions-only native lifecycle proof; this small fixture is not a whole-battle budget measurement.
 import {isDeepStrictEqual} from 'node:util';
 import {AllocationLedger,mipSizes,ReservationPeak,installAllocationObserver,createSceneHistory,compactSceneSample,expandSceneContext} from './bake/scene-allocation.mjs';
+import {installSceneStartGate} from './bake/inactive-figures.mjs';
 
 export async function sceneAllocationControls({browser,url,check,result,watchErrors}) {
   const ctx=await browser.newContext({viewport:{width:320,height:240}});
@@ -77,8 +78,9 @@ export async function sceneAllocationControls({browser,url,check,result,watchErr
 // One actual current-PNG battle is a prerequisite proof, not the qualified 22+88 matrix.
 async function sceneStressOwnerControls({browser,url,check,result,watchErrors}){
   const ctx=await browser.newContext({viewport:{width:320,height:240},deviceScaleFactor:1,reducedMotion:'no-preference'});
+  await ctx.addInitScript(source=>{window.__sceneStartNative={native:window.requestAnimationFrame,descriptor:Object.getOwnPropertyDescriptor(window,'requestAnimationFrame')};window.__sceneStartGate=(0,eval)('('+source+')')();},installSceneStartGate.toString());
   await ctx.addInitScript(installAllocationObserver,{ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString()});
-  const page=await ctx.newPage(),errors=[];watchErrors(page,url,errors);
+  const page=await ctx.newPage(),errors=[];let primaryFailure;watchErrors(page,url,errors);
   try{
     await page.goto(url+'?battle=henry-hill&quality=high&figures=rigged&nosw');
     await page.waitForFunction(()=>window.__ready&&window.__game?.game&&window.__game.effects?.ok,null,{timeout:180000});
@@ -90,6 +92,7 @@ async function sceneStressOwnerControls({browser,url,check,result,watchErrors}){
       const {deriveSceneStressContract,warmSceneStressBaseline,runSceneStressTransaction,installRenderGate,restoreSceneDiagnostics}=await import('./tools/bake/inactive-figures.mjs'),
         {sampleSceneAllocations,initializeSceneTextures}=await import('./tools/bake/scene-allocation.mjs'),{COMMAND}=await import('./src/game.js');
       const scope=window.__game,{game,scene,camera,post,effects}=scope;
+      const startup=window.__sceneStartGate.first;if(game.simTime!==0||!game.paused||startup?.simTime!==0)throw Error('native scene startup: time zero required');
       const combat=()=>JSON.stringify({time:game.simTime,orders:game.orders,holder:game.holder,units:game.units.map(u=>({id:u.id,men:u.men,morale:u.morale,ammo:u.ammo,state:u.state,order:u.order,x:u.x,z:u.z}))});
       const expected=deriveSceneStressContract(game.scenario,{US:{field:2,close:3},CS:{field:4,close:5}}),gate=installRenderGate(post);window.__sceneRenderGate=gate;
       let restoration;
@@ -98,18 +101,34 @@ async function sceneStressOwnerControls({browser,url,check,result,watchErrors}){
         const proof=runSceneStressTransaction({discovery:warm.discovery,draw:()=>gate.renderOnce(scene,camera),sample:()=>sampleSceneAllocations(),
           verifyBaseline:()=>combat()===baseline,reservations:array=>window.__allocation.bufferReservations(post.renderer.getContext(),array)});
         restoration=restoreSceneDiagnostics(window,{sampleRestored(){gate.renderOnce(scene,camera);const pending={label:'restored-native-pending',...sampleSceneAllocations()};post.renderer.getContext().finish();return [pending,{label:'restored-native-settled',...sampleSceneAllocations()}];}});
+        window.__sceneStartGate.restore();const prior=window.__sceneStartNative,after=Object.getOwnPropertyDescriptor(window,'requestAnimationFrame'),startRestored=window.requestAnimationFrame===prior.native
+          &&['value','writable','enumerable','configurable','get','set'].every(k=>after?.[k]===prior.descriptor?.[k]);
         const samples=[...proof.transaction.samples.map(s=>s.observation),...restoration.samples],clean=s=>s.glError===0&&!s.allocation.unknown.length&&s.unmappedBufferBytes===0;
         return {kind:'actual current-PNG Henry Hill warmed maximum prerequisite; full qualified both-route matrix UNRUN',expected,spawned:warm.spawned,baseline:warm.baseline,
-          proof,restoration,combatUnchanged:combat()===baseline,clean:samples.every(clean),rows:[
+          proof,restoration,startup,startRestored,combatUnchanged:combat()===baseline,clean:samples.every(clean),rows:[
+            {name:'stress-owner-start-gate',ok:startup.simTime===0&&startRestored&&game.simTime===0&&game.paused},
             {name:'stress-owner-coverage',ok:proof.ok&&proof.native.length===3&&proof.native.every(s=>s.owners.length===warm.discovery.owners.length)},
             {name:'stress-owner-smoke',ok:proof.smoke.systems===200&&proof.smoke.particles===800&&proof.smoke.capacity===1000},
             {name:'stress-owner-restoration',ok:proof.ok&&restoration.ok&&combat()===baseline&&samples.every(clean)},
           ]};
-      }finally{if(!restoration){const r=restoreSceneDiagnostics(window);if(!r.ok)throw Error('native stress cleanup: '+r.errors.join('; '));}}
+      }finally{try{window.__sceneStartGate.restore();}finally{if(!restoration){const r=restoreSceneDiagnostics(window);if(!r.ok)throw Error('native stress cleanup: '+r.errors.join('; '));}}}
     });
     result.sceneStressOwners=report;for(const row of report.rows)check(`scene-allocation-${row.name}`,row.ok,JSON.stringify(report));
     check('scene-allocation-stress-owner-errors',errors.length===0,errors.join('; '));
-  }finally{await ctx.close();}
+  }catch(error){primaryFailure=error;throw error;}finally{
+    let cleanupError;
+    try{
+      result.sceneStressStartupCleanup=await page.evaluate(()=>{
+        const gate=window.__sceneStartGate,prior=window.__sceneStartNative;
+        if(!gate||!prior)throw Error('native scene startup cleanup: owner missing');gate.restore();
+        const after=Object.getOwnPropertyDescriptor(window,'requestAnimationFrame'),ok=window.requestAnimationFrame===prior.native
+          &&['value','writable','enumerable','configurable','get','set'].every(k=>after?.[k]===prior.descriptor?.[k]);
+        if(!ok)throw Error('native scene startup cleanup: descriptor changed');return {ok:true,first:gate.first};
+      });
+    }catch(error){cleanupError=error;result.sceneStressStartupCleanup={ok:false,error:error.message,primaryFailure:primaryFailure?.message||null};}
+    finally{await ctx.close();}
+    if(cleanupError&&!primaryFailure)throw cleanupError;
+  }
 }
 
 // getBufferSubData intentionally synchronizes this tiny correctness fixture only.

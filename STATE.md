@@ -12,7 +12,7 @@ Mixed38282452947/9d60c12 qualified; root+Astra viewed001–076; exact11files/576
 0151 loader CPU18+18/adapter10+10/export23+23; latest actual11 UIrows/genuine native ASTC pass.
 0156 CPU38+38/cleanup12+12; native source92/chunks132/restored92B exact identities/bytes/retirement pass.
 3407 all9green/fullread/native30owners/63arrays/max smoke/exact restore;0160 transport68+68 accepted.
-0161 a2/0162 2c/0163 e036 all9/full own read;0164 journal/transport131+131/native163 Actions UNRUN.
+0161–0163 all9/full own read;0164 28eeafb CI38335587595/native163 pending;0165 startup90+90/native164 UNRUN.
 Whole scene GPU432,441,700>250M; qualified both×11/max pools/latent/fault/restoration/ceiling UNRUN.
 All20 badge natural B/S/G and legal level10 route open; six approved Veteran observations pending.
 .out near294.5MB/300M preserved; CPU local only; browser suites/scene runners Actions only.

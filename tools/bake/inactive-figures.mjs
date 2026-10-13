@@ -3,6 +3,30 @@ import {phaseMenPerFigure,prepareReinforcementTimeline} from '../../src/sim/phas
 import {AtlasLayout} from '../../src/units/impostor.js';
 import {astcAvailable} from '../../src/units/atlas-compression.js';
 
+/** Time-zero scene startup. RAF remains native; the game pauses before its first callback. */
+export function installSceneStartGate(scope=globalThis){
+  const descriptor=Object.getOwnPropertyDescriptor(scope,'requestAnimationFrame'),native=scope.requestAnimationFrame;
+  if(typeof native!=='function'||descriptor&&(!('value'in descriptor)||!descriptor.configurable))throw Error('scene start gate: reversible native RAF required');
+  let restored=false,first=null;
+  const wrapped=function(callback){
+    if(typeof callback!=='function')return native.call(this,callback);
+    return native.call(this,function(timestamp){
+      if(!restored&&scope.__game?.game){const game=scope.__game.game;
+        if(first===null){first={simTime:game.simTime,wasPaused:game.paused};if(game.simTime!==0)throw Error('scene start gate: first simulation step already occurred');}
+        if(!game.paused)game.togglePause();
+      }
+      return callback.call(this,timestamp);
+    });
+  };
+  Object.defineProperty(scope,'requestAnimationFrame',{value:wrapped,writable:descriptor?.writable??true,enumerable:descriptor?.enumerable??true,configurable:true});
+  return {get first(){return first&&{...first};},restore(){
+    if(restored)return;
+    if(Object.getOwnPropertyDescriptor(scope,'requestAnimationFrame')?.value!==wrapped)throw Error('scene start gate: RAF ownership changed');
+    if(descriptor)Object.defineProperty(scope,'requestAnimationFrame',descriptor);else delete scope.requestAnimationFrame;
+    restored=true;
+  }};
+}
+
 /** Configure the existing atlas before first close IO. Publication becomes a labelled loaded baseline. */
 export function configureSceneCloseRoute(scope,{manifest,sourceManifest,base,route,candidateRequests}){
   const {game,post}=scope,atlases=game?.baked?.atlases,renderer=post?.renderer;

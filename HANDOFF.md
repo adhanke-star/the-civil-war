@@ -1,5 +1,18 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0169 — root ACTIVE sole writer; no transfer. SOURCE28eeafb0388797dd2dcab41096ba81c96547e168
+CI38335587595 running; original probes/three smoke green, four shards/campaign pending;
+own native journal163 and other canonical readbacks UNRUN. Accepted main e036 automatic
+CI38335359579 running; Pages38335359541 exact e036 success/livecw-v68 fetched.
+0165 reversible pre-first-frame startup gate90+90/root+Astra/unit/syntax/diff clear;
+HenryHill native time-zero/exact descriptor/independent cleanup fixture expected164 Actions UNRUN.
+Next complete existing runner's qualified22ordinary+88fault contexts, native per-context history,
+trusted authored scenarios/paired rosters, one genuine allocation-neutral native upload fault,
+prepare-once/delayed siblings/first-baseline pending deletes, same-time native owner labels,
+required Lookout numbered canvas/geometry/tree binds, independent restore/routes, exact envelope.
+Do not enable scene_routes or dispatch until full implementation; no asset adoption.
+ProtectedMAIN11 preserved/no simultaneous edits; same-session loop continues through routine greens.
+
 LATEST0168 — root ACTIVE sole writer; no transfer. Accepted remote main e036716 after its own
 CI38333093705 all9green/full canonical251/365/162/159+campaign201+smoke6 each/original5,711,587B
 and actual four native observer rows read. Prior main353879 CI38332577594 independently all9/full

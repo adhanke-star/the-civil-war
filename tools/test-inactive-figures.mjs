@@ -3,10 +3,10 @@ import assert from 'node:assert/strict';
 import {SoldierPool,FallenPool,FlagPool,UNIFORMS,FALLEN} from '../src/units/soldier-mesh.js';
 import {HaloPool} from '../src/units/halos.js';
 import {loaderFixture} from './atlas-loader-fixture.mjs';
-import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDiagnostics,runSceneAllocationTransaction,discoverSceneStressOwners,runSceneStressTransaction,deriveSceneStressContract,warmSceneStressBaseline,configureSceneCloseRoute} from './bake/inactive-figures.mjs';
+import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDiagnostics,runSceneAllocationTransaction,discoverSceneStressOwners,runSceneStressTransaction,deriveSceneStressContract,warmSceneStressBaseline,configureSceneCloseRoute,installSceneStartGate} from './bake/inactive-figures.mjs';
 import * as THREE from 'three';
 import fs from 'node:fs';
-const api={install:installInactiveFigures,gate:installRenderGate,png:renderCanvasPng,restore:restoreSceneDiagnostics,transaction:runSceneAllocationTransaction,discover:discoverSceneStressOwners,stress:runSceneStressTransaction,contract:deriveSceneStressContract,warm:warmSceneStressBaseline,closeRoute:configureSceneCloseRoute};
+const api={install:installInactiveFigures,gate:installRenderGate,png:renderCanvasPng,restore:restoreSceneDiagnostics,transaction:runSceneAllocationTransaction,discover:discoverSceneStressOwners,stress:runSceneStressTransaction,contract:deriveSceneStressContract,warm:warmSceneStressBaseline,closeRoute:configureSceneCloseRoute,startGate:installSceneStartGate};
 // Constructed CPU capability/IO only; this fixture cannot establish genuine native ASTC support.
 function closeFixture(){
  const US=loaderFixture(),CS=loaderFixture(),sourceManifest=CS.atlas.diagnosticClose.sourceManifest;
@@ -48,6 +48,13 @@ function fixture(install){
 }
 const push=p=>p.push(0,0,0,0,1,0,0,0,0,0,0,0,true);
 const checks=[
+ ['start-gate-time-zero',a=>{const queue=[],scope={requestAnimationFrame(callback){queue.push(callback);return queue.length;}},game={simTime:0,paused:false,togglePause(){this.paused=!this.paused;}},gate=a.startGate(scope);scope.__game={game};let observed;
+   const id=scope.requestAnimationFrame(function(t){observed={t,receiver:this,paused:game.paused,time:game.simTime};});queue.shift().call(scope,123);
+   assert(id===1&&observed.t===123&&observed.receiver===scope&&observed.paused&&observed.time===0&&gate.first?.simTime===0,'start-gate-time-zero: native scheduling/receiver/timestamp preserved, first callback paused at zero');gate.restore();}],
+ ['start-gate-descriptor',a=>{const proto={requestAnimationFrame(){}},scope=Object.create(proto),native=scope.requestAnimationFrame;const gate=a.startGate(scope);gate.restore();gate.restore();assert(!Object.hasOwn(scope,'requestAnimationFrame')&&scope.requestAnimationFrame===native,'start-gate-descriptor: inherited native restored without shadow');
+   const own={};Object.defineProperty(own,'requestAnimationFrame',{value:native,writable:true,enumerable:false,configurable:true});const prior=Object.getOwnPropertyDescriptor(own,'requestAnimationFrame');a.startGate(own).restore();assert.deepEqual(Object.getOwnPropertyDescriptor(own,'requestAnimationFrame'),prior,'start-gate-descriptor: exact own descriptor restored');}],
+ ['start-gate-ownership',a=>{const scope={requestAnimationFrame(){}},gate=a.startGate(scope),foreign=()=>{};scope.requestAnimationFrame=foreign;let e;try{gate.restore();}catch(x){e=x;}assert(e?.message==='scene start gate: RAF ownership changed'&&scope.requestAnimationFrame===foreign,'start-gate-ownership: foreign hook retained and restoration rejected');}],
+ ['start-gate-late',a=>{let pending;const scope={requestAnimationFrame(cb){pending=cb;},__game:{game:{simTime:.1,paused:false,togglePause(){throw Error('must not rewrite simulation');}}}},gate=a.startGate(scope);scope.requestAnimationFrame(()=>{});let e;try{pending(1);}catch(x){e=x;}gate.restore();assert(e?.message==='scene start gate: first simulation step already occurred','start-gate-late: drift refused without changing time or invoking callback');}],
  ...['capable','unsupported'].map(route=>['close-route-'+route,async a=>{const f=closeFixture();try{
    const before=Object.getOwnPropertyDescriptor(f.CS.atlas,'renderer'),diagnostic=Object.getOwnPropertyDescriptor(f.CS.atlas,'diagnosticClose'),r=a.closeRoute(f.scope,{...f.args,route});
    await Promise.all([f.US.atlas.load('close'),f.CS.atlas.load('close')]);const publication=r.assertPublication();
@@ -164,6 +171,10 @@ const checks=[
  ['hidden-gore-restore',a=>{const saved={gore:FALLEN.gore,clock:FALLEN.clock};try{let now=0;FALLEN.gore=true;FALLEN.clock=()=>now;const f=fixture(a.install),p=f.fallen,i=p.alloc();p.set(i,1,2,3,0,1,false,0,0,true);p.setBakedClip(2);p.flush();assert.equal(p.mesh.visible,false,'hidden-gore-restore: entirely clipped casualties retired');FALLEN.gore=false;now=1000;p.setBakedClip(0);p.flush();assert.equal(p.hiddenTo,1,'hidden-gore-restore: CPU fade continues while hidden');FALLEN.gore=true;p.setBakedClip(0);p.flush();assert.ok(p.mesh.visible,'hidden-gore-restore: rigged casualty restores');assert.equal(p.hiddenTo,0,'hidden-gore-restore: gore restoration preserved');assert.equal(p.mesh.instanceMatrix.array[13],2,'hidden-gore-restore: original ground restored');}finally{Object.assign(FALLEN,saved);}}],
 ];
 const mutants={
+ 'start-gate-time-zero':{startGate:()=>({restore(){}})},
+ 'start-gate-descriptor':{startGate:scope=>{const g=installSceneStartGate(scope);return {...g,restore(){scope.requestAnimationFrame=()=>{};}};}},
+ 'start-gate-ownership':{startGate:scope=>({...installSceneStartGate(scope),restore(){}})},
+ 'start-gate-late':{startGate:()=>({restore(){}})},
  'contract-scheduled':{contract:(scenario,pages)=>{const r=deriveSceneStressContract(scenario,pages);for(const d of scenario.reinforcements)r[d.side]-=Math.round(d.men/(d.type==='artillery'?4:r.ratio))+6;r.definitions-=r.scheduled;r.scheduled=0;return r;}},
  'warm-bounds':{warm:(...args)=>{const r=warmSceneStressBaseline(...args);r.discovery.meshes[0].boundingSphere=null;return r;}},
  'contract-capacity':{contract:(...args)=>({...deriveSceneStressContract(...args),US:0})},
