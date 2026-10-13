@@ -10,6 +10,8 @@ import {badgeClockReliefTactic,badgeClockReliefPositions} from './observe-badges
 import {BADGE_SILVER_ORIGIN,validateBadgeSilverOrigin,badgeForwardDefenceTactic,badgeForwardDefencePositions,badgeForwardDefenceComplete} from './observe-badges.mjs';
 import {BADGE_LOOKOUT_ORIGIN,validateBadgeLookoutOrigin,badgeLookoutTactic,badgeLookoutOrders,createBadgeLookoutReadiness,validateBadgeLookoutReadiness,badgeLookoutComplete} from './observe-badges.mjs';
 import {BADGE_LOOKOUT_WEST_ORIGIN,validateBadgeLookoutWestOrigin} from './observe-badges.mjs';
+import {BADGE_MARCH_PHASES,badgeMarchTactic,badgeMarchOrders,badgeMarchComplete} from './observe-badges.mjs';
+import {admitBadgeMarchCheckpoint} from './test-badges-ui.mjs';
 import {FEAT_STATS} from '../src/franchise/badges.js';
 const campaign=JSON.parse(fs.readFileSync(new URL('../assets/campaign.json',import.meta.url)));
 const zero=()=>({side:'US',xp:0,menStart:1000,...Object.fromEntries(FEAT_STATS.map(k=>[k,0]))});
@@ -19,7 +21,7 @@ function fakeGame(){return {playerSide:'US',simTime:0,over:false,calls:[],units:
   select(u){this.selected=u;this.calls.push({method:'select',id:u.id});},orderSelected(kind){this.calls.push({method:'selected',kind});return true;},featReport(){return {a:zero()};},tick(dt){this.simTime+=dt;return dt;}};}
 const rejects=(name,fn)=>{let error;try{fn();}catch(e){error=e;}assert.ok(error&&/badge observation:/.test(error.message),name+': invalid private observation must refuse');};
 const stage=(id,extra={})=>({id,after:[],notBefore:0,expires:10,condition:[],command:{type:'hold',unitId:'a'},...extra});
-const nativeStages=()=>{const g=fakeGame();for(const [i,u]of g.units.entries())Object.assign(u,{x:i*40,z:0,men:1000,morale:78,underFire:0,flanked:0,reload:1,state:'steady',melee:false,firing:false,engaged:false,follow:{active:false},type:'infantry',cover:1,coverKind:'open',canTakeOrders(){return this.alive&&this.state!=='routing';}});
+const nativeStages=()=>{const g=fakeGame();for(const [i,u]of g.units.entries())Object.assign(u,{x:i*40,z:0,men:1000,morale:78,fatigue:0,underFire:0,flanked:0,reload:1,state:'steady',melee:false,firing:false,engaged:false,follow:{active:false},type:'infantry',cover:1,coverKind:'open',canTakeOrders(){return this.alive&&this.state!=='routing';}});
   g.combat={masks:()=>false};return g;};
 const states=p=>p.receipt().stages.map(r=>r.state);
 const combatStages=()=>{const g=nativeStages();g.combat.calls=[];g.combat.token={native:true};for(const name of ['volleyAt','chargeFeat','routFeat','moraleStep'])g.combat[name]=function(...args){this.calls.push({name,args,receiver:this});return this.token;};
@@ -264,6 +266,69 @@ checks.push(
  ['west-complete',a=>{assert.equal(a.lookoutComplete([{id:'lookout-mountain',complete:true}],{achieved:true,stopReason:null},{western:true}),true,'west-complete: one actual branch case can complete');assert.equal(a.lookoutComplete([{id:'lookout-mountain',complete:true}],{achieved:false,stopReason:'actual Lookout did not persist Silver-to-Gold'},{western:true}),true,'west-complete: honest genuine shortfall retained');}],
  ['west-complete-refusal',a=>{for(const rows of [[],[{id:'orchard-knob',complete:true}],[{id:'lookout-mountain',complete:false}]])assert.equal(a.lookoutComplete(rows,{achieved:true,stopReason:null},{western:true}),false,'west-complete-refusal: missing/wrong/uncompleted native phase cannot complete');assert.equal(a.lookoutComplete([{id:'lookout-mountain',complete:true}],{achieved:false,stopReason:'actual Orchard orders refused or expired'},{western:true}),false,'west-complete-refusal: wrong-phase stop cannot complete');}],
 );
+
+Object.assign(api,{march:badgeMarchTactic,marchOrders:badgeMarchOrders,marchComplete:badgeMarchComplete,marchCheckpoint:admitBadgeMarchCheckpoint});
+const marchScenario=id=>JSON.parse(fs.readFileSync(new URL('../assets/packs/chattanooga.json',import.meta.url))).phases.find(p=>p.id===id).scenario;
+function marchFixture(a=api,id='missionary-ridge'){
+ const scenario=marchScenario(id),t=a.march({scenario,playerSide:'US',simTime:0},id),g=nativeStages(),template=g.units[0];
+ g.units=t.roster.map((id,i)=>({...template,id,side:id.startsWith('us-')?'US':'CS',x:id.startsWith('cs-')?10000+i:0,z:0,order:{type:'hold'},follow:{active:false}}));
+ g.orderSelected=function(kind){if(kind==='run')this.selected.run=!this.selected.run;else this.selected.order={type:kind};return true;};
+ g.order=function(u,spec){this.calls.push({method:'order',id:u.id,spec});u.order={type:spec.type,dest:spec.points.at(-1),target:spec.target};return true;};
+ const p=createBadgeStages(t.plan,1,t.roster),actor=g.units.find(u=>u.id==='us-gibson-brigade'),support=g.units.find(u=>u.id==='us-hazen-brigade');p.advance(g);
+ g.simTime=1;[actor.x,actor.z]=id==='orchard-knob'?[-720,640]:[600,1750];support.x=actor.x+20;support.z=actor.z;p.advance(g);
+ g.simTime=2;if(id==='missionary-ridge')[actor.x,actor.z]=[850,-100];p.advance(g);
+ g.over=true;p.advance(g);return {scenario,t,r:p.receipt(),end:2};
+}
+const marchRejects=(name,a,change)=>{const f=marchFixture();change(f);assert.equal(a.marchOrders(f.t,f.r,f.end,f.scenario),false,name+': altered witness refuses');};
+const marchChecks=[
+ ['march-mode',a=>assert.deepEqual(a.selection(['--badge-promotion-march']),{mode:'promotion-march',shard:1},'march-mode: isolated finite witness')],
+ ['march-mode-refusal',a=>{for(const flag of ['--native','--badge-promotion-lookout','--badge-shard=1'])rejects('march-mode-refusal',()=>a.selection(['--badge-promotion-march',flag]));}],
+ ['march-plan',a=>{for(const [id,n]of [['orchard-knob',10],['missionary-ridge',17]]){const t=a.march({scenario:marchScenario(id),playerSide:'US',simTime:0},id);assert.equal(t.plan.length,n,'march-plan: finite authored counts');}}],
+ ['march-phase-refusal',a=>{for(const field of ['seed','id','clockRatio']){const scenario=marchScenario('missionary-ridge');scenario[field]=null;rejects('march-phase-refusal',()=>a.march({scenario,playerSide:'US',simTime:0},'missionary-ridge'));}}],
+ ['march-orders',a=>{for(const id of ['orchard-knob','missionary-ridge']){const f=marchFixture(api,id);assert.equal(a.marchOrders(f.t,f.r,f.end,f.scenario),true,'march-orders: actual stage machinery fixture accepts');}}],
+ ['march-complete',a=>{assert.equal(a.marchComplete(BADGE_MARCH_PHASES.map(p=>({id:p.phaseId,complete:true})),{achieved:true,stopReason:null}),true,'march-complete: actual ordered three phases');assert.equal(a.marchComplete([{id:'orchard-knob',complete:true}],{achieved:false,stopReason:'actual Orchard did not persist living Bronze-to-Silver'}),true,'march-complete: honest shortfall');}],
+ ['march-incomplete',a=>{for(const rows of [[],[{id:'missionary-ridge',complete:true}],[{id:'orchard-knob',complete:false}],[{id:'orchard-knob',complete:true}]])assert.equal(a.marchComplete(rows,{achieved:true,stopReason:null}),false,'march-incomplete: cannot skip actual saved Silver');}],
+ ['march-checkpoint-refusal',a=>{let error;try{a.marchCheckpoint(' '.repeat(BADGE_LOOKOUT_ORIGIN.saveBytes));}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION','march-checkpoint-refusal: altered actual whole save refuses');}],
+];
+const marchMutations={
+ 'march-accepted-no-trace':f=>delete f.r.stages.find(p=>p.id==='ridge-north-consolidate').trace,
+ 'march-pending-no-trace':f=>{const r=f.r.stages.find(p=>p.id==='ridge-north-consolidate');delete r.trace;r.state='pending';},
+ 'march-arrival-replay':f=>Object.assign(f.r.stages.find(p=>p.id==='ridge-north-run').lastFacts.find(p=>p.kind==='arrived'),{distance:999,following:true,engaged:true}),
+ 'march-move-result':f=>f.r.stages.find(p=>p.id==='ridge-take-crest').trace.result={type:'hold',destination:null},
+ 'march-hold-result':f=>f.r.stages.find(p=>p.id==='ridge-north-consolidate').trace.result.type='move',
+ 'march-wrong-actor':f=>f.t.plan.find(p=>p.id==='ridge-first-run').command.unitId='us-hazen-brigade',
+ 'march-wrong-point':f=>f.t.plan.find(p=>p.id==='ridge-take-crest').command.path.point=[0,0],
+ 'march-repeat-order':f=>f.r.stages.push(structuredClone(f.r.stages[0])),
+ 'march-counter-condition':f=>f.t.plan.find(p=>p.id==='ridge-north-run').condition.push({kind:'feat',min:1}),
+ 'march-missing-runoff':f=>f.r.stages.find(p=>p.id==='ridge-first-contact-walk').state='expired',
+ 'march-premature-north':f=>{const p=f.r.stages.find(p=>p.id==='ridge-north-run');p.at=0;p.trace.at=0;},
+ 'march-exhausted':f=>f.r.stages.find(p=>p.id==='ridge-north-run').lastFacts.find(p=>p.kind==='march-ready').fatigue=61,
+ 'march-under-fire':f=>f.r.stages.find(p=>p.id==='ridge-north-run').lastFacts.find(p=>p.kind==='march-ready').underFire=1,
+ 'march-no-support':f=>f.r.stages.find(p=>p.id==='ridge-north-run').lastFacts.find(p=>p.kind==='support').support=[],
+ 'march-following-arrival':f=>f.r.stages.find(p=>p.id==='ridge-first-contact-walk').lastFacts.find(p=>p.kind==='march-stop').arrival.following=true,
+ 'march-engaged-arrival':f=>f.r.stages.find(p=>p.id==='ridge-first-contact-walk').lastFacts.find(p=>p.kind==='march-stop').arrival.engaged=true,
+ 'march-empty-enemy':f=>f.r.stages.find(p=>p.id==='ridge-first-contact-walk').lastFacts.find(p=>p.kind==='march-stop').nearest={},
+ 'march-routing-contact':f=>{const c=f.r.stages.find(p=>p.id==='ridge-first-contact-walk').lastFacts.find(p=>p.kind==='march-stop');c.nearest={id:f.t.roster.find(id=>id.startsWith('cs-')),side:'CS',alive:true,men:100,state:'routing',position:c.actor,distance:0};},
+};
+for(const[name,change]of Object.entries(marchMutations))marchChecks.push([name,a=>marchRejects(name,a,change)]);
+function marchFact(a,edit,ready=false){
+ const g=nativeStages();g.units[1].x=20;if(edit)edit(g);
+ const condition=ready?{kind:'march-ready',moraleMin:60,fatigueMax:60}:{kind:'march-stop',point:[1000,0],radius:30,enemyRadius:250};
+ const p=a.stages([stage('march-fact',{condition:[condition]})],1,['a','b']);p.advance(g);return p.receipt().stages?.[0];
+}
+const marchFactChecks=[
+ ['march-live-contact',a=>{const r=marchFact(a);assert.ok(r?.state==='accepted'&&r.lastFacts[0].admittedBy.join(',')==='contact'&&r.lastFacts[0].nearest.id==='b','march-live-contact: actual living opponent binds contact');}],
+ ['march-routing-excluded',a=>assert.equal(marchFact(a,g=>g.units[1].state='routing')?.state,'pending','march-routing-excluded: routing opponent cannot trigger contact')],
+ ['march-empty-excluded',a=>{const r=marchFact(a,g=>g.units[1].men=0);assert.ok(r?.state==='pending'&&r.lastFacts[0].nearest===null,'march-empty-excluded: no opponent is null, never zero distance');}],
+ ['march-follow-excluded',a=>assert.equal(marchFact(a,g=>{g.units[1].men=0;g.units[0].x=1000;g.units[0].follow.active=true;})?.state,'pending','march-follow-excluded: proximity while following is not arrival')],
+ ['march-engaged-excluded',a=>assert.equal(marchFact(a,g=>{g.units[1].men=0;g.units[0].x=1000;g.units[0].engaged=true;})?.state,'pending','march-engaged-excluded: proximity while engaged is not arrival')],
+ ['march-ready-actual',a=>assert.equal(marchFact(a,null,true)?.state,'accepted','march-ready-actual: actual readiness passes')],
+ ['march-fatigue-block',a=>assert.equal(marchFact(a,g=>g.units[0].fatigue=61,true)?.state,'pending','march-fatigue-block: exhausted Run refused')],
+ ['march-fire-block',a=>assert.equal(marchFact(a,g=>g.units[0].underFire=1,true)?.state,'pending','march-fire-block: incoming fire blocks Run')],
+ ['march-melee-block',a=>assert.equal(marchFact(a,g=>g.units[0].melee=true,true)?.state,'pending','march-melee-block: melee blocks Run')],
+];
+checks.push(...marchChecks,...marchFactChecks);
+
 for(const[,check]of checks)check(api);
 console.log(`BADGE-OBSERVATION CPU BOOKKEEPING OK (${checks.length}/${checks.length}); natural combat/storage/level10 UNRUN`);
 if(process.argv.includes('--prove-fail')){
@@ -380,6 +445,8 @@ if(process.argv.includes('--prove-fail')){
     'west-plan':{west:changeWest(t=>t.plan.pop())},'west-attack':{west:changeWest(t=>t.plan.find(p=>p.command.type==='attack').command.targetId='cs-howell-brigade')},'west-cleanup':{west:changeWest(t=>t.plan.find(p=>p.id==='run-cleanup-us-ammen-brigade').expires=999)},'west-support':{west:changeWest(t=>t.plan.find(p=>p.id==='position-us-woods-brigade').command.path.point=[0,0])},'west-survival':{west:changeWest(t=>t.plan.find(p=>p.id==='ammen-withdraw').condition.find(c=>c.kind==='pressure').moraleMax=100)},
     'west-phase-refusal':{west:()=>({})},'west-target-refusal':{west:()=>({})},'west-orders':{lookoutOrders:()=>false},'west-orders-refusal':{lookoutOrders:()=>true},'west-readiness':{readiness:createBadgeLookoutReadiness.bind(null,{western:false})},'west-complete':{lookoutComplete:()=>false},'west-complete-refusal':{lookoutComplete:()=>true},
   });
+  for(const[name]of marchChecks)mutants[name]=name==='march-mode'?{selection:()=>null}:name==='march-mode-refusal'?{selection:()=>({})}:name==='march-plan'?{march:()=>({plan:[]})}:name==='march-phase-refusal'?{march:()=>({})}:name==='march-orders'?{marchOrders:()=>false}:name==='march-complete'?{marchComplete:()=>false}:name==='march-incomplete'?{marchComplete:()=>true}:name==='march-checkpoint-refusal'?{marchCheckpoint:()=>true}:{marchOrders:()=>true};
+  for(const[name]of marchFactChecks)mutants[name]={stages:()=>({advance(){},receipt:()=>({stages:[{state:['march-live-contact','march-ready-actual'].includes(name)?'pending':'accepted'}]})})};
   for(const[name,check]of checks){let error;try{check({...api,...mutants[name]});}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&error.message.startsWith(name),`${name}: mutant must fail its own assertion`);}
   console.log(`BADGE-OBSERVATION CONTROLS OK (${checks.length}/${checks.length})`);
 }
