@@ -1,5 +1,11 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0170 — Observe actual native combat pairs without changing the simulation (Sol/Astra, 2026-10-13)
+
+Private observer forwards actual volleyAt/chargeFeat/routFeat/moraleStep calls with identical receiver/arguments/return/exception, copies pre-call native facts and aggregates bounded opportunities and pressure seconds. It samples no RNG and changes no combat/feat fields. Equipment snapshots reuse actual frozen Unit equipment; no per-tick equipment cloning or unbounded call list. Actual chargeFeat pairs feed stage history independently of inaccessible private episodes. Native-contact predicates bind a previous accepted same-actor/opponent charge and require a later contact sequence, preventing a preceding call at identical simTime from authorizing a new order. All exceptions, including null/undefined/false/zero/empty string, remain explicit failed calls. Cleanup independently restores exact own/inherited descriptors; foreign edits survive and fail restoration.
+
+Root+Astra69 positives+69 own rejecting controls, CPU UNIT OK/syntax/diff pass. First67-control run failed on an incidental TypeError in the omitted-pair mutant assertion; optional own assertion repaired it and failure retained. Astra independently exposed same-time contact and falsy-exception false successes; both now have rejecting controls. Native browser hooks, six approved policies/combat/persistence/level10 and resource verdict remain UNRUN. Sourceb0 CI38344611737 all9/full own251/365/171/159+campaign201+three6smokes clean; direct raw probe115122984223 has5,716,981B and actual27+27 badge/168+168 scene/99+99 inactive/68+68 export/10+10 terrain/27+27 loader. Main23CI38344425188 independently all9/full own same counts clean, rawprobe1151224017385,716,334B; Pages38344425205 exact23 success/livecw-v68. gh formatted probe logs returned only82,785/82,897B and no required summaries; direct jobs/<id>/logs supplied complete raw originals, now preferred for verification. Full matrix38343715785 continues unchanged at23; no duplicate/cancel/adoption. Root remains ACTIVE.
+
 ## 0169 — Bind one-shot tactics to observed native conditions (Sol/Astra, 2026-10-13)
 
 CPU unit completed UNIT OK before this source commit.

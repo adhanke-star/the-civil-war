@@ -2,6 +2,7 @@
 import {newCampaign,recordPhase,campaignPhase,validateCampaign,campaignDifficulty} from '../src/franchise/campaign.js';
 import {validateSnapshot} from '../src/franchise/save.js';
 import {BADGES,FEAT_STATS,TIERS,measure,threshold} from '../src/franchise/badges.js';
+import {CANISTER} from '../src/sim/combat.js';
 
 export const BADGE_OBSERVATIONS=Object.freeze([
   ['slaughter-fire','stones-river','slaughter-pen',['farKills','heldVolley','disciplineKills','screenKills','worksKills','woodsKills']],
@@ -154,7 +155,7 @@ export function createBadgeStages(plan,cadence,roster){
   const known=new Set(roster),seen=new Set(),ids=new Set(),history=new Map();
   const atomKeys={
     'actor-orderable':[],'target-unbroken':['targetId'],distance:['targetId','max'],'target-larger':['targetId'],
-    'target-cover':['targetId'],support:['radius','min','types'],'fire-ready':['maxDistance'],pressure:['moraleMax'],
+    'target-cover':['targetId'],'native-contact':['targetId','afterStage'],support:['radius','min','types'],'fire-ready':['maxDistance'],pressure:['moraleMax'],
     recovery:['moraleMin','requirePriorRouting'],'engagement-ended':['targetId','quietSeconds'],separated:['minDistance'],arrived:['point','radius'],'crate-owned':['crateId','side'],
   };
   const positive=n=>Number.isFinite(n)&&n>0;
@@ -165,7 +166,7 @@ export function createBadgeStages(plan,cadence,roster){
     for(const dep of row.after)if(!plain(dep,['id','require'])||!ids.has(dep.id)||!['success','terminal'].includes(dep.require))fail('earlier stage dependency required');
     if(new Set(row.after.map(d=>d.id)).size!==row.after.length)fail('duplicate stage dependency');
     for(const c of row.condition){
-      if(!plain(c,['kind','targetId','max','radius','min','types','maxDistance','moraleMax','moraleMin','requirePriorRouting','quietSeconds','minDistance','point','crateId','side'])
+      if(!plain(c,['kind','targetId','afterStage','max','radius','min','types','maxDistance','moraleMax','moraleMin','requirePriorRouting','quietSeconds','minDistance','point','crateId','side'])
         ||!Object.hasOwn(atomKeys,c.kind)||!plain(c,['kind',...atomKeys[c.kind]])
         ||atomKeys[c.kind].some(k=>!Object.hasOwn(c,k))||c.targetId!==undefined&&!known.has(c.targetId))fail('stage condition schema/identity');
       if(c.kind==='distance'&&!positive(c.max)||c.kind==='support'&&(!positive(c.radius)||!Number.isSafeInteger(c.min)||c.min<1
@@ -175,6 +176,7 @@ export function createBadgeStages(plan,cadence,roster){
         ||c.kind==='recovery'&&(!Number.isFinite(c.moraleMin)||c.moraleMin<0||c.moraleMin>100||typeof c.requirePriorRouting!=='boolean')
         ||c.kind==='engagement-ended'&&!positive(c.quietSeconds)
         ||c.kind==='separated'&&!positive(c.minDistance)
+        ||c.kind==='native-contact'&&!ids.has(c.afterStage)
         ||c.kind==='arrived'&&(!finitePoint(c.point)||!positive(c.radius))
         ||c.kind==='crate-owned'&&(typeof c.crateId!=='string'||!c.crateId||c.side!=='US'))fail('stage condition bounds');
     }
@@ -189,7 +191,11 @@ export function createBadgeStages(plan,cadence,roster){
     if(!known.has(command.unitId)||command.targetId!==undefined&&!known.has(command.targetId))fail('stage command identity');
     ids.add(row.id);return {...structuredClone(row),state:'pending',evaluations:0,lastFacts:[],unmet:[],trace:null,at:null};
   });
-  const byId=new Map(rows.map(r=>[r.id,r]));let last=-1,lastObserved=-1,failure=null,activeRow=null;
+  const byId=new Map(rows.map(r=>[r.id,r]));let last=-1,lastObserved=-1,failure=null,activeRow=null,contactSequence=0;
+  for(const row of rows)for(const c of row.condition)if(c.kind==='native-contact'){
+    const prior=byId.get(c.afterStage).command;
+    if(prior.type!=='charge'||prior.unitId!==row.command.unitId||prior.targetId!==c.targetId)fail('native contact must bind preceding same-actor charge');
+  }
   const refuse=(message,at)=>{failure={message,at:Number.isFinite(at)?at:null};fail(message);};
   const record=(g)=>{
     if(!Number.isFinite(g.simTime)||g.simTime<0||g.simTime<lastObserved)refuse('stage native time drift',g.simTime);
@@ -223,6 +229,10 @@ export function createBadgeStages(plan,cadence,roster){
       case 'distance':return {...base,distance:t?distance(u,t):null,max:c.max,ok:!!t&&distance(u,t)<=c.max};
       case 'target-larger':return {...base,actorMen:u.men,targetMen:t?.men??null,ok:!!t&&t.men>u.men};
       case 'target-cover':if(t&&!Number.isFinite(t.cover))fail('malformed native target cover');return {...base,cover:t?.cover??null,coverKind:t?.coverKind||null,ok:!!t&&t.cover>1};
+      case 'native-contact':{const prior=byId.get(c.afterStage),pair=h&&Object.hasOwn(h.pairs,c.targetId)?h.pairs[c.targetId]:null,native=pair?.nativeEvents?.chargeFeat;
+        return {...base,afterStage:c.afterStage,chargeAcceptedAt:prior.state==='accepted'?prior.at:null,nativePair:structuredClone(native||null),
+          contactSequenceAfterCharge:prior.contactSequenceAfterAttempt??null,
+          ok:prior.state==='accepted'&&!!native&&native.last>=prior.at&&native.lastSequence>prior.contactSequenceAfterAttempt};}
       case 'support':{const support=g.units.filter(v=>v!==u&&v.side===u.side&&c.types.includes(v.type)&&orderable(g,v)&&distance(u,v)<=c.radius).map(v=>v.id);
         return {...base,support,radius:c.radius,min:c.min,ok:support.length>=c.min};}
       case 'fire-ready':{const target=u.target;if(!Number.isFinite(u.reload)||typeof g.combat?.masks!=='function')fail('malformed native fire readiness');
@@ -255,7 +265,16 @@ export function createBadgeStages(plan,cadence,roster){
     const {path,targetId,...base}=row.command,command=validateBadgeCommand({...base,...(base.type==='charge'?{targetId}:{}),points:[a,[a[0]+(b[0]-a[0])*scale,a[1]+(b[1]-a[1])*scale]]});
     return {command,inputs:{actor:a,target:b,targetId,standOff:path.standOff,distance:d}};
   };
-  return {advance(g){
+  return {contact(g,actor,target,at,method){
+    if(failure)fail('stage policy already failed');
+    if(!['volleyAt','chargeFeat'].includes(method)||!Number.isFinite(at)||Math.abs(at-g.simTime)>1e-8||at<lastObserved
+      ||!g.units.includes(actor)||!g.units.includes(target)||!known.has(actor.id)||!known.has(target.id)||actor.side===target.side)refuse('malformed actual native contact',at);
+    let h=history.get(actor.id);if(!h){h={id:actor.id,firstSeen:at,markers:{},pairs:Object.create(null)};history.set(actor.id,h);}
+    seen.add(actor.id);seen.add(target.id);
+    const p=Object.hasOwn(h.pairs,target.id)?h.pairs[target.id]:{first:at,kind:'actual native opponent pair; not private charge episode'};
+    p.last=at;p.nativeCalls=(p.nativeCalls||0)+1;p.methods=[...new Set([...(p.methods||[]),method])];
+    p.nativeEvents??={};const event=p.nativeEvents[method]||{first:at,calls:0};event.last=at;event.lastSequence=++contactSequence;event.calls++;p.nativeEvents[method]=event;h.pairs[target.id]=p;
+  },advance(g){
     if(failure)fail('stage policy already failed');
     try{
       activeRow=null;
@@ -279,7 +298,7 @@ export function createBadgeStages(plan,cadence,roster){
         if(failed||permanent){row.state='skipped';row.at=g.simTime;row.reason=failed?'unsuccessful dependency '+failed.id:'actor/target permanently unavailable';continue;}
         if(g.simTime<row.notBefore||row.after.some(d=>!terminal(byId.get(d.id).state))||row.unmet.length)continue;
         const resolved=resolve(g,row);if(!resolved.command){row.unmet.push('path target not present');continue;}
-        try{row.trace={...executeBadgeCommand(g,resolved.command),resolvedInputs:resolved.inputs};}
+        try{row.trace={...executeBadgeCommand(g,resolved.command),resolvedInputs:resolved.inputs};row.contactSequenceAfterAttempt=contactSequence;}
         catch(error){row.state='error';row.at=g.simTime;row.trace={command:resolved.command,resolvedInputs:resolved.inputs,accepted:null,invoked:null,error:String(error?.message??error)};throw error;}
         row.state=row.trace.accepted===true?'accepted':row.trace.accepted===null&&row.trace.reason==='already in requested state'?'already-satisfied':'refused';row.at=g.simTime;
       }
@@ -287,4 +306,74 @@ export function createBadgeStages(plan,cadence,roster){
       if(!failure)failure={message:String(error?.message??error),at:Number.isFinite(g.simTime)?g.simTime:null};throw error;}
   },receipt:()=>({kind:'finite native conditional attempts; observed engagement is not a private charge episode',cadence,
     stages:structuredClone(rows),history:[...history.values()].map(h=>structuredClone(h)),failure:structuredClone(failure)})};
+}
+
+/** Private native-call observer. Aggregates opportunities without changing RNG, counters or arguments. */
+export function installBadgeCombatObserver(game,stages){
+  const combat=game.combat,names=['volleyAt','chargeFeat','routFeat','moraleStep'];
+  if(!combat||typeof stages?.contact!=='function')fail('native combat observer prerequisites');
+  const saved=names.map(name=>{const descriptor=Object.getOwnPropertyDescriptor(combat,name),native=combat[name];
+    if(typeof native!=='function'||descriptor&&(!Object.hasOwn(descriptor,'value')||!descriptor.configurable))fail('reversible native combat method required');
+    return {name,descriptor,native,installed:null,restored:false};});
+  if(!Object.isExtensible(combat)&&saved.some(o=>!o.descriptor))fail('extensible native combat owner required');
+  const aggregate=new Map(),errors=[],equipmentCopies=new WeakMap();let failure=null,lastAt=-1;
+  const snapshot=u=>{
+    if(!game.units.includes(u)||!['US','CS'].includes(u.side)||![u.x,u.z,u.men,u.morale,u.cover,u.underFire,u.flanked].every(Number.isFinite)
+      ||typeof u.follow?.active!=='boolean'||typeof u.melee!=='boolean'||typeof u.firing!=='boolean'||!u.order)fail('malformed native combat actor');
+    let equipment=equipmentCopies.get(u);if(!equipment||equipment.source!==u.equipment){equipment={source:u.equipment,copy:structuredClone(u.equipment||null)};equipmentCopies.set(u,equipment);}
+    return {id:u.id,side:u.side,type:u.type,men:u.men,x:u.x,z:u.z,morale:u.morale,cover:u.cover,coverKind:u.coverKind||null,
+      underFire:u.underFire,flanked:u.flanked,state:u.state,following:u.follow.active,melee:u.melee,firing:u.firing,
+      order:u.order.type,targetId:u.target?.id||null,intendedTargetId:u.order.target?.id||null,equipment:equipment.copy};
+  };
+  const capture=(name,args)=>{
+    const at=name==='volleyAt'?args[2]:name==='chargeFeat'?args[3]:game.simTime;
+    if(!Number.isFinite(at)||Math.abs(at-game.simTime)>1e-8||at<lastAt)fail('native combat observation time drift');lastAt=at;
+    const actor=snapshot(args[0]),target=['volleyAt','chargeFeat'].includes(name)?snapshot(args[1]):null;
+    if(target&&target.side===actor.side)fail('native combat opponent ownership');
+    const d=target?Math.hypot(actor.x-target.x,actor.z-target.z):null;
+    const nearbyRouting=name==='moraleStep'?game.units.filter(u=>u!==args[0]&&u.side===actor.side&&u.state==='routing'&&Math.hypot(u.x-actor.x,u.z-actor.z)<300).map(u=>u.id):[];
+    if(name==='moraleStep'&&(!Number.isFinite(args[1])||args[1]<0))fail('native morale delta required');
+    if(name==='chargeFeat'&&(!Number.isFinite(args[2])||args[2]<0))fail('native melee casualty measure required');
+    const opportunities=name==='volleyAt'?{far:d>200,largerLong:d>150&&target.men>actor.men,closeRange:d<=60,
+      works:['fence line','farm buildings'].includes(actor.coverKind),woods:args[0].inWoods===true,canister:actor.type==='artillery'&&d<=CANISTER,
+      fallback:actor.order==='fallback'}:name==='chargeFeat'?{smaller:actor.men<target.men,coveredTarget:target.cover>1}:
+      name==='moraleStep'?{holdingPressure:actor.underFire>0&&actor.state!=='routing'&&!actor.following&&(actor.flanked>0||nearbyRouting.length>0)}:{};
+    return {method:name,at,actor,target,distance:d,nearbyRouting,opportunities,dt:name==='moraleStep'?args[1]:null,
+      nativeCasualties:name==='chargeFeat'?args[2]:null,kind:'conditions at actual native call; hidden feat latches and award attribution not inferred'};
+  };
+  const store=(event,failed,error)=>{
+    const key=JSON.stringify([event.method,event.actor.id,event.target?.id||null]);let row=aggregate.get(key);
+    if(!row){if(aggregate.size>=10000)fail('native combat aggregation bound');row={method:event.method,actorId:event.actor.id,targetId:event.target?.id||null,
+      calls:0,succeeded:0,failed:0,first:event.at,last:event.at,opportunities:{},firstInputs:event,lastInputs:event};aggregate.set(key,row);}
+    row.calls++;row.last=event.at;row.lastInputs=event;
+    if(failed){row.failed++;if(errors.length>=20)fail('native combat error bound');errors.push({method:event.method,at:event.at,actorId:event.actor.id,error:String(error?.message??error)});return;}
+    row.succeeded++;
+    for(const[k,eligible]of Object.entries(event.opportunities))if(eligible){const o=row.opportunities[k]||{calls:0,seconds:0,first:event.at,last:event.at};o.calls++;o.seconds+=event.dt||0;o.last=event.at;row.opportunities[k]=o;}
+  };
+  for(const owner of saved){
+    const wrapped=function(...args){
+      if(this!==combat)return owner.native.apply(this,args);
+      if(failure)fail('native combat observer already failed');
+      let event;try{event=capture(owner.name,args);}catch(error){failure={message:String(error?.message??error),at:game.simTime};throw error;}
+      let value;
+      try{value=owner.native.apply(this,args);}catch(error){
+        failure={message:String(error?.message??error),at:game.simTime,kind:'native exception'};
+        try{store(event,true,error);}catch(secondary){failure={message:String(secondary?.message??secondary),at:game.simTime,primary:String(error?.message??error)};}
+        throw error;
+      }
+      try{store(event,false,null);if(['volleyAt','chargeFeat'].includes(owner.name))stages.contact(game,args[0],args[1],event.at,owner.name);}
+      catch(error){failure={message:String(error?.message??error),at:game.simTime};throw error;}return value;
+    };
+    Object.defineProperty(combat,owner.name,{value:wrapped,writable:true,configurable:true,enumerable:owner.descriptor?.enumerable??false});
+    owner.installed=Object.getOwnPropertyDescriptor(combat,owner.name);
+  }
+  return {receipt:()=>({kind:'actual native call opportunities; nearby support/cover and numeric tiers require separate outcomes',rows:structuredClone([...aggregate.values()]),errors:structuredClone(errors),failure:structuredClone(failure)}),
+    restore(){const cleanup=[];for(const owner of saved){if(owner.restored)continue;try{
+      const current=Object.getOwnPropertyDescriptor(combat,owner.name);
+      if(!current||!['value','writable','enumerable','configurable','get','set'].every(k=>current[k]===owner.installed[k]))fail('foreign native combat method owner '+owner.name);
+      if(owner.descriptor)Object.defineProperty(combat,owner.name,owner.descriptor);else delete combat[owner.name];
+      if(combat[owner.name]!==owner.native)fail('inherited native combat method drift '+owner.name);owner.restored=true;
+    }catch(error){cleanup.push(String(error?.message??error));}}
+    return {ok:cleanup.length===0,errors:cleanup};},
+  };
 }

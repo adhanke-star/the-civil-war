@@ -9,9 +9,9 @@ MAIN's eleven protected WIP files stay untouched. COORDINATION.md is absent; rea
 |---|---|
 | Project licence | Aaron approved MIT code + CC-BY 4.0 original data/text; a79ec3a; full CI green, live |
 | Stones River southern ground | Rebuilt tile + coherent dawn deployment;21eb4a3 full CI/actual screenshots/Pages green |
-| Compressed atlases and more CS looks | Mixed8ASTC/2PNG38282452947 qualified/diagnostic only; e036 accepted source/main/full9/own native162 read, mainCI38335359579 all9green/readbacks ongoing/Pages38335359541 livecw-v68;0164 28eeafb all9/full own native163 read,131+131/constructed22+88 transport22,514,319B;0165 startup90+90/native164 pending;0166 tier99+99/native171 UNRUN; full110-context caller/Lookout/input/acquisition/native matrix pending; no adoption |
+| Compressed atlases and more CS looks | Mixed8ASTC/2PNG38282452947 qualified/diagnostic only; acceptedmain23dcea3/source+main all9green, own171 native prerequisites clean. Complete22ordinary+88fault caller168+168; full qualifiedmatrix38343715785 once-dispatched at23/running, no resource verdict. Pages38344425205 exact23/livecw-v68; no runtime adoption |
 | Higher commanders | Four sourced Inferred rows across three Stones phases; carryfix09a12f1 full CI38261729029/actual image readback green, integrated |
-| Balance | Actual09a12f1 campaign201/201, grades3Defeat/4Draw/2Victory/3Decisive incl replay;570rep/L5; proposed numbers held. Buell four fictional stores7/7 CPU+7 controls, actual route/fullCI next (0127) |
+| Balance | Actual09a12f1 campaign201/201, grades3Defeat/4Draw/2Victory/3Decisive incl replay;570rep/L5; amounts held. Accepted separate native ForagersGold retained. Six approved Veteran tactics: private prefixes/crossings/stages53+53 and native-hook bookkeeping69+69 clear; actual six battles/storage/tier upgrades/legalL10 UNRUN |
 
 Each slice: affected `node tools/test-<system>.mjs`, then `--prove-fail`, and `node tools/test.mjs --unit`
 locally; commit explicit paths, push branch, read all CI jobs for that exact SHA. Four browser shards,

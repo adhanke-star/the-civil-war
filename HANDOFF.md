@@ -1,5 +1,23 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0174 — root ACTIVE same-session sole writer, no transfer. Branch7cf25108f6f5ca84a0f2c4aca940716a55dcc50e;
+Acceptedremote mainb0ad719968ec6e5ccbcb30477deb7c6e19c84a45; new mainCI/Pages pending.
+its CI38345649171 running; own canonical/probe receipts pending. 0170 native-call observer root+Astra69+69,
+CPU UNIT OK/syntax/diff pass. Actual successful chargeFeat pairs plus monotonic contact sequence bind
+post-accepted-charge dependencies; hidden episodes not inferred. Original/falsy native exceptions remain failed.
+Owned hooks preserve arguments/receiver/returns, aggregate bounded native opportunities and independently restore
+descriptors; native six-case integration/policies/storage/badge tier upgrade/level10 proof still UNRUN.
+Next implement six Astra recipes (11/12/9/15/14/19 stages) in existing private helper, bind actual authored+
+scheduled IDs, one-second cadence/per-native-tick observations; then browser flag/shard before Actions.
+Sourceb0 CI38344611737 all9/full own251/365/171/159+201campaign+three6smokes clean;
+direct rawprobe1151229842235,716,981B includes actual badge27+27/scene168+168/inactive99+99.
+Main23 CI38344425188 all9/full own same counts/rawprobe1151224017385,716,334B clean;
+Pages38344425205 exact23/livecw-v68 fetched. Use gh api actions/jobs/<id>/logs for full originals;
+formatted gh run view returned82KB incomplete summaries, do not accept it as full probe proof.
+Qualified matrix38343715785 still running unchanged/no artifact/verdict. Preserve ZIP/member/selected99MB cap,
+original images/report/failed receipts and protectedMAIN11. No runtime assets/policy/SW/release adoption,
+local browser/download/prune, quota assertion or simultaneous provider edits. Continue through routine greens.
+
 LATEST0173 — root ACTIVE sole writer same session, no transfer. Branch sourceb0ad719968ec6e5ccbcb30477deb7c6e19c84a45.
 Its CI38344611737 running; own Firefox/WebKit/offline6 each read clean; other canonical pending.
 0169 conditional stages root+Astra53+53/unit/syntax/diff clear; no native claims.
