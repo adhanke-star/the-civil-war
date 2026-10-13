@@ -1,5 +1,23 @@
 // Diagnostic-only accounting of WebGL reservations. These are API bytes, not native driver measurements.
 import {deriveSceneStressContract} from './inactive-figures.mjs';
+
+// Diagnostic capture only. Hidden tree chunks otherwise keep a previous view's LOD.
+// Settle every native geometry, then restore ordinary visibility before any draw.
+export function settleSceneCapture(scope,{framedUnitId=null}={}) {
+  const {world,rts,camera,game,post}=scope?.__game||{};
+  if(typeof world?.trees?.userData?.updateLod!=='function'||!camera||!Number.isFinite(rts?.dist))throw Error('scene capture: native tree and camera owners required');
+  if(framedUnitId!==null){
+    const unit=game?.units?.find(u=>u.id===framedUnitId&&u.side==='US'&&u.type==='infantry'&&u.alive);
+    if(!unit||game.simTime!==0||!Number.isFinite(scope.innerHeight*post?.scale)||scope.innerHeight*post.scale<=0)throw Error('scene capture: living time-zero framed brigade required');
+    rts.flyTo(unit.x,unit.z,200);rts.goal.dist=200;rts.goal.pitch=rts._pitch(200);
+    rts.snap();rts.update(1);game.setView(camera,scope.innerHeight*post.scale);game.animate(0);
+    if(rts.dist!==200||rts.goal.dist!==200)throw Error('scene capture: actual 200m framing required');
+  }
+  world.trees.userData.updateLod(camera,rts.dist+200,Infinity);
+  world.trees.userData.updateLod(camera,rts.dist+200);
+  return {framed:framedUnitId!==null,distance:rts.dist,goalDistance:rts.goal?.dist};
+}
+
 export async function rejectionObservation(run) {
   try {await run();return {rejected:false,message:''};}
   catch(e){return {rejected:true,message:e?.message||e?.type||String(e)};}

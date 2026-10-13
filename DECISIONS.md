@@ -1,5 +1,9 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0199 — Settle diagnostic tree owners and require the actual 200m frame (2026-10-13)
+
+Float32 FIRSTRED38466534181/exact3d all3originalZIP/42wholePNG/all10contexts/nativeevent+slotreplay read; wholepixels all3views exact, strictreducer fails overviewhidden treeLOD ownergeometry and actual100m framedcamera vsrequired200. ObservedGPU248944050B, conservative298138658B includesCPU; no acceptance. ActualbuildTrees/RtsCamera source and AstraCPU reproduce both producer defects. Diagnostic-only all-owner nativeLOD settlement thenordinaryvisibility (nointermediateawait/draw), explicit200m/pitch/snap framing repair; keepallstrictworld/byte/identity/negative/native/fullgates. Three resource sources+fourdocs WIP/source270+270/CPU-onlyUNIT/syntax/diff/Astra independent CLEAR; repairednativeUNRUN.0198 fde sourceCI running; ONCEridge38470321986 bound exactqualifiedfde BEFORE0199commit; art/250MB/all20/protectedMAIN/.out unchanged.
+
 ## 0198 — Preserve genuine Hard Marchers Silver before one distinct ridge design (2026-10-13)
 
 Final local source264+264/CPU-onlyUNIT/syntax/diff/YAML32/actualconflictingCLI/exact original acquisition/fulltwo-prefix replay and Astra independent scopedSOURCE CLEAR. All242 preceding paired controls retained. NewnativeGold and own0198nineCI UNRUN;0197focusedmustbind before0198commit. No acceptance or release claim from sourcecontrols.

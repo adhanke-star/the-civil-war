@@ -374,7 +374,9 @@ async function main(){
         }
         const capture=async label=>{
           await page.evaluate(initializeSceneTextures);
-          const drawing=await page.evaluate(()=>{const {post,scene,camera}=window.__game,r=post.renderer,prior=r.info.autoReset;r.info.autoReset=false;r.info.reset();try{if(window.__sceneRenderGate)window.__sceneRenderGate.renderOnce(scene,camera);else post.render(scene,camera);r.getContext().finish();return {drawCalls:r.info.render.calls,nativeRenders:window.__sceneRenderGate?.count??null};}finally{r.info.autoReset=prior;}});
+          const drawing=await page.evaluate(async()=>{const {post,scene,camera}=window.__game,r=post.renderer,prior=r.info.autoReset;
+            const {settleSceneCapture}=await import('./tools/bake/scene-allocation.mjs');settleSceneCapture(window);
+            r.info.autoReset=false;r.info.reset();try{if(window.__sceneRenderGate)window.__sceneRenderGate.renderOnce(scene,camera);else post.render(scene,camera);r.getContext().finish();return {drawCalls:r.info.render.calls,nativeRenders:window.__sceneRenderGate?.count??null};}finally{r.info.autoReset=prior;}});
           const data=focused?await page.evaluate(label=>window.__focusedScene.sample(label),label):await page.evaluate(inventory);row.states.push(observation({...data,label,...drawing}));save();
           if(data.glError||data.allocation.unknown.length||data.unmappedBufferBytes!==0||errors.length)throw new Error(`scene allocation: ${entry.phaseId}/${label} incomplete: GL${data.glError}, unmapped ${data.unmappedBufferBytes}, ${data.allocation.unknown.join(',')}, ${errors.join(',')}`);
           console.log(entry.phaseId,label,JSON.stringify({reservation:data.conservativeReservation,...data.allocation.byKind,arrays:data.declaredArrayBytes,pages:data.atlasPages}));
@@ -383,6 +385,7 @@ async function main(){
           if(qualified)filename=`${entry.packId}-${entry.phaseId}-${entry.route}-${filename}`;
           const shot=await page.evaluate(async({source,bindWorld})=>{
             const S=await import('./src/settings.js'),C=await import('./src/sandbox/compare.js'),{post,scene,camera,rts,game,world}=window.__game;
+            const {settleSceneCapture}=await import('./tools/bake/scene-allocation.mjs');settleSceneCapture(window);
             const png=(0,eval)('('+source+')')(post,scene,camera,window.__sceneRenderGate),receipt={...png,style:S.get('look.figureStyle'),comparison:C.compareState(),simTime:game.simTime,
               camera:{position:camera.position.toArray(),quaternion:camera.quaternion.toArray(),fov:camera.fov,near:camera.near,far:camera.far,goal:{...rts.goal}}};
             if(window.__focusedScene)receipt.figurePublication=Object.fromEntries(Object.entries(game.baked.atlases).map(([side,a])=>[side,Object.fromEntries(Object.entries(a.textures).map(([tier,pages])=>[tier,pages.map(t=>({uuid:t.uuid,width:t.image?.width,height:t.image?.height,
@@ -568,10 +571,10 @@ async function main(){
           await transition('compare-rigged-left','rigged',true);await transition('compare-baked-left','baked',true);
           await transition('baked-restored','baked');
           if(partition&&entry.phaseId==='lookout-mountain'){
-            row.framedComparison=await page.evaluate(()=>{
+            row.framedComparison=await page.evaluate(async()=>{
               const {game:g,rts,camera,post}=window.__game,u=g.units.find(u=>u.side==='US'&&u.type==='infantry'&&u.alive);
               if(!u)throw new Error('combined prototype: living formation needed for readable comparison');
-              rts.flyTo(u.x,u.z,200);for(let i=0;i<12;i++)rts.update(1);g.setView(camera,innerHeight*post.scale);g.animate(0);
+              const {settleSceneCapture}=await import('./tools/bake/scene-allocation.mjs');settleSceneCapture(window,{framedUnitId:u.id});
               return {unitId:u.id,position:[u.x,u.z],simTime:g.simTime,goal:{...rts.goal}};
             });
             await transition('framed-compare-rigged-left','rigged',true,'07-framed-compare-rigged-left.png');

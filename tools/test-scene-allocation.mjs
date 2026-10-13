@@ -4,6 +4,10 @@ import {isDeepStrictEqual} from 'node:util';
 import {float32TerrainRetirementErrors,float32OriginalReceiptValid,reduceFocusedFloat32LookoutObservations,failPaintedComparison,collectPaintedIsolation,AllocationLedger,mipSizes,installAllocationObserver,ReservationPeak,rejectionObservation,reduceSceneObservations,reduceFocusedLookoutObservations,focusedSceneResourceErrors,sampleSceneAllocations,initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,expandSceneContext,sceneReportEnvelope,scenePartHeader,createSceneMatrixMerger} from './bake/scene-allocation.mjs';
 import {deriveSceneStressContract} from './bake/inactive-figures.mjs';
 import {QUALIFIED_HYBRID} from './bake/review-current-compression.mjs';
+import {settleSceneCapture} from './bake/scene-allocation.mjs';
+import * as THREE from 'three';
+import {buildTrees} from '../src/world/props.js';
+import {RtsCamera} from '../src/render/rts-camera.js';
 
 function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,sampler=sampleSceneAllocations,forgetOwners=false,nativeJournal=false) {
   const saved={window:globalThis.window,WebGLRenderingContext:globalThis.WebGLRenderingContext,WebGL2RenderingContext:globalThis.WebGL2RenderingContext};
@@ -659,6 +663,34 @@ checks.push(['float32-never-full',a=>{const r=a.float32Focused({resourceFocus:'f
 mutants['float32-never-full']={float32Focused:()=>({complete:true})};
 checks.push(['float32-full-header-refusal',a=>{const r=qualifiedObservations();r.float32TerrainRepresentation='Float32 with retained exact original';assert.equal(a.reduce(r,phases).complete,false,'float32-full-header-refusal: full reducer rejects isolated representation');let rejected=false;try{a.merge(phases,r);}catch{rejected=true;}assert.ok(rejected,'float32-full-header-refusal: full merger rejects isolated representation');}]);
 mutants['float32-full-header-refusal']={reduce:()=>({complete:true}),merge:()=>({})};
+Object.assign(api,{settleCapture:settleSceneCapture});
+function captureFixture(){
+ const terrain={half:3000,heightAt:()=>0},camera=new THREE.PerspectiveCamera(32,1,1,10000),rts=new RtsCamera(camera,terrain,{dist:100,yaw:0}),trees=buildTrees(terrain,[[0,-1000,5,0]],{far:1}),events=[];
+ const game={simTime:0,units:[{id:'us-cpu-framed',side:'US',type:'infantry',alive:true,x:0,z:0}],setView(c,h){events.push(['setView',c===camera,h]);},animate(dt){events.push(['animate',dt]);}};
+ rts.snap();rts.update(1);return {scope:{__game:{world:{trees},camera,rts,game,post:{scale:1}},innerHeight:768},events,trees,mesh:trees.children[0],camera,rts};
+}
+function seededCapture(f,high){
+ const center=f.mesh.boundingSphere.center;
+ if(high){f.camera.position.copy(center).add(new THREE.Vector3(0,0,1));f.camera.lookAt(center);}else{f.rts.snap();f.rts.update(1);}
+ f.trees.userData.updateLod(f.camera,400,Infinity);f.rts.snap();f.rts.update(1);f.trees.userData.updateLod(f.camera,400);
+ return {geometry:f.mesh.geometry,visible:f.mesh.visible};
+}
+const captureChecks=[
+ ['capture-framed200',a=>{const f=captureFixture();a.settleCapture(f.scope,{framedUnitId:'us-cpu-framed'});assert.deepEqual([f.rts.dist,f.rts.goal.dist,f.rts.pitch],[200,200,f.rts._pitch(200)],'capture-framed200: actual goal and camera settle from100 to200');assert.deepEqual(f.events,[['setView',true,768],['animate',0]],'capture-framed200: native time-zero game pose');}],
+ ['capture-hidden-owner',a=>{const f=captureFixture(),high=seededCapture(f,true),low=seededCapture(f,false);assert.equal(high.visible,false,'capture-hidden-owner: original native far visibility');assert.equal(low.visible,false,'capture-hidden-owner: same native visibility');assert.notEqual(high.geometry,low.geometry,'capture-hidden-owner: actual native stale hidden geometry reproduced');seededCapture(f,true);a.settleCapture(f.scope);const first=f.mesh.geometry;seededCapture(f,false);a.settleCapture(f.scope);assert.equal(first,f.mesh.geometry,'capture-hidden-owner: all-owner geometry independent of earlier view');}],
+ ['capture-native-visibility',a=>{const f=captureFixture();seededCapture(f,true);a.settleCapture(f.scope);assert.equal(f.mesh.visible,false,'capture-native-visibility: native far visibility restored before draw');}],
+ ['capture-native-order',a=>{const f=captureFixture(),native=f.trees.userData.updateLod,calls=[];f.trees.userData.updateLod=(...args)=>{calls.push(args);return native(...args);};a.settleCapture(f.scope);assert.deepEqual(calls.map(r=>r[2]),[Infinity,undefined],'capture-native-order: synchronous all-owner then ordinary visibility');assert.ok(calls.every(r=>r[0]===f.camera&&r[1]===f.rts.dist+200),'capture-native-order: actual camera/native band');}],
+ ['capture-preserves-world',a=>{const f=captureFixture(),matrix=f.mesh.instanceMatrix.array.slice(),colors=f.mesh.instanceColor.array.slice(),material=f.mesh.material,units=structuredClone(f.scope.__game.game.units);a.settleCapture(f.scope);assert.equal(f.trees.userData.count,1,'capture-preserves-world: tree count');assert.equal(f.mesh.material,material,'capture-preserves-world: native material identity');assert.deepEqual(f.mesh.instanceMatrix.array,matrix,'capture-preserves-world: native instance matrices');assert.deepEqual(f.mesh.instanceColor.array,colors,'capture-preserves-world: native colors');assert.deepEqual(f.scope.__game.game.units,units,'capture-preserves-world: gameplay remains time-zero');assert.equal(f.scope.__game.game.simTime,0,'capture-preserves-world: no simulation');}],
+ ['capture-owner-refusal',a=>{for(const change of [f=>f.scope.__game.world.trees.userData.updateLod=null,f=>f.rts.dist=NaN]){const f=captureFixture();change(f);let error;try{a.settleCapture(f.scope);}catch(e){error=e;}assert.ok(error?.message.startsWith('scene capture:'),'capture-owner-refusal: unproved owner refused');}}],
+ ['capture-framed-refusal',a=>{for(const change of [f=>f.scope.__game.game.units[0].alive=false,f=>f.scope.__game.game.simTime=1,f=>f.scope.innerHeight=0]){const f=captureFixture();change(f);let error;try{a.settleCapture(f.scope,{framedUnitId:'us-cpu-framed'});}catch(e){error=e;}assert.ok(error?.message.startsWith('scene capture:'),'capture-framed-refusal: genuine live time-zero frame required');}}],
+];
+checks.push(...captureChecks);
+mutants['capture-framed200']={settleCapture:scope=>{const g=scope.__game;g.rts.flyTo(0,0,200);g.rts.snap();g.rts.update(1);}};
+mutants['capture-hidden-owner']={settleCapture:scope=>{const g=scope.__game;g.world.trees.userData.updateLod(g.camera,g.rts.dist+200);}};
+mutants['capture-native-visibility']={settleCapture:scope=>{const g=scope.__game;g.world.trees.userData.updateLod(g.camera,g.rts.dist+200,Infinity);}};
+mutants['capture-native-order']={settleCapture:scope=>{const g=scope.__game;g.world.trees.userData.updateLod(g.camera,g.rts.dist+200);g.world.trees.userData.updateLod(g.camera,g.rts.dist+200,Infinity);}};
+mutants['capture-preserves-world']={settleCapture:scope=>{settleSceneCapture(scope);scope.__game.world.trees.children[0].instanceMatrix.array[0]++;}};
+mutants['capture-owner-refusal']={settleCapture:()=>{}};mutants['capture-framed-refusal']={settleCapture:()=>{}};
 for(const [,check]of checks)await check(api);
 console.log(`SCENE-ALLOCATION OK (${checks.length}/${checks.length})`);
 if(process.argv.includes('--prove-fail')){
