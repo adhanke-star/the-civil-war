@@ -75,6 +75,76 @@ export async function sceneAllocationControls({browser,url,check,result,watchErr
   await sceneTransactionControls({browser,url,check,result,watchErrors});
   await sceneStressOwnerControls({browser,url,check,result,watchErrors});
   await sceneStressOwnerControls({browser,url,check,result,watchErrors,mode:'terminal'});
+  await canonicalTerrainControls({browser,url,check,result,watchErrors});
+}
+
+// Geometry/shader prerequisite with synthetic spatial ground inputs; no painted-art or scene-budget claim.
+async function canonicalTerrainControls({browser,url,check,result,watchErrors}){
+  const ctx=await browser.newContext({viewport:{width:320,height:240}}),errors=[];let page;
+  try{await ctx.addInitScript(installAllocationObserver,{ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),nativeJournal:true});
+    page=await ctx.newPage();watchErrors(page,url,errors);await page.goto(url+'?nosw');await page.waitForFunction(()=>window.__entry&&!window.__entry.importing,null,{timeout:60000});
+    const proof=await page.evaluate(async()=>{
+      const THREE=await import('three'),Martini=(await import('@mapbox/martini')).default,
+        {loadTerrainData,buildTerrainMesh}=await import('./src/world/terrain.js'),{makeSun}=await import('./src/world/world.js'),
+        {prepareCanonicalTerrain,createCanonicalTerrainMesh,installTerrainPartition,partitionTerrain}=await import('./tools/bake/partition-terrain.mjs'),
+        {sampleSceneAllocations}=await import('./tools/bake/scene-allocation.mjs');
+      const proof={cases:[],errors:[],cleanup:[],kind:'actual source terrain geometry/shader with synthetic spatial ground/info; painted art and complete scene budget UNRUN',budgetClaim:false},ownedTextures=new Set();let renderer,scene,gl,scope;
+      const attempt=(receipts,name,fn)=>{try{fn();receipts.push({name,ok:true});}catch(e){receipts.push({name,ok:false,error:String(e?.message??e)});}};
+      const sample=label=>({label,...sampleSceneAllocations(scope)}),encode=bytes=>{let s='';for(let i=0;i<bytes.length;i+=8192)s+=String.fromCharCode(...bytes.subarray(i,i+8192));return btoa(s);};
+      const texture=(size,info=false)=>{const bytes=new Uint8Array(size*size*4);for(let z=0;z<size;z++)for(let x=0;x<size;x++){const i=(z*size+x)*4;bytes.set(info?[x*255/(size-1),120,(x+z)%256,255]:[40+(x*3+z)%120,70+(z*5+x)%110,30+((x>>3)^(z>>3))*5,255],i);}
+        const t=new THREE.DataTexture(bytes,size,size);t.flipY=false;t.magFilter=THREE.LinearFilter;t.minFilter=THREE.LinearMipmapLinearFilter;t.generateMipmaps=true;t.needsUpdate=true;ownedTextures.add(t);return t;};
+      try{renderer=new THREE.WebGLRenderer({antialias:false});scene=new THREE.Scene();gl=renderer.getContext();renderer.setPixelRatio(1);renderer.setSize(320,240);
+        scope={__game:{scene,post:{renderer},game:{baked:{atlases:{}}}},__allocation:window.__allocation,innerWidth:320,innerHeight:240,devicePixelRatio:1};const ground=texture(128),info=texture(64,true);
+        for(const name of ['henry-hill','shiloh','stones-river','chattanooga','lookout-mountain']){
+          const receipt={name,views:[],snapshots:[],cleanup:[],primary:null,complete:false};proof.cases.push(receipt);let old,canonical,material;
+          try{const data=await loadTerrainData('./assets/terrain',name);old=buildTerrainMesh(data,ground,info,makeSun());material=old.material;
+            for(const u of Object.values(material.uniforms))if(u.value?.isTexture)ownedTextures.add(u.value);
+            const {vertices,triangles}=new Martini(data.grid).createTile(data.heights).getMesh(.5),prepared=prepareCanonicalTerrain({grid:data.grid,cell:data.cell,half:data.half,heights:data.heights,vertices,triangles});canonical=createCanonicalTerrainMesh(prepared,THREE,material);
+            const originalUniforms={...material.uniforms},originalGeometry=old.geometry,originalAttributes={...old.geometry.attributes},originalIndex=old.geometry.index,originalBox=old.geometry.boundingBox,originalSphere=old.geometry.boundingSphere;
+            const camera=new THREE.OrthographicCamera(),center=prepared.bounds.center,first=prepared.chunks[0].gridPosition,keys=new Set();for(let i=0;i<first.length;i+=2)keys.add(first[i]+','+first[i+1]);
+            let edge=[first[0],first[1]],shared=false;if(prepared.chunks.length>1){const second=prepared.chunks[1].gridPosition;for(let i=0;i<second.length;i+=2)if(keys.has(second[i]+','+second[i+1])){edge=[second[i],second[i+1]];shared=true;break;}}
+            const nearX=edge[0]*data.cell-data.half,nearZ=edge[1]*data.cell-data.half,nearY=data.heightAt(nearX,nearZ);receipt.near={point:[nearX,nearY,nearZ],sharedChunkBoundary:shared};
+            const setView=label=>{const near=label==='near',span=near?Math.min(500,data.half*.3):data.half*1.3,look=near?[nearX,nearY,nearZ]:center;
+              camera.left=-span*4/3;camera.right=span*4/3;camera.top=span;camera.bottom=-span;camera.near=.1;camera.far=data.half*12+10000;
+              camera.up.set(0,0,-1);if(label==='overview')camera.position.set(look[0],prepared.bounds.max[1]+data.half*3,look[2]+.001);
+              else{camera.up.set(0,1,0);camera.position.set(look[0]+span*.35,look[1]+span*1.9,look[2]+span*1.35);}camera.lookAt(...look);camera.updateProjectionMatrix();camera.updateMatrixWorld();};
+            const draw=label=>{setView(label);renderer.render(scene,camera);gl.finish();const bytes=new Uint8Array(320*240*4);gl.readPixels(0,0,320,240,gl.RGBA,gl.UNSIGNED_BYTE,bytes);
+              return {pixels:encode(bytes),drawCalls:renderer.info.render.calls,drawTriangles:renderer.info.render.triangles,nonuniform:bytes.some((b,i)=>i%4<3&&b!==bytes[i%4]),glError:gl.getError()};};
+            scene.add(old);for(const label of ['overview','oblique','near'])receipt.views.push({label,original:draw(label)});receipt.snapshots.push(sample('monolithic'));
+            const partition=installTerrainPartition({terrainMesh:old},THREE,partitionTerrain,{reversible:true});gl.finish();for(const view of receipt.views)view.partition=draw(view.label);receipt.snapshots.push(sample('old-partition'));partition.restore();gl.finish();
+            receipt.restored=old.geometry===originalGeometry&&old.geometry.index===originalIndex&&old.geometry.boundingBox===originalBox&&old.geometry.boundingSphere===originalSphere&&!old.children.length
+              &&Object.entries(originalAttributes).every(([key,value])=>old.geometry.attributes[key]===value);
+            scene.remove(old);old.geometry.dispose();gl.finish();scene.add(canonical);for(const view of receipt.views)view.canonical=draw(view.label);const native=sample('canonical');receipt.snapshots.push(native);
+            const arrays=[];canonical.traverse(o=>{if(o.geometry)for(const a of [...Object.values(o.geometry.attributes),o.geometry.index].filter(Boolean))arrays.push(a.array);});
+            receipt.fullBuffers=arrays.every(a=>scope.__allocation.bufferReservations(gl,a).some(r=>!r.pendingDelete&&r.bytes===a.byteLength));
+            receipt.unchangedTextures=Object.entries(originalUniforms).every(([key,u])=>material.uniforms[key]===u&&canonical.material.uniforms[key]===u);const textureSlots=s=>s.allocation.textureSlots.map(t=>({texture:t.texture,slots:t.slots}));
+            receipt.texturesStable=JSON.stringify(textureSlots(receipt.snapshots[1]))===JSON.stringify(textureSlots(native));
+            receipt.controls={before:receipt.views[2].canonical};for(const child of canonical.children){const a=child.geometry.attributes.aHeight;for(let i=0;i<a.count;i++)a.array[i]+=75;a.needsUpdate=true;child.frustumCulled=false;}
+            receipt.controls.changedHeight=draw('near');for(const child of canonical.children){const g=child.geometry.attributes.aGrid,h=child.geometry.attributes.aHeight;for(let i=0;i<h.count;i++)h.array[i]=data.heights[g.array[i*2+1]*data.grid+g.array[i*2]];h.needsUpdate=true;}
+            canonical.material.uniforms.uCanonicalInverse.value*=.5;receipt.controls.changedUV=draw('near');canonical.material.uniforms.uCanonicalInverse.value*=2;receipt.controls.repaired=draw('near');receipt.snapshots.push(sample('after-controls'));
+            Object.assign(receipt,{grid:data.grid,triangles:prepared.triangles,chunks:prepared.chunks.length,bytes:prepared.bytes,precision:gl.getShaderPrecisionFormat(gl.VERTEX_SHADER,gl.HIGH_FLOAT).precision,complete:true});
+          }catch(error){receipt.primary=String(error?.message??error);}
+          finally{if(old)attempt(receipt.cleanup,'detach-original',()=>scene.remove(old));if(canonical)attempt(receipt.cleanup,'detach-canonical',()=>scene.remove(canonical));
+            const geometries=new Set();for(const root of [old,canonical].filter(Boolean))root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);});for(const [i,g]of [...geometries].entries())attempt(receipt.cleanup,'geometry-'+i,()=>g.dispose());
+            for(const [i,m]of [old?.material,canonical?.material].filter(Boolean).entries())attempt(receipt.cleanup,'material-'+i,()=>m.dispose());
+            for(const key of ['uNormal','uNoise']){const t=material?.uniforms[key]?.value;if(t)attempt(receipt.cleanup,key,()=>{t.dispose();ownedTextures.delete(t);});}
+            attempt(receipt.cleanup,'finish',()=>gl.finish());attempt(receipt.cleanup,'cleanup-observation',()=>receipt.snapshots.push(sample('cleanup')));}
+          receipt.complete=receipt.complete&&!receipt.primary&&receipt.cleanup.every(r=>r.ok);if(!receipt.complete)break;
+        }
+      }catch(error){proof.errors.push(String(error?.message??error));}
+      finally{for(const [i,t]of [...ownedTextures].entries())attempt(proof.cleanup,'remaining-texture-'+i,()=>t.dispose());if(renderer)attempt(proof.cleanup,'renderer',()=>renderer.dispose());if(gl)attempt(proof.cleanup,'finish',()=>gl.finish());if(renderer)attempt(proof.cleanup,'context',()=>renderer.forceContextLoss());}
+      return proof;
+    });
+    result.canonicalTerrainProof=proof;
+    const healthy=p=>p&&p.drawCalls>0&&p.drawTriangles>0&&p.nonuniform&&p.glError===0;
+    for(const c of proof.cases){const equal=c.views.length===3&&c.views.every(v=>v.original&&v.partition&&v.canonical&&v.original.pixels===v.partition.pixels&&v.original.pixels===v.canonical.pixels),pixels=c.views.every(v=>[v.original,v.partition,v.canonical].every(healthy));
+      check('canonical-terrain-'+c.name,c.complete&&equal&&pixels&&c.precision>=23&&c.restored&&c.fullBuffers&&c.unchangedTextures&&c.texturesStable&&(c.chunks===1||c.near?.sharedChunkBoundary===true)
+        &&c.snapshots.length===5&&c.snapshots.every(s=>s.glError===0&&s.allocation.unknown.length===0&&s.unmappedBufferBytes===0)
+        &&[c.controls?.changedHeight,c.controls?.changedUV,c.controls?.repaired].every(healthy)
+        &&c.controls.changedHeight.pixels!==c.controls.before.pixels&&c.controls.changedUV.pixels!==c.controls.before.pixels&&c.controls.repaired.pixels===c.controls.before.pixels,
+        JSON.stringify({equal,pixels,restored:c.restored,fullBuffers:c.fullBuffers,texturesStable:c.texturesStable,primary:c.primary,cleanup:c.cleanup}));}
+    check('canonical-terrain-errors',errors.length===0&&proof.errors.length===0&&proof.cleanup.every(r=>r.ok)&&proof.cases.length===5,errors.concat(proof.errors).join('; '));
+  }finally{await ctx.close();}
 }
 
 

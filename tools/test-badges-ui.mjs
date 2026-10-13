@@ -21,7 +21,7 @@ import * as campaign from '../src/franchise/campaign.js';
 import * as badges from '../src/franchise/badges.js';
 import { validateSnapshot,parseSnapshot,exportSnapshot } from '../src/franchise/save.js';
 import {installSceneStartGate} from './bake/inactive-figures.mjs';
-import {BADGE_PROMOTION_PHASES,BADGE_RELIEF_ORIGIN,validateBadgeReliefOrigin} from './observe-badges.mjs';
+import {BADGE_PROMOTION_PHASES,BADGE_RELIEF_ORIGIN,validateBadgeReliefOrigin,BADGE_SILVER_ORIGIN,validateBadgeSilverOrigin} from './observe-badges.mjs';
 import {validateDeck,cardsFor,chooseDecision} from '../src/franchise/decisions.js';
 import {breakCamp} from '../src/franchise/camp-orders.js';
 import {prepareFieldScenario} from '../src/sim/phase.js';
@@ -41,9 +41,9 @@ export function validatePromotionDeployment(deployed,initial){
 }
 
 /** Original Buell award, despite the retained failed Missionary sibling in this same run. */
-export async function acquireBadgePromotionSave({relief=false}={}){
-  assert.equal(typeof relief,'boolean');if(relief)validateBadgeReliefOrigin(BADGE_RELIEF_ORIGIN);
-  const O=relief?BADGE_RELIEF_ORIGIN:{run:38354836201,sha:'b3e45c5d38f831a4ab7b1f72cfd50754010ff986',artifact:11792497141,name:'badge-observations-3',zipBytes:372145,
+export async function acquireBadgePromotionSave({relief=false,silver=false}={}){
+  assert.equal(typeof relief,'boolean');assert.equal(typeof silver,'boolean');assert.ok(!(relief&&silver));if(relief)validateBadgeReliefOrigin(BADGE_RELIEF_ORIGIN);if(silver)validateBadgeSilverOrigin(BADGE_SILVER_ORIGIN);
+  const O=silver?BADGE_SILVER_ORIGIN:relief?BADGE_RELIEF_ORIGIN:{run:38354836201,sha:'b3e45c5d38f831a4ab7b1f72cfd50754010ff986',artifact:11792497141,name:'badge-observations-3',zipBytes:372145,
     zipSha:'7ca059d0720fd527da564e375f11457307bd6554e844e952840b786e9ea6f762',saveBytes:14519,saveSha:'e88bcfb43b002860b3af15b39a7bdcdaa00f004b7528d1d3659116d1db8a7503'};
   const api=async p=>{
     if(!process.env.GH_TOKEN)return execFileSync('gh',['api','repos/adhanke-star/the-civil-war'+p],{maxBuffer:99000000});
@@ -52,7 +52,7 @@ export async function acquireBadgePromotionSave({relief=false}={}){
     const chunks=[];let n=0;for await(const c of response.body){n+=c.length;if(n>=99000000)throw Error('badge promotion original RAM bound');chunks.push(Buffer.from(c));}return Buffer.concat(chunks);
   };
   const run=JSON.parse(await api('/actions/runs/'+O.run)),artifact=JSON.parse(await api('/actions/artifacts/'+O.artifact));
-  assert.deepEqual([run.id,run.status,run.conclusion,run.head_sha,run.path],[O.run,'completed',relief?'success':'failure',O.sha,'.github/workflows/pack-figures.yml']);
+  assert.deepEqual([run.id,run.status,run.conclusion,run.head_sha,run.path],[O.run,'completed',relief||silver?'success':'failure',O.sha,'.github/workflows/pack-figures.yml']);
   assert.deepEqual([artifact.id,artifact.expired,artifact.workflow_run.id,artifact.workflow_run.head_sha,artifact.name,artifact.size_in_bytes,artifact.digest],[O.artifact,false,O.run,O.sha,O.name,O.zipBytes,'sha256:'+O.zipSha]);
   const bytes=await api('/actions/artifacts/'+O.artifact+'/zip'),hash=b=>createHash('sha256').update(b).digest('hex');assert.equal(bytes.length,O.zipBytes);assert.equal(hash(bytes),O.zipSha);
   const {yauzl}=createRequire(import.meta.url)(new URL('../node_modules/playwright-core/lib/utilsBundle.js',import.meta.url).pathname),members=new Map();let total=0;
@@ -64,12 +64,22 @@ export async function acquireBadgePromotionSave({relief=false}={}){
     });zip.readEntry();
   }));
   assert.equal(members.size,2);const a=members.get('badge-observations.json'),b=members.get('last-result.json');assert.deepEqual(a.badgeObservations,b.badgeObservations);
-  const observation=a.badgeObservations;assert.deepEqual([observation.sourceSha,String(observation.run),observation.shard,observation.complete],[O.sha,String(O.run),relief?1:3,true]);
-  assert.deepEqual(observation.cases.map(c=>c.id),relief?['dawn-on-the-right','slaughter-pen','round-forest']:['slaughter-recovery','buell-capture']);
+  const observation=a.badgeObservations;assert.deepEqual([observation.sourceSha,String(observation.run),observation.shard,observation.complete],[O.sha,String(O.run),relief||silver?1:3,true]);
+  assert.deepEqual(observation.cases.map(c=>c.id),silver?['round-forest','mcfaddens-ford']:relief?['dawn-on-the-right','slaughter-pen','round-forest']:['slaughter-recovery','buell-capture']);
   for(const c of observation.cases)assert.ok(c.complete&&!c.primary&&!c.errors.length&&c.nativeCleanup.ok&&c.outerCleanup.ok&&c.contextClosed&&c.importContextClosed);
-  const original=observation.cases[1],raw=original.saved.raw;assert.equal(Buffer.byteLength(raw),O.saveBytes);assert.equal(hash(raw),O.saveSha);
+  const original=observation.cases[silver?0:1],raw=original.saved.raw;assert.equal(Buffer.byteLength(raw),O.saveBytes);assert.equal(hash(raw),O.saveSha);
   assert.equal(raw,original.saved.exported);assert.equal(raw,original.saved.duplicateRaw);assert.equal(raw,original.reload.raw);assert.equal(raw,original.imported.raw);
   const save=parseSnapshot(raw),brigade=save.army.find(b=>b.unitId==='us-ammen-brigade');
+  if(silver){
+    admitBadgeSilverCheckpoint(raw);assert.equal(observation.revision,0);assert.deepEqual(observation.promotion.origin,BADGE_RELIEF_ORIGIN);
+    assert.equal(observation.promotion.witness,'battle-clock-relief');assert.equal(hash(original.continuation.before),BADGE_RELIEF_ORIGIN.saveSha);
+    assert.deepEqual(original.promotion.previous.badges,[{id:'coolUnderFire',tier:'bronze',awardId:'west.1.shiloh.buell-attacks.1',feat:13}]);
+    assert.deepEqual(original.promotion.saved,brigade);assert.deepEqual(original.promotion.earned,{id:'coolUnderFire',tier:'silver',from:'bronze',feat:21,kept:true});
+    assert.equal(original.promotion.positionsAccepted,true);assert.deepEqual(original.native.award.brigades.find(b=>b.id===brigade.id)?.earned.find(b=>b.id==='coolUnderFire'),original.promotion.earned);
+    assert.equal(observation.cases[1].continuation.before,raw,'retained failed McFadden branch starts from this genuine Silver');
+    assert.equal(observation.promotion.achieved,false);assert.equal(observation.promotion.stopReason,'actual McFadden did not persist Silver-to-Gold');
+    return {origin:O,raw,brigadeId:brigade.id};
+  }
   assert.equal(exportSnapshot(save),raw);assert.equal(save.campaign.index,relief?6:4);assert.ok(brigade&&brigade.men===1327&&brigade.vet==='green'&&brigade.badges.some(b=>b.id==='coolUnderFire'&&b.tier==='bronze'));
   if(relief){
     admitBadgeReliefCheckpoint(raw);assert.equal(observation.revision,0);assert.equal(observation.promotion.achieved,false);assert.equal(observation.promotion.stopReason,'actual Round Forest did not persist a living Bronze-to-Silver candidate');
@@ -77,6 +87,18 @@ export async function acquireBadgePromotionSave({relief=false}={}){
     assert.ok(!original.initial.units.some(u=>u.id==='us-ammen-brigade'));assert.deepEqual(original.promotion.previous,original.promotion.saved);
   }else assert.ok(original.native.award.brigades.find(b=>b.id===brigade.id)?.earned.some(b=>b.id==='coolUnderFire'&&b.tier==='bronze'&&b.from===null));
   return {origin:O,raw,brigadeId:brigade.id};
+}
+
+/** Admit only the unchanged actual native Silver checkpoint, never a constructed tier fixture. */
+export function admitBadgeSilverCheckpoint(raw){
+  assert.equal(typeof raw,'string','badge observation: silver checkpoint raw');
+  assert.equal(Buffer.byteLength(raw),BADGE_SILVER_ORIGIN.saveBytes,'badge observation: silver checkpoint bytes');
+  assert.equal(createHash('sha256').update(raw).digest('hex'),BADGE_SILVER_ORIGIN.saveSha,'badge observation: silver checkpoint hash');
+  const save=parseSnapshot(raw),brigade=save.army.find(b=>b.unitId==='us-ammen-brigade');
+  assert.equal(exportSnapshot(save),raw,'badge observation: silver checkpoint canonical');assert.equal(save.campaign.index,7,'badge observation: silver checkpoint next phase');
+  assert.ok(brigade&&brigade.men===995&&brigade.vet==='green'&&brigade.weapon?.itemId==='m1842','badge observation: silver same living brigade');
+  assert.deepEqual(brigade.badges,[{id:'coolUnderFire',tier:'silver',awardId:'west.1.stones-river.round-forest.1',feat:21}],'badge observation: silver actual saved award');
+  return {raw,brigadeId:brigade.id};
 }
 
 
@@ -179,14 +201,15 @@ function restoreNativeBadgeContext(){
 }
 
 /** Six first-tactic observations, two fresh native contexts per explicitly selected Actions shard. */
-export async function nativeBadgeObservations({browser,url,check,result,watchErrors,shard,persist,missionaryOnly=false,revision=0,promotion=false,relief=false,openLine=false,clockRelief=false}){
+export async function nativeBadgeObservations({browser,url,check,result,watchErrors,shard,persist,missionaryOnly=false,revision=0,promotion=false,relief=false,openLine=false,clockRelief=false,forwardDefence=false}){
+  if(typeof forwardDefence!=='boolean'||forwardDefence&&(!relief||!promotion||openLine||clockRelief))throw Error('badge forward defence: isolated authorized Silver witness');
   if(typeof clockRelief!=='boolean'||clockRelief&&(!relief||!promotion||openLine))throw Error('badge clock relief: isolated authorized witness');
   if(typeof openLine!=='boolean'||openLine&&(!relief||!promotion))throw Error('badge open line: isolated authorized witness');
   if(typeof relief!=='boolean'||relief&&!promotion)throw Error('badge relief: isolated authorized promotion witness');
   if(promotion&&(shard!==1||revision!==0||missionaryOnly))throw Error('badge promotion: isolated sequential continuation');
   if(![0,1].includes(revision))throw Error('badge observations: exactly first tactic or one approved revision');
   if(missionaryOnly&&shard!==1)throw Error('badge observations: missionary repair is exactly shard1');
-  const cases=promotion?BADGE_PROMOTION_PHASES.filter(p=>!relief||['round-forest','mcfaddens-ford'].includes(p.phaseId)).map(p=>p.phaseId):missionaryOnly?['missionary-assault']:revision===1&&shard===1?['slaughter-fire']:[['slaughter-fire','missionary-assault'],['slaughter-defence','mcfadden-assault'],['slaughter-recovery','buell-capture']][shard-1];
+  const cases=forwardDefence?['mcfaddens-ford']:promotion?BADGE_PROMOTION_PHASES.filter(p=>!relief||['round-forest','mcfaddens-ford'].includes(p.phaseId)).map(p=>p.phaseId):missionaryOnly?['missionary-assault']:revision===1&&shard===1?['slaughter-fire']:[['slaughter-fire','missionary-assault'],['slaughter-defence','mcfadden-assault'],['slaughter-recovery','buell-capture']][shard-1];
   if(!cases)throw Error('badge observations: shard must be 1, 2 or 3');
   const output={kind:'actual first native tactics; constructed earlier Draw prefixes; numeric tiers are not separate saved upgrades',
     sourceSha:process.env.GITHUB_SHA,run:process.env.GITHUB_RUN_ID,shard,revision,cases:[],complete:false};
@@ -198,8 +221,9 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
     if(relief)output.kind='one additional authorized front-line relief witness from actual pre-Round checkpoint; original failed Round retained; earlier three Draw prefix records constructed';
     if(openLine)output.kind='authorized forward open-ground defensive witness from actual pre-Round checkpoint; both failed Round observations retained; earlier three Draw prefix records constructed';
     if(clockRelief)output.kind='authorized battle-clock relief witness from actual pre-Round checkpoint; preceding Round observations retained; earlier three Draw prefix records constructed';
-    output.promotion={achieved:false,stopReason:null,...(relief?{witness:clockRelief?'battle-clock-relief':openLine?'forward-open-line':'front-line-relief',checkpointBranch:'actual post-Slaughter; distinct from preserved failed post-Round'}:{})};await persist();
-    try{continuation=await acquireBadgePromotionSave({relief});output.promotion.origin=continuation.origin;await persist();}
+    if(forwardDefence)output.kind='authorized supported forward McFadden defence from actual saved Silver; original failed McFadden retained; earlier three Draw prefix records constructed';
+    output.promotion={achieved:false,stopReason:null,...(relief?{witness:forwardDefence?'supported-forward-defence':clockRelief?'battle-clock-relief':openLine?'forward-open-line':'front-line-relief',checkpointBranch:forwardDefence?'actual saved Round Silver; distinct from retained failed McFadden':'actual post-Slaughter; distinct from preserved failed post-Round'}:{})};await persist();
+    try{continuation=await acquireBadgePromotionSave({relief:relief&&!forwardDefence,silver:forwardDefence});output.promotion.origin=continuation.origin;await persist();}
     catch(error){output.promotion.acquisitionError=String(error?.message??error);await persist();throw error;}
   }
   for(const id of cases){
@@ -250,8 +274,8 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
       await page.waitForFunction(()=>window.__ready&&window.__game?.game&&document.getElementById('briefing')?.open,null,{timeout:180000,polling:250});
       }
       await page.locator('#briefing-begin').click();await page.waitForFunction(()=>window.__badgeStartGate?.first?.simTime===0&&window.__game.game.paused);
-      row.initial=await page.evaluate(async({id,revision,promotion,relief,openLine,clockRelief})=>{
-        const B=await import('./tools/observe-badges.mjs'),G=await import('./src/game.js'),g=window.__game.game,tactic=promotion?(relief?(clockRelief?B.badgeClockReliefTactic(g,id):openLine?B.badgeOpenLineTactic(g,id):B.badgeReliefTactic(g,id)):B.badgePromotionTactic(g,id)):B.badgeTactic(g,id,revision),crossings=B.createBadgeCrossings(),policy=B.createBadgeStages(tactic.plan,tactic.cadence,tactic.roster);
+      row.initial=await page.evaluate(async({id,revision,promotion,relief,openLine,clockRelief,forwardDefence})=>{
+        const B=await import('./tools/observe-badges.mjs'),G=await import('./src/game.js'),g=window.__game.game,tactic=promotion?(relief?(forwardDefence?B.badgeForwardDefenceTactic(g,id):clockRelief?B.badgeClockReliefTactic(g,id):openLine?B.badgeOpenLineTactic(g,id):B.badgeReliefTactic(g,id)):B.badgePromotionTactic(g,id)):B.badgeTactic(g,id,revision),crossings=B.createBadgeCrossings(),policy=B.createBadgeStages(tactic.plan,tactic.cadence,tactic.roster);
         if(G.difficultyOf(g)!=='veteran')throw Error('badge observations: actual difficulty drift');
         const beforeTick={native:g.tick,descriptor:Object.getOwnPropertyDescriptor(g,'tick')},methods=['volleyAt','chargeFeat','routFeat','moraleStep'].map(name=>({name,native:g.combat[name],descriptor:Object.getOwnPropertyDescriptor(g.combat,name)}));
         const owner={tactic,crossings,policy,beforeTick,methods,combat:null,tick:null,samples:0,lastTime:null,initialTime:null,largestDelta:0,fullReports:true};window.__badgeObservation=owner;
@@ -267,7 +291,7 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
           ...(promotion?{deployment:{units:g.scenario.units,reinforcements:g.scenario.reinforcements||[]},
             live:g.units.map(u=>({id:u.id,side:u.side,type:u.type,men:u.men,menMax:u.menMax,guns:u.guns,xp:u.xp,weapon:u.weapon,equipment:u.equipment??null,
               def:u.def,moraleMax:u.moraleMax,fatigue:u.fatigue,ammo:u.ammo}))}:{})};
-      },{id,revision,promotion,relief,openLine,clockRelief});
+      },{id,revision,promotion,relief,openLine,clockRelief,forwardDefence});
       const seeds={'dawn-on-the-right':18621231,'slaughter-pen':18621232,'round-forest':18621233,'mcfaddens-ford':18630102,'slaughter-fire':18621232,'slaughter-defence':18621232,'slaughter-recovery':18621232,'mcfadden-assault':18630102,'missionary-assault':18631125,'buell-capture':18620409};
       if(row.initial.tactic.revision!==revision||row.initial.seed!==seeds[id]||!Number.isFinite(row.initial.horizon)||row.initial.horizon<=0)throw Error('badge observations: authored seed/horizon/revision drift');
       if(promotion){
@@ -371,7 +395,7 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
     }
     if(promotion){
       if(!row.complete)break;
-      if(relief){const {badgeReliefPositions,badgeClockReliefPositions}=await import('./observe-badges.mjs');row.promotion.positionsAccepted=(clockRelief?badgeClockReliefPositions:badgeReliefPositions)(row.initial.tactic,row.native.stages);if(!row.promotion.positionsAccepted){output.promotion.stopReason='actual relief positioning refused or expired';break;}}
+      if(relief){const {badgeReliefPositions,badgeClockReliefPositions,badgeForwardDefencePositions}=await import('./observe-badges.mjs');row.promotion.positionsAccepted=(forwardDefence?badgeForwardDefencePositions:clockRelief?badgeClockReliefPositions:badgeReliefPositions)(row.initial.tactic,row.native.stages);if(!row.promotion.positionsAccepted){output.promotion.stopReason='actual relief positioning refused or expired';break;}}
       if(id==='round-forest'){
         const e=row.promotion.earned,kept=row.promotion.saved.badges?.find(b=>b.id==='coolUnderFire');
         if(e?.from!=='bronze'||e?.tier!=='silver'||kept?.tier!=='silver'||row.promotion.saved.men<=0){output.promotion.stopReason='actual Round Forest did not persist a living Bronze-to-Silver candidate';break;}
@@ -383,8 +407,8 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
       }
     }
   }
-  const {badgeObservationComplete,badgeReliefComplete}=await import('./observe-badges.mjs');
-  output.complete=relief?badgeReliefComplete(output.cases,output.promotion):promotion?output.cases.every(r=>r.complete)&&((output.cases.length===3&&output.promotion.stopReason==='actual Round Forest did not persist a living Bronze-to-Silver candidate')||output.cases.length===4):badgeObservationComplete(cases,output.cases);await persist();
+  const {badgeObservationComplete,badgeReliefComplete,badgeForwardDefenceComplete}=await import('./observe-badges.mjs');
+  output.complete=forwardDefence?badgeForwardDefenceComplete(output.cases,output.promotion):relief?badgeReliefComplete(output.cases,output.promotion):promotion?output.cases.every(r=>r.complete)&&((output.cases.length===3&&output.promotion.stopReason==='actual Round Forest did not persist a living Bronze-to-Silver candidate')||output.cases.length===4):badgeObservationComplete(cases,output.cases);await persist();
   if(promotion)check('badge-promotion-observation-complete',output.complete,JSON.stringify(output.promotion));
 }
 

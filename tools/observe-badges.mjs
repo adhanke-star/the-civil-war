@@ -73,6 +73,45 @@ export function validateBadgeReliefOrigin(o){
   return true;
 }
 
+// Actual clock-relief Round Forest save, before its retained unsuccessful McFadden branch.
+export const BADGE_SILVER_ORIGIN=Object.freeze({run:38402398738,sha:'f4f1d8020f7043cab3c7b1f7ceebfd4f4c248443',artifact:11816247710,name:'badge-observations-1',zipBytes:537868,zipSha:'134f7bd2f678ee02dd06e14e98230142b7cae83dd32d96a173c2897cbb7121ef',saveBytes:44066,saveSha:'aa45821a556f8371b0facfae9fd3e9585412a52cd21ef808f668d8dbb753f60b'});
+export function validateBadgeSilverOrigin(o){
+  if(!plain(o,Object.keys(BADGE_SILVER_ORIGIN))||Object.keys(o).length!==Object.keys(BADGE_SILVER_ORIGIN).length||Object.keys(BADGE_SILVER_ORIGIN).some(k=>o[k]!==BADGE_SILVER_ORIGIN[k]))fail('silver exact completed source/checkpoint origin');
+  return true;
+}
+
+/** One distinct McFadden defence from the genuinely saved Silver brigade. */
+export function badgeForwardDefenceTactic(game,phaseId){
+  const s=game?.scenario;
+  if(phaseId!=='mcfaddens-ford'||game.simTime!==0||game.playerSide!=='US'||s?.id!=='stones-river-mcfaddens-ford'||s.start!=='16:00'||s.clockRatio!==3.5)fail('forward defence authored initial phase/time/side/clock');
+  const actor='us-ammen-brigade',points=[[actor,[2100,-1080]],['us-fyffe-brigade',[2300,-1210]],['us-boyle-brigade',[1900,-1210]]],
+    arrivals=[['us-estep-battery',258,288],['us-board-of-trade-battery',258,288],['us-standart-battery',258,288],['us-miller-brigade',515,545],['us-stanley-brigade',515,545]],
+    roster=[...new Set([...s.units,...(s.reinforcements||[])].map(u=>u.id))];
+  if(points.some(([id])=>!s.units.some(u=>u.id===id&&u.side==='US'))||arrivals.some(([id])=>!roster.includes(id)))fail('forward defence required initial/reinforcement actor unavailable');
+  const plan=[],success=id=>({id,require:'success'}),add=(id,type,unitId,{end,start=0,after=[],condition=[],...extra})=>plan.push({id,notBefore:start,expires:end,after,condition:[{kind:'actor-orderable'},...condition],command:{type,unitId,...extra}});
+  for(const [id,point]of points){
+    const move=id===actor?'ammen-position':'support-position-'+id,hold=id===actor?'ammen-hold':'support-hold-'+id;
+    add(move,'move',id,{end:1,path:{kind:'actor-to-point',point}});
+    add(hold,'hold',id,{start:1,end:240,after:[success(move)],condition:[{kind:'arrived',point,radius:25}]});
+  }
+  for(const u of s.units.filter(u=>u.side==='US'&&!points.some(([id])=>id===u.id)))add('hold-'+u.id,'hold',u.id,{end:1});
+  for(const [id,start,end]of arrivals)add('arrival-'+id,'hold',id,{start,end});
+  add('ammen-withdraw','fallback',actor,{end:950,after:[success('ammen-position')],condition:[{kind:'pressure',moraleMax:45}]});
+  add('ammen-recover','hold',actor,{end:1000,after:[success('ammen-withdraw')],condition:[{kind:'recovery',moraleMin:55,requirePriorRouting:false},{kind:'separated',minDistance:220}]});
+  if(plan.length!==24)fail('forward defence stage count');createBadgeStages(plan,1,roster);
+  return {kind:'authorized supported forward McFadden defence; genuine saved Gold unproved',recipe:{id:'forward-defence-mcfaddens-ford',packId:'stones-river',phaseId},revision:0,plan,cadence:1,roster};
+}
+export function badgeForwardDefencePositions(tactic,receipt){
+  if(tactic?.recipe?.id!=='forward-defence-mcfaddens-ford'||!dense(tactic.plan)||tactic.plan.length!==24||!dense(receipt?.stages)||receipt.failure||receipt.cadence!==1)return false;
+  const points=[['ammen-position','ammen-hold',[2100,-1080]],['support-position-us-fyffe-brigade','support-hold-us-fyffe-brigade',[2300,-1210]],['support-position-us-boyle-brigade','support-hold-us-boyle-brigade',[1900,-1210]]];
+  return points.every(([move,hold,point])=>JSON.stringify(tactic.plan.find(r=>r.id===move)?.command.path?.point)===JSON.stringify(point)
+    &&acceptedBadgeStages(tactic,receipt,[move,hold]));
+}
+export function badgeForwardDefenceComplete(rows,promotion){
+  if(!dense(rows)||rows.length!==1||rows[0]?.id!=='mcfaddens-ford'||rows[0].complete!==true)return false;
+  return promotion?.achieved===true&&promotion.stopReason===null||promotion?.achieved===false&&['actual relief positioning refused or expired','actual McFadden did not persist Silver-to-Gold'].includes(promotion?.stopReason);
+}
+
 /** One separately authorized relief witness; no replay, repeated assault or counter-triggered action. */
 export function badgeReliefTactic(game,phaseId){
   if(!['round-forest','mcfaddens-ford'].includes(phaseId)||game.simTime!==0||game.playerSide!=='US'||game.scenario?.id!=='stones-river-'+phaseId)fail('relief initial phase/time/side');
@@ -324,6 +363,7 @@ export function badgeObservationSelection(args){
   if(args.length===1&&args[0]==='--badge-promotion-relief')return {mode:'promotion-relief',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion-open-line')return {mode:'promotion-open-line',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion-clock-relief')return {mode:'promotion-clock-relief',shard:1};
+  if(args.length===1&&args[0]==='--badge-promotion-forward-defence')return {mode:'promotion-forward-defence',shard:1};
   const shards=args.filter(a=>/^--badge-shard=[123]$/.test(a));
   if(args.length===2&&args.includes('--badge-observations')&&shards.length===1)return {mode:'observations',shard:Number(shards[0].slice(-1))};
   if(args.length===2&&args.includes('--badge-revisions')&&shards.length===1)return {mode:'revisions',shard:Number(shards[0].slice(-1))};
