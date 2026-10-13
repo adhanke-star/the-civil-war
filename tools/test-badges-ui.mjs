@@ -12,12 +12,67 @@
 //    row and plays the full X-Factor moment once, without taking focus or blocking a click.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {createRequire} from 'node:module';
 import { AxeBuilder } from '@axe-core/playwright';
 import { probeProgress, seedProgress } from './test-progress-browser.mjs';
 import * as campaign from '../src/franchise/campaign.js';
 import * as badges from '../src/franchise/badges.js';
 import { validateSnapshot,parseSnapshot,exportSnapshot } from '../src/franchise/save.js';
 import {installSceneStartGate} from './bake/inactive-figures.mjs';
+import {BADGE_PROMOTION_PHASES} from './observe-badges.mjs';
+import {validateDeck,cardsFor,chooseDecision} from '../src/franchise/decisions.js';
+import {breakCamp} from '../src/franchise/camp-orders.js';
+import {prepareFieldScenario} from '../src/sim/phase.js';
+import {equipmentProfile} from '../src/sim/equipment.js';
+
+/** Bind complete actual definitions AND initialized actors before any native simulation step. */
+export function validatePromotionDeployment(deployed,initial){
+  assert.deepEqual(initial.deployment,deployed,'actual initial and scheduled complete saved deployment');
+  assert.deepEqual(initial.live.map(u=>u.id),deployed.units.map(d=>d.id),'actual initial live roster');
+  for(const [i,u]of initial.live.entries()){
+    const d=deployed.units[i],type=d.type||'infantry';assert.deepEqual(u.def,d,'actual full live definition including badges and camp effects');
+    assert.deepEqual([u.side,u.type,u.men,u.menMax,u.guns,u.xp,u.equipment,u.moraleMax,u.fatigue,u.ammo],
+      [d.side,type,d.men,d.men,d.guns||0,d.xp||1,d.equipment?equipmentProfile(d.equipment,type).item:null,d.morale??78,d.fatigue??0,d.ammo??100],'actual initial native strengths, equipment, veterancy and ready effects');
+    if(d.weapon)assert.equal(u.weapon,d.weapon,'actual native carried weapon');
+  }
+  return true;
+}
+
+/** Original Buell award, despite the retained failed Missionary sibling in this same run. */
+export async function acquireBadgePromotionSave(){
+  const O={run:38354836201,sha:'b3e45c5d38f831a4ab7b1f72cfd50754010ff986',artifact:11792497141,name:'badge-observations-3',zipBytes:372145,
+    zipSha:'7ca059d0720fd527da564e375f11457307bd6554e844e952840b786e9ea6f762',saveBytes:14519,saveSha:'e88bcfb43b002860b3af15b39a7bdcdaa00f004b7528d1d3659116d1db8a7503'};
+  const api=async p=>{
+    if(!process.env.GH_TOKEN)return execFileSync('gh',['api','repos/adhanke-star/the-civil-war'+p],{maxBuffer:99000000});
+    const response=await fetch('https://api.github.com/repos/adhanke-star/the-civil-war'+p,{headers:{Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(120000)});
+    if(!response.ok)throw Error('badge promotion original HTTP '+response.status);
+    const chunks=[];let n=0;for await(const c of response.body){n+=c.length;if(n>=99000000)throw Error('badge promotion original RAM bound');chunks.push(Buffer.from(c));}return Buffer.concat(chunks);
+  };
+  const run=JSON.parse(await api('/actions/runs/'+O.run)),artifact=JSON.parse(await api('/actions/artifacts/'+O.artifact));
+  assert.deepEqual([run.id,run.status,run.conclusion,run.head_sha,run.path],[O.run,'completed','failure',O.sha,'.github/workflows/pack-figures.yml']);
+  assert.deepEqual([artifact.id,artifact.expired,artifact.workflow_run.id,artifact.workflow_run.head_sha,artifact.name,artifact.size_in_bytes,artifact.digest],[O.artifact,false,O.run,O.sha,O.name,O.zipBytes,'sha256:'+O.zipSha]);
+  const bytes=await api('/actions/artifacts/'+O.artifact+'/zip'),hash=b=>createHash('sha256').update(b).digest('hex');assert.equal(bytes.length,O.zipBytes);assert.equal(hash(bytes),O.zipSha);
+  const {yauzl}=createRequire(import.meta.url)(new URL('../node_modules/playwright-core/lib/utilsBundle.js',import.meta.url).pathname),members=new Map();let total=0;
+  await new Promise((resolve,reject)=>yauzl.fromBuffer(bytes,{lazyEntries:true},(error,zip)=>{
+    if(error)return reject(error);zip.on('error',reject);zip.on('end',resolve);zip.on('entry',e=>{
+      if(!['badge-observations.json','last-result.json'].includes(e.fileName)){zip.readEntry();return;}
+      if(members.has(e.fileName)||e.uncompressedSize>=99000000||(total+=e.uncompressedSize)>=99000000)return reject(Error('badge promotion original duplicate/member/total bound'));
+      members.set(e.fileName,null);zip.openReadStream(e,(err,stream)=>{if(err)return reject(err);const chunks=[];let n=0;stream.on('error',reject);stream.on('data',c=>{n+=c.length;if(n>e.uncompressedSize){stream.destroy(Error('badge promotion expansion'));return;}chunks.push(c);});stream.on('end',()=>{try{if(n!==e.uncompressedSize)throw Error('badge promotion original member length');members.set(e.fileName,JSON.parse(Buffer.concat(chunks)));zip.readEntry();}catch(error){reject(error);}});});
+    });zip.readEntry();
+  }));
+  assert.equal(members.size,2);const a=members.get('badge-observations.json'),b=members.get('last-result.json');assert.deepEqual(a.badgeObservations,b.badgeObservations);
+  const observation=a.badgeObservations;assert.deepEqual([observation.sourceSha,String(observation.run),observation.shard,observation.complete],[O.sha,String(O.run),3,true]);
+  assert.deepEqual(observation.cases.map(c=>c.id),['slaughter-recovery','buell-capture']);
+  for(const c of observation.cases)assert.ok(c.complete&&!c.primary&&!c.errors.length&&c.nativeCleanup.ok&&c.outerCleanup.ok&&c.contextClosed&&c.importContextClosed);
+  const original=observation.cases[1],raw=original.saved.raw;assert.equal(Buffer.byteLength(raw),O.saveBytes);assert.equal(hash(raw),O.saveSha);
+  assert.equal(raw,original.saved.exported);assert.equal(raw,original.saved.duplicateRaw);assert.equal(raw,original.reload.raw);assert.equal(raw,original.imported.raw);
+  const save=parseSnapshot(raw),brigade=save.army.find(b=>b.unitId==='us-ammen-brigade');
+  assert.equal(exportSnapshot(save),raw);assert.equal(save.campaign.index,4);assert.ok(brigade&&brigade.men===1327&&brigade.vet==='green'&&brigade.badges.some(b=>b.id==='coolUnderFire'&&b.tier==='bronze'));
+  assert.ok(original.native.award.brigades.find(b=>b.id===brigade.id)?.earned.some(b=>b.id==='coolUnderFire'&&b.tier==='bronze'&&b.from===null));
+  return {origin:O,raw,brigadeId:brigade.id};
+}
 
 /** Actual native prerequisite only; this short context does not substantiate badge attainability. */
 export async function nativeBadgeObserverControls({browser,url,check,result,watchErrors}){
@@ -105,14 +160,22 @@ function restoreNativeBadgeContext(){
 }
 
 /** Six first-tactic observations, two fresh native contexts per explicitly selected Actions shard. */
-export async function nativeBadgeObservations({browser,url,check,result,watchErrors,shard,persist,missionaryOnly=false,revision=0}){
+export async function nativeBadgeObservations({browser,url,check,result,watchErrors,shard,persist,missionaryOnly=false,revision=0,promotion=false}){
+  if(promotion&&(shard!==1||revision!==0||missionaryOnly))throw Error('badge promotion: isolated sequential continuation');
   if(![0,1].includes(revision)||missionaryOnly&&revision!==0)throw Error('badge observations: exactly first tactic or one approved revision');
   if(missionaryOnly&&shard!==1)throw Error('badge observations: missionary repair is exactly shard1');
-  const cases=missionaryOnly?['missionary-assault']:revision===1&&shard===1?['slaughter-fire']:[['slaughter-fire','missionary-assault'],['slaughter-defence','mcfadden-assault'],['slaughter-recovery','buell-capture']][shard-1];
+  const cases=promotion?BADGE_PROMOTION_PHASES.map(p=>p.phaseId):missionaryOnly?['missionary-assault']:revision===1&&shard===1?['slaughter-fire']:[['slaughter-fire','missionary-assault'],['slaughter-defence','mcfadden-assault'],['slaughter-recovery','buell-capture']][shard-1];
   if(!cases)throw Error('badge observations: shard must be 1, 2 or 3');
   const output={kind:'actual first native tactics; constructed earlier Draw prefixes; numeric tiers are not separate saved upgrades',
     sourceSha:process.env.GITHUB_SHA,run:process.env.GITHUB_RUN_ID,shard,revision,cases:[],complete:false};
   if(revision===1)output.kind='actual single approved legal tactic revision; original five successful observations retained; constructed prefixes';result.badgeObservations=output;
+  let continuation;
+  if(promotion){
+    output.kind='actual Buell Bronze save continued through ordinary Camp, decisions and native battles; its earlier three Draw prefix records were constructed';
+    output.promotion={achieved:false,stopReason:null};await persist();
+    try{continuation=await acquireBadgePromotionSave();output.promotion.origin=continuation.origin;await persist();}
+    catch(error){output.promotion.acquisitionError=String(error?.message??error);await persist();throw error;}
+  }
   for(const id of cases){
     const row={id,complete:false,errors:[],primary:null,cleanup:[],contextClosed:false};output.cases.push(row);
     await persist(); // retain a pending second case without losing the already completed first case
@@ -120,6 +183,37 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
     try{
       ctx=await browser.newContext({viewport:{width:1024,height:768},reducedMotion:'reduce'});page=await ctx.newPage();watchErrors(page,url,row.errors);
       await page.goto(url+'?nosw');await page.waitForFunction(()=>window.__entry&&!window.__entry.importing,null,{timeout:60000});
+      if(promotion){
+        const spec=BADGE_PROMOTION_PHASES.find(p=>p.phaseId===id),before=parseSnapshot(continuation.raw),phase=campaign.campaignPhase(before,JSON.parse(fs.readFileSync(new URL('../assets/campaign.json',import.meta.url))));
+        assert.deepEqual([before.campaign.index,phase.packId,phase.phaseId],[spec.index,'stones-river',id]);
+        row.continuation={before:continuation.raw,brigadeId:continuation.brigadeId,choices:[]};
+        await page.evaluate(async raw=>{const S=await import('./src/franchise/save.js'),store=S.createProgressStore(undefined,{slot:1});if(await store.readRawBaseline()!==null)throw Error('badge promotion: context not fresh');await store.import(raw,{previousRaw:null});},continuation.raw);
+        await page.goto(url+'?camp&slot=1&nosw');await page.waitForFunction(()=>window.__entry?.saved&&!window.__entry.importing,null,{timeout:60000});
+        const deck=validateDeck(JSON.parse(fs.readFileSync(new URL('../assets/decisions.json',import.meta.url)))),definition=JSON.parse(fs.readFileSync(new URL('../assets/campaign.json',import.meta.url))),pack=JSON.parse(fs.readFileSync(new URL('../assets/packs/stones-river.json',import.meta.url)));
+        assert.deepEqual(cardsFor(deck,phase).map(c=>c.id),spec.choices.map(c=>c[0]));
+        await ctx.addInitScript(source=>{window.__badgeNativeRAF={native:window.requestAnimationFrame,descriptor:Object.getOwnPropertyDescriptor(window,'requestAnimationFrame')};window.__badgeStartGate=(0,eval)('('+source+')')();},installSceneStartGate.toString());
+        let expected=before;await page.locator('#camp-next').click();
+        for(const [cardId,optionId]of spec.choices){
+          const card=cardsFor(deck,phase).find(c=>c.id===cardId);
+          await page.waitForFunction(()=>document.getElementById('camp-decision')?.open&&!document.getElementById('camp-decision-choose').hidden);
+          assert.equal(await page.locator('#camp-decision-heading').textContent(),card.title);
+          await page.locator('#camp-decision-options input[value="'+optionId+'"]').check();await page.locator('#camp-decision-choose').click();
+          await page.waitForFunction(()=>!document.getElementById('camp-decision-continue').hidden);
+          expected=chooseDecision(expected,{campaign:definition,deck,cardId,optionId});
+          const raw=await page.evaluate(async()=>{const S=await import('./src/franchise/save.js');return await S.createProgressStore(undefined,{slot:1}).readRawBaseline();});
+          assert.equal(raw,exportSnapshot(expected),'actual normal decision whole save');row.continuation.choices.push({cardId,optionId,raw});await persist();
+          await page.locator('#camp-decision-continue').click();
+        }
+        await page.waitForFunction(()=>window.__ready&&window.__game?.game&&document.getElementById('briefing')?.open,null,{timeout:180000,polling:250});
+        const authored=pack.phases.find(p=>p.id===id).scenario,fielded=[...authored.units,...(authored.reinforcements||[])].filter(u=>u.side==='US').map(u=>u.id);
+        expected=breakCamp(expected,{campaign:definition,fielded});
+        const raw=await page.evaluate(async()=>{const S=await import('./src/franchise/save.js');return await S.createProgressStore(undefined,{slot:1}).readRawBaseline();});
+        assert.equal(raw,exportSnapshot(expected),'actual normal Camp departure whole save');
+        row.prefix={raw,index:expected.campaign.index,phase:campaign.campaignPhase(expected,definition)};
+        const deployed=prepareFieldScenario(campaign.applyCampaign(authored,expected,row.prefix.phase),'pack');
+        row.continuation.ready=raw;row.continuation.expectedDeployment={units:deployed.units,reinforcements:deployed.reinforcements||[]};
+        row.continuation.unavailable=fielded.filter(id=>![...deployed.units,...(deployed.reinforcements||[])].some(u=>u.id===id));
+      }else{
       row.prefix=await page.evaluate(async id=>{
         const B=await import('./tools/observe-badges.mjs'),S=await import('./src/franchise/save.js'),campaign=await(await fetch('./assets/campaign.json')).json();
         const p=B.badgePrefix(campaign,id),store=S.createProgressStore(undefined,{slot:1});await store.complete(p.save);
@@ -128,9 +222,10 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
       await ctx.addInitScript(source=>{window.__badgeNativeRAF={native:window.requestAnimationFrame,descriptor:Object.getOwnPropertyDescriptor(window,'requestAnimationFrame')};window.__badgeStartGate=(0,eval)('('+source+')')();},installSceneStartGate.toString());
       await page.goto(url+'?campaign=1&quality=low&nosw');
       await page.waitForFunction(()=>window.__ready&&window.__game?.game&&document.getElementById('briefing')?.open,null,{timeout:180000,polling:250});
+      }
       await page.locator('#briefing-begin').click();await page.waitForFunction(()=>window.__badgeStartGate?.first?.simTime===0&&window.__game.game.paused);
-      row.initial=await page.evaluate(async({id,revision})=>{
-        const B=await import('./tools/observe-badges.mjs'),G=await import('./src/game.js'),g=window.__game.game,tactic=B.badgeTactic(g,id,revision),crossings=B.createBadgeCrossings(),policy=B.createBadgeStages(tactic.plan,tactic.cadence,tactic.roster);
+      row.initial=await page.evaluate(async({id,revision,promotion})=>{
+        const B=await import('./tools/observe-badges.mjs'),G=await import('./src/game.js'),g=window.__game.game,tactic=promotion?B.badgePromotionTactic(g,id):B.badgeTactic(g,id,revision),crossings=B.createBadgeCrossings(),policy=B.createBadgeStages(tactic.plan,tactic.cadence,tactic.roster);
         if(G.difficultyOf(g)!=='veteran')throw Error('badge observations: actual difficulty drift');
         const beforeTick={native:g.tick,descriptor:Object.getOwnPropertyDescriptor(g,'tick')},methods=['volleyAt','chargeFeat','routFeat','moraleStep'].map(name=>({name,native:g.combat[name],descriptor:Object.getOwnPropertyDescriptor(g.combat,name)}));
         const owner={tactic,crossings,policy,beforeTick,methods,combat:null,tick:null,samples:0,lastTime:null,initialTime:null,largestDelta:0,fullReports:true};window.__badgeObservation=owner;
@@ -142,10 +237,16 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
           owner.samples++;owner.lastTime=at;crossings.sample(at,feats);policy.advance(g);
         }});
         return {tactic,seed:g.scenario.seed,horizon:(g.clockEnd-g.clockStart)/g.clockRatio,difficulty:G.difficultyOf(g),
-          units:g.units.map(u=>({id:u.id,side:u.side,men:u.men,menStart:u.menMax,equipment:u.equipment,position:[u.x,u.z]}))};
-      },{id,revision});
-      const seeds={'slaughter-fire':18621232,'slaughter-defence':18621232,'slaughter-recovery':18621232,'mcfadden-assault':18630102,'missionary-assault':18631125,'buell-capture':18620409};
+          units:g.units.map(u=>({id:u.id,side:u.side,men:u.men,menStart:u.menMax,equipment:u.equipment,position:[u.x,u.z]})),
+          ...(promotion?{deployment:{units:g.scenario.units,reinforcements:g.scenario.reinforcements||[]},
+            live:g.units.map(u=>({id:u.id,side:u.side,type:u.type,men:u.men,menMax:u.menMax,guns:u.guns,xp:u.xp,weapon:u.weapon,equipment:u.equipment??null,
+              def:u.def,moraleMax:u.moraleMax,fatigue:u.fatigue,ammo:u.ammo}))}:{})};
+      },{id,revision,promotion});
+      const seeds={'dawn-on-the-right':18621231,'slaughter-pen':18621232,'round-forest':18621233,'mcfaddens-ford':18630102,'slaughter-fire':18621232,'slaughter-defence':18621232,'slaughter-recovery':18621232,'mcfadden-assault':18630102,'missionary-assault':18631125,'buell-capture':18620409};
       if(row.initial.tactic.revision!==revision||row.initial.seed!==seeds[id]||!Number.isFinite(row.initial.horizon)||row.initial.horizon<=0)throw Error('badge observations: authored seed/horizon/revision drift');
+      if(promotion){
+        validatePromotionDeployment(row.continuation.expectedDeployment,row.initial);
+      }
       const began=Date.now();row.progress=[];
       for(let chunk=0;chunk<Math.ceil(row.initial.horizon/20)+120;chunk++){
         if(Date.now()-began>15*60*1000)throw Error('badge observations: natural completion wall budget exhausted; no result forced');
@@ -221,6 +322,16 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
       await ip.goto(url+'?nosw');await ip.waitForFunction(()=>window.__entry&&!window.__entry.importing);
       row.imported=await ip.evaluate(async raw=>{const S=await import('./src/franchise/save.js'),store=S.createProgressStore(undefined,{slot:1}),previousRaw=await store.readRawBaseline();if(previousRaw!==null)throw Error('badge observations: fresh import context not empty');await store.import(raw,{previousRaw});return {raw:await store.readRawBaseline()};},row.saved.exported);
       if(row.imported.raw!==row.saved.raw)throw Error('badge observations: fresh import byte drift');
+      if(promotion){
+        const previous=parseSnapshot(row.prefix.raw).army.find(b=>b.id===continuation.brigadeId),saved=parseSnapshot(row.saved.raw).army.find(b=>b.id===continuation.brigadeId);
+        assert.ok(previous&&saved&&saved.unitId==='us-ammen-brigade','promotion same actual brigade lineage');
+        row.promotion={previous, saved,earned:row.native.award?.brigades.find(b=>b.id===continuation.brigadeId)?.earned.find(b=>b.id==='coolUnderFire')??null};
+        if(['dawn-on-the-right','slaughter-pen'].includes(id)){
+          assert.ok(!row.initial.units.some(u=>u.id==='us-ammen-brigade'),'absent lineage not deployed');
+          assert.deepEqual([saved.men,saved.weapon,saved.badges],[previous.men,previous.weapon,previous.badges],'absent brigade strength/gear/kept badge preserved');
+        }
+        continuation.raw=row.saved.raw;
+      }
       row.complete=true;
     }catch(error){row.primary=String(error?.message??error);}
     finally{
@@ -232,9 +343,22 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
       check('badge-observation-'+id,row.complete,JSON.stringify({primary:row.primary,naturalOver:row.native?.over,at:row.native?.simTime,errors:row.errors,cleanup:row.cleanup,contextClosed:row.contextClosed}));
       await persist();
     }
+    if(promotion){
+      if(!row.complete)break;
+      if(id==='round-forest'){
+        const e=row.promotion.earned,kept=row.promotion.saved.badges?.find(b=>b.id==='coolUnderFire');
+        if(e?.from!=='bronze'||e?.tier!=='silver'||kept?.tier!=='silver'||row.promotion.saved.men<=0){output.promotion.stopReason='actual Round Forest did not persist a living Bronze-to-Silver candidate';break;}
+      }
+      if(id==='mcfaddens-ford'){
+        const e=row.promotion.earned,kept=row.promotion.saved.badges?.find(b=>b.id==='coolUnderFire');
+        output.promotion.achieved=e?.from==='silver'&&e?.tier==='gold'&&kept?.tier==='gold';
+        if(!output.promotion.achieved)output.promotion.stopReason='actual McFadden did not persist Silver-to-Gold';
+      }
+    }
   }
   const {badgeObservationComplete}=await import('./observe-badges.mjs');
-  output.complete=badgeObservationComplete(cases,output.cases);await persist();
+  output.complete=promotion?output.cases.every(r=>r.complete)&&((output.cases.length===3&&output.promotion.stopReason==='actual Round Forest did not persist a living Bronze-to-Silver candidate')||output.cases.length===4):badgeObservationComplete(cases,output.cases);await persist();
+  if(promotion)check('badge-promotion-observation-complete',output.complete,JSON.stringify(output.promotion));
 }
 
 const HH = JSON.parse(fs.readFileSync(new URL('../assets/scenarios/henry-hill.json', import.meta.url)));

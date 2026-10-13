@@ -35,6 +35,36 @@ export function advanceBadgeChunk(game){
   for(let step=0;step<400&&!game.over&&!game.paused;step++)game.fastForward(.05);
 }
 
+export const BADGE_PROMOTION_PHASES=Object.freeze([
+  ['dawn-on-the-right',4,[['sr1-refuse','stand'],['sr1-rally','pike']]],
+  ['slaughter-pen',5,[['sr2-guns','forward'],['sr2-ammunition','withdraw']]],
+  ['round-forest',6,[['sr3-embankment','embankment'],['sr3-batteries','cycle']]],
+  ['mcfaddens-ford',7,[]],
+].map(([phaseId,index,choices])=>Object.freeze({phaseId,index,choices:Object.freeze(choices.map(c=>Object.freeze(c)))})));
+
+/** Ordinary defence of the existing line. Survival triggers read native morale/contact, never badge counters. */
+export function badgePromotionTactic(game,phaseId){
+  const spec=BADGE_PROMOTION_PHASES.find(p=>p.phaseId===phaseId),s=game.scenario;
+  if(!spec||game.simTime!==0||game.playerSide!=='US'||s?.id!=='stones-river-'+phaseId)fail('promotion initial phase/time/side');
+  const roster=[...new Set([...s.units,...(s.reinforcements||[])].map(u=>u.id))],plan=[],actor='us-ammen-brigade';
+  const success=id=>({id,require:'success'}),add=(id,type,unitId,{end,start=0,after=[],condition=[],...extra})=>plan.push({id,notBefore:start,expires:end,after,condition:[{kind:'actor-orderable'},...condition],command:{type,unitId,...extra}});
+  for(const u of s.units.filter(u=>u.side==='US'&&(phaseId==='dawn-on-the-right'||u.id!==actor)))add('hold-'+u.id,'hold',u.id,{end:1});
+  if(phaseId==='slaughter-pen'){
+    for(const id of ['us-shepherd-brigade','us-j-beatty-brigade','us-terrill-battery'])if(roster.includes(id))add('arrival-'+id,'hold',id,{start:450,end:480});
+  }else if(phaseId!=='dawn-on-the-right'){
+    if(!roster.includes(actor))fail('promotion candidate unavailable');
+    const point=phaseId==='round-forest'?[910,-330]:[2180,-1200];
+    add('ammen-position','move',actor,{end:180,path:{kind:'actor-to-point',point}});
+    add('ammen-hold','hold',actor,{end:240,after:[success('ammen-position')],condition:[{kind:'arrived',point,radius:20}]});
+    add('ammen-withdraw','fallback',actor,{end:950,after:[success('ammen-hold')],condition:[{kind:'pressure',moraleMax:35}]});
+    add('ammen-recover','hold',actor,{end:phaseId==='round-forest'?1050:1000,after:[success('ammen-withdraw')],condition:[{kind:'recovery',moraleMin:55,requirePriorRouting:false},{kind:'separated',minDistance:220}]});
+    const arrivals=phaseId==='round-forest'?[['us-bruce-brigade',328,358]]:[['us-estep-battery',258,288],['us-board-of-trade-battery',258,288],['us-standart-battery',258,288],['us-miller-brigade',515,545],['us-stanley-brigade',515,545]];
+    for(const[id,start,end]of arrivals)if(roster.includes(id))add('arrival-'+id,'hold',id,{start,end});
+  }
+  createBadgeStages(plan,1,roster);
+  return {kind:'ordinary defensive continuation; genuine Silver/Gold unproved',recipe:{id:'promotion-'+phaseId,packId:'stones-river',phaseId},revision:0,plan,cadence:1,roster};
+}
+
 /** Exact authorized Draw/null/empty prefix. All income/joins/cards are kept, never spent or equipped. */
 export function badgePrefix(campaign,observation,{slot=1,seed=1861,at='2026-10-12T12:00:00Z'}={}){
   const def=validateCampaign(campaign),recipe=BADGE_OBSERVATIONS.find(r=>r.id===observation);
@@ -176,6 +206,7 @@ export function badgeObservationSelection(args){
   if(args.length===1&&args[0]==='--badge-observer')return {mode:'prerequisite',shard:null};
   if(args.length===1&&args[0]==='--badge-level10')return {mode:'level10',shard:null};
   if(args.length===1&&args[0]==='--badge-missionary')return {mode:'missionary',shard:1};
+  if(args.length===1&&args[0]==='--badge-promotion')return {mode:'promotion',shard:1};
   const shards=args.filter(a=>/^--badge-shard=[123]$/.test(a));
   if(args.length===2&&args.includes('--badge-observations')&&shards.length===1)return {mode:'observations',shard:Number(shards[0].slice(-1))};
   if(args.length===2&&args.includes('--badge-revisions')&&shards.length===1)return {mode:'revisions',shard:Number(shards[0].slice(-1))};

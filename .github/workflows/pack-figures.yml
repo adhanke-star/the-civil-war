@@ -16,6 +16,7 @@ on:
           - badge-level10
           - badge-missionary
           - badge-revisions
+          - badge-promotion
           - diagnostic
           - candidate
           - full
@@ -43,7 +44,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
-    if: inputs.mode != 'scene-transport' && inputs.mode != 'badge-observations' && inputs.mode != 'badge-level10' && inputs.mode != 'badge-missionary' && inputs.mode != 'badge-revisions'
+    if: inputs.mode != 'scene-transport' && inputs.mode != 'badge-observations' && inputs.mode != 'badge-level10' && inputs.mode != 'badge-missionary' && inputs.mode != 'badge-revisions' && inputs.mode != 'badge-promotion'
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ (inputs.mode == 'candidate' || inputs.mode == 'current' || inputs.mode == 'cs-close' || inputs.mode == 'cs-hybrid' || (inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both')) && 90 || 40 }}
     env:
@@ -425,13 +426,13 @@ jobs:
           if-no-files-found: error
 
   badge-observations:
-    if: inputs.mode == 'badge-observations' || inputs.mode == 'badge-level10' || inputs.mode == 'badge-missionary' || inputs.mode == 'badge-revisions'
+    if: inputs.mode == 'badge-observations' || inputs.mode == 'badge-level10' || inputs.mode == 'badge-missionary' || inputs.mode == 'badge-revisions' || inputs.mode == 'badge-promotion'
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: ${{ inputs.mode == 'badge-promotion' && 75 || 45 }}
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(inputs.mode == 'badge-level10' && '[3]' || inputs.mode == 'badge-missionary' && '[1]' || '[1,2,3]') }}
+        shard: ${{ fromJSON(inputs.mode == 'badge-level10' && '[3]' || (inputs.mode == 'badge-missionary' || inputs.mode == 'badge-promotion') && '[1]' || '[1,2,3]') }}
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host --init
@@ -470,6 +471,11 @@ jobs:
       - name: One approved legal revision per completed group
         if: inputs.mode == 'badge-revisions'
         run: node tools/test.mjs --badge-revisions --badge-shard=${{ matrix.shard }}
+      - name: Continue original Bronze brigade through ordinary Camp and natural battles
+        if: inputs.mode == 'badge-promotion'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/test.mjs --badge-promotion
       - name: Retained completed and failed native case receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
