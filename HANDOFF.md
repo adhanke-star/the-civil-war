@@ -1,5 +1,13 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0165 — root ACTIVE sole writer; no transfer. SOURCE353879c CI38329830725 running.
+SOURCE3407 CI38329187934 running; canonical11782800232 156clean/actual30owners/63arrays/
+5,903,752B native full reservations/capacity/smoke/exact restore/five clean samples. Narrow232,401,286
+is not resource acceptance. Other source/main full canonical pending; acceptedmain4460/Pagescw-v67.
+0161 before-close configuration CPU86+86/root+Astra clear; two real-GL tiny new rows Actions UNRUN.
+Next complete22ordinary+88fault caller/reducer/input; full qualified acquisition/native transport UNRUN.
+ProtectedMAIN11 preserved; no simultaneous edits; continue same-session through routine greens.
+
 LATEST0164 — root ACTIVE sole writer; no transfer. SOURCE3407e11 CI38329187934 running;
 actual warmed-owner/native four-row fixture pending. Original probe115074781609 5,703,219B
 read once confirms67+67 inactive/51+51export/38+38scene/10terrain/18loader/10adapter;

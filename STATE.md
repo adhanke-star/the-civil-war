@@ -11,8 +11,8 @@ Mixed38282452947/9d60c12 qualified; root+Astra viewed001–076; exact11files/576
 8ASTC+2originalPNG close48,996,984B; diagnostic only; no runtime asset adoption.
 0151 loader CPU18+18/adapter10+10/export23+23; latest actual11 UIrows/genuine native ASTC pass.
 0156 CPU38+38/cleanup12+12; native source92/chunks132/restored92B exact identities/bytes/retirement pass.
-SOURCE3407e11 CI38329187934 running; warmed-native owner fixture pending; prior tiny native pass.
-0159 CPU67+67;0160 transport CPU68+68/Astra clear; native materialization/routes Actions UNRUN.
+SOURCE3407 CI38329187934 running; shard3 156clean/native30owners/63arrays/max smoke/exact restore.
+0160 transport68+68/353879 CI pending;0161 close config86+86/Astra clear/new native rows UNRUN.
 Whole scene GPU432,441,700>250M; qualified both×11/max pools/latent/fault/restoration/ceiling UNRUN.
 All20 badge natural B/S/G and legal level10 route open; six approved Veteran observations pending.
 .out near294.5MB/300M preserved; CPU local only; browser suites/scene runners Actions only.

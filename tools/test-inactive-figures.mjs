@@ -3,10 +3,17 @@ import assert from 'node:assert/strict';
 import {SoldierPool,FallenPool,FlagPool,UNIFORMS,FALLEN} from '../src/units/soldier-mesh.js';
 import {HaloPool} from '../src/units/halos.js';
 import {loaderFixture} from './atlas-loader-fixture.mjs';
-import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDiagnostics,runSceneAllocationTransaction,discoverSceneStressOwners,runSceneStressTransaction,deriveSceneStressContract,warmSceneStressBaseline} from './bake/inactive-figures.mjs';
+import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDiagnostics,runSceneAllocationTransaction,discoverSceneStressOwners,runSceneStressTransaction,deriveSceneStressContract,warmSceneStressBaseline,configureSceneCloseRoute} from './bake/inactive-figures.mjs';
 import * as THREE from 'three';
 import fs from 'node:fs';
-const api={install:installInactiveFigures,gate:installRenderGate,png:renderCanvasPng,restore:restoreSceneDiagnostics,transaction:runSceneAllocationTransaction,discover:discoverSceneStressOwners,stress:runSceneStressTransaction,contract:deriveSceneStressContract,warm:warmSceneStressBaseline};
+const api={install:installInactiveFigures,gate:installRenderGate,png:renderCanvasPng,restore:restoreSceneDiagnostics,transaction:runSceneAllocationTransaction,discover:discoverSceneStressOwners,stress:runSceneStressTransaction,contract:deriveSceneStressContract,warm:warmSceneStressBaseline,closeRoute:configureSceneCloseRoute};
+// Constructed CPU capability/IO only; this fixture cannot establish genuine native ASTC support.
+function closeFixture(){
+ const US=loaderFixture(),CS=loaderFixture(),sourceManifest=CS.atlas.diagnosticClose.sourceManifest;
+ US.atlas.diagnosticClose=undefined;CS.atlas.diagnosticClose=undefined;
+ const base='http://localhost:1234/__scene-qualified/',scope={game:{paused:true,baked:{atlases:{US:US.atlas,CS:CS.atlas}}},post:{renderer:CS.renderer}};
+ return {US,CS,scope,args:{manifest:CS.hybrid,sourceManifest,base,route:'capable',candidateRequests:()=>CS.events.filter(e=>e.includes(base)).length},cleanup(){US.cleanup();CS.cleanup();}};
+}
 // Constructed CPU ownership fixture: native render/upload/particle emission are deliberately UNRUN.
 function ownerFixture(){
  const loaders=[],game={pools:{},fallen:{},impostors:{},units:[]},expected={US:2,CS:2,horses:2,mounts:2,guns:{US:2,CS:2,limbers:2},flags:2,commanders:1,pages:{US:{field:4,close:5},CS:{field:4,close:5}}};
@@ -41,6 +48,33 @@ function fixture(install){
 }
 const push=p=>p.push(0,0,0,0,1,0,0,0,0,0,0,0,true);
 const checks=[
+ ...['capable','unsupported'].map(route=>['close-route-'+route,async a=>{const f=closeFixture();try{
+   const before=Object.getOwnPropertyDescriptor(f.CS.atlas,'renderer'),diagnostic=Object.getOwnPropertyDescriptor(f.CS.atlas,'diagnosticClose'),r=a.closeRoute(f.scope,{...f.args,route});
+   await Promise.all([f.US.atlas.load('close'),f.CS.atlas.load('close')]);const publication=r.assertPublication();
+   assert.equal(publication.closePages,route==='capable'?10:5,`close-route-${route}: exact declared route publication`);
+   assert.ok(publication.fieldUnchanged&&r.fieldUnchanged(),`close-route-${route}: field identities preserved`);
+   assert.ok(route==='capable'?publication.candidateRequests===10:publication.candidateRequests===0,`close-route-${route}: admitted IO route`);
+   const cleanup=await r.restore();assert.ok(cleanup.ok&&cleanup.baseline.includes('not an unloaded atlas'),`close-route-${route}: honest settled descriptor restoration`);
+   assert.deepEqual(Object.getOwnPropertyDescriptor(f.CS.atlas,'renderer'),before,`close-route-${route}: renderer descriptor restored`);
+   assert.deepEqual(Object.getOwnPropertyDescriptor(f.CS.atlas,'diagnosticClose'),diagnostic,`close-route-${route}: close descriptor restored`);
+ }finally{f.cleanup();}}]),
+ ...Object.entries({'close-route-promise':f=>f.US.atlas.state.close=Promise.resolve([]),'close-route-textures':f=>f.CS.atlas.textures.close=[],
+   'close-route-batches':f=>f.US.pools[0].batches.close=[{}],'close-route-premature':f=>f.args.candidateRequests=()=>1,
+   'close-route-capability':f=>f.CS.renderer.getContext=()=>({getExtension:()=>null}),
+   'close-route-field-source':f=>f.args.manifest.tiers.field.pages[0].w++,
+   'close-route-close-source':f=>f.args.sourceManifest.tiers.close.frames.stand_0_d00={...f.args.sourceManifest.tiers.close.frames.stand_0_d00,ax:3},
+   'close-route-baseline-pages':f=>f.args.sourceManifest.tiers.close.pages[0].file='foreign.png',
+   'close-route-base':f=>f.args.base='http://localhost:1234/foreign/',
+   'close-route-descriptor':f=>Object.defineProperty(f.CS.atlas,'renderer',{writable:false})
+ }).map(([name,change])=>[name,a=>{const f=closeFixture();try{change(f);let error;try{a.closeRoute(f.scope,f.args);}catch(e){error=e;}assert.ok(error?.message.startsWith('scene close route:'),`${name}: invalid before-close admission rejected`);}finally{if(name==='close-route-batches')f.US.pools[0].batches.close=[];f.cleanup();}}]),
+ ['close-route-field-restore',async a=>{const f=closeFixture();try{const renderer=f.CS.atlas.renderer,r=a.closeRoute(f.scope,f.args);f.CS.atlas.layout.tiers.field={...f.CS.atlas.layout.tiers.field};const cleanup=await r.restore();assert.ok(!cleanup.ok&&!cleanup.fieldUnchanged&&f.CS.atlas.renderer===renderer,'close-route-field-restore: field failure retained while independent configuration restoration continues');}finally{f.cleanup();}}],
+ ['close-route-ownership',async a=>{const f=closeFixture();try{const renderer=f.CS.atlas.renderer,r=a.closeRoute(f.scope,f.args);f.CS.atlas.diagnosticClose={foreign:true};const cleanup=await r.restore();assert.ok(!cleanup.ok&&f.CS.atlas.diagnosticClose.foreign&&f.CS.atlas.renderer===renderer,'close-route-ownership: foreign ownership retained and independent renderer restored');}finally{f.cleanup();}}],
+ ['close-route-concurrent-restore',async a=>{const f=closeFixture();try{const r=a.closeRoute(f.scope,f.args),first=r.restore(),second=r.restore();assert.equal(first,second,'close-route-concurrent-restore: one shared in-flight cleanup');const rows=await Promise.all([first,second]);assert.ok(rows.every(x=>x.ok)&&rows[0]===rows[1],'close-route-concurrent-restore: repeated cleanup cannot replace success with ownership failure');}finally{f.cleanup();}}],
+ ...Object.entries({'close-route-rect-drift':f=>f.CS.atlas.layout.tiers.close.rects[0]++,
+   'close-route-US-drift':f=>f.US.atlas.layout.tiers.close.rects[0]++,
+   'close-route-fallback-failure':f=>f.CS.atlas.closeDiagnosticFailure='controlled malformed source',
+   'close-route-field-entry':f=>f.CS.atlas.textures.field[0]=f.CS.atlas.textures.field[1]
+ }).map(([name,change])=>[name,async a=>{const f=closeFixture();let r;try{r=a.closeRoute(f.scope,{...f.args,route:'unsupported'});await Promise.all([f.US.atlas.load('close'),f.CS.atlas.load('close')]);change(f);let e;try{r.assertPublication();}catch(x){e=x;}assert.ok(e?.message.startsWith('scene close route:'),`${name}: exact ordinary publication cannot drift`);}finally{if(r)await r.restore();f.cleanup();}}]),
  ['contract-scheduled',a=>{const pack=JSON.parse(fs.readFileSync(new URL('../assets/packs/stones-river.json',import.meta.url))),scenario=pack.phases.find(p=>p.scenario.reinforcements?.length)?.scenario;
   assert.ok(scenario,'contract-scheduled: actual authored scheduled phase exists');const pages={US:{field:2,close:3},CS:{field:4,close:5}},r=a.contract(scenario,pages),all=[...scenario.units,...scenario.reinforcements],cap=side=>all.filter(d=>d.side===side).reduce((n,d)=>n+Math.round(d.men/(d.type==='artillery'?4:r.ratio))+6,r.reserve);
   assert.ok(r.scheduled===scenario.reinforcements.length&&r.definitions===all.length&&r.US===cap('US')&&r.CS===cap('CS'),'contract-scheduled: native prepared timeline includes every authored scheduled definition');}],
@@ -172,5 +206,7 @@ const mutants={
 for(const name of ['transaction-geometry-owner','transaction-array-owner','transaction-attribute-owner','transaction-parent-owner','transaction-attribute-shape','transaction-material-members'])mutants[name]={transaction:args=>({...runSceneAllocationTransaction(args),ok:true})};
 for(const [name]of checks.filter(([name])=>name.startsWith('owners-')&&name!=='owners-complete'))mutants[name]={discover:()=>({owners:[]})};
 for(const name of ['stress-missing-native','stress-wrong-bytes','stress-duplicate-id','stress-extra-live','stress-restore-error','stress-thenable','stress-draw-count'])mutants[name]={stress:args=>({...runSceneStressTransaction(args),ok:true})};
-for(const [,check]of checks)check(api);console.log(`INACTIVE-FIGURES OK (${checks.length}/${checks.length})`);
-if(process.argv.includes('--prove-fail')){for(const [name,check]of checks){let error;try{check({...api,...mutants[name]});}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&error.message.startsWith(name),`${name}: mutant must fail its own assertion`);console.log(`CAUGHT ${name}`);}console.log(`INACTIVE-FIGURES CONTROLS OK (${checks.length}/${checks.length})`);}
+for(const [name]of checks.filter(([name])=>name.startsWith('close-route-')))mutants[name]={closeRoute:name==='close-route-capable'||name==='close-route-unsupported'?()=>({assertPublication:()=>({closePages:0})}):name==='close-route-field-restore'||name==='close-route-ownership'||name==='close-route-concurrent-restore'?()=>({restore:async()=>({ok:true,fieldUnchanged:true})}):()=>({})};
+for(const name of ['close-route-rect-drift','close-route-US-drift','close-route-fallback-failure','close-route-field-entry'])mutants[name]={closeRoute:(...args)=>({...configureSceneCloseRoute(...args),assertPublication:()=>({fieldUnchanged:true})})};
+for(const [,check]of checks)await check(api);console.log(`INACTIVE-FIGURES OK (${checks.length}/${checks.length})`);
+if(process.argv.includes('--prove-fail')){for(const [name,check]of checks){let error;try{await check({...api,...mutants[name]});}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&error.message.startsWith(name),`${name}: mutant must fail its own assertion`);console.log(`CAUGHT ${name}`);}console.log(`INACTIVE-FIGURES CONTROLS OK (${checks.length}/${checks.length})`);}

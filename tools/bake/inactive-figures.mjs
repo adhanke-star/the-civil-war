@@ -1,5 +1,85 @@
 import {MEN_PER_FIGURE_OPTIONS,MEN_PER_CREW_FIGURE} from '../../src/units/unit.js';
 import {phaseMenPerFigure,prepareReinforcementTimeline} from '../../src/sim/phase.js';
+import {AtlasLayout} from '../../src/units/impostor.js';
+import {astcAvailable} from '../../src/units/atlas-compression.js';
+
+/** Configure the existing atlas before first close IO. Publication becomes a labelled loaded baseline. */
+export function configureSceneCloseRoute(scope,{manifest,sourceManifest,base,route,candidateRequests}){
+  const {game,post}=scope,atlases=game?.baked?.atlases,renderer=post?.renderer;
+  const fail=message=>{throw Error('scene close route: '+message);};
+  if(!game?.paused||!atlases?.US||!atlases.CS||!renderer||typeof candidateRequests!=='function'
+    ||!['capable','unsupported'].includes(route)||typeof base!=='string'||!/^https?:\/\/[^/]+\/__scene-qualified\/$/.test(base))fail('configuration inputs');
+  if(candidateRequests()!==0)fail('premature candidate IO');
+  const fields=Object.entries(atlases).map(([side,atlas])=>{
+    if(!atlas.textures.field?.length||atlas.state.close!==undefined||atlas.textures.close!==undefined
+      ||atlas.pools.some(p=>p.batches.close?.length))fail('preexisting close state '+side);
+    return {side,atlas,layout:atlas.layout,field:atlas.layout.tiers.field,textures:atlas.textures.field,
+      base:atlas.base,close:atlas.layout.tiers.close,closeJSON:JSON.stringify(atlas.layout.tiers.close),fieldJSON:JSON.stringify(atlas.layout.tiers.field),textureEntries:[...atlas.textures.field],
+      pools:atlas.pools.map(pool=>({pool,layout:pool.layout,batches:pool.batches.field,entries:[...pool.batches.field]}))};
+  });
+  const atlas=atlases.CS,layout=new AtlasLayout(manifest),pages=layout.tiers.close.pages;
+  if(layout.missing.length||layout.problems().length||pages.length!==10||pages.filter(p=>p.encoding==='astc4x4').length!==8
+    ||pages.filter(p=>p.encoding==='png'&&p.alpha==='straight-gamma-bytes').length!==2||atlas.layout.tiers.close.looks.length!==1)fail('candidate/baseline layout');
+  const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b),original=atlas.layout.manifest;
+  if(!sourceManifest||!same(manifest.camera,original.camera)||!same(manifest.clips,original.clips)
+    ||!same(manifest.tiers.field,original.tiers.field)||!same(sourceManifest.camera,original.camera)
+    ||!same(sourceManifest.clips,original.clips)||!same(sourceManifest.tiers.field,original.tiers.field))fail('source/field binding');
+  const strip=T=>Object.fromEntries(Object.entries(T||{}).filter(([k])=>k!=='pages'&&k!=='variants')),
+    sourceLooks={base:sourceManifest.tiers.close,...sourceManifest.tiers.close.variants},candidateLooks={base:manifest.tiers.close,...manifest.tiers.close.variants};
+  if('base'in(sourceManifest.tiers.close.variants||{})||'base'in(manifest.tiers.close.variants||{})
+    ||!same(strip(sourceManifest.tiers.close),strip(original.tiers.close))||!same(sourceManifest.tiers.close.pages,original.tiers.close.pages)
+    ||!same(Object.keys(sourceLooks),Object.keys(candidateLooks))||Object.entries(candidateLooks).some(([name,T])=>
+      !same(strip(T),strip(sourceLooks[name]))||!same(T.pages.map(p=>[p.w,p.h]),sourceLooks[name].pages.map(p=>[p.w,p.h]))))fail('close source binding');
+  const gl=renderer.getContext(),nativeCapability=astcAvailable(gl,pages);
+  if(route==='capable'&&!nativeCapability)fail('genuine native capability unavailable');
+  let routeRenderer=renderer;
+  if(route==='unsupported'){
+    const facade=new Proxy(gl,{get(target,key){
+      if(key==='getExtension')return name=>name==='WEBGL_compressed_texture_astc'?null:target.getExtension(name);
+      const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
+    }});
+    routeRenderer={getContext:()=>facade,properties:renderer.properties,initTexture:renderer.initTexture.bind(renderer)};
+    if(astcAvailable(facade,pages))fail('masked capability remains available');
+  }
+  const configured={manifest,sourceManifest,base},descriptors=new Map(['diagnosticClose','renderer'].map(k=>[k,Object.getOwnPropertyDescriptor(atlas,k)]));
+  // Refuse impossible descriptor restoration before modifying either property.
+  for(const key of descriptors.keys()){const d=descriptors.get(key);if(d&&(!('value'in d)||!d.writable))fail('unwritable configuration '+key);}
+  atlas.diagnosticClose=configured;atlas.renderer=routeRenderer;
+  const fieldUnchanged=()=>fields.every(f=>atlases[f.side]===f.atlas&&f.atlas.layout===f.layout&&f.atlas.layout.tiers.field===f.field
+    &&JSON.stringify(f.atlas.layout.tiers.field)===f.fieldJSON&&f.atlas.textures.field===f.textures
+    &&f.textures.length===f.textureEntries.length&&f.textureEntries.every((t,i)=>f.textures[i]===t)
+    &&f.atlas.base===f.base&&f.pools.length===f.atlas.pools.length
+    &&f.pools.every((p,i)=>f.atlas.pools[i]===p.pool&&p.pool.layout===p.layout&&p.pool.batches.field===p.batches
+      &&p.batches.length===p.entries.length&&p.entries.every((b,i)=>p.batches[i]===b)));
+  const expectedCloseJSON=route==='capable'?JSON.stringify(layout.tiers.close):fields.find(f=>f.side==='CS').closeJSON;
+  let restorationTask;
+  return {route,nativeCapability,baseline:'existing native field and exact current single-base close, before first close IO',fieldUnchanged,
+    assertPublication(){
+      if(!fieldUnchanged())fail('field reference changed');
+      if(atlas.closeDiagnosticFailure)fail('normal route fell back after configuration failure');
+      if(!atlases.US.loaded('close')||!atlas.loaded('close'))fail('close publication missing');
+      const expected=route==='capable'?pages:fields.find(f=>f.side==='CS').close.pages;
+      if(atlas.textures.close.length!==(route==='capable'?10:5)||JSON.stringify(atlas.layout.tiers.close)!==expectedCloseJSON)fail('published route differs');
+      if(atlas.pools.some(p=>p.batches.close.length!==expected.length))fail('close pool publication differs');
+      const us=fields.find(f=>f.side==='US');
+      if(atlases.US.layout.tiers.close!==us.close||JSON.stringify(atlases.US.layout.tiers.close)!==us.closeJSON
+        ||atlases.US.textures.close.length!==us.close.pages.length||atlases.US.pools.some(p=>p.batches.close.length!==us.close.pages.length))fail('US close layout changed');
+      if(candidateRequests()!==(route==='capable'?10:0))fail('candidate IO route differs');
+      return {fieldUnchanged:true,closePages:atlas.textures.close.length,encodings:expected.map(p=>p.encoding||'png'),candidateRequests:candidateRequests()};
+    },restore(){
+      if(restorationTask)return restorationTask;
+      restorationTask=(async()=>{
+      await Promise.allSettled(Object.values(atlases).map(a=>a.state.close).filter(Boolean));
+      const errors=[];
+      if(!fieldUnchanged())errors.push('field reference changed');
+      for(const [key,value]of [['diagnosticClose',configured],['renderer',routeRenderer]]){
+        if(Object.getOwnPropertyDescriptor(atlas,key)?.value!==value){errors.push('configuration ownership changed '+key);continue;}
+        try{const prior=descriptors.get(key);if(prior)Object.defineProperty(atlas,key,prior);else delete atlas[key];}catch(e){errors.push(e.message);}
+      }
+      return {ok:errors.length===0,errors,fieldUnchanged:fieldUnchanged(),baseline:'loaded or failed settled close transaction; configuration descriptors restored, not an unloaded atlas'};
+      })();return restorationTask;
+    }};
+}
 
 /** Diagnostic prototype only. Retains all pool/mesh/attribute/CPU records; Three reuploads on reactivation. */
 export function installRenderGate(post) {

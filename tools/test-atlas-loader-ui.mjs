@@ -7,6 +7,7 @@ export async function atlasLoaderControls({ browser, url, check, result, watchEr
     await page.waitForFunction(() => window.__entry && !window.__entry.importing, null, { timeout: 60000 });
     const report = await page.evaluate(async () => {
       const { loaderFixture } = await import('./tools/atlas-loader-fixture.mjs');
+      const {configureSceneCloseRoute}=await import('./tools/bake/inactive-figures.mjs');
       const THREE = await import('three'), rows = [];
       const row = (name, ok, detail) => rows.push({ name, ok: !!ok, detail });
       for (const [name, options] of [['success', {}], ['unsupported', { unsupported: true }],
@@ -73,6 +74,26 @@ export async function atlasLoaderControls({ browser, url, check, result, watchEr
             && gl.getError() === gl.NO_ERROR && ts.length === (gl.getExtension('WEBGL_compressed_texture_astc') ? 10 : 5),
             { pages: ts.length, astc: !!gl.getExtension('WEBGL_compressed_texture_astc'), memory: f.atlas.memoryBytes() });
         } finally { f.cleanup(); }
+        // Constructed tiny manifests exercise real-GL configuration, never retained qualified-art admission.
+        for(const route of ['capable','unsupported']){
+          const US=loaderFixture(),CS=loaderFixture(),sourceManifest=CS.atlas.diagnosticClose.sourceManifest;
+          US.atlas.diagnosticClose=undefined;CS.atlas.diagnosticClose=undefined;
+          const before={renderer:Object.getOwnPropertyDescriptor(CS.atlas,'renderer'),close:Object.getOwnPropertyDescriptor(CS.atlas,'diagnosticClose')},
+            base=new URL('/__scene-qualified/',location.href).href;
+          let config;
+          try{
+            config=configureSceneCloseRoute({game:{paused:true,baked:{atlases:{US:US.atlas,CS:CS.atlas}}},post:{renderer}},
+              {manifest:CS.hybrid,sourceManifest,base,route,candidateRequests:()=>CS.events.filter(e=>e.includes(base)).length});
+            await Promise.all([US.atlas.load('close'),CS.atlas.load('close')]);
+            const publication=config.assertPublication(),native=CS.atlas.textures.close.map(t=>({uploaded:gl.isTexture(renderer.properties.get(t).__webglTexture),
+              versionMatches:renderer.properties.get(t).__version===t.version,compressed:!!t.isCompressedTexture})),restoration=await config.restore();
+            const descriptor=(key,prior)=>{const current=Object.getOwnPropertyDescriptor(CS.atlas,key);return ['value','writable','enumerable','configurable','get','set'].every(k=>current?.[k]===prior?.[k]);};
+            row('native-configured-'+route,restoration.ok&&publication.fieldUnchanged&&native.every(t=>t.uploaded&&t.versionMatches)
+              &&native.filter(t=>t.compressed).length===(route==='capable'?8:0)&&gl.getError()===gl.NO_ERROR
+              &&descriptor('renderer',before.renderer)&&descriptor('diagnosticClose',before.close),
+              {kind:'constructed tiny two-atlas fixture, actual native GL; full qualified scene UNRUN',publication,native,restoration,nativeCapability:config.nativeCapability});
+          }finally{if(config)await config.restore();US.cleanup();CS.cleanup();}
+        }
         // A genuine native INVALID_VALUE produced during candidate upload must trigger cleanup and fallback.
         // Admission is controlled here to exercise this failure even on a machine without ASTC support.
         const failed = loaderFixture(), nativeUpload = renderer.initTexture.bind(renderer);
