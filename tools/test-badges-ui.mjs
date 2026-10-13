@@ -11,11 +11,12 @@
 // 2. Full motion: the reward sequence mounted with a badges summary built here (src/franchise/campaign.js) stamps every
 //    row and plays the full X-Factor moment once, without taking focus or blocking a click.
 import fs from 'node:fs';
+import assert from 'node:assert/strict';
 import { AxeBuilder } from '@axe-core/playwright';
 import { probeProgress, seedProgress } from './test-progress-browser.mjs';
 import * as campaign from '../src/franchise/campaign.js';
 import * as badges from '../src/franchise/badges.js';
-import { validateSnapshot } from '../src/franchise/save.js';
+import { validateSnapshot,parseSnapshot,exportSnapshot } from '../src/franchise/save.js';
 import {installSceneStartGate} from './bake/inactive-figures.mjs';
 
 /** Actual native prerequisite only; this short context does not substantiate badge attainability. */
@@ -85,6 +86,146 @@ export async function nativeBadgeObserverControls({browser,url,check,result,watc
     try{await ctx.close();receipt.contextClosed=true;}catch(error){receipt.contextClosed=false;check('badge-native-context-close',false,String(error?.message??error));}
   }
   check('badge-native-errors',!primary&&outerCleanup?.ok===true&&receipt.contextClosed&&errors.length===0,JSON.stringify({errors,outerCleanup}));
+}
+
+function restoreNativeBadgeContext(){
+  const o=window.__badgeObservation,g=window.__game?.game,entries=[];
+  const same=(a,b)=>['value','writable','enumerable','configurable','get','set'].every(k=>a?.[k]===b?.[k]);
+  for(const[name,owner]of [['tick',o?.tick],['combat',o?.combat],['startup',window.__badgeStartGate]]){
+    try{const receipt=owner?.restore();entries.push({name,installed:!!owner,ok:receipt?.ok!==false,receipt:receipt??null});}
+    catch(error){entries.push({name,installed:!!owner,ok:false,error:String(error?.message??error)});}
+  }
+  const p=window.__badgeNativeRAF;
+  const exact={tick:!o||!!g&&g.tick===o.beforeTick.native&&same(o.beforeTick.descriptor,Object.getOwnPropertyDescriptor(g,'tick')),
+    combat:!o||!!g&&o.methods.every(m=>g.combat[m.name]===m.native&&same(m.descriptor,Object.getOwnPropertyDescriptor(g.combat,m.name))),
+    RAF:!p||window.requestAnimationFrame===p.native&&same(p.descriptor,Object.getOwnPropertyDescriptor(window,'requestAnimationFrame'))};
+  const partial=o?{samples:o.samples,initialTime:o.initialTime,lastTime:o.lastTime,fullReports:o.fullReports,
+    crossings:o.crossings.receipt(),stages:o.policy.receipt(),combat:o.combat?.receipt()??null}:null;
+  return {entries,exact,partial,ok:entries.every(e=>e.ok)&&Object.values(exact).every(Boolean)};
+}
+
+/** Six first-tactic observations, two fresh native contexts per explicitly selected Actions shard. */
+export async function nativeBadgeObservations({browser,url,check,result,watchErrors,shard,persist}){
+  const cases=[['slaughter-fire','missionary-assault'],['slaughter-defence','mcfadden-assault'],['slaughter-recovery','buell-capture']][shard-1];
+  if(!cases)throw Error('badge observations: shard must be 1, 2 or 3');
+  const output={kind:'actual first native tactics; constructed earlier Draw prefixes; numeric tiers are not separate saved upgrades',
+    sourceSha:process.env.GITHUB_SHA,run:process.env.GITHUB_RUN_ID,shard,cases:[],complete:false};result.badgeObservations=output;
+  for(const id of cases){
+    const row={id,complete:false,errors:[],primary:null,cleanup:[],contextClosed:false};output.cases.push(row);
+    await persist(); // retain a pending second case without losing the already completed first case
+    let ctx=null,page=null,imported=null;
+    try{
+      ctx=await browser.newContext({viewport:{width:1024,height:768},reducedMotion:'reduce'});page=await ctx.newPage();watchErrors(page,url,row.errors);
+      await page.goto(url+'?nosw');await page.waitForFunction(()=>window.__entry&&!window.__entry.importing,null,{timeout:60000});
+      row.prefix=await page.evaluate(async id=>{
+        const B=await import('./tools/observe-badges.mjs'),S=await import('./src/franchise/save.js'),campaign=await(await fetch('./assets/campaign.json')).json();
+        const p=B.badgePrefix(campaign,id),store=S.createProgressStore(undefined,{slot:1});await store.complete(p.save);
+        return {...B.badgePrefixReceipt(p),phase:p.phase,raw:await store.readRawBaseline()};
+      },id);
+      await ctx.addInitScript(source=>{window.__badgeNativeRAF={native:window.requestAnimationFrame,descriptor:Object.getOwnPropertyDescriptor(window,'requestAnimationFrame')};window.__badgeStartGate=(0,eval)('('+source+')')();},installSceneStartGate.toString());
+      await page.goto(url+'?campaign=1&quality=low&nosw');
+      await page.waitForFunction(()=>window.__ready&&window.__game?.game&&document.getElementById('briefing')?.open,null,{timeout:180000,polling:250});
+      await page.locator('#briefing-begin').click();await page.waitForFunction(()=>window.__badgeStartGate?.first?.simTime===0&&window.__game.game.paused);
+      row.initial=await page.evaluate(async id=>{
+        const B=await import('./tools/observe-badges.mjs'),G=await import('./src/game.js'),g=window.__game.game,tactic=B.badgeTactic(g,id),crossings=B.createBadgeCrossings(),policy=B.createBadgeStages(tactic.plan,tactic.cadence,tactic.roster);
+        if(G.difficultyOf(g)!=='veteran')throw Error('badge observations: actual difficulty drift');
+        const beforeTick={native:g.tick,descriptor:Object.getOwnPropertyDescriptor(g,'tick')},methods=['volleyAt','chargeFeat','routFeat','moraleStep'].map(name=>({name,native:g.combat[name],descriptor:Object.getOwnPropertyDescriptor(g.combat,name)}));
+        const owner={tactic,crossings,policy,beforeTick,methods,combat:null,tick:null,samples:0,lastTime:null,initialTime:null,largestDelta:0,fullReports:true};window.__badgeObservation=owner;
+        owner.combat=B.installBadgeCombatObserver(g,policy);
+        owner.tick=B.installBadgeTickObserver(g,{sample(at,feats){
+          const ids=g.units.map(u=>u.id).sort(),keys=Object.keys(feats).sort();
+          if(JSON.stringify(ids)!==JSON.stringify(keys)){owner.fullReports=false;throw Error('badge observations: incomplete native feat report');}
+          if(owner.samples===0)owner.initialTime=at;else owner.largestDelta=Math.max(owner.largestDelta,at-owner.lastTime);
+          owner.samples++;owner.lastTime=at;crossings.sample(at,feats);policy.advance(g);
+        }});
+        return {tactic,seed:g.scenario.seed,horizon:(g.clockEnd-g.clockStart)/g.clockRatio,difficulty:G.difficultyOf(g),
+          units:g.units.map(u=>({id:u.id,side:u.side,men:u.men,menStart:u.menMax,equipment:u.equipment,position:[u.x,u.z]}))};
+      },id);
+      const seeds={'slaughter-fire':18621232,'slaughter-defence':18621232,'slaughter-recovery':18621232,'mcfadden-assault':18630102,'missionary-assault':18631125,'buell-capture':18620409};
+      if(row.initial.seed!==seeds[id]||!Number.isFinite(row.initial.horizon)||row.initial.horizon<=0)throw Error('badge observations: authored seed/horizon drift');
+      const began=Date.now();row.progress=[];
+      for(let chunk=0;chunk<Math.ceil(row.initial.horizon/20)+120;chunk++){
+        if(Date.now()-began>15*60*1000)throw Error('badge observations: natural completion wall budget exhausted; no result forced');
+        const state=await page.evaluate(()=>{
+          const g=window.__game.game;if(!g.over){if(g.paused)g.togglePause();try{g.fastForward(20);}finally{if(!g.paused)g.togglePause();}}
+          const o=window.__badgeObservation;
+          return {at:g.simTime,over:g.over,winner:g.result?.winner??null,alive:g.units.filter(u=>u.alive).length,
+            observed:{samples:o.samples,initialTime:o.initialTime,lastTime:o.lastTime,largestDelta:o.largestDelta,fullReports:o.fullReports,
+              crossings:o.crossings.receipt(),stages:o.policy.receipt(),combat:o.combat.receipt()}};
+        });row.partialNative=state.observed;delete state.observed;row.progress.push(state);await persist();if(state.over)break;
+      }
+      await page.waitForFunction(()=>document.getElementById('result').open&&!document.getElementById('result-action').hidden,null,{timeout:30000});
+      row.native=await page.evaluate(async()=>{
+        const S=await import('./src/franchise/save.js'),D=await import('./src/franchise/badges.js'),g=window.__game.game,o=window.__badgeObservation;
+        const native={simTime:g.simTime,over:g.over,result:g.result,fullReports:o.fullReports,samples:o.samples,initialTime:o.initialTime,lastTime:o.lastTime,largestDelta:o.largestDelta,
+          crossings:o.crossings.receipt(),stages:o.policy.receipt(),combat:o.combat.receipt(),feats:g.featReport(),captures:g.captureReport?.()??null,
+          units:[...g.scenario.units,...(g.scenario.reinforcements||[])].map(d=>{const u=g.units.find(u=>u.id===d.id),men=u?Math.floor(u.men):d.men;
+            return {id:d.id,side:d.side,menStart:d.men,men,...(d.type==='artillery'?{gunsStart:d.guns,guns:!u?d.guns:men?u.gunSlots.filter(s=>s.alive).length:0}:{})};})};
+        if(!g.over)return native;
+        const phase=window.__game.practice.phase;if(!phase)throw Error('badge observations: native phase bridge unavailable: '+window.__game.practice.phaseFailure);
+        const {outcome,record,next:after}=phase;
+        window.__badgePhaseRecord=record;
+        return {...native,outcome,record,afterPhase:S.exportSnapshot(after),award:D.badgeAward(after.awardId),
+          nativeArmy:after.army.map(b=>({id:b.id,unitId:b.unitId,men:b.men,badges:b.badges||[],offer:b.offer||[],xfactor:b.xfactor||null})),
+          economy:{rp:after.rp,reputation:after.reputation,level:after.level,stores:after.stores,ledger:after.ledger,depot:after.depot}};
+      });
+      if(!row.native.over||!row.native.record||!row.native.fullReports||row.native.initialTime!==0||row.native.largestDelta>.05+1e-8||row.native.lastTime!==row.native.simTime
+        ||row.native.stages.failure||row.native.combat.failure)throw Error('badge observations: actual native completion/observation failure');
+      assert.deepStrictEqual(row.native.record.feats,row.native.feats,'native phase must retain every final observed feat');
+      assert.strictEqual(row.native.record.winner,row.native.result.winner,'native phase winner must match actual game result');
+      assert.deepStrictEqual(row.native.record.units,row.native.units,'native phase must retain actual final strengths and guns');
+      // The independent oracle runs in Node; it must never replace the browser's native award cache.
+      const definition=JSON.parse(fs.readFileSync(new URL('../assets/campaign.json',import.meta.url))),nativeNext=parseSnapshot(row.native.afterPhase);
+      const expected=campaign.recordPhase(parseSnapshot(row.prefix.raw),definition,{...row.native.record,at:nativeNext.updated});
+      row.expected={afterPhase:exportSnapshot(expected),award:badges.badgeAward(expected.awardId)};
+      if(row.expected.afterPhase!==row.native.afterPhase||JSON.stringify(row.expected.award)!==JSON.stringify(row.native.award))throw Error('badge observations: native phase/award differs from independent result');
+      // Restore and verify the actual native owners before any navigation can discard that document.
+      row.nativeCleanup=await page.evaluate(restoreNativeBadgeContext);
+      if(!row.nativeCleanup.ok)throw Error('badge observations: original native owner restoration failed');
+      await page.waitForFunction(()=>document.getElementById('result').open&&!document.getElementById('result-action').hidden,null,{timeout:30000});
+      await page.locator('#result-action').click();
+      const firstX=(row.native.award?.brigades||[]).find(b=>b.xfactor),xStyle=await page.evaluate(async()=>{const S=await import('./src/settings.js');return S.get('look.xFactorStyle')??'full';});
+      const expectedX=firstX&&xStyle!=='off'?[firstX.label+'|'+firstX.xfactor]:[];
+      if(expectedX.length)await page.waitForFunction(()=>window.__xfactors?.length===1,null,{timeout:30000});
+      row.afterAction=await page.evaluate(()=>({rows:[...document.querySelectorAll('.rw-badge-row')].map(r=>({brigade:r.dataset.brigade,badge:r.dataset.badge,tier:r.dataset.tier,text:r.textContent})),xfactors:window.__xfactors||[]}));
+      row.afterAction.style=xStyle;
+      const expectedRows=(row.expected.award?.brigades||[]).flatMap(br=>br.earned.map(e=>({brigade:br.id,badge:e.id,tier:e.tier})));
+      if(JSON.stringify(row.afterAction.rows.map(({brigade,badge,tier})=>({brigade,badge,tier})))!==JSON.stringify(expectedRows))throw Error('badge observations: actual after-action badge rows differ from native award');
+      if(JSON.stringify(row.afterAction.xfactors)!==JSON.stringify(expectedX))throw Error('badge observations: actual single first-Gold moment/award drift');
+      await page.getByRole('button',{name:/^Open the loot/}).click();await page.keyboard.press('s');
+      await page.getByRole('button',{name:/^Issue to brigades/}).click();await page.getByRole('button',{name:'Done',exact:true}).click();
+      await page.waitForFunction(()=>!window.__game.practice.reward.state.counting);
+      row.reward=await page.evaluate(()=>{const s=window.__game.practice.reward.state;return {awardId:s.awardId,army:s.army,depot:s.tray,issued:s.log,seed:s.seed,grade:s.grade};});
+      const {applyRewardIssues}=await import('../src/ui/briefing.js');row.expected.saved=exportSnapshot(applyRewardIssues(expected,row.native.record.loot,row.reward).save);
+      await page.getByRole('button',{name:'Continue',exact:true}).click();
+      await page.waitForFunction(()=>document.getElementById('result').open&&document.getElementById('result-title').textContent==='Campaign saved',null,{timeout:30000});
+      row.saved=await page.evaluate(async()=>{
+        const C=await import('./src/franchise/campaign.js'),S=await import('./src/franchise/save.js'),campaign=await(await fetch('./assets/campaign.json')).json(),store=S.createProgressStore(undefined,{slot:1}),raw=await store.readRawBaseline(),save=S.parseSnapshot(raw);
+        const duplicate=C.recordPhase(save,campaign,window.__badgePhaseRecord);await store.complete(duplicate,{previous:save});const afterRaw=await store.readRawBaseline();
+        return {raw,exported:S.exportSnapshot(save),duplicateRaw:afterRaw,duplicateStable:raw===afterRaw,index:save.campaign.index,
+          army:save.army,enemy:save.enemy,ledger:save.ledger,depot:save.depot,level:save.level,reputation:save.reputation,rp:save.rp,xfactors:window.__xfactors||[]};
+      });
+      if(row.saved.raw!==row.expected.saved||!row.saved.duplicateStable||row.saved.index!==row.prefix.index+1||JSON.stringify(row.saved.xfactors)!==JSON.stringify(expectedX))throw Error('badge observations: real UI whole save/duplicate award/moment drift');
+      await page.goto(url+'?nosw');await page.waitForFunction(()=>window.__entry&&!window.__entry.importing);
+      row.reload=await page.evaluate(async()=>{const S=await import('./src/franchise/save.js');return {raw:await S.createProgressStore(undefined,{slot:1}).readRawBaseline(),xfactors:window.__xfactors||[]};});
+      if(row.reload.raw!==row.saved.raw||row.reload.xfactors.length)throw Error('badge observations: reload byte/moment drift');
+      imported=await browser.newContext({viewport:{width:1024,height:768},reducedMotion:'reduce'});const ip=await imported.newPage();watchErrors(ip,url,row.errors);
+      await ip.goto(url+'?nosw');await ip.waitForFunction(()=>window.__entry&&!window.__entry.importing);
+      row.imported=await ip.evaluate(async raw=>{const S=await import('./src/franchise/save.js'),store=S.createProgressStore(undefined,{slot:1}),previousRaw=await store.readRawBaseline();if(previousRaw!==null)throw Error('badge observations: fresh import context not empty');await store.import(raw,{previousRaw});return {raw:await store.readRawBaseline()};},row.saved.exported);
+      if(row.imported.raw!==row.saved.raw)throw Error('badge observations: fresh import byte drift');
+      row.complete=true;
+    }catch(error){row.primary=String(error?.message??error);}
+    finally{
+      if(page)try{const cleanup=await page.evaluate(restoreNativeBadgeContext);row.outerCleanup=cleanup;row.cleanup=cleanup.entries;row.partialNative=cleanup.partial;
+        if(!cleanup.ok)row.cleanup.push({name:'exact-descriptors',ok:false,exact:cleanup.exact});
+      }catch(error){row.cleanup.push({name:'page',ok:false,error:String(error?.message??error)});}
+      for(const[name,c]of [['import',imported],['native',ctx]])if(c)try{await c.close();if(name==='native')row.contextClosed=true;else row.importContextClosed=true;}catch(error){row.cleanup.push({name:name+'-context',ok:false,error:String(error?.message??error)});}
+      row.complete=row.complete&&!row.primary&&!row.errors.length&&row.nativeCleanup?.ok===true&&row.cleanup.every(r=>r.ok)&&row.contextClosed&&row.importContextClosed===true;
+      check('badge-observation-'+id,row.complete,JSON.stringify({primary:row.primary,naturalOver:row.native?.over,at:row.native?.simTime,errors:row.errors,cleanup:row.cleanup,contextClosed:row.contextClosed}));
+      await persist();
+    }
+  }
+  output.complete=output.cases.length===2&&output.cases.every(r=>r.complete);await persist();
 }
 
 const HH = JSON.parse(fs.readFileSync(new URL('../assets/scenarios/henry-hill.json', import.meta.url)));

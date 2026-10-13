@@ -9,9 +9,9 @@ MAIN's eleven protected WIP files stay untouched. COORDINATION.md is absent; rea
 |---|---|
 | Project licence | Aaron approved MIT code + CC-BY 4.0 original data/text; a79ec3a; full CI green, live |
 | Stones River southern ground | Rebuilt tile + coherent dawn deployment;21eb4a3 full CI/actual screenshots/Pages green |
-| Compressed atlases and more CS looks | Mixed8ASTC/2PNG38282452947 qualified/diagnostic only; acceptedmain23dcea3/source+main all9green, own171 native prerequisites clean. Complete22ordinary+88fault caller168+168; full qualifiedmatrix38343715785 once-dispatched at23/running, no resource verdict. Pages38344425205 exact23/livecw-v68; no runtime adoption |
+| Compressed atlases and more CS looks | Mixed8ASTC/2PNG38282452947 qualified/diagnostic only; matrix38343715785 failed report transport after22ordinary/44completed faults. Original11789877172 retained631MB; exact-byte recovery38352343371 ONCE exact0c/running, all144PNGs/146members required. Main9e full CI/ownread/Pageslivev68 clear; no resource verdict/runtime adoption |
 | Higher commanders | Four sourced Inferred rows across three Stones phases; carryfix09a12f1 full CI38261729029/actual image readback green, integrated |
-| Balance | Actual09a12f1 campaign201/201, grades3Defeat/4Draw/2Victory/3Decisive incl replay;570rep/L5; amounts held. Accepted separate native ForagersGold retained. Six approved Veteran tactics: private prefixes/crossings/stages53+53 and native-hook bookkeeping69+69 clear; actual six battles/storage/tier upgrades/legalL10 UNRUN |
+| Balance | Actual09a12f1 campaign201/201, grades3Defeat/4Draw/2Victory/3Decisive incl replay;570rep/L5; amounts held. Accepted separate native ForagersGold retained. Six finite Veteran tactics/full harness root+Astra82+82/15+15/UNIT clear; actual tiny native observer41whole19-unit samples/Veteran/cleanup clear; actual six battles/storage/tier upgrades/legalL10 UNRUN |
 
 Each slice: affected `node tools/test-<system>.mjs`, then `--prove-fail`, and `node tools/test.mjs --unit`
 locally; commit explicit paths, push branch, read all CI jobs for that exact SHA. Four browser shards,

@@ -12,6 +12,7 @@ on:
           - cs-hybrid
           - scene
           - scene-transport
+          - badge-observations
           - diagnostic
           - candidate
           - full
@@ -39,7 +40,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
-    if: inputs.mode != 'scene-transport'
+    if: inputs.mode != 'scene-transport' && inputs.mode != 'badge-observations'
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ (inputs.mode == 'candidate' || inputs.mode == 'current' || inputs.mode == 'cs-close' || inputs.mode == 'cs-hybrid' || (inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both')) && 90 || 40 }}
     env:
@@ -417,5 +418,50 @@ jobs:
         with:
           name: scene-original-uploads
           path: .out/scene-allocation/transport-uploads.json
+          retention-days: 7
+          if-no-files-found: error
+
+  badge-observations:
+    if: inputs.mode == 'badge-observations'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    container:
+      image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+      options: --ipc=host --init
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.21.0
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify pinned native browser runtime
+        run: |
+          node --input-type=module -e "
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import {chromium} from 'playwright';
+          const lock=JSON.parse(fs.readFileSync('package-lock.json'));
+          assert.equal(lock.packages['node_modules/playwright'].version,'1.63.0');
+          assert.equal(JSON.parse(fs.readFileSync('node_modules/playwright/package.json')).version,'1.63.0');
+          fs.accessSync(chromium.executablePath(),fs.constants.X_OK);
+          "
+      - name: Play two actual finite tactics to natural completion and persist
+        run: node tools/test.mjs --badge-observations --badge-shard=${{ matrix.shard }}
+      - name: Retained completed and failed native case receipts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: badge-observations-${{ matrix.shard }}
+          path: |
+            .out/badge-observations.json
+            .out/last-result.json
           retention-days: 7
           if-no-files-found: error

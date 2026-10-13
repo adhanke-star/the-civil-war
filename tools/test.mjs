@@ -100,6 +100,12 @@ import { soldierViewControls } from './test-soldier-view-ui.mjs';
 import { reinforcementUIControls } from './test-reinforcement-ui.mjs';
 import { fieldAdmissionControls } from './test-field-admission-ui.mjs';
 import { finalizeActivationUI } from './test-surrender-activation-ui.mjs';
+let BADGE_SELECTION;
+try{if(process.argv.slice(2).some(a=>a.startsWith('--badge-'))){
+  const {badgeObservationSelection}=await import('./observe-badges.mjs');
+  BADGE_SELECTION=badgeObservationSelection(process.argv.slice(2));
+}}
+catch(error){console.error(error.message);process.exit(1);}
 
 // `--shard=N` (1-4) runs one CI slice of the full browser run; the Node unit checks run in shard 3. No flag = everything.
 const SHARD = Number((process.argv.find((a) => a.startsWith("--shard=")) || "=0").split("=")[1]) || 0;
@@ -1745,7 +1751,7 @@ async function battlePage(browser, url) {
 }
 
 async function main() {
-  if (runs(3)) await nodeUnits();
+  if (!BADGE_SELECTION && runs(3)) await nodeUnits();
   await fs.mkdir(OUT_DIR, { recursive: true });
   const { server, url } = await startServer({ port: 0 });
   return browserChecks(server, url);
@@ -1776,10 +1782,17 @@ async function browserChecks(server, url) {
     browser = await chromium.launch(native ? { channel: 'chrome', headless: false }
       : { headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     result.browser = `chromium ${browser.version()}`;
-    if(process.argv.includes('--badge-observer')){
+    if(BADGE_SELECTION?.mode==='prerequisite'){
       result.mode='actual short native badge observer prerequisite';
       const {nativeBadgeObserverControls}=await import('./test-badges-ui.mjs');
       await nativeBadgeObserverControls({browser,url,check,result,watchErrors});return;
+    }
+    if(BADGE_SELECTION?.mode==='observations'){
+      result.mode='actual first native badge tactics shard '+BADGE_SELECTION.shard+' of3';
+      const {nativeBadgeObservations}=await import('./test-badges-ui.mjs');
+      const persist=async()=>{const target=path.join(OUT_DIR,'badge-observations.json'),temporary=target+'.pending';
+        await fs.writeFile(temporary,JSON.stringify(result));await fs.rename(temporary,target);};
+      await nativeBadgeObservations({browser,url,check,result,watchErrors,shard:BADGE_SELECTION.shard,persist});return;
     }
     if (process.argv.includes('--reinforcement-ui')) { result.mode = 'scheduled reinforcement UI'; await reinforcementUIControls({ browser, url, check, shot, result, native }); return; }
     if (process.argv.includes('--field-admission')) { result.mode = 'current field admission'; await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native }); return; }

@@ -1,12 +1,12 @@
 // Constructed CPU observations test bookkeeping only; no native combat/award/level-10 claim.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {BADGE_OBSERVATIONS,badgePrefix,createBadgeCrossings,validateBadgeCommand,badgePrefixReceipt,executeBadgeCommand,installBadgeTickObserver,createBadgePolicy,createBadgeStages,installBadgeCombatObserver,badgeTactic} from './observe-badges.mjs';
+import {BADGE_OBSERVATIONS,badgePrefix,createBadgeCrossings,validateBadgeCommand,badgePrefixReceipt,executeBadgeCommand,installBadgeTickObserver,createBadgePolicy,createBadgeStages,installBadgeCombatObserver,badgeTactic,badgeObservationSelection} from './observe-badges.mjs';
 import * as C from '../src/franchise/campaign.js';
 import {FEAT_STATS} from '../src/franchise/badges.js';
 const campaign=JSON.parse(fs.readFileSync(new URL('../assets/campaign.json',import.meta.url)));
 const zero=()=>({side:'US',xp:0,menStart:1000,...Object.fromEntries(FEAT_STATS.map(k=>[k,0]))});
-const api={recipes:BADGE_OBSERVATIONS,prefix:badgePrefix,crossings:createBadgeCrossings,command:validateBadgeCommand,receipt:badgePrefixReceipt,execute:executeBadgeCommand,tick:installBadgeTickObserver,policy:createBadgePolicy,stages:createBadgeStages,combat:installBadgeCombatObserver,tactic:badgeTactic};
+const api={recipes:BADGE_OBSERVATIONS,prefix:badgePrefix,crossings:createBadgeCrossings,command:validateBadgeCommand,receipt:badgePrefixReceipt,execute:executeBadgeCommand,tick:installBadgeTickObserver,policy:createBadgePolicy,stages:createBadgeStages,combat:installBadgeCombatObserver,tactic:badgeTactic,selection:badgeObservationSelection};
 function fakeGame(){return {playerSide:'US',simTime:0,over:false,calls:[],units:[{id:'a',side:'US',alive:true,holdFire:false,run:false,order:{type:'hold'}},{id:'b',side:'CS',alive:true,order:{type:'hold'}}],
   controls(u){return u.alive;},order(u,spec){this.calls.push({method:'order',id:u.id,spec});u.order={type:spec.type,target:spec.target};return true;},
   select(u){this.selected=u;this.calls.push({method:'select',id:u.id});},orderSelected(kind){this.calls.push({method:'selected',kind});return true;},featReport(){return {a:zero()};},tick(dt){this.simTime+=dt;return dt;}};}
@@ -19,6 +19,8 @@ const combatStages=()=>{const g=nativeStages();g.combat.calls=[];g.combat.token=
   const p=createBadgeStages([stage('wait',{notBefore:10})],1,['a','b']);p.advance(g);return {g,p};};
 const authoredTactic=(a,id)=>{const r=BADGE_OBSERVATIONS.find(r=>r.id===id),scenario=JSON.parse(fs.readFileSync(new URL('../assets/packs/'+r.packId+'.json',import.meta.url))).phases.find(p=>p.id===r.phaseId).scenario;return a.tactic({scenario,playerSide:'US',simTime:0},id);};
 const checks=[
+  ['mode-selection',a=>{assert.equal(a.selection(['--unit']),null,'mode-selection: ordinary suite unaffected');assert.deepEqual(a.selection(['--badge-observer']),{mode:'prerequisite',shard:null},'mode-selection: separate tiny actual prerequisite');for(const shard of [1,2,3])assert.deepEqual(a.selection(['--badge-observations','--badge-shard='+shard]),{mode:'observations',shard},'mode-selection: exact full observation shard');}],
+  ['mode-refusal',a=>{for(const args of [['--badge-observations'],['--badge-shard=1'],['--badge-observations','--badge-shard=0'],['--badge-observations','--badge-shard=4'],['--badge-observer','--badge-observations'],['--badge-observer','--native'],['--badge-observations','--badge-shard=1','--shard=4'],['--badge-shard=1','--badge-shard=1']])rejects('mode-refusal',()=>a.selection(args));}],
   ['recipes',a=>assert.deepEqual(a.recipes.map(r=>[r.id,r.packId,r.phaseId]),[
     ['slaughter-fire','stones-river','slaughter-pen'],['slaughter-defence','stones-river','slaughter-pen'],['slaughter-recovery','stones-river','slaughter-pen'],
     ['mcfadden-assault','stones-river','mcfaddens-ford'],['missionary-assault','chattanooga','missionary-ridge'],['buell-capture','shiloh','buell-attacks']],
@@ -113,7 +115,7 @@ console.log(`BADGE-OBSERVATION CPU BOOKKEEPING OK (${checks.length}/${checks.len
 if(process.argv.includes('--prove-fail')){
   const empty=()=>({sample(){},receipt:()=>({kind:'',units:[],samples:0,lastTime:0})});
   const changedReceipt=change=>()=>{const o=createBadgeCrossings();return {...o,receipt:()=>{const r=o.receipt();change(r);return r;}};};
-  const mutants={recipes:{recipes:[]},'prefix-exact':{prefix:(...args)=>{const p=badgePrefix(...args);p.save.rp++;return p;}},'prefix-receipt':{receipt:p=>({...badgePrefixReceipt(p),rp:0})},
+  const mutants={'mode-selection':{selection:()=>null},'mode-refusal':{selection:()=>null},recipes:{recipes:[]},'prefix-exact':{prefix:(...args)=>{const p=badgePrefix(...args);p.save.rp++;return p;}},'prefix-receipt':{receipt:p=>({...badgePrefixReceipt(p),rp:0})},
     'prefix-refusal':{prefix:()=>({})},'crossing-measure':{crossings:changedReceipt(r=>r.units[0].crossings['sharpshooters/gold'].value=0)},'crossing-first':{crossings:changedReceipt(r=>r.units[0].crossings['sharpshooters/gold'].at=0)},'crossing-copy':{crossings:changedReceipt(r=>r.units[0].raw.farKills=999)},
     'crossing-refusal':{crossings:empty},'crossing-atomic':{crossings:empty},'crossing-regression':{crossings:empty},commands:{command:()=>null},'forbidden-mutation':{command:c=>c},'command-refusal':{command:c=>c},'command-dense':{command:c=>c},'command-own-fields':{command:c=>c},
     'native-command':{execute:()=>({accepted:false})},'native-refusal':{execute:()=>({invoked:true})},'native-toggle':{execute:()=>({invoked:true,accepted:true})},

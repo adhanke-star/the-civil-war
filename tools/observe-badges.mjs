@@ -148,6 +148,16 @@ const finitePoint=p=>dense(p)&&p.length===2&&p.every(Number.isFinite);
 const terminal=s=>s!=='pending';
 const success=s=>['accepted','already-satisfied'].includes(s);
 
+/** Private modes are explicit and mutually exclusive with ordinary suite flags. */
+export function badgeObservationSelection(args){
+  if(!dense(args)||args.some(a=>typeof a!=='string'))fail('mode arguments');
+  if(!args.some(a=>a.startsWith('--badge-')))return null;
+  if(args.length===1&&args[0]==='--badge-observer')return {mode:'prerequisite',shard:null};
+  const shards=args.filter(a=>/^--badge-shard=[123]$/.test(a));
+  if(args.length===2&&args.includes('--badge-observations')&&shards.length===1)return {mode:'observations',shard:Number(shards[0].slice(-1))};
+  fail('explicit badge mode/shard required; conflicting or unknown selector');
+}
+
 /** First finite tactics approved by Astra. These are hypotheses, never promised badge outcomes. */
 export function badgeTactic(game,observation){
   const recipe=BADGE_OBSERVATIONS.find(r=>r.id===observation),s=game.scenario;
