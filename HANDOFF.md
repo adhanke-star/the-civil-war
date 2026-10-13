@@ -1,5 +1,16 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0166 — root ACTIVE sole writer; no transfer. Acceptedremote main353879 after3407+353879
+all9green/full own canonical; prior main4460 all9green/full own readback incl exact native128+48B
+positive/negative/repair and7clean captures. New353879 mainCI/Pages pending.
+Sourcea2c57ca CI38330460653 all9green; own11782957245 shard3 158clean and actual configured
+capable10/8ASTC+2PNG versus unsupported5PNG/zero candidate IO/native version/cleanup read;
+other canonical pending.0162 bounded qualified reducer/model root+Astra107+107/unit/syntax/diff pass.
+Next minimal synchronous diagnostic loader observation hook, bounded lossless report transport,
+full22ordinary+88fault caller/Lookout canvas/input/acquisition/materialization/native transport.
+No full qualified dispatch yet; no product/SW/assets adoption. ProtectedMAIN11 preserved;
+no simultaneous edits; continue same-session through routine greens and pending CI.
+
 LATEST0165 — root ACTIVE sole writer; no transfer. SOURCE353879c CI38329830725 running.
 SOURCE3407 CI38329187934 running; canonical11782800232 156clean/actual30owners/63arrays/
 5,903,752B native full reservations/capacity/smoke/exact restore/five clean samples. Narrow232,401,286
