@@ -178,10 +178,26 @@ export function deriveSceneStressContract(scenario,pages){
   return result;
 }
 
+function sceneLoadedTiers(game,mode){
+  const require=(ok,label)=>{if(!ok)throw Error(`scene stress owners: ${label}`);};
+  require(['full','preclose','terminal'].includes(mode),'explicit loaded-tier mode');
+  const tiers={US:mode==='preclose'?['field']:['field','close'],CS:mode==='full'?['field','close']:['field']};
+  for(const side of ['US','CS']){
+    const baked=game?.impostors?.[side],atlas=baked?.atlas;
+    require(atlas?.loaded('field'),side+' loaded baked field');
+    if(tiers[side].includes('close'))require(atlas.loaded('close'),side+' loaded baked close');
+    else require(atlas.textures.close===undefined&&Array.isArray(baked.batches.close)&&baked.batches.close.length===0
+      &&atlas.pools.every(p=>p.batches.close?.length===0)
+      &&(mode==='preclose'?atlas.state.close===undefined:!!atlas.state.close&&baked.layout.tiers.close.looks.length===1),side+' excluded close publication state');
+  }
+  return tiers;
+}
+
 /** Keep supported lazy resources and any legal cavalry spawn in an explicitly warmed baseline. */
-export function warmSceneStressBaseline(scope,expected,rallyRadius){
+export function warmSceneStressBaseline(scope,expected,rallyRadius,mode='full'){
   const {game,effects}=scope;
   if(!game?.paused||!effects?.ok||effects.reducedMotion||!effects.smokeEnabled||!Number.isFinite(rallyRadius)||rallyRadius<=0)throw Error('scene stress warm: paused normal-motion native baseline required');
+  sceneLoadedTiers(game,mode);
   let cavalry=game.units.find(u=>u.type==='cavalry'&&u.mounts),spawned=null;
   if(!cavalry){
     const anchor=game.units.find(u=>u.side==='US'&&u.alive);if(!anchor)throw Error('scene stress warm: legal spawn anchor unavailable');
@@ -197,7 +213,7 @@ export function warmSceneStressBaseline(scope,expected,rallyRadius){
   for(let i=0;i<40;i++)effects.puff(cavalry.x,cavalry.z,true,0);
   for(let i=0;i<160;i++)effects.puff(cavalry.x,cavalry.z,false,0);
   effects.update(.01);
-  const discovery=discoverSceneStressOwners(game,effects,expected);
+  const discovery=discoverSceneStressOwners(game,effects,expected,mode);
   // Three's native sorting creates lazy spheres even with frustum culling disabled.
   // Make those supported owners part of the labelled warm baseline before snapshotting identities.
   for(const mesh of discovery.meshes){
@@ -208,7 +224,7 @@ export function warmSceneStressBaseline(scope,expected,rallyRadius){
 }
 
 /** Explicit warmed native owners. No allocations, animation, upload or inferred GPU bytes occur here. */
-export function discoverSceneStressOwners(game,effects,expected){
+export function discoverSceneStressOwners(game,effects,expected,mode='full'){
   const owners=[],meshes=new Set(),attributes=new Set(),arrays=new Set(),records=[];
   const require=(ok,label)=>{if(!ok)throw Error(`scene stress owners: ${label}`);};
   const capacity=(n,label)=>{require(Number.isSafeInteger(n)&&n>0,label+' capacity');return n;};
@@ -235,6 +251,7 @@ export function discoverSceneStressOwners(game,effects,expected){
     owners.push({label,meshes:drawables,attributes:entries.map(e=>e[0]),arrays:[...local],capacity:count,bytes});
   };
   require(game&&effects&&expected,'explicit warmed contract');
+  const loadedTiers=sceneLoadedTiers(game,mode);
   for(const side of ['US','CS']){
     const n=capacity(expected[side],side),pool=game.pools?.[side],fallen=game.fallen?.[side],baked=game.impostors?.[side];
     require(pool?.capacity===n&&pool.buckets?.length===3&&new Set(pool.buckets.map(b=>b.lod)).size===3&&pool.buckets.every(b=>[0,1,2].includes(b.lod)),side+' three LOD buckets');
@@ -247,8 +264,8 @@ export function discoverSceneStressOwners(game,effects,expected){
     require(fallen.mesh.geometry.attributes.aAnim===fallen.anim&&fallen.mesh.geometry.attributes.aTint===fallen.tint&&fallen.mesh.geometry.attributes.aClip===fallen.clip,side+' named fallen attributes');
     add(`fallen.${side}`,[fallen.mesh],[[fallen.mesh.instanceMatrix,16],[fallen.anim,4],[fallen.tint,4],[fallen.clip,1]],n,100);
     record(fallen,['used','hiddenTo','sunk','dirty','bakedClip']);
-    require(baked?.capacity===n&&baked.layout&&baked.atlas?.loaded('field')&&baked.atlas.loaded('close'),side+' loaded baked tiers');
-    for(const tier of ['field','close']){
+    require(baked?.capacity===n&&baked.layout&&baked.atlas?.loaded('field'),side+' loaded baked field');
+    for(const tier of loadedTiers[side]){
       const batches=baked.batches[tier],pages=baked.layout.tiers[tier].pages;
       require(Array.isArray(batches)&&pages.length===expected.pages?.[side]?.[tier]&&baked.atlas.textures[tier]?.length===pages.length
         &&batches.length===pages.length&&new Set(batches.map(b=>b.page)).size===pages.length,side+' baked page coverage');
@@ -286,7 +303,7 @@ export function discoverSceneStressOwners(game,effects,expected){
   require(batch.systems instanceof Set&&batch.systems.size===200&&effects.systems.every(s=>batch.systems.has(s.system)),'native smoke system bindings');
   require(['offset','color','rotation','size','uvTile'].every((key,i)=>batch.geometry.attributes[key]===[batch.offsetBuffer,batch.colorBuffer,batch.rotationBuffer,batch.sizeBuffer,batch.uvTileBuffer][i]),'named smoke attributes');
   add('smoke',[batch],[[batch.offsetBuffer,3],[batch.colorBuffer,4],[batch.rotationBuffer,1],[batch.sizeBuffer,3],[batch.uvTileBuffer,1]],1000,48);
-  return {owners,meshes:[...meshes],attributes:[...attributes],arrays:[...arrays],records,uniqueDynamicBytes:[...arrays].reduce((n,a)=>n+a.byteLength,0),smoke:{systems:200,particles:800,capacity:1000}};
+  return {mode,loadedTiers,owners,meshes:[...meshes],attributes:[...attributes],arrays:[...arrays],records,uniqueDynamicBytes:[...arrays].reduce((n,a)=>n+a.byteLength,0),smoke:{systems:200,particles:800,capacity:1000}};
 }
 
 /** Synthetic maximum draw of existing arrays; the independently warmed roster/smoke stays labelled. */
@@ -329,7 +346,7 @@ export function runSceneStressTransaction({discovery,draw,sample,verifyBaseline,
       native.push({label,ok,owners:rows});if(!ok)throw Error('scene stress: missing full-array live native reservation');return observation;
     },
   });
-  return {transaction,native,ok:transaction.ok&&native.length===3&&native.every(r=>r.ok),
+  return {mode:discovery.mode,loadedTiers:discovery.loadedTiers,transaction,native,ok:transaction.ok&&native.length===3&&native.every(r=>r.ok),
     kind:'synthetic capacity draw of warmed supported owners; simultaneous legal living/casualty gameplay not inferred',
     uniqueDynamicBytes:discovery.uniqueDynamicBytes,smoke:discovery.smoke};
 }

@@ -31,6 +31,7 @@ function ownerFixture(){
  return {game,effects,expected,command,cleanup(){loaders.forEach(f=>f.cleanup());
   roots.forEach(root=>root.traverse(m=>{m.geometry?.dispose();m.material?.map?.dispose();m.material?.dispose();}));}};
 }
+function discardFixtureClose(atlas){for(const p of atlas.pools){p.disposeTier(p.batches.close);p.batches.close=[];}atlas.textures.close.forEach(t=>t.dispose());delete atlas.textures.close;delete atlas.state.close;}
 function transactionFixture(){
  const storage=new ArrayBuffer(32),array=new Float32Array(storage,8,4),bits=new Uint32Array(storage,8,4);bits.set([0x7fa12345,0x80000000,0x3f800000,0x40000000]);
  const attr=new THREE.BufferAttribute(array,2),geo=new THREE.BufferGeometry();geo.setAttribute('position',attr);geo.setDrawRange(1,2);
@@ -48,6 +49,19 @@ function fixture(install){
 }
 const push=p=>p.push(0,0,0,0,1,0,0,0,0,0,0,0,true);
 const checks=[
+ ['owners-preclose',a=>{const f=ownerFixture();try{for(const side of ['US','CS'])discardFixtureClose(f.game.impostors[side].atlas);const d=a.discover(f.game,f.effects,f.expected,'preclose');assert(d.mode==='preclose'&&d.owners.filter(o=>o.label.includes('.close.')).length===0&&d.owners.filter(o=>o.label.startsWith('baked.')).length===8&&d.owners.some(o=>o.label==='smoke'),'owners-preclose: all non-close owners with no loaded close or IO');}finally{f.cleanup();}}],
+ ['owners-terminal',a=>{const f=ownerFixture();try{const p=f.game.impostors.CS;discardFixtureClose(p.atlas);p.atlas.state.close=Promise.resolve();const d=a.discover(f.game,f.effects,f.expected,'terminal');assert(d.mode==='terminal'&&d.owners.filter(o=>o.label.startsWith('baked.US.close.')).length===5&&!d.owners.some(o=>o.label.startsWith('baked.CS.close.')),'owners-terminal: Union close retained, unpublished Confederate close excluded');}finally{f.cleanup();}}],
+ ...Object.entries({'owners-mode-unknown':'unexpected','owners-preclose-loaded':'preclose','owners-terminal-published':'terminal'}).map(([name,mode])=>[name,a=>{const f=ownerFixture();let e;try{a.discover(f.game,f.effects,f.expected,mode);}catch(x){e=x;}finally{f.cleanup();}assert(e?.message.startsWith('scene stress owners:'),`${name}: ambiguous or contradictory tier selection rejected`);}]),
+ ...['missing-US','missing-promise','hidden-pool'].map(fault=>['owners-tier-'+fault,a=>{const f=ownerFixture();let e;try{
+   if(fault==='hidden-pool'){for(const side of ['US','CS'])discardFixtureClose(f.game.impostors[side].atlas);f.game.impostors.CS.atlas.pools[1].batches.close=[{}];}
+   else{discardFixtureClose(f.game.impostors.CS.atlas);if(fault==='missing-US'){f.game.impostors.CS.atlas.state.close=Promise.resolve();discardFixtureClose(f.game.impostors.US.atlas);}}
+   try{a.discover(f.game,f.effects,f.expected,fault==='hidden-pool'?'preclose':'terminal');}catch(x){e=x;}
+   if(fault==='hidden-pool')f.game.impostors.CS.atlas.pools[1].batches.close=[];
+   assert(e?.message.startsWith('scene stress owners:'),`owners-tier-${fault}: every attached pool and Union close remain bound`);
+ }finally{f.cleanup();}}]),
+ ['warm-tier-admission',a=>{const f=ownerFixture();try{f.game.paused=true;let calls=0;f.game.spawnUnit=()=>{calls++;};f.command.rings.show=()=>calls++;f.effects.puff=()=>calls++;f.effects.update=()=>calls++;
+   for(const mode of ['unexpected','preclose','terminal']){let e;try{a.warm({game:f.game,effects:f.effects},f.expected,300,mode);}catch(x){e=x;}assert(e?.message.startsWith('scene stress owners:')&&calls===0,'warm-tier-admission: contradictory tiers rejected before spawning, rings or smoke');}
+ }finally{f.cleanup();}}],
  ['start-gate-time-zero',a=>{const queue=[],scope={requestAnimationFrame(callback){queue.push(callback);return queue.length;}},game={simTime:0,paused:false,togglePause(){this.paused=!this.paused;}},gate=a.startGate(scope);scope.__game={game};let observed;
    const id=scope.requestAnimationFrame(function(t){observed={t,receiver:this,paused:game.paused,time:game.simTime};});queue.shift().call(scope,123);
    assert(id===1&&observed.t===123&&observed.receiver===scope&&observed.paused&&observed.time===0&&gate.first?.simTime===0,'start-gate-time-zero: native scheduling/receiver/timestamp preserved, first callback paused at zero');gate.restore();}],
@@ -181,6 +195,7 @@ const mutants={
  'contract-refusal':{contract:()=>({})},
  'warm-native-calls':{warm:(...args)=>({...warmSceneStressBaseline(...args),baseline:'pristine'})},
  'warm-refusal':{warm:()=>({})},
+ 'warm-tier-admission':{warm:()=>({})},
  'stress-complete':{stress:args=>({...runSceneStressTransaction(args),ok:false})},
  'stress-hidden-upload':{stress:args=>({...runSceneStressTransaction(args),ok:false})},
  'stress-async':{stress:()=>({ok:true})},

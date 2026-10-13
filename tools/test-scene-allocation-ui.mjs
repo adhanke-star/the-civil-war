@@ -1,7 +1,7 @@
 // Actions-only native lifecycle proof; this small fixture is not a whole-battle budget measurement.
 import {isDeepStrictEqual} from 'node:util';
 import {AllocationLedger,mipSizes,ReservationPeak,installAllocationObserver,createSceneHistory,compactSceneSample,expandSceneContext} from './bake/scene-allocation.mjs';
-import {installSceneStartGate} from './bake/inactive-figures.mjs';
+import {installSceneStartGate,restoreSceneDiagnostics} from './bake/inactive-figures.mjs';
 
 export async function sceneAllocationControls({browser,url,check,result,watchErrors}) {
   const ctx=await browser.newContext({viewport:{width:320,height:240}});
@@ -73,10 +73,11 @@ export async function sceneAllocationControls({browser,url,check,result,watchErr
   } finally {await ctx.close();}
   await sceneTransactionControls({browser,url,check,result,watchErrors});
   await sceneStressOwnerControls({browser,url,check,result,watchErrors});
+  await sceneStressOwnerControls({browser,url,check,result,watchErrors,mode:'terminal'});
 }
 
 // One actual current-PNG battle is a prerequisite proof, not the qualified 22+88 matrix.
-async function sceneStressOwnerControls({browser,url,check,result,watchErrors}){
+async function sceneStressOwnerControls({browser,url,check,result,watchErrors,mode='full'}){
   const ctx=await browser.newContext({viewport:{width:320,height:240},deviceScaleFactor:1,reducedMotion:'no-preference'});
   await ctx.addInitScript(source=>{window.__sceneStartNative={native:window.requestAnimationFrame,descriptor:Object.getOwnPropertyDescriptor(window,'requestAnimationFrame')};window.__sceneStartGate=(0,eval)('('+source+')')();},installSceneStartGate.toString());
   await ctx.addInitScript(installAllocationObserver,{ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString()});
@@ -87,8 +88,45 @@ async function sceneStressOwnerControls({browser,url,check,result,watchErrors}){
     if(await page.evaluate(()=>document.getElementById('briefing')?.open))await page.locator('#briefing-begin').click();
     await page.evaluate(()=>{const g=window.__game.game;if(!g.paused)g.togglePause();g.ensureBaked();});
     await page.waitForFunction(()=>window.__game.game.baked.state==='ready',null,{timeout:120000});
-    await page.evaluate(async()=>{await Promise.all(Object.values(window.__game.game.baked.atlases).map(a=>a.load('close')));});
-    const report=await page.evaluate(async()=>{
+    const preload=await page.evaluate(async()=>{
+      const {deriveSceneStressContract,warmSceneStressBaseline,runSceneStressTransaction,installRenderGate,restoreSceneDiagnostics}=await import('./tools/bake/inactive-figures.mjs'),
+        {sampleSceneAllocations,initializeSceneTextures}=await import('./tools/bake/scene-allocation.mjs'),{COMMAND}=await import('./src/game.js');
+      const scope=window.__game,{game,post,scene,camera}=scope,expected=deriveSceneStressContract(game.scenario,{US:{field:2,close:3},CS:{field:4,close:5}});
+      const zero=()=>Object.values(game.baked.atlases).every(a=>!a.state.close&&!a.textures.close&&a.pools.every(p=>p.batches.close.length===0));
+      if(!zero())throw Error('native preclose stress: premature close load');
+      const gate=installRenderGate(post);window.__sceneRenderGate=gate;let restoration;
+      const restore=()=>{gate.restore();if(window.__sceneRenderGate!==gate)throw Error('native preclose render gate ownership changed');delete window.__sceneRenderGate;return {ok:true,allocationRetained:!!window.__allocation};};
+      try{
+        const warm=warmSceneStressBaseline(scope,expected,COMMAND.radius,'preclose'),roster=JSON.stringify(game.units.map(u=>({id:u.id,men:u.men,x:u.x,z:u.z})));initializeSceneTextures();
+        const proof=runSceneStressTransaction({discovery:warm.discovery,draw:()=>gate.renderOnce(scene,camera),sample:()=>sampleSceneAllocations(),
+          verifyBaseline:()=>zero()&&game.simTime===0&&roster===JSON.stringify(game.units.map(u=>({id:u.id,men:u.men,x:u.x,z:u.z}))),reservations:array=>window.__allocation.bufferReservations(post.renderer.getContext(),array)});
+        restoration=restore();
+        const clean=s=>s.glError===0&&!s.allocation.unknown.length&&s.unmappedBufferBytes===0;
+        return {proof,restoration,zero:zero(),ok:proof.ok&&restoration.ok&&restoration.allocationRetained&&zero()
+          &&proof.transaction.samples.every(s=>clean(s.observation))&&proof.native.every(s=>s.owners.every(o=>!o.label.includes('.close.')))&&proof.smoke.particles===800};
+      }finally{if(!restoration)restore();}
+    });
+    if(!preload.ok)throw Error('native preclose maximum or restoration incomplete');
+    const loading=await page.evaluate(async mode=>{
+      const {US,CS}=window.__game.game.baked.atlases;
+      if(mode==='terminal'){
+        const pool=CS.pools[0],prior=Object.getOwnPropertyDescriptor(pool,'prepareTier'),native=pool.prepareTier;let fired=0,uploaded=0;
+        const wrapped=function(tier,...args){if(tier==='close'&&!fired++){
+          const renderer=window.__game.post.renderer,gl=renderer.getContext(),textures=args[1];
+          if(textures.length!==5)throw Error('native terminal prepare: expected five baseline textures');
+          for(const texture of textures){renderer.initTexture(texture);if(!renderer.properties.get(texture).__webglTexture||gl.getError())throw Error('native terminal prepare: upload not proved');uploaded++;}
+          throw Error('diagnostic current-PNG terminal prepare');
+        }return native.call(this,tier,...args);};
+        Object.defineProperty(pool,'prepareTier',{value:wrapped,writable:true,configurable:true});
+        window.__sceneTerminalPrepareRestore=()=>{if(pool.prepareTier!==wrapped)throw Error('native terminal prepare ownership changed');if(prior)Object.defineProperty(pool,'prepareTier',prior);else delete pool.prepareTier;delete window.__sceneTerminalPrepareRestore;};
+        const pending=CS.load('close'),cached=pending===CS.state.close,settled=await Promise.allSettled([US.load('close'),pending]);
+        if(fired!==1||uploaded!==5||!cached||CS.load('close')!==pending||settled[0].status!=='fulfilled'||settled[1].status!=='rejected'
+          ||settled[1].reason?.message!=='diagnostic current-PNG terminal prepare'||CS.textures.close||CS.pools.some(p=>p.batches.close.length))throw Error('native terminal load shape not proved');
+        window.__sceneTerminalPrepareRestore();return {fired,uploaded,cached,rejected:true,USLoaded:US.loaded('close'),CSLoaded:CS.loaded('close')};
+      }
+      await Promise.all([US.load('close'),CS.load('close')]);return {rejected:false,USLoaded:US.loaded('close'),CSLoaded:CS.loaded('close')};
+    },mode);
+    const report=await page.evaluate(async({mode,preload,loading})=>{
       const {deriveSceneStressContract,warmSceneStressBaseline,runSceneStressTransaction,installRenderGate,restoreSceneDiagnostics}=await import('./tools/bake/inactive-figures.mjs'),
         {sampleSceneAllocations,initializeSceneTextures}=await import('./tools/bake/scene-allocation.mjs'),{COMMAND}=await import('./src/game.js');
       const scope=window.__game,{game,scene,camera,post,effects}=scope;
@@ -97,35 +135,39 @@ async function sceneStressOwnerControls({browser,url,check,result,watchErrors}){
       const expected=deriveSceneStressContract(game.scenario,{US:{field:2,close:3},CS:{field:4,close:5}}),gate=installRenderGate(post);window.__sceneRenderGate=gate;
       let restoration;
       try{
-        const warm=warmSceneStressBaseline(scope,expected,COMMAND.radius),baseline=combat();initializeSceneTextures();
+        const warm=warmSceneStressBaseline(scope,expected,COMMAND.radius,mode),baseline=combat();initializeSceneTextures();
         const proof=runSceneStressTransaction({discovery:warm.discovery,draw:()=>gate.renderOnce(scene,camera),sample:()=>sampleSceneAllocations(),
           verifyBaseline:()=>combat()===baseline,reservations:array=>window.__allocation.bufferReservations(post.renderer.getContext(),array)});
         restoration=restoreSceneDiagnostics(window,{sampleRestored(){gate.renderOnce(scene,camera);const pending={label:'restored-native-pending',...sampleSceneAllocations()};post.renderer.getContext().finish();return [pending,{label:'restored-native-settled',...sampleSceneAllocations()}];}});
         window.__sceneStartGate.restore();const prior=window.__sceneStartNative,after=Object.getOwnPropertyDescriptor(window,'requestAnimationFrame'),startRestored=window.requestAnimationFrame===prior.native
           &&['value','writable','enumerable','configurable','get','set'].every(k=>after?.[k]===prior.descriptor?.[k]);
         const samples=[...proof.transaction.samples.map(s=>s.observation),...restoration.samples],clean=s=>s.glError===0&&!s.allocation.unknown.length&&s.unmappedBufferBytes===0;
-        return {kind:'actual current-PNG Henry Hill warmed maximum prerequisite; full qualified both-route matrix UNRUN',expected,spawned:warm.spawned,baseline:warm.baseline,
+        return {kind:'actual current-PNG Henry Hill warmed maximum prerequisite; full qualified both-route matrix UNRUN',mode,preload,loading,expected,spawned:warm.spawned,baseline:warm.baseline,
           proof,restoration,startup,startRestored,combatUnchanged:combat()===baseline,clean:samples.every(clean),rows:[
+            {name:'stress-owner-preclose',ok:preload.ok&&preload.zero&&preload.proof.mode==='preclose'},
             {name:'stress-owner-start-gate',ok:startup.simTime===0&&startRestored&&game.simTime===0&&game.paused},
-            {name:'stress-owner-coverage',ok:proof.ok&&proof.native.length===3&&proof.native.every(s=>s.owners.length===warm.discovery.owners.length)},
+            {name:'stress-owner-coverage',ok:proof.ok&&proof.native.length===3&&proof.native.every(s=>s.owners.length===warm.discovery.owners.length)
+              &&loading.USLoaded&&(mode==='full'?loading.CSLoaded:loading.rejected&&!loading.CSLoaded&&proof.native.every(s=>s.owners.some(o=>o.label.startsWith('baked.US.close.'))&&!s.owners.some(o=>o.label.startsWith('baked.CS.close.'))))},
             {name:'stress-owner-smoke',ok:proof.smoke.systems===200&&proof.smoke.particles===800&&proof.smoke.capacity===1000},
             {name:'stress-owner-restoration',ok:proof.ok&&restoration.ok&&combat()===baseline&&samples.every(clean)},
           ]};
       }finally{try{window.__sceneStartGate.restore();}finally{if(!restoration){const r=restoreSceneDiagnostics(window);if(!r.ok)throw Error('native stress cleanup: '+r.errors.join('; '));}}}
-    });
-    result.sceneStressOwners=report;for(const row of report.rows)check(`scene-allocation-${row.name}`,row.ok,JSON.stringify(report));
-    check('scene-allocation-stress-owner-errors',errors.length===0,errors.join('; '));
+    },{mode,preload,loading});
+    result[mode==='full'?'sceneStressOwners':'sceneTerminalStressOwners']=report;for(const row of report.rows)check(`scene-allocation-${mode==='terminal'?'terminal-':''}${row.name}`,row.ok,JSON.stringify(report));
+    check(`scene-allocation-${mode==='terminal'?'terminal-':''}stress-owner-errors`,errors.length===0,errors.join('; '));
   }catch(error){primaryFailure=error;throw error;}finally{
     let cleanupError;
     try{
-      result.sceneStressStartupCleanup=await page.evaluate(()=>{
+        result[mode==='full'?'sceneStressStartupCleanup':'sceneTerminalStressStartupCleanup']=await page.evaluate(source=>{
+        const errors=[];try{window.__sceneTerminalPrepareRestore?.();}catch(e){errors.push(e.message);}
+        try{const r=(0,eval)('('+source+')')(window);if(!r.ok)errors.push(...r.errors);}catch(e){errors.push(e.message);}
         const gate=window.__sceneStartGate,prior=window.__sceneStartNative;
-        if(!gate||!prior)throw Error('native scene startup cleanup: owner missing');gate.restore();
+        try{if(!gate||!prior)throw Error('native scene startup cleanup: owner missing');gate.restore();}catch(e){errors.push(e.message);}
         const after=Object.getOwnPropertyDescriptor(window,'requestAnimationFrame'),ok=window.requestAnimationFrame===prior.native
           &&['value','writable','enumerable','configurable','get','set'].every(k=>after?.[k]===prior.descriptor?.[k]);
-        if(!ok)throw Error('native scene startup cleanup: descriptor changed');return {ok:true,first:gate.first};
-      });
-    }catch(error){cleanupError=error;result.sceneStressStartupCleanup={ok:false,error:error.message,primaryFailure:primaryFailure?.message||null};}
+        if(!ok)errors.push('native scene startup cleanup: descriptor changed');if(errors.length)throw Error(errors.join('; '));return {ok:true,first:gate.first};
+      },restoreSceneDiagnostics.toString());
+    }catch(error){cleanupError=error;result[mode==='full'?'sceneStressStartupCleanup':'sceneTerminalStressStartupCleanup']={ok:false,error:error.message,primaryFailure:primaryFailure?.message||null};}
     finally{await ctx.close();}
     if(cleanupError&&!primaryFailure)throw cleanupError;
   }

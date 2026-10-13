@@ -1,5 +1,17 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0170 — root ACTIVE sole writer; no transfer. Source11803b66a0e5246e2d6c76414d22a69c443b276f
+CI38336271223 running; shard3/startup164 artifact unread. 0166 loaded-tier modes root+Astra99+99,
+unit/syntax/diff pass. Actions-only two-context preclose/full/terminal fixture expected shard3 171,
+native UNRUN. Pending source commit follows. Source28eeafb CI38335587595 all9/full own canonical
+251/365/163/159+campaign201+smoke6 each/errors[]/warnings[]/probe5,713,320B read.
+Accepted main e036 CI38335359579 all9green; own shards/campaign readback in progress;
+smoke/probe own readbacks pending; Pages38335359541 exact success/livecw-v68 fetched.
+Next complete reducer preload/postoutcome SAME native-owner validation and full qualified110context
+caller, acquisition/materialization/routes, actual native fault/held siblings, Lookout captures, envelope.
+Do not enable scene_routes or dispatch until full implementation; no asset adoption.
+Protected MAIN11 untouched; root continues same-session, no simultaneous provider edits.
+
 LATEST0169 — root ACTIVE sole writer; no transfer. SOURCE28eeafb0388797dd2dcab41096ba81c96547e168
 CI38335587595 running; original probes/three smoke green, four shards/campaign pending;
 own native journal163 and other canonical readbacks UNRUN. Accepted main e036 automatic

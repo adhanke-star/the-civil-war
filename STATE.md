@@ -1,8 +1,8 @@
 # STATE
-2026-10-12 — v1 released558456f; ACTIVE0162 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
+2026-10-12 — v1 released558456f; ACTIVE0166 Codex/Sol sole writer /private/tmp/cw-v1-1-20261012.
 Branch v1-1-gaps-20261012; light loop0108; Astra judge; COORDINATION absent; v1.1 then approved v2, unreleased.
 Accepted source/main e036716 CI38333093705 all9green/full canonical251/365/162/159 clean.
-Actualcampaign11783763872 201/errors[]/failure null; smoke6 each/native observer read; mainCI38335359579 pending.
+Actualcampaign11783763872 201/errors[]/failure null; smoke6 each/native observer read; mainCI38335359579 all9green/own readback ongoing.
 Pages38335359541 e036 green/livecw-v68 fetched; prior353879 mainCI38332577594 all9/full read.
 MAIN13a7b136 exact protected11 dirty paths untouched; c328 failedmainCI38298643624 retained.
 Delegation test-only native-refresh repair now passes latest actual shard3; no timer/runtime change.
@@ -12,7 +12,7 @@ Mixed38282452947/9d60c12 qualified; root+Astra viewed001–076; exact11files/576
 0151 loader CPU18+18/adapter10+10/export23+23; latest actual11 UIrows/genuine native ASTC pass.
 0156 CPU38+38/cleanup12+12; native source92/chunks132/restored92B exact identities/bytes/retirement pass.
 3407 all9green/fullread/native30owners/63arrays/max smoke/exact restore;0160 transport68+68 accepted.
-0161–0163 all9/full own read;0164 28eeafb CI38335587595/native163 pending;0165 startup90+90/native164 UNRUN.
+0161–0163 all9/full own read;0164 28eeafb all9/full own native163 read;0165 native164 pending;0166 tier99+99/native171 UNRUN.
 Whole scene GPU432,441,700>250M; qualified both×11/max pools/latent/fault/restoration/ceiling UNRUN.
 All20 badge natural B/S/G and legal level10 route open; six approved Veteran observations pending.
 .out near294.5MB/300M preserved; CPU local only; browser suites/scene runners Actions only.
