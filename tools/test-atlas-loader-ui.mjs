@@ -1,5 +1,7 @@
 // Actions-only controls. Synthetic fixture controls are separate from native GL upload observations.
 import {installAllocationObserver,AllocationLedger,mipSizes,ReservationPeak} from './bake/scene-allocation.mjs';
+import fs from 'node:fs';
+import {createHash} from 'node:crypto';
 export async function atlasLoaderControls({ browser, url, check, result, watchErrors }) {
   const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
   const page = await ctx.newPage(), errors = []; watchErrors(page, url, errors);
@@ -152,6 +154,68 @@ export async function atlasLoaderControls({ browser, url, check, result, watchEr
     check('atlas-loader-errors', errors.length === 0, errors.join('; '));
   } finally { await ctx.close(); }
   await limitedMipControls({browser,url,check,result,watchErrors});
+  await paintedMipReleaseControls({browser,url,check,result,watchErrors});
+}
+
+// Actual unchanged source PNG pages; isolated native proof, no whole-scene or visual adoption claim.
+async function paintedMipReleaseControls({browser,url,check,result,watchErrors}){
+ const base='assets/figures/confederate-infantry/',manifest=JSON.parse(fs.readFileSync(new URL('../'+base+'soldier.json',import.meta.url)));
+ const pages=['field','close'].map(tier=>{const page=manifest.tiers[tier].pages[0],bytes=fs.readFileSync(new URL('../'+base+page.file,import.meta.url));return {tier,...page,sha256:createHash('sha256').update(bytes).digest('hex')};});
+ const ctx=await browser.newContext({viewport:{width:128,height:128}}),errors=[];let page;
+ try{await ctx.addInitScript(installAllocationObserver,{ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),nativeJournal:true});
+  page=await ctx.newPage();watchErrors(page,url,errors);await page.goto(url+'?nosw');await page.waitForFunction(()=>window.__entry&&!window.__entry.importing);
+  const proof=await page.evaluate(async({pages,base})=>{
+   const THREE=await import('three'),{createLimitedMipOwner,pageMipBytes}=await import('./src/units/atlas-compression.js');
+   const p={kind:'two actual unchanged NPOT painted PNG pages; complete scene and all-page savings UNRUN',budgetClaim:false,pages:[],snapshots:[],cleanup:[],primary:null};
+   let renderer,owner,gl,geometry,material;const textures=new Set();
+   const attempt=(name,fn)=>{try{fn();p.cleanup.push({name,ok:true});}catch(e){p.cleanup.push({name,ok:false,error:String(e?.message??e)});}};
+   const hash=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
+   const sample=label=>({label,...window.__allocation.snapshot(gl)});
+   try{renderer=new THREE.WebGLRenderer({antialias:false});renderer.setPixelRatio(1);renderer.setSize(128,128);gl=renderer.getContext();
+    const nativeRender=Object.getOwnPropertyDescriptor(renderer,'render');p.snapshots.push(sample('baseline'));owner=createLimitedMipOwner(THREE,renderer);
+    geometry=new THREE.PlaneGeometry(2,2);material=new THREE.ShaderMaterial({uniforms:{uPage:{value:null},uLod:{value:0},uMax:{value:0}},vertexShader:'varying vec2 vUv; void main(){vUv=uv;gl_Position=vec4(position,1.0);}',fragmentShader:'uniform sampler2D uPage; uniform float uLod; uniform float uMax; varying vec2 vUv; void main(){gl_FragColor=textureLod(uPage,vUv,min(uLod,uMax));}'});
+    const scene=new THREE.Scene();scene.add(new THREE.Mesh(geometry,material));const camera=new THREE.Camera();
+    const reservation=t=>window.__allocation.textureReservation(gl,renderer.properties.get(t).__webglTexture);
+    const draw=async(t,lod,max)=>{material.uniforms.uPage.value=t;material.uniforms.uLod.value=lod;material.uniforms.uMax.value=max;renderer.render(scene,camera);gl.finish();const bytes=new Uint8Array(128*128*4);gl.readPixels(0,0,128,128,gl.RGBA,gl.UNSIGNED_BYTE,bytes);return {sha256:await hash(bytes),glError:gl.getError(),drawCalls:renderer.info.render.calls,drawTriangles:renderer.info.render.triangles,nonuniform:bytes.some((v,i)=>i%4<3&&v!==bytes[i%4])};};
+    const readLevels=async(t,count,w,h,rows)=>{const previous=gl.getParameter(gl.FRAMEBUFFER_BINDING),fb=gl.createFramebuffer();try{gl.bindFramebuffer(gl.FRAMEBUFFER,fb);for(let level=0;level<count;level++){
+      gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,renderer.properties.get(t).__webglTexture,level);if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('painted mip framebuffer incomplete');const bytes=new Uint8Array(w*h*4);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,bytes);rows.push({level,w,h,bytes:bytes.length,sha256:await hash(bytes),glError:gl.getError()});w=Math.max(1,Math.floor(w/2));h=Math.max(1,Math.floor(h/2));}}
+      finally{gl.bindFramebuffer(gl.FRAMEBUFFER,previous);gl.deleteFramebuffer(fb);renderer.resetState();}return rows;};
+    for(const source of pages){const response=await fetch('./'+base+source.file);if(!response.ok)throw Error('painted PNG HTTP '+response.status);const bytes=await response.arrayBuffer(),sourceHash=await hash(bytes);if(sourceHash!==source.sha256||bytes.byteLength!==source.bytes)throw Error('painted PNG source identity changed');
+      const image=new Image(),objectURL=URL.createObjectURL(new Blob([bytes],{type:'image/png'}));try{await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(Error('painted PNG decode'));image.src=objectURL;});}finally{URL.revokeObjectURL(objectURL);}
+      const texture=()=>{const t=new THREE.Texture(image);Object.assign(t,{flipY:false,premultiplyAlpha:true,colorSpace:THREE.NoColorSpace,generateMipmaps:true,minFilter:THREE.LinearMipmapLinearFilter,magFilter:THREE.LinearFilter,wrapS:THREE.ClampToEdgeWrapping,wrapT:THREE.ClampToEdgeWrapping});t.needsUpdate=true;textures.add(t);return t;};
+      const full=texture(),limited=texture(),count=source.tier==='field'?3:2,originalSource=limited.source,originalMips=limited.mipmaps;
+      const row={source,sourceHash,decoded:{w:image.width,h:image.height},count,views:[],original:[],levels:[],limited,originalSource,originalMips,image};p.pages.push(row);
+      renderer.initTexture(full);row.fullReservation=reservation(full);await readLevels(full,count,source.w,source.h,row.original);row.registered=owner.register(limited,source,source.tier);row.limitedReservation=reservation(limited);await readLevels(limited,count,source.w,source.h,row.levels);
+      row.expected={full:pageMipBytes(source.w,source.h).bytes,limited:row.original.reduce((n,r)=>n+r.bytes,0)};
+      for(const lod of [0,.5,1,1.5,2,5])row.views.push({lod,original:await draw(full,lod,count-1),limited:await draw(limited,lod,count-1)});
+      limited.needsUpdate=true;row.updated=await draw(limited,.5,count-1);row.identity=limited.image===image&&limited.source===originalSource;
+      gl.bindTexture(gl.TEXTURE_2D,renderer.properties.get(limited).__webglTexture);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,source.w,source.h,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(source.w*source.h*4));gl.bindTexture(gl.TEXTURE_2D,null);renderer.resetState();row.damaged=await draw(limited,0,count-1);
+      limited.needsUpdate=true;row.repaired=await draw(limited,0,count-1);const wrong=texture();wrong.premultiplyAlpha=false;row.wrongAlpha=await draw(wrong,0,count-1);wrong.dispose();textures.delete(wrong);gl.finish();
+      p.snapshots.push(sample(source.tier+'-initialized'));full.dispose();textures.delete(full);gl.finish();
+    }
+    const [field,close]=p.pages;p.beforeRelease=sample('before-release');p.fieldBefore=await draw(field.limited,.5,field.count-1);
+    owner.releaseForDisposal(close.limited);p.closeReleasedFields=close.limited.source===close.originalSource&&close.limited.image===close.image&&close.limited.mipmaps===close.originalMips&&close.limited.generateMipmaps===true&&close.limited.source.dataReady===true;
+    close.limited.dispose();textures.delete(close.limited);gl.finish();p.afterRelease=sample('close-released');p.fieldAfter=await draw(field.limited,.5,field.count-1);p.ownerAfterRelease=owner.receipt();
+    owner.releaseForDisposal(field.limited);field.limited.dispose();textures.delete(field.limited);gl.finish();p.afterAllRelease=sample('all-released');p.ownerAfterAllRelease=owner.receipt();
+    owner.restore();p.renderRestored=['value','writable','enumerable','configurable','get','set'].every(k=>Object.getOwnPropertyDescriptor(renderer,'render')?.[k]===nativeRender?.[k]);
+   }catch(e){p.primary=String(e?.message??e);}
+   finally{if(owner)attempt('owner',()=>owner.restore());for(const t of textures)attempt('texture-'+t.uuid,()=>t.dispose());if(material)attempt('material',()=>material.dispose());if(geometry)attempt('geometry',()=>geometry.dispose());if(gl)attempt('finish',()=>gl.finish());if(renderer)attempt('renderer',()=>renderer.dispose());if(renderer)attempt('context',()=>renderer.forceContextLoss());}
+   for(const row of p.pages)for(const key of ['limited','originalSource','originalMips','image'])delete row[key];return p;
+  },{pages,base});result.paintedMipReleaseProof=proof;
+  const healthy=r=>r?.glError===0&&r.drawCalls>0&&r.drawTriangles===2&&r.nonuniform;
+  const slots=(snapshot,reservation,expected)=>{const rows=snapshot?.textureSlots.filter(r=>r.texture===reservation?.id)||[];return rows.length===1&&!rows[0].pendingDelete&&JSON.stringify(rows[0].slots)===JSON.stringify(Object.fromEntries(expected.map((r,i)=>['3553:'+i,r.bytes])));};
+  check('painted-mip-source',proof.pages.length===2&&proof.pages.every((r,i)=>JSON.stringify(r.source)===JSON.stringify(pages[i])&&r.sourceHash===pages[i].sha256&&r.decoded.w===pages[i].w&&r.decoded.h===pages[i].h&&r.identity),'actual two source PNG SHA/length/dimensions and original image/source identities');
+  check('painted-mip-levels',proof.pages.length===2&&proof.pages.every(r=>r.original.length===r.count&&r.levels.length===r.count&&r.original.every((v,i)=>JSON.stringify(v)===JSON.stringify(r.levels[i])&&v.glError===0)),'whole native RGBA SHA for each retained NPOT level; no image resampling or substitute art');
+  check('painted-mip-first-frames',proof.pages.length===2&&proof.pages.every(r=>r.views.length===6&&r.views.every(v=>healthy(v.original)&&healthy(v.limited)&&v.original.sha256===v.limited.sha256)&&healthy(r.updated)&&r.updated.sha256===r.views[1].original.sha256),'six explicit sampled/clamped LOD whole-frame SHA and changed-version first frame');
+  check('painted-mip-rejecting-controls',proof.pages.length===2&&proof.pages.every(r=>r.damaged?.glError===0&&r.damaged.drawTriangles===2&&healthy(r.repaired)&&healthy(r.wrongAlpha)&&r.damaged.sha256!==r.views[0].original.sha256&&r.wrongAlpha.sha256!==r.views[0].original.sha256&&r.repaired.sha256===r.views[0].original.sha256),'actual zero native base and wrong alpha differ; same original PNG repairs exactly');
+  check('painted-mip-allocation',proof.pages.length===2&&proof.pages.every(r=>r.expected&&r.fullReservation?.bytes===r.expected.full&&r.limitedReservation?.bytes===r.expected.limited&&slots(proof.snapshots.find(s=>s.label===r.source.tier+'-initialized'),r.limitedReservation,r.original))&&proof.snapshots.every(s=>!s.unknown.length),'exact native full/limited bytes and finite NPOT level slots');
+  const [field,close]=proof.pages;
+  check('painted-mip-release',proof.closeReleasedFields&&healthy(proof.fieldBefore)&&healthy(proof.fieldAfter)&&proof.fieldBefore.sha256===proof.fieldAfter.sha256
+    &&proof.afterRelease?.textureSlots.every(r=>r.texture!==close?.limitedReservation.id)&&slots(proof.afterRelease,field?.limitedReservation,field?.original||[])
+    &&proof.afterAllRelease?.textureSlots.every(r=>![field?.limitedReservation.id,close?.limitedReservation.id].includes(r.texture))&&proof.ownerAfterRelease?.pages.length===1&&proof.ownerAfterRelease.pages[0].tier==='field'&&proof.ownerAfterAllRelease?.pages.length===0&&!proof.ownerAfterRelease?.failed&&!proof.ownerAfterAllRelease?.failed&&proof.renderRestored,
+    'intentional close native disposal retires only close; sibling field renders unchanged; all owned slots retire and renderer descriptor restores');
+  check('painted-mip-errors',!proof.primary&&!errors.length&&proof.cleanup.every(r=>r.ok),JSON.stringify({primary:proof.primary,errors,cleanup:proof.cleanup}));
+ }finally{await ctx.close();}
 }
 
 async function limitedMipControls({browser,url,check,result,watchErrors}){

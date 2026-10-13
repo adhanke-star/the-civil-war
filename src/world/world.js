@@ -46,7 +46,9 @@ export function planGround(terrain, scenario, { parcels: kind = DEFAULT_PARCELS 
   return { parcels, roadField, streamField, trees, forest, treeSpacing: spacing, treeSpacingRequested: requested, fences, fenceField };
 }
 
-export function buildWorld(scene, terrain, scenario) {
+export function buildWorld(scene, terrain, scenario, { terrainMeshFactory = null } = {}) {
+  if (terrainMeshFactory !== null && (typeof terrainMeshFactory !== 'function'
+    || Object.prototype.toString.call(terrainMeshFactory) === '[object AsyncFunction]')) throw new Error('World: synchronous diagnostic terrain factory required');
   const sun = makeSun();
   const meta = terrain.meta;
   const t0 = performance.now();
@@ -56,7 +58,18 @@ export function buildWorld(scene, terrain, scenario) {
   const { ground, info } = paintGround(terrain, parcels, meta.roads, meta.streams, trees, sun.direction);
   const t1 = performance.now();
 
-  const terrainMesh = buildTerrainMesh(terrain, ground, info, sun);
+  let terrainMesh;
+  try { terrainMesh = buildTerrainMesh(terrain, ground, info, sun, { meshFactory: terrainMeshFactory }); }
+  catch (error) {
+    const failures = [];
+    for (const texture of [ground, info]) { try { texture.dispose(); } catch (failure) { failures.push(failure); } }
+    if (failures.length) {
+      const aggregate = new AggregateError([error, ...failures], 'World: terrain construction and painted texture cleanup failed');
+      if (error?.cleanupPromise) aggregate.cleanupPromise = error.cleanupPromise;
+      throw aggregate;
+    }
+    throw error;
+  }
   scene.add(terrainMesh);
   scene.add(buildApron(terrain, sun));
   const treeGroup = buildTrees(terrain, trees, { far: FOG_FAR });

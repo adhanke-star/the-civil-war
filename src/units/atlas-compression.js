@@ -73,7 +73,7 @@ export function createLimitedMipOwner(THREE,renderer){
     initialContext=renderer.getContext();
   let properties=renderer.properties,propertiesGet=properties.get,propertiesHas=properties.has,propertiesDescriptor=Object.getOwnPropertyDescriptor(properties,'get'),hasDescriptor=Object.getOwnPropertyDescriptor(properties,'has');
   if(!initialContext||initialContext.isContextLost())refuse('lost initial context');
-  let epoch=0,busy=false,initializing=false,restored=false,failed=false,failure,pendingLoss=false;
+  let epoch=0,busy=false,initializing=false,releasing=false,restored=false,failed=false,failure,pendingLoss=false;
   const same=(a,b)=>['value','writable','enumerable','configurable','get','set'].every(k=>a?.[k]===b?.[k]);
   const record=row=>{if(events.length>=256)refuse('receipt bound');events.push(row);};
   const sticky=error=>{if(!failed){failed=true;failure=error;}return error;};
@@ -96,9 +96,9 @@ export function createLimitedMipOwner(THREE,renderer){
     if(threw)throw error;assertOwner();context();if(!valid(r)||r.texture.version!==version||r.source.version!==sourceVersion)refuse('source cleanup ownership drift');
     r.version=version;r.sourceVersion=sourceVersion;r.epoch=epoch;record({operation:'initialized',tier:r.tier,levels:r.mips.length,bytes:r.bytes,version,sourceVersion,epoch});
   };
-  const assertOwner=()=>{if(restored)refuse('restored owner');if(!same(Object.getOwnPropertyDescriptor(renderer,'render'),installed))refuse('render ownership drift');if(failed)throw failure;};
+  const assertOwner=(allowRelease=false)=>{if(releasing&&!allowRelease)refuse('release reentrancy');if(restored)refuse('restored owner');if(!same(Object.getOwnPropertyDescriptor(renderer,'render'),installed))refuse('render ownership drift');if(failed)throw failure;};
   const preflight=()=>{assertOwner();context();for(const r of owned.values()){if(!valid(r))refuse('texture/image ownership drift');if(r.version!==r.texture.version||r.sourceVersion!==r.source.version||r.epoch!==epoch)initialize(r);}};
-  const wrapped=function(...args){if(this!==renderer||busy||initializing)refuse('render receiver/reentrancy');busy=true;try{preflight();assertOwner();return Reflect.apply(native,this,args);}catch(error){throw sticky(error);}finally{busy=false;}};
+  const wrapped=function(...args){if(this!==renderer||busy||initializing||releasing)refuse('render receiver/reentrancy');busy=true;try{preflight();assertOwner();return Reflect.apply(native,this,args);}catch(error){throw sticky(error);}finally{busy=false;}};
   Object.defineProperty(renderer,'render',{value:wrapped,writable:true,enumerable:descriptor?.enumerable??true,configurable:true});const installed=Object.getOwnPropertyDescriptor(renderer,'render');
   const onLost=event=>{try{if(event?.isTrusted!==true||event.target!==canvas||event.type!=='webglcontextlost'||!apiOwned()
     ||!same(Object.getOwnPropertyDescriptor(renderer,'render'),installed)||renderer.getContext()!==initialContext||!initialContext.isContextLost())refuse('lost context ownership drift');pendingLoss=true;}catch(error){sticky(error);}};
@@ -128,9 +128,31 @@ export function createLimitedMipOwner(THREE,renderer){
         initialize(r);return {tier,levels,bytes:r.bytes};}catch(error){sticky(error);const cleanup=[];try{record({operation:'failure',tier,error:String(error?.message??error)});}catch(e){cleanup.push(e);}
         for(const fn of [()=>originalFields(r),()=>texture.removeEventListener('dispose',r.dispose),()=>texture.dispose()])try{fn();}catch(e){cleanup.push(e);}owned.delete(texture);if(cleanup.length)throw new AggregateError([error,...cleanup],'limited atlas mips: registration and cleanup failed');throw error;}
     },
+    // The caller still owns native disposal. Release only a verified page, keeping other tiers gated.
+    releaseForDisposal(texture){
+      assertOwner();if(busy||initializing)refuse('release during draw/initialization');
+      const r=owned.get(texture);if(!r||!valid(r))refuse('release texture ownership drift');context();
+      if(events.length>=256)refuse('receipt bound');
+      const entry={operation:'released-for-disposal',textureUUID:texture.uuid,tier:r.tier,levels:r.mips.length,bytes:r.bytes,version:texture.version,sourceVersion:r.source.version,epoch};
+      releasing=true;
+      try{
+        originalFields(r);texture.removeEventListener('dispose',r.dispose);assertOwner(true);context();
+        if(texture.source!==r.source||texture.image!==r.image||texture.mipmaps!==r.originalMips||r.source.dataReady!==r.originalReady||texture.generateMipmaps!==r.originalGenerate
+          ||Object.entries(r.fields).some(([key,value])=>texture[key]!==value))refuse('release restoration ownership drift');
+        record(entry);owned.delete(texture);return {...entry};
+      }catch(error){
+        sticky(error);const cleanup=[];
+        // Keep failed releases registered in their owned limited state, so independent restore remains possible.
+        // Never replace an unexpected foreign image/source or mip array while rolling back.
+        if(texture.source===r.source&&texture.image===r.image&&[r.mips,r.originalMips].includes(texture.mipmaps)){
+          for(const fn of [()=>{texture.mipmaps=r.mips;},()=>{r.source.dataReady=false;},()=>{texture.generateMipmaps=false;},()=>texture.addEventListener('dispose',r.dispose)])try{fn();}catch(e){cleanup.push(e);}
+        }
+        if(cleanup.length)throw new AggregateError([error,...cleanup],'limited atlas mips: release and rollback failed');throw error;
+      }finally{releasing=false;}
+    },
     initialize(){if(busy)refuse('initialization during draw');try{preflight();}catch(error){throw sticky(error);}},
     receipt(){return {diagnosticOnly:true,nativeFeasibility:'UNRUN until external native readback',epoch,failed,error:failed?String(failure?.message??failure):null,events:structuredClone(events),pages:[...owned.values()].map(r=>({tier:r.tier,levels:r.mips.length,bytes:r.bytes,version:r.version,sourceVersion:r.sourceVersion,epoch:r.epoch}))};},
-    restore(){if(restored){if(failed)throw failure;return;}if(busy||!same(Object.getOwnPropertyDescriptor(renderer,'render'),installed))refuse('restore ownership drift');
+    restore(){if(releasing)refuse('release reentrancy');if(restored){if(failed)throw failure;return;}if(busy||!same(Object.getOwnPropertyDescriptor(renderer,'render'),installed))refuse('restore ownership drift');
       for(const r of owned.values())if(!valid(r))refuse('restore texture ownership drift');const errors=[];
       for(const r of [...owned.values()])for(const fn of [()=>originalFields(r),()=>r.texture.removeEventListener('dispose',r.dispose)])try{fn();}catch(e){errors.push(e);}
       for(const [name,fn]of [['webglcontextlost',onLost],['webglcontextrestored',onRestored]])try{canvas.removeEventListener(name,fn);}catch(e){errors.push(e);}try{if(descriptor)Object.defineProperty(renderer,'render',descriptor);else delete renderer.render;}catch(e){errors.push(e);}

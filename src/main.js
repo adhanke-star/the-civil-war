@@ -40,7 +40,9 @@ import { FALLEN } from './units/soldier-mesh.js';
 let fieldClaimed = false;
 // Importing this module has no field side effects. The owner commits navigation only after recheck.
 // A campaign launch ({ campaign: { slot, replay } }, from ?campaign=<slot>[&replay]) loads that slot's next phase.
-export async function startField({ manifest = null, campaign = null, isCurrent = () => true, onAdmitted = () => {} } = {}) {
+export async function startField({ manifest = null, campaign = null, isCurrent = () => true, onAdmitted = () => {}, diagnosticTerrainFactory = null } = {}) {
+  if (diagnosticTerrainFactory !== null && (typeof diagnosticTerrainFactory !== 'function'
+    || Object.prototype.toString.call(diagnosticTerrainFactory) === '[object AsyncFunction]')) throw new Error('Field: synchronous diagnostic terrain factory required');
   if (!isCurrent()) throw new Error('Practice: deployment review was cancelled.');
   if (campaign && (manifest || ![1, 2, 3].includes(campaign.slot)
     || ['intro', 'practice', 'battle', 'sandbox', 'tune'].some((key) => new URLSearchParams(location.search).has(key)))) {
@@ -135,7 +137,7 @@ const gpuTier = import('detect-gpu')
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 2, 6000);
 
-const world = buildWorld(scene, terrain, scenario);
+const world = buildWorld(scene, terrain, scenario, { terrainMeshFactory: diagnosticTerrainFactory });
 Object.assign(stats, world.stats);
 
 // Opening view: both armies between the clock and the bottom panels; the pitch follows the zoom.

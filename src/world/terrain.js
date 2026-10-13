@@ -166,30 +166,13 @@ function buildNormalTexture(data) {
   return tex;
 }
 
-export function buildTerrainMesh(data, groundTexture, infoTexture, sun) {
+export function buildTerrainMesh(data, groundTexture, infoTexture, sun, { meshFactory = null } = {}) {
+  if (meshFactory !== null && (typeof meshFactory !== 'function'
+    || Object.prototype.toString.call(meshFactory) === '[object AsyncFunction]')) throw new Error('terrain: synchronous diagnostic mesh factory required');
   const G = data.grid;
   const martini = new Martini(G);
   const tile = martini.createTile(data.heights);
   const { vertices, triangles } = tile.getMesh(0.5);
-  const n = vertices.length / 2;
-  const pos = new Float32Array(n * 3);
-  const uv = new Float32Array(n * 2);
-  for (let i = 0; i < n; i++) {
-    const gx = vertices[i * 2];
-    const gz = vertices[i * 2 + 1];
-    pos[i * 3] = gx * data.cell - data.half;
-    pos[i * 3 + 1] = data.heights[gz * G + gx];
-    pos[i * 3 + 2] = gz * data.cell - data.half;
-    uv[i * 2] = gx / (G - 1);
-    uv[i * 2 + 1] = gz / (G - 1);
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  geo.setIndex(new THREE.BufferAttribute(new Uint32Array(triangles), 1));
-  geo.computeBoundingSphere();
-  geo.computeBoundingBox();
-
   const material = new THREE.ShaderMaterial({
     uniforms: {
       uGround: { value: groundTexture },
@@ -277,6 +260,95 @@ export function buildTerrainMesh(data, groundTexture, infoTexture, sun) {
       }
     `,
   });
+  if (meshFactory) {
+    const uniforms = material.uniforms;
+    const records = Object.entries(uniforms).map(([key, record]) => [key, record, record.value]);
+    const ownedNormal = uniforms.uNormal.value, ownedNoise = uniforms.uNoise.value;
+    const vertexShader = material.vertexShader, fragmentShader = material.fragmentShader;
+    const disposed = new Set();
+    const meshResources = value => {
+      const resources = new Set();
+      if (value?.isMesh && value.parent === null) value.traverse(o => {
+        if (o.geometry) resources.add(o.geometry);
+        for (const m of (Array.isArray(o.material) ? o.material : [o.material]).filter(Boolean)) resources.add(m);
+      });
+      return resources;
+    };
+    const cleanupResources = (resources, errors) => {
+      for (const resource of resources) {
+        if (disposed.has(resource)) continue;
+        disposed.add(resource);
+        try { resource.dispose(); } catch (error) { errors.push(error); }
+      }
+    };
+    let mesh;
+    let transferred = new Set();
+    const validPublication = () => mesh?.isMesh && mesh.name === 'terrain' && mesh.userData.triangles === triangles.length / 3
+      && mesh.material?.isShaderMaterial && mesh.material !== material && mesh.parent === null
+      && material.uniforms === uniforms && Object.keys(uniforms).length === records.length
+      && records.every(([key, record, value]) => uniforms[key] === record && record.value === value)
+      && material.vertexShader === vertexShader && material.fragmentShader === fragmentShader
+      && ['uGround', 'uInfo', 'uNormal', 'uNoise'].every(k => mesh.material.uniforms[k] === uniforms[k]);
+    try {
+      // Diagnostic factory runs before any monolithic position/UV/index render backing is allocated.
+      mesh = meshFactory({ THREE, data, vertices, triangles, material });
+      if (mesh && typeof mesh.then === 'function') {
+        const error = new Error('terrain: synchronous diagnostic mesh factory required');
+        // Refuse asynchronous publication, consume its rejection, and retain late cleanup results.
+        error.cleanupPromise = Promise.resolve(mesh).then(value => {
+          const errors = []; cleanupResources(meshResources(value), errors); return errors;
+        }, failure => [failure]).catch(failure => [failure]);
+        throw error;
+      }
+      transferred = meshResources(mesh);
+      if (!validPublication()) {
+        throw new Error('terrain: diagnostic factory must publish its own mesh/material with shared texture records');
+      }
+      disposed.add(material);
+      material.dispose(); // Original shader shell was never published; the factory owns its cloned material.
+      const published = meshResources(mesh);
+      if (!validPublication() || published.size !== transferred.size || [...transferred].some(r => !published.has(r))) {
+        throw new Error('terrain: diagnostic factory publication changed during shell disposal');
+      }
+      return mesh;
+    } catch (error) {
+      const cleanup = [];
+      const resources = new Set([ownedNormal, ownedNoise, material]);
+      // Returning an unattached mesh transfers its geometry/material ownership to this construction.
+      // A factory that throws before returning remains responsible for its own partial publication.
+      for (const resource of resources) {
+        if (disposed.has(resource)) continue;
+        disposed.add(resource);
+        try { resource.dispose(); } catch (e) { cleanup.push(e); }
+      }
+      cleanupResources(transferred, cleanup);
+      if (cleanup.length) {
+        const aggregate = new AggregateError([error, ...cleanup], 'terrain: diagnostic factory and cleanup failed');
+        if (error?.cleanupPromise) aggregate.cleanupPromise = error.cleanupPromise;
+        throw aggregate;
+      }
+      throw error;
+    }
+  }
+  const n = vertices.length / 2;
+  const pos = new Float32Array(n * 3);
+  const uv = new Float32Array(n * 2);
+  for (let i = 0; i < n; i++) {
+    const gx = vertices[i * 2];
+    const gz = vertices[i * 2 + 1];
+    pos[i * 3] = gx * data.cell - data.half;
+    pos[i * 3 + 1] = data.heights[gz * G + gx];
+    pos[i * 3 + 2] = gz * data.cell - data.half;
+    uv[i * 2] = gx / (G - 1);
+    uv[i * 2 + 1] = gz / (G - 1);
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  geo.setIndex(new THREE.BufferAttribute(new Uint32Array(triangles), 1));
+  geo.computeBoundingSphere();
+  geo.computeBoundingBox();
+
   const mesh = new THREE.Mesh(geo, material);
   mesh.name = 'terrain';
   mesh.userData.triangles = triangles.length / 3;

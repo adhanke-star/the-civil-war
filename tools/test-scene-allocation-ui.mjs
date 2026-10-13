@@ -96,7 +96,7 @@ async function canonicalTerrainControls({browser,url,check,result,watchErrors}){
       try{renderer=new THREE.WebGLRenderer({antialias:false});scene=new THREE.Scene();gl=renderer.getContext();renderer.setPixelRatio(1);renderer.setSize(320,240);
         scope={__game:{scene,post:{renderer},game:{baked:{atlases:{}}}},__allocation:window.__allocation,innerWidth:320,innerHeight:240,devicePixelRatio:1};const ground=texture(128),info=texture(64,true);
         for(const name of ['henry-hill','shiloh','stones-river','chattanooga','lookout-mountain']){
-          const receipt={name,views:[],snapshots:[],cleanup:[],primary:null,complete:false};proof.cases.push(receipt);let old,canonical,material;
+          const receipt={name,views:[],snapshots:[],cleanup:[],primary:null,complete:false};proof.cases.push(receipt);let old,canonical,material,startup;
           try{const data=await loadTerrainData('./assets/terrain',name);old=buildTerrainMesh(data,ground,info,makeSun());material=old.material;
             for(const u of Object.values(material.uniforms))if(u.value?.isTexture)ownedTextures.add(u.value);
             const {vertices,triangles}=new Martini(data.grid).createTile(data.heights).getMesh(.5),prepared=prepareCanonicalTerrain({grid:data.grid,cell:data.cell,half:data.half,heights:data.heights,vertices,triangles});canonical=createCanonicalTerrainMesh(prepared,THREE,material);
@@ -122,12 +122,39 @@ async function canonicalTerrainControls({browser,url,check,result,watchErrors}){
             receipt.controls={before:receipt.views[2].canonical};for(const child of canonical.children){const a=child.geometry.attributes.aHeight;for(let i=0;i<a.count;i++)a.array[i]+=75;a.needsUpdate=true;child.frustumCulled=false;}
             receipt.controls.changedHeight=draw('near');for(const child of canonical.children){const g=child.geometry.attributes.aGrid,h=child.geometry.attributes.aHeight;for(let i=0;i<h.count;i++)h.array[i]=data.heights[g.array[i*2+1]*data.grid+g.array[i*2]];h.needsUpdate=true;}
             canonical.material.uniforms.uCanonicalInverse.value*=.5;receipt.controls.changedUV=draw('near');canonical.material.uniforms.uCanonicalInverse.value*=2;receipt.controls.repaired=draw('near');receipt.snapshots.push(sample('after-controls'));
+            // Separate diagnostic startup baseline: never allocate the original position/UV/index render backing.
+            const direct={views:[],snapshots:[],controls:{}};receipt.startup=direct;let shell,sourceVertices,sourceTriangles,shellDisposals=0;
+            startup=buildTerrainMesh(data,ground,info,makeSun(),{meshFactory:input=>{
+              shell=input.material;sourceVertices=input.vertices;sourceTriangles=input.triangles;shell.addEventListener('dispose',()=>shellDisposals++);
+              for(const key of ['uNormal','uNoise'])ownedTextures.add(shell.uniforms[key].value);
+              return createCanonicalTerrainMesh(prepareCanonicalTerrain({grid:data.grid,cell:data.cell,half:data.half,heights:data.heights,vertices:input.vertices,triangles:input.triangles}),THREE,shell);
+            }});
+            const ownGeometry=startup.geometry,ownMaterial=startup.material,ownChildren=[...startup.children],ownCulling=startup.children.map(c=>c.frustumCulled),ownArrays=[];
+            startup.traverse(o=>{for(const a of [...Object.values(o.geometry.attributes),o.geometry.index].filter(Boolean))ownArrays.push(a.array);});
+            direct.identity={ownMaterial:ownMaterial!==shell,shellDisposals,emptyRoot:Object.keys(ownGeometry.attributes).length===0&&ownGeometry.index===null,
+              noSourceBacking:ownArrays.every(a=>a!==sourceVertices&&a!==sourceTriangles&&a!==data.heights),bytes:ownArrays.reduce((n,a)=>n+a.byteLength,0),
+              textures:['uGround','uInfo','uNormal','uNoise'].every(k=>ownMaterial.uniforms[k]===shell.uniforms[k])};
+            direct.snapshots.push(sample('before-startup'));scene.remove(canonical);
+            // Retire the comparison mesh before mapping the independent startup baseline.
+            // Otherwise its detached native buffers would be honestly reported as unmapped.
+            canonical.traverse(o=>o.geometry.dispose());gl.finish();scene.add(startup);
+            for(const view of receipt.views)direct.views.push({label:view.label,original:view.original,startup:draw(view.label)});
+            direct.snapshots.push(sample('startup'));direct.fullBuffers=ownArrays.every(a=>scope.__allocation.bufferReservations(gl,a).some(r=>!r.pendingDelete&&r.bytes===a.byteLength));
+            direct.controls.before=direct.views[2].startup;
+            for(const child of startup.children){const a=child.geometry.attributes.aHeight;for(let i=0;i<a.count;i++)a.array[i]+=75;a.needsUpdate=true;child.frustumCulled=false;}
+            direct.controls.changedHeight=draw('near');
+            for(const child of startup.children){const g=child.geometry.attributes.aGrid,h=child.geometry.attributes.aHeight;for(let i=0;i<h.count;i++)h.array[i]=data.heights[g.array[i*2+1]*data.grid+g.array[i*2]];h.needsUpdate=true;}
+            ownMaterial.uniforms.uCanonicalInverse.value*=.5;direct.controls.changedUV=draw('near');ownMaterial.uniforms.uCanonicalInverse.value*=2;ownChildren.forEach((child,i)=>{child.frustumCulled=ownCulling[i];});direct.controls.repaired=draw('near');
+            direct.restored=startup.geometry===ownGeometry&&startup.material===ownMaterial&&startup.children.length===ownChildren.length&&ownChildren.every((child,i)=>startup.children[i]===child&&child.frustumCulled===ownCulling[i])
+              &&['uGround','uInfo','uNormal','uNoise'].every(k=>ownMaterial.uniforms[k]===shell.uniforms[k]);
+            direct.snapshots.push(sample('startup-repaired'));
             Object.assign(receipt,{grid:data.grid,triangles:prepared.triangles,chunks:prepared.chunks.length,bytes:prepared.bytes,precision:gl.getShaderPrecisionFormat(gl.VERTEX_SHADER,gl.HIGH_FLOAT).precision,complete:true});
           }catch(error){receipt.primary=String(error?.message??error);}
-          finally{if(old)attempt(receipt.cleanup,'detach-original',()=>scene.remove(old));if(canonical)attempt(receipt.cleanup,'detach-canonical',()=>scene.remove(canonical));
-            const geometries=new Set();for(const root of [old,canonical].filter(Boolean))root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);});for(const [i,g]of [...geometries].entries())attempt(receipt.cleanup,'geometry-'+i,()=>g.dispose());
-            for(const [i,m]of [old?.material,canonical?.material].filter(Boolean).entries())attempt(receipt.cleanup,'material-'+i,()=>m.dispose());
+          finally{if(old)attempt(receipt.cleanup,'detach-original',()=>scene.remove(old));if(canonical)attempt(receipt.cleanup,'detach-canonical',()=>scene.remove(canonical));if(startup)attempt(receipt.cleanup,'detach-startup',()=>scene.remove(startup));
+            const geometries=new Set();for(const root of [old,canonical,startup].filter(Boolean))root.traverse(o=>{if(o.geometry)geometries.add(o.geometry);});for(const [i,g]of [...geometries].entries())attempt(receipt.cleanup,'geometry-'+i,()=>g.dispose());
+            for(const [i,m]of [old?.material,canonical?.material,startup?.material].filter(Boolean).entries())attempt(receipt.cleanup,'material-'+i,()=>m.dispose());
             for(const key of ['uNormal','uNoise']){const t=material?.uniforms[key]?.value;if(t)attempt(receipt.cleanup,key,()=>{t.dispose();ownedTextures.delete(t);});}
+            for(const key of ['uNormal','uNoise']){const t=startup?.material?.uniforms[key]?.value;if(t)attempt(receipt.cleanup,'startup-'+key,()=>{t.dispose();ownedTextures.delete(t);});}
             attempt(receipt.cleanup,'finish',()=>gl.finish());attempt(receipt.cleanup,'cleanup-observation',()=>receipt.snapshots.push(sample('cleanup')));}
           receipt.complete=receipt.complete&&!receipt.primary&&receipt.cleanup.every(r=>r.ok);if(!receipt.complete)break;
         }
@@ -143,6 +170,13 @@ async function canonicalTerrainControls({browser,url,check,result,watchErrors}){
         &&[c.controls?.changedHeight,c.controls?.changedUV,c.controls?.repaired].every(healthy)
         &&c.controls.changedHeight.pixels!==c.controls.before.pixels&&c.controls.changedUV.pixels!==c.controls.before.pixels&&c.controls.repaired.pixels===c.controls.before.pixels,
         JSON.stringify({equal,pixels,restored:c.restored,fullBuffers:c.fullBuffers,texturesStable:c.texturesStable,primary:c.primary,cleanup:c.cleanup}));}
+    for(const c of proof.cases){const d=c.startup;
+      check('canonical-startup-'+c.name,c.complete&&d?.views.length===3&&d.views.every(v=>healthy(v.original)&&healthy(v.startup)&&v.original.pixels===v.startup.pixels)
+        &&d.identity?.ownMaterial&&d.identity.shellDisposals===1&&d.identity.emptyRoot&&d.identity.noSourceBacking&&d.identity.textures&&d.identity.bytes===c.bytes&&d.fullBuffers&&d.restored
+        &&d.snapshots.length===3&&d.snapshots.every(s=>s.glError===0&&!s.allocation.unknown.length&&s.unmappedBufferBytes===0)
+        &&[d.controls?.changedHeight,d.controls?.changedUV,d.controls?.repaired].every(healthy)&&d.controls.changedHeight.pixels!==d.controls.before.pixels
+        &&d.controls.changedUV.pixels!==d.controls.before.pixels&&d.controls.repaired.pixels===d.controls.before.pixels,
+        JSON.stringify({identity:d?.identity,restored:d?.restored,fullBuffers:d?.fullBuffers,primary:c.primary}));}
     check('canonical-terrain-errors',errors.length===0&&proof.errors.length===0&&proof.cleanup.every(r=>r.ok)&&proof.cases.length===5,errors.concat(proof.errors).join('; '));
   }finally{await ctx.close();}
 }
