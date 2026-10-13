@@ -75,6 +75,80 @@ export function createCanonicalTerrainMesh(prepared,THREE,originalMaterial){
     if(failures.length)throw new AggregateError([error,...failures],'canonical terrain: publication and cleanup failed');throw error;}
 }
 
+// Diagnostic replacement with the actual original identities retained for restoration.
+// The caller supplies checked native retirement; neither CPU ownership nor GPU completion is inferred.
+export function installCanonicalTerrain(world,THREE,prepared,{completeRetirement}={}){
+  const root=world?.terrainMesh,source=root?.geometry,material=root?.material;
+  if(!root?.isMesh||root.children.length||Object.keys(source?.attributes||{}).sort().join(',')!=='position,uv'
+    ||!(source.attributes.position.array instanceof Float32Array)||!(source.attributes.uv.array instanceof Float32Array)
+    ||!source.index||![Uint16Array,Uint32Array].some(T=>source.index.array instanceof T)
+    ||typeof completeRetirement!=='function'||Object.prototype.toString.call(completeRetirement)==='[object AsyncFunction]')throw Error('canonical replacement: exact source and synchronous retirement required');
+  const attributes={...source.attributes},index=source.index,box=source.boundingBox,sphere=source.boundingSphere,
+    sourceArrays=[attributes.position.array,attributes.uv.array,index.array],oracles=sourceArrays.map(a=>a.slice()),
+    rangeOwner=source.drawRange,range={...source.drawRange},flags={visible:root.visible,frustumCulled:root.frustumCulled},
+    bounds=box&&sphere?{min:box.min.toArray(),max:box.max.toArray(),center:sphere.center.toArray(),radius:sphere.radius}:null,
+    uniforms=material?.uniforms,uniformRecords=Object.entries(uniforms||{}),textures=uniformRecords.filter(([,r])=>r.value?.isTexture).map(([,r])=>({r,value:r.value})),
+    shader={vertex:material?.vertexShader,fragment:material?.fragmentShader},
+    shapes=[attributes.position,attributes.uv,index].map(a=>({itemSize:a.itemSize,count:a.count,normalized:a.normalized,gpuType:a.gpuType,usage:a.usage}));
+  let replacement=createCanonicalTerrainMesh(prepared,THREE,material);
+  const children=[...replacement.children],geometries=[replacement.geometry,...children.map(c=>c.geometry)],replacementMaterial=replacement.material,
+    chunkArrays=children.flatMap((c,i)=>[...Object.entries(c.geometry.attributes),['index',c.geometry.index]].map(([key,a])=>({array:a.array,owner:`terrain-canonical-${i+1}/${key}`})));
+  const dispose=()=>{const errors=[];for(const g of geometries)try{g.dispose();}catch(e){errors.push(e);}try{replacementMaterial.dispose();}catch(e){errors.push(e);}return errors;};
+  // Compare every ordered triangle corner, including Float32 bits and UV reconstruction.
+  const equal=(a,b)=>Array.isArray(a)&&a.length===b.length&&a.every((v,i)=>Object.is(v,b[i]));
+  let corner=0,valid=sourceArrays[0].length/3===sourceArrays[1].length/2&&prepared.triangles*3===index.array.length
+    &&bounds&&equal(prepared.bounds.min,bounds.min)&&equal(prepared.bounds.max,bounds.max)&&equal(prepared.bounds.center,bounds.center)&&Object.is(prepared.bounds.radius,bounds.radius);
+  for(const c of prepared.chunks){const point=i=>[Math.fround(c.gridPosition[i*2]*prepared.cell-prepared.half),c.height[i],Math.fround(c.gridPosition[i*2+1]*prepared.cell-prepared.half)],min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
+    for(let i=0;i<c.height.length;i++){const p=point(i);for(let k=0;k<3;k++){min[k]=Math.min(min[k],p[k]);max[k]=Math.max(max[k],p[k]);}}
+    const center=min.map((v,k)=>(v+max[k])/2);let radius2=0;for(let i=0;i<c.height.length;i++)radius2=Math.max(radius2,point(i).reduce((n,v,k)=>n+(v-center[k])**2,0));
+    valid&&=equal(c.bounds.min,min)&&equal(c.bounds.max,max)&&equal(c.bounds.center,center)&&Object.is(c.bounds.radius,Math.sqrt(radius2));}
+  for(const c of prepared.chunks)for(const local of c.index){const original=index.array[corner++],gx=c.gridPosition[local*2],gz=c.gridPosition[local*2+1],
+    point=[Math.fround(gx*prepared.cell-prepared.half),c.height[local],Math.fround(gz*prepared.cell-prepared.half)],uv=[Math.fround(gx/(prepared.grid-1)),Math.fround(gz/(prepared.grid-1))];
+    valid&&=point.every((v,k)=>Object.is(v,sourceArrays[0][original*3+k]))&&uv.every((v,k)=>Object.is(v,sourceArrays[1][original*2+k]));}
+  if(!valid){const errors=dispose();throw new AggregateError([Error('canonical replacement: source triangle/position/UV bits differ'),...errors],'canonical replacement: source comparison failed');}
+  const sourceIntact=()=>{try{return source.index===index&&source.boundingBox===box&&source.boundingSphere===sphere
+    &&bounds&&box.min.toArray().every((v,i)=>Object.is(v,bounds.min[i]))&&box.max.toArray().every((v,i)=>Object.is(v,bounds.max[i]))
+    &&sphere.center.toArray().every((v,i)=>Object.is(v,bounds.center[i]))&&Object.is(sphere.radius,bounds.radius)
+    &&source.drawRange===rangeOwner&&source.drawRange.start===range.start&&source.drawRange.count===range.count&&Object.keys(source.attributes).sort().join(',')==='position,uv'
+    &&Object.entries(attributes).every(([k,a])=>source.attributes[k]===a)
+    &&attributes.position.array===sourceArrays[0]&&attributes.uv.array===sourceArrays[1]&&index.array===sourceArrays[2]
+    &&[attributes.position,attributes.uv,index].every((a,i)=>Object.entries(shapes[i]).every(([k,v])=>a[k]===v))
+    &&material.uniforms===uniforms&&Object.keys(uniforms).length===uniformRecords.length&&uniformRecords.every(([k,r])=>uniforms[k]===r)
+    &&textures.every(({r,value})=>r.value===value)&&material.vertexShader===shader.vertex&&material.fragmentShader===shader.fragment
+    &&sourceArrays.every((a,i)=>a.length===oracles[i].length&&a.every((v,j)=>Object.is(v,oracles[i][j])));}catch{return false;}};
+  let active=false,restored=false,busy=false,failed=false,failure;
+  const owner=()=>{try{return world.terrainMesh===root&&root.geometry===replacement.geometry&&root.material===replacementMaterial
+    &&root.visible===flags.visible&&root.frustumCulled===flags.frustumCulled&&root.children.length===children.length
+    &&children.every((c,i)=>root.children[i]===c&&c.parent===root&&c.geometry===geometries[i+1]&&c.material===replacementMaterial)&&sourceIntact();}catch{return false;}};
+  try{if(world.terrainMesh!==root||root.geometry!==source||root.material!==material||!sourceIntact())throw Error('canonical replacement: source owner changed');
+    root.geometry=replacement.geometry;root.material=replacementMaterial;
+    for(const c of children)root.add(c);active=true;
+    if(!owner())throw Error('canonical replacement: publication changed ownership');
+    source.dispose();if(!owner())throw Error('canonical replacement: source disposal changed ownership');
+  }catch(error){const errors=[error];for(const c of children)if(c.parent===root)try{root.remove(c);}catch(e){errors.push(e);}
+    if(root.geometry===replacement.geometry)root.geometry=source;if(root.material===replacementMaterial)root.material=material;
+    errors.push(...dispose());throw new AggregateError(errors,'canonical replacement: publication failed');}
+  return {kind:'canonical with retained exact original',triangles:prepared.triangles,chunks:children.length,sourceBytes:sourceArrays.reduce((n,a)=>n+a.byteLength,0),bytes:prepared.bytes,
+    get retainedArrays(){return restored&&!failed?[]:[...sourceArrays.map((array,i)=>({array,owner:`terrain-retained-source/${i}`})),
+      ...oracles.map((array,i)=>({array,owner:`terrain-restore-oracle/${i}`})),...chunkArrays.map(r=>({...r}))];},
+    restore(){if(failed)throw failure;if(restored)return;if(busy||!active||!owner())throw Error('canonical replacement: restoration ownership changed');busy=true;
+      const errors=[];let retired=false;
+      const retire=()=>{if(retired)throw Error('canonical replacement: repeated retirement');retired=true;
+        for(const c of children)try{root.remove(c);}catch(e){errors.push(e);}errors.push(...dispose());if(errors.length)throw new AggregateError([...errors],'canonical replacement: retirement failed');};
+      try{const value=completeRetirement(retire);if(value&&typeof value.then==='function'){Promise.resolve(value).catch(()=>{});throw Error('canonical replacement: synchronous completion required');}
+        if(value!==undefined||!retired)throw Error('canonical replacement: retirement not completed');
+      }catch(e){if(!errors.includes(e))errors.push(e);}
+      // Independently release owned storage after a refused callback, without claiming completion.
+      if(!retired)try{retire();}catch(e){if(!errors.includes(e))errors.push(e);}
+      try{if(world.terrainMesh!==root||root.geometry!==replacement.geometry||root.material!==replacementMaterial||root.visible!==flags.visible||root.frustumCulled!==flags.frustumCulled||root.children.length||!sourceIntact())errors.push(Error('canonical replacement: restoration callback changed ownership'));
+        else{root.geometry=source;root.material=material;for(const a of [...Object.values(attributes),index])try{a.needsUpdate=true;}catch(e){errors.push(e);}
+          if(root.geometry!==source||root.material!==material||root.visible!==flags.visible||root.frustumCulled!==flags.frustumCulled||!sourceIntact())errors.push(Error('canonical replacement: original identity restoration failed'));}
+      }catch(e){errors.push(e);}finally{busy=false;}
+      if(errors.length){failed=true;failure=new AggregateError(errors,'canonical replacement: restoration failed');throw failure;}
+      restored=true;active=false;children.length=0;geometries.length=0;chunkArrays.length=0;oracles.length=0;sourceArrays.length=0;replacement=null;
+    }};
+}
+
 // Diagnostic ownership stays registered while failed cleanup retains CPU backing arrays.
 export function registerTerrainPartition(scope,owner){
   if(Object.hasOwn(scope,'__sceneTerrainPartition')||typeof owner?.restore!=='function')throw Error('terrain partition: diagnostic scope already owned or unrestorable');
