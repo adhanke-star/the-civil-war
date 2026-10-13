@@ -1,5 +1,21 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0172 — root ACTIVE same-session sole writer; no transfer. Accepted remote main23dcea3a8aae6ae4cd50ccfe08442abedfc65023.
+Source23 CI38341640821 all9green/full own251/365/171/159+campaign201+three6smokes/probe5,716,435B clean.
+Main88 CI38341680020 independently all9/full own same counts clean/probe5,713,967B read;
+Pages38341680028 exact88 success/livecw-v68 fetched. New main23 automatic CI/Pages pending.
+Full qualified matrix38343715785 dispatched ONCE at23, package115120218803 running; no result yet.
+Do not cancel/duplicate or bypass complete ZIP/member/selected99MB RAM admission. If actual artifact
+exceeds cap, retain original and use reviewed Actions-only split transport of already-produced evidence,
+every original PNG/report byte and source digest preserved; no simulation rerun or PNG recompression.
+0168 private badge bookkeeping root+Astra27+27 clear; CPU probe registration included.
+Six exact constructed Veteran prefixes preserve income/cards/joins; numeric crossings do not prove saved upgrades.
+Native controls/one-shot fixed cadence/owned tick hook implemented; conditional stages, opportunities,
+six actual combats/storage/reload/export/import/duplicate proof and legalL10 remain UNRUN.
+Next extend finite condition stages against real native state, then complete browser flag/shard before Actions.
+No runtime asset/policy/SW/release adoption. Protected MAIN13a7b136 eleven paths/index preserved;
+.out297,938,617B/300M, no local browser/downloads/prune; no simultaneous provider edits.
+
 LATEST0171 — root ACTIVE same-session sole writer; no transfer. Branch HEAD88c9fd3c7be2e141b9ab436d87ba64fd5198d073.
 0167 complete22ordinary+88freshfault runner/reducer WIP Astra source-clear, root168+168/unit/syntax/diff pass.
 Qualified acquisition/materialization/routes/full native fault matrix/resource ceiling remain UNRUN.
