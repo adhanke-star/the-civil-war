@@ -287,8 +287,9 @@ function restoreNativeBadgeContext(){
 }
 
 /** Six first-tactic observations, two fresh native contexts per explicitly selected Actions shard. */
-export async function nativeBadgeObservations({browser,url,check,result,watchErrors,shard,persist,missionaryOnly=false,revision=0,promotion=false,relief=false,openLine=false,clockRelief=false,forwardDefence=false,lookout=false,western=false,march=false,flank=false,ridge=false}){
+export async function nativeBadgeObservations({browser,url,check,result,watchErrors,shard,persist,missionaryOnly=false,revision=0,promotion=false,relief=false,openLine=false,clockRelief=false,forwardDefence=false,lookout=false,western=false,march=false,flank=false,ridge=false,column=false}){
   if(typeof ridge!=='boolean'||ridge&&(!march||flank))throw Error('badge ridge: isolated actual Silver continuation');
+  if(typeof column!=='boolean'||column&&!ridge)throw Error('badge column: isolated actual Silver continuation');
   if(typeof flank!=='boolean'||flank&&!march)throw Error('badge flank: isolated distinct march witness');
   if(typeof march!=='boolean'||march&&(!promotion||lookout||western||relief||openLine||clockRelief||forwardDefence))throw Error('badge march: isolated ordinary genuine lineage witness');
   if(typeof western!=='boolean'||western&&!lookout)throw Error('badge western Lookout: isolated actual post-Orchard branch');
@@ -317,8 +318,8 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
     if(western)output.kind='authorized distinct western Attack from genuine post-Orchard899; original road-anchor Lookout855 shortfall retained';
     if(march)output.kind='authorized finite Gibson consolidation and northern-flank march from actual Buell kept Bronze through ordinary saved Silver; earlier three Draw prefixes constructed';
     if(flank)output.kind='authorized distinct finite northern Gibson/Boyle envelopment from genuine kept Bronze; previous frontal1342m shortfall retained';
-    if(ridge)output.kind='authorized finite rested supported Missionary ascent from actual persisted Silver1625; original native Bronze-to-Silver and absent Lookout prefix retained';
-    output.promotion={...(march?{witness:ridge?'rested-supported-ridge':flank?'northern-gibson-envelopment':'finite-gibson-march',badgeId:'hardMarchers',candidateUnitId:'us-gibson-brigade'}:{}),achieved:false,stopReason:null,...(lookout?{witness:western?'western-attack-lookout':'road-anchor-lookout',checkpointBranch:western?'actual saved Orchard899; distinct from retained road-anchor Lookout855':'actual forward McFadden survivor; ordinary Orchard then Lookout'}:{}),...(relief?{witness:forwardDefence?'supported-forward-defence':clockRelief?'battle-clock-relief':openLine?'forward-open-line':'front-line-relief',checkpointBranch:forwardDefence?'actual saved Round Silver; distinct from retained failed McFadden':'actual post-Slaughter; distinct from preserved failed post-Round'}:{})};await persist();
+    if(ridge)output.kind=column?'authorized finite northern turning column against Vaughan from actual persisted Silver1625':'authorized finite rested supported Missionary ascent from actual persisted Silver1625; original native Bronze-to-Silver and absent Lookout prefix retained';
+    output.promotion={...(march?{witness:ridge?(column?'northern-turning-column':'rested-supported-ridge'):flank?'northern-gibson-envelopment':'finite-gibson-march',badgeId:'hardMarchers',candidateUnitId:'us-gibson-brigade'}:{}),achieved:false,stopReason:null,...(lookout?{witness:western?'western-attack-lookout':'road-anchor-lookout',checkpointBranch:western?'actual saved Orchard899; distinct from retained road-anchor Lookout855':'actual forward McFadden survivor; ordinary Orchard then Lookout'}:{}),...(relief?{witness:forwardDefence?'supported-forward-defence':clockRelief?'battle-clock-relief':openLine?'forward-open-line':'front-line-relief',checkpointBranch:forwardDefence?'actual saved Round Silver; distinct from retained failed McFadden':'actual post-Slaughter; distinct from preserved failed post-Round'}:{})};await persist();
     try{continuation=await acquireBadgePromotionSave({relief:relief&&!forwardDefence,silver:forwardDefence,lookout:!ridge&&(march||lookout&&!western),western,ridge});if(march)Object.assign(continuation,(ridge?admitBadgeRidgeCheckpoint:admitBadgeMarchCheckpoint)(continuation.raw));output.promotion.origin=continuation.origin;if(ridge)output.promotion.prefix=continuation.prefix;await persist();}
     catch(error){output.promotion.acquisitionError=String(error?.message??error);await persist();throw error;}
   }
@@ -372,8 +373,8 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
       await page.waitForFunction(()=>window.__ready&&window.__game?.game&&document.getElementById('briefing')?.open,null,{timeout:180000,polling:250});
       }
       await page.locator('#briefing-begin').click();await page.waitForFunction(()=>window.__badgeStartGate?.first?.simTime===0&&window.__game.game.paused);
-      row.initial=await page.evaluate(async({id,revision,promotion,relief,openLine,clockRelief,forwardDefence,lookout,western,march,flank,ridge})=>{
-        const B=await import('./tools/observe-badges.mjs'),G=await import('./src/game.js'),g=window.__game.game,tactic=march?B.badgeMarchTactic(g,id,{flank,ridge}):lookout?B.badgeLookoutTactic(g,id,{western}):promotion?(relief?(forwardDefence?B.badgeForwardDefenceTactic(g,id):clockRelief?B.badgeClockReliefTactic(g,id):openLine?B.badgeOpenLineTactic(g,id):B.badgeReliefTactic(g,id)):B.badgePromotionTactic(g,id)):B.badgeTactic(g,id,revision),crossings=B.createBadgeCrossings(),policy=B.createBadgeStages(tactic.plan,tactic.cadence,tactic.roster);
+      row.initial=await page.evaluate(async({id,revision,promotion,relief,openLine,clockRelief,forwardDefence,lookout,western,march,flank,ridge,column})=>{
+        const B=await import('./tools/observe-badges.mjs'),G=await import('./src/game.js'),g=window.__game.game,tactic=march?B.badgeMarchTactic(g,id,{flank,ridge,column}):lookout?B.badgeLookoutTactic(g,id,{western}):promotion?(relief?(forwardDefence?B.badgeForwardDefenceTactic(g,id):clockRelief?B.badgeClockReliefTactic(g,id):openLine?B.badgeOpenLineTactic(g,id):B.badgeReliefTactic(g,id)):B.badgePromotionTactic(g,id)):B.badgeTactic(g,id,revision),crossings=B.createBadgeCrossings(),policy=B.createBadgeStages(tactic.plan,tactic.cadence,tactic.roster);
         if(G.difficultyOf(g)!=='veteran')throw Error('badge observations: actual difficulty drift');
         const beforeTick={native:g.tick,descriptor:Object.getOwnPropertyDescriptor(g,'tick')},methods=['volleyAt','chargeFeat','routFeat','moraleStep'].map(name=>({name,native:g.combat[name],descriptor:Object.getOwnPropertyDescriptor(g.combat,name)}));
         const owner={tactic,crossings,policy,beforeTick,methods,readiness:(lookout||march)&&id==='lookout-mountain'?B.createBadgeLookoutReadiness({western}):null,combat:null,tick:null,samples:0,lastTime:null,initialTime:null,largestDelta:0,fullReports:true};window.__badgeObservation=owner;
@@ -389,7 +390,7 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
           ...(promotion?{deployment:{units:g.scenario.units,reinforcements:g.scenario.reinforcements||[]},
             live:g.units.map(u=>({id:u.id,side:u.side,type:u.type,men:u.men,menMax:u.menMax,guns:u.guns,xp:u.xp,weapon:u.weapon,equipment:u.equipment??null,
               def:u.def,moraleMax:u.moraleMax,fatigue:u.fatigue,ammo:u.ammo}))}:{})};
-      },{id,revision,promotion,relief,openLine,clockRelief,forwardDefence,lookout,western,march,flank,ridge});
+      },{id,revision,promotion,relief,openLine,clockRelief,forwardDefence,lookout,western,march,flank,ridge,column});
       const seeds={'missionary-ridge':18631125,'orchard-knob':18631123,'lookout-mountain':18631124,'dawn-on-the-right':18621231,'slaughter-pen':18621232,'round-forest':18621233,'mcfaddens-ford':18630102,'slaughter-fire':18621232,'slaughter-defence':18621232,'slaughter-recovery':18621232,'mcfadden-assault':18630102,'missionary-assault':18631125,'buell-capture':18620409};
       if(row.initial.tactic.revision!==revision||row.initial.seed!==seeds[id]||!Number.isFinite(row.initial.horizon)||row.initial.horizon<=0)throw Error('badge observations: authored seed/horizon/revision drift');
       if(promotion){
@@ -496,7 +497,7 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
       if(march){
         try{
           const B=await import('./observe-badges.mjs');
-          row.promotion.ordersAccepted=B.badgeMarchOrders(row.initial.tactic,row.native.stages,row.native.simTime,row.continuation.expectedScenario,{flank,ridge});
+          row.promotion.ordersAccepted=B.badgeMarchOrders(row.initial.tactic,row.native.stages,row.native.simTime,row.continuation.expectedScenario,{flank,ridge,column});
           const e=row.promotion.earned,kept=row.promotion.saved.badges?.find(b=>b.id==='hardMarchers'),prior=row.promotion.previous.badges?.find(b=>b.id==='hardMarchers');
           if(id==='orchard-knob'){
             assert.equal(prior?.tier,'bronze','march starts from actual kept Bronze');
@@ -551,7 +552,7 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
     }
   }
   const {badgeRidgeComplete,badgeMarchComplete,badgeLookoutComplete,badgeObservationComplete,badgeReliefComplete,badgeForwardDefenceComplete}=await import('./observe-badges.mjs');
-  output.complete=ridge?badgeRidgeComplete(output.cases,output.promotion):march?badgeMarchComplete(output.cases,output.promotion):lookout?badgeLookoutComplete(output.cases,output.promotion,{western}):forwardDefence?badgeForwardDefenceComplete(output.cases,output.promotion):relief?badgeReliefComplete(output.cases,output.promotion):promotion?output.cases.every(r=>r.complete)&&((output.cases.length===3&&output.promotion.stopReason==='actual Round Forest did not persist a living Bronze-to-Silver candidate')||output.cases.length===4):badgeObservationComplete(cases,output.cases);await persist();
+  output.complete=ridge?badgeRidgeComplete(output.cases,output.promotion,{column}):march?badgeMarchComplete(output.cases,output.promotion):lookout?badgeLookoutComplete(output.cases,output.promotion,{western}):forwardDefence?badgeForwardDefenceComplete(output.cases,output.promotion):relief?badgeReliefComplete(output.cases,output.promotion):promotion?output.cases.every(r=>r.complete)&&((output.cases.length===3&&output.promotion.stopReason==='actual Round Forest did not persist a living Bronze-to-Silver candidate')||output.cases.length===4):badgeObservationComplete(cases,output.cases);await persist();
   if(promotion)check('badge-promotion-observation-complete',output.complete,JSON.stringify(output.promotion));
 }
 

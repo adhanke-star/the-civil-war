@@ -405,6 +405,44 @@ const ridgeChecks=[
 ];
 checks.push(...ridgeChecks);
 
+Object.assign(api,{column:(g,id)=>badgeMarchTactic(g,id,{ridge:true,column:true}),columnOrders:(...args)=>badgeMarchOrders(...args,{ridge:true,column:true}),columnComplete:(...args)=>badgeRidgeComplete(...args,{column:true})});
+function columnFixture(){
+ const scenario=marchScenario('missionary-ridge'),t=badgeMarchTactic({scenario,playerSide:'US',simTime:0},'missionary-ridge',{ridge:true,column:true}),g=nativeStages(),template=g.units[0];
+ g.units=t.roster.map((id,i)=>({...template,id,side:id.startsWith('us-')?'US':'CS',x:id.startsWith('cs-')?10000+i:0,z:0,order:{type:'hold'},follow:{active:false}}));
+ g.orderSelected=function(kind){if(kind==='run')this.selected.run=!this.selected.run;else this.selected.order={type:kind};return true;};
+ g.order=function(u,spec){u.order={type:spec.type,...(spec.type==='attack'?{target:spec.target}:{dest:spec.points.at(-1)})};return true;};
+ const p=createBadgeStages(t.plan,1,t.roster);p.advance(g);g.simTime=1;
+ for(const id of ['us-gibson-brigade','us-boyle-brigade']){const u=g.units.find(u=>u.id===id);[u.x,u.z]=t.plan.find(s=>s.id==='column-turn-'+id).command.path.points.at(-1);}
+ p.advance(g);for(let at=2;at<=1051;at++){g.simTime=at;p.advance(g);}g.over=true;p.advance(g);
+ return {scenario,t,r:p.receipt(),end:1051};
+}
+const columnChecks=[
+ ['column-mode',a=>assert.deepEqual(a.selection(['--badge-promotion-column']),{mode:'promotion-column',shard:1},'column-mode: distinct one-phase witness')],
+ ['column-mode-refusal',a=>{for(const flag of ['--native','--badge-promotion-ridge','--badge-shard=1'])rejects('column-mode-refusal',()=>a.selection(['--badge-promotion-column',flag]));}],
+ ['column-plan',a=>{const t=a.column({scenario:marchScenario('missionary-ridge'),playerSide:'US',simTime:0},'missionary-ridge');assert.equal(t.plan.length,28,'column-plan: finite28');assert.equal(t.cadence,1,'column-plan: one-second cadence');assert.equal(t.plan.filter(p=>p.command.type==='run'&&p.command.enabled).length,2,'column-plan: one Run per actor');assert.deepEqual(t.plan.find(p=>p.id==='column-turn-us-gibson-brigade').command.path.points,[[-600,-450],[1100,-450]],'column-plan: distinct northern source route');assert.equal(t.plan.find(p=>p.id==='column-attack-us-gibson-brigade').after.length,2,'column-plan: both genuine consolidation Holds');assert.ok(t.plan.every(p=>p.expires<=1052),'column-plan: finite unchanged battle horizon');}],
+ ['column-phase-refusal',a=>{for(const id of ['orchard-knob','lookout-mountain'])rejects('column-phase-refusal',()=>a.column({scenario:marchScenario(id),playerSide:'US',simTime:0},id));}],
+ ['column-orders',a=>{const f=columnFixture();assert.equal(a.columnOrders(f.t,f.r,f.end,f.scenario),true,'column-orders: actual stage executor forwards supported Attack fixture');}],
+ ['column-complete',a=>{const p={...ridgePromotion(),witness:'northern-turning-column'};assert.equal(a.columnComplete(ridgeRows(),p),true,'column-complete: same actual Silver origin and native Gold evidence');}],
+ ['column-incomplete',a=>{for(const change of [(r,p)=>r[0].promotion.goldPersisted=false,(r,p)=>r[0].promotion.ordersAccepted=false,(r,p)=>p.origin.saveSha='0'.repeat(64),(r,p)=>p.witness='rested-supported-ridge']){const r=ridgeRows(),p={...ridgePromotion(),witness:'northern-turning-column'};change(r,p);assert.equal(a.columnComplete(r,p),false,'column-incomplete: foreign or missing genuine promotion refused');}}],
+];
+for(const [suffix,change]of [
+ ['route',f=>f.t.plan.find(p=>p.id==='column-turn-us-gibson-brigade').command.path.points[0]=[0,0]],
+ ['extra-run',f=>f.t.plan.push(structuredClone(f.t.plan[8]))],
+ ['missing-hold',f=>{const r=f.r.stages.find(p=>p.id==='column-ready-us-boyle-brigade');r.state='expired';r.trace=null;}],
+ ['fatigue',f=>f.r.stages.find(p=>p.id==='column-ready-us-gibson-brigade').lastFacts.find(f=>f.kind==='march-ready').fatigue=41],
+ ['morale',f=>f.r.stages.find(p=>p.id==='column-ready-us-gibson-brigade').lastFacts.find(f=>f.kind==='march-ready').morale=64],
+ ['support',f=>f.r.stages.find(p=>p.id==='column-attack-us-gibson-brigade').lastFacts.find(f=>f.kind==='support').support=[]],
+ ['target',f=>f.r.stages.find(p=>p.id==='column-attack-us-gibson-brigade').lastFacts.find(f=>f.kind==='target-unbroken').state='routing'],
+ ['attack-result',f=>f.r.stages.find(p=>p.id==='column-attack-us-gibson-brigade').trace.result.targetId='foreign'],
+ ['attack-type',f=>f.r.stages.find(p=>p.id==='column-attack-us-boyle-brigade').trace.result.type='move'],
+ ['arrival',f=>f.r.stages.find(p=>p.id==='column-ready-us-gibson-brigade').lastFacts.find(f=>f.kind==='arrived').following=true],
+ ['deadline',f=>{const r=f.r.stages.find(p=>p.id==='column-attack-us-gibson-brigade');r.at=1051;r.trace.at=1051;}],
+ ['counter',f=>f.t.plan.find(p=>p.id==='column-ready-us-gibson-brigade').condition.push({kind:'feat',min:3200})],
+ ['chronology',f=>{const r=f.r.stages.find(p=>p.id==='column-attack-us-boyle-brigade');r.at=0;r.trace.at=0;}],
+ ['missing-trace',f=>delete f.r.stages.find(p=>p.id==='column-turn-us-gibson-brigade').trace],
+]){const name='column-'+suffix;columnChecks.push([name,a=>{const f=columnFixture();change(f);assert.equal(a.columnOrders(f.t,f.r,f.end,f.scenario),false,name+': altered native plan, readiness or order proof refused');}]);}
+checks.push(...columnChecks);
+
 for(const[,check]of checks)check(api);
 console.log(`BADGE-OBSERVATION CPU BOOKKEEPING OK (${checks.length}/${checks.length}); natural combat/storage/level10 UNRUN`);
 if(process.argv.includes('--prove-fail')){
@@ -524,6 +562,7 @@ if(process.argv.includes('--prove-fail')){
   for(const[name]of marchChecks)mutants[name]=name==='march-mode'?{selection:()=>null}:name==='march-mode-refusal'?{selection:()=>({})}:name==='march-plan'?{march:()=>({plan:[]})}:name==='march-phase-refusal'?{march:()=>({})}:name==='march-orders'?{marchOrders:()=>false}:name==='march-complete'?{marchComplete:()=>false}:name==='march-incomplete'?{marchComplete:()=>true}:name==='march-checkpoint-refusal'?{marchCheckpoint:()=>true}:{marchOrders:()=>true};
   for(const[name]of flankChecks)mutants[name]=name==='flank-mode'?{selection:()=>null}:name==='flank-mode-refusal'?{selection:()=>({})}:name==='flank-plan'?{flank:()=>({plan:[]})}:name==='flank-preserve'?{flank:()=>({})}:name==='flank-orders'?{flankOrders:()=>false}:{flankOrders:()=>true};
   for(const[name]of ridgeChecks)mutants[name]=name==='ridge-mode'?{selection:()=>null}:name==='ridge-mode-refusal'?{selection:()=>({})}:name==='ridge-origin'?{ridgeOrigin:()=>null}:name==='ridge-origin-refusal'?{ridgeOrigin:o=>o}:name==='ridge-checkpoint-refusal'?{ridgeCheckpoint:()=>true}:name==='ridge-plan'?{ridge:()=>({plan:[],cadence:1})}:name==='ridge-phase-refusal'?{ridge:()=>({})}:name==='ridge-orders'?{ridgeOrders:()=>false}:name==='ridge-complete'?{ridgeComplete:()=>false}:name==='ridge-incomplete'?{ridgeComplete:()=>true}:{ridgeOrders:()=>true};
+  for(const[name]of columnChecks)mutants[name]=name==='column-mode'?{selection:()=>null}:name==='column-mode-refusal'?{selection:()=>({})}:name==='column-plan'?{column:()=>({plan:[],cadence:1})}:name==='column-phase-refusal'?{column:()=>({})}:name==='column-orders'?{columnOrders:()=>false}:name==='column-complete'?{columnComplete:()=>false}:name==='column-incomplete'?{columnComplete:()=>true}:{columnOrders:()=>true};
   for(const[name]of marchFactChecks)mutants[name]={stages:()=>({advance(){},receipt:()=>({stages:[{state:['march-live-contact','march-ready-actual'].includes(name)?'pending':'accepted'}]})})};
   for(const[name,check]of checks){let error;try{check({...api,...mutants[name]});}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&error.message.startsWith(name),`${name}: mutant must fail its own assertion`);}
   console.log(`BADGE-OBSERVATION CONTROLS OK (${checks.length}/${checks.length})`);

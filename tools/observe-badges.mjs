@@ -98,9 +98,10 @@ export const BADGE_RIDGE_ORIGIN=Object.freeze({run:38461620307,sha:'677377181057
 export function validateBadgeRidgeOrigin(o){
   if(!plain(o,Object.keys(BADGE_RIDGE_ORIGIN))||Object.keys(o).length!==Object.keys(BADGE_RIDGE_ORIGIN).length||Object.keys(BADGE_RIDGE_ORIGIN).some(k=>o[k]!==BADGE_RIDGE_ORIGIN[k]))fail('ridge exact actual persisted Silver origin');return {...o};
 }
-export function badgeMarchTactic(game,phaseId,{flank=false,ridge=false}={}){
+export function badgeMarchTactic(game,phaseId,{flank=false,ridge=false,column=false}={}){
   if(typeof flank!=='boolean')fail('march explicit flank scope');
   if(typeof ridge!=='boolean'||ridge&&(flank||phaseId!=='missionary-ridge'))fail('march explicit isolated ridge scope');
+  if(typeof column!=='boolean'||column&&!ridge)fail('march explicit isolated northern column scope');
   if(phaseId==='lookout-mountain')return badgeLookoutTactic(game,phaseId);
   const s=game?.scenario,orchard=phaseId==='orchard-knob',actor='us-gibson-brigade';
   if(!['orchard-knob','missionary-ridge'].includes(phaseId)||game.simTime!==0||game.playerSide!=='US'||s?.id!=='chattanooga-'+phaseId
@@ -109,6 +110,21 @@ export function badgeMarchTactic(game,phaseId,{flank=false,ridge=false}={}){
   const roster=[...new Set([...s.units,...(s.reinforcements||[])].map(u=>u.id))],plan=[],success=id=>({id,require:'success'}),
     add=(id,type,unitId,{start=0,end,after=[],condition=[],...extra})=>plan.push({id,notBefore:start,expires:end,after,condition:[{kind:'actor-orderable'},...condition],command:{type,unitId,...extra}}),
     stop=point=>({kind:'march-stop',point,radius:30,enemyRadius:250});
+  if(column){
+    const actors=[{id:actor,corners:[[-600,-450],[1100,-450]]},{id:'us-boyle-brigade',corners:[[-800,-600],[950,-600]]}],targetId='cs-vaughan-brigade',ready={kind:'march-ready',moraleMin:65,fatigueMax:40};
+    if(actors.some(a=>!s.units.some(u=>u.id===a.id&&u.side==='US'))||s.units.filter(u=>u.side==='US').length!==10||!s.units.some(u=>u.id===targetId&&u.side==='CS'))fail('column actual paired actors, Vaughan and ten-unit roster');
+    const others=s.units.filter(u=>u.side==='US'&&!actors.some(a=>a.id===u.id));
+    for(const u of others)add('column-screen-'+u.id,'hold',u.id,{end:1});
+    for(const a of actors){add('column-run-'+a.id,'run',a.id,{end:1,enabled:true});add('column-turn-'+a.id,'move',a.id,{end:1,after:[success('column-run-'+a.id)],path:{kind:'actor-through-points',points:a.corners}});}
+    for(const a of actors)add('column-walk-'+a.id,'run',a.id,{start:1,end:1000,after:[success('column-turn-'+a.id)],condition:[stop(a.corners.at(-1))],enabled:false});
+    for(const a of actors)add('column-ready-'+a.id,'hold',a.id,{start:1,end:1040,after:[success('column-walk-'+a.id)],condition:[{kind:'arrived',point:a.corners.at(-1),radius:30},ready]});
+    add('column-attack-'+actor,'attack',actor,{start:1,end:1050,after:actors.map(a=>success('column-ready-'+a.id)),condition:[{kind:'support',radius:250,min:1,types:['infantry']},{kind:'target-unbroken',targetId}],targetId});
+    add('column-attack-us-boyle-brigade','attack','us-boyle-brigade',{start:1,end:1050,after:[success('column-attack-'+actor)],condition:[{kind:'target-unbroken',targetId}],targetId});
+    for(const u of others)add('column-main-'+u.id,'move',u.id,{start:1,end:1050,after:[success('column-attack-'+actor)],path:{kind:'actor-to-point',point:[s.objective.x,s.objective.z]}});
+    for(const a of actors)add('column-cleanup-'+a.id,'run',a.id,{start:1051,end:1052,enabled:false});
+    createBadgeStages(plan,1,roster);
+    return {kind:'finite northern turning column and synchronized Vaughan attack; genuine Gold unproved',recipe:{id:'march-column-'+phaseId,packId:'chattanooga',phaseId},revision:0,plan,cadence:1,roster};
+  }
   if(ridge){
     const actors=[{id:actor,assembly:[-250,1300],ascent:[600,1750]},{id:'us-boyle-brigade',assembly:[-250,1050],ascent:[600,1350]},{id:'us-hazen-brigade',assembly:[-400,1550],ascent:[500,1600]}],
       ready={kind:'march-ready',moraleMin:65,fatigueMax:40},north=[850,-100];
@@ -172,8 +188,8 @@ export function badgeMarchTactic(game,phaseId,{flank=false,ridge=false}={}){
   return {kind:'finite direct consolidation or crest-to-northern-flank march; genuine promotion unproved',recipe:{id:'march-'+phaseId,packId:'chattanooga',phaseId},revision:0,plan,cadence:1,roster};
 }
 /** The Node caller supplies the independently prepared actual campaign scenario. */
-export function badgeMarchOrders(tactic,receipt,endAt,scenario,{flank=false,ridge=false}={}){
-  let expected;try{expected=badgeMarchTactic({scenario,playerSide:'US',simTime:0},tactic?.recipe?.phaseId,{flank,ridge});}catch{return false;}
+export function badgeMarchOrders(tactic,receipt,endAt,scenario,{flank=false,ridge=false,column=false}={}){
+  let expected;try{expected=badgeMarchTactic({scenario,playerSide:'US',simTime:0},tactic?.recipe?.phaseId,{flank,ridge,column});}catch{return false;}
   if(JSON.stringify(tactic)!==JSON.stringify(expected)||!dense(receipt?.stages)||receipt.stages.length!==expected.plan.length||receipt.failure||receipt.cadence!==1||!Number.isFinite(endAt))return false;
   if(tactic.recipe.phaseId==='lookout-mountain')return badgeLookoutOrders(tactic,receipt,endAt);
   const byId=new Map(receipt.stages.map(r=>[r.id,r]));if(byId.size!==expected.plan.length)return false;
@@ -188,10 +204,13 @@ export function badgeMarchOrders(tactic,receipt,endAt,scenario,{flank=false,ridg
       if(t.result?.run!==p.command.enabled||JSON.stringify(t.command)!==JSON.stringify(p.command)||(r.state==='accepted'?t.accepted!==true||t.invoked!==true:t.accepted!==null||t.invoked!==false||t.reason!=='already in requested state'))return false;
     }else if(p.command.type==='hold'){
       if(r.state!=='accepted'||t.accepted!==true||t.invoked!==true||t.result?.type!=='hold'||JSON.stringify(t.command)!==JSON.stringify(p.command))return false;
+    }else if(p.command.type==='attack'){
+      if(r.state!=='accepted'||t.accepted!==true||t.invoked!==true||t.result?.type!=='attack'||t.result.targetId!==p.command.targetId||JSON.stringify(t.command)!==JSON.stringify(p.command))return false;
     }else{const actor=t.resolvedInputs?.actor,path=p.command.path,points=path.kind==='actor-through-points'?path.points:[path.point],resolved=path.kind==='actor-through-points'?{actor,points}:{actor,point:points[0]};
       if(r.state!=='accepted'||t.accepted!==true||t.invoked!==true||t.result?.type!=='move'||JSON.stringify(t.result.destination)!==JSON.stringify(points.at(-1))||!finitePoint(actor)||JSON.stringify(t.command)!==JSON.stringify({type:'move',unitId:p.command.unitId,points:[actor,...points]})
         ||JSON.stringify(t.resolvedInputs)!==JSON.stringify(resolved))return false;}
     for(const f of r.lastFacts){
+      if(f.kind==='target-unbroken'){const c=p.condition.find(c=>c.kind===f.kind);if(f.targetId!==c.targetId||f.alive!==true||['routing','captured'].includes(f.state)||!scenario.units.some(u=>u.id===c.targetId&&u.side==='CS'))return false;}
       if(f.kind==='arrived'){
         const c=p.condition.find(c=>c.kind==='arrived');
         if(!finitePoint(f.actor)||JSON.stringify(f.point)!==JSON.stringify(c.point)||f.radius!==c.radius||!Number.isFinite(f.distance)
@@ -221,9 +240,10 @@ export function badgeMarchComplete(rows,promotion){
     ||rows.length===2&&['actual Lookout march continuation orders refused or expired','actual Lookout did not retain living Silver'].includes(promotion.stopReason)
     ||rows.length===3&&['actual Missionary march orders refused or expired','actual Missionary did not persist Silver-to-Gold'].includes(promotion.stopReason));
 }
-export function badgeRidgeComplete(rows,promotion){
+export function badgeRidgeComplete(rows,promotion,{column=false}={}){
+  if(typeof column!=='boolean')return false;
   try{validateBadgeRidgeOrigin(promotion?.origin);}catch{return false;}
-  if(!dense(rows)||rows.length!==1||rows[0]?.id!=='missionary-ridge'||rows[0].complete!==true||promotion?.witness!=='rested-supported-ridge')return false;
+  if(!dense(rows)||rows.length!==1||rows[0]?.id!=='missionary-ridge'||rows[0].complete!==true||promotion?.witness!==(column?'northern-turning-column':'rested-supported-ridge'))return false;
   if(promotion.achieved===true)return promotion.stopReason===null&&rows[0].promotion?.ordersAccepted===true&&rows[0].promotion.goldPersisted===true;
   return promotion.achieved===false&&['actual Missionary march orders refused or expired','actual Missionary did not persist Silver-to-Gold'].includes(promotion.stopReason);
 }
@@ -631,6 +651,7 @@ export function badgeObservationSelection(args){
   if(args.length===1&&args[0]==='--badge-promotion-march')return {mode:'promotion-march',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion-flank')return {mode:'promotion-flank',shard:1};
   if(args.length===1&&args[0]==='--badge-promotion-ridge')return {mode:'promotion-ridge',shard:1};
+  if(args.length===1&&args[0]==='--badge-promotion-column')return {mode:'promotion-column',shard:1};
   const shards=args.filter(a=>/^--badge-shard=[123]$/.test(a));
   if(args.length===2&&args.includes('--badge-observations')&&shards.length===1)return {mode:'observations',shard:Number(shards[0].slice(-1))};
   if(args.length===2&&args.includes('--badge-revisions')&&shards.length===1)return {mode:'revisions',shard:Number(shards[0].slice(-1))};

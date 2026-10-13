@@ -27,6 +27,7 @@ on:
           - badge-promotion-march
           - badge-promotion-flank
           - badge-promotion-ridge
+          - badge-promotion-column
           - diagnostic
           - candidate
           - full
@@ -70,7 +71,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
-    if: inputs.mode != 'scene-transport' && inputs.mode != 'badge-observations' && inputs.mode != 'badge-level10' && inputs.mode != 'badge-missionary' && inputs.mode != 'badge-missionary-revision' && inputs.mode != 'badge-revisions' && inputs.mode != 'badge-promotion' && inputs.mode != 'badge-promotion-relief' && inputs.mode != 'badge-promotion-open-line' && inputs.mode != 'badge-promotion-clock-relief' && inputs.mode != 'badge-promotion-forward-defence' && inputs.mode != 'badge-promotion-lookout' && inputs.mode != 'badge-promotion-lookout-west' && inputs.mode != 'badge-promotion-march' && inputs.mode != 'badge-promotion-flank' && inputs.mode != 'badge-promotion-ridge'
+    if: inputs.mode != 'scene-transport' && inputs.mode != 'badge-observations' && inputs.mode != 'badge-level10' && inputs.mode != 'badge-missionary' && inputs.mode != 'badge-missionary-revision' && inputs.mode != 'badge-revisions' && inputs.mode != 'badge-promotion' && inputs.mode != 'badge-promotion-relief' && inputs.mode != 'badge-promotion-open-line' && inputs.mode != 'badge-promotion-clock-relief' && inputs.mode != 'badge-promotion-forward-defence' && inputs.mode != 'badge-promotion-lookout' && inputs.mode != 'badge-promotion-lookout-west' && inputs.mode != 'badge-promotion-march' && inputs.mode != 'badge-promotion-flank' && inputs.mode != 'badge-promotion-ridge' && inputs.mode != 'badge-promotion-column'
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ (inputs.mode == 'candidate' || inputs.mode == 'current' || inputs.mode == 'cs-close' || inputs.mode == 'cs-hybrid' || (inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both')) && 90 || 40 }}
     env:
@@ -617,13 +618,13 @@ jobs:
           if-no-files-found: error
 
   badge-observations:
-    if: inputs.mode == 'badge-observations' || inputs.mode == 'badge-level10' || inputs.mode == 'badge-missionary' || inputs.mode == 'badge-missionary-revision' || inputs.mode == 'badge-revisions' || inputs.mode == 'badge-promotion' || inputs.mode == 'badge-promotion-relief' || inputs.mode == 'badge-promotion-open-line' || inputs.mode == 'badge-promotion-clock-relief' || inputs.mode == 'badge-promotion-forward-defence' || inputs.mode == 'badge-promotion-lookout' || inputs.mode == 'badge-promotion-lookout-west' || inputs.mode == 'badge-promotion-march' || inputs.mode == 'badge-promotion-flank' || inputs.mode == 'badge-promotion-ridge'
+    if: inputs.mode == 'badge-observations' || inputs.mode == 'badge-level10' || inputs.mode == 'badge-missionary' || inputs.mode == 'badge-missionary-revision' || inputs.mode == 'badge-revisions' || inputs.mode == 'badge-promotion' || inputs.mode == 'badge-promotion-relief' || inputs.mode == 'badge-promotion-open-line' || inputs.mode == 'badge-promotion-clock-relief' || inputs.mode == 'badge-promotion-forward-defence' || inputs.mode == 'badge-promotion-lookout' || inputs.mode == 'badge-promotion-lookout-west' || inputs.mode == 'badge-promotion-march' || inputs.mode == 'badge-promotion-flank' || inputs.mode == 'badge-promotion-ridge' || inputs.mode == 'badge-promotion-column'
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ inputs.mode == 'badge-promotion' && 75 || 45 }}
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(inputs.mode == 'badge-level10' && '[3]' || (inputs.mode == 'badge-missionary' || inputs.mode == 'badge-missionary-revision' || inputs.mode == 'badge-promotion' || inputs.mode == 'badge-promotion-relief' || inputs.mode == 'badge-promotion-open-line' || inputs.mode == 'badge-promotion-clock-relief' || inputs.mode == 'badge-promotion-forward-defence' || inputs.mode == 'badge-promotion-lookout' || inputs.mode == 'badge-promotion-lookout-west' || inputs.mode == 'badge-promotion-march' || inputs.mode == 'badge-promotion-flank' || inputs.mode == 'badge-promotion-ridge') && '[1]' || '[1,2,3]') }}
+        shard: ${{ fromJSON(inputs.mode == 'badge-level10' && '[3]' || (inputs.mode == 'badge-missionary' || inputs.mode == 'badge-missionary-revision' || inputs.mode == 'badge-promotion' || inputs.mode == 'badge-promotion-relief' || inputs.mode == 'badge-promotion-open-line' || inputs.mode == 'badge-promotion-clock-relief' || inputs.mode == 'badge-promotion-forward-defence' || inputs.mode == 'badge-promotion-lookout' || inputs.mode == 'badge-promotion-lookout-west' || inputs.mode == 'badge-promotion-march' || inputs.mode == 'badge-promotion-flank' || inputs.mode == 'badge-promotion-ridge' || inputs.mode == 'badge-promotion-column') && '[1]' || '[1,2,3]') }}
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host --init
@@ -715,6 +716,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: node tools/test.mjs --badge-promotion-ridge
+      - name: One genuine northern turning column against Vaughan
+        if: inputs.mode == 'badge-promotion-column'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/test.mjs --badge-promotion-column
       - name: Retained completed and failed native case receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
