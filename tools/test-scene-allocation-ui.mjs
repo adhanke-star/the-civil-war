@@ -1,9 +1,10 @@
 // Actions-only native lifecycle proof; this small fixture is not a whole-battle budget measurement.
-import {AllocationLedger,mipSizes,ReservationPeak,installAllocationObserver} from './bake/scene-allocation.mjs';
+import {isDeepStrictEqual} from 'node:util';
+import {AllocationLedger,mipSizes,ReservationPeak,installAllocationObserver,createSceneHistory,compactSceneSample,expandSceneContext} from './bake/scene-allocation.mjs';
 
 export async function sceneAllocationControls({browser,url,check,result,watchErrors}) {
   const ctx=await browser.newContext({viewport:{width:320,height:240}});
-  await ctx.addInitScript(installAllocationObserver,{ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString()});
+  await ctx.addInitScript(installAllocationObserver,{ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),nativeJournal:true});
   const page=await ctx.newPage(),errors=[];watchErrors(page,url,errors);
   try {
     await page.goto(url+'?nosw');
@@ -22,6 +23,10 @@ export async function sceneAllocationControls({browser,url,check,result,watchErr
       const post={renderer,render(s,c){renderer.render(s,c);}},scope={__game:{scene,post,game:{baked:{atlases:{}}}},__allocation:window.__allocation,innerWidth:32,innerHeight:32,devicePixelRatio:1};
       const gate=installRenderGate(post);scope.__sceneRenderGate=gate;
       const gl=renderer.getContext(),rows=[];
+      const renderbuffer=gl.createRenderbuffer(),priorRenderbuffer=gl.getParameter(gl.RENDERBUFFER_BINDING);
+      gl.bindRenderbuffer(gl.RENDERBUFFER,renderbuffer);gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,4,4);
+      const nativeRenderbuffer={width:gl.getRenderbufferParameter(gl.RENDERBUFFER,gl.RENDERBUFFER_WIDTH),height:gl.getRenderbufferParameter(gl.RENDERBUFFER,gl.RENDERBUFFER_HEIGHT),format:gl.getRenderbufferParameter(gl.RENDERBUFFER,gl.RENDERBUFFER_INTERNAL_FORMAT)};
+      gl.bindRenderbuffer(gl.RENDERBUFFER,priorRenderbuffer);
       const draw=()=>gate.renderOnce(scene,camera),sample=label=>({label,...sampleSceneAllocations(scope)});
       let restoration;
       try {
@@ -49,12 +54,18 @@ export async function sceneAllocationControls({browser,url,check,result,watchErr
           &&chunkIds.every(id=>pending?.bufferOwnership.some(r=>r.id===id&&r.pendingDelete&&r.owners.length))
           &&chunkIds.every(id=>!restoredIds.includes(id))&&clean(pending)&&clean(final)});
         rows.push({name:'restoration-order',ok:JSON.stringify(restoration.calls)===JSON.stringify(['terrain','capture','render','allocation'])&&gate.count===3});
-        return {rows,original,partitioned,settled,restoration,kind:'small native terrain lifecycle fixture; whole-battle matrix UNRUN'};
+        return {rows,original,partitioned,settled,restoration,nativeRenderbuffer,kind:'small native terrain lifecycle fixture; whole-battle matrix UNRUN'};
       } finally {
         if(!restoration)restoreSceneDiagnostics(scope);
-        geometry.dispose();material.dispose();renderer.dispose();renderer.forceContextLoss();
+        gl.deleteRenderbuffer(renderbuffer);geometry.dispose();material.dispose();renderer.dispose();renderer.forceContextLoss();
       }
     });
+    const raw=[report.original,report.partitioned,report.settled,...report.restoration.samples].map((s,i)=>({...s,sequence:i+1})),history=createSceneHistory(),
+      compact={history,states:raw.map(s=>compactSceneSample(history,s))},expanded=expandSceneContext(compact);
+    report.nativeHistory=compact;
+    report.rows.push({name:'native-history-roundtrip',ok:isDeepStrictEqual(expanded.states,raw)
+      &&['buffer','texture','renderbuffer'].every(kind=>history.nativeEvents.some(e=>e.operation==='reserve'&&e.kind===kind))
+      &&report.nativeRenderbuffer.width===4&&report.nativeRenderbuffer.height===4&&raw[0].allocation.renderbufferSlots.some(r=>r.bytes===64)});
     result.sceneAllocation=report;
     for(const row of report.rows)check(`scene-allocation-${row.name}`,row.ok,JSON.stringify(report.restoration));
     check('scene-allocation-errors',errors.length===0,errors.join('; '));

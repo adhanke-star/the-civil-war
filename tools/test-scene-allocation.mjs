@@ -1,10 +1,11 @@
 // Pure CPU controls: fake native GL records unchanged calls; no browser or renderer is launched.
 import assert from 'node:assert/strict';
-import {AllocationLedger,mipSizes,installAllocationObserver,ReservationPeak,rejectionObservation,reduceSceneObservations,sampleSceneAllocations,initializeSceneTextures,sceneMatrixContract} from './bake/scene-allocation.mjs';
+import {isDeepStrictEqual} from 'node:util';
+import {AllocationLedger,mipSizes,installAllocationObserver,ReservationPeak,rejectionObservation,reduceSceneObservations,sampleSceneAllocations,initializeSceneTextures,sceneMatrixContract,createSceneHistory,compactSceneSample,expandSceneContext,sceneReportEnvelope} from './bake/scene-allocation.mjs';
 import {deriveSceneStressContract} from './bake/inactive-figures.mjs';
 import {QUALIFIED_HYBRID} from './bake/review-current-compression.mjs';
 
-function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,sampler=sampleSceneAllocations,forgetOwners=false) {
+function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,sampler=sampleSceneAllocations,forgetOwners=false,nativeJournal=false) {
   const saved={window:globalThis.window,WebGLRenderingContext:globalThis.WebGLRenderingContext,WebGL2RenderingContext:globalThis.WebGL2RenderingContext};
   class GL {
     constructor(){this.bindings=new Map();this.native=[];this.drawingBufferWidth=100;this.drawingBufferHeight=50;}
@@ -14,8 +15,9 @@ function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,s
   }
   const constants=['TEXTURE_2D','TEXTURE_CUBE_MAP','TEXTURE_3D','TEXTURE_2D_ARRAY','TEXTURE_BINDING_2D','TEXTURE_BINDING_CUBE_MAP','TEXTURE_BINDING_3D','TEXTURE_BINDING_2D_ARRAY',
     'RGBA','RGB','FLOAT','HALF_FLOAT','RGBA8','RGBA16F','DEPTH_COMPONENT16','RENDERBUFFER_BINDING','ARRAY_BUFFER','ARRAY_BUFFER_BINDING'];
-  constants.forEach((name,i)=>GL.prototype[name]=i+100);
-  GL.prototype.TEXTURE_CUBE_MAP_POSITIVE_X=1000;GL.prototype.TEXTURE_CUBE_MAP_NEGATIVE_Z=1005;
+  const enums=[3553,34067,32879,35866,32873,34068,32874,35869,6408,6407,5126,5131,32856,34842,33189,36007,34962,34964];
+  constants.forEach((name,i)=>GL.prototype[name]=enums[i]);
+  GL.prototype.TEXTURE_CUBE_MAP_POSITIVE_X=34069;GL.prototype.TEXTURE_CUBE_MAP_NEGATIVE_Z=34074;
   for(const name of ['texImage2D','compressedTexImage2D','compressedTexSubImage2D','compressedTexSubImage3D','texImage3D','compressedTexImage3D','texStorage2D','texStorage3D','generateMipmap','bufferData','renderbufferStorage','renderbufferStorageMultisample','deleteTexture','deleteBuffer','deleteRenderbuffer','finish'])
     GL.prototype[name]=function(...args){this.native.push({name,args});return 'native-result';};
   const inherited=Object.create(Object.getPrototypeOf(GL.prototype));
@@ -30,7 +32,7 @@ function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,s
     const ownerInstall=forgetOwners?(0,eval)('('+installAllocationObserver.toString().replace('for(const label of labels)owners.add(label);','void labels;')+')'):historyInstall;
     const install=dropSamplePeak?(0,eval)('('+installAllocationObserver.toString().replace(
       's.defaultPeak=Math.max(s.defaultPeak,s.gpu.framebuffer+s.gpu.pendingFramebuffer);return current;','return current;')+')'):ownerInstall;
-    install({ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString()});
+    install({ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),nativeJournal});
     const gl=new GL(),snap=()=>window.__allocation.snapshot(gl),bind=(kind)=>{const o={};gl.bindings.set(gl[kind],o);return o;};
     const t=bind('TEXTURE_BINDING_2D');
     assert.equal(gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,0,{width:8,height:4}),'native-result');
@@ -79,7 +81,7 @@ function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,s
     return {pendingBuffers,settledBuffers,firstSample,samplingCalls,detachedSample,unassociatedSample,retiredSample,reallocatedSample,knownId,rgba,beforeFinish,afterFinish,floating,bufferReservation,cubeAdded,immutableAdded,npotAdded,compressedAdded,astcAdded,afterAstcSubimage,bc7Added,compressedImmutableUnknown,exactRestore,windowRestore,inheritedRestore,small,resized,resizedAfterFinish,unknown,native:gl.native};
   } finally {for(const [key,value]of Object.entries(saved)){if(value===undefined)delete globalThis[key];else globalThis[key]=value;}}
 }
-const api={Ledger:AllocationLedger,mips:mipSizes,observe:observed,Peak:ReservationPeak,rejection:rejectionObservation,reduce:reduceSceneObservations,matrix:sceneMatrixContract};
+const api={Ledger:AllocationLedger,mips:mipSizes,observe:observed,Peak:ReservationPeak,rejection:rejectionObservation,reduce:reduceSceneObservations,matrix:sceneMatrixContract,history:createSceneHistory,compact:compactSceneSample,expand:expandSceneContext,envelope:sceneReportEnvelope};
 const phases=Array.from({length:11},(_,i)=>({packId:'pack',phaseId:String(i),scenario:{units:[{id:'us',side:'US',type:'infantry',men:100},{id:'cs',side:'CS',type:'infantry',men:100}]}}));
 function observations(){
  const sample=(label,gpuReservation=100)=>({label,gpuReservation,conservativeReservation:gpuReservation+10,glError:0,allocation:{unknown:[]},unmappedBufferBytes:0});
@@ -153,7 +155,89 @@ function qualifiedObservations(){
  }
  return report;
 }
+function transportObservations(a=api){
+ const o=a.observe(false,false,false,sampleSceneAllocations,false,true),history=a.history(),raw=[];
+ for(const [i,key]of ['rgba','beforeFinish','afterFinish','floating','small','resized','unknown','firstSample','detachedSample','unassociatedSample','retiredSample','reallocatedSample'].entries()){
+   const allocation=o[key].allocation||o[key];raw.push({label:key,sequence:i+1,allocation, gpuReservation:allocation.gpuPeak,conservativeReservation:allocation.peak+allocation.defaultPeak,
+     declaredArrayBytes:0,cpuDeclaredArrayBytes:0,glError:0,unmappedBufferBytes:0});
+ }
+ return {raw,context:{history,states:raw.map(s=>a.compact(history,s))}};
+}
+// CPU transport profile: retained SOURCE353879 native fixture maxima326 buffers/28 textures/
+// 1 renderbuffer/52 signatures/41-character labels. Extra candidate/baseline pages and replacements
+// model transport growth; this is not a proven native whole-matrix worst case or a resource budget.
+function transportProfile(route,fault=null){
+ const ledger=new AllocationLedger(),events=[],signatures=[],calls={},ids=new Map(),history=createSceneHistory(),raw=[],compact=[];let ordinal=0,call='',sequence=0;
+ const native=name=>{call=name;ordinal++;calls[name]=(calls[name]||0)+1;};
+ ledger.onEvent=(operation,e)=>events.push({sequence:events.length+1,operation,kind:e.kind,id:ids.get(e.id),slot:e.slot??null,bytes:e.bytes??null,previous:e.previous??null,transient:e.transient??null,
+   overlap:e.overlap??null,detail:e.detail||null,call,callOrdinal:ordinal,current:ledger.bytes,peak:ledger.peak});
+ const reserve=(kind,id,bytes)=>{const key=kind+'/'+id;ids.set(key,id);native(kind==='buffer'?'bufferData':kind==='texture'?'texImage2D':'renderbufferStorage');ledger.reserve(key,kind,kind==='texture'?'3553:0':0,bytes,true,kind==='renderbuffer'?{format:33189,width:4,height:4,samples:1}:null);if(kind==='texture'){const w=Math.sqrt(bytes/4);signatures.push({texture:id,call:'image',nativeCall:call,callOrdinal:ordinal,raw:{target:3553,level:0,format:32856,w,h:w,d:1,type:5121},canonical:{target:3553,level:0,w,h:w,d:1,bytes}});}};
+ const retire=(kind,id)=>{native(kind==='buffer'?'deleteBuffer':'deleteTexture');ledger.retire(kind+'/'+id);};
+ const finish=()=>{native('finish');events.push({sequence:events.length+1,operation:'finish',kind:null,id:null,slot:null,bytes:null,previous:null,transient:null,overlap:null,detail:null,call,callOrdinal:ordinal,current:ledger.bytes,peak:ledger.peak});ledger.sync();};
+ const capture=label=>{
+   const allocation={...ledger.snapshot(),defaultFramebuffer:9437184,defaultPeak:9437184,gpuCurrent:ledger.bytes+9437184,gpuPeak:ledger.peak+9437184,dimensions:[1024,768],attributes:{depth:true,stencil:false,antialias:false},calls:{...calls},unknown:[],framebufferAssumption:'constructed transport profile',signatures:structuredClone(signatures),nativeEvents:structuredClone(events),bufferSlots:[],textureSlots:[],renderbufferSlots:[]};
+   for(const[key,r]of ledger.objects){const id=ids.get(key),bytes=[...r.slots.values()].reduce((n,b)=>n+b,0),pendingDelete=ledger.retired.has(key);
+     allocation[r.kind==='buffer'?'bufferSlots':r.kind==='texture'?'textureSlots':'renderbufferSlots'].push(r.kind==='texture'?{texture:id,slots:Object.fromEntries(r.slots),pendingDelete}:{id,bytes,pendingDelete,...(r.kind==='buffer'?{owners:['constructed/'+String(id).padStart(3,'0')+'x'.repeat(41)]}:{})});}
+   const s={label,sequence:++sequence,allocation,gpuReservation:allocation.gpuPeak,conservativeReservation:allocation.peak+allocation.defaultPeak+326*4096,declaredArrayBytes:326*4096,cpuDeclaredArrayBytes:326*4096,glError:0,unmappedBufferBytes:0};
+   raw.push(s);compact.push(compactSceneSample(history,s));
+ };
+ for(let i=1;i<=326;i++)reserve('buffer',i,4096);for(let i=1;i<=28;i++)reserve('texture',i,1048576);reserve('renderbuffer',1,64);
+ for(let i=0;i<24;i++)reserve('texture',i%28+1,1048576);
+ finish();
+ if(!fault){
+   const labels=['field','partition-field','inactive-field','both-close-tiers','lens-depth','lens-resize','lens-retired','narrow-resize','rigged-reactivation','near-lod-reupload','baked-reclamation','compare-rigged-left','compare-baked-left','baked-restored','stress','restore-upload','restored-scene'];
+   for(const[i,label]of labels.entries()){if(i%3===0)for(let j=1;j<=68;j++)reserve('buffer',j,4096+i*16);capture(label);}
+ }else{
+   capture('fault-start');const candidates=route==='capable'?fault==='native-upload'||fault.includes('prepare')||fault==='candidate-then-baseline-terminal'?10:9:0;
+   for(let i=1;i<=candidates;i++)reserve('texture',28+i,65536);
+   if(fault.startsWith('rejection-delayed-'))capture('held-check');for(let i=1;i<=candidates;i++)retire('texture',28+i);
+   capture('first-baseline-request');for(let i=1;i<=5;i++){reserve('texture',50+i,1048576);capture('baseline-upload');}
+   capture('fallback-or-terminal-pending');finish();capture('fallback-or-terminal-settled');
+ }
+ capture('restored-native-pending');finish();capture('restored-native-settled');
+ return {raw,context:{history,states:compact,kind:'constructed CPU transport profile; native whole-scene matrix UNRUN'}};
+}
 const checks=[
+ ['scene-history-matrix-envelope',a=>{
+   const contract=sceneMatrixContract(phases),templates=new Map(),model={cases:[],faults:[],kind:'CPU transport sized from one retained native fixture; not proven native worst case'};
+   for(const[collection,tuples]of [['cases',contract.cases],['faults',contract.faults]])for(const tuple of tuples){const key=tuple.route+'/'+(tuple.fault||'ordinary');let t=templates.get(key);if(!t){const profile=transportProfile(tuple.route,tuple.fault);assert(isDeepStrictEqual(a.expand(profile.context).states,profile.raw),'scene-history-matrix-envelope: profiles round-trip all samples losslessly');t=profile.context;templates.set(key,t);}model[collection].push({...tuple,...t});}
+   const envelope=a.envelope(model);assert.equal(model.cases.length,22,'scene-history-matrix-envelope:22 ordinary contexts');assert.equal(model.faults.length,88,'scene-history-matrix-envelope:88 fault contexts');assert.equal(envelope.withinLimit,true,'scene-history-matrix-envelope: complete constructed transport fits90M reader margin');assert.equal(envelope.limit,90000000,'scene-history-matrix-envelope: reader margin is explicit');assert(envelope.bytes>1000000,'scene-history-matrix-envelope: real full-profile serialization measured');
+   console.log(`SCENE-HISTORY CPU MODEL22+88 ${envelope.bytes} bytes; native whole-matrix worst case UNRUN`);
+ }],
+ ['scene-history-envelope-overflow',a=>{const result=a.envelope({constructed:'x'.repeat(90000000)});assert.equal(result.withinLimit,false,'scene-history-envelope-overflow: complete oversized evidence refused, never truncated');assert(result.bytes>=90000000,'scene-history-envelope-overflow: actual serialized byte length counted');}],
+ ['scene-history-reducer-equivalence',a=>{
+   const {raw}=transportObservations(),report=observations(),labels=['field','both-close-tiers','lens-depth','lens-resize','lens-retired','narrow-resize'];
+   report.cases=phases.map(p=>({...p,complete:true,errors:[],restoration:{ok:true},states:raw.slice(0,6).map((s,i)=>({...structuredClone(s),label:labels[i]}))}));
+   const compact=structuredClone(report);for(const row of compact.cases){row.history=a.history();row.states=row.states.map(s=>a.compact(row.history,s));}
+   assert.deepEqual(a.reduce(compact,phases),a.reduce(report,phases),'scene-history-reducer-equivalence: one reducer preserves complete schema and oversize failure peak');assert.equal(a.reduce(compact,phases).complete,true,'scene-history-reducer-equivalence: compact complete model admitted');
+ }],
+ ['native-journal-kinds',a=>{const o=a.observe(false,false,false,sampleSceneAllocations,false,true),events=o.reallocatedSample.allocation.nativeEvents;
+   assert.deepEqual([...new Set(events.filter(e=>e.operation==='reserve').map(e=>e.kind))].sort(),['buffer','renderbuffer','texture'],'native-journal-kinds: ordered records cover all three allocation kinds');
+   assert(events.some(e=>e.operation==='retire')&&events.some(e=>e.operation==='release')&&events.some(e=>e.operation==='finish'),'native-journal-kinds: native fence retains retirement and actual removal');
+   assert(events.every((e,i)=>e.sequence===i+1&&e.callOrdinal>0),'native-journal-kinds: one complete chronological sequence');}],
+ ['native-journal-replacement',a=>{const o=a.observe(false,false,false,sampleSceneAllocations,false,true),events=o.reallocatedSample.allocation.nativeEvents,e=events.filter(e=>e.kind==='buffer'&&e.operation==='reserve'&&e.previous>0).at(-1);
+   assert.equal(e.previous,40,'native-journal-replacement: original native reservation retained');assert.equal(e.bytes,16,'native-journal-replacement: replacement byte length retained');assert.equal(e.transient-e.current,40,'native-journal-replacement: transient old/new overlap retained');assert(e.peak>=e.transient,'native-journal-replacement: cumulative peak covers transient');}],
+ ['native-journal-copy',a=>{const o=a.observe(false,false,false,sampleSceneAllocations,false,true);o.rgba.nativeEvents[0].bytes=1;assert.notEqual(o.beforeFinish.nativeEvents[0].bytes,1,'native-journal-copy: earlier returned history cannot mutate later snapshots');}],
+ ['native-journal-off',a=>assert.equal(a.observe().rgba.nativeEvents,undefined,'native-journal-off: legacy snapshot shape remains unchanged')],
+ ['scene-history-roundtrip',a=>{const {raw,context}=transportObservations(a),expanded=a.expand(context);assert.deepEqual(expanded.states,raw,'scene-history-roundtrip: every scalar, signature, native event and native slot restored exactly');assert(context.states.every(s=>!s.allocation.bufferSlots&&!s.allocation.nativeEvents),'scene-history-roundtrip: repeated native records stored once');}],
+ ...Object.entries({
+   'scene-history-backward':c=>c.states[1].allocation.history.nativeEventsEnd=0,
+   'scene-history-missing-revision':c=>c.history.slotRevisions.pop(),
+   'scene-history-lost-transient':c=>c.history.nativeEvents.find(e=>e.operation==='reserve').transient++,
+   'scene-history-native-order':c=>c.history.nativeEvents[0].sequence++,
+   'scene-history-signature-loss':c=>{c.history.signatures=[];for(const s of c.states)s.allocation.history.signaturesEnd=0;},
+   'scene-history-signature-format':c=>c.history.signatures[0].raw.format=0,
+   'scene-history-signature-bytes':c=>c.history.signatures[0].canonical.bytes=1,
+   'scene-history-signature-payload':c=>{delete c.history.signatures[0].raw;delete c.history.signatures[0].canonical;},
+   'scene-history-native-call':c=>{for(const e of c.history.nativeEvents)if(e.operation==='reserve')e.call='deleteTexture';},
+   'scene-history-call-ordinal':c=>{for(const e of c.history.nativeEvents)e.callOrdinal=1;},
+   'scene-history-same-call-ordinal':c=>{const e=c.history.nativeEvents.filter(e=>e.call==='bufferData');e[1].callOrdinal=e[0].callOrdinal;},
+   'scene-history-renderbuffer-size':c=>{c.history.nativeEvents.find(e=>e.kind==='renderbuffer'&&e.operation==='reserve').detail.width=100000;},
+   'scene-history-slot-bytes':c=>c.history.slotRevisions.find(r=>r.operation==='upsert'&&r.kind==='buffer').record.bytes++,
+   'scene-history-native-fence':c=>c.history.nativeEvents.find(e=>e.operation==='finish').operation='reserve',
+   'scene-history-mixed-records':c=>c.states[0].allocation.bufferSlots=[],
+ }).map(([name,change])=>[name,a=>{const {context}=transportObservations(a);change(context);let failure;try{a.expand(context);}catch(e){failure=e;}assert(failure?.message.startsWith('scene history:'),`${name}: misbound native history fails closed`);}]),
+ ['scene-history-altered-prefix',a=>{const {raw}=transportObservations(),h=a.history();a.compact(h,raw[0]);h.nativeEvents[0].bytes++;let failure;try{a.compact(h,raw[1]);}catch(e){failure=e;}assert(failure?.message==='scene history: altered owned prefix','scene-history-altered-prefix: public mutation cannot rewrite owned history');}],
  ['matrix-contract',a=>{const c=a.matrix(phases);assert.equal(c.cases.length,22,'matrix-contract: two native routes for every phase');assert.equal(c.faults.length,88,'matrix-contract: seven capable and one unsupported faults per phase');assert.equal(new Set(c.faults.map(f=>`${f.packId}/${f.phaseId}/${f.route}/${f.fault}`)).size,88,'matrix-contract: exact unique fault tuples');}],
  ['matrix-contract-refusal',a=>{let e;try{a.matrix(phases.slice(1));}catch(x){e=x;}assert.ok(e?.message.startsWith('scene matrix:'),'matrix-contract-refusal: omitted phase cannot shrink declaration');}],
  ['qualified-complete',a=>{const r=a.reduce(qualifiedObservations(),phases);assert.equal(r.complete,true,'qualified-complete: constructed complete22+88 schema');assert.equal(r.withinLimit,true,'qualified-complete: complete under budget');assert.equal(r.maxGpuReservation,100000000,'qualified-complete: all native sample maxima read');}],
@@ -263,6 +347,14 @@ const checks=[
 const changed=(key,value)=>({observe:()=>({...observed(),[key]:value})});
 class NoOverlap extends AllocationLedger {reserve(id,k,s,n){super.reserve(id,k,s,n,false);}}
 const mutants={
+  'scene-history-matrix-envelope':{envelope:r=>({...sceneReportEnvelope(r),withinLimit:false})},
+  'scene-history-envelope-overflow':{envelope:r=>({...sceneReportEnvelope(r),withinLimit:true})},
+  'scene-history-reducer-equivalence':{reduce:(r,p)=>r.cases.some(c=>c.history)?{complete:false}:reduceSceneObservations(r,p)},
+  ...Object.fromEntries(['native-journal-kinds','native-journal-replacement','native-journal-copy'].map(name=>[name,{observe:(...args)=>{const o=observed(...args);if(name==='native-journal-kinds')o.reallocatedSample.allocation.nativeEvents=o.reallocatedSample.allocation.nativeEvents.filter(e=>e.kind!=='renderbuffer');if(name==='native-journal-replacement')o.reallocatedSample.allocation.nativeEvents.filter(e=>e.kind==='buffer'&&e.operation==='reserve'&&e.previous>0).at(-1).transient=0;if(name==='native-journal-copy')o.beforeFinish.nativeEvents=o.rgba.nativeEvents;return o;}}])),
+  'native-journal-off':{observe:()=>observed(false,false,false,sampleSceneAllocations,false,true)},
+  'scene-history-roundtrip':{expand:c=>({...expandSceneContext(c),states:[]})},
+  ...Object.fromEntries(checks.filter(([name])=>name.startsWith('scene-history-')&&!['scene-history-roundtrip','scene-history-altered-prefix','scene-history-matrix-envelope','scene-history-envelope-overflow','scene-history-reducer-equivalence'].includes(name)).map(([name])=>[name,{expand:()=>({states:[]})}])),
+  'scene-history-altered-prefix':{compact:(h,s)=>{try{return compactSceneSample(h,s);}catch{return s;}}},
   'npot-mips':{mips:()=>[{bytes:140}]},'replacement-peak':{Ledger:NoOverlap},
   'deferred-delete':changed('beforeFinish',{bytes:0,pendingDeleteBytes:0}),
   'native-uncompressed':changed('rgba',{byKind:{texture:128}}),

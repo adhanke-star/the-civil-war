@@ -22,17 +22,19 @@ export function mipSizes(w,h,bpp,levels=Math.floor(Math.log2(Math.max(w,h)))+1) 
 }
 export class AllocationLedger {
   constructor(){this.objects=new Map();this.retired=new Set();this.bytes=0;this.peak=0;this.calls=0;}
-  reserve(id,kind,slot,bytes,overlap=true){
+  reserve(id,kind,slot,bytes,overlap=true,detail=null){
     if(!id||!['texture','renderbuffer','buffer'].includes(kind)||!Number.isSafeInteger(bytes)||bytes<0)throw new Error('allocation: invalid reservation');
     let r=this.objects.get(id);if(r&&r.kind!==kind)throw new Error('allocation: resource kind changed');
     if(!r){r={kind,slots:new Map()};this.objects.set(id,r);}
     const prior=r.slots.get(slot)||0;
-    this.peak=Math.max(this.peak,this.bytes+bytes-(overlap?0:prior));
-    this.onReservation?.(this.bytes+bytes-(overlap?0:prior));
+    const transient=this.bytes+bytes-(overlap?0:prior);
+    this.peak=Math.max(this.peak,transient);
+    this.onReservation?.(transient);
     this.bytes+=bytes-prior;r.slots.set(slot,bytes);this.calls++;
+    this.onEvent?.('reserve',{id,kind,slot,bytes,previous:prior,transient,overlap,detail});
   }
-  retire(id){if(this.objects.has(id))this.retired.add(id);}
-  sync(){for(const id of this.retired){const r=this.objects.get(id);if(r){this.bytes-=[...r.slots.values()].reduce((a,b)=>a+b,0);this.objects.delete(id);}}this.retired.clear();}
+  retire(id){const r=this.objects.get(id);if(r){this.retired.add(id);this.onEvent?.('retire',{id,kind:r.kind});}}
+  sync(){for(const id of this.retired){const r=this.objects.get(id);if(r){this.bytes-=[...r.slots.values()].reduce((a,b)=>a+b,0);this.objects.delete(id);this.onEvent?.('release',{id,kind:r.kind});}}this.retired.clear();}
   snapshot(){
     const byKind={texture:0,renderbuffer:0,buffer:0};let pendingDeleteBytes=0;
     for(const [id,r]of this.objects){const n=[...r.slots.values()].reduce((a,b)=>a+b,0);byKind[r.kind]+=n;if(this.retired.has(id))pendingDeleteBytes+=n;}
@@ -97,22 +99,186 @@ export function sceneMatrixContract(phases){
   return {cases:phases.flatMap(p=>SCENE_ROUTES.map(route=>({packId:p.packId,phaseId:p.phaseId,route}))),
     faults:phases.flatMap(p=>SCENE_FAULTS.map(f=>({packId:p.packId,phaseId:p.phaseId,...f})))};
 }
+
+const sceneHistories=new WeakMap();
+export function sceneReportEnvelope(report){
+  const json=JSON.stringify(report),bytes=new TextEncoder().encode(json).byteLength;
+  return {json,bytes,withinLimit:bytes<90000000,limit:90000000};
+}
+/** Lossless per-context transport in the existing report; no samples or scalar peaks are removed. */
+export function createSceneHistory(){
+  const history={signatures:[],nativeEvents:[],slotRevisions:[]};
+  sceneHistories.set(history,{prefixes:['[]','[]','[]'],slots:new Map(),sequence:-1});return history;
+}
+export function compactSceneSample(history,input){
+  const owner=sceneHistories.get(history),keys=['signatures','nativeEvents','slotRevisions'];
+  if(!owner||keys.some((k,i)=>JSON.stringify(history[k])!==owner.prefixes[i]))throw Error('scene history: altered owned prefix');
+  const sample=structuredClone(input),a=sample?.allocation;
+  if(!Number.isSafeInteger(sample?.sequence)||sample.sequence<=owner.sequence||!a||a.history!==undefined)throw Error('scene history: sample sequence/shape');
+  for(const key of ['signatures','nativeEvents']){
+    const records=a[key];if(!Array.isArray(records)||records.length<history[key].length
+      ||history[key].some((r,i)=>JSON.stringify(r)!==JSON.stringify(records[i])))throw Error('scene history: altered observation prefix');
+  }
+  const next=new Map();
+  for(const[kind,key,idKey]of [['buffer','bufferSlots','id'],['texture','textureSlots','texture'],['renderbuffer','renderbufferSlots','id']]){
+    if(!Array.isArray(a[key]))throw Error('scene history: complete native slots required');
+    for(const record of a[key]){
+      const id=record?.[idKey],key=kind+'/'+id;
+      if(!Number.isSafeInteger(id)||id<1||next.has(key))throw Error('scene history: duplicate/invalid native ID');
+      next.set(key,{kind,id,record});
+    }
+  }
+  const revisions=[];
+  for(const[key,value]of owner.slots)if(!next.has(key))revisions.push({operation:'remove',kind:value.kind,id:value.id});
+  for(const[key,value]of next)if(JSON.stringify(value)!==JSON.stringify(owner.slots.get(key)))revisions.push({operation:'upsert',...value});
+  const bufferOwnership=Object.hasOwn(sample,'bufferOwnership');
+  if(bufferOwnership&&JSON.stringify(sample.bufferOwnership)!==JSON.stringify(a.bufferSlots))throw Error('scene history: buffer ownership alias differs');
+  // Mutate the admitted history only after all refusal checks; keep private copies of public records.
+  for(const key of ['signatures','nativeEvents'])history[key].push(...structuredClone(a[key].slice(history[key].length)));
+  history.slotRevisions.push(...structuredClone(revisions));owner.slots=structuredClone(next);owner.sequence=sample.sequence;
+  owner.prefixes=keys.map(k=>JSON.stringify(history[k]));
+  a.history={signaturesEnd:history.signatures.length,nativeEventsEnd:history.nativeEvents.length,slotsEnd:history.slotRevisions.length,bufferOwnership};
+  for(const key of ['signatures','nativeEvents','bufferSlots','textureSlots','renderbufferSlots'])delete a[key];
+  if(bufferOwnership)delete sample.bufferOwnership;return sample;
+}
+function sceneNativeReplay(events){
+  const objects=new Map(),released=new Set(),nativeCalls=new Map();let cursor=0,current=0,peak=0,ordinal=0,finishes=0,fence=new Set();
+  const safe=n=>Number.isSafeInteger(n)&&n>=0;
+  const textureCalls=['texImage2D','texImage3D','compressedTexImage2D','compressedTexImage3D','texStorage2D','texStorage3D','generateMipmap'];
+  const renderbufferBpp=new Map([[0x8229,1],[0x822b,2],[0x8051,4],[0x8058,4],[0x8c41,4],[0x8c43,4],[0x822d,2],[0x822f,4],[0x881b,8],[0x881a,8],[0x822e,4],[0x8230,8],[0x8815,16],[0x8814,16],[0x81a5,4],[0x81a6,4],[0x8cac,4],[0x88f0,4],[0x8cad,8],[0x8d48,1]]);
+  return (end,a)=>{
+    for(;cursor<end;cursor++){
+      const e=events[cursor],key=e?.kind+'/'+e?.id;
+      if(e?.sequence!==cursor+1||!safe(e?.callOrdinal)||!e.callOrdinal||e.callOrdinal<ordinal||typeof e.call!=='string'||!e.call)throw Error('scene history: native event chronology');
+      if(nativeCalls.has(e.callOrdinal)&&nativeCalls.get(e.callOrdinal)!==e.call)throw Error('scene history: native call identity');
+      nativeCalls.set(e.callOrdinal,e.call);
+      ordinal=e.callOrdinal;
+      if(e.operation==='finish'){
+        if(e.kind!==null||e.id!==null||e.call!=='finish'||fence.size)throw Error('scene history: native finish fence');
+        finishes++;fence=new Set([...objects].filter(([,r])=>r.pending).map(([key])=>key));
+      }else{
+        if(!['texture','buffer','renderbuffer'].includes(e.kind)||!Number.isSafeInteger(e.id)||e.id<1)throw Error('scene history: native identity');
+        let r=objects.get(key);
+        if(e.operation==='reserve'){
+          if(!(e.kind==='buffer'?e.call==='bufferData':e.kind==='renderbuffer'?['renderbufferStorage','renderbufferStorageMultisample'].includes(e.call):textureCalls.includes(e.call)))throw Error('scene history: native allocation call');
+          if(fence.size||released.has(key)||!safe(e.bytes)||!safe(e.previous)||typeof e.overlap!=='boolean'||!['string','number'].includes(typeof e.slot))throw Error('scene history: native reservation');
+          if(!r){r={kind:e.kind,slots:new Map(),pending:false};objects.set(key,r);}
+          const previous=r.slots.get(String(e.slot))||0,transient=current+e.bytes-(e.overlap?0:previous);
+          if(e.previous!==previous||e.transient!==transient)throw Error('scene history: lost native replacement peak');
+          if(e.kind==='renderbuffer'&&(!e.detail||!['format','width','height','samples'].every(k=>Number.isSafeInteger(e.detail[k])&&e.detail[k]>0)
+            ||!renderbufferBpp.has(e.detail.format)||e.bytes!==e.detail.width*e.detail.height*e.detail.samples*renderbufferBpp.get(e.detail.format)
+            ||(e.call==='renderbufferStorage'&&e.detail.samples!==1)))throw Error('scene history: renderbuffer geometry');
+          peak=Math.max(peak,transient);current+=e.bytes-previous;r.slots.set(String(e.slot),e.bytes);
+        }else if(e.operation==='retire'){
+          if(e.call!==({texture:'deleteTexture',buffer:'deleteBuffer',renderbuffer:'deleteRenderbuffer'})[e.kind])throw Error('scene history: native deletion call');
+          if(!r||fence.size)throw Error('scene history: missing native retirement');r.pending=true;
+        }else if(e.operation==='release'){
+          if(e.call!=='finish'||!r?.pending||!fence.delete(key))throw Error('scene history: unfenced native removal');
+          current-=[...r.slots.values()].reduce((n,b)=>n+b,0);objects.delete(key);released.add(key);
+        }else throw Error('scene history: native event operation');
+      }
+      if(e.current!==current||e.peak!==peak)throw Error('scene history: native event totals');
+    }
+    if(fence.size||a.bytes!==current||a.peak!==peak||(a.calls?.finish||0)!==finishes||ordinal>Object.values(a.calls||{}).reduce((n,c)=>n+c,0))throw Error('scene history: native sample totals');
+    const signatures=new Map(),counts=new Map(),sampleOrdinal=Object.values(a.calls||{}).reduce((n,c)=>n+c,0),bases=new Map(),expected=new Map();let lastSignature=0;
+    for(const s of a.signatures){
+      if(!safe(s?.callOrdinal)||!s.callOrdinal||s.callOrdinal<=lastSignature||s.callOrdinal>sampleOrdinal||!textureCalls.includes(s.nativeCall)
+        ||!Number.isSafeInteger(s.texture)||s.texture<1||nativeCalls.has(s.callOrdinal)&&nativeCalls.get(s.callOrdinal)!==s.nativeCall)throw Error('scene history: signature chronology');
+      const r=s.raw,c=s.canonical,allocations=[],fail=()=>{throw Error('scene history: signature allocation payload');};
+      if(!r||!c)fail();
+      const compressed=f=>f===0x93b0||f===0x8e8c;
+      const bpp=(format,type)=>renderbufferBpp.get(format)??([0x1908,0x1907].includes(format)?type===0x1406?16:type===0x140b?8:4:[0x1902,0x84f9].includes(format)?4:a.unknown?.includes(`format:${format},type:${type}`)?64:null);
+      const bytes=(w,h,d,format,type,isCompressed)=>isCompressed?(compressed(format)?Math.ceil(w/4)*Math.ceil(h/4)*16*d:a.unknown?.includes(`compressed format:${format}`)?w*h*d*64:NaN):w*h*d*bpp(format,type);
+      const add=(target,level,n,overlap=true)=>allocations.push({slot:`${target}:${level}`,bytes:n,overlap});
+      if(s.nativeCall==='generateMipmap'){
+        const base=bases.get(s.texture);if(s.call!=='generate mipmaps'||!base||JSON.stringify(c.base)!==JSON.stringify(base)
+          ||!(r.target===base.target||r.target===0x8513&&base.target>=0x8515&&base.target<=0x851a))fail();
+        if(!base.immutable){if(!base.bpp)fail();for(const target of r.target===0x8513?[0,1,2,3,4,5].map(i=>0x8515+i):[base.target])for(const[i,m]of mipSizes(base.w,base.h,base.bpp).entries())if(i)add(target,i,m.bytes*(base.target===0x806f?Math.max(1,base.d>>i):base.d),false);}
+      }else if(s.nativeCall.startsWith('texStorage')){
+        const levels=Math.trunc(r.levels),w=Math.trunc(r.w),h=Math.trunc(r.h),d=Math.trunc(r.d),isCompressed=compressed(r.format),n=isCompressed?null:bpp(r.format);
+        if(s.call!=='immutable storage'||!Number.isSafeInteger(levels)||levels<1||levels>32||!n&&!isCompressed
+          ||c.target!==r.target||c.levels!==levels||c.w!==w||c.h!==h||c.d!==d||c.bpp!==n||c.compressed!==isCompressed)fail();
+        for(const[i,m]of mipSizes(w,h,n||1,levels).entries())add(r.target,i,(isCompressed?Math.ceil(m.w/4)*Math.ceil(m.h/4)*16:m.bytes)*(r.target===0x806f?Math.max(1,d>>i):d)*(r.target===0x8513?6:1));
+        bases.set(s.texture,{target:r.target,w,h,d,bpp:n,compressed:isCompressed,immutable:true});
+      }else{
+        const isCompressed=s.nativeCall.startsWith('compressed'),n=bytes(r.w,r.h,r.d,r.format,r.type,isCompressed);
+        if(s.call!==(isCompressed?'compressed image':'image')||!['w','h','d'].every(k=>Number.isSafeInteger(r[k])&&r[k]>0)||!safe(r.level)
+          ||!Number.isSafeInteger(n)||c.bytes!==n||!['target','level','w','h','d'].every(k=>c[k]===r[k]))fail();
+        add(r.target,r.level,n);if(r.level===0)bases.set(s.texture,{target:r.target,w:r.w,h:r.h,d:r.d,bpp:isCompressed?null:bpp(r.format,r.type),immutable:false});
+      }
+      if(allocations.some(e=>!safe(e.bytes)))fail();expected.set(s.callOrdinal,allocations);
+      lastSignature=s.callOrdinal;signatures.set(s.callOrdinal,s);counts.set(s.nativeCall,(counts.get(s.nativeCall)||0)+1);
+    }
+    for(const name of textureCalls)if((counts.get(name)||0)!==(a.calls?.[name]||0))throw Error('scene history: missing texture signatures');
+    const eventGroups=new Map();for(let i=0;i<end;i++){const e=events[i];let group=eventGroups.get(e.callOrdinal);if(!group){group=[];eventGroups.set(e.callOrdinal,group);}group.push(e);}
+    for(const[ord,group]of eventGroups){const first=group[0];if(first.kind==='texture'&&first.operation==='reserve'){
+      const s=signatures.get(ord),want=expected.get(ord);if(!s||!want||group.length!==want.length||group.some((e,i)=>e.operation!=='reserve'||e.kind!=='texture'||e.id!==s.texture||String(e.slot)!==want[i].slot||e.bytes!==want[i].bytes||e.overlap!==want[i].overlap))throw Error('scene history: native signature binding');
+    }else if(first.call==='finish'){if(group[0].operation!=='finish'||group.slice(1).some(e=>e.operation!=='release'))throw Error('scene history: native finish call grammar');}
+    else if(group.length!==1)throw Error('scene history: collapsed native call ordinal');}
+    for(const[ord,want]of expected)if(want.length&&!eventGroups.has(ord))throw Error('scene history: missing signature reservation');
+    const totals={texture:0,buffer:0,renderbuffer:0};let pending=0;
+    for(const[key,r]of objects){const bytes=[...r.slots.values()].reduce((n,b)=>n+b,0);totals[r.kind]+=bytes;if(r.pending)pending+=bytes;
+      const records=a[r.kind==='buffer'?'bufferSlots':r.kind==='texture'?'textureSlots':'renderbufferSlots'],id=Number(key.slice(key.indexOf('/')+1)),found=records.filter(s=>s?.[r.kind==='texture'?'texture':'id']===id);
+      if(found.length!==1||found[0].pendingDelete!==r.pending||(r.kind==='texture'?JSON.stringify(found[0].slots)!==JSON.stringify(Object.fromEntries(r.slots)):found[0].bytes!==bytes))throw Error('scene history: missing native slot revision');
+    }
+    if(Object.keys(totals).some(k=>totals[k]!==a.byKind?.[k])||pending!==a.pendingDeleteBytes
+      ||a.bufferSlots.length+a.textureSlots.length+a.renderbufferSlots.length!==objects.size)throw Error('scene history: native slot totals');
+  };
+}
+/** Replay one context in observation order. Never expand the entire multi-context report at once. */
+export function expandSceneContext(input){
+  if(input?.history===undefined)return input;
+  const h=input.history;
+  if(!h||!['signatures','nativeEvents','slotRevisions'].every(k=>Array.isArray(h[k])))throw Error('scene history: history shape');
+  const raw=[...(Array.isArray(input.states)?input.states:[]),...(Array.isArray(input.restoration?.samples)?input.restoration.samples:[]),
+    ...(Array.isArray(input.stress?.transaction?.samples)?input.stress.transaction.samples.map(s=>s?.observation):[])];
+  const ordered=raw.slice().sort((a,b)=>a?.sequence-b?.sequence),decoded=new Map(),slots=new Map(),cursor={signaturesEnd:0,nativeEventsEnd:0,slotsEnd:0};
+  let sequence=-1;const replay=sceneNativeReplay(h.nativeEvents);
+  for(const s of ordered){
+    const a=s?.allocation,c=a?.history;
+    if(!Number.isSafeInteger(s?.sequence)||s.sequence<=sequence||!c||typeof c.bufferOwnership!=='boolean'
+      ||['signatures','nativeEvents','bufferSlots','textureSlots','renderbufferSlots'].some(k=>a[k]!==undefined))throw Error('scene history: mixed sample or sequence');
+    for(const[key,records]of [['signaturesEnd',h.signatures],['nativeEventsEnd',h.nativeEvents],['slotsEnd',h.slotRevisions]]){
+      if(!Number.isSafeInteger(c[key])||c[key]<cursor[key]||c[key]>records.length)throw Error('scene history: invalid/backward cursor');
+    }
+    for(let i=cursor.slotsEnd;i<c.slotsEnd;i++){
+      const r=h.slotRevisions[i],key=r?.kind+'/'+r?.id;
+      if(!['buffer','texture','renderbuffer'].includes(r?.kind)||!Number.isSafeInteger(r?.id)||r.id<1)throw Error('scene history: revision identity');
+      if(r.operation==='remove'){if(!slots.delete(key))throw Error('scene history: missing removed reservation');}
+      else if(r.operation==='upsert'){
+        if(r.record?.[r.kind==='texture'?'texture':'id']!==r.id||JSON.stringify(slots.get(key))===JSON.stringify(r))throw Error('scene history: invalid/redundant revision');
+        slots.set(key,structuredClone(r));
+      }else throw Error('scene history: revision operation');
+    }
+    const allocation={...a,signatures:h.signatures.slice(0,c.signaturesEnd),nativeEvents:h.nativeEvents.slice(0,c.nativeEventsEnd),
+      bufferSlots:[],textureSlots:[],renderbufferSlots:[]};delete allocation.history;
+    for(const r of slots.values())allocation[r.kind==='buffer'?'bufferSlots':r.kind==='texture'?'textureSlots':'renderbufferSlots'].push(structuredClone(r.record));
+    replay(c.nativeEventsEnd,allocation);
+    const sample={...s,allocation};if(c.bufferOwnership)sample.bufferOwnership=allocation.bufferSlots;
+    decoded.set(s,sample);Object.assign(cursor,c);sequence=s.sequence;
+  }
+  if(cursor.signaturesEnd!==h.signatures.length||cursor.nativeEventsEnd!==h.nativeEvents.length||cursor.slotsEnd!==h.slotRevisions.length)throw Error('scene history: unreferenced trailing evidence');
+  return {...input,states:Array.isArray(input.states)?input.states.map(s=>decoded.get(s)):input.states,
+    ...(input.restoration?{restoration:{...input.restoration,samples:Array.isArray(input.restoration.samples)?input.restoration.samples.map(s=>decoded.get(s)):input.restoration.samples}}:{}),
+    ...(input.stress?{stress:{...input.stress,...(input.stress.transaction?{transaction:{...input.stress.transaction,samples:Array.isArray(input.stress.transaction.samples)?input.stress.transaction.samples.map(s=>({...s,observation:decoded.get(s.observation)})):input.stress.transaction.samples}}:{})}}:{})};
+}
 export function reduceSceneObservations(report, phases) {
   const errors=[], expected=(Array.isArray(phases)?phases:[]).map(p=>`${p?.packId}/${p?.phaseId}`), seen=new Set(), samples=[];
   const fail=message=>errors.push(message);
+  const keep=s=>samples.push({gpuReservation:s?.gpuReservation,conservativeReservation:s?.conservativeReservation});
   if(!report||typeof report!=='object'||Array.isArray(report)){fail('report shape');report={};}
   // Retain scalar peaks even when a malformed mode or mixed schema rejects the report.
   for(const row of [...(Array.isArray(report.cases)?report.cases:[]),...(Array.isArray(report.faults)?report.faults:[]),report.failure]){
-    if(row?.gpuReservation!==undefined||row?.conservativeReservation!==undefined)samples.push(row);
-    for(const s of Array.isArray(row?.states)?row.states:[])samples.push(s);
-    for(const s of Array.isArray(row?.restoration?.samples)?row.restoration.samples:[])samples.push(s);
-    for(const s of Array.isArray(row?.stress?.transaction?.samples)?row.stress.transaction.samples:[])samples.push(s?.observation);
+    if(row?.gpuReservation!==undefined||row?.conservativeReservation!==undefined)keep(row);
+    for(const s of Array.isArray(row?.states)?row.states:[])keep(s);
+    for(const s of Array.isArray(row?.restoration?.samples)?row.restoration.samples:[])keep(s);
+    for(const s of Array.isArray(row?.stress?.transaction?.samples)?row.stress.transaction.samples:[])keep(s?.observation);
   }
   if(report.sceneRoutes!==undefined&&!['current-png','qualified-both'].includes(report.sceneRoutes))fail('unknown scene route mode');
   if(report.sceneRoutes!=='qualified-both'&&(report.qualification!==undefined||report.faults!==undefined))fail('qualified evidence requires explicit qualified mode');
   if(new Set(expected).size!==expected.length||expected.length!==11)fail('phase contract');
   const sample=(s,label)=>{
-    samples.push(s);
+    keep(s);
     if(!Number.isSafeInteger(s?.gpuReservation)||s.gpuReservation<0
       ||!Number.isSafeInteger(s?.conservativeReservation)||s.conservativeReservation<s.gpuReservation)fail(`${label}: finite bytes`);
     if(s?.glError!==0||!Array.isArray(s?.allocation?.unknown)||s.allocation.unknown.length)fail(`${label}: unknown/GL`);
@@ -198,14 +364,15 @@ export function reduceSceneObservations(report, phases) {
       const ordered=list.filter(Boolean).slice().sort((a,b)=>a.sequence-b.sequence),seq=new Set();let peak=-1,finish=0;
       for(const s of ordered){const f=s.allocation?.calls?.finish||0;if(!safe(s.sequence)||seq.has(s.sequence)||s.allocation?.gpuPeak<peak||f<finish)fail(label+': sample chronology');seq.add(s.sequence);peak=s.allocation?.gpuPeak;finish=f;}
     };
-    for(const row of array(report.cases,'qualified cases')){
+    for(const input of array(report.cases,'qualified cases')){
+      let row=input;try{row=expandSceneContext(input);}catch(error){fail(key(input)+': '+error.message);}
       const label=key(row),states=array(row?.states,label+'/states'),transaction=row?.stress?.transaction,
         stressSamples=array(transaction?.samples,label+'/stress samples');
       for(const s of states)nativeSample(s,label+'/'+s?.label);
       for(const s of stressSamples)nativeSample(s?.observation,label+'/stress/'+s?.label);
       nativeRestore(row,label); // Collect every peak before rejecting malformed/duplicate identity.
       if(!expected.includes(`${row?.packId}/${row?.phaseId}`)||!SCENE_ROUTES.includes(row?.route)||ordinary.has(label))fail(label+': ordinary tuple');
-      ordinary.set(label,row);context(row,label);
+      ordinary.set(label,{ordinaryRoster:row?.ordinaryRoster,warm:{retainedRoster:row?.warm?.retainedRoster,spawned:row?.warm?.spawned}});context(row,label);
       const labels=states.map(s=>s?.label),required=['field','partition-field','inactive-field','both-close-tiers','lens-depth','lens-resize','lens-retired','narrow-resize',
         'rigged-reactivation','near-lod-reupload','baked-reclamation','compare-rigged-left','compare-baked-left','baked-restored',
         ...(row?.phaseId==='lookout-mountain'?['partition-native-zoom','framed-compare-rigged-left','framed-compare-baked-left','framed-baked-restored']:[])];
@@ -273,7 +440,8 @@ export function reduceSceneObservations(report, phases) {
         ||!n.every(s=>Array.isArray(s?.owners)&&s.owners.some(o=>o?.label==='smoke'&&o.bytes===48000)))fail(label+': full native smoke');
       chronology([...states,...stressSamples.map(s=>s?.observation),...array(row?.restoration?.samples,label+'/chronology restore')],label);
     }
-    for(const row of array(report.faults,'qualified faults')){
+    for(const input of array(report.faults,'qualified faults')){
+      let row=input;try{row=expandSceneContext(input);}catch(error){fail(key(input)+': '+error.message);}
       const label=key(row)+'/'+row?.fault,states=array(row?.states,label+'/states');
       for(const s of states)nativeSample(s,label+'/'+s?.label);
       if(row?.stress?.transaction?.samples!==undefined)for(const s of array(row.stress.transaction.samples,label+'/fault stress samples'))nativeSample(s?.observation,label+'/fault stress');
@@ -351,7 +519,8 @@ export function reduceSceneObservations(report, phases) {
     return verdict();
   }
   if(!Array.isArray(report.cases))fail('cases shape');
-  for(const row of Array.isArray(report.cases)?report.cases:[]){
+  for(const input of Array.isArray(report.cases)?report.cases:[]){
+    let row=input;try{row=expandSceneContext(input);}catch(error){fail('scene history: '+error.message);}
     if(!row||typeof row!=='object'||Array.isArray(row)){fail('phase shape');continue;}
     const key=`${row.packId}/${row.phaseId}`;
     if(!expected.includes(key)||seen.has(key))fail(`${key}: extra/duplicate phase`);seen.add(key);
@@ -408,12 +577,25 @@ export function installAllocationObserver(source) {
     const current=s.gpu.sample(bytes,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.getContextAttributes());
     s.defaultPeak=Math.max(s.defaultPeak,s.gpu.framebuffer+s.gpu.pendingFramebuffer);return current;
   };
-  const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),gpu:new Peak(),bufferArrays:new WeakMap(),bufferSources:new Map(),bufferIds:new Map(),bufferOwners:new Map(),nextBufferId:1,textures:new Map(),textureIds:new Map(),signatures:[],unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};s.ledger.onReservation=bytes=>sample(gl,s,bytes);contexts.set(gl,s);}return s;};
+  const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),gpu:new Peak(),bufferArrays:new WeakMap(),bufferSources:new Map(),bufferIds:new Map(),bufferOwners:new Map(),nextBufferId:1,textures:new Map(),textureIds:new Map(),renderbufferIds:new Map(),nativeEvents:[],signatures:[],unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};s.ledger.onReservation=bytes=>sample(gl,s,bytes);
+    if(source.nativeJournal===true)s.ledger.onEvent=(operation,event)=>journal(s,operation,event);
+    contexts.set(gl,s);}return s;};
   const unknown=(s,value)=>{if(!s.unknown.includes(value))s.unknown.push(value);};
+  const journal=(s,operation,event={})=>{
+    if(source.nativeJournal!==true)return;
+    if(s.nativeEvents.length>=16384){unknown(s,'native journal limit');return;}
+    const {kind,id}=event;let nativeId=null;
+    if(id){const ids=kind==='buffer'?s.bufferIds:kind==='texture'?s.textureIds:s.renderbufferIds;
+      if(!ids.has(id))ids.set(id,kind==='buffer'?s.nextBufferId++:ids.size+1);nativeId=ids.get(id);}
+    s.nativeEvents.push({sequence:s.nativeEvents.length+1,operation,kind:kind||null,id:nativeId,slot:event.slot??null,bytes:event.bytes??null,
+      previous:event.previous??null,transient:event.transient??null,detail:event.detail?structuredClone(event.detail):null,
+      overlap:event.overlap??null,call:s.activeCall||null,callOrdinal:s.nativeCallOrdinal||0,current:s.ledger.bytes,peak:s.ledger.peak});
+  };
   const signature=(gl,s,id,call,raw,canonical)=>{
     if(!s.textureIds.has(id))s.textureIds.set(id,s.textureIds.size+1);
     if(s.signatures.length>=256){unknown(s,'texture signature limit');return;}
-    s.signatures.push({texture:s.textureIds.get(id),call,activeUnit:gl.ACTIVE_TEXTURE===undefined?null:gl.getParameter(gl.ACTIVE_TEXTURE),raw,canonical});
+    s.signatures.push({texture:s.textureIds.get(id),call,activeUnit:gl.ACTIVE_TEXTURE===undefined?null:gl.getParameter(gl.ACTIVE_TEXTURE),raw,canonical,
+      ...(source.nativeJournal===true?{nativeCall:s.activeCall,callOrdinal:s.nativeCallOrdinal}: {})});
   };
   const bpp=(gl,s,format,type)=>{
     const entries=[['R8',1],['RG8',2],['RGB8',4],['RGBA8',4],['SRGB8',4],['SRGB8_ALPHA8',4],['R16F',2],['RG16F',4],['RGB16F',8],['RGBA16F',8],
@@ -450,7 +632,9 @@ export function installAllocationObserver(source) {
     const native=proto[name];if(typeof native!=='function')return;
     const descriptor=Object.getOwnPropertyDescriptor(proto,name);
     const wrapped=function(...args){const value=native.apply(this,args),s=state(this);s.calls[name]=(s.calls[name]||0)+1;
-      try{sample(this,s);after(this,args,value);sample(this,s);}catch(error){unknown(s,`observer:${name}:${error.message}`);}return value;};
+      const priorCall=s.activeCall;s.activeCall=name;
+      if(source.nativeJournal===true)s.nativeCallOrdinal=(s.nativeCallOrdinal||0)+1;
+      try{sample(this,s);after(this,args,value);sample(this,s);}catch(error){unknown(s,`observer:${name}:${error.message}`);}finally{s.activeCall=priorCall;}return value;};
     Object.defineProperty(proto,name,{value:wrapped,writable:descriptor?.writable??true,enumerable:descriptor?.enumerable??true,configurable:descriptor?.configurable??true});
     wrappers.push({proto,name,descriptor,wrapped});
   };
@@ -496,11 +680,12 @@ export function installAllocationObserver(source) {
     for(const multisample of [false,true])wrap(proto,multisample?'renderbufferStorageMultisample':'renderbufferStorage',(gl,a)=>{
       const s=state(gl),offset=multisample?1:0,samples=multisample?Math.max(1,a[1]):1,id=gl.getParameter(gl.RENDERBUFFER_BINDING);
       if(!id){unknown(s,'storage without bound renderbuffer');return;}
-      s.ledger.reserve(id,'renderbuffer',0,a[2+offset]*a[3+offset]*bpp(gl,s,a[1+offset])*samples);
+      s.ledger.reserve(id,'renderbuffer',0,a[2+offset]*a[3+offset]*bpp(gl,s,a[1+offset])*samples,true,
+        {format:a[1+offset],width:a[2+offset],height:a[3+offset],samples});
     });
     for(const [name,kind]of [['deleteTexture','texture'],['deleteBuffer','buffer'],['deleteRenderbuffer','renderbuffer']])
       wrap(proto,name,(gl,a)=>{const s=state(gl);s.ledger.retire(a[0]);if(kind==='texture')s.textures.delete(a[0]);});
-    wrap(proto,'finish',gl=>{const s=state(gl);s.ledger.sync();s.gpu.finish();for(const id of s.bufferIds.keys())if(!s.ledger.objects.has(id)){
+    wrap(proto,'finish',gl=>{const s=state(gl);journal(s,'finish');s.ledger.sync();s.gpu.finish();for(const id of s.bufferIds.keys())if(!s.ledger.objects.has(id)){
       s.bufferArrays.get(s.bufferSources.get(id))?.delete(id);s.bufferSources.delete(id);s.bufferOwners.delete(id);s.bufferIds.delete(id);
     }});
   }
@@ -521,7 +706,8 @@ export function installAllocationObserver(source) {
       gpuCurrent:s.gpu.current,gpuPeak:s.gpu.peak,
       dimensions:[gl.drawingBufferWidth,gl.drawingBufferHeight],attributes:attrs,unknown:[...s.unknown],calls:{...s.calls},signatures:structuredClone(s.signatures),
       bufferSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='buffer').map(([id,r])=>({id:s.bufferIds.get(id),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(id),owners:[...s.bufferOwners.get(id)||[]]})),
-      textureSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='texture').map(([id,r])=>({texture:s.textureIds.get(id),slots:Object.fromEntries(r.slots)}))};
+      textureSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='texture').map(([id,r])=>({texture:s.textureIds.get(id),slots:Object.fromEntries(r.slots),...(source.nativeJournal===true?{pendingDelete:s.ledger.retired.has(id)}:{})})),
+      ...(source.nativeJournal===true?{nativeEvents:structuredClone(s.nativeEvents),renderbufferSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='renderbuffer').map(([id,r])=>({id:s.renderbufferIds.get(id),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(id)}))}: {})};
   }};
   Object.defineProperty(window,'__allocation',{value:observer,writable:true,enumerable:prior?.enumerable??true,configurable:true});installed=true;
   }catch(error){restore();throw error;}

@@ -1,5 +1,18 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0168 — root ACTIVE sole writer; no transfer. Accepted remote main e036716 after its own
+CI38333093705 all9green/full canonical251/365/162/159+campaign201+smoke6 each/original5,711,587B
+and actual four native observer rows read. Prior main353879 CI38332577594 independently all9/full
+read/Pages38332577579 cw-v67 fetched; e036 mainCI38335359579 pending; Pages38335359541 cw-v68 fetched.
+Source2c7c779 CI38332647706 independently all9/full own read; sourcea2 full own read also complete.
+0164 native journal/lossless per-context history/replay/envelope root131+131, related probes/controls,
+unit/syntax/diff pass; native tiny roundtrip expected shard3 163 Actions UNRUN. CPU22+88 report
+22,514,319B is constructed transport sizing, not native worst case/resource evidence. Root two137
+and Astra interrupted130 retained; oversized diff caused by overwritten mutants fixed deterministically.
+Next full qualified22ordinary+88fault caller/mandatory native history/Lookout canvas/input/acquisition/
+materialization/native transport/dispatch; no partial full-scene dispatch or asset adoption.
+ProtectedMAIN11 preserved/no simultaneous edits; same-session autonomous loop continues.
+
 LATEST0167 — root ACTIVE sole writer; no transfer. SOURCE2c7c779 reducer CI38332647706 running;
 root+Astra107+107 pass.0163 synchronous close-loader event seam root+Astra27+27 clear;
 four new native observer rows Actions UNRUN/expected shard3 162; recorded runtime SWcw-v68.
