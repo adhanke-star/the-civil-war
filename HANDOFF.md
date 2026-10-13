@@ -1,5 +1,19 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0173 — root ACTIVE sole writer same session, no transfer. Branch sourceb0ad719968ec6e5ccbcb30477deb7c6e19c84a45.
+Its CI38344611737 running; own Firefox/WebKit/offline6 each read clean; other canonical pending.
+0169 conditional stages root+Astra53+53/unit/syntax/diff clear; no native claims.
+Stage windows/dependencies distinguish success from terminal cleanup, each native attempt one-shot.
+Actual firing-target pair history only; no stale intended-target/incoming-fire attribution/private charge episode.
+Witnessed recovery/separation, quiet completion without melee/incoming fire, actual target object membership.
+All constructor/accessor/sparse/identity/cadence/foreign-target faults reject and retain honest failed evidence.
+Next owned native contact/opportunity hooks and six approved Veteran policies; browser flag/shard BEFORE Actions,
+then actual completed battle/UI saves/reload/export/fresh import/duplicate receipts; numeric Gold not separate tier upgrades.
+Acceptedmain23 CI38344425188 running; own201 campaign/three6smokes read clean, four shards/probe pending.
+gh probe log read was unavailable while whole run pending (exit1), defer once complete; no duplicate run.
+Pages38344425205 exact23 success/livecw-v68 fetched. Matrix38343715785 unchanged/running/no artifact/verdict.
+Protected MAIN11 unchanged, .out297,938,617B/300M, no local browser/download/prune or simultaneous edits.
+
 LATEST0172 — root ACTIVE same-session sole writer; no transfer. Accepted remote main23dcea3a8aae6ae4cd50ccfe08442abedfc65023.
 Source23 CI38341640821 all9green/full own251/365/171/159+campaign201+three6smokes/probe5,716,435B clean.
 Main88 CI38341680020 independently all9/full own same counts clean/probe5,713,967B read;
