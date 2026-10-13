@@ -5,7 +5,10 @@ import { selectPages, EXTRA_LOOK } from './bake/current-compression.mjs';
 import { selectClosePages,selectHybridClosePages } from './bake/current-compression.mjs';
 import { colourComposite, closeQualified,hybridQualified,validateHybridExport,QUALIFIED_HYBRID,
   validateQualifiedArtifacts,validateQualifiedZip,selectQualifiedMembers,validateQualifiedSceneInput,acquireQualifiedHybrid,
-  qualifiedSceneFiles,materializeQualifiedSceneInput,installQualifiedSceneRoutes } from './bake/review-current-compression.mjs';
+  qualifiedSceneFiles,materializeQualifiedSceneInput,installQualifiedSceneRoutes,
+  FAILED_SCENE_ORIGIN,validateFailedSceneOrigin,failedSceneNames,validateSceneTransportInventory,validateSceneTransportMember,
+  sceneTransportGroups,inflateFailedSceneReport,sceneTransportCRC } from './bake/review-current-compression.mjs';
+import {gzipSync} from 'node:zlib';
 import {loaderFixture} from './atlas-loader-fixture.mjs';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
@@ -81,8 +84,25 @@ function routeContext(failFulfill=false){
 }
 const api={select:selectPages,close:selectClosePages,hybrid:selectHybridClosePages,qualified:closeQualified,hybridQualified,composite:colourComposite,bytes:mipBytes,compare:comparePixels,export:validateHybridExport,
  metadata:validateQualifiedArtifacts,zip:validateQualifiedZip,members:selectQualifiedMembers,sceneInput:validateQualifiedSceneInput,acquire:acquireQualifiedHybrid,
- transport:qualifiedSceneFiles,materialize:materializeQualifiedSceneInput,routes:installQualifiedSceneRoutes};
+ transport:qualifiedSceneFiles,materialize:materializeQualifiedSceneInput,routes:installQualifiedSceneRoutes,
+ failedOrigin:validateFailedSceneOrigin,failedNames:failedSceneNames,inventory:validateSceneTransportInventory,member:validateSceneTransportMember,
+ groups:sceneTransportGroups,inflate:inflateFailedSceneReport,crc:sceneTransportCRC};
+const failedMetadata=()=>{const o=FAILED_SCENE_ORIGIN;return {run:{id:o.run,head_sha:o.sha,status:'completed',conclusion:'failure',repository:{full_name:o.repo}},artifact:{id:o.artifact,name:o.name,expired:false,size_in_bytes:o.bytes,digest:'sha256:'+o.digest,workflow_run:{id:o.run,head_sha:o.sha}}};};
+const transportFixture=()=>{const names=failedSceneNames(JSON.parse(fs.readFileSync(new URL('../assets/campaign.json',import.meta.url)))),bytes=Buffer.from('abc');return {names,bytes,entries:names.map(name=>({name,bytes:3,crc32:0x352441c2,externalFileAttributes:0,generalPurposeBitFlag:0}))};};
+const overflowFixture=()=>{const bytes=Buffer.from(JSON.stringify({toolSha:FAILED_SCENE_ORIGIN.sha,complete:false,withinLimit:false,cases:[],faults:[]})),gzip=gzipSync(bytes),digest=b=>createHash('sha256').update(b).digest('hex');return {bytes,gzip,stub:{toolSha:FAILED_SCENE_ORIGIN.sha,complete:false,withinLimit:false,fieldable:false,transportFailure:{bytes:bytes.length,sha256:digest(bytes),encoding:'gzip',forensicFile:'report-overflow.json.gz',compressedBytes:gzip.length,compressedSha256:digest(gzip)}}};};
 const checks=[
+ ['scene-original-identity',a=>{const m=failedMetadata();assert.equal(a.failedOrigin(m.run,m.artifact),true,'scene-original-identity: exact failed source and digest');}],
+ ['scene-original-refusal',a=>{for(const change of [m=>m.run.head_sha='b'.repeat(40),m=>m.run.conclusion='success',m=>m.artifact.digest='sha256:'+'b'.repeat(64),m=>m.artifact.size_in_bytes++,m=>m.artifact.expired=true,m=>m.run.repository.full_name='other/repo']){const m=failedMetadata();change(m);mustReject(()=>a.failedOrigin(m.run,m.artifact),/scene transport/,'scene-original-refusal: mismatched source refuses before download');}}],
+ ['scene-original-names',a=>{const c=JSON.parse(fs.readFileSync(new URL('../assets/campaign.json',import.meta.url))),names=a.failedNames(c);assert.ok(names.length===146&&names.includes('chattanooga-lookout-mountain-capable-07-framed-compare-rigged-left.png')&&names.includes('shiloh-buell-attacks-unsupported-03-baked-reclamation.png'),'scene-original-names: exact144 images plus both original reports, qualified numbering retained');}],
+ ['scene-original-inventory',a=>{const f=transportFixture();assert.equal(a.inventory(f.entries,f.names),true,'scene-original-inventory: complete original member identity');}],
+ ['scene-original-malformed',a=>{for(const change of [e=>e[1].name=e[0].name,e=>e[1].name='../escape.png',e=>e[1].externalFileAttributes=0xa000<<16,e=>e[1].generalPurposeBitFlag=1,e=>e[1].bytes=99000000,e=>e.pop()]){const f=transportFixture();change(f.entries);mustReject(()=>a.inventory(f.entries,f.names),/scene transport/,'scene-original-malformed: duplicates/traversal/symlink/encryption/size/missing rejected');}}],
+ ['scene-original-member',a=>{const f=transportFixture();assert.equal(a.member(f.bytes,f.entries[0]),createHash('sha256').update(f.bytes).digest('hex'),'scene-original-member: expanded original CRC/size/hash');assert.equal((a.crc(f.bytes.subarray(1),a.crc(f.bytes.subarray(0,1)))^0xffffffff)>>>0,0x352441c2,'scene-original-member: chunk boundaries preserve CRC');}],
+ ['scene-original-crc',a=>{const f=transportFixture();f.entries[0].crc32++;mustReject(()=>a.member(f.bytes,f.entries[0]),/scene transport/,'scene-original-crc: mismatched CRC rejected');}],
+ ['scene-original-size',a=>{const f=transportFixture();f.entries[0].bytes++;mustReject(()=>a.member(f.bytes,f.entries[0]),/scene transport/,'scene-original-size: mismatched expanded size rejected');}],
+ ['scene-original-group-union',a=>{const f=transportFixture();f.entries.filter(e=>e.name.endsWith('.png')).forEach(e=>e.bytes=5000000);const groups=a.groups(f.entries),names=groups.flat().map(e=>e.name);assert.ok(groups.length===15&&new Set(names).size===146&&names.length===146&&groups.every(g=>g.reduce((n,e)=>n+e.bytes,0)<60000000),'scene-original-group-union: every whole original exactly once under bound');}],
+ ['scene-original-group-refusal',a=>{const f=transportFixture();f.entries[2].bytes=60000000;mustReject(()=>a.groups(f.entries),/scene transport/,'scene-original-group-refusal: oversized member never altered or omitted');}],
+ ['scene-original-overflow',a=>{const f=overflowFixture(),r=a.inflate(Buffer.from(JSON.stringify(f.stub)),f.gzip);assert.ok(r.bytes?.equals(f.bytes)&&r.stub.complete===false&&r.report.complete===false&&r.report.withinLimit===false,'scene-original-overflow: complete bytes and failed/incomplete state unchanged');}],
+ ['scene-original-gzip-refusal',a=>{for(const change of [f=>f.stub.transportFailure.bytes=99000000,f=>f.stub.transportFailure.sha256='b'.repeat(64),f=>f.stub.transportFailure.compressedSha256='b'.repeat(64),f=>f.gzip=f.gzip.subarray(1)]){const f=overflowFixture();change(f);mustReject(()=>a.inflate(Buffer.from(JSON.stringify(f.stub)),f.gzip),/scene transport/,'scene-original-gzip-refusal: expansion/hash/compressed corruption refused');}}],
  ['transport-files',a=>{const r=transportInput(),files=a.transport(r);assert.equal(files.size,14,'transport-files: exact optimized plus review set');for(const [name,f]of files)assert.deepEqual(f.bytes,Buffer.from(r.files.get(name)||r.reviewFiles.get(name)),'transport-files: retained byte identity');r.files.get('soldier-hybrid.json')[0]^=1;assert.notEqual(files.get('soldier-hybrid.json').bytes[0],r.files.get('soldier-hybrid.json')[0],'transport-files: independent bytes');}],
  ...Object.entries({'transport-review-missing':r=>r.reviewFiles.delete('quality.json'),'transport-review-extra':r=>r.reviewFiles.set('extra.json',Buffer.from('{}')),'transport-review-bytes':r=>r.reviewFiles.set('quality.json',Buffer.from('{}'))}).map(([name,change])=>[name,a=>{const r=transportInput();change(r);let e;try{a.transport(r);}catch(x){e=x;}assert.ok(e?.message.startsWith('scene transport:'),`${name}: selected review bytes bound to parsed reports`);}]),
  ['transport-actions',a=>{const prior=process.env.GITHUB_ACTIONS;delete process.env.GITHUB_ACTIONS;let e;try{a.materialize(transportInput());}catch(x){e=x;}finally{if(prior!==undefined)process.env.GITHUB_ACTIONS=prior;}assert.ok(e?.message==='scene transport: Actions only','transport-actions: no local materialization');}],
@@ -178,6 +198,11 @@ const mutants={'hybrid-route':{hybrid:selectClosePages},'hybrid-evidence':{hybri
   'all-close-frames':{close:m=>selectClosePages(m).map(p=>({...p,frames:p.frames.slice(0,3)}))},'close-rejects':{close:()=>[]},'qualification-evidence':{qualified:()=>true},
   'complete-mips':{bytes:()=>({block16:64,rgba8:256,levels:1})},thresholds:{compare:()=>({ok:true})},
   'once-premultiplied':{composite:()=>{const p=new PNG({width:1,height:1});p.data=Buffer.from([64,32,16,255]);return PNG.sync.write(p);}}};
+Object.assign(mutants,{'scene-original-identity':{failedOrigin:()=>false},'scene-original-refusal':{failedOrigin:()=>true},
+ 'scene-original-names':{failedNames:()=>[]},'scene-original-inventory':{inventory:()=>false},'scene-original-malformed':{inventory:()=>true},
+ 'scene-original-member':{member:()=>''},'scene-original-crc':{member:()=>''},'scene-original-size':{member:()=>''},
+ 'scene-original-group-union':{groups:()=>[]},'scene-original-group-refusal':{groups:()=>[]},
+ 'scene-original-overflow':{inflate:()=>({bytes:Buffer.alloc(0)})},'scene-original-gzip-refusal':{inflate:()=>({})}});
 for(const [name]of checks.filter(([name])=>name.startsWith('transport-'))){
  if(name==='transport-actions'||name==='transport-provenance')mutants[name]={materialize:()=>({})};
  else if(name.startsWith('transport-route'))mutants[name]={routes:async(context,origin,files)=>{const base=origin+'/__scene-qualified/',requests=[];await context.route(base+'**',route=>route.fulfill({status:200,body:files.get('quality.json')?.bytes}));return {base,requests,restore:async()=>{}};}};

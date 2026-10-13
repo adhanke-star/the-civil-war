@@ -10,8 +10,126 @@ import { readSmall, outputBytes, selectClosePages } from './current-compression.
 import { comparePixels, candidateSupported } from './review-compression.mjs';
 import {createHash} from 'node:crypto';
 import {parseAtlasAstc,pageMipBytes} from '../../src/units/atlas-compression.js';
-import {execFileSync} from 'node:child_process';
+import {execFileSync,spawn} from 'node:child_process';
 import {createRequire} from 'node:module';
+import {Transform} from 'node:stream';
+import {pipeline} from 'node:stream/promises';
+import {gunzipSync} from 'node:zlib';
+
+// Failed original evidence only. Transport success never promotes this incomplete matrix.
+export const FAILED_SCENE_ORIGIN=Object.freeze({repo:'adhanke-star/the-civil-war',run:38343715785,
+  sha:'23dcea3a8aae6ae4cd50ccfe08442abedfc65023',artifact:11789877172,name:'scene-allocation',bytes:631415498,
+  digest:'b160db4f38c31d6eaf93d33e42c5b999e38a9df7b0f025f398ed81836fcdcdab'});
+const transportFail=message=>{throw Error('scene transport: '+message);};
+const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+const crcTable=Array.from({length:256},(_,i)=>{let n=i;for(let k=0;k<8;k++)n=(n>>>1)^((n&1)?0xedb88320:0);return n>>>0;});
+export const sceneTransportCRC=(bytes,prior=0xffffffff)=>{let crc=prior;for(const b of bytes)crc=(crc>>>8)^crcTable[(crc^b)&255];return crc>>>0;};
+export function validateFailedSceneOrigin(run,artifact){
+  const o=FAILED_SCENE_ORIGIN;
+  if(run?.id!==o.run||run.head_sha!==o.sha||run.status!=='completed'||run.conclusion!=='failure'
+    ||run.repository?.full_name!==o.repo||artifact?.id!==o.artifact||artifact.name!==o.name||artifact.expired!==false
+    ||artifact.size_in_bytes!==o.bytes||artifact.digest!=='sha256:'+o.digest||artifact.workflow_run?.id!==o.run
+    ||artifact.workflow_run.head_sha!==o.sha)transportFail('original run/artifact identity');
+  return true;
+}
+export function failedSceneNames(campaign){
+  // Qualified near-LOD transition is inserted before reclamation; its fixed 06 filename is retained.
+  const base=['01-rigged-reactivation.png','03-baked-reclamation.png','04-compare-rigged-left.png','05-compare-baked-left.png','06-baked-restored.png','06-near-lod-reupload.png'];
+  const extra=['terrain-partition-01-before.png','terrain-partition-02-after.png','terrain-partition-03-zoom.png','07-framed-compare-rigged-left.png','08-framed-compare-baked-left.png','09-framed-baked-restored.png'];
+  if(!Array.isArray(campaign?.phases)||campaign.phases.length!==11)transportFail('phase source coverage');
+  const names=['report.json','report-overflow.json.gz'];
+  for(const p of campaign.phases)for(const route of ['capable','unsupported'])for(const n of [...base,...(p.phaseId==='lookout-mountain'?extra:[])])names.push(`${p.packId}-${p.phaseId}-${route}-${n}`);
+  if(names.length!==146||new Set(names).size!==146)transportFail('original member coverage');return names;
+}
+export function validateSceneTransportInventory(entries,expected){
+  if(!Array.isArray(entries)||entries.length!==expected.length||new Set(expected).size!==expected.length)transportFail('inventory coverage');
+  const seen=new Set();for(const e of entries){const mode=e.externalFileAttributes>>>16;
+    if(typeof e.name!=='string'||!expected.includes(e.name)||seen.has(e.name)||/[\\/]/.test(e.name)||e.name==='..'
+      ||![0,0x8000].includes(mode&0xf000)||e.generalPurposeBitFlag&1||!Number.isSafeInteger(e.bytes)||e.bytes<0||e.bytes>=99000000
+      ||!Number.isSafeInteger(e.crc32)||e.crc32<0||e.crc32>0xffffffff)transportFail('member identity/size/type');seen.add(e.name);
+  }return true;
+}
+export function validateSceneTransportMember(bytes,entry){
+  if(!(bytes instanceof Uint8Array)||bytes.length!==entry.bytes||((sceneTransportCRC(bytes)^0xffffffff)>>>0)!==entry.crc32)transportFail('expanded member size/CRC');
+  return hash(bytes);
+}
+export function sceneTransportGroups(entries){
+  const reports=entries.filter(e=>['report.json','report-overflow.json.gz'].includes(e.name));
+  if(reports.length!==2||new Set(entries.map(e=>e.name)).size!==entries.length)transportFail('group inventory');
+  const groups=[reports.sort((a,b)=>a.name.localeCompare(b.name))];let current=[],size=0;
+  if(reports.reduce((n,e)=>n+e.bytes,0)>=60000000)transportFail('report group bound');
+  for(const e of entries.filter(e=>!reports.includes(e)).sort((a,b)=>a.name.localeCompare(b.name))){
+    if(!Number.isSafeInteger(e.bytes)||e.bytes<0||e.bytes>=60000000)transportFail('whole image group bound');
+    if(size+e.bytes>=60000000){groups.push(current);current=[];size=0;}current.push(e);size+=e.bytes;
+  }if(current.length)groups.push(current);
+  if(groups.length>16||groups.flat().length!==entries.length||new Set(groups.flat().map(e=>e.name)).size!==entries.length)transportFail('group union/slot overflow');return groups;
+}
+export function inflateFailedSceneReport(stubBytes,gzipBytes){
+  if(stubBytes.length>=99000000||gzipBytes.length>=99000000)transportFail('report input bound');
+  const stub=JSON.parse(Buffer.from(stubBytes).toString()),f=stub.transportFailure;
+  if(stub.complete!==false||stub.withinLimit!==false||stub.fieldable!==false||stub.toolSha!==FAILED_SCENE_ORIGIN.sha
+    ||f?.encoding!=='gzip'||f.forensicFile!=='report-overflow.json.gz'||!Number.isSafeInteger(f.bytes)||f.bytes<=0||f.bytes>=99000000
+    ||f.compressedBytes!==gzipBytes.length||f.compressedSha256!==hash(gzipBytes))transportFail('original overflow stub');
+  let bytes;try{bytes=gunzipSync(gzipBytes,{maxOutputLength:99000000-1});}catch{transportFail('gzip expansion refusal');}
+  if(bytes.length!==f.bytes||hash(bytes)!==f.sha256)transportFail('complete report bytes/hash');
+  const report=JSON.parse(bytes.toString());if(report.toolSha!==FAILED_SCENE_ORIGIN.sha)transportFail('report source identity');
+  return {stub,report,bytes};
+}
+
+/** Actions-only streaming repackaging of original evidence. Never launches a browser or simulation. */
+export async function transportFailedScene(){
+  if(process.env.GITHUB_ACTIONS!=='true'||!/^\/home\/runner\/work\/_temp$/.test(process.env.RUNNER_TEMP||''))transportFail('hosted runner temp required');
+  const o=FAILED_SCENE_ORIGIN,json=endpoint=>JSON.parse(execFileSync('gh',['api',`repos/${o.repo}/actions/${endpoint}`],{maxBuffer:1000000}));
+  validateFailedSceneOrigin(json(`runs/${o.run}`),json(`artifacts/${o.artifact}`));
+  const temp=fs.realpathSync(process.env.RUNNER_TEMP);if(temp!==process.env.RUNNER_TEMP||fs.lstatSync(temp).isSymbolicLink())transportFail('runner root escape');
+  const dir=fs.mkdtempSync(path.join(temp,'cw-scene-transport-')),zipPath=path.join(dir,'original.zip');
+  const child=spawn('gh',['api',`repos/${o.repo}/actions/artifacts/${o.artifact}/zip`],{stdio:['ignore','pipe','inherit']});
+  const completion=new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',code=>code===0?resolve():reject(Error('scene transport: original download exit '+code)));});
+  let size=0;const digest=createHash('sha256'),meter=new Transform({transform(chunk,encoding,callback){size+=chunk.length;if(size>o.bytes)return callback(Error('scene transport: ZIP size overflow'));digest.update(chunk);callback(null,chunk);}});
+  try{await Promise.all([pipeline(child.stdout,meter,fs.createWriteStream(zipPath,{flags:'wx'})),completion]);}catch(error){child.kill();throw error;}
+  if(size!==o.bytes||digest.digest('hex')!==o.digest)transportFail('original ZIP bytes/hash');
+  const require=createRequire(import.meta.url),{yauzl}=require(path.join(path.dirname(require.resolve('playwright-core/package.json')),'lib/utilsBundle.js'));
+  const open=()=>new Promise((resolve,reject)=>yauzl.open(zipPath,{lazyEntries:true},(e,z)=>e?reject(e):resolve(z)));
+  const source=JSON.parse(execFileSync('gh',['api',`repos/${o.repo}/contents/assets/campaign.json?ref=${o.sha}`],{maxBuffer:1000000}));
+  if(source.encoding!=='base64'||source.path!=='assets/campaign.json'||!Number.isSafeInteger(source.size)||source.size>=1000000)transportFail('original campaign source');
+  const campaignBytes=Buffer.from(source.content,'base64');
+  if(campaignBytes.length!==source.size||createHash('sha1').update(`blob ${campaignBytes.length}\0`).update(campaignBytes).digest('hex')!==source.sha)transportFail('original campaign blob');
+  const campaign=JSON.parse(campaignBytes.toString()),expected=failedSceneNames(campaign),entries=[];
+  const inventory=await open();await new Promise((resolve,reject)=>{inventory.on('error',reject);inventory.on('end',resolve);inventory.on('entry',e=>{
+    entries.push({name:e.fileName,bytes:e.uncompressedSize,crc32:e.crc32,externalFileAttributes:e.externalFileAttributes,generalPurposeBitFlag:e.generalPurposeBitFlag});
+    if(entries.length>expected.length){inventory.close();reject(Error('scene transport: extra archive member'));}else inventory.readEntry();});inventory.readEntry();});
+  validateSceneTransportInventory(entries,expected);const groups=sceneTransportGroups(entries);
+  const out=path.join(ROOT,'.out','scene-allocation'),parent=path.dirname(out);
+  if(fs.existsSync(parent)&&fs.lstatSync(parent).isSymbolicLink())transportFail('output parent escape');
+  fs.mkdirSync(parent,{recursive:true});if(fs.realpathSync(parent)!==parent)transportFail('output parent escape');fs.mkdirSync(out);
+  if(fs.realpathSync(out)!==out||fs.lstatSync(out).isSymbolicLink())transportFail('owned output escape');
+  // Large originals stay on the runner temp volume, never in the capped .out receipts directory.
+  const groupRoot=path.join(dir,'groups');fs.mkdirSync(groupRoot);
+  const groupDirs=groups.map((_,i)=>{const d=path.join(groupRoot,'transport-'+String(i).padStart(2,'0'));fs.mkdirSync(d);return d;});
+  const zip=await open();await new Promise((resolve,reject)=>{zip.on('error',reject);zip.on('end',resolve);zip.on('entry',e=>{
+    const row=entries.find(r=>r.name===e.fileName),group=groups.findIndex(g=>g.includes(row));
+    if(!row||group<0){zip.close();reject(Error('scene transport: second inventory drift'));return;}
+    zip.openReadStream(e,async(error,stream)=>{if(error){reject(error);return;}let n=0,crc=0xffffffff;const h=createHash('sha256');
+      const meter=new Transform({transform(chunk,encoding,callback){n+=chunk.length;if(n>row.bytes)return callback(Error('scene transport: expanded member overflow'));crc=sceneTransportCRC(chunk,crc);h.update(chunk);callback(null,chunk);}});
+      try{await pipeline(stream,meter,fs.createWriteStream(path.join(groupDirs[group],row.name),{flags:'wx'}));
+        if(n!==row.bytes||((crc^0xffffffff)>>>0)!==row.crc32)transportFail('expanded member size/CRC');row.sha256=h.digest('hex');row.group=group;zip.readEntry();
+      }catch(error){zip.close();reject(error);}
+    });});zip.readEntry();});
+  const reportGroup=groupDirs[0],recovered=inflateFailedSceneReport(fs.readFileSync(path.join(reportGroup,'report.json')),fs.readFileSync(path.join(reportGroup,'report-overflow.json.gz')));
+  const refs=(recovered.report.cases||[]).flatMap(r=>(r.canvasCaptures||[]).map(c=>c.filename)).sort(),images=entries.filter(e=>e.name.endsWith('.png')).map(e=>e.name).sort();
+  if(refs.length!==144||JSON.stringify(refs)!==JSON.stringify(images))transportFail('original report/image union');
+  for(const c of recovered.report.cases.flatMap(r=>r.canvasCaptures||[])){
+    const file=entries.find(e=>e.name===c.filename);if(file.bytes!==c.bytes||file.sha256!==c.sha256)transportFail('original capture byte/hash bind');
+  }
+  const manifest={kind:'exact original-byte transport; failed incomplete resource evidence retained',origin:o,packagingSha:process.env.GITHUB_SHA,
+    originalStub:recovered.stub,reportState:{complete:recovered.report.complete,withinLimit:recovered.report.withinLimit,cases:recovered.report.cases?.length,faults:recovered.report.faults?.length},
+    groups:groups.map((g,i)=>({index:i,names:g.map(e=>e.name),bytes:g.reduce((n,e)=>n+e.bytes,0)})),members:entries,completeUnion:true};
+  fs.writeFileSync(path.join(out,'transport-manifest.json'),JSON.stringify(manifest),{flag:'wx'});
+  const output=process.env.GITHUB_OUTPUT;
+  if(!output||!output.startsWith(temp+path.sep)||fs.realpathSync(output)!==output||!fs.lstatSync(output).isFile())transportFail('runner output command path');
+  fs.appendFileSync(output,`root=${groupRoot}\ngroups=${groups.length}\n`);
+  console.log('ORIGINAL SCENE TRANSPORT',JSON.stringify({groups:groups.length,originalMembers:entries.length,source:o.sha,...manifest.reportState}));
+}
 
 // Immutable retained qualification. Acquisition is separate from export parsing and never writes assets.
 export const QUALIFIED_HYBRID = Object.freeze({
@@ -398,4 +516,6 @@ async function main() {
     }
   } finally {fs.writeFileSync(path.join(out,'quality.json'),JSON.stringify(review,null,2));if(browser)await browser.close();await new Promise(resolve=>server.close(resolve));}
 }
-if(process.argv[1]&&import.meta.url===pathToFileURL(fs.realpathSync(process.argv[1])).href)await main();
+if(process.argv[1]&&import.meta.url===pathToFileURL(fs.realpathSync(process.argv[1])).href){
+  if(process.argv.includes('--transport-failed-scene'))await transportFailedScene().catch(error=>{console.error(error.message);process.exitCode=1;});else await main();
+}

@@ -11,6 +11,7 @@ on:
           - cs-close
           - cs-hybrid
           - scene
+          - scene-transport
           - diagnostic
           - candidate
           - full
@@ -38,6 +39,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
+    if: inputs.mode != 'scene-transport'
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ (inputs.mode == 'candidate' || inputs.mode == 'current' || inputs.mode == 'cs-close' || inputs.mode == 'cs-hybrid' || (inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both')) && 90 || 40 }}
     env:
@@ -229,3 +231,191 @@ jobs:
             .out/figure-pack/compression-*.png
           retention-days: 7
           if-no-files-found: warn
+
+  scene-transport:
+    if: inputs.mode == 'scene-transport'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.21.0
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Verify original-byte transport controls
+        run: |
+          node tools/test-current-compression.mjs
+          node tools/test-current-compression.mjs --prove-fail
+      - name: Split retained failed evidence only; no browser or simulation
+        id: split
+        run: node tools/bake/review-current-compression.mjs --transport-failed-scene
+      - name: Original union manifest
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-manifest
+          path: .out/scene-allocation/transport-manifest.json
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 00
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 0
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-00
+          path: ${{ steps.split.outputs.root }}/transport-00/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 01
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 1
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-01
+          path: ${{ steps.split.outputs.root }}/transport-01/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 02
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-02
+          path: ${{ steps.split.outputs.root }}/transport-02/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 03
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 3
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-03
+          path: ${{ steps.split.outputs.root }}/transport-03/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 04
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-04
+          path: ${{ steps.split.outputs.root }}/transport-04/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 05
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 5
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-05
+          path: ${{ steps.split.outputs.root }}/transport-05/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 06
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 6
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-06
+          path: ${{ steps.split.outputs.root }}/transport-06/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 07
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 7
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-07
+          path: ${{ steps.split.outputs.root }}/transport-07/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 08
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 8
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-08
+          path: ${{ steps.split.outputs.root }}/transport-08/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 09
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 9
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-09
+          path: ${{ steps.split.outputs.root }}/transport-09/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 10
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 10
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-10
+          path: ${{ steps.split.outputs.root }}/transport-10/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 11
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 11
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-11
+          path: ${{ steps.split.outputs.root }}/transport-11/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 12
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 12
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-12
+          path: ${{ steps.split.outputs.root }}/transport-12/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 13
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 13
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-13
+          path: ${{ steps.split.outputs.root }}/transport-13/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 14
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 14
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-14
+          path: ${{ steps.split.outputs.root }}/transport-14/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Original byte group 15
+        if: always() && steps.split.outcome == 'success' && fromJSON(steps.split.outputs.groups || '0') > 15
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-15
+          path: ${{ steps.split.outputs.root }}/transport-15/*
+          retention-days: 7
+          if-no-files-found: error
+      - name: Verify actual split ZIP sizes and source identities
+        if: always() && steps.split.outcome == 'success'
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          import {execFileSync} from 'node:child_process';
+          const m=JSON.parse(fs.readFileSync('.out/scene-allocation/transport-manifest.json'));
+          const run=process.env.GITHUB_RUN_ID;assert.match(run,/^[0-9]+$/);
+          const wanted=['scene-original-manifest',...m.groups.map(g=>'scene-original-'+String(g.index).padStart(2,'0'))];
+          const receipt={run,sha:process.env.GITHUB_SHA,wanted,complete:false,artifacts:[],missing:[],extra:[],failure:null};
+          try{
+            const data=JSON.parse(execFileSync('gh',['api',`repos/adhanke-star/the-civil-war/actions/runs/${run}/artifacts?per_page=100`],{maxBuffer:1000000}));
+            receipt.artifacts=data.artifacts;
+            receipt.missing=wanted.filter(n=>!data.artifacts.some(a=>a.name===n));
+            receipt.extra=data.artifacts.filter(a=>!wanted.includes(a.name)).map(a=>a.name);
+            assert.equal(data.total_count,wanted.length);assert.equal(data.artifacts.length,wanted.length);
+            assert.deepEqual(receipt.missing,[]);assert.deepEqual(receipt.extra,[]);
+            assert.equal(new Set(data.artifacts.map(a=>a.name)).size,wanted.length);
+            for(const a of data.artifacts){assert.ok(a.size_in_bytes<99000000);assert.equal(a.expired,false);assert.equal(String(a.workflow_run.id),run);assert.equal(a.workflow_run.head_sha,process.env.GITHUB_SHA);assert.match(a.digest,/^sha256:[a-f0-9]{64}$/);}
+            receipt.complete=true;
+          }catch(error){receipt.failure=String(error.message);console.error(receipt.failure);process.exitCode=1;}
+          finally{fs.writeFileSync('.out/scene-allocation/transport-uploads.json',JSON.stringify(receipt),{flag:'wx'});console.log('EXACT ORIGINAL TRANSPORT UPLOADS',JSON.stringify(receipt));}
+          JS
+      - name: Bounded uploaded ZIP receipts
+        if: always() && steps.split.outcome == 'success' && hashFiles('.out/scene-allocation/transport-uploads.json') != ''
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: scene-original-uploads
+          path: .out/scene-allocation/transport-uploads.json
+          retention-days: 7
+          if-no-files-found: error
