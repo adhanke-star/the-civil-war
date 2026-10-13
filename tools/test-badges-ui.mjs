@@ -16,6 +16,76 @@ import { probeProgress, seedProgress } from './test-progress-browser.mjs';
 import * as campaign from '../src/franchise/campaign.js';
 import * as badges from '../src/franchise/badges.js';
 import { validateSnapshot } from '../src/franchise/save.js';
+import {installSceneStartGate} from './bake/inactive-figures.mjs';
+
+/** Actual native prerequisite only; this short context does not substantiate badge attainability. */
+export async function nativeBadgeObserverControls({browser,url,check,result,watchErrors}){
+  const ctx=await browser.newContext({viewport:{width:1024,height:768},reducedMotion:'reduce'}),errors=[];
+  let page=null,primary=null,receipt=null,outerCleanup=null;
+  try{
+    page=await ctx.newPage();watchErrors(page,url,errors);
+    await page.goto(url+'?nosw');await page.waitForFunction(()=>window.__entry&&!window.__entry.importing,null,{timeout:60000});
+    const prefix=await page.evaluate(async()=>{
+      const B=await import('./tools/observe-badges.mjs'),S=await import('./src/franchise/save.js'),campaign=await(await fetch('./assets/campaign.json')).json();
+      const p=B.badgePrefix(campaign,'slaughter-fire');await S.createProgressStore(undefined,{slot:1}).complete(p.save);return {...B.badgePrefixReceipt(p),phase:p.phase};
+    });
+    await ctx.addInitScript(source=>{
+      window.__badgeNativeRAF={native:window.requestAnimationFrame,descriptor:Object.getOwnPropertyDescriptor(window,'requestAnimationFrame')};
+      window.__badgeStartGate=(0,eval)('('+source+')')();
+    },installSceneStartGate.toString());
+    await page.goto(url+'?campaign=1&quality=low&nosw');
+    await page.waitForFunction(()=>window.__ready&&window.__game?.game&&document.getElementById('briefing')?.open,null,{timeout:180000,polling:250});
+    await page.locator('#briefing-begin').click();
+    await page.waitForFunction(()=>window.__badgeStartGate?.first?.simTime===0&&window.__game.game.paused);
+    const data=await page.evaluate(async()=>{
+      const B=await import('./tools/observe-badges.mjs'),G=await import('./src/game.js'),g=window.__game.game;
+      if(g.simTime!==0||!g.paused)throw Error('badge native prerequisite lost time-zero gate');
+      const tactic=B.badgeTactic(g,'slaughter-fire'),crossings=B.createBadgeCrossings(),policy=B.createBadgeStages([
+        {id:'hold-roberts',notBefore:0,expires:1,after:[],condition:[{kind:'actor-orderable'}],command:{type:'hold',unitId:'us-roberts-brigade'}}
+      ],1,tactic.roster),beforeTick=Object.getOwnPropertyDescriptor(g,'tick');
+      const methods=['volleyAt','chargeFeat','routFeat','moraleStep'],nativeMethods=methods.map(n=>({name:n,native:g.combat[n],descriptor:Object.getOwnPropertyDescriptor(g.combat,n)}));
+      let combat=null,tick=null,primary=null;const cleanup=[],samples=[];
+      try{
+        combat=B.installBadgeCombatObserver(g,policy);
+        tick=B.installBadgeTickObserver(g,{sample(at,feats){
+          const ids=g.units.map(u=>u.id).sort(),keys=Object.keys(feats).sort();
+          if(JSON.stringify(ids)!==JSON.stringify(keys))throw Error('badge native prerequisite partial feat report');
+          samples.push({at,ids});crossings.sample(at,feats);policy.advance(g);
+        }});
+        g.togglePause();try{for(let i=0;i<40;i++)g.fastForward(.05);}finally{if(!g.paused)g.togglePause();}
+      }catch(error){primary=String(error?.message??error);}
+      finally{
+        for(const [name,restore]of [['tick',()=>tick?.restore()],['combat',()=>combat?.restore()],['startup',()=>window.__badgeStartGate.restore()]]){
+          try{const r=restore();cleanup.push({name,ok:r?.ok!==false,receipt:r??null});}catch(error){cleanup.push({name,ok:false,error:String(error?.message??error)});}
+        }
+      }
+      const same=(a,b)=>['value','writable','enumerable','configurable','get','set'].every(k=>a?.[k]===b?.[k]);
+      return {kind:'actual short native observer prerequisite; natural result/storage/attainability UNRUN',source:tactic.recipe,simTime:g.simTime,over:g.over,
+        difficulty:G.difficultyOf(g),samples,crossings:crossings.receipt(),stages:policy.receipt(),combat:combat?.receipt()??null,primary,cleanup,
+        restoration:{tick:same(beforeTick,Object.getOwnPropertyDescriptor(g,'tick')),combat:nativeMethods.every(o=>g.combat[o.name]===o.native&&same(o.descriptor,Object.getOwnPropertyDescriptor(g.combat,o.name))),
+          RAF:window.requestAnimationFrame===window.__badgeNativeRAF.native&&same(window.__badgeNativeRAF.descriptor,Object.getOwnPropertyDescriptor(window,'requestAnimationFrame'))}};
+    });
+    receipt={prefix,...data};result.badgeNativePrerequisite=receipt;
+    check('badge-native-prefix',prefix.difficulty==='veteran'&&data.difficulty==='veteran'&&prefix.phase.phaseId==='slaughter-pen','constructed prefix retained separately; actual Game Veteran confirmed');
+    check('badge-native-time',Math.abs(data.simTime-2)<1e-8&&!data.over,'actual native ticks advanced two seconds; no result forced');
+    check('badge-native-order',data.stages.stages[0]?.state==='accepted','real player Hold control accepted on actual owned brigade');
+    check('badge-native-full-feats',data.crossings.samples===41&&data.samples.length===41&&data.samples.every((s,i)=>Math.abs(s.at-i*.05)<1e-8&&s.ids.length===19),'initial0 plus40 native .05 ticks, exact whole live roster every report');
+    check('badge-native-combat',!data.primary&&!data.combat?.failure&&data.combat.rows.some(r=>r.method==='moraleStep'&&r.succeeded>0),'actual native morale calls forwarded and copied');
+    check('badge-native-restoration',data.cleanup.every(r=>r.ok)&&Object.values(data.restoration).every(Boolean),'exact tick/combat/RAF owners restored independently');
+  }catch(error){primary=String(error?.message??error);check('badge-native-prerequisite',false,primary);}
+  finally{
+    // Covers navigation/readiness/import/setup failures as well as the normal inner restore path.
+    if(page)try{outerCleanup=await page.evaluate(()=>{
+      if(!window.__badgeStartGate)return {ok:true,installed:false};window.__badgeStartGate.restore();
+      const prior=window.__badgeNativeRAF,current=Object.getOwnPropertyDescriptor(window,'requestAnimationFrame');
+      const ok=window.requestAnimationFrame===prior.native&&['value','writable','enumerable','configurable','get','set'].every(k=>current?.[k]===prior.descriptor?.[k]);
+      return {ok,installed:true};
+    });}catch(error){outerCleanup={ok:false,error:String(error?.message??error)};}
+    receipt??={kind:'failed actual native prerequisite; no natural-play proof',primary};receipt.outerCleanup=outerCleanup;result.badgeNativePrerequisite=receipt;
+    try{await ctx.close();receipt.contextClosed=true;}catch(error){receipt.contextClosed=false;check('badge-native-context-close',false,String(error?.message??error));}
+  }
+  check('badge-native-errors',!primary&&outerCleanup?.ok===true&&receipt.contextClosed&&errors.length===0,JSON.stringify({errors,outerCleanup}));
+}
 
 const HH = JSON.parse(fs.readFileSync(new URL('../assets/scenarios/henry-hill.json', import.meta.url)));
 const PACK_ID = 'test-badges';

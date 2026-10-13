@@ -1776,6 +1776,11 @@ async function browserChecks(server, url) {
     browser = await chromium.launch(native ? { channel: 'chrome', headless: false }
       : { headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
     result.browser = `chromium ${browser.version()}`;
+    if(process.argv.includes('--badge-observer')){
+      result.mode='actual short native badge observer prerequisite';
+      const {nativeBadgeObserverControls}=await import('./test-badges-ui.mjs');
+      await nativeBadgeObserverControls({browser,url,check,result,watchErrors});return;
+    }
     if (process.argv.includes('--reinforcement-ui')) { result.mode = 'scheduled reinforcement UI'; await reinforcementUIControls({ browser, url, check, shot, result, native }); return; }
     if (process.argv.includes('--field-admission')) { result.mode = 'current field admission'; await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native }); return; }
     if (process.argv.includes('--soldier-view')) { result.mode = 'held soldier-eye view'; await soldierViewControls({ browser, url, check, shot, result, watchErrors, native, focused: true }); return; }
@@ -1877,6 +1882,8 @@ async function browserChecks(server, url) {
     }
     // Shard 4: commanders and regiments, cavalry, then every shipped battle-pack phase on its own terrain.
     if (runs(4)) {
+      const {nativeBadgeObserverControls}=await import('./test-badges-ui.mjs');
+      await nativeBadgeObserverControls({browser,url,check,result,watchErrors});
       const { commandControls } = await import('./test-command-ui.mjs');
       await commandControls({ browser, url, check, shot, result, watchErrors });
       const { cavalryControls } = await import('./test-cavalry-ui.mjs');
