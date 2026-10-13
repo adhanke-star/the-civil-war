@@ -1787,12 +1787,12 @@ async function browserChecks(server, url) {
       const {nativeBadgeObserverControls}=await import('./test-badges-ui.mjs');
       await nativeBadgeObserverControls({browser,url,check,result,watchErrors});return;
     }
-    if(['observations','missionary'].includes(BADGE_SELECTION?.mode)){
-      result.mode=BADGE_SELECTION.mode==='missionary'?'actual Missionary-only terminal-step repair':'actual first native badge tactics shard '+BADGE_SELECTION.shard+' of3';
+    if(['observations','missionary','revisions'].includes(BADGE_SELECTION?.mode)){
+      result.mode=BADGE_SELECTION.mode==='missionary'?'actual Missionary-only terminal-step repair':(BADGE_SELECTION.mode==='revisions'?'actual single legal tactic revision':'actual first native badge tactics')+' shard '+BADGE_SELECTION.shard+' of3';
       const {nativeBadgeObservations}=await import('./test-badges-ui.mjs');
       const persist=async()=>{const target=path.join(OUT_DIR,'badge-observations.json'),temporary=target+'.pending';
         await fs.writeFile(temporary,JSON.stringify(result));await fs.rename(temporary,target);};
-      await nativeBadgeObservations({browser,url,check,result,watchErrors,shard:BADGE_SELECTION.shard,persist,missionaryOnly:BADGE_SELECTION.mode==='missionary'});return;
+      await nativeBadgeObservations({browser,url,check,result,watchErrors,shard:BADGE_SELECTION.shard,persist,missionaryOnly:BADGE_SELECTION.mode==='missionary',revision:BADGE_SELECTION.mode==='revisions'?1:0});return;
     }
     if(BADGE_SELECTION?.mode==='level10'){
       result.mode='actual played-save legal level10 continuation';

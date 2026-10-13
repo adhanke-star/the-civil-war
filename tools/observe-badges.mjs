@@ -178,13 +178,22 @@ export function badgeObservationSelection(args){
   if(args.length===1&&args[0]==='--badge-missionary')return {mode:'missionary',shard:1};
   const shards=args.filter(a=>/^--badge-shard=[123]$/.test(a));
   if(args.length===2&&args.includes('--badge-observations')&&shards.length===1)return {mode:'observations',shard:Number(shards[0].slice(-1))};
+  if(args.length===2&&args.includes('--badge-revisions')&&shards.length===1)return {mode:'revisions',shard:Number(shards[0].slice(-1))};
   fail('explicit badge mode/shard required; conflicting or unknown selector');
 }
 
+/** Completeness follows the declared exact selection, including the two legitimate singleton modes. */
+export function badgeObservationComplete(selected,rows){
+  const allowed=[['slaughter-fire','missionary-assault'],['slaughter-defence','mcfadden-assault'],['slaughter-recovery','buell-capture'],['slaughter-fire'],['missionary-assault']];
+  if(!dense(selected)||!allowed.some(ids=>JSON.stringify(ids)===JSON.stringify(selected))||!dense(rows))fail('observation completion scope');
+  return rows.length===selected.length&&rows.every((row,i)=>row?.id===selected[i]&&row.complete===true);
+}
+
 /** First finite tactics approved by Astra. These are hypotheses, never promised badge outcomes. */
-export function badgeTactic(game,observation){
+export function badgeTactic(game,observation,revision=0){
   const recipe=BADGE_OBSERVATIONS.find(r=>r.id===observation),s=game.scenario;
   if(!recipe||game.simTime!==0||game.playerSide!=='US'||s?.id!==recipe.packId+'-'+recipe.phaseId)fail('tactic initial phase/time/side');
+  if(![0,1].includes(revision)||revision===1&&observation==='missionary-assault')fail('one approved revision; Missionary repair is separate');
   const roster=[...new Set([...s.units,...(s.reinforcements||[])].map(u=>u.id))],plan=[];
   const unit=(name,side='US',type='brigade')=>side.toLowerCase()+'-'+name+'-'+type;
   const us=name=>unit(name),cs=name=>unit(name,'CS'),battery=name=>unit(name,'US','battery');
@@ -265,9 +274,56 @@ export function badgeTactic(game,observation){
   }
   const expected={'slaughter-fire':11,'slaughter-defence':12,'slaughter-recovery':9,'mcfadden-assault':15,'missionary-assault':14,'buell-capture':19};
   if(plan.length!==expected[observation])fail('tactic count drift');
+  if(revision===1){
+    if(observation==='slaughter-fire'){
+      plan.splice(3);const actor=us('miller'),target=cs('anderson');
+      add('miller-holdfire','holdfire',actor,{end:1,enabled:true});
+      add('miller-run','run',actor,{end:1,after:[successDep('miller-holdfire')],enabled:true});
+      move('miller-flank',actor,[950,1300],{end:200,after:[successDep('miller-run')]});
+      toward('miller-approach',actor,target,45,{end:400,after:[successDep('miller-flank')],condition:[{kind:'arrived',point:[950,1300],radius:20}]});
+      add('miller-fire-hold','hold',actor,{end:599,after:[successDep('miller-approach')],condition:[{kind:'fire-ready',maxDistance:55}]});
+      add('miller-stop-run','run',actor,{end:599,after:[successDep('miller-fire-hold')],enabled:false});
+      add('miller-release','holdfire',actor,{end:599,after:[successDep('miller-stop-run')],enabled:false});
+      add('cleanup-run','run',actor,{start:600,end:601,after:[terminalDep('miller-release')],enabled:false});
+      add('cleanup-fire','holdfire',actor,{start:600,end:601,after:[terminalDep('miller-release')],enabled:false});
+    }else if(observation==='slaughter-defence'){
+      const kept=plan.filter(row=>!['hold-'+r,'hold-'+battery('houghtaling')].includes(row.id));plan.splice(0);
+      for(const [actor,point]of [[r,[310,900]],[battery('houghtaling'),[367,914]]]){
+        move('forward-'+actor,actor,point,{end:120});
+        add('forward-hold-'+actor,'hold',actor,{end:120,after:[successDep('forward-'+actor)],condition:[{kind:'arrived',point,radius:20}]});
+      }plan.push(...kept);
+    }else if(observation==='slaughter-recovery'){
+      const kept=plan.splice(0);move('schaefer-support',us('schaefer'),[180,900],{end:120});
+      add('schaefer-support-hold','hold',us('schaefer'),{end:120,after:[successDep('schaefer-support')],condition:[{kind:'arrived',point:[180,900],radius:20}]});plan.push(...kept);
+      const ends={'greusel-fallback':900,'greusel-recovered':1000,'roberts-charge':650,'roberts-fallback':850,'roberts-recovered':950,'roberts-renewed':1000,'cleanup':1041};
+      for(const row of plan)if(Object.hasOwn(ends,row.id))row.expires=ends[row.id];plan.find(row=>row.id==='cleanup').notBefore=1040;
+    }else if(observation==='mcfadden-assault'){
+      const kept=plan.splice(0).filter(row=>row.id!=='price-hold');let previous=null,previousTarget=null;
+      for(const row of kept){
+        if(row.id.endsWith('-approach')){
+          const name=row.id.slice(0,-9),target=cs(name),support=name+'-price-support';
+          toward(support,us('price'),target,180,{end:row.expires,after:[successDep(previous||'bruce-hold')],condition:previous?[ended(us('bruce'),previousTarget,previous)]:[]});
+          row.after=[successDep(support)];previous=name+'-charge';previousTarget=target;
+        }plan.push(row);
+      }
+    }else if(observation==='buell-capture'){
+      const kept=plan.splice(0),hazen=us('hazen'),bruce=us('bruce');
+      for(const row of kept){
+        if(row.id==='mcclung-approach'){
+          add('bruce-second-run','run',bruce,{end:600,after:[successDep('hodgson-charge')],condition:[ended(hazen,unit('hodgson','CS','battery'),'hodgson-charge')],enabled:true});
+          move('bruce-second-support',bruce,[400,220],{end:600,after:[successDep('bruce-second-run')]});
+          add('bruce-second-stop','run',bruce,{end:600,after:[successDep('bruce-second-support')],condition:[{kind:'arrived',point:[400,220],radius:20}],enabled:false});
+        }else if(row.id==='mcclung-charge'){row.after=[successDep('bruce-second-stop')];row.expires=800;plan.push(row);}
+        else plan.push(row);
+      }
+      add('bruce-second-cleanup','run',bruce,{start:601,end:602,after:[terminalDep('bruce-second-stop')],enabled:false});
+    }
+    const counts={'slaughter-fire':12,'slaughter-defence':14,'slaughter-recovery':11,'mcfadden-assault':18,'buell-capture':22};
+    if(plan.length!==counts[observation])fail('revised tactic count drift');
+  }
   // Validate all identities and atoms before any native order can be attempted.
   createBadgeStages(plan,1,roster);
-  return {kind:'Astra-approved first finite tactic; natural results unproved',recipe,plan,cadence:1,roster};
+  return {kind:revision===1?'Astra-approved single legal revision; no natural result guaranteed':'Astra-approved first finite tactic; natural results unproved',revision,recipe,plan,cadence:1,roster};
 }
 
 /** Finite data-only conditional stages. Facts are read from native units, never badge counters. */

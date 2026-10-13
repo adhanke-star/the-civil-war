@@ -15,6 +15,7 @@ on:
           - badge-observations
           - badge-level10
           - badge-missionary
+          - badge-revisions
           - diagnostic
           - candidate
           - full
@@ -42,7 +43,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
-    if: inputs.mode != 'scene-transport' && inputs.mode != 'badge-observations' && inputs.mode != 'badge-level10' && inputs.mode != 'badge-missionary'
+    if: inputs.mode != 'scene-transport' && inputs.mode != 'badge-observations' && inputs.mode != 'badge-level10' && inputs.mode != 'badge-missionary' && inputs.mode != 'badge-revisions'
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ (inputs.mode == 'candidate' || inputs.mode == 'current' || inputs.mode == 'cs-close' || inputs.mode == 'cs-hybrid' || (inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both')) && 90 || 40 }}
     env:
@@ -424,7 +425,7 @@ jobs:
           if-no-files-found: error
 
   badge-observations:
-    if: inputs.mode == 'badge-observations' || inputs.mode == 'badge-level10' || inputs.mode == 'badge-missionary'
+    if: inputs.mode == 'badge-observations' || inputs.mode == 'badge-level10' || inputs.mode == 'badge-missionary' || inputs.mode == 'badge-revisions'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
@@ -466,6 +467,9 @@ jobs:
       - name: Missionary Ridge only after demonstrated terminal-step repair
         if: inputs.mode == 'badge-missionary'
         run: node tools/test.mjs --badge-missionary
+      - name: One approved legal revision per completed group
+        if: inputs.mode == 'badge-revisions'
+        run: node tools/test.mjs --badge-revisions --badge-shard=${{ matrix.shard }}
       - name: Retained completed and failed native case receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
