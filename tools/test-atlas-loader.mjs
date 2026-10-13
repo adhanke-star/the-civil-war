@@ -75,6 +75,46 @@ const checks = [
     const task = f.atlas.load('close'); assert.equal(task, f.atlas.state.close);
     await assert.rejects(task, /synchronous provider/); assert.equal(f.disposed.size, 4); assert.equal(f.atlas.loaded('close'), false);
   }, f => { f.disposed.add = () => f.disposed; }],
+  ['observe-success', {}, async f => {
+    const records=[];f.io.observeClose=e=>records.push(e);await f.atlas.load('close');
+    for(const op of ['created','uploaded','settled'])assert.equal(records.filter(e=>e.operation===op).length,10);
+    assert.equal(records.filter(e=>e.operation==='all-settled').length,1);assert.equal(records.at(-1).operation,'publish-start');
+    assert(records.every(e=>Object.isFrozen(e)&&e.attempt==='candidate'&&Object.values(e).every(v=>v===null||['string','number','boolean'].includes(typeof v))));
+    for(const e of records.filter(e=>e.operation==='settled')){const created=records.find(r=>r.operation==='created'&&r.index===e.index),uploaded=records.find(r=>r.operation==='uploaded'&&r.index===e.index);
+      assert.equal(e.outcome,'fulfilled');assert.equal(e.textureUUID,created.textureUUID);assert(records.indexOf(created)<records.indexOf(uploaded)&&records.indexOf(uploaded)<records.indexOf(e));}
+  }, f=>{const load=f.atlas.loadDiagnosticClose;f.atlas.loadDiagnosticClose=function(){delete f.io.observeClose;return load.call(this);};}],
+  ...['malformed','httpFailure'].map(key=>['observe-'+key,{[key]:true},async f=>{
+    const records=[];f.io.observeClose=e=>records.push(e);await f.atlas.load('close');const candidate=records.filter(e=>e.attempt==='candidate');
+    assert.equal(candidate.filter(e=>e.operation==='created').length,9);assert.equal(candidate.filter(e=>e.operation==='uploaded').length,9);
+    assert.equal(candidate.filter(e=>e.operation==='settled'&&e.outcome==='rejected').length,1);
+    const barrier=records.findIndex(e=>e.operation==='all-settled'&&e.attempt==='candidate'),firstBaseline=records.findIndex(e=>e.attempt==='baseline');
+    assert.equal(candidate.filter(e=>e.operation==='dispose-result'&&e.ok).length,9);
+    assert(candidate.filter(e=>e.operation==='settled').every(e=>records.indexOf(e)<barrier));
+    assert(candidate.filter(e=>e.operation==='dispose-result').every(e=>records.indexOf(e)>barrier&&records.indexOf(e)<firstBaseline));
+  },f=>{const load=f.atlas.loadDiagnosticClose;f.atlas.loadDiagnosticClose=function(){const observer=f.io.observeClose;f.io.observeClose=e=>{if(e.operation!=='dispose-result')return observer(e);};return load.call(this);};}]),
+  ['observe-delayed', {httpFailure:true,delay:true},async f=>{
+    const records=[];f.io.observeClose=e=>records.push(e);const task=f.atlas.load('close');for(let i=0;i<20;i++)await Promise.resolve();
+    assert(records.some(e=>e.operation==='settled'&&e.outcome==='rejected'));assert(!records.some(e=>e.operation==='all-settled'||e.attempt==='baseline'||e.operation==='dispose-start'));
+    f.releaseLate();await task;const late=records.findIndex(e=>e.operation==='settled'&&e.page==='extra-4.png'),barrier=records.findIndex(e=>e.operation==='all-settled');assert(late>=0&&late<barrier);
+  },f=>{const load=f.io.loadPNG;f.io.loadPNG=url=>load(url.replace('extra-4.png','base-4.png'));}],
+  ...['created','publish-start','dispose-result'].map(operation=>['observe-fatal-'+operation,operation==='dispose-result'?{httpFailure:true}:{},async f=>{
+    const records=[];f.io.observeClose=e=>{records.push(e);if(e.operation===operation)throw Error('controlled observation failure');};
+    const task=f.atlas.load('close');let failure;try{await task;}catch(e){failure=e;}
+    assert.equal(failure?.closeObservationFailure,true);assert(failure.observationErrors.every(e=>e==='controlled observation failure'));
+    assert.equal(f.atlas.state.close,task);assert.equal(f.atlas.loaded('close'),false);assert(!records.some(e=>e.attempt==='baseline'));
+    assert.equal(records.filter(e=>e.operation==='settled').length,10);assert.equal(records.filter(e=>e.operation==='dispose-result').length,operation==='dispose-result'?9:10);
+    assert.equal(f.disposed.size,operation==='dispose-result'?9:10);assert.equal(f.atlas.closeDiagnosticFailure,undefined);
+  },f=>{const load=f.atlas.loadDiagnosticClose;f.atlas.loadDiagnosticClose=function(){delete f.io.observeClose;return load.call(this);};}]),
+  ['observe-async', {},async f=>{
+    f.io.observeClose=()=>Promise.reject(Error('controlled asynchronous observation'));let failure;try{await f.atlas.load('close');}catch(e){failure=e;}
+    assert.equal(failure?.closeObservationFailure,true);assert(failure.observationErrors.every(e=>e==='synchronous observer required'));assert.equal(f.disposed.size,10);assert(!f.events.some(e=>e.startsWith('png:baseline/')));
+  },f=>{const load=f.atlas.loadDiagnosticClose;f.atlas.loadDiagnosticClose=function(){f.io.observeClose=()=>{};return load.call(this);};}],
+  ['observe-png-owned-rejection', {},async f=>{
+    const records=[],load=f.io.loadPNG;f.io.observeClose=e=>records.push(e);f.io.loadPNG=async url=>{const t=await load(url);if(url.startsWith('candidate/'))t.image=null;return t;};
+    await f.atlas.load('close');const rejected=records.filter(e=>e.attempt==='candidate'&&e.operation==='settled'&&e.outcome==='rejected');assert.equal(rejected.length,2);
+    for(const e of rejected){const created=records.find(c=>c.operation==='created'&&c.attempt==='candidate'&&c.page===e.page),disposed=records.find(d=>d.operation==='dispose-result'&&d.attempt==='candidate'&&d.page===e.page);
+      assert.equal(typeof e.textureUUID,'string');assert.equal(e.textureUUID,created.textureUUID);assert.equal(e.textureUUID,disposed.textureUUID);assert.equal(disposed.ok,true);}
+  },f=>{const load=f.atlas.loadDiagnosticClose;f.atlas.loadDiagnosticClose=function(){const observe=f.io.observeClose;f.io.observeClose=e=>observe(e.operation==='settled'&&e.outcome==='rejected'?{...e,textureUUID:null}:e);return load.call(this);};}],
 ];
 for (const [name, options, check] of checks) { const f = loaderFixture(options); try { await check(f); } catch (e) { e.message = `${name}: ${e.message}`; throw e; } finally { f.cleanup(); } }
 console.log(`ATLAS-LOADER OK (${checks.length}/${checks.length})`);

@@ -307,6 +307,23 @@ export class BakedAtlas {
 
   async loadDiagnosticClose() {
     const baseline = this.layout.tiers.close;
+    const observer = this.io.observeClose, observationErrors = [];
+    if (observer !== undefined && typeof observer !== 'function') throw new Error('baked close observation: synchronous function required');
+    const observe = event => {
+      if (!observer) return;
+      try {
+        const result = observer(Object.freeze(event));
+        if (result && typeof result.then === 'function') {
+          // Avoid an unhandled rejection, while refusing asynchronous observation.
+          Promise.resolve(result).catch(() => {});
+          throw new Error('synchronous observer required');
+        }
+      } catch (error) { observationErrors.push(error?.message || String(error)); }
+    };
+    const observationFailure = () => {
+      const error = new Error(`baked close observation: ${observationErrors.join('; ')}`);
+      error.closeObservationFailure = true; error.observationErrors = observationErrors.slice(); return error;
+    };
     const png = async (url, page, own) => {
       const t = await (this.io.loadPNG ? this.io.loadPNG(url) : new THREE.TextureLoader().loadAsync(url));
       own(t);
@@ -318,16 +335,20 @@ export class BakedAtlas {
       return t;
     };
     const attempt = async (T, base, compressed) => {
-      const owned = [];
+      const owned = [], attemptName = compressed ? 'candidate' : 'baseline';
+      const event = (operation, p, index, t, extra = {}) => observe({operation, attempt:attemptName,
+        page:p?.file ?? null, index:index ?? null, encoding:p?.encoding || 'png', textureUUID:t?.uuid ?? null, ...extra});
       try {
         // Every sibling settles before cleanup/fallback, including late successful PNGs.
-        const settled = await Promise.allSettled(T.pages.map(async p => {
+        const settled = await Promise.allSettled(T.pages.map(async (p, index) => {
           let t;
+          const own = texture => {t=texture;owned.push({texture, page:p, index});event('created',p,index,texture);};
+          try {
           if (compressed && p.encoding === 'astc4x4') {
             const res = await (this.io.fetch || fetch)(base + p.file);
             if (!res.ok) throw new Error(`baked close: HTTP ${res.status}`);
-            t = createAtlasAstcTexture(THREE, new Uint8Array(await res.arrayBuffer()), p); owned.push(t);
-          } else t = await png(base + p.file, p, t => owned.push(t));
+            t = createAtlasAstcTexture(THREE, new Uint8Array(await res.arrayBuffer()), p); own(t);
+          } else t = await png(base + p.file, p, own);
           if (this.disposed) throw new Error('baked atlas: disposed');
           // needsUpdate alone is not proof of successful native allocation/upload.
           const gl = this.renderer.getContext();
@@ -339,16 +360,29 @@ export class BakedAtlas {
             if (!gl.isTexture(native.__webglTexture) || native.__version !== t.version)
               throw new Error('baked close: native texture not uploaded');
           }
-          return t;
+          event('uploaded',p,index,t);
+          event('settled',p,index,t,{outcome:'fulfilled',error:null});return t;
+          } catch (error) {
+            event('settled',p,index,t,{outcome:'rejected',error:error?.message || String(error)});throw error;
+          }
         }));
+        event('all-settled',null,null,null,{fulfilled:settled.filter(r=>r.status==='fulfilled').length,rejected:settled.filter(r=>r.status==='rejected').length});
+        if (observationErrors.length) throw observationFailure();
         const failure = settled.find(r => r.status === 'rejected');
         if (failure) throw failure.reason;
         if (this.disposed) throw new Error('baked atlas: disposed');
         const textures = settled.map(r => r.value);
+        event('publish-start',null,null,null);
+        if (observationErrors.length) throw observationFailure();
         this.publishTier('close', T, textures);
         return textures;
       } catch (error) {
-        for (const t of owned) { try { t.dispose(); } catch {} }
+        for (const {texture:t,page:p,index} of owned) {
+          event('dispose-start',p,index,t);
+          try {t.dispose();event('dispose-result',p,index,t,{ok:true,error:null});}
+          catch (failure) {event('dispose-result',p,index,t,{ok:false,error:failure?.message || String(failure)});}
+        }
+        if (observationErrors.length) throw observationFailure();
         throw error;
       }
     };
@@ -378,6 +412,7 @@ export class BakedAtlas {
         throw new Error('baked close: unqualified layout');
       if (astcAvailable(this.renderer.getContext(), T.pages)) return await attempt(T, base, true);
     } catch (error) {
+      if (error.closeObservationFailure) throw error;
       this.closeDiagnosticFailure = error.message;
     }
     if (this.disposed) throw new Error('baked atlas: disposed');

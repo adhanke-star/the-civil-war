@@ -82,6 +82,7 @@ export async function atlasLoaderControls({ browser, url, check, result, watchEr
             base=new URL('/__scene-qualified/',location.href).href;
           let config;
           try{
+            const observations=[];CS.io.observeClose=e=>observations.push(e);
             config=configureSceneCloseRoute({game:{paused:true,baked:{atlases:{US:US.atlas,CS:CS.atlas}}},post:{renderer}},
               {manifest:CS.hybrid,sourceManifest,base,route,candidateRequests:()=>CS.events.filter(e=>e.includes(base)).length});
             await Promise.all([US.atlas.load('close'),CS.atlas.load('close')]);
@@ -92,6 +93,11 @@ export async function atlasLoaderControls({ browser, url, check, result, watchEr
               &&native.filter(t=>t.compressed).length===(route==='capable'?8:0)&&gl.getError()===gl.NO_ERROR
               &&descriptor('renderer',before.renderer)&&descriptor('diagnosticClose',before.close),
               {kind:'constructed tiny two-atlas fixture, actual native GL; full qualified scene UNRUN',publication,native,restoration,nativeCapability:config.nativeCapability});
+            const attempt=route==='capable'?'candidate':'baseline',pages=route==='capable'?10:5,of=op=>observations.filter(e=>e.operation===op);
+            row('native-observation-'+route,of('created').length===pages&&of('uploaded').length===pages&&of('settled').length===pages
+              &&of('all-settled').length===1&&observations.at(-1)?.operation==='publish-start'&&observations.every(e=>e.attempt===attempt)
+              &&of('settled').every(e=>e.outcome==='fulfilled'&&of('uploaded').some(u=>u.page===e.page&&u.textureUUID===e.textureUUID&&observations.indexOf(u)<observations.indexOf(e))),
+              {kind:'actual native GL, constructed tiny manifests; observer records native-check boundary',observations});
           }finally{if(config)await config.restore();US.cleanup();CS.cleanup();}
         }
         // A genuine native INVALID_VALUE produced during candidate upload must trigger cleanup and fallback.
@@ -113,6 +119,7 @@ export async function atlasLoaderControls({ browser, url, check, result, watchEr
           } else nativeUpload(t);
         } };
         try {
+          const observations=[];failed.io.observeClose=e=>observations.push(e);
           const ts = await failed.atlas.load('close');
           row('native-upload-failure', ts.length === 5 && failed.atlas.layout.tiers.close === failed.before.close
             && failed.atlas.closeDiagnosticFailure === 'baked close: upload GL failure'
@@ -120,7 +127,22 @@ export async function atlasLoaderControls({ browser, url, check, result, watchEr
             && failed.events.lastIndexOf('dispose') < failed.events.findIndex(e => e.startsWith('png:baseline/'))
             && gl.getError() === gl.NO_ERROR && ts.every(t => gl.isTexture(renderer.properties.get(t).__webglTexture)),
             { failure: failed.atlas.closeDiagnosticFailure, pages: ts.length, events: failed.events });
+          const candidate=observations.filter(e=>e.attempt==='candidate'),barrier=observations.findIndex(e=>e.attempt==='candidate'&&e.operation==='all-settled'),first=observations.findIndex(e=>e.attempt==='baseline');
+          row('native-observation-upload-failure',candidate.filter(e=>e.operation==='settled'&&e.outcome==='rejected').length===8
+            &&candidate.filter(e=>e.operation==='uploaded').length===2&&candidate.filter(e=>e.operation==='dispose-result'&&e.ok).length===10
+            &&candidate.filter(e=>e.operation==='settled').every(e=>observations.indexOf(e)<barrier)
+            &&candidate.filter(e=>e.operation==='dispose-result').every(e=>observations.indexOf(e)>barrier&&observations.indexOf(e)<first)
+            &&observations.filter(e=>e.attempt==='baseline'&&e.operation==='uploaded').length===5,
+            {kind:'actual native INVALID_VALUE injection; controlled capability facade, not positive ASTC evidence',observations});
         } finally { failed.cleanup(); }
+        const fatal=loaderFixture({httpFailure:true});fatal.atlas.renderer=renderer;
+        try{
+          const observations=[];fatal.io.observeClose=e=>{observations.push(e);if(e.operation==='dispose-result')throw Error('controlled observation cleanup failure');};
+          let rejection;try{await fatal.atlas.load('close');}catch(e){rejection={message:e.message,fatal:e.closeObservationFailure,errors:e.observationErrors};}
+          row('native-observation-fatal-cleanup',rejection?.fatal===true&&rejection.errors.length===9&&observations.filter(e=>e.operation==='dispose-result'&&e.ok).length===9
+            &&observations.filter(e=>e.operation==='settled').length===10&&!observations.some(e=>e.attempt==='baseline')&&!fatal.atlas.loaded('close')&&gl.getError()===gl.NO_ERROR,
+            {kind:'actual native GL; observer failure retained independently, every sibling disposed',rejection,observations});
+        }finally{fatal.cleanup();}
       } finally { renderer.dispose(); renderer.forceContextLoss(); }
       return { rows };
     });

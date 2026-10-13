@@ -1,5 +1,15 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0167 — root ACTIVE sole writer; no transfer. SOURCE2c7c779 reducer CI38332647706 running;
+root+Astra107+107 pass.0163 synchronous close-loader event seam root+Astra27+27 clear;
+four new native observer rows Actions UNRUN/expected shard3 162; recorded runtime SWcw-v68.
+Accepted remote main353879/Pages38332577579 cw-v67; mainCI38332577594 running.
+Sourcea2 all9green/four ownshards251/365/158/159+campaign201+originalprobes read;
+remaining smoke readback in progress. Next bounded lossless scene report transport and complete
+qualified22ordinary+88fault caller/Lookout canvas/input/acquisition/native transport/dispatch.
+No full scene dispatch or product asset adoption; protectedMAIN11 unchanged/no simultaneous edits.
+Continue same-session; routine greens/pendingCI do not trigger transfer.
+
 LATEST0166 — root ACTIVE sole writer; no transfer. Acceptedremote main353879 after3407+353879
 all9green/full own canonical; prior main4460 all9green/full own readback incl exact native128+48B
 positive/negative/repair and7clean captures. New353879 mainCI/Pages pending.
