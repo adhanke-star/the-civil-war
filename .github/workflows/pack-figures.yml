@@ -13,6 +13,8 @@ on:
           - scene
           - scene-transport
           - badge-observations
+          - badge-level10
+          - badge-missionary
           - diagnostic
           - candidate
           - full
@@ -40,7 +42,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
-    if: inputs.mode != 'scene-transport' && inputs.mode != 'badge-observations'
+    if: inputs.mode != 'scene-transport' && inputs.mode != 'badge-observations' && inputs.mode != 'badge-level10' && inputs.mode != 'badge-missionary'
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ (inputs.mode == 'candidate' || inputs.mode == 'current' || inputs.mode == 'cs-close' || inputs.mode == 'cs-hybrid' || (inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both')) && 90 || 40 }}
     env:
@@ -422,13 +424,13 @@ jobs:
           if-no-files-found: error
 
   badge-observations:
-    if: inputs.mode == 'badge-observations'
+    if: inputs.mode == 'badge-observations' || inputs.mode == 'badge-level10' || inputs.mode == 'badge-missionary'
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: ${{ fromJSON(inputs.mode == 'badge-level10' && '[3]' || inputs.mode == 'badge-missionary' && '[1]' || '[1,2,3]') }}
     container:
       image: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
       options: --ipc=host --init
@@ -454,7 +456,16 @@ jobs:
           fs.accessSync(chromium.executablePath(),fs.constants.X_OK);
           "
       - name: Play two actual finite tactics to natural completion and persist
+        if: inputs.mode == 'badge-observations'
         run: node tools/test.mjs --badge-observations --badge-shard=${{ matrix.shard }}
+      - name: Legal level10 through eight original spare-card sales
+        if: inputs.mode == 'badge-level10'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/test.mjs --badge-level10
+      - name: Missionary Ridge only after demonstrated terminal-step repair
+        if: inputs.mode == 'badge-missionary'
+        run: node tools/test.mjs --badge-missionary
       - name: Retained completed and failed native case receipts
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
@@ -462,6 +473,7 @@ jobs:
           name: badge-observations-${{ matrix.shard }}
           path: |
             .out/badge-observations.json
+            .out/badge-level10.json
             .out/last-result.json
           retention-days: 7
           if-no-files-found: error

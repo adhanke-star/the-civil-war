@@ -1787,12 +1787,19 @@ async function browserChecks(server, url) {
       const {nativeBadgeObserverControls}=await import('./test-badges-ui.mjs');
       await nativeBadgeObserverControls({browser,url,check,result,watchErrors});return;
     }
-    if(BADGE_SELECTION?.mode==='observations'){
-      result.mode='actual first native badge tactics shard '+BADGE_SELECTION.shard+' of3';
+    if(['observations','missionary'].includes(BADGE_SELECTION?.mode)){
+      result.mode=BADGE_SELECTION.mode==='missionary'?'actual Missionary-only terminal-step repair':'actual first native badge tactics shard '+BADGE_SELECTION.shard+' of3';
       const {nativeBadgeObservations}=await import('./test-badges-ui.mjs');
       const persist=async()=>{const target=path.join(OUT_DIR,'badge-observations.json'),temporary=target+'.pending';
         await fs.writeFile(temporary,JSON.stringify(result));await fs.rename(temporary,target);};
-      await nativeBadgeObservations({browser,url,check,result,watchErrors,shard:BADGE_SELECTION.shard,persist});return;
+      await nativeBadgeObservations({browser,url,check,result,watchErrors,shard:BADGE_SELECTION.shard,persist,missionaryOnly:BADGE_SELECTION.mode==='missionary'});return;
+    }
+    if(BADGE_SELECTION?.mode==='level10'){
+      result.mode='actual played-save legal level10 continuation';
+      const {nativeLevel10Controls}=await import('./test-economy-ui.mjs');
+      const persist=async()=>{const target=path.join(OUT_DIR,'badge-level10.json'),temporary=target+'.pending';
+        await fs.writeFile(temporary,JSON.stringify(result));await fs.rename(temporary,target);};
+      await nativeLevel10Controls({browser,url,check,result,watchErrors,persist});return;
     }
     if (process.argv.includes('--reinforcement-ui')) { result.mode = 'scheduled reinforcement UI'; await reinforcementUIControls({ browser, url, check, shot, result, native }); return; }
     if (process.argv.includes('--field-admission')) { result.mode = 'current field admission'; await fieldAdmissionControls({ browser, url, check, shot, result, watchErrors, native }); return; }

@@ -14,6 +14,27 @@ export const BADGE_OBSERVATIONS=Object.freeze([
 ].map(([id,packId,phaseId,stats])=>Object.freeze({id,packId,phaseId,stats:Object.freeze(stats)})));
 const fail=message=>{throw Error('badge observation: '+message);};
 
+// This is an actual, completed Actions playthrough export, not a constructed Veteran prefix.
+export const LEVEL10_ORIGIN=Object.freeze({run:38350032246,sha:'0c8e791cdd77980df0a4cc4c0d5936742266bf4e',artifact:11790274623,name:'playthrough',
+  zipBytes:48447932,zipSha:'96ef5f7c0c08c4986fcb27f36f08578ab63c68d40a63d2db02c69d4648bad0ec',
+  member:'final-save.json',saveBytes:75245,saveSha:'bb7727636bb660735494785f4e3052659983d35ea86787cd0035ab7d694f7aa3'});
+export const LEVEL10_TURN_INS=Object.freeze([
+  ['west.1.chattanooga.missionary-ridge.1.Ly88c1s-3',40],['west.1.chattanooga.orchard-knob.1.L1c0hs20-3',40],
+  ['west.1.level.6',40],['west.1.level.7',40],['west.1.level.8',40],
+  ['west.1.chattanooga.lookout-mountain.1.L1yuui9p-0',20],['west.1.level.4',20],['west.1.level.5',20],
+].map(([uid,points])=>Object.freeze({uid,points})));
+/** Bind acquisition to the immutable producer before using its bytes. Hashes are computed by the Node reader. */
+export function admitLevel10Origin(observed){
+  if(!observed||Reflect.ownKeys(observed).length!==Object.keys(LEVEL10_ORIGIN).length
+    ||Object.entries(LEVEL10_ORIGIN).some(([k,v])=>observed[k]!==v))fail('level10 original producer/bytes');
+  return {...LEVEL10_ORIGIN};
+}
+/** The legacy no-reinforcement fastForward hook does not stop within a multi-step call. */
+export function advanceBadgeChunk(game){
+  if(typeof game?.fastForward!=='function'||typeof game.over!=='boolean'||typeof game.paused!=='boolean')fail('native chunk prerequisites');
+  for(let step=0;step<400&&!game.over&&!game.paused;step++)game.fastForward(.05);
+}
+
 /** Exact authorized Draw/null/empty prefix. All income/joins/cards are kept, never spent or equipped. */
 export function badgePrefix(campaign,observation,{slot=1,seed=1861,at='2026-10-12T12:00:00Z'}={}){
   const def=validateCampaign(campaign),recipe=BADGE_OBSERVATIONS.find(r=>r.id===observation);
@@ -153,6 +174,8 @@ export function badgeObservationSelection(args){
   if(!dense(args)||args.some(a=>typeof a!=='string'))fail('mode arguments');
   if(!args.some(a=>a.startsWith('--badge-')))return null;
   if(args.length===1&&args[0]==='--badge-observer')return {mode:'prerequisite',shard:null};
+  if(args.length===1&&args[0]==='--badge-level10')return {mode:'level10',shard:null};
+  if(args.length===1&&args[0]==='--badge-missionary')return {mode:'missionary',shard:1};
   const shards=args.filter(a=>/^--badge-shard=[123]$/.test(a));
   if(args.length===2&&args.includes('--badge-observations')&&shards.length===1)return {mode:'observations',shard:Number(shards[0].slice(-1))};
   fail('explicit badge mode/shard required; conflicting or unknown selector');

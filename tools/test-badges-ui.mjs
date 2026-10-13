@@ -105,8 +105,9 @@ function restoreNativeBadgeContext(){
 }
 
 /** Six first-tactic observations, two fresh native contexts per explicitly selected Actions shard. */
-export async function nativeBadgeObservations({browser,url,check,result,watchErrors,shard,persist}){
-  const cases=[['slaughter-fire','missionary-assault'],['slaughter-defence','mcfadden-assault'],['slaughter-recovery','buell-capture']][shard-1];
+export async function nativeBadgeObservations({browser,url,check,result,watchErrors,shard,persist,missionaryOnly=false}){
+  if(missionaryOnly&&shard!==1)throw Error('badge observations: missionary repair is exactly shard1');
+  const cases=missionaryOnly?['missionary-assault']:[['slaughter-fire','missionary-assault'],['slaughter-defence','mcfadden-assault'],['slaughter-recovery','buell-capture']][shard-1];
   if(!cases)throw Error('badge observations: shard must be 1, 2 or 3');
   const output={kind:'actual first native tactics; constructed earlier Draw prefixes; numeric tiers are not separate saved upgrades',
     sourceSha:process.env.GITHUB_SHA,run:process.env.GITHUB_RUN_ID,shard,cases:[],complete:false};result.badgeObservations=output;
@@ -146,8 +147,13 @@ export async function nativeBadgeObservations({browser,url,check,result,watchErr
       const began=Date.now();row.progress=[];
       for(let chunk=0;chunk<Math.ceil(row.initial.horizon/20)+120;chunk++){
         if(Date.now()-began>15*60*1000)throw Error('badge observations: natural completion wall budget exhausted; no result forced');
-        const state=await page.evaluate(()=>{
-          const g=window.__game.game;if(!g.over){if(g.paused)g.togglePause();try{g.fastForward(20);}finally{if(!g.paused)g.togglePause();}}
+        const state=await page.evaluate(async()=>{
+          const B=await import('./tools/observe-badges.mjs');
+          const g=window.__game.game;if(!g.over){if(g.paused)g.togglePause();try{
+            // Phases without reinforcements use the legacy fastForward loop, which does not stop on over.
+            // Bound every genuine native step by the natural ending before requesting the next step.
+            B.advanceBadgeChunk(g);
+          }finally{if(!g.paused)g.togglePause();}}
           const o=window.__badgeObservation;
           return {at:g.simTime,over:g.over,winner:g.result?.winner??null,alive:g.units.filter(u=>u.alive).length,
             observed:{samples:o.samples,initialTime:o.initialTime,lastTime:o.lastTime,largestDelta:o.largestDelta,fullReports:o.fullReports,

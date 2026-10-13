@@ -12,6 +12,11 @@
 //    cancels with storage untouched); the turn-in crosses further levels and its moment plays once; axe, 320 px, screenshots.
 //    The battle result is forced through the documented hook window.__game.game (as tools/test-campaign-ui.mjs does).
 import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
+import {createRequire} from 'node:module';
+import {LEVEL10_ORIGIN,LEVEL10_TURN_INS,admitLevel10Origin} from './observe-badges.mjs';
 import { AxeBuilder } from '@axe-core/playwright';
 import { probeProgress, seedProgress } from './test-progress-browser.mjs';
 import * as campaign from '../src/franchise/campaign.js';
@@ -29,6 +34,123 @@ const CAMPAIGN = { version: 1, id: 'test-econ', title: 'Fictional economy campai
   { unitId: 'ricketts', label: 'Test battery (fictional)', kind: 'battery', men: 110, guns: 5, weapon: 'sixPdr', vet: 'veteran' }],
 phases: [{ packId: PACK_ID, phaseId: 'p1' }] };
 const LEGENDARY = 'test-econ.1.fixture.legend';
+
+/** Read one immutable played export in RAM. No Mac artifact output, synthetic migration or campaign replay. */
+export async function acquireLevel10Save(){
+  const O=LEVEL10_ORIGIN,repo='repos/adhanke-star/the-civil-war',api=async p=>{
+    if(!process.env.GH_TOKEN)return execFileSync('gh',['api',repo+p],{maxBuffer:99000000});
+    const response=await fetch('https://api.github.com/'+repo+p,{headers:{Authorization:'Bearer '+process.env.GH_TOKEN,Accept:'application/vnd.github+json'},signal:AbortSignal.timeout(120000)});
+    if(!response.ok)throw Error('level10 acquisition HTTP '+response.status);
+    const chunks=[];let bytes=0;for await(const chunk of response.body){bytes+=chunk.length;if(bytes>=99000000)throw Error('level10 response exceeds RAM bound');chunks.push(Buffer.from(chunk));}
+    return Buffer.concat(chunks);
+  };
+  const run=JSON.parse(await api('/actions/runs/'+O.run)),artifact=JSON.parse(await api('/actions/artifacts/'+O.artifact));
+  assert.equal(run.id,O.run);assert.equal(artifact.id,O.artifact);
+  assert.equal(run.status,'completed');assert.equal(run.conclusion,'success');assert.equal(run.head_sha,O.sha);
+  assert.equal(run.path,'.github/workflows/ci.yml');assert.equal(artifact.expired,false);
+  assert.equal(artifact.workflow_run.id,O.run);assert.equal(artifact.workflow_run.head_sha,O.sha);
+  assert.equal(artifact.name,O.name);assert.equal(artifact.size_in_bytes,O.zipBytes);
+  assert.equal(artifact.digest,'sha256:'+O.zipSha);
+  const zipBytes=await api('/actions/artifacts/'+O.artifact+'/zip'),hash=b=>createHash('sha256').update(b).digest('hex');
+  assert.equal(zipBytes.length,O.zipBytes);assert.equal(hash(zipBytes),O.zipSha);
+  const require=createRequire(import.meta.url),{yauzl}=require(new URL('../node_modules/playwright-core/lib/utilsBundle.js',import.meta.url).pathname);
+  let selected;
+  await new Promise((resolve,reject)=>yauzl.fromBuffer(zipBytes,{lazyEntries:true},(error,zip)=>{
+    if(error)return reject(error);zip.on('error',reject);zip.on('end',resolve);zip.on('entry',entry=>{
+      if(entry.fileName!==O.member){zip.readEntry();return;}
+      if(selected||entry.uncompressedSize!==O.saveBytes)return reject(Error('level10 duplicate/size of original save'));
+      zip.openReadStream(entry,(err,stream)=>{if(err)return reject(err);const chunks=[];let bytes=0;
+        stream.on('error',reject);stream.on('data',chunk=>{bytes+=chunk.length;if(bytes>O.saveBytes){stream.destroy(Error('level10 expanded bound'));return;}chunks.push(chunk);});
+        stream.on('end',()=>{selected=Buffer.concat(chunks);zip.readEntry();});});
+    });zip.readEntry();
+  }));
+  assert.ok(selected);const origin=admitLevel10Origin({...O,zipBytes:zipBytes.length,zipSha:hash(zipBytes),saveBytes:selected.length,saveSha:hash(selected)});
+  const raw=selected.toString('utf8'),save=validateSnapshot(JSON.parse(raw));
+  assert.equal(JSON.stringify(save),raw,'original export already canonical');
+  assert.deepEqual([save.slot,save.reputation,save.rp,save.level,save.campaign.index,save.campaign.history.length,save.depot.length],[1,545,545,8,11,12,53]);
+  const equipped=new Set(save.army.map(b=>b.weapon.uid)),uids=new Set();let expected=save;
+  for(const {uid,points}of LEVEL10_TURN_INS){
+    assert.ok(!uids.has(uid)&&!equipped.has(uid));uids.add(uid);
+    const card=save.depot.find(it=>it.uid===uid);assert.ok(card,'original spare card '+uid);assert.equal(economy.turnInPoints(card),points);
+    assert.ok(!save.ledger.some(r=>r.kind==='turnIn'&&r.item.uid===uid));expected=economy.turnInCard(expected,{itemUid:uid});
+  }
+  assert.deepEqual([expected.reputation,expected.rp,expected.level,expected.depot.length],[805,805,10,47]);
+  assert.deepEqual(expected.army,save.army);assert.deepEqual(expected.campaign,save.campaign);
+  for(const level of [9,10])assert.equal(expected.ledger.filter(r=>r.kind==='level'&&r.level===level).length,1);
+  return {origin,raw,save};
+}
+
+/** Continuation of a genuinely played campaign: eight actual camp sales; no battle/result mutations. */
+export async function nativeLevel10Controls({browser,url,check,result,watchErrors,persist}){
+  const row={kind:'actual played-save continuation by original spare-card turn-ins',expectedOrigin:LEVEL10_ORIGIN,steps:[],errors:[],complete:false,cleanup:false};
+  result.level10=row;await persist();let ctx,importCtx,primary;
+  try{
+    const acquired=await acquireLevel10Save();row.origin=acquired.origin;
+    const definition=JSON.parse(fs.readFileSync(new URL('../assets/campaign.json',import.meta.url))),last=definition.phases.at(-1),
+      pack=JSON.parse(fs.readFileSync(new URL('../assets/packs/'+last.packId+'.json',import.meta.url))),date=pack.phases.find(p=>p.id===last.phaseId).scenario.date;
+    assert.equal(definition.id,acquired.save.campaign.id);assert.equal(definition.phases.length,acquired.save.campaign.index);assert.equal(date,'1863-11-25');
+    ctx=await browser.newContext({viewport:{width:1024,height:768},reducedMotion:'reduce'});
+    const page=await ctx.newPage(),errors=row.errors;watchErrors(page,url,errors);
+    const ready=()=>page.waitForFunction(()=>window.__entry&&!window.__entry.importing,null,{timeout:60000});
+    const raw=()=>page.evaluate(async()=>{const S=await import('./src/franchise/save.js');return S.createProgressStore(undefined,{slot:1}).readRawBaseline();});
+    await page.goto(url+'?nosw');await ready();
+    row.import=await page.evaluate(async text=>{const S=await import('./src/franchise/save.js'),store=S.createProgressStore(undefined,{slot:1});
+      const previousRaw=await store.readRawBaseline();if(previousRaw!==null)throw Error('level10 import must be empty');
+      await store.import(text,{previousRaw});return {previousRaw,raw:await store.readRawBaseline()};},acquired.raw);
+    assert.equal(row.import.raw,acquired.raw);await page.goto(url+'?camp&slot=1&nosw');await ready();
+    await page.waitForFunction(()=>window.__entry.mode==='camp');assert.equal(await raw(),acquired.raw);
+    check('level10-original-played-save',true,'exact source0c campaign export: 12 actual history rows, 545 reputation/level8, original army/depot');
+    let expected=acquired.save;
+    for(const {uid,points}of LEVEL10_TURN_INS){
+      // Search finite native pagination; issuing/equipment and new level reward cards are untouched.
+      const previous=page.getByRole('button',{name:'Previous depot cards',exact:true});
+      for(let i=0;i<20&&await previous.count()&&await previous.isEnabled();i++)await previous.click();
+      assert.ok(!await previous.count()||!await previous.isEnabled(),'native previous pagination bounded');
+      const button=page.locator('#camp-depot [data-item-uid="'+uid+'"] .camp-turnin-button');let found=false;
+      for(let i=0;i<20;i++){
+        if(await button.count()){found=true;break;}
+        const next=page.getByRole('button',{name:'Next depot cards',exact:true});
+        if(!await next.count()||!await next.isEnabled())break;await next.click();
+      }
+      assert.ok(found,'original card reachable by native pagination '+uid);await button.click();
+      assert.equal(await page.locator('#camp-confirm-ok').textContent(),'Turn in for '+points+' points');
+      const before=expected;expected=economy.turnInCard(before,{itemUid:uid});await page.locator('#camp-confirm-ok').click();
+      await page.waitForFunction(uid=>!window.__entry.importing&&!document.getElementById('camp-confirm').open&&/^Turned in /.test(document.getElementById('camp-shop-status').textContent)
+        &&!window.__entry.saved.depot.some(it=>it.uid===uid),uid,{timeout:15000});
+      const saved=await raw();assert.deepEqual(JSON.parse(saved),expected,'whole actual saved sale equals native economy oracle');
+      assert.deepEqual(expected.army,acquired.save.army);assert.deepEqual(expected.campaign,acquired.save.campaign);
+      row.steps.push({uid,points,reputation:expected.reputation,level:expected.level,raw:saved});await persist();
+    }
+    row.moments=await page.evaluate(()=>window.__levelUps??[]);assert.deepEqual(row.moments,[9,10]);
+    for(const level of [9,10]){
+      const uid='west.1.level.'+level;assert.equal(expected.ledger.filter(r=>r.kind==='level'&&r.level===level&&r.uid===uid).length,1);
+      assert.equal(expected.depot.filter(it=>it.uid===uid&&it.source==='reward').length,1);
+    }
+    check('level10-eight-native-sales',true,'eight original spare cards: 545→805 reputation/RP; level9/10 moments and cards once; army/history/index unchanged');
+    row.duplicate=await page.evaluate(async uid=>{const S=await import('./src/franchise/save.js'),E=await import('./src/franchise/economy.js'),store=S.createProgressStore(undefined,{slot:1});
+      const before=await store.readRawBaseline();let error=null;try{await store.exchange(E.turnInCard,{itemUid:uid},{previous:JSON.parse(before)});}catch(e){error=e.message;}
+      return {error,before,after:await store.readRawBaseline()};},LEVEL10_TURN_INS[0].uid);
+    assert.match(row.duplicate.error,/no longer in the depot/);assert.equal(row.duplicate.after,row.duplicate.before);
+    await page.locator('#camp-shop-toggle').click();await ready();expected=economy.markShopSeen(expected);
+    assert.deepEqual(JSON.parse(await raw()),expected);row.shop=await page.evaluate(()=>({date:window.__entry.shop.date,rep:document.getElementById('camp-reputation').textContent,
+      note:document.getElementById('camp-shop-note').textContent,stock:[...document.querySelectorAll('#camp-shop-stock [data-lot]')].map(n=>n.dataset.lot)}));
+    assert.equal(row.shop.date,date);assert.deepEqual(row.shop.stock,economy.shopStock(expected,{date}).map(l=>l.itemId));assert.match(row.shop.note,/Legendary/);
+    row.finalRaw=await raw();await page.reload();await ready();assert.equal(await raw(),row.finalRaw);
+    row.reloadMoments=await page.evaluate(()=>window.__levelUps??[]);assert.deepEqual(row.reloadMoments,[]);
+    row.exported=await page.evaluate(async()=>{const S=await import('./src/franchise/save.js');return S.exportSnapshot(await S.createProgressStore(undefined,{slot:1}).load());});
+    assert.equal(row.exported,row.finalRaw);
+    importCtx=await browser.newContext({reducedMotion:'reduce'});const ip=await importCtx.newPage();watchErrors(ip,url,errors);
+    await ip.goto(url+'?nosw');await ip.waitForFunction(()=>window.__entry&&!window.__entry.importing,null,{timeout:60000});
+    row.freshImport=await ip.evaluate(async text=>{const S=await import('./src/franchise/save.js'),store=S.createProgressStore(undefined,{slot:1}),previousRaw=await store.readRawBaseline();
+      if(previousRaw!==null)throw Error('level10 final import context not empty');await store.import(text,{previousRaw});return await store.readRawBaseline();},row.exported);
+    assert.equal(row.freshImport,row.finalRaw);assert.deepEqual(errors,[]);row.observationsComplete=true;
+    check('level10-storage-and-stock',true,'actual duplicate exchange refuses with unchanged bytes; exact dated stock/shopSeen; reload/export/fresh import bytes equal, no moments replay or console errors');
+  }catch(e){primary=e;row.error=e.stack;}finally{
+    const closed=await Promise.allSettled([ctx?.close(),importCtx?.close()]);row.cleanup=closed.every(r=>r.status==='fulfilled');
+    row.closeErrors=closed.filter(r=>r.status==='rejected').map(r=>String(r.reason));row.complete=row.observationsComplete===true&&row.cleanup&&!primary;await persist();
+  }
+  if(primary)throw primary;assert.ok(row.cleanup,'level10 independent contexts close');
+}
 
 /** Slot 1 at 50 reputation: five Uncommon cards already turned in; a Legendary (80) waits in the depot for the UI. */
 function seededSave() {
