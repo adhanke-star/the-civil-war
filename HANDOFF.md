@@ -1,5 +1,14 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0164 — root ACTIVE sole writer; no transfer. SOURCE3407e11 CI38329187934 running;
+actual warmed-owner/native four-row fixture pending. Original probe115074781609 5,703,219B
+read once confirms67+67 inactive/51+51export/38+38scene/10terrain/18loader/10adapter;
+smoke11781692917/11781662815/11781253231 each6 clean. Accepted remote main4460 full source9green/
+canonical251/365/152/159+201 clean; Pages38329572617 cw-v67; mainCI38329572656 pending.
+0160 retained original review bytes/acquisition provenance/fresh runner materialization/exact routes
+CPU68+68/Astra clear. Native transport UNRUN; full22+88/caller/reducer/input/dispatch pending.
+No simultaneous edits; protectedMAIN11 and near-cap receipts preserved; continue autonomous loop.
+
 LATEST0163 — root ACTIVE sole writer; no session transfer. SOURCE4460be79a27439c6e3e4f2282e5326326a5b15f1
 CI38327203798 running; probes/three smoke/shards2+3+4/campaign green; shard1 pending.
 Canonical11781442592 has152 alltrue/consoleclean; native128B matrix+48B interleaved bytes exact:

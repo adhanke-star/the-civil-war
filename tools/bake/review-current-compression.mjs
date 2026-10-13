@@ -21,6 +21,7 @@ export const QUALIFIED_HYBRID = Object.freeze({
   review:Object.freeze({id:11762905334,name:'cs-close-qualification-review',size:79493756,
     digest:'b9b761a24435489cfe272c90cbe04b60f7b9eb62c8ffec5f1b0f1ae37454452b'}),
 });
+const acquiredSceneInputs=new WeakMap();
 export function validateQualifiedArtifacts(run,artifacts){
   const Q=QUALIFIED_HYBRID;
   if(run?.id!==Q.run||run.head_sha!==Q.sha||run.status!=='completed'||run.conclusion!=='success')throw Error('hybrid acquisition: qualification run');
@@ -92,7 +93,77 @@ export async function acquireQualifiedHybrid(current,io){
   const json=(map,name)=>JSON.parse(new TextDecoder().decode(map.get(name)));
   const input={current,files,manifest:json(files,'soldier-hybrid.json'),source:json(review,'soldier-source.json'),
     compression:json(review,'compression.json'),quality:json(review,'quality.json')};
-  return {...input,admission:validateQualifiedSceneInput(input)};
+  const result={...input,reviewFiles:review,admission:validateQualifiedSceneInput(input)};
+  acquiredSceneInputs.set(result,new Map([...files,...review].map(([n,b])=>[n,createHash('sha256').update(b).digest('hex')])));
+  return result;
+}
+
+/** Exact transport files; production acquisition has already bound both immutable ZIP digests. */
+export function qualifiedSceneFiles(input){
+  validateHybridExport(input);
+  const reviewNames=['soldier-source.json','compression.json','quality.json'],review=input.reviewFiles;
+  if(!(review instanceof Map)||review.size!==3||reviewNames.some(n=>!review.has(n)))throw Error('scene transport: review coverage');
+  const values=[input.source,input.compression,input.quality];
+  for(const [i,name]of reviewNames.entries()){
+    const bytes=review.get(name);
+    if(!(bytes instanceof Uint8Array)||JSON.stringify(JSON.parse(new TextDecoder().decode(bytes)))!==JSON.stringify(values[i]))throw Error('scene transport: review byte binding');
+  }
+  const files=new Map();let total=0;
+  for(const [name,inputBytes]of [...input.files,...review]){
+    if(files.has(name)||!(/^(soldier-hybrid|soldier-source|compression|quality)\.json$/.test(name)||/^cs-close-[a-z0-9_-]+\.(png|ktx2)$/.test(name)))throw Error('scene transport: filename');
+    if(!(inputBytes instanceof Uint8Array)||!inputBytes.length||(total+=inputBytes.length)>=99000000)throw Error('scene transport: byte bound');
+    const bytes=Buffer.from(inputBytes),sha256=createHash('sha256').update(bytes).digest('hex');
+    files.set(name,{bytes,sha256,contentType:name.endsWith('.json')?'application/json':name.endsWith('.png')?'image/png':'image/ktx2'});
+  }
+  return files;
+}
+
+/** Fresh runner-only files, never a repo asset or static-server exception. No overwrites/deletes. */
+export function materializeQualifiedSceneInput(input){
+  if(process.env.GITHUB_ACTIONS!=='true')throw Error('scene transport: Actions only');
+  const acquired=acquiredSceneInputs.get(input);
+  if(!acquired||![...input.files,...input.reviewFiles].every(([name,b])=>acquired.get(name)===createHash('sha256').update(b).digest('hex')))throw Error('scene transport: acquired byte provenance');
+  const admission=validateQualifiedSceneInput(input);
+  const files=qualifiedSceneFiles(input),temp=process.env.RUNNER_TEMP;
+  if(!temp||!path.isAbsolute(temp)||temp.includes('\\')||fs.lstatSync(temp).isSymbolicLink()||fs.realpathSync(temp)!==temp||!fs.statSync(temp).isDirectory())throw Error('scene transport: real runner root');
+  const directory=path.join(temp,'scene-qualified-input');
+  if(fs.existsSync(directory))throw Error('scene transport: existing destination');
+  fs.mkdirSync(directory);
+  if(fs.realpathSync(directory)!==directory||!directory.startsWith(temp+path.sep))throw Error('scene transport: directory escape');
+  for(const [name,file]of files){
+    const target=path.join(directory,name);
+    if(path.dirname(target)!==directory)throw Error('scene transport: target escape');
+    fs.writeFileSync(target,file.bytes,{flag:'wx'});
+    if(fs.lstatSync(target).isSymbolicLink()||!fs.statSync(target).isFile()||fs.realpathSync(target)!==target
+      ||createHash('sha256').update(fs.readFileSync(target)).digest('hex')!==file.sha256)throw Error('scene transport: materialized byte binding');
+  }
+  return {directory,files,admission,qualification:{run:QUALIFIED_HYBRID.run,sha:QUALIFIED_HYBRID.sha}};
+}
+
+/** Context-owned exact URLs. Unknown paths/methods fail closed and every attempted request is retained. */
+export async function installQualifiedSceneRoutes(context,origin,files){
+  const parsed=new URL(origin);
+  if(!['http:','https:'].includes(parsed.protocol)||parsed.origin!==origin||parsed.username||parsed.password
+    ||!(files instanceof Map)||files.size!==14)throw Error('scene transport: route contract');
+  const required=['soldier-hybrid.json','soldier-source.json','compression.json','quality.json'];
+  if(required.some(n=>!files.has(n))||[...files].some(([name,f])=>
+    !(required.includes(name)||/^cs-close-[a-z0-9_-]+\.(png|ktx2)$/.test(name))
+    ||!(f?.bytes instanceof Uint8Array)||!f.bytes.length||f.contentType!==(name.endsWith('.json')?'application/json':name.endsWith('.png')?'image/png':'image/ktx2')
+    ||createHash('sha256').update(f.bytes).digest('hex')!==f.sha256))throw Error('scene transport: route files');
+  const admitted=new Map([...files].map(([name,file])=>[name,{file,bytes:file.bytes,sha256:file.sha256,contentType:file.contentType}]));
+  const base=origin+'/__scene-qualified/',requests=[],pattern=base+'**';let restored=false;
+  const handler=async route=>{
+    const request=route.request(),url=request.url(),method=request.method(),name=url.startsWith(base)?url.slice(base.length):null,file=admitted.get(name);
+    const record={url,method,name,served:false};requests.push(record);
+    if(method!=='GET'||!file||files.get(name)!==file.file||file.file.bytes!==file.bytes||url!==base+name||!file.bytes?.length
+      ||createHash('sha256').update(file.bytes).digest('hex')!==file.sha256)return route.abort('blockedbyclient');
+    try{
+      await route.fulfill({status:200,body:file.bytes,contentType:file.contentType,headers:{'Cache-Control':'no-store'}});
+      Object.assign(record,{served:true,bytes:file.bytes.length,sha256:file.sha256});
+    }catch(error){record.failure=error?.message||String(error);throw error;}
+  };
+  await context.route(pattern,handler);
+  return {base,requests,async restore(){if(restored)return;await context.unroute(pattern,handler);restored=true;}};
 }
 
 export async function gpuReadback({ png, premul, files, w, h, hybrid=false }) {

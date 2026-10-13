@@ -4,7 +4,8 @@ import { PNG } from 'pngjs';
 import { selectPages, EXTRA_LOOK } from './bake/current-compression.mjs';
 import { selectClosePages,selectHybridClosePages } from './bake/current-compression.mjs';
 import { colourComposite, closeQualified,hybridQualified,validateHybridExport,QUALIFIED_HYBRID,
-  validateQualifiedArtifacts,validateQualifiedZip,selectQualifiedMembers,validateQualifiedSceneInput,acquireQualifiedHybrid } from './bake/review-current-compression.mjs';
+  validateQualifiedArtifacts,validateQualifiedZip,selectQualifiedMembers,validateQualifiedSceneInput,acquireQualifiedHybrid,
+  qualifiedSceneFiles,materializeQualifiedSceneInput,installQualifiedSceneRoutes } from './bake/review-current-compression.mjs';
 import {loaderFixture} from './atlas-loader-fixture.mjs';
 import {createHash} from 'node:crypto';
 import fs from 'node:fs';
@@ -73,9 +74,27 @@ function archive(entries){
  return Buffer.concat([...local,cd,end]);
 }
 const exportEntries=()=>[{name:'soldier-hybrid.json'},...Array.from({length:10},(_,i)=>({name:`cs-close-base-${i}.ktx2`}))];
+function transportInput(){const r=exportInput();r.reviewFiles=new Map(['soldier-source.json','compression.json','quality.json'].map((n,i)=>[n,Buffer.from(JSON.stringify([r.source,r.compression,r.quality][i]))]));return r;}
+function routeContext(failFulfill=false){
+ const calls=[];let handler;return {calls,async route(pattern,h){calls.push(['route',pattern]);handler=h;},async unroute(pattern,h){assert.equal(h,handler);calls.push(['unroute',pattern]);},
+ async request(url,method='GET'){const events=[];await handler({request:()=>({url:()=>url,method:()=>method}),abort:reason=>events.push(['abort',reason]),fulfill:r=>{if(failFulfill)throw Error('controlled fulfill refusal');events.push(['fulfill',r]);}});return events;}};
+}
 const api={select:selectPages,close:selectClosePages,hybrid:selectHybridClosePages,qualified:closeQualified,hybridQualified,composite:colourComposite,bytes:mipBytes,compare:comparePixels,export:validateHybridExport,
- metadata:validateQualifiedArtifacts,zip:validateQualifiedZip,members:selectQualifiedMembers,sceneInput:validateQualifiedSceneInput,acquire:acquireQualifiedHybrid};
+ metadata:validateQualifiedArtifacts,zip:validateQualifiedZip,members:selectQualifiedMembers,sceneInput:validateQualifiedSceneInput,acquire:acquireQualifiedHybrid,
+ transport:qualifiedSceneFiles,materialize:materializeQualifiedSceneInput,routes:installQualifiedSceneRoutes};
 const checks=[
+ ['transport-files',a=>{const r=transportInput(),files=a.transport(r);assert.equal(files.size,14,'transport-files: exact optimized plus review set');for(const [name,f]of files)assert.deepEqual(f.bytes,Buffer.from(r.files.get(name)||r.reviewFiles.get(name)),'transport-files: retained byte identity');r.files.get('soldier-hybrid.json')[0]^=1;assert.notEqual(files.get('soldier-hybrid.json').bytes[0],r.files.get('soldier-hybrid.json')[0],'transport-files: independent bytes');}],
+ ...Object.entries({'transport-review-missing':r=>r.reviewFiles.delete('quality.json'),'transport-review-extra':r=>r.reviewFiles.set('extra.json',Buffer.from('{}')),'transport-review-bytes':r=>r.reviewFiles.set('quality.json',Buffer.from('{}'))}).map(([name,change])=>[name,a=>{const r=transportInput();change(r);let e;try{a.transport(r);}catch(x){e=x;}assert.ok(e?.message.startsWith('scene transport:'),`${name}: selected review bytes bound to parsed reports`);}]),
+ ['transport-actions',a=>{const prior=process.env.GITHUB_ACTIONS;delete process.env.GITHUB_ACTIONS;let e;try{a.materialize(transportInput());}catch(x){e=x;}finally{if(prior!==undefined)process.env.GITHUB_ACTIONS=prior;}assert.ok(e?.message==='scene transport: Actions only','transport-actions: no local materialization');}],
+ ['transport-provenance',a=>{const prior=process.env.GITHUB_ACTIONS;process.env.GITHUB_ACTIONS='true';let e;try{a.materialize(transportInput());}catch(x){e=x;}finally{if(prior!==undefined)process.env.GITHUB_ACTIONS=prior;else delete process.env.GITHUB_ACTIONS;}assert.ok(e?.message==='scene transport: acquired byte provenance','transport-provenance: a parser-valid fixture cannot bypass immutable acquisition');}],
+ ['transport-route',async a=>{const files=qualifiedSceneFiles(transportInput()),ctx=routeContext(),r=await a.routes(ctx,'http://localhost:1234',files);const events=await ctx.request(r.base+'soldier-hybrid.json');assert.ok(events.length===1&&events[0][0]==='fulfill'&&events[0][1].status===200,'transport-route: exact native request served');assert.ok(Buffer.from(events[0][1].body).equals(files.get('soldier-hybrid.json').bytes),'transport-route: original bytes served');assert.ok(r.requests[0].served&&r.requests[0].sha256===files.get('soldier-hybrid.json').sha256,'transport-route: actual request receipt');await r.restore();await r.restore();assert.equal(ctx.calls.filter(c=>c[0]==='unroute').length,1,'transport-route: exact owned handler restored once');}],
+ ...Object.entries({'transport-route-missing':f=>f.delete('quality.json'),'transport-route-extra':f=>f.set('extra.json',f.get('quality.json')),'transport-route-foreign':f=>{f.set('../quality.json',f.get('quality.json'));f.delete('quality.json');},'transport-route-bytes':f=>f.get('quality.json').bytes[0]^=1}).map(([name,change])=>[name,async a=>{const f=qualifiedSceneFiles(transportInput());change(f);let e;try{await a.routes(routeContext(),'http://localhost:1234',f);}catch(x){e=x;}assert.ok(e?.message.startsWith('scene transport:'),`${name}: invalid route table rejected before registration`);}]),
+ ['transport-route-refusal',async a=>{const f=qualifiedSceneFiles(transportInput()),ctx=routeContext(),r=await a.routes(ctx,'http://localhost:1234',f);for(const [url,method]of [[r.base+'other.png','GET'],[r.base+'quality.json?alias=1','GET'],[r.base+'quality.json','POST'],['http://foreign/__scene-qualified/quality.json','GET']]){const events=await ctx.request(url,method);assert.equal(events[0]?.[0],'abort','transport-route-refusal: foreign name URL or method cannot serve bytes');}assert.equal(r.requests.length,4,'transport-route-refusal: attempted IO retained');await r.restore();}],
+ ['transport-route-late-mutation',async a=>{const f=qualifiedSceneFiles(transportInput()),ctx=routeContext(),r=await a.routes(ctx,'http://localhost:1234',f);f.get('quality.json').bytes[0]^=1;const events=await ctx.request(r.base+'quality.json');assert.equal(events[0]?.[0],'abort','transport-route-late-mutation: changed bytes cannot be served after admission');await r.restore();}],
+ ['transport-route-mime',async a=>{const f=qualifiedSceneFiles(transportInput());f.get('quality.json').contentType='image/png';let e;try{await a.routes(routeContext(),'http://localhost:1234',f);}catch(x){e=x;}assert.ok(e?.message==='scene transport: route files','transport-route-mime: MIME binds the admitted extension');}],
+ ['transport-route-rehashed-replacement',async a=>{const f=qualifiedSceneFiles(transportInput()),ctx=routeContext(),r=await a.routes(ctx,'http://localhost:1234',f),bytes=Buffer.from('{}');f.set('quality.json',{bytes,sha256:createHash('sha256').update(bytes).digest('hex'),contentType:'application/json'});const events=await ctx.request(r.base+'quality.json');assert.equal(events[0]?.[0],'abort','transport-route-rehashed-replacement: a caller cannot replace admitted identity');await r.restore();}],
+ ['transport-route-added-name',async a=>{const f=qualifiedSceneFiles(transportInput()),ctx=routeContext(),r=await a.routes(ctx,'http://localhost:1234',f);f.set('not-admitted.png',{...f.get('quality.json'),contentType:'image/png'});const events=await ctx.request(r.base+'not-admitted.png');assert.equal(events[0]?.[0],'abort','transport-route-added-name: registered allowlist cannot grow');await r.restore();}],
+ ['transport-route-fulfill-failure',async a=>{const f=qualifiedSceneFiles(transportInput()),ctx=routeContext(true),r=await a.routes(ctx,'http://localhost:1234',f);let e;try{await ctx.request(r.base+'quality.json');}catch(x){e=x;}assert.ok(e?.message==='controlled fulfill refusal'&&r.requests.length===1&&r.requests[0].served===false&&r.requests[0].failure===e.message,'transport-route-fulfill-failure: rejected fulfillment is retained as failure');await r.restore();}],
  ['acquisition-metadata',a=>{const m=retainedMetadata();assert.equal(a.metadata(m.run,m.artifacts),true,'acquisition-metadata: retained successful run and both artifacts');}],
  ...Object.entries({
   'acquisition-run':m=>m.run.id++, 'acquisition-sha':m=>m.run.head_sha='b'.repeat(40),
@@ -159,6 +178,11 @@ const mutants={'hybrid-route':{hybrid:selectClosePages},'hybrid-evidence':{hybri
   'all-close-frames':{close:m=>selectClosePages(m).map(p=>({...p,frames:p.frames.slice(0,3)}))},'close-rejects':{close:()=>[]},'qualification-evidence':{qualified:()=>true},
   'complete-mips':{bytes:()=>({block16:64,rgba8:256,levels:1})},thresholds:{compare:()=>({ok:true})},
   'once-premultiplied':{composite:()=>{const p=new PNG({width:1,height:1});p.data=Buffer.from([64,32,16,255]);return PNG.sync.write(p);}}};
+for(const [name]of checks.filter(([name])=>name.startsWith('transport-'))){
+ if(name==='transport-actions'||name==='transport-provenance')mutants[name]={materialize:()=>({})};
+ else if(name.startsWith('transport-route'))mutants[name]={routes:async(context,origin,files)=>{const base=origin+'/__scene-qualified/',requests=[];await context.route(base+'**',route=>route.fulfill({status:200,body:files.get('quality.json')?.bytes}));return {base,requests,restore:async()=>{}};}};
+ else mutants[name]={transport:()=>new Map()};
+}
 for(const [name]of checks.filter(([name])=>name.startsWith('export-')))mutants[name]={export:name==='export-coverage'?()=>({}):()=>({files:11})};
 for(const [name]of checks.filter(([name])=>name.startsWith('acquisition-'))){
  if(name==='acquisition-metadata')mutants[name]={metadata:()=>false};
