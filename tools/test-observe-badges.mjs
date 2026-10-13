@@ -329,6 +329,36 @@ const marchFactChecks=[
 ];
 checks.push(...marchChecks,...marchFactChecks);
 
+
+// Constructed CPU command fixture: no native badge or attainment claim.
+Object.assign(api,{flank:(g,id)=>badgeMarchTactic(g,id,{flank:true}),flankOrders:(...args)=>badgeMarchOrders(...args,{flank:true})});
+function flankFixture(){
+ const scenario=marchScenario('orchard-knob'),t=badgeMarchTactic({scenario,playerSide:'US',simTime:0},'orchard-knob',{flank:true}),g=nativeStages(),template=g.units[0];
+ g.units=t.roster.map((id,i)=>({...template,id,side:id.startsWith('us-')?'US':'CS',x:id.startsWith('cs-')?10000+i:0,z:0,order:{type:'hold'},follow:{active:false}}));
+ g.orderSelected=function(kind){if(kind==='run')this.selected.run=!this.selected.run;else this.selected.order={type:kind};return true;};
+ g.order=function(u,spec){u.order={type:spec.type,dest:spec.points.at(-1)};return true;};
+ const p=createBadgeStages(t.plan,1,t.roster);p.advance(g);g.simTime=1;
+ const gibson=g.units.find(u=>u.id==='us-gibson-brigade'),boyle=g.units.find(u=>u.id==='us-boyle-brigade');
+ [gibson.x,gibson.z]=[-700,150];[boyle.x,boyle.z]=[-850,50];p.advance(g);
+ g.simTime=2;[gibson.x,gibson.z]=[-950,520];[boyle.x,boyle.z]=[-950,400];p.advance(g);g.over=true;p.advance(g);
+ return {scenario,t,r:p.receipt(),end:2};
+}
+const flankReject=(name,a,change)=>{const f=flankFixture();change(f);assert.equal(a.flankOrders(f.t,f.r,f.end,f.scenario),false,name+': changed native route proof refuses');};
+const flankChecks=[
+ ['flank-mode',a=>assert.deepEqual(a.selection(['--badge-promotion-flank']),{mode:'promotion-flank',shard:1},'flank-mode: one distinct isolated witness')],
+ ['flank-mode-refusal',a=>{for(const extra of ['--native','--badge-promotion-march','--badge-shard=1'])rejects('flank-mode-refusal',()=>a.selection(['--badge-promotion-flank',extra]));}],
+ ['flank-plan',a=>{const t=a.flank({scenario:marchScenario('orchard-knob'),playerSide:'US',simTime:0},'orchard-knob');assert.equal(t.plan.length,21,'flank-plan: finite21 stages');assert.deepEqual(t.plan.find(p=>p.id==='flank-assembly-us-gibson-brigade').command.path.points,[[-1450,-150],[-700,150]],'flank-plan: genuine distinct north route');assert.deepEqual(t.plan.find(p=>p.id==='flank-assault-us-gibson-brigade').after.map(p=>p.id),['flank-ready-us-gibson-brigade','flank-ready-us-boyle-brigade'],'flank-plan: both readiness Holds required');assert.equal(t.plan.filter(p=>p.command.type==='run'&&p.command.enabled).length,2,'flank-plan: one Run per flanker');}],
+ ['flank-preserve',a=>{for(const id of ['lookout-mountain','missionary-ridge'])assert.deepEqual(a.flank({scenario:marchScenario(id),playerSide:'US',simTime:0},id),badgeMarchTactic({scenario:marchScenario(id),playerSide:'US',simTime:0},id),'flank-preserve: original later phases remain exact');}],
+ ['flank-orders',a=>{const f=flankFixture();assert.equal(a.flankOrders(f.t,f.r,f.end,f.scenario),true,'flank-orders: actual stage machinery fixture accepts');}],
+ ['flank-corner',a=>flankReject('flank-corner',a,f=>f.r.stages.find(s=>s.id==='flank-assembly-us-gibson-brigade').trace.command.points[1]=[0,0])],
+ ['flank-fatigue',a=>flankReject('flank-fatigue',a,f=>f.r.stages.find(s=>s.id==='flank-ready-us-gibson-brigade').lastFacts.find(x=>x.kind==='march-ready').fatigue=41)],
+ ['flank-support',a=>flankReject('flank-support',a,f=>f.r.stages.find(s=>s.id==='flank-assault-us-gibson-brigade').lastFacts.find(x=>x.kind==='support').support=[])],
+ ['flank-readiness-dependency',a=>flankReject('flank-readiness-dependency',a,f=>{const r=f.r.stages.find(s=>s.id==='flank-ready-us-boyle-brigade');r.state='ended';r.trace=null;})],
+ ['flank-main-chronology',a=>flankReject('flank-main-chronology',a,f=>{const r=f.r.stages.find(s=>s.id==='flank-main-us-hazen-brigade');r.at=.5;r.trace.at=.5;})],
+ ['flank-extra-run',a=>flankReject('flank-extra-run',a,f=>{f.t.plan.push(structuredClone(f.t.plan[4]));})],
+];
+checks.push(...flankChecks);
+
 for(const[,check]of checks)check(api);
 console.log(`BADGE-OBSERVATION CPU BOOKKEEPING OK (${checks.length}/${checks.length}); natural combat/storage/level10 UNRUN`);
 if(process.argv.includes('--prove-fail')){
@@ -446,6 +476,7 @@ if(process.argv.includes('--prove-fail')){
     'west-phase-refusal':{west:()=>({})},'west-target-refusal':{west:()=>({})},'west-orders':{lookoutOrders:()=>false},'west-orders-refusal':{lookoutOrders:()=>true},'west-readiness':{readiness:createBadgeLookoutReadiness.bind(null,{western:false})},'west-complete':{lookoutComplete:()=>false},'west-complete-refusal':{lookoutComplete:()=>true},
   });
   for(const[name]of marchChecks)mutants[name]=name==='march-mode'?{selection:()=>null}:name==='march-mode-refusal'?{selection:()=>({})}:name==='march-plan'?{march:()=>({plan:[]})}:name==='march-phase-refusal'?{march:()=>({})}:name==='march-orders'?{marchOrders:()=>false}:name==='march-complete'?{marchComplete:()=>false}:name==='march-incomplete'?{marchComplete:()=>true}:name==='march-checkpoint-refusal'?{marchCheckpoint:()=>true}:{marchOrders:()=>true};
+  for(const[name]of flankChecks)mutants[name]=name==='flank-mode'?{selection:()=>null}:name==='flank-mode-refusal'?{selection:()=>({})}:name==='flank-plan'?{flank:()=>({plan:[]})}:name==='flank-preserve'?{flank:()=>({})}:name==='flank-orders'?{flankOrders:()=>false}:{flankOrders:()=>true};
   for(const[name]of marchFactChecks)mutants[name]={stages:()=>({advance(){},receipt:()=>({stages:[{state:['march-live-contact','march-ready-actual'].includes(name)?'pending':'accepted'}]})})};
   for(const[name,check]of checks){let error;try{check({...api,...mutants[name]});}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&error.message.startsWith(name),`${name}: mutant must fail its own assertion`);}
   console.log(`BADGE-OBSERVATION CONTROLS OK (${checks.length}/${checks.length})`);
