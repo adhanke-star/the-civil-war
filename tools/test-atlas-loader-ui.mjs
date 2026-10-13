@@ -1,4 +1,5 @@
 // Actions-only controls. Synthetic fixture controls are separate from native GL upload observations.
+import {installAllocationObserver,AllocationLedger,mipSizes,ReservationPeak} from './bake/scene-allocation.mjs';
 export async function atlasLoaderControls({ browser, url, check, result, watchErrors }) {
   const ctx = await browser.newContext({ viewport: { width: 800, height: 600 } });
   const page = await ctx.newPage(), errors = []; watchErrors(page, url, errors);
@@ -150,4 +151,58 @@ export async function atlasLoaderControls({ browser, url, check, result, watchEr
     for (const row of report.rows) check(`atlas-loader-${row.name}`, row.ok, JSON.stringify(row.detail));
     check('atlas-loader-errors', errors.length === 0, errors.join('; '));
   } finally { await ctx.close(); }
+  await limitedMipControls({browser,url,check,result,watchErrors});
+}
+
+async function limitedMipControls({browser,url,check,result,watchErrors}){
+ const ctx=await browser.newContext({viewport:{width:64,height:32}}),errors=[];let page;
+ try{await ctx.addInitScript(installAllocationObserver,{ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),nativeJournal:true});
+  page=await ctx.newPage();watchErrors(page,url,errors);await page.goto(url+'?nosw');await page.waitForFunction(()=>window.__entry&&!window.__entry.importing);
+  const proof=await page.evaluate(async()=>{
+   const THREE=await import('three'),{createLimitedMipOwner}=await import('./src/units/atlas-compression.js');
+   const p={kind:'synthetic PNG, actual public native limited-mip lifecycle; full approved art and scene budget UNRUN',budgetClaim:false,levels:[],views:[],updates:[],snapshots:[],cleanup:[],primary:null};let renderer,owner,full,field,close,wrong,geo,material,gl;
+   const clean=(name,fn)=>{try{fn();p.cleanup.push({name,ok:true});}catch(e){p.cleanup.push({name,ok:false,error:String(e?.message??e)});}},encode=b=>{let s='';for(const v of b)s+=String.fromCharCode(v);return btoa(s);};
+   try{const canvas=document.createElement('canvas');canvas.width=64;canvas.height=32;const c=canvas.getContext('2d'),data=c.createImageData(64,32);
+    for(let y=0;y<32;y++)for(let x=0;x<64;x++)data.data.set([(x*11+y*3)%256,(y*17+x*5)%256,(x*7+y*13)%256,40+(x*9+y*7)%216],(y*64+x)*4);c.putImageData(data,0,0);
+    const image=new Image();await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=reject;image.src=canvas.toDataURL('image/png');});
+    renderer=new THREE.WebGLRenderer({antialias:false});renderer.setPixelRatio(1);renderer.setSize(64,32);gl=renderer.getContext();
+    const texture=()=>{const t=new THREE.Texture(image);Object.assign(t,{flipY:false,premultiplyAlpha:true,colorSpace:THREE.NoColorSpace,generateMipmaps:true,minFilter:THREE.LinearMipmapLinearFilter,magFilter:THREE.LinearFilter,wrapS:THREE.ClampToEdgeWrapping,wrapT:THREE.ClampToEdgeWrapping});t.needsUpdate=true;return t;};
+    full=texture();field=texture();close=texture();wrong=texture();wrong.premultiplyAlpha=false;
+    const nativeRender=Object.getOwnPropertyDescriptor(renderer,'render'),fieldSource=field.source,closeSource=close.source,fieldMips=field.mipmaps,closeMips=close.mipmaps;
+    const snapshot=label=>({label,...window.__allocation.snapshot(gl)}),reservation=t=>window.__allocation.textureReservation(gl,renderer.properties.get(t).__webglTexture);
+    const levels=(texture,count,rows)=>{const handle=renderer.properties.get(texture).__webglTexture,fb=gl.createFramebuffer(),previous=gl.getParameter(gl.FRAMEBUFFER_BINDING);
+      try{gl.bindFramebuffer(gl.FRAMEBUFFER,fb);for(let i=0;i<count;i++){const width=64>>i,height=32>>i;gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,handle,i);if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('limited mip readback framebuffer');const bytes=new Uint8Array(width*height*4);gl.readPixels(0,0,width,height,gl.RGBA,gl.UNSIGNED_BYTE,bytes);rows.push({level:i,width,height,pixels:encode(bytes),glError:gl.getError()});}}
+      finally{gl.bindFramebuffer(gl.FRAMEBUFFER,previous);gl.deleteFramebuffer(fb);renderer.resetState();}return rows;};
+    p.snapshots.push(snapshot('renderer-baseline'));renderer.initTexture(full);p.originalLevels=[];levels(full,3,p.originalLevels);owner=createLimitedMipOwner(THREE,renderer);p.field=owner.register(field,{w:64,h:32},'field');p.close=owner.register(close,{w:64,h:32},'close');
+    for(const [tier,texture,count]of [['field',field,3],['close',close,2]]){const r={tier,original:p.originalLevels.slice(0,count),limited:[]};p.levels.push(r);levels(texture,count,r.limited);}
+    p.reservations={full:reservation(full),field:reservation(field),close:reservation(close)};p.snapshots.push(snapshot('initialized'));
+    geo=new THREE.PlaneGeometry(2,2);material=new THREE.ShaderMaterial({uniforms:{uA:{value:full},uB:{value:full},uLod:{value:0},uMaxA:{value:2},uMaxB:{value:1}},
+      vertexShader:'varying vec2 vUv; void main(){vUv=uv;gl_Position=vec4(position,1.0);}',fragmentShader:'uniform sampler2D uA; uniform sampler2D uB; uniform float uLod; uniform float uMaxA; uniform float uMaxB; varying vec2 vUv; void main(){gl_FragColor=vUv.x<0.5?textureLod(uA,vec2(vUv.x*2.0,vUv.y),min(uLod,uMaxA)):textureLod(uB,vec2((vUv.x-0.5)*2.0,vUv.y),min(uLod,uMaxB));}'});
+    const scene=new THREE.Scene();scene.add(new THREE.Mesh(geo,material));const camera=new THREE.Camera(),draw=(a,b,lod)=>{material.uniforms.uA.value=a;material.uniforms.uB.value=b;material.uniforms.uLod.value=lod;renderer.render(scene,camera);gl.finish();const bytes=new Uint8Array(64*32*4);gl.readPixels(0,0,64,32,gl.RGBA,gl.UNSIGNED_BYTE,bytes);return {pixels:encode(bytes),drawCalls:renderer.info.render.calls,drawTriangles:renderer.info.render.triangles,nonuniform:bytes.some((v,i)=>i%4<3&&v!==bytes[i%4]),glError:gl.getError()};};
+    for(const lod of [0,.5,1,1.5,2,5]){const r={lod};p.views.push(r);r.original=draw(full,full,lod);r.limited=draw(field,close,lod);}
+    field.needsUpdate=true;close.needsUpdate=true;p.updates.push({kind:'needsUpdate',first:draw(field,close,.5)});p.snapshots.push(snapshot('updated'));
+    // Genuine damaged native base level: detects missing upload/generation without changing source image or counters.
+    const handle=renderer.properties.get(field).__webglTexture;gl.bindTexture(gl.TEXTURE_2D,handle);gl.texSubImage2D(gl.TEXTURE_2D,0,0,0,64,32,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array(64*32*4));gl.bindTexture(gl.TEXTURE_2D,null);renderer.resetState();p.damaged=draw(field,close,0);field.needsUpdate=true;p.repaired=draw(field,close,0);p.wrongAlpha=draw(wrong,wrong,0);
+    p.ownerBefore=owner.receipt();const extension=gl.getExtension('WEBGL_lose_context');if(!extension)throw Error('limited mip native context loss extension unavailable');
+    const event=type=>new Promise((resolve,reject)=>{const target=renderer.domElement,listener=()=>{clearTimeout(timer);resolve();},timer=setTimeout(()=>{target.removeEventListener(type,listener);reject(Error('limited mip native context event timeout'));},10000);target.addEventListener(type,listener,{once:true});});
+    const lost=event('webglcontextlost');extension.loseContext();await lost;const restored=event('webglcontextrestored');extension.restoreContext();await restored;
+    p.snapshots.push(snapshot('restored-pre-draw'));p.updates.push({kind:'context-restored',first:draw(field,close,.5)});p.ownerAfter=owner.receipt();p.afterContext={field:reservation(field),close:reservation(close)};p.snapshots.push(snapshot('context-restored'));
+    owner.restore();p.restoration={render: ['value','writable','enumerable','configurable','get','set'].every(k=>Object.getOwnPropertyDescriptor(renderer,'render')?.[k]===nativeRender?.[k]),
+      field:field.source===fieldSource&&field.image===image&&field.mipmaps===fieldMips&&field.source.dataReady===true&&field.generateMipmaps===true,
+      close:close.source===closeSource&&close.image===image&&close.mipmaps===closeMips&&close.source.dataReady===true&&close.generateMipmaps===true};
+   }catch(e){p.primary=String(e?.message??e);}
+   finally{if(owner)clean('owner',()=>owner.restore());for(const [name,t]of [['full',full],['field',field],['close',close],['wrong-alpha',wrong]])if(t)clean(name,()=>t.dispose());if(material)clean('material',()=>material.dispose());if(geo)clean('geometry',()=>geo.dispose());if(gl)clean('finish',()=>gl.finish());if(renderer)clean('renderer',()=>renderer.dispose());if(renderer)clean('context',()=>renderer.forceContextLoss());}
+   return p;
+  });result.limitedMipProof=proof;
+  const healthy=r=>r&&r.glError===0&&r.drawCalls>0&&r.drawTriangles===2&&r.nonuniform;
+  check('limited-mip-levels',proof.levels.length===2&&proof.levels.every(r=>r.original.length===r.limited.length&&r.original.every((o,i)=>o.glError===0&&r.limited[i].glError===0&&o.pixels===r.limited[i].pixels)),'actual original vs limited retained mip bytes');
+  const exactSlots=(snapshot,reservation,sizes)=>{const rows=snapshot?.textureSlots?.filter(r=>r.texture===reservation?.id)||[];return rows.length===1&&!rows[0].pendingDelete&&JSON.stringify(Object.entries(rows[0].slots))===JSON.stringify(sizes.map((bytes,i)=>['3553:'+i,bytes]));};
+  const initialized=proof.snapshots.find(s=>s.label==='initialized'),restored=proof.snapshots.find(s=>s.label==='context-restored'),baseline=proof.snapshots.find(s=>s.label==='renderer-baseline'),restoredBaseline=proof.snapshots.find(s=>s.label==='restored-pre-draw');
+  const addedOnly=(before,after,expected)=>{const ids=new Set(before?.textureSlots?.map(r=>r.texture)||[]),added=after?.textureSlots?.filter(r=>!ids.has(r.texture)).map(r=>r.texture).sort((a,b)=>a-b)||[];return expected.every(Number.isInteger)&&JSON.stringify(added)===JSON.stringify([...expected].sort((a,b)=>a-b));};
+  check('limited-mip-allocation',proof.reservations?.field.bytes===10752&&proof.reservations?.close.bytes===10240&&proof.field?.levels===3&&proof.close?.levels===2&&proof.afterContext?.field.bytes===10752&&proof.afterContext?.close.bytes===10240&&exactSlots(initialized,proof.reservations?.field,[8192,2048,512])&&exactSlots(initialized,proof.reservations?.close,[8192,2048])&&exactSlots(restored,proof.afterContext?.field,[8192,2048,512])&&exactSlots(restored,proof.afterContext?.close,[8192,2048])&&baseline?.textureSlots.length===4&&addedOnly(baseline,initialized,['full','field','close'].map(k=>proof.reservations?.[k]?.id))&&addedOnly(restoredBaseline,restored,['field','close'].map(k=>proof.afterContext?.[k]?.id))&&proof.snapshots.every(s=>!s.unknown.length),'exact native level slots and baseline-relative IDs before/after restoration; no native source texture; context-loss history is conservative, not a physical-release claim');
+  check('limited-mip-first-frames',proof.views.length===6&&proof.views.every(r=>healthy(r.original)&&healthy(r.limited)&&r.original.pixels===r.limited.pixels)&&proof.updates.length===2&&proof.updates.every(r=>healthy(r.first)&&r.first.pixels===proof.views[1].original.pixels)&&proof.ownerAfter?.epoch===1&&!proof.ownerAfter.failed,'unit0/unit1/fractional/clamped/updated/restored first frame exact');
+  check('limited-mip-rejecting-controls',healthy(proof.damaged)&&healthy(proof.repaired)&&healthy(proof.wrongAlpha)&&proof.damaged.pixels!==proof.views[0]?.original.pixels&&proof.wrongAlpha.pixels!==proof.views[0]?.original.pixels&&proof.repaired.pixels===proof.views[0]?.original.pixels,'native missing base and alpha drift detected; same source repairs exactly');
+  check('limited-mip-restoration',Object.values(proof.restoration||{}).length===3&&Object.values(proof.restoration).every(Boolean)&&proof.cleanup.every(r=>r.ok),'original texture/image/mipmap/source fields and renderer descriptor restored independently');
+  check('limited-mip-errors',!proof.primary&&errors.length===0,JSON.stringify({primary:proof.primary,errors}));
+ }finally{await ctx.close();}
 }
