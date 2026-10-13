@@ -25,6 +25,51 @@ export const DEPTH_BLEND = 'smoothstep(0.08, 0.40, abs(zDistance - focusDistance
 const LOW_SCALE = 0.7;
 const AUTO_LEVELS = [2, 1.6, 1.3, 1, 0.85, 0.7, 0.6];
 
+export function pinPostResourceDiagnostic(input) {
+  if (input === null) return null;
+  const fail = () => { throw new Error('Field: explicit synchronous diagnostic Post preparation required'); };
+  if (typeof input !== 'object' || Object.getPrototypeOf(input) !== Object.prototype || Reflect.ownKeys(input).length !== 2) fail();
+  const descriptors = Object.getOwnPropertyDescriptors(input), bytes = descriptors.pixelBytes, prepare = descriptors.prepare;
+  if (!bytes || !prepare || !Object.hasOwn(bytes, 'value') || !Object.hasOwn(prepare, 'value')
+    || !Number.isSafeInteger(bytes.value) || bytes.value < 44 || bytes.value > 250000000
+    || typeof prepare.value !== 'function' || Object.prototype.toString.call(prepare.value) === '[object AsyncFunction]') fail();
+  return Object.freeze({ pixelBytes: bytes.value, prepare: prepare.value });
+}
+
+// Explicit diagnostic hypothesis only. Count rounded targets and every intermediate canvas size.
+// Pixel bytes exclude fixed textures/buffers; the caller must prove that separate fixed envelope.
+export function derivePostResourceScale({ width, height, priorWidth, priorHeight, requestedScale, pixelBytes }) {
+  if (![width, height, priorWidth, priorHeight].every(n => Number.isSafeInteger(n) && n > 0)
+    || !Number.isFinite(requestedScale) || requestedScale <= 0
+    || !Number.isSafeInteger(pixelBytes) || pixelBytes < 44 || pixelBytes > 250000000) {
+    throw new Error('Post resource: invalid dimensions, scale or diagnostic pixel envelope.');
+  }
+  const footprint = scale => {
+    const rw = Math.max(1, Math.round(width * scale)), rh = Math.max(1, Math.round(height * scale));
+    const dw = Math.floor(width * scale), dh = Math.floor(height * scale);
+    const iw = Math.floor(priorWidth * scale), ih = Math.floor(priorHeight * scale);
+    const renderPixels = rw * rh, quarterPixels = Math.max(1, Math.floor(rw / 4)) * Math.max(1, Math.floor(rh / 4));
+    const defaultPixels = dw * dh, intermediatePixels = iw * ih;
+    // Colour + both depth owners + two quarter targets + default surfaces; no MSAA.
+    const lensBytes = 16 * renderPixels + 16 * quarterPixels + 12 * defaultPixels;
+    const resizeBytes = 24 * Math.max(defaultPixels, intermediatePixels);
+    return { scale, target: [rw, rh], canvas: [dw, dh], intermediate: [iw, ih],
+      renderPixels, quarterPixels, defaultPixels, intermediatePixels, lensBytes, resizeBytes };
+  };
+  const positive = r => [...r.canvas, ...r.intermediate].every(n => Number.isSafeInteger(n) && n > 0);
+  const fits = r => positive(r) && [r.lensBytes, r.resizeBytes].every(n => Number.isSafeInteger(n) && n <= pixelBytes);
+  let admission = footprint(requestedScale);
+  if (!fits(admission)) {
+    let lo = Math.max(1 / width, 1 / height, 1 / priorWidth, 1 / priorHeight), hi = requestedScale;
+    for (let i = 0; i < 4 && !positive(footprint(lo)); i++) lo += Math.max(Number.MIN_VALUE, lo * Number.EPSILON);
+    if (lo > hi || !fits(footprint(lo))) throw new Error('Post resource: diagnostic envelope cannot admit a positive canvas.');
+    for (let i = 0; i < 64; i++) { const mid = (lo + hi) / 2; if (fits(footprint(mid))) lo = mid; else hi = mid; }
+    admission = footprint(lo);
+    if (lo <= 0 || !fits(admission)) throw new Error('Post resource: diagnostic envelope cannot admit a positive scale.');
+  }
+  return { ...admission, requestedScale, pixelBytes };
+}
+
 const fullscreenVert = /* glsl */ `
   varying vec2 vUv;
   void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
@@ -35,7 +80,10 @@ function fsMaterial(fragmentShader, uniforms) {
 }
 
 export class Post {
-  constructor(renderer, { mode = 'auto' } = {}) {
+  constructor(renderer, { mode = 'auto', diagnosticPixelBytes = null } = {}) {
+    if (diagnosticPixelBytes !== null && (!Number.isSafeInteger(diagnosticPixelBytes)
+      || diagnosticPixelBytes < 44 || diagnosticPixelBytes > 250000000)) throw new Error('Post resource: invalid diagnostic pixel envelope.');
+    Object.defineProperty(this, 'diagnosticPixelBytes', { value: diagnosticPixelBytes, enumerable: true });
     this.renderer = renderer;
     this.maxScale = Math.min(window.devicePixelRatio || 1, 2);
     this.levels = AUTO_LEVELS.filter((l) => l <= this.maxScale + 1e-6);
@@ -43,9 +91,11 @@ export class Post {
     this.mode = mode;
     this.level = 0;
     this.scale = this.maxScale;
+    this.requestedScale = this.scale;
     this.samples = this._samplesFor(this.scale);
-    this.width = 1;
-    this.height = 1;
+    const initialSize = diagnosticPixelBytes === null ? null : renderer.getSize(new THREE.Vector2());
+    this.width = initialSize?.x ?? 1;
+    this.height = initialSize?.y ?? 1;
     this.enabled = true;
     this.soldierView = null;
     this.quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2));
@@ -169,6 +219,7 @@ export class Post {
     this.levels.forEach((l, i) => { if (Math.abs(l - want) < Math.abs(this.levels[best] - want)) best = i; });
     this.level = best;
     this.scale = this.levels[best];
+    this.requestedScale = this.scale;
     this.samplesLog.length = 0;
     this._apply();
     return true;
@@ -178,6 +229,7 @@ export class Post {
     this.mode = QUALITY_MODES.includes(mode) ? mode : 'auto';
     this.level = 0;
     this.scale = this.mode === 'low' ? LOW_SCALE : this.maxScale;
+    this.requestedScale = this.scale;
     this.samplesLog.length = 0;
     this.blockedUntil.clear();
     this.probe = null;
@@ -186,6 +238,12 @@ export class Post {
   }
 
   _apply() {
+    if (this.diagnosticPixelBytes !== null) {
+      const prior = this.renderer.getSize(new THREE.Vector2());
+      this.resourceAdmission = derivePostResourceScale({ width: this.width, height: this.height,
+        priorWidth: prior.x, priorHeight: prior.y, requestedScale: this.requestedScale, pixelBytes: this.diagnosticPixelBytes });
+      this.scale = this.resourceAdmission.scale;
+    }
     this.renderer.setPixelRatio(this.scale);
     this.renderer.setSize(this.width, this.height, false);
     const n = this._samplesFor(this.scale);
@@ -317,6 +375,7 @@ export class Post {
         this.holdUntil = now + 60000;
         this.level = p.level;
         this.scale = this.levels[p.level];
+        this.requestedScale = this.scale;
         log.length = 0;
         this._apply();
         return;
@@ -333,6 +392,7 @@ export class Post {
     }
     this.level = next;
     this.scale = this.levels[next];
+    this.requestedScale = this.scale;
     this.adjusted = true;
     log.length = 0;
     this._apply();

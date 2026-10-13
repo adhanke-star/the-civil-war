@@ -76,6 +76,96 @@ export async function sceneAllocationControls({browser,url,check,result,watchErr
   await sceneStressOwnerControls({browser,url,check,result,watchErrors});
   await sceneStressOwnerControls({browser,url,check,result,watchErrors,mode:'terminal'});
   await canonicalTerrainControls({browser,url,check,result,watchErrors});
+  await postPixelResourceControls({browser,url,check,result,watchErrors});
+}
+
+// Focused native Post prerequisite. No full-art fixed envelope or whole-scene acceptance claim.
+async function postPixelResourceControls({browser,url,check,result,watchErrors}){
+ const ctx=await browser.newContext({viewport:{width:1366,height:1024},deviceScaleFactor:2}),errors=[];let page;
+ try{await ctx.addInitScript(installAllocationObserver,{ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),nativeJournal:true});
+  page=await ctx.newPage();watchErrors(page,url,errors);await page.goto(url+'?nosw');await page.waitForFunction(()=>window.__entry&&!window.__entry.importing,null,{timeout:60000});
+  const proof=await page.evaluate(async()=>{
+   const THREE=await import('three'),{Post}=await import('./src/render/post.js'),{sampleSceneAllocations}=await import('./tools/bake/scene-allocation.mjs'),{installSceneLifetimeGate}=await import('./tools/bake/inactive-figures.mjs');
+   const proof={pixelBytes:10562144,fixedHypothesis:239437856,kind:'small native Post/lifetime prerequisite; actual full-art fixed envelope and whole110 acceptance UNRUN',cases:[],errors:[]};
+   const attempt=(rows,label,fn)=>{try{fn();rows.push({label,ok:true});}catch(e){rows.push({label,ok:false,error:String(e?.message??e)});}};
+   const encode=bytes=>{let s='';for(let i=0;i<bytes.length;i+=16384)s+=String.fromCharCode(...bytes.subarray(i,i+16384));return btoa(s);};
+   for(const bounded of [true,false]){let renderer,post,geometry,material,lifetime,gl,sequence=0;const receipt={bounded,states:[],frames:[],cleanup:[],complete:false};proof.cases.push(receipt);
+    try{renderer=new THREE.WebGLRenderer({antialias:false,stencil:false});gl=renderer.getContext();receipt.rendererOnly=window.__allocation.snapshot(gl);post=new Post(renderer,{mode:'high',...(bounded?{diagnosticPixelBytes:proof.pixelBytes}:{})});
+     const scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,10);camera.position.z=2;
+     geometry=new THREE.PlaneGeometry(1,1);material=new THREE.MeshBasicMaterial({color:0x86734c,side:THREE.DoubleSide});const mesh=new THREE.Mesh(geometry,material);mesh.name='post-resource-plane';scene.add(mesh);
+     const scope={__game:{post,scene,game:{baked:{atlases:{}}}},__allocation:window.__allocation};
+     const fixedArrays=[...new Set([geometry,post.quad.geometry].flatMap(g=>[...Object.values(g.attributes).map(a=>a.array),g.index.array]))];
+     receipt.fixedArrayBytes=fixedArrays.reduce((n,a)=>n+a.byteLength,0);receipt.fixedBuffers=[];receipt.postTextures=[];
+     const sample=label=>{for(const a of fixedArrays)for(const r of window.__allocation.bufferReservations(gl,a)){
+       if(r.bytes!==a.byteLength)throw Error('Post prerequisite: fixed buffer source bytes differ');
+       if(!receipt.fixedBuffers.some(b=>b.id===r.id))receipt.fixedBuffers.push({...r,sourceBytes:a.byteLength});}
+      for(const target of [post.rtScene,post.rtSmall,post.rtBlur])for(const texture of [target.texture,target.depthTexture].filter(Boolean)){
+       const native=renderer.properties.get(texture).__webglTexture,r=native&&window.__allocation.textureReservation(gl,native);
+       if(r&&!receipt.postTextures.includes(r.id))receipt.postTextures.push(r.id);}
+      const s={label,sequence:++sequence,...sampleSceneAllocations(scope)};receipt.states.push(s);return s;};
+     receipt.attributes=gl.getContextAttributes();receipt.constructor=sample('constructor');
+     const draw=()=>{renderer.info.reset();post.render(scene,camera);gl.finish();if(gl.getError()!==0)throw Error('Post prerequisite: native draw failed');};
+     const frame=label=>{draw();const bytes=new Uint8Array(gl.drawingBufferWidth*gl.drawingBufferHeight*4);gl.readPixels(0,0,gl.drawingBufferWidth,gl.drawingBufferHeight,gl.RGBA,gl.UNSIGNED_BYTE,bytes);
+      const r={label,width:gl.drawingBufferWidth,height:gl.drawingBufferHeight,pixels:encode(bytes),glError:gl.getError(),drawCalls:renderer.info.render.calls,nonuniform:bytes.some((v,i)=>v!==bytes[i%4])};receipt.frames.push(r);return r;};
+     if(bounded){lifetime=installSceneLifetimeGate(scope,{sample,finishEachResize:true,finishLensRetirement:true});receipt.cycles=lifetime.cycles;receipt.admissions=[];
+      const admit=label=>{const a=structuredClone(post.resourceAdmission);receipt.admissions.push({label,...a,actualCanvas:[gl.drawingBufferWidth,gl.drawingBufferHeight],targets:[[post.rtScene.width,post.rtScene.height],[post.rtSmall.width,post.rtSmall.height],[post.rtBlur.width,post.rtBlur.height]],requested:post.requestedScale});sample(label);};
+      post.setSize(1366,1024);admit('wide');draw();sample('wide-drawn');
+      for(let i=0;i<3;i++){post.beginSoldierView(camera,2);draw();sample('lens-'+i);post.endSoldierView();draw();sample('lens-retired-'+i);}
+      post.setMode('low');admit('low-wide');post.setSize(320,240);admit('narrow-intermediate');post.setMode('high');admit('narrow-high');
+      post.setSize(1366,1024);admit('opposed-growth');post.setMode('auto');post.startFromTier(3);admit('tier');
+      post.level=3;post.scale=post.requestedScale=post.levels[3];post._apply();for(let i=0;i<201;i++)post.govern(1/60,i*15);admit('governor');
+      post.setMode('high');post.setSize(320,240);post.setSize(320,240);admit('requested-high-recovered');frame('same-resolution');sample('same-resolution-drawn');
+      lifetime.restore();receipt.descriptorsRestored=!Object.hasOwn(post,'_apply')&&!Object.hasOwn(post,'beginSoldierView')&&!Object.hasOwn(post,'endSoldierView');
+     }else{post.setSize(320,240);frame('same-resolution');sample('same-resolution-drawn');post.setSize(1366,1024);draw();sample('unclamped-wide');}
+     receipt.complete=true;
+    }catch(e){receipt.primary=String(e?.message??e);proof.errors.push(receipt.primary);}
+    finally{if(lifetime)attempt(receipt.cleanup,'lifetime',()=>lifetime.restore());if(post){attempt(receipt.cleanup,'lens',()=>post.endSoldierView());for(const[k,t]of [['scene',post.rtScene],['small',post.rtSmall],['blur',post.rtBlur]])attempt(receipt.cleanup,'target-'+k,()=>t.dispose());
+      for(const[k,m]of [['down',post.downMat],['blur',post.blurMat],['final',post.finalMat]])attempt(receipt.cleanup,'material-'+k,()=>m.dispose());attempt(receipt.cleanup,'quad',()=>post.quad.geometry.dispose());}
+     if(geometry)attempt(receipt.cleanup,'geometry',()=>geometry.dispose());if(material)attempt(receipt.cleanup,'material',()=>material.dispose());if(renderer)attempt(receipt.cleanup,'renderer',()=>renderer.dispose());if(gl){attempt(receipt.cleanup,'finish',()=>gl.finish());if(post)attempt(receipt.cleanup,'cleanup-observation',()=>{
+       const scene=new THREE.Scene(),s={label:'cleanup',sequence:++sequence,...sampleSceneAllocations({__game:{post,scene,game:{baked:{atlases:{}}}},__allocation:window.__allocation})};receipt.states.push(s);});}if(renderer)attempt(receipt.cleanup,'context',()=>renderer.forceContextLoss());}
+    receipt.complete=receipt.complete&&!receipt.primary&&receipt.cleanup.every(r=>r.ok);
+   }return proof;
+  });
+  result.postPixelResourceProof=proof;const c=proof.cases.find(r=>r.bounded),original=proof.cases.find(r=>!r.bounded),healthy=s=>s.glError===0&&s.allocation.unknown.length===0&&s.unmappedBufferBytes===0;
+  const nativeClean=proof.cases.length===2&&proof.cases.every(r=>r.complete&&r.states.every(healthy)&&r.attributes.antialias===false&&r.attributes.stencil===false&&r.attributes.depth===true);
+  const admitted=c?.admissions?.length===8&&c.admissions.every(r=>r.canvas.every(n=>n>0)&&r.intermediate.every(n=>n>0)&&r.actualCanvas.every((n,i)=>n===r.canvas[i])&&r.targets[0].every((n,i)=>n===r.target[i])&&r.lensBytes<=proof.pixelBytes&&r.resizeBytes<=proof.pixelBytes);
+  // Three WebGLState creates exactly four 1x1 RGBA8 defaults: 2D, six cube faces, array, 3D.
+  // Bind their identities before Post exists; never subtract arbitrary texture allocations.
+  const boundedNative=receipt=>{const base=receipt?.rendererOnly,defaults=base?.textureSlots??[],ids=new Set(defaults.map(t=>t.texture));
+   const defaultShape=defaults.length===4&&defaults.map(t=>Object.values(t.slots).length).sort((a,b)=>a-b).join(',')==='1,1,1,6'
+    &&defaults.every(t=>!t.pendingDelete&&Object.values(t.slots).every(n=>n===4))&&base.byKind.texture===36&&base.byKind.buffer===0&&base.byKind.renderbuffer===0
+    &&base.signatures.length===9&&base.signatures.every(s=>ids.has(s.texture)&&s.call==='image'&&s.raw.format===6408&&s.raw.type===5121&&s.canonical.w===1&&s.canonical.h===1&&s.canonical.d===1&&s.canonical.level===0&&s.canonical.bytes===4);
+   const buffers=new Map((receipt?.fixedBuffers??[]).map(b=>[b.id,b.sourceBytes])),pixelIds=new Set(receipt?.postTextures??[]);
+   const fixed=36+(receipt?.fixedArrayBytes??0),ceiling=proof.pixelBytes+fixed;
+   const journal=receipt?.states?.at(-1)?.allocation.nativeEvents??[];
+   const nativeSources=journal.every(e=>e.operation!=='reserve'||(e.kind==='buffer'?buffers.get(e.id)===e.bytes
+    :e.kind==='texture'?ids.has(e.id)||pixelIds.has(e.id)
+    :e.kind==='renderbuffer'?e.detail?.samples===1&&[33189,33190,36012].includes(e.detail.format):false));
+   const classified=defaultShape&&nativeSources&&receipt?.fixedArrayBytes===280&&buffers.size===8&&[...buffers.values()].reduce((n,b)=>n+b,0)===280
+    &&receipt.states.every(s=>s.allocation.bufferSlots.every(b=>buffers.get(b.id)===b.bytes)
+     &&s.allocation.textureSlots.every(t=>ids.has(t.texture)||pixelIds.has(t.texture)));
+   return {classified,fixed,ceiling,maxNative:Math.max(base?.gpuPeak??Infinity,...(receipt?.states??[]).map(s=>s.allocation.gpuPeak)),within:classified
+    &&base.gpuCurrent<=ceiling&&base.gpuPeak<=ceiling&&receipt.states.every(s=>s.allocation.gpuCurrent<=ceiling&&s.allocation.gpuPeak<=ceiling)};};
+  const budget=boundedNative(c);if(c)c.nativeBudget=budget;
+  check('post-resource-native-admission',nativeClean&&admitted&&budget.within,JSON.stringify({nativeClean,admitted,budget,errors:proof.errors}));
+  check('post-resource-native-requested-quality',c?.admissions?.at(-1)?.requested===2&&c.admissions.at(-1).scale===2&&c.admissions.find(a=>a.label==='governor')?.requested===1.3,JSON.stringify(c?.admissions));
+  check('post-resource-native-resize-completion',c?.cycles?.filter(r=>r.kind==='resize').length>=8&&c.cycles.filter(r=>r.kind==='resize').every(r=>r.complete&&r.samples.some(s=>s.label==='resize-default-1-settled')&&r.samples.some(s=>s.label==='resize-default-2-settled')),JSON.stringify(c?.cycles?.map(r=>({kind:r.kind,complete:r.complete,labels:r.samples.map(s=>s.label)}))));
+  check('post-resource-native-lens-cycles',c?.cycles?.filter(r=>r.kind==='lens').length===3&&c.cycles.filter(r=>r.kind==='lens').every(r=>r.complete&&r.samples.at(-1)?.label==='lens-retired-settled'&&r.samples.at(-1).observation.allocation.pendingDeleteBytes===0),JSON.stringify(c?.cycles?.filter(r=>r.kind==='lens').map(r=>({complete:r.complete,labels:r.samples.map(s=>s.label)}))));
+  const f=c?.frames?.[0],g=original?.frames?.[0];check('post-resource-native-original-pixels',f?.glError===0&&g?.glError===0&&f.nonuniform&&g.nonuniform&&f.drawCalls>0&&g.drawCalls>0&&f.width===g.width&&f.height===g.height&&f.pixels===g.pixels,'whole native RGBA equality at original High320x240; small fixture, painted world unproved');
+  check('post-resource-native-unclamped-control',original?.states?.find(s=>s.label==='unclamped-wide')?.allocation.gpuPeak>proof.pixelBytes&&c?.descriptorsRestored===true,'actual uncapped native viewport exceeds the hypothesis; owned descriptors restore');
+  let replay=true;for(const receipt of proof.cases){try{const history=createSceneHistory(),compact={history,states:receipt.states.map(s=>compactSceneSample(history,s))};replay&&=isDeepStrictEqual(expandSceneContext(compact).states,receipt.states);receipt.nativeHistory=compact;}catch(e){replay=false;receipt.replayError=String(e?.message??e);}}
+  const retiredReceipt=receipt=>{const final=receipt?.states?.at(-1)?.allocation,defaults=new Set((receipt?.rendererOnly?.textureSlots??[]).map(t=>t.texture));
+   return final&&Array.isArray(receipt.postTextures)&&receipt.states.at(-1).label==='cleanup'&&final.byKind.buffer===0&&final.byKind.renderbuffer===0&&final.pendingDeleteBytes===0
+    &&final.textureSlots.every(t=>defaults.has(t.texture)&&!receipt.postTextures.includes(t.texture)&&!t.pendingDelete&&Object.values(t.slots).every(n=>n===4));};
+  const retired=proof.cases.every(retiredReceipt);
+  let rejected=false;if(c?.states?.at(-1)?.allocation&&c.postTextures?.length){
+   const excess=structuredClone(c);excess.states.at(-1).allocation.gpuPeak=budget.ceiling+1;
+   const unknown=structuredClone(c);unknown.states.at(-1).allocation.textureSlots.push({texture:999999,slots:{'3553:0':4}});
+   const leaked=structuredClone(c);leaked.states.at(-1).allocation.textureSlots.push({texture:c.postTextures[0],slots:{'3553:0':8}});
+   const liveBuffer=structuredClone(c);liveBuffer.states.at(-1).allocation.byKind.buffer=4;
+   rejected=!boundedNative(excess).within&&!boundedNative(unknown).within&&!retiredReceipt(leaked)&&!retiredReceipt(liveBuffer);}
+  check('post-resource-native-history-cleanup',nativeClean&&replay&&retired&&rejected&&errors.length===0,JSON.stringify({replay,retired,rejected,errors}));
+ }finally{await ctx.close();}
 }
 
 // Geometry/shader prerequisite with synthetic spatial ground inputs; no painted-art or scene-budget claim.

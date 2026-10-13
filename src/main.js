@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { loadTerrainData } from './world/terrain.js';
 import { buildWorld } from './world/world.js';
-import { Post, QUALITY_MODES } from './render/post.js';
+import { Post, QUALITY_MODES, pinPostResourceDiagnostic } from './render/post.js';
 import { RtsCamera } from './render/rts-camera.js';
 import { SoldierView } from './render/soldier-view.js';
 import { Game } from './game.js';
@@ -40,9 +40,10 @@ import { FALLEN } from './units/soldier-mesh.js';
 let fieldClaimed = false;
 // Importing this module has no field side effects. The owner commits navigation only after recheck.
 // A campaign launch ({ campaign: { slot, replay } }, from ?campaign=<slot>[&replay]) loads that slot's next phase.
-export async function startField({ manifest = null, campaign = null, isCurrent = () => true, onAdmitted = () => {}, diagnosticTerrainFactory = null } = {}) {
+export async function startField({ manifest = null, campaign = null, isCurrent = () => true, onAdmitted = () => {}, diagnosticTerrainFactory = null, diagnosticPost = null } = {}) {
   if (diagnosticTerrainFactory !== null && (typeof diagnosticTerrainFactory !== 'function'
     || Object.prototype.toString.call(diagnosticTerrainFactory) === '[object AsyncFunction]')) throw new Error('Field: synchronous diagnostic terrain factory required');
+  const postDiagnostic = pinPostResourceDiagnostic(diagnosticPost);
   if (!isCurrent()) throw new Error('Practice: deployment review was cancelled.');
   if (campaign && (manifest || ![1, 2, 3].includes(campaign.slot)
     || ['intro', 'practice', 'battle', 'sandbox', 'tune'].some((key) => new URLSearchParams(location.search).has(key)))) {
@@ -126,7 +127,15 @@ renderer.autoClear = false;
 renderer.info.autoReset = false;
 // ?quality=auto|high|low overrides the saved choice for this visit (tests use low) without saving it.
 const urlQuality = new URLSearchParams(location.search).get('quality');
-const post = new Post(renderer, { mode: QUALITY_MODES.includes(urlQuality) ? urlQuality : loadPref('cw.quality', 'auto') });
+const post = new Post(renderer, { mode: QUALITY_MODES.includes(urlQuality) ? urlQuality : loadPref('cw.quality', 'auto'),
+  diagnosticPixelBytes: postDiagnostic?.pixelBytes ?? null });
+if (postDiagnostic) {
+  const prepared = postDiagnostic.prepare({ post, renderer });
+  if (prepared !== undefined) {
+    if (prepared && typeof prepared.then === 'function') Promise.resolve(prepared).catch(() => {});
+    throw new Error('Field: diagnostic Post preparation must complete synchronously without a return value');
+  }
+}
 post.setSize(window.innerWidth, window.innerHeight);
 // GPU tier picks Auto's starting level; benchmark tables are vendored (no CDN). Failure keeps High.
 const gpuTier = import('detect-gpu')

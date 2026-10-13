@@ -118,18 +118,22 @@ export function installRenderGate(post) {
   }};
 }
 /** Explicit diagnostic only: retire native storage before delegating the unchanged resize. */
-export function installSceneLifetimeGate(scope,{sample}={}) {
+export function installSceneLifetimeGate(scope,{sample,finishEachResize=false,finishLensRetirement=false}={}) {
   const post=scope?.__game?.post||scope?.post,renderer=post?.renderer,gl=renderer?.getContext?.();
-  if(typeof sample!=='function'||typeof post?._apply!=='function'||typeof renderer?.setSize!=='function'
+  if(typeof finishEachResize!=='boolean'||typeof finishLensRetirement!=='boolean'||typeof sample!=='function'||typeof post?._apply!=='function'||typeof renderer?.setSize!=='function'
     ||typeof gl?.finish!=='function'||typeof gl?.getError!=='function'||typeof gl?.isContextLost!=='function')throw Error('scene lifetime: missing synchronous native owner');
   const keys=['rtScene','rtSmall','rtBlur'],targets=keys.map(k=>post[k]),colours=targets.map(t=>t?.texture),
     native=post._apply,descriptor=Object.getOwnPropertyDescriptor(post,'_apply'),initialSize=renderer.setSize,initialSizeDescriptor=Object.getOwnPropertyDescriptor(renderer,'setSize');
   if(targets.some(t=>!t?.isWebGLRenderTarget||typeof t.dispose!=='function')||new Set(targets).size!==3
     ||descriptor?.configurable===false||initialSizeDescriptor?.configurable===false)throw Error('scene lifetime: ambiguous render target ownership');
+  const endNative=post.endSoldierView,beginNative=post.beginSoldierView,endDescriptor=Object.getOwnPropertyDescriptor(post,'endSoldierView'),beginDescriptor=Object.getOwnPropertyDescriptor(post,'beginSoldierView');
+  if(finishLensRetirement&&(typeof endNative!=='function'||typeof beginNative!=='function'||[endNative,beginNative].some(f=>Object.prototype.toString.call(f)==='[object AsyncFunction]')||endDescriptor?.configurable===false||beginDescriptor?.configurable===false
+    ||!Object.isExtensible(post)&&(!endDescriptor||!beginDescriptor)))throw Error('scene lifetime: ambiguous lens ownership');
   const same=(a,b)=>['value','get','set','writable','enumerable','configurable'].every(k=>a?.[k]===b?.[k]);
-  const cycles=[];let restored=false,failure,failed=false,busy=false,activeDepth;
-  const owner=()=>{if(!same(Object.getOwnPropertyDescriptor(post,'_apply'),installed)||renderer.setSize!==initialSize||!same(Object.getOwnPropertyDescriptor(renderer,'setSize'),initialSizeDescriptor)||post.renderer!==renderer||renderer.getContext()!==gl||keys.some((k,i)=>post[k]!==targets[i]||targets[i].texture!==colours[i])
-    ||busy&&post.rtScene.depthTexture!==activeDepth)throw Error('scene lifetime: native owner changed');};
+  const cycles=[];let restored=false,failure,failed=false,busy=false,activeDepth,activeSize=null,endInstalled=null,beginInstalled=null,entering=false;
+  const owner=()=>{if(!same(Object.getOwnPropertyDescriptor(post,'_apply'),installed)||renderer.setSize!==(activeSize?.value??initialSize)||!same(Object.getOwnPropertyDescriptor(renderer,'setSize'),activeSize??initialSizeDescriptor)||post.renderer!==renderer||renderer.getContext()!==gl||keys.some((k,i)=>post[k]!==targets[i]||targets[i].texture!==colours[i])
+    ||busy&&post.rtScene.depthTexture!==activeDepth||finishLensRetirement&&(!same(Object.getOwnPropertyDescriptor(post,'endSoldierView'),endInstalled??endDescriptor)
+      ||!same(Object.getOwnPropertyDescriptor(post,'beginSoldierView'),beginInstalled??beginDescriptor)))throw Error('scene lifetime: native owner changed');};
   const capture=(cycle,label)=>{const value=sample(label);if(!value||typeof value!=='object'||typeof value.then==='function')throw Error('scene lifetime: synchronous sample required');
     cycle.samples.push({label,observation:value});if(value.glError!==0||!Array.isArray(value.allocation?.unknown)||value.allocation.unknown.length||value.unmappedBufferBytes!==0)throw Error('scene lifetime: unproved native allocation sample');return value;};
   const finish=(cycle,label)=>{owner();const lost=gl.isContextLost(),error=gl.getError();cycle.checks.push({label,lost,error});
@@ -149,12 +153,14 @@ export function installSceneLifetimeGate(scope,{sample}={}) {
     if(sizeDescriptor?.configurable===false)throw Error('scene lifetime: unwrappable canvas resize');
     let sizeCount=0,delegatedError,delegatedFailed=false,value;
     const sizeWrapped=function(...sizeArgs){if(this!==renderer)throw Error('scene lifetime: foreign canvas receiver');
-      const result=sizeNative.apply(this,sizeArgs);capture(cycle,'resize-default-'+(++sizeCount));return result;};
+      const result=sizeNative.apply(this,sizeArgs),label='resize-default-'+(++sizeCount);capture(cycle,label);
+      if(finishEachResize){finish(cycle,label);capture(cycle,label+'-settled');}return result;};
     const sizeInstalled={value:sizeWrapped,writable:true,enumerable:sizeDescriptor?.enumerable??true,configurable:true};
     Object.defineProperty(renderer,'setSize',sizeInstalled);
+    activeSize=sizeInstalled;
     try{value=native.apply(this,args);}catch(error){delegatedError=error;delegatedFailed=true;}
     finally{if(!same(Object.getOwnPropertyDescriptor(renderer,'setSize'),sizeInstalled)){if(!delegatedFailed)delegatedError=Error('scene lifetime: canvas wrapper ownership changed');delegatedFailed=true;}
-      else if(sizeDescriptor)Object.defineProperty(renderer,'setSize',sizeDescriptor);else delete renderer.setSize;}
+      else if(sizeDescriptor)Object.defineProperty(renderer,'setSize',sizeDescriptor);else delete renderer.setSize;activeSize=null;}
     if(delegatedFailed)throw delegatedError;
     if(value&&typeof value.then==='function')throw Error('scene lifetime: synchronous native delegation required');
     if(!sizeCount)throw Error('scene lifetime: native canvas resize not delegated');
@@ -162,12 +168,39 @@ export function installSceneLifetimeGate(scope,{sample}={}) {
   });};
   const installed={value:wrapped,writable:true,enumerable:descriptor?.enumerable??true,configurable:true};
   Object.defineProperty(post,'_apply',installed);
+  const restoreDescriptor=(key,prior)=>{if(prior)Object.defineProperty(post,key,prior);else delete post[key];};
+  if(finishLensRetirement){
+    const end=function(...args){if(this!==post)throw Error('scene lifetime: foreign lens receiver');if(failed)throw failure;if(restored||busy)throw Error('scene lifetime: unavailable or reentrant gate');owner();
+      if(!post.soldierView){const lens=post.soldierView,depth=post.rtScene.depthTexture;try{const value=endNative.apply(this,args);
+        if(value&&typeof value.then==='function'){Promise.resolve(value).catch(()=>{});throw Error('scene lifetime: synchronous lens retirement required');}
+        owner();if(post.soldierView!==lens||post.rtScene.depthTexture!==depth)throw Error('scene lifetime: no-op lens owner changed');return value;
+      }catch(error){failure=error;failed=true;throw error;}}
+      return run('lens',cycle=>{const depth=post.soldierView.depth;
+        if(!depth?.isDepthTexture||post.rtScene.depthTexture!==depth)throw Error('scene lifetime: unproved lens depth owner');
+        capture(cycle,'lens-before');const value=endNative.apply(this,args);
+        if(value&&typeof value.then==='function'){Promise.resolve(value).catch(()=>{});throw Error('scene lifetime: synchronous lens retirement required');}
+        if(post.soldierView!==null||post.rtScene.depthTexture!==null)throw Error('scene lifetime: retired lens still published');activeDepth=null;
+        capture(cycle,'lens-retired');finish(cycle,'lens-retired');capture(cycle,'lens-retired-settled');return value;
+      });};
+    const begin=function(...args){if(this!==post)throw Error('scene lifetime: foreign lens receiver');if(failed)throw failure;if(restored||busy||entering)throw Error('scene lifetime: unavailable or reentrant gate');owner();
+      entering=true;try{const value=beginNative.apply(this,args);if(value&&typeof value.then==='function'){Promise.resolve(value).catch(()=>{});throw Error('scene lifetime: synchronous lens allocation required');}owner();
+        if(!post.soldierView?.depth?.isDepthTexture||post.rtScene.depthTexture!==post.soldierView.depth)throw Error('scene lifetime: unproved lens allocation');return value;}
+      catch(error){failure=error;failed=true;throw error;}finally{entering=false;}};
+    endInstalled={value:end,writable:true,enumerable:endDescriptor?.enumerable??true,configurable:true};beginInstalled={value:begin,writable:true,enumerable:beginDescriptor?.enumerable??true,configurable:true};
+    try{Object.defineProperty(post,'endSoldierView',endInstalled);Object.defineProperty(post,'beginSoldierView',beginInstalled);}
+    catch(error){const errors=[error];for(const[key,owned,prior]of [['_apply',installed,descriptor],['endSoldierView',endInstalled,endDescriptor],['beginSoldierView',beginInstalled,beginDescriptor]]){
+      try{if(same(Object.getOwnPropertyDescriptor(post,key),owned))restoreDescriptor(key,prior);}catch(e){errors.push(e);}}
+      if(errors.length>1)throw new AggregateError(errors,'scene lifetime: lens publication and cleanup failed');throw error;}
+  }
+  const descriptorOwners=[{key:'_apply',owned:installed,prior:descriptor,done:false},...(finishLensRetirement?[{key:'endSoldierView',owned:endInstalled,prior:endDescriptor,done:false},{key:'beginSoldierView',owned:beginInstalled,prior:beginDescriptor,done:false}]:[])];
   return {cycles,completeTerrainRetirement(retire){if(typeof retire!=='function')throw Error('scene lifetime: terrain retirement required');return run('terrain',cycle=>{
     capture(cycle,'terrain-before');const value=retire();if(value&&typeof value.then==='function')throw Error('scene lifetime: synchronous terrain retirement required');
     capture(cycle,'terrain-retired');finish(cycle,'terrain-retired');capture(cycle,'terrain-retired-settled');return value;
-  });},restore(){if(restored)return;if(busy)throw Error('scene lifetime: restoration during native delegation');
-    if(!same(Object.getOwnPropertyDescriptor(post,'_apply'),installed))throw Error('scene lifetime: resize wrapper ownership changed');
-    if(descriptor)Object.defineProperty(post,'_apply',descriptor);else delete post._apply;restored=true;
+  });},restore(){if(restored)return;if(busy||entering)throw Error('scene lifetime: restoration during native delegation');
+    const errors=[];for(const item of descriptorOwners){if(item.done)continue;try{if(!same(Object.getOwnPropertyDescriptor(post,item.key),item.owned))throw Error('scene lifetime: '+(item.key==='_apply'?'resize':'lens')+' wrapper ownership changed');
+      restoreDescriptor(item.key,item.prior);item.done=true;}catch(error){errors.push(error);}}
+    if(errors.length){failed=true;failure=errors.length===1?errors[0]:new AggregateError(errors,'scene lifetime: independent descriptor restoration failed');throw failure;}
+    restored=true;
   }};
 }
 
