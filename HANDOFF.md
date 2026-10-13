@@ -1,5 +1,21 @@
 # Handoff — v1.1 and then v2 (2026-10-12, Codex/Sol)
 
+LATEST0163 — root ACTIVE sole writer; no session transfer. SOURCE4460be79a27439c6e3e4f2282e5326326a5b15f1
+CI38327203798 running; probes/three smoke/shards2+3+4/campaign green; shard1 pending.
+Canonical11781442592 has152 alltrue/consoleclean; native128B matrix+48B interleaved bytes exact:
+positive full restore upload; deliberate omitted upload leaves actual captured stress bytes despite CPU
+restore; explicit repair originalbytes; all7 captures GL0/unknown0/unmapped0; exact identities/cleanup.
+Original probe115068531385 5,701,443B read once:33+33 inactive/38+38scene/51+51export/10/18/10;
+three smoke11781960114/11781935152/11781705514 each6 read. Shard2 canonical11781523034 read:365 alltrue/consoleclean. Campaign11781777829 read:201 alltrue/errors[]/failure null. Shard4 readback in progress.
+Accepted main3ad8 automaticCI38326405764 independently all9green/full canonical251/365/148/159,
+201 campaign/errors[]/failure null, smoke6each; original probe115065982611 5,700,027B read once.
+Current source0159 bundles authored capacity derivation, labelled lazy-resource/cavalry/smoke warm
+baseline, exact named native owners and synchronous full-capacity transaction. CPU67+67/Astra clear;
+one actual Henry Hill current-PNG fixture adds4 rows, expected shard3 156, native execution UNRUN.
+Required complete22 ordinary+88fault contexts, qualified acquisition/routes/reducer/input/dispatch,
+fixed/pixel ceiling, visual approval/adoption, badges/level10, v1.1 and v2 remain subsequent work.
+Continue existing exact CI/readback and repair actual reds. Preserve protectedMAIN11; no simultaneous edits.
+
 ACTIVE0162 — Aaron corrected premature session endings. Sol resumes sole writing in this same
 session; routine commits/pending CI are continuation points, not reasons for another handoff.
 No evidence of provider capacity exhaustion. Prior TRANSFER0161 is superseded for ownership.

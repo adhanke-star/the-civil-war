@@ -1,9 +1,29 @@
 // CPU object/record lifecycle only. Actual GPU deletion/reupload/savings are Actions observations.
 import assert from 'node:assert/strict';
-import {SoldierPool,FallenPool,UNIFORMS,FALLEN} from '../src/units/soldier-mesh.js';
-import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDiagnostics,runSceneAllocationTransaction} from './bake/inactive-figures.mjs';
+import {SoldierPool,FallenPool,FlagPool,UNIFORMS,FALLEN} from '../src/units/soldier-mesh.js';
+import {HaloPool} from '../src/units/halos.js';
+import {loaderFixture} from './atlas-loader-fixture.mjs';
+import {installInactiveFigures,installRenderGate,renderCanvasPng,restoreSceneDiagnostics,runSceneAllocationTransaction,discoverSceneStressOwners,runSceneStressTransaction,deriveSceneStressContract,warmSceneStressBaseline} from './bake/inactive-figures.mjs';
 import * as THREE from 'three';
-const api={install:installInactiveFigures,gate:installRenderGate,png:renderCanvasPng,restore:restoreSceneDiagnostics,transaction:runSceneAllocationTransaction};
+import fs from 'node:fs';
+const api={install:installInactiveFigures,gate:installRenderGate,png:renderCanvasPng,restore:restoreSceneDiagnostics,transaction:runSceneAllocationTransaction,discover:discoverSceneStressOwners,stress:runSceneStressTransaction,contract:deriveSceneStressContract,warm:warmSceneStressBaseline};
+// Constructed CPU ownership fixture: native render/upload/particle emission are deliberately UNRUN.
+function ownerFixture(){
+ const loaders=[],game={pools:{},fallen:{},impostors:{},units:[]},expected={US:2,CS:2,horses:2,mounts:2,guns:{US:2,CS:2,limbers:2},flags:2,commanders:1,pages:{US:{field:4,close:5},CS:{field:4,close:5}}};
+ for(const side of ['US','CS']){game.pools[side]=new SoldierPool(2,UNIFORMS[side],{kit:side});game.fallen[side]=new FallenPool(2,UNIFORMS[side],{kit:side});
+  const f=loaderFixture();loaders.push(f);f.atlas.publishTier('close',f.atlas.layout.tiers.close,Array.from({length:5},()=>new THREE.DataTexture(new Uint8Array(256),8,8)));game.impostors[side]=f.pools[0];}
+ const instanced=()=>new THREE.InstancedMesh(new THREE.BufferGeometry(),new THREE.MeshBasicMaterial(),2),horse=()=>{const mesh=instanced();mesh.instanceColor=new THREE.InstancedBufferAttribute(new Float32Array(6),3);return {mesh,capacity:2,used:0,n:0,color:new THREE.Color(.7,.7,.7)};};
+ game.halos=new HaloPool(4);game.horses=horse();game.units=[{type:'cavalry',mounts:horse()}];game.gunPool={guns:{US:instanced(),CS:instanced()},limbers:instanced(),used:{US:0,CS:0,limbers:0}};
+ const ring=new THREE.LineLoop(new THREE.BufferGeometry(),new THREE.LineBasicMaterial());ring.geometry.setAttribute('position',new THREE.BufferAttribute(new Float32Array(288),3));
+ const command={flags:new FlagPool(2),commanders:[{}],rings:{rings:[ring]}};game.commandState=()=>command;
+ const batch=new THREE.Mesh(new THREE.InstancedBufferGeometry(),new THREE.MeshBasicMaterial());batch.maxParticles=1000;batch.geometry.instanceCount=800;
+ for(const [key,name,size]of [['offsetBuffer','offset',3],['colorBuffer','color',4],['rotationBuffer','rotation',1],['sizeBuffer','size',3],['uvTileBuffer','uvTile',1]]){batch[key]=new THREE.InstancedBufferAttribute(new Float32Array(1000*size),size);batch.geometry.setAttribute(name,batch[key]);}
+ const systems=Array.from({length:200},(_,i)=>({big:i%5===0,system:{particleNum:i%5===0?8:3}}));batch.systems=new Set(systems.map(s=>s.system));
+ const effects={ok:true,reducedMotion:false,smokeEnabled:true,systems,batch:{batches:[batch]}};
+ const roots=[...Object.values(game.pools).map(p=>p.mesh),...Object.values(game.fallen).map(p=>p.mesh),game.halos.mesh,game.horses.mesh,game.units[0].mounts.mesh,...Object.values(game.gunPool.guns),game.gunPool.limbers,command.flags.mesh,ring,batch];
+ return {game,effects,expected,command,cleanup(){loaders.forEach(f=>f.cleanup());
+  roots.forEach(root=>root.traverse(m=>{m.geometry?.dispose();m.material?.map?.dispose();m.material?.dispose();}));}};
+}
 function transactionFixture(){
  const storage=new ArrayBuffer(32),array=new Float32Array(storage,8,4),bits=new Uint32Array(storage,8,4);bits.set([0x7fa12345,0x80000000,0x3f800000,0x40000000]);
  const attr=new THREE.BufferAttribute(array,2),geo=new THREE.BufferGeometry();geo.setAttribute('position',attr);geo.setDrawRange(1,2);
@@ -21,6 +41,48 @@ function fixture(install){
 }
 const push=p=>p.push(0,0,0,0,1,0,0,0,0,0,0,0,true);
 const checks=[
+ ['contract-scheduled',a=>{const pack=JSON.parse(fs.readFileSync(new URL('../assets/packs/stones-river.json',import.meta.url))),scenario=pack.phases.find(p=>p.scenario.reinforcements?.length)?.scenario;
+  assert.ok(scenario,'contract-scheduled: actual authored scheduled phase exists');const pages={US:{field:2,close:3},CS:{field:4,close:5}},r=a.contract(scenario,pages),all=[...scenario.units,...scenario.reinforcements],cap=side=>all.filter(d=>d.side===side).reduce((n,d)=>n+Math.round(d.men/(d.type==='artillery'?4:r.ratio))+6,r.reserve);
+  assert.ok(r.scheduled===scenario.reinforcements.length&&r.definitions===all.length&&r.US===cap('US')&&r.CS===cap('CS'),'contract-scheduled: native prepared timeline includes every authored scheduled definition');}],
+ ['warm-bounds',a=>{const f=ownerFixture();try{f.game.paused=true;f.game.units[0].x=f.game.units[0].z=0;f.command.rings.show=()=>{};f.effects.puff=()=>{};f.effects.update=()=>{};
+  const r=a.warm({game:f.game,effects:f.effects},f.expected,300);assert.ok(r.discovery.meshes.every(m=>m.geometry.boundingSphere!==null&&(!m.isInstancedMesh||m.boundingSphere!==null)),'warm-bounds: sorting-created identities belong to warm baseline');}finally{f.cleanup();}}],
+ ['contract-capacity',a=>{const scenario={menPerFigure:10,units:[{side:'US',men:1000,regiments:[{},{}]},{side:'CS',men:160,type:'artillery',guns:2}],commanders:[{}]},pages={US:{field:2,close:3},CS:{field:4,close:10}},r=a.contract(scenario,pages);
+  assert.deepEqual({US:r.US,CS:r.CS,horses:r.horses,mounts:r.mounts,guns:r.guns,flags:r.flags,commanders:r.commanders,ratio:r.ratio,reserve:r.reserve},{US:1156,CS:1096,horses:9,mounts:2100,guns:{US:1,CS:2,limbers:2},flags:4,commanders:1,ratio:10,reserve:1050},'contract-capacity: independent density/crew/reserve/commander/regiment formulas');assert.notEqual(r.pages,pages,'contract-capacity: page contract copied');}],
+ ['contract-refusal',a=>{let error;try{a.contract({units:[]},{US:{field:2,close:3},CS:{field:4,close:NaN}});}catch(e){error=e;}assert.ok(error?.message.startsWith('scene stress contract:'),'contract-refusal: invalid page contract rejected');}],
+ ['warm-native-calls',a=>{const f=ownerFixture();try{const calls=[];f.game.paused=true;f.game.units[0].x=f.game.units[0].z=0;f.command.rings.show=list=>calls.push(['rings',list.length]);f.effects.puff=(x,z,big,delay)=>calls.push(['puff',big,delay]);f.effects.update=dt=>calls.push(['update',dt]);
+  const r=a.warm({game:f.game,effects:f.effects},f.expected,300);assert.ok(r.discovery.owners.length===35&&r.spawned===null&&r.baseline.startsWith('explicitly warmed'),'warm-native-calls: preexisting native owner retained and warm state labelled');assert.equal(calls.filter(c=>c[0]==='puff'&&c[1]).length,40,'warm-native-calls: forty native big puffs');assert.equal(calls.filter(c=>c[0]==='puff'&&!c[1]).length,160,'warm-native-calls: 160 native small puffs');assert.ok(calls.filter(c=>c[0]==='puff').every(c=>c[2]===0)&&calls.at(-1)[1]===.01,'warm-native-calls: no timer and positive native update');}finally{f.cleanup();}}],
+ ['warm-refusal',a=>{const f=ownerFixture();try{let error;try{a.warm({game:f.game,effects:f.effects},f.expected,300);}catch(e){error=e;}assert.ok(error?.message.startsWith('scene stress warm:'),'warm-refusal: unpaused or reduced baseline cannot be warmed');}finally{f.cleanup();}}],
+ ['stress-complete',a=>{const f=ownerFixture();try{const d=discoverSceneStressOwners(f.game,f.effects,f.expected),original=d.arrays.map(a=>Buffer.from(new Uint8Array(a.buffer,a.byteOffset,a.byteLength))),draws=[];
+  const r=a.stress({discovery:d,draw(label){draws.push(label);if(label==='stress'){assert.ok(d.arrays.every(a=>a.every(Number.isFinite)),'stress-complete: synthetic data finite');assert.ok(d.owners.every(o=>o.meshes.every(m=>m.visible&&!m.frustumCulled&&(!m.isInstancedMesh||m.count===o.capacity)&&(!m.geometry.isInstancedBufferGeometry||m.geometry.instanceCount===o.capacity))),'stress-complete: every native synthetic capacity submitted');}},sample:label=>({label}),verifyBaseline:()=>true,reservations:array=>[{id:d.arrays.indexOf(array)+1,bytes:array.byteLength,pendingDelete:false}]});
+  assert.ok(r.ok&&r.native.length===3&&r.uniqueDynamicBytes===53640,'stress-complete: three native reservation observations retained');assert.deepEqual(draws,['stress','restore-upload','restored-scene'],'stress-complete: synchronous native submission order');d.arrays.forEach((a,i)=>assert.deepEqual(Buffer.from(new Uint8Array(a.buffer,a.byteOffset,a.byteLength)),original[i],'stress-complete: byte-exact CPU restoration'));}finally{f.cleanup();}}],
+ ['stress-hidden-upload',a=>{const f=ownerFixture();try{const d=discoverSceneStressOwners(f.game,f.effects,f.expected);let uploaded=false;for(const m of d.meshes)m.visible=false;
+  const r=a.stress({discovery:d,draw(label){if(label==='restore-upload')uploaded=d.meshes.every(m=>m.visible&&(!m.isInstancedMesh||m.count===0)&&(!m.geometry.isInstancedBufferGeometry||m.geometry.instanceCount===0))&&d.attributes.every(a=>(a.isInterleavedBufferAttribute?a.data:a).updateRanges.length===0);},sample:label=>({label}),verifyBaseline:()=>true,reservations:array=>[{id:d.arrays.indexOf(array)+1,bytes:array.byteLength,pendingDelete:false}]});
+  assert.ok(r.ok&&uploaded&&d.meshes.every(m=>!m.visible),'stress-hidden-upload: full restored upload precedes exact hidden scene');}finally{f.cleanup();}}],
+ ...['missing-native','wrong-bytes','duplicate-id','extra-live','restore-error','thenable','draw-count'].map(fault=>['stress-'+fault,a=>{const f=ownerFixture();try{const d=discoverSceneStressOwners(f.game,f.effects,f.expected);let final=false;
+  const r=a.stress({discovery:d,draw(label){if(label==='restored-scene')final=true;if(fault==='restore-error'&&label==='restore-upload')throw Error('controlled restore error');if(fault==='thenable')return Promise.resolve();if(fault==='draw-count'&&label==='stress')d.meshes[0].count=0;},sample:label=>({label}),verifyBaseline:()=>true,reservations:array=>fault==='missing-native'?[]:[{id:fault==='duplicate-id'?1:d.arrays.indexOf(array)+1,bytes:array.byteLength+(fault==='wrong-bytes'?4:0),pendingDelete:false},...(fault==='extra-live'?[{id:d.arrays.indexOf(array)+1000,bytes:1,pendingDelete:false}]:[])]});
+  assert.ok(!r.ok&&final&&r.transaction.errors.length,`stress-${fault}: incomplete native evidence fails with independent cleanup`);}finally{f.cleanup();}}]),
+ ['stress-async',a=>{const f=ownerFixture();try{const d=discoverSceneStressOwners(f.game,f.effects,f.expected);let called=false,error;try{a.stress({discovery:d,draw:async()=>{called=true;},sample:()=>({}),verifyBaseline:()=>true,reservations:()=>[]});}catch(e){error=e;}assert.ok(!called&&error?.message.includes('synchronous callbacks'),'stress-async: asynchronous native draw rejected before mutation');}finally{f.cleanup();}}],
+ ['stress-uniforms',a=>{const f=ownerFixture();try{const d=discoverSceneStressOwners(f.game,f.effects,f.expected),uniform=f.game.impostors.US.batches.close[0].body.material.uniforms.uSplit,original=uniform.value;
+  const r=a.stress({discovery:d,draw(label){if(label==='stress')uniform.value=160;},sample:label=>({label}),verifyBaseline:()=>true,reservations:array=>[{id:d.arrays.indexOf(array)+1,bytes:array.byteLength,pendingDelete:false}]});assert.ok(r.ok&&uniform.value===original,'stress-uniforms: hidden render-hook scalar restored');}finally{f.cleanup();}}],
+ ['owners-complete',a=>{const f=ownerFixture();try{const r=a.discover(f.game,f.effects,f.expected);assert.equal(r.owners.length,35,'owners-complete: every declared owner included');assert.equal(r.uniqueDynamicBytes,53640,'owners-complete: outline/body-soft/interleaved shared storage deduplicated');assert.equal(new Set(r.arrays).size,r.arrays.length,'owners-complete: unique native array identities');}finally{f.cleanup();}}],
+ ...Object.entries({
+  'owners-missing-bucket':f=>f.game.pools.US.buckets.pop(),
+  'owners-missing-page':f=>f.game.impostors.CS.batches.close.pop(),
+  'owners-trimmed-page':f=>{f.game.impostors.CS.batches.close.pop();f.game.impostors.CS.layout.tiers.close.pages.pop();},
+  'owners-interleaved-offset':f=>f.game.impostors.CS.batches.close[0].geo.attributes.iOff.offset=0,
+  'owners-interleaved-stride':f=>f.game.impostors.CS.batches.close[0].buf.stride=6,
+  'owners-named-attribute':f=>{const b=f.game.pools.US.buckets[0];[b.anim,b.tint]=[b.tint,b.anim];},
+  'owners-page-texture':f=>f.game.impostors.CS.batches.close[0].body.material.uniforms.uMap.value=f.game.impostors.CS.atlas.textures.close[1],
+  'owners-capacity':f=>f.expected.US++,
+  'owners-shared':f=>{const a=f.game.pools.US.buckets[0],b=f.game.pools.US.buckets[1];b.anim=a.anim;b.mesh.geometry.setAttribute('aAnim',a.anim);},
+  'owners-colour':f=>f.game.horses.mesh.instanceColor=null,
+  'owners-smoke-batch':f=>f.effects.batch.batches=[],
+  'owners-smoke-count':f=>f.effects.systems[0].system.particleNum=0,
+  'owners-smoke-bind':f=>f.effects.batch.batches[0].systems.clear(),
+  'owners-mount':f=>f.game.units=[],
+  'owners-ring':f=>f.command.rings.rings=[],
+  'owners-malformed':f=>f.game.pools.US.buckets[0].anim.itemSize=3,
+ }).map(([name,change])=>[name,a=>{const f=ownerFixture();try{change(f);let error;try{a.discover(f.game,f.effects,f.expected);}catch(e){error=e;}assert.ok(error?.message.startsWith('scene stress owners:'),`${name}: incomplete or misbound native owner refuses coverage`);}finally{f.cleanup();}}]),
  ['transaction-byte-restore',a=>{const f=transactionFixture(),r=a.transaction(f.args);assert.ok(r.ok,'transaction-byte-restore: synchronous transaction complete');assert.deepEqual(Buffer.from(new Uint8Array(f.storage)),f.bytes,'transaction-byte-restore: NaN bits, negative zero and nonzero byte offset exact');assert.equal(r.restoration.arrays,1,'transaction-byte-restore: shared attribute captured once');assert.ok(f.attr.version>f.version,'transaction-byte-restore: genuine upload version advances');}],
  ['transaction-draw-order',a=>{const f=transactionFixture(),r=a.transaction(f.args);assert.deepEqual(f.events,['mutate','stress','sample:stress','restore-upload','sample:restore-upload','restored-scene','sample:restored-scene'],'transaction-draw-order: upload and exact scene restored synchronously');assert.deepEqual(r.samples.map(s=>s.label),['stress','restore-upload','restored-scene'],'transaction-draw-order: every peak retained');}],
  ['transaction-state-restore',a=>{const f=transactionFixture(),r=a.transaction(f.args);assert.ok(r.ok&&!f.parent.visible&&!f.mesh.visible&&f.mesh.count===0&&f.mesh.frustumCulled&&f.geo.drawRange.start===1&&f.geo.drawRange.count===2&&f.record.n===7,'transaction-state-restore: ancestors/counts/frustum/ranges/counters restored');assert.ok(f.attr.updateRanges.length===1&&f.attr.updateRanges[0]===f.range&&f.range.start===1&&f.range.count===2,'transaction-state-restore: exact update-range entries restored');}],
@@ -68,6 +130,17 @@ const checks=[
  ['hidden-gore-restore',a=>{const saved={gore:FALLEN.gore,clock:FALLEN.clock};try{let now=0;FALLEN.gore=true;FALLEN.clock=()=>now;const f=fixture(a.install),p=f.fallen,i=p.alloc();p.set(i,1,2,3,0,1,false,0,0,true);p.setBakedClip(2);p.flush();assert.equal(p.mesh.visible,false,'hidden-gore-restore: entirely clipped casualties retired');FALLEN.gore=false;now=1000;p.setBakedClip(0);p.flush();assert.equal(p.hiddenTo,1,'hidden-gore-restore: CPU fade continues while hidden');FALLEN.gore=true;p.setBakedClip(0);p.flush();assert.ok(p.mesh.visible,'hidden-gore-restore: rigged casualty restores');assert.equal(p.hiddenTo,0,'hidden-gore-restore: gore restoration preserved');assert.equal(p.mesh.instanceMatrix.array[13],2,'hidden-gore-restore: original ground restored');}finally{Object.assign(FALLEN,saved);}}],
 ];
 const mutants={
+ 'contract-scheduled':{contract:(scenario,pages)=>{const r=deriveSceneStressContract(scenario,pages);for(const d of scenario.reinforcements)r[d.side]-=Math.round(d.men/(d.type==='artillery'?4:r.ratio))+6;r.definitions-=r.scheduled;r.scheduled=0;return r;}},
+ 'warm-bounds':{warm:(...args)=>{const r=warmSceneStressBaseline(...args);r.discovery.meshes[0].boundingSphere=null;return r;}},
+ 'contract-capacity':{contract:(...args)=>({...deriveSceneStressContract(...args),US:0})},
+ 'contract-refusal':{contract:()=>({})},
+ 'warm-native-calls':{warm:(...args)=>({...warmSceneStressBaseline(...args),baseline:'pristine'})},
+ 'warm-refusal':{warm:()=>({})},
+ 'stress-complete':{stress:args=>({...runSceneStressTransaction(args),ok:false})},
+ 'stress-hidden-upload':{stress:args=>({...runSceneStressTransaction(args),ok:false})},
+ 'stress-async':{stress:()=>({ok:true})},
+ 'stress-uniforms':{stress:args=>{const r=runSceneStressTransaction(args);args.discovery.owners.find(o=>o.label==='baked.US.close.0').meshes[0].material.uniforms.uSplit.value=999;return r;}},
+ 'owners-complete':{discover:(...args)=>({...discoverSceneStressOwners(...args),uniqueDynamicBytes:0})},
  'transaction-byte-restore':{transaction:args=>{const r=runSceneAllocationTransaction(args);new Uint32Array(args.attributes[0].array.buffer,args.attributes[0].array.byteOffset,1)[0]=0x7fc00000;return r;}},
  'transaction-draw-order':{transaction:args=>runSceneAllocationTransaction({...args,render:label=>{if(label!=='restore-upload')args.render(label);}})},
  'transaction-state-restore':{transaction:args=>{const r=runSceneAllocationTransaction(args);args.meshes[0].parent.visible=true;return r;}},
@@ -97,5 +170,7 @@ const mutants={
  'hidden-gore-restore':{install:g=>{const s=installInactiveFigures(g);const p=g.fallen.US,native=p.flush;p.flush=function(){if(this.mesh.visible)native.call(this);};return s;}},
 };
 for(const name of ['transaction-geometry-owner','transaction-array-owner','transaction-attribute-owner','transaction-parent-owner','transaction-attribute-shape','transaction-material-members'])mutants[name]={transaction:args=>({...runSceneAllocationTransaction(args),ok:true})};
+for(const [name]of checks.filter(([name])=>name.startsWith('owners-')&&name!=='owners-complete'))mutants[name]={discover:()=>({owners:[]})};
+for(const name of ['stress-missing-native','stress-wrong-bytes','stress-duplicate-id','stress-extra-live','stress-restore-error','stress-thenable','stress-draw-count'])mutants[name]={stress:args=>({...runSceneStressTransaction(args),ok:true})};
 for(const [,check]of checks)check(api);console.log(`INACTIVE-FIGURES OK (${checks.length}/${checks.length})`);
 if(process.argv.includes('--prove-fail')){for(const [name,check]of checks){let error;try{check({...api,...mutants[name]});}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&error.message.startsWith(name),`${name}: mutant must fail its own assertion`);console.log(`CAUGHT ${name}`);}console.log(`INACTIVE-FIGURES CONTROLS OK (${checks.length}/${checks.length})`);}

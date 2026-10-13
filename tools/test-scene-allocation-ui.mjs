@@ -60,6 +60,45 @@ export async function sceneAllocationControls({browser,url,check,result,watchErr
     check('scene-allocation-errors',errors.length===0,errors.join('; '));
   } finally {await ctx.close();}
   await sceneTransactionControls({browser,url,check,result,watchErrors});
+  await sceneStressOwnerControls({browser,url,check,result,watchErrors});
+}
+
+// One actual current-PNG battle is a prerequisite proof, not the qualified 22+88 matrix.
+async function sceneStressOwnerControls({browser,url,check,result,watchErrors}){
+  const ctx=await browser.newContext({viewport:{width:320,height:240},deviceScaleFactor:1,reducedMotion:'no-preference'});
+  await ctx.addInitScript(installAllocationObserver,{ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString()});
+  const page=await ctx.newPage(),errors=[];watchErrors(page,url,errors);
+  try{
+    await page.goto(url+'?battle=henry-hill&quality=high&figures=rigged&nosw');
+    await page.waitForFunction(()=>window.__ready&&window.__game?.game&&window.__game.effects?.ok,null,{timeout:180000});
+    if(await page.evaluate(()=>document.getElementById('briefing')?.open))await page.locator('#briefing-begin').click();
+    await page.evaluate(()=>{const g=window.__game.game;if(!g.paused)g.togglePause();g.ensureBaked();});
+    await page.waitForFunction(()=>window.__game.game.baked.state==='ready',null,{timeout:120000});
+    await page.evaluate(async()=>{await Promise.all(Object.values(window.__game.game.baked.atlases).map(a=>a.load('close')));});
+    const report=await page.evaluate(async()=>{
+      const {deriveSceneStressContract,warmSceneStressBaseline,runSceneStressTransaction,installRenderGate,restoreSceneDiagnostics}=await import('./tools/bake/inactive-figures.mjs'),
+        {sampleSceneAllocations,initializeSceneTextures}=await import('./tools/bake/scene-allocation.mjs'),{COMMAND}=await import('./src/game.js');
+      const scope=window.__game,{game,scene,camera,post,effects}=scope;
+      const combat=()=>JSON.stringify({time:game.simTime,orders:game.orders,holder:game.holder,units:game.units.map(u=>({id:u.id,men:u.men,morale:u.morale,ammo:u.ammo,state:u.state,order:u.order,x:u.x,z:u.z}))});
+      const expected=deriveSceneStressContract(game.scenario,{US:{field:2,close:3},CS:{field:4,close:5}}),gate=installRenderGate(post);window.__sceneRenderGate=gate;
+      let restoration;
+      try{
+        const warm=warmSceneStressBaseline(scope,expected,COMMAND.radius),baseline=combat();initializeSceneTextures();
+        const proof=runSceneStressTransaction({discovery:warm.discovery,draw:()=>gate.renderOnce(scene,camera),sample:()=>sampleSceneAllocations(),
+          verifyBaseline:()=>combat()===baseline,reservations:array=>window.__allocation.bufferReservations(post.renderer.getContext(),array)});
+        restoration=restoreSceneDiagnostics(window,{sampleRestored(){gate.renderOnce(scene,camera);const pending={label:'restored-native-pending',...sampleSceneAllocations()};post.renderer.getContext().finish();return [pending,{label:'restored-native-settled',...sampleSceneAllocations()}];}});
+        const samples=[...proof.transaction.samples.map(s=>s.observation),...restoration.samples],clean=s=>s.glError===0&&!s.allocation.unknown.length&&s.unmappedBufferBytes===0;
+        return {kind:'actual current-PNG Henry Hill warmed maximum prerequisite; full qualified both-route matrix UNRUN',expected,spawned:warm.spawned,baseline:warm.baseline,
+          proof,restoration,combatUnchanged:combat()===baseline,clean:samples.every(clean),rows:[
+            {name:'stress-owner-coverage',ok:proof.ok&&proof.native.length===3&&proof.native.every(s=>s.owners.length===warm.discovery.owners.length)},
+            {name:'stress-owner-smoke',ok:proof.smoke.systems===200&&proof.smoke.particles===800&&proof.smoke.capacity===1000},
+            {name:'stress-owner-restoration',ok:proof.ok&&restoration.ok&&combat()===baseline&&samples.every(clean)},
+          ]};
+      }finally{if(!restoration){const r=restoreSceneDiagnostics(window);if(!r.ok)throw Error('native stress cleanup: '+r.errors.join('; '));}}
+    });
+    result.sceneStressOwners=report;for(const row of report.rows)check(`scene-allocation-${row.name}`,row.ok,JSON.stringify(report));
+    check('scene-allocation-stress-owner-errors',errors.length===0,errors.join('; '));
+  }finally{await ctx.close();}
 }
 
 // getBufferSubData intentionally synchronizes this tiny correctness fixture only.
