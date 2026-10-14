@@ -252,6 +252,7 @@ function poolResourceLifetime(renderer,entries,verifyPool) {
     if(closed&&closeComplete){if(failed)throw failure;return true;}
     if(busy)fail(Error('figure resource: reentrant close'));
     canvas?.removeEventListener?.('webglcontextlost',onLoss);closed=true;hide();if(failed)throw failure;
+    try{verify();}catch(error){fail(error);}
     busy=true;try{const completed=retire(records);closeComplete=completed;for(const r of records){r.active=false;r.requested=false;r.pending=!completed;}return completed;}finally{busy=false;}
   },
   setOutline(on){outlineOn=!!on;for(const r of records)if(r.outline)r.outline.visible=r.active&&!r.pending&&outlineOn&&!renderer.getContext().isContextLost();},
@@ -471,7 +472,8 @@ export class FallenPool {
       const k = fadeOf(now - this.born[i], false);
       if (k <= 0) break; // laid down in order, so the rest are younger
       const o = i * 16, y = k >= 1 ? this.baseY[i] : this.baseY[i] - k * SINK * te[o + 5];
-      if (te[o + 13] === y && (k < 1 || clip[i] === 2)) continue;
+      // Already baked-clipped casualties still advance the CPU fade cursor and gore restore flag.
+      if (te[o + 13] === y && k < 1) continue;
       te[o + 13] = y;
       if (k >= 1) { clip[i] = 2; this.hiddenTo = i + 1; }
       if (lo < 0) lo = i;
@@ -487,7 +489,7 @@ export class FallenPool {
 
   #flush() {
     this.mesh.count = this.used;
-    const range = this.#fade();
+    const range = this.#resource ? this.#fade() : this.fade();
     if (!this.dirty && range) {
       // only the fading casualties changed: upload just their rows
       const [lo, n] = [range[0], range[1] - range[0] + 1];

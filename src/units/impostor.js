@@ -229,6 +229,13 @@ export class AtlasLayout {
 
 /** The atlas in the browser: the manifest, then each tier's pages (base and variants) as textures on request. */
 export class BakedAtlas {
+  #disposeStarted = false;
+  #pendingLoads = 0;
+  get loadsSettled(){return this.#pendingLoads===0;}
+  #disposeFailed = false;
+  #disposeError;
+  get cleanupFailure(){return Object.freeze({failed:this.#disposeFailed,error:this.#disposeError});}
+  #cleanupFailure(error){if(!this.#disposeFailed){this.#disposeFailed=true;this.#disposeError=error;}}
   constructor(manifest, base = BAKED_BASE, options = {}) {
     this.layout = new AtlasLayout(manifest);
     this.base = base;
@@ -246,10 +253,13 @@ export class BakedAtlas {
     if (this.disposed) return Promise.reject(new Error('baked atlas: disposed'));
     if (this.state[tier]) return this.state[tier];
     if (tier === 'close' && this.diagnosticClose) {
-      this.state.close = this.loadDiagnosticClose();
+      this.#pendingLoads++;
+      this.state.close = this.loadDiagnosticClose().finally(()=>this.#pendingLoads--);
       return this.state.close;
     }
     const T = this.layout.tiers[tier];
+    if(!T||!Array.isArray(T.pages))return Promise.reject(new Error('baked atlas: unknown tier'));
+    this.#pendingLoads++;
     const loader = new THREE.TextureLoader();
     this.state[tier] = Promise.allSettled(T.pages.map(async (p) => this.io.loadPNG
       ? this.io.loadPNG(this.base + p.file) : loader.loadAsync(this.base + p.file))).then((settled) => {
@@ -270,8 +280,8 @@ export class BakedAtlas {
         }
         this.publishTier(tier, T, texs);
         return texs;
-      } catch (error) { for (const t of texs) { try { t.dispose(); } catch {} } throw error; }
-    });
+      } catch (error) { for (const t of texs) { try { t.dispose(); } catch (cleanupError) { this.#cleanupFailure(cleanupError); } } throw error; }
+    }).finally(()=>this.#pendingLoads--);
     return this.state[tier];
   }
 
@@ -292,7 +302,7 @@ export class BakedAtlas {
       this.textures[tier] = textures;
       for (const { pool, batches } of prepared) { pool.layout = this.layout; pool.batches[tier] = batches; }
     } catch (error) {
-      for (const { pool, batches } of prepared) { try { pool.disposeTier(batches); } catch {} }
+      for (const { pool, batches } of prepared) { try { pool.disposeTier(batches); } catch (cleanupError) { this.#cleanupFailure(cleanupError); } }
       throw error;
     }
   }
@@ -447,24 +457,34 @@ export class BakedAtlas {
     return attempt(baseline, this.base, false);
   }
 
+  async close(){
+    try{this.dispose();}catch{}
+    await Promise.allSettled(Object.values(this.state));
+    this.dispose();
+  }
+
   dispose() {
-    this.disposed = true;
-    const textures = this.textures; this.textures = {};
-    for (const pool of this.pools) for (const tier of ['field', 'close']) {
-      const batches = pool.batches[tier]; pool.batches[tier] = [];
-      try { pool.disposeTier(batches); } catch {}
+    if(this.#disposeStarted){if(this.#disposeFailed)throw this.#disposeError;return;}
+    this.#disposeStarted=true;this.disposed=true;
+    const clean=fn=>{try{fn();}catch(error){this.#cleanupFailure(error);}};
+    const textures=this.textures;this.textures={};
+    for(const pool of this.pools)if(pool.cleanupFailure?.failed)this.#cleanupFailure(pool.cleanupFailure.error);
+    for(const pool of this.pools)for(const tier of ['field','close']){
+      const batches=pool.batches[tier];pool.batches[tier]=[];clean(()=>pool.disposeTier(batches));if(pool.cleanupFailure?.failed)this.#cleanupFailure(pool.cleanupFailure.error);
     }
-    for (const ts of Object.values(textures)) for (const t of ts) { try { t.dispose(); } catch {} }
+    for(const t of new Set(Object.values(textures).flat()))clean(()=>t.dispose());
+    this.pools.length=0;
+    if(this.#disposeFailed)throw this.#disposeError;
   }
 }
 
 /** Fetch the manifest and the field pages; resolves once sprites can draw. */
-export async function loadBakedAtlas(base = BAKED_BASE) {
+export async function loadBakedAtlas(base = BAKED_BASE, { onCreated = null } = {}) {
+  if(onCreated!==null&&typeof onCreated!=='function')throw Error('baked atlas: creation observer required');
   const res = await fetch(`${base}soldier.json`);
   if (!res.ok) throw new Error(`baked figures: HTTP ${res.status} for ${base}soldier.json`);
   const atlas = new BakedAtlas(await res.json(), base);
-  await atlas.load('field');
-  return atlas;
+  try{if(onCreated)onCreated(atlas);await atlas.load('field');return atlas;}catch(error){try{atlas.dispose();}catch{}throw error;}
 }
 
 const VERT = /* glsl */ `
@@ -566,6 +586,10 @@ function quad() {
  * re-pushes the casualties: their baked direction follows the camera). Draws nothing until attach(atlas).
  */
 export class ImpostorPool {
+  #cleanupFailed=false;
+  #cleanupError;
+  get cleanupFailure(){return Object.freeze({failed:this.#cleanupFailed,error:this.#cleanupError});}
+  #cleanupFailure(error){if(!this.#cleanupFailed){this.#cleanupFailed=true;this.#cleanupError=error;}}
   constructor(capacity, { side = 'US' } = {}) {
     this.capacity = capacity;
     this.side = side;
@@ -649,8 +673,8 @@ export class ImpostorPool {
       }
       batches.push({ tier, page, look: T.pages[page].look, data, buf, geo, body, soft, n: 0 });
     }); } catch (error) {
-      for (const m of materials) m.dispose();
-      for (const g of geometries) { g.index = null; g.deleteAttribute('position'); g.dispose(); }
+      for(const m of materials)try{m.dispose();}catch(cleanupError){this.#cleanupFailure(cleanupError);}
+      for(const g of geometries)try{g.index=null;g.deleteAttribute('position');g.dispose();}catch(cleanupError){this.#cleanupFailure(cleanupError);}
       throw error;
     }
     return batches;
@@ -666,15 +690,15 @@ export class ImpostorPool {
   }
 
   disposeTier(batches) {
-    let failure;
-    const clean = fn => { try { fn(); } catch (error) { failure ||= error; } };
+    let failed=false,failure;
+    const clean = fn => { try { fn(); } catch (error) { if(!failed){failed=true;failure=error;}this.#cleanupFailure(error); } };
     for (const b of batches) {
       clean(() => this.group.remove(b.body)); clean(() => this.group.remove(b.soft));
       clean(() => b.body.material.dispose()); clean(() => b.soft.material.dispose());
       // Shared quad attributes belong to the common geometry, not this candidate.
       b.geo.index = null; b.geo.deleteAttribute('position'); clean(() => b.geo.dispose());
     }
-    if (failure) throw failure;
+    if (failed) throw failure;
   }
 
   setView(camera) { this.cam.copy(camera.position); }
@@ -698,7 +722,7 @@ export class ImpostorPool {
     let tier = 'field';
     if (this.allowClose && d2 < LOD_NEAR * LOD_NEAR) {
       if (this.batches.close.length) tier = 'close';
-      else if (this.atlas && L.tiers.close && !this.atlas.state.close) this.atlas.load('close').catch((e) => console.warn('baked figures: close tier not loaded:', e && e.message ? e.message : e));
+      else if (this.atlas && L.tiers.close && !this.atlas.state.close) {const atlas=this.atlas;atlas.load('close').catch((e) => {if(!atlas.disposed)console.warn('baked figures: close tier not loaded:', e && e.message ? e.message : e);});}
     }
     const T = L.tiers[tier];
     const slot = L.slotFor(clip, phase);

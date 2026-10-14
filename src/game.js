@@ -568,7 +568,26 @@ function packResult(game, effective, ended) {
 }
 
 export class Game {
-  constructor({ scene, terrain, scenario, world, effects, playerSide = 'US' }) {
+  #figureOptions;
+  #figureClosed=false;
+  #figureLoadTask=null;
+  #figureCloseTask=null;
+  #figureCloseDone=false;
+  #figureNativeCompletion=null;
+  #figureFailed=false;
+  #figureError;
+  #figureRetired=new Map();
+  #figureLoadsSettled=false;
+  #figureAtlases=new Set();
+  #figurePools;
+  #figureSprites;
+  #figureMeshRefs;
+  #figureRoots;
+  #figureUnsubscribes=[];
+  constructor({ scene, terrain, scenario, world, effects, playerSide = 'US', figureResourceLifetime = false, renderer = null }) {
+    if(typeof figureResourceLifetime!=='boolean'||renderer!==null&&typeof renderer?.getContext!=='function'||figureResourceLifetime&&!renderer)throw Error('Game figures: explicit lifetime boolean and renderer required');
+    this.#figureOptions=Object.freeze({resourceLifetime:figureResourceLifetime,renderer});
+    const figureOptions={resourceLifetime:figureResourceLifetime,renderer};
     // This validates structure, not hardware admission: routed definitions pass the field guard upstream.
     const timeline = 'reinforcements' in scenario || 'surrender' in scenario || 'batteryOverrun' in scenario ? prepareReinforcementTimeline({ version: 1,
       id: 'game', title: 'Battle runtime', phases: [{ id: 'battle', scenario }] }, 'battle', scenario) : null;
@@ -607,12 +626,12 @@ export class Game {
     this.reserve = { US: reserve, CS: reserve };
     const cap = (side) => figs(side) + reserve;
     this.pools = {
-      US: new SoldierPool(cap('US'), UNIFORMS.US, { kit: 'US', outline }),
-      CS: new SoldierPool(cap('CS'), UNIFORMS.CS, { kit: 'CS', outline }),
+      US: new SoldierPool(cap('US'), UNIFORMS.US, { kit: 'US', outline, ...figureOptions }),
+      CS: new SoldierPool(cap('CS'), UNIFORMS.CS, { kit: 'CS', outline, ...figureOptions }),
     };
     this.fallen = {
-      US: new FallenPool(cap('US'), UNIFORMS.US, { kit: 'US' }),
-      CS: new FallenPool(cap('CS'), UNIFORMS.CS, { kit: 'CS' }),
+      US: new FallenPool(cap('US'), UNIFORMS.US, { kit: 'US', ...figureOptions }),
+      CS: new FallenPool(cap('CS'), UNIFORMS.CS, { kit: 'CS', ...figureOptions }),
     };
     this.halos = new HaloPool(cap('US') + cap('CS'));
     // baked sprites: each side draws from its own bake (BAKED_BASES)
@@ -621,6 +640,11 @@ export class Game {
       CS: new ImpostorPool(cap('CS'), { side: 'CS' }),
     };
     // idle | loading | ready | failed; atlases per side, atlas = the Union one (older readers)
+    this.#figurePools=[this.pools.US,this.pools.CS,this.fallen.US,this.fallen.CS];
+    this.#figureSprites=Object.freeze({...this.impostors});
+    this.#figureRoots=[...this.#figurePools,...Object.values(this.#figureSprites)].map(p=>({p,mesh:p.mesh}));
+    const figureMeshes=[...this.#figurePools.slice(0,2).flatMap(p=>p.buckets.flatMap(b=>[b.mesh,...(b.outline?[b.outline]:[])])),...this.#figurePools.slice(2).map(p=>p.mesh)];
+    this.#figureMeshRefs=figureMeshes.map(m=>({m,g:m.geometry,material:m.material,matrix:m.instanceMatrix,color:m.instanceColor,index:m.geometry.index,attrs:Object.entries(m.geometry.attributes).map(([key,a])=>({key,a,array:a.array}))}));
     this.baked = { state: 'idle', atlas: null, atlases: null, error: null };
     scene.add(this.impostors.US.mesh, this.impostors.CS.mesh);
     // cavalry horses (one per trooper figure; a horse-holder leads three) plus room for sandbox spawns
@@ -682,14 +706,15 @@ export class Game {
     }
     this.logSeen = 0;
     this.slowT = 0;
-    onSetting('look.menPerFigure', (v) => this.applyMenPerFigure(v));
-    onSetting('look.formationSpacing', () => this.applyFormationSpacing());
+    this.#figureUnsubscribes.push(onSetting('look.menPerFigure', (v) => this.applyMenPerFigure(v)),
+      onSetting('look.formationSpacing', () => this.applyFormationSpacing()));
     this.updateFigureView();
     this.flushAll();
   }
 
   /** Re-form every infantry brigade at `n` men per figure (look.menPerFigure). */
   applyMenPerFigure(n) {
+    this.#assertFiguresOpen();
     setMenPerFigure(n, minMenPerFigureOf(this));
     let changed = 0;
     for (const u of this.units) if (u.rebuildFigures()) changed++;
@@ -698,6 +723,7 @@ export class Game {
 
   /** Re-layout existing infantry without rerolling figures, including while paused. */
   applyFormationSpacing() {
+    this.#assertFiguresOpen();
     let changed = 0;
     for (const u of this.units) {
       if (u.type !== 'infantry') continue;
@@ -713,19 +739,82 @@ export class Game {
 
   /** Start loading both sides' baked atlases (once); the rigged figures draw until both are ready. */
   ensureBaked() {
-    if (this.baked.state !== 'idle') return;
-    this.baked.state = 'loading';
-    Promise.all([loadBakedAtlas(BAKED_BASES.US), loadBakedAtlas(BAKED_BASES.CS)]).then(([us, cs]) => {
-      this.baked.atlas = us;
-      this.baked.atlases = { US: us, CS: cs };
-      this.impostors.US.attach(us);
-      this.impostors.CS.attach(cs);
-      this.baked.state = 'ready';
-    }).catch((err) => {
-      this.baked.state = 'failed';
-      this.baked.error = err && err.message ? err.message : String(err);
-      console.warn('baked figures unavailable; drawing the rigged figures:', this.baked.error);
+    if(this.#figureClosed)return Promise.resolve(false);
+    if(this.#figureLoadTask)return this.#figureLoadTask;
+    this.baked.state='loading';
+    const onCreated=atlas=>{this.#figureAtlases.add(atlas);if(this.#figureClosed)this.#retireFigure(atlas,()=>atlas.dispose());};
+    this.#figureLoadTask=Promise.allSettled([loadBakedAtlas(BAKED_BASES.US,{onCreated}),loadBakedAtlas(BAKED_BASES.CS,{onCreated})]).then(settled=>{
+      this.#figureLoadsSettled=true;
+      const atlases=settled.filter(r=>r.status==='fulfilled').map(r=>r.value),failure=settled.find(r=>r.status==='rejected');
+      if(this.#figureClosed||failure){
+        for(const atlas of this.#figureAtlases)this.#retireFigure(atlas,()=>atlas.dispose());
+        if(!this.#figureClosed){this.baked.state='failed';this.baked.error=failure.reason?.message??String(failure.reason);console.warn('baked figures unavailable; drawing the rigged figures:',this.baked.error);}
+        return false;
+      }
+      const [us,cs]=atlases;
+      try{
+        this.#figureSprites.US.attach(us);this.#figureSprites.CS.attach(cs);
+        if(this.#figureClosed)throw Error('Game figures: closed during atlas attachment');
+        this.baked.atlas=us;this.baked.atlases={US:us,CS:cs};this.baked.state='ready';return true;
+      }catch(error){
+        for(const atlas of atlases)this.#retireFigure(atlas,()=>atlas.dispose());
+        if(!this.#figureClosed){this.baked.state='failed';this.baked.error=error?.message??String(error);console.warn('baked figures unavailable; drawing the rigged figures:',this.baked.error);}
+        return false;
+      }
     });
+    return this.#figureLoadTask;
+  }
+
+  get figureResourceLifetime(){return this.#figureOptions.resourceLifetime;}
+  #assertFiguresOpen(){if(this.#figureClosed)throw Error('Game figures: closed owner');}
+  #figureFailure(error){if(!this.#figureFailed){this.#figureFailed=true;this.#figureError=error;}}
+  #retireFigure(owner,action,operation='dispose'){let done=this.#figureRetired.get(owner);if(!done){done=new Set();this.#figureRetired.set(owner,done);}if(done.has(operation))return;done.add(operation);try{action();}catch(error){this.#figureFailure(error);}}
+  figureResourceSnapshot(){return Object.freeze({closed:this.#figureClosed,loadsSettled:this.#figureLoadsSettled&&[...this.#figureAtlases].every(a=>a.loadsSettled),nativeCompletion:this.#figureNativeCompletion,failed:this.#figureFailed});}
+
+  // Quiescent caller only: closes figure owners, not world/effects/RAF or the renderer.
+  // null completion means no renderer was supplied; it is never native completion proof.
+  closeFigureResources(){
+    if(this.#figureCloseTask)return this.#figureCloseTask;
+    if(this.#figureCloseDone){if(this.#figureFailed)return Promise.reject(this.#figureError);return Promise.resolve(this.figureResourceSnapshot());}
+    this.#figureClosed=true;this.baked.state='closed';this.#figureLoadsSettled=false;
+    const pools=this.#figurePools,sprites=Object.values(this.#figureSprites),refs=this.#figureMeshRefs;
+    for(const r of this.#figureRoots)r.mesh.visible=false;
+    this.#figureCloseTask=(async()=>{
+      await Promise.resolve(); // publish the close task before external cleanup callbacks
+      for(const owner of [...sprites,...this.#figureAtlases])if(owner.cleanupFailure?.failed)this.#figureFailure(owner.cleanupFailure.error);
+      const unchanged=r=>r.m.geometry===r.g&&r.m.material===r.material&&r.m.instanceMatrix===r.matrix&&r.m.instanceColor===r.color&&r.g.index===r.index&&Object.keys(r.g.attributes).length===r.attrs.length&&r.attrs.every(a=>r.g.attributes[a.key]===a.a&&a.a.array===a.array);
+      if(pools.some((p,i)=>p!==[this.pools.US,this.pools.CS,this.fallen.US,this.fallen.CS][i])||sprites.some((p,i)=>p!==[this.impostors.US,this.impostors.CS][i])||this.#figureRoots.some(r=>r.p.mesh!==r.mesh)||refs.some(r=>!unchanged(r)))this.#figureFailure(Error('Game figures: owner changed'));
+      for(const r of this.#figureRoots)this.#retireFigure(r.mesh,()=>r.mesh.removeFromParent(),'detach');
+      for(const off of this.#figureUnsubscribes)this.#retireFigure(off,off);this.#figureUnsubscribes.length=0;
+      const closePools=()=>{let complete=true;for(const p of pools)try{if(!p.disposeResourceLifetime())complete=false;}catch(error){complete=false;this.#figureFailure(error);}return complete;};
+      // Detach stale Three callbacks immediately, including when the native context is lost.
+      let controllersComplete=closePools();
+      if(!this.#figureOptions.resourceLifetime){for(const r of refs)if(unchanged(r)){this.#retireFigure(r.g,()=>r.g.dispose());this.#retireFigure(r.m,()=>r.m.dispose(),'instance');}}
+      for(const m of new Set(refs.map(r=>r.material)))this.#retireFigure(m,()=>m.dispose());
+      for(const atlas of this.#figureAtlases)this.#retireFigure(atlas,()=>atlas.dispose());
+      if(this.#figureLoadTask)try{await this.#figureLoadTask;}catch(error){this.#figureFailure(error);}
+      // close() bars new tier I/O and waits every started field/close tier, retaining late failures.
+      for(const atlas of this.#figureAtlases)try{await atlas.close();}catch(error){this.#figureFailure(error);}
+      this.#figureLoadsSettled=true;
+      if(!controllersComplete)controllersComplete=closePools();
+      this.baked.atlas=null;this.baked.atlases=null;
+      for(const p of sprites){if(p.cleanupFailure.failed)this.#figureFailure(p.cleanupFailure.error);for(const tier of ['field','close']){const batches=p.batches[tier];p.batches[tier]=[];if(batches.length)this.#retireFigure(batches,()=>p.disposeTier(batches));}p.atlas=null;p.layout=null;if(p.cleanupFailure.failed)this.#figureFailure(p.cleanupFailure.error);}
+      if(this.#figureRoots.some(r=>r.p.mesh!==r.mesh)||refs.some(r=>!unchanged(r)))this.#figureFailure(Error('Game figures: owner changed during cleanup'));
+      for(const r of this.#figureRoots){r.mesh.visible=false;if(r.mesh.parent)try{r.mesh.removeFromParent();}catch(error){this.#figureFailure(error);}}
+      const renderer=this.#figureOptions.renderer;
+      if(renderer){
+        this.#figureNativeCompletion=false;
+        try{const gl=renderer.getContext();if(!gl.isContextLost()){
+          if(gl.getError()!==gl.NO_ERROR)throw Error('Game figures: completion refused');gl.finish();
+          if(!gl.isContextLost()){if(gl.getError()!==gl.NO_ERROR)throw Error('Game figures: completion failed');this.#figureNativeCompletion=controllersComplete&&!this.#figureFailed;}
+        }}catch(error){this.#figureFailure(error);}
+      }
+      for(const r of this.#figureRoots)r.mesh.visible=false;
+      this.#figureCloseDone=!this.#figureFailed&&this.#figureNativeCompletion!==false;
+      if(this.#figureFailed)throw this.#figureError;
+      return this.figureResourceSnapshot();
+    })().finally(()=>{this.#figureCloseTask=null;});
+    return this.#figureCloseTask;
   }
 
   /**
@@ -734,6 +823,7 @@ export class Game {
    * that the sprites now draw.
    */
   updateFigureView() {
+    this.#assertFiguresOpen();
     const V = FIGURE_VIEW;
     const cmp = compareState();
     let a = LOOK.figureStyle, b = null;
@@ -1382,6 +1472,7 @@ export class Game {
 
   /** Level of detail and outline width follow the camera (call before animate). */
   setView(camera, renderHeightPx) {
+    this.#assertFiguresOpen();
     this.pools.US.setView(camera, renderHeightPx);
     this.pools.CS.setView(camera, renderHeightPx);
     this.impostors.US.setView(camera);
@@ -1391,6 +1482,7 @@ export class Game {
 
   /** Animate figures with the (speed-scaled) sim delta; refill and upload the instance buffers. */
   animate(simDt) {
+    this.#assertFiguresOpen();
     this.updateFigureView();
     this.pools.US.begin();
     this.pools.CS.begin();
@@ -1405,6 +1497,7 @@ export class Game {
   }
 
   flushAll() {
+    this.#assertFiguresOpen();
     this.pools.US.flush();
     this.pools.CS.flush();
     this.impostors.US.flush();

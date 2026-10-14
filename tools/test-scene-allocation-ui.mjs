@@ -1,6 +1,6 @@
 // Actions-only native lifecycle proof; this small fixture is not a whole-battle budget measurement.
 import {isDeepStrictEqual} from 'node:util';
-import {poolResourceControls} from './test-pool-resource-ui.mjs';
+import {poolResourceControls,gameFigureResourceControls} from './test-pool-resource-ui.mjs';
 import {AllocationLedger,mipSizes,ReservationPeak,installAllocationObserver,createSceneHistory,compactSceneSample,expandSceneContext,lostRetirementValid} from './bake/scene-allocation.mjs';
 import {installSceneStartGate,restoreSceneDiagnostics} from './bake/inactive-figures.mjs';
 
@@ -81,6 +81,7 @@ export async function sceneAllocationControls({browser,url,check,result,watchErr
   await postOwnerResourceControls({browser,url,check,result,watchErrors});
   await terrainOwnerResourceControls({browser,url,check,result,watchErrors});
   await poolResourceControls({browser,url,check,result,watchErrors});
+  await gameFigureResourceControls({browser,url,check,result,watchErrors});
 }
 
 // Exercise the runtime geometry owner directly; observation never supplies its lifecycle.
