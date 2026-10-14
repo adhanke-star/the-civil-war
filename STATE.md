@@ -1,6 +1,6 @@
 # STATE
-2026-10-13 — v1 released558456f; ACTIVE Codex sole writer /private/tmp/cw-v1-1-20261012;0207 compatibility repair.
-HEAD/originf47a83cf81b4fe5e78b7a8929b39cd68e7389efb. Own38497971270 probeRED spacing7/13, raw115637994571657458B/962203914f8f1e6931cab1106c0e5e6b6522e13cbd41f227a6625714515a7a35 retained; native265/all other jobs finishing.0207 private-brand conditional guards retain borrowed public-method semantics and closed-real-Game refusals: spacing13/Game23+5/Astra clear, required UNIT/syntax/diff CLEAR; own corrected-sourceCI/fullroots UNRUN. PriorREDs retained. Aaron seen6+candidate02/05 comparison APPROVED; graphics-loss scope popup pending. Runtime/v1.1/v2 incomplete; COORD absent.
+2026-10-13 — v1 released558456f; ACTIVE Codex sole writer /private/tmp/cw-v1-1-20261012;0208 immutable runtime-close API WIP.
+HEAD/origin4da9b66b3af2d718f15f35ce769b5ba24bec061b own38498469500 all9/full8 original roots/native265/raw1156395398945741580B/d93955891d52b2ece14f66cce744d79a42d15c01ad5e048ce3bfd8788c062fca root CLEAR.0208 runtime15+2/atlas39+39/Game23+5/inactive148+148 local; required CPU-only UNIT/syntax/diff/Astra CLEAR; own freshCI UNRUN. No startup/assets/quality activation. PriorREDs retained. Aaron seen6+candidate02/05 comparison APPROVED; graphics-loss stop/reload APPROVED. Runtime/v1.1/v2 incomplete; COORD absent.
 Accepted remote main9e72079; sourceCI38346843720 all9/full own251/365/171/159+201+three6smokes/digests clean.
 Main9eCI38349763169 all9/fullown/digests/rawprobe clear; Pages38349763192 exact9e/livev68 clear.
 MAIN13a7b136 exact protected11 dirty paths untouched; c328 failedmainCI38298643624 retained.

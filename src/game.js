@@ -61,7 +61,7 @@ import { Unit, MEN_PER_FIGURE_OPTIONS, MEN_PER_CREW_FIGURE, SPEED, setMenPerFigu
 import { Battery, GunPool } from './units/battery.js';
 import { SoldierPool, FallenPool, FlagPool, UNIFORMS, FIGURE_VIEW, FIGURE_SCALE } from './units/soldier-mesh.js';
 import { framePos } from './units/figure.js';
-import { ImpostorPool, loadBakedAtlas, BAKED_BASES } from './units/impostor.js';
+import { ImpostorPool, loadBakedAtlas, BAKED_BASES, pinRuntimeClose } from './units/impostor.js';
 import { LOOK } from './ui/look.js';
 import { on as onSetting } from './settings.js';
 import { compareState } from './sandbox/compare.js';
@@ -584,9 +584,11 @@ export class Game {
   #figureMeshRefs;
   #figureRoots;
   #figureUnsubscribes=[];
-  constructor({ scene, terrain, scenario, world, effects, playerSide = 'US', figureResourceLifetime = false, renderer = null }) {
+  constructor({ scene, terrain, scenario, world, effects, playerSide = 'US', figureResourceLifetime = false, renderer = null, csRuntimeClose = null }) {
     if(typeof figureResourceLifetime!=='boolean'||renderer!==null&&typeof renderer?.getContext!=='function'||figureResourceLifetime&&!renderer)throw Error('Game figures: explicit lifetime boolean and renderer required');
-    this.#figureOptions=Object.freeze({resourceLifetime:figureResourceLifetime,renderer});
+    if(csRuntimeClose!==null&&!renderer)throw Error('Game figures: runtime close renderer required');
+    this.#figureOptions=Object.freeze({resourceLifetime:figureResourceLifetime,renderer,
+      csRuntimeClose:csRuntimeClose===null?null:pinRuntimeClose(csRuntimeClose)});
     const figureOptions={resourceLifetime:figureResourceLifetime,renderer};
     // This validates structure, not hardware admission: routed definitions pass the field guard upstream.
     const timeline = 'reinforcements' in scenario || 'surrender' in scenario || 'batteryOverrun' in scenario ? prepareReinforcementTimeline({ version: 1,
@@ -743,7 +745,8 @@ export class Game {
     if(this.#figureLoadTask)return this.#figureLoadTask;
     this.baked.state='loading';
     const onCreated=atlas=>{this.#figureAtlases.add(atlas);if(this.#figureClosed)this.#retireFigure(atlas,()=>atlas.dispose());};
-    this.#figureLoadTask=Promise.allSettled([loadBakedAtlas(BAKED_BASES.US,{onCreated}),loadBakedAtlas(BAKED_BASES.CS,{onCreated})]).then(settled=>{
+    this.#figureLoadTask=Promise.allSettled([loadBakedAtlas(BAKED_BASES.US,{onCreated}),loadBakedAtlas(BAKED_BASES.CS,{onCreated,
+      runtimeClose:this.#figureOptions.csRuntimeClose,renderer:this.#figureOptions.renderer})]).then(settled=>{
       this.#figureLoadsSettled=true;
       const atlases=settled.filter(r=>r.status==='fulfilled').map(r=>r.value),failure=settled.find(r=>r.status==='rejected');
       if(this.#figureClosed||failure){

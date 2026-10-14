@@ -227,8 +227,92 @@ export class AtlasLayout {
   }
 }
 
+const runtimeCloseDescriptors = new WeakSet();
+// Only plain JSON metadata crosses this boundary. Capture values once, before any page I/O.
+function frozenMetadata(value, seen = new Set()) {
+  if (value === null || ['string', 'boolean'].includes(typeof value)) return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (!value || typeof value !== 'object' || seen.has(value)
+    || ![Object.prototype, Array.prototype].includes(Object.getPrototypeOf(value)))
+    throw new Error('baked close: plain metadata required');
+  seen.add(value);
+  const copy = Array.isArray(value) ? [] : {};
+  for (const key of Reflect.ownKeys(value)) {
+    if (Array.isArray(value) && key === 'length') continue;
+    const d = Object.getOwnPropertyDescriptor(value, key);
+    if (typeof key !== 'string' || !d.enumerable || !('value' in d) || key === '__proto__')
+      throw new Error('baked close: data properties required');
+    copy[key] = frozenMetadata(d.value, seen);
+  }
+  seen.delete(value);
+  return Object.freeze(copy);
+}
+
+/** Default-off immutable route for the qualified Confederate close pack; no requests or GL calls. */
+export function pinRuntimeClose(input) {
+  if (runtimeCloseDescriptors.has(input)) return input;
+  const snapshot = frozenMetadata(input);
+  if (Object.keys(snapshot).some(key => !['baseline','manifest','sourceManifest','base'].includes(key))
+    || !snapshot.baseline || !snapshot.manifest || !snapshot.sourceManifest)
+    throw new Error('baked close: runtime descriptor fields');
+  const { baseline, manifest, sourceManifest, base = './assets/figures/confederate-infantry/' } = snapshot;
+  if (base !== './assets/figures/confederate-infantry/') throw new Error('baked close: runtime asset base');
+  const descriptor = Object.freeze({ baseline, manifest, sourceManifest, base });
+  const T = closeMetadata(descriptor.baseline, descriptor.manifest, descriptor.sourceManifest);
+  const same = (a,b) => JSON.stringify(a) === JSON.stringify(b);
+  if (!same(descriptor.baseline.tiers.close.pages, descriptor.sourceManifest.tiers.close.pages)
+    || Object.keys(descriptor.baseline.tiers.close.variants || {}).length
+    || !same(Object.keys(descriptor.manifest.tiers.close.variants || {}), ['h2_slouch_roll_butternut']))
+    throw new Error('baked close: runtime baseline binding');
+  for (const [look, tier] of Object.entries({base:descriptor.manifest.tiers.close,...descriptor.manifest.tiers.close.variants})) {
+    if (tier.pages.some((page,index) => page.file !== `cs-close-${look}-${index}-${index === 4 ? 'original.png' : 'astc.ktx2'}`
+      || page.encoding !== (index === 4 ? 'png' : 'astc4x4')
+      || page.alpha !== (index === 4 ? 'straight-gamma-bytes' : 'premultiplied-gamma-bytes')))
+      throw new Error('baked close: runtime page order');
+  }
+  for (const tier of Object.values(new AtlasLayout(descriptor.baseline).tiers))
+    if (tier.pages.some(page => !/^[a-z0-9_-]+\.png$/.test(page.file)))
+      throw new Error('baked close: runtime baseline path');
+  for (const page of T.pages) {
+    if (!/^cs-close-(base|h2_slouch_roll_butternut)-[0-4]-(astc\.ktx2|original\.png)$/.test(page.file)
+      || page.mipLevels !== pageMipBytes(page.w,page.h,page.encoding === 'astc4x4').levels.length
+      || !Number.isSafeInteger(page.bytes) || page.bytes <= 0)
+      throw new Error('baked close: runtime page binding');
+  }
+  runtimeCloseDescriptors.add(descriptor);
+  return descriptor;
+}
+
+function closeMetadata(original, manifest, sourceManifest) {
+  const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  if (!same(manifest.camera, original.camera) || !same(manifest.clips, original.clips)
+    || !same(manifest.tiers.field, original.tiers.field)) throw new Error('baked close: source mismatch');
+  const strip = T => Object.fromEntries(Object.entries(T).filter(([k]) => k !== 'pages' && k !== 'variants'));
+  if (!same(strip(manifest.tiers.close), strip(original.tiers.close))) throw new Error('baked close: frame mismatch');
+  if (!sourceManifest || !same(sourceManifest.camera, original.camera) || !same(sourceManifest.clips, original.clips)
+    || !same(sourceManifest.tiers.field, original.tiers.field)) throw new Error('baked close: missing source binding');
+  const sourceLooks = { base: sourceManifest.tiers.close, ...sourceManifest.tiers.close.variants };
+  const candidateLooks = { base: manifest.tiers.close, ...manifest.tiers.close.variants };
+  if (!same(Object.keys(sourceLooks), Object.keys(candidateLooks))) throw new Error('baked close: source looks');
+  for (const [name, T] of Object.entries(candidateLooks)) {
+    const source = sourceLooks[name];
+    if (!same(strip(T), strip(source)) || !same(T.pages.map(p => [p.w, p.h]), source.pages.map(p => [p.w, p.h])))
+      throw new Error('baked close: look source mismatch');
+  }
+  const candidate = new AtlasLayout(manifest);
+  const T = candidate.tiers.close;
+  if (candidate.missing.length || candidate.problems().length || T.pages.length !== 10
+    || T.pages.filter(p => p.encoding === 'astc4x4').length !== 8
+    || T.pages.filter(p => p.encoding === 'png' && p.alpha === 'straight-gamma-bytes').length !== 2)
+    throw new Error('baked close: unqualified layout');
+
+  return T;
+}
+
 /** The atlas in the browser: the manifest, then each tier's pages (base and variants) as textures on request. */
 export class BakedAtlas {
+  #runtimeClose = null;
+  #runtimeRenderer = null;
   #disposeStarted = false;
   #pendingLoads = 0;
   get loadsSettled(){return this.#pendingLoads===0;}
@@ -237,12 +321,20 @@ export class BakedAtlas {
   get cleanupFailure(){return Object.freeze({failed:this.#disposeFailed,error:this.#disposeError});}
   #cleanupFailure(error){if(!this.#disposeFailed){this.#disposeFailed=true;this.#disposeError=error;}}
   constructor(manifest, base = BAKED_BASE, options = {}) {
+    if (options.runtimeClose != null) {
+      if (!runtimeCloseDescriptors.has(options.runtimeClose) || options.diagnosticClose != null
+        || base !== options.runtimeClose.base || typeof options.renderer?.getContext !== 'function'
+        || JSON.stringify(manifest) !== JSON.stringify(options.runtimeClose.baseline))
+        throw new Error('baked close: invalid runtime binding');
+      this.#runtimeClose = options.runtimeClose;
+      this.#runtimeRenderer = options.renderer;
+    }
     this.layout = new AtlasLayout(manifest);
     this.base = base;
     this.textures = {};
     this.state = {};
     this.pools = [];
-    // Explicit diagnostic opt-in only; ordinary product callers retain the PNG route.
+    // Mutable diagnostic configuration stays separate from the private immutable runtime route.
     this.diagnosticClose = options.diagnosticClose;
     this.renderer = options.renderer;
     this.io = options.io || {};
@@ -252,9 +344,11 @@ export class BakedAtlas {
   load(tier) {
     if (this.disposed) return Promise.reject(new Error('baked atlas: disposed'));
     if (this.state[tier]) return this.state[tier];
-    if (tier === 'close' && this.diagnosticClose) {
+    if (tier === 'close' && (this.#runtimeClose || this.diagnosticClose)) {
       this.#pendingLoads++;
-      this.state.close = this.loadDiagnosticClose().finally(()=>this.#pendingLoads--);
+      this.state.close = (this.#runtimeClose
+        ? this.#loadClose(this.#runtimeClose, this.#runtimeRenderer, true)
+        : this.loadDiagnosticClose()).finally(()=>this.#pendingLoads--);
       return this.state.close;
     }
     const T = this.layout.tiers[tier];
@@ -287,21 +381,24 @@ export class BakedAtlas {
 
   loaded(tier) { return !!this.textures[tier]; }
 
-  publishTier(tier, T, textures) {
+  publishTier(tier, T, textures, requireClean = null) {
     const prepared = [];
     const layout = Object.assign(Object.create(Object.getPrototypeOf(this.layout)), this.layout,
       { tiers: { ...this.layout.tiers, [tier]: T } });
     try {
+      requireClean?.();
       // Native callbacks run before reference publication and newly attached pools join the transaction.
       for (const pool of this.pools) {
         const entry = { pool, batches: pool.prepareTier(tier, layout, textures) }; prepared.push(entry);
         pool.mountTier(entry.batches);
+        requireClean?.();
       }
       if (this.disposed) throw new Error('baked atlas: disposed');
       this.layout.tiers[tier] = T;
       this.textures[tier] = textures;
       for (const { pool, batches } of prepared) { pool.layout = this.layout; pool.batches[tier] = batches; }
     } catch (error) {
+      for (const pool of this.pools) if (pool.cleanupFailure?.failed) this.#cleanupFailure(pool.cleanupFailure.error);
       for (const { pool, batches } of prepared) { try { pool.disposeTier(batches); } catch (cleanupError) { this.#cleanupFailure(cleanupError); } }
       throw error;
     }
@@ -316,8 +413,33 @@ export class BakedAtlas {
   }
 
   async loadDiagnosticClose() {
-    const baseline = this.layout.tiers.close;
-    const completionBeforeFallback = this.diagnosticClose.completionBeforeFallback ?? false;
+    return this.#loadClose(this.diagnosticClose, this.renderer, false);
+  }
+
+  async #loadClose(configuration, renderer, runtime) {
+    const baseline = runtime ? new AtlasLayout(configuration.baseline).tiers.close : this.layout.tiers.close;
+    const completionBeforeFallback = runtime || (configuration.completionBeforeFallback ?? false);
+    const captureRuntimeFailures = () => {
+      if (runtime) for (const pool of this.pools) if (pool.cleanupFailure?.failed) this.#cleanupFailure(pool.cleanupFailure.error);
+    };
+    const requireCleanRuntime = () => {
+      if (!runtime) return;
+      captureRuntimeFailures();
+      if (this.#disposeFailed || this.disposed) {
+        const error = new Error('baked close: runtime cleanup incomplete', {cause:this.#disposeError});
+        error.closeCompletionFailure = true;
+        throw error;
+      }
+    };
+    const requireStableRuntime = () => {
+      if (runtime && (JSON.stringify(this.layout.manifest) !== JSON.stringify(configuration.baseline)
+        || JSON.stringify(this.layout.tiers.close) !== JSON.stringify(baseline)
+        || JSON.stringify(this.layout.tiers.field) !== JSON.stringify(new AtlasLayout(configuration.baseline).tiers.field))) {
+        const error = new Error('baked close: runtime metadata drift');error.closeCompletionFailure = true;throw error;
+      }
+    };
+    requireCleanRuntime();
+    requireStableRuntime();
     if (typeof completionBeforeFallback !== 'boolean') throw new Error('baked close: explicit completion boolean required');
     const observer = this.io.observeClose, observationErrors = [];
     if (observer !== undefined && typeof observer !== 'function') throw new Error('baked close observation: synchronous function required');
@@ -363,12 +485,12 @@ export class BakedAtlas {
           } else t = await png(base + p.file, p, own);
           if (this.disposed) throw new Error('baked atlas: disposed');
           // needsUpdate alone is not proof of successful native allocation/upload.
-          const gl = this.renderer.getContext();
+          const gl = renderer.getContext();
           if (gl.isContextLost() || gl.getError() !== gl.NO_ERROR) throw new Error('baked close: pre-upload GL failure');
-          this.renderer.initTexture(t);
+          renderer.initTexture(t);
           if (gl.isContextLost() || gl.getError() !== gl.NO_ERROR) throw new Error('baked close: upload GL failure');
-          if (this.renderer.properties) {
-            const native = this.renderer.properties.get(t);
+          if (renderer.properties) {
+            const native = renderer.properties.get(t);
             if (!gl.isTexture(native.__webglTexture) || native.__version !== t.version)
               throw new Error('baked close: native texture not uploaded');
           }
@@ -383,26 +505,30 @@ export class BakedAtlas {
         const failure = settled.find(r => r.status === 'rejected');
         if (failure) throw failure.reason;
         if (this.disposed) throw new Error('baked atlas: disposed');
+        requireStableRuntime();
         const textures = settled.map(r => r.value);
         event('publish-start',null,null,null);
         if (observationErrors.length) throw observationFailure();
-        this.publishTier('close', T, textures);
+        this.publishTier('close', T, textures, runtime ? () => {requireCleanRuntime();requireStableRuntime();} : null);
         return textures;
       } catch (error) {
+        captureRuntimeFailures();
         const disposalErrors = [];
         for (const {texture:t,page:p,index} of owned) {
           event('dispose-start',p,index,t);
           try {t.dispose();event('dispose-result',p,index,t,{ok:true,error:null});}
-          catch (failure) {disposalErrors.push(failure?.message || String(failure));event('dispose-result',p,index,t,{ok:false,error:failure?.message || String(failure)});}
+          catch (failure) {if(runtime)this.#cleanupFailure(failure);disposalErrors.push(failure?.message || String(failure));event('dispose-result',p,index,t,{ok:false,error:failure?.message || String(failure)});}
         }
         if (observationErrors.length) throw observationFailure();
+        requireCleanRuntime();
+        requireStableRuntime();
         if (compressed && completionBeforeFallback && owned.length) {
-          // Explicit diagnostic experiment only: disposal is not GPU completion.
+          // Opt-in retirement boundary: disposal is not GPU completion.
           // All siblings have settled and every owned texture has been disposed first.
           const began = performance.now();
           event('completion-start',null,null,null,{method:'finish'});
           try {
-            const gl = this.renderer.getContext();
+            const gl = renderer.getContext();
             if (disposalErrors.length || this.disposed || gl.isContextLost() || gl.getError() !== gl.NO_ERROR)
               throw new Error('candidate disposal/context incomplete');
             if (observationErrors.length) throw observationFailure();
@@ -423,38 +549,19 @@ export class BakedAtlas {
       }
     };
     try {
-      const { manifest, base, sourceManifest } = this.diagnosticClose;
-      const original = this.layout.manifest;
-      const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-      if (!same(manifest.camera, original.camera) || !same(manifest.clips, original.clips)
-        || !same(manifest.tiers.field, original.tiers.field)) throw new Error('baked close: source mismatch');
-      const strip = T => Object.fromEntries(Object.entries(T).filter(([k]) => k !== 'pages' && k !== 'variants'));
-      if (!same(strip(manifest.tiers.close), strip(original.tiers.close))) throw new Error('baked close: frame mismatch');
-      if (!sourceManifest || !same(sourceManifest.camera, original.camera) || !same(sourceManifest.clips, original.clips)
-        || !same(sourceManifest.tiers.field, original.tiers.field)) throw new Error('baked close: missing source binding');
-      const sourceLooks = { base: sourceManifest.tiers.close, ...sourceManifest.tiers.close.variants };
-      const candidateLooks = { base: manifest.tiers.close, ...manifest.tiers.close.variants };
-      if (!same(Object.keys(sourceLooks), Object.keys(candidateLooks))) throw new Error('baked close: source looks');
-      for (const [name, T] of Object.entries(candidateLooks)) {
-        const source = sourceLooks[name];
-        if (!same(strip(T), strip(source)) || !same(T.pages.map(p => [p.w, p.h]), source.pages.map(p => [p.w, p.h])))
-          throw new Error('baked close: look source mismatch');
-      }
-      const candidate = new AtlasLayout(manifest);
-      const T = candidate.tiers.close;
-      if (candidate.missing.length || candidate.problems().length || T.pages.length !== 10
-        || T.pages.filter(p => p.encoding === 'astc4x4').length !== 8
-        || T.pages.filter(p => p.encoding === 'png' && p.alpha === 'straight-gamma-bytes').length !== 2)
-        throw new Error('baked close: unqualified layout');
-      if (astcAvailable(this.renderer.getContext(), T.pages)) return await attempt(T, base, true);
+      const { manifest, base, sourceManifest } = configuration;
+      const T = closeMetadata(this.layout.manifest, manifest, sourceManifest);
+      if (astcAvailable(renderer.getContext(), T.pages)) return await attempt(T, base, true);
     } catch (error) {
       if (error.closeObservationFailure || error.closeCompletionFailure) throw error;
       this.closeDiagnosticFailure = error.message;
     }
     if (this.disposed) throw new Error('baked atlas: disposed');
+    requireCleanRuntime();
+    requireStableRuntime();
     // Exact current single-base close layout; field object and pool references stay intact.
     if (baseline.looks.length !== 1) throw new Error('baked close: baseline must be single-base PNG');
-    return attempt(baseline, this.base, false);
+    return attempt(baseline, runtime ? configuration.base : this.base, false);
   }
 
   async close(){
@@ -479,11 +586,11 @@ export class BakedAtlas {
 }
 
 /** Fetch the manifest and the field pages; resolves once sprites can draw. */
-export async function loadBakedAtlas(base = BAKED_BASE, { onCreated = null } = {}) {
+export async function loadBakedAtlas(base = BAKED_BASE, { onCreated = null, runtimeClose = null, renderer = null } = {}) {
   if(onCreated!==null&&typeof onCreated!=='function')throw Error('baked atlas: creation observer required');
   const res = await fetch(`${base}soldier.json`);
   if (!res.ok) throw new Error(`baked figures: HTTP ${res.status} for ${base}soldier.json`);
-  const atlas = new BakedAtlas(await res.json(), base);
+  const atlas = new BakedAtlas(await res.json(), base, { runtimeClose, renderer });
   try{if(onCreated)onCreated(atlas);await atlas.load('field');return atlas;}catch(error){try{atlas.dispose();}catch{}throw error;}
 }
 
