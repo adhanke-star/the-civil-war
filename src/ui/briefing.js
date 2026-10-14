@@ -33,6 +33,30 @@ const MAX_BYTES = 1024 * 1024;
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const has = (o, k) => !!o && typeof o === 'object' && Object.prototype.hasOwnProperty.call(o, k);
 const words = (v) => typeof v === 'string' && v.trim() ? v.trim() : '';
+const el = (tag, props = {}, ...kids) => {
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(props)) if (v !== undefined && v !== null) k === 'text' ? (n.textContent = v) : n.setAttribute(k, v);
+  n.append(...kids.filter(Boolean));
+  return n;
+};
+
+/** Terminal graphics interruption; only an explicit reload can start another field. */
+export function showGraphicsReload({reload=()=>location.reload()}={}) {
+  const existing=document.getElementById('graphics-reload');
+  if(existing){existing.querySelector('button').focus({preventScroll:true});return existing;}
+  const dialog=el('dialog',{id:'graphics-reload',role:'alertdialog','aria-modal':'true','aria-labelledby':'graphics-reload-title',
+    'aria-describedby':'graphics-reload-text'});
+  const body=el('div',{class:'briefing-body',tabindex:'0',role:'region','aria-labelledby':'graphics-reload-title'},
+    el('h2',{id:'graphics-reload-title',text:'Battle stopped'}),
+    el('p',{id:'graphics-reload-text',text:'The graphics connection was lost. Reload to restart this battle.'}));
+  const button=el('button',{type:'button',class:'briefing-begin',text:'Reload battle'});
+  button.addEventListener('click',reload);
+  dialog.addEventListener('cancel',event=>event.preventDefault());
+  dialog.append(body,el('div',{class:'briefing-foot'},button));
+  const battle=document.getElementById('battle');if(battle)battle.inert=true;
+  document.body.append(dialog);dialog.showModal();button.focus({preventScroll:true});
+  return dialog;
+}
 
 async function boundedJson(url, fetcher = globalThis.fetch) {
   const response = await fetcher(url);
@@ -335,12 +359,6 @@ const DEFAULT_LOAN = "Grant's Army of the Tennessee is on loan for this phase. I
 /** The paused Briefing overlay. Begin (or Escape) closes it, unpauses and focuses the battlefield. */
 export function mountBriefing({ scenario, phase, game, hud, effects, onBegin = () => {}, save = null, deck = null }) {
   const b = has(scenario, 'briefing') && scenario.briefing && typeof scenario.briefing === 'object' ? scenario.briefing : {};
-  const el = (tag, props = {}, ...kids) => {
-    const n = document.createElement(tag);
-    for (const [k, v] of Object.entries(props)) if (v !== undefined && v !== null) k === 'text' ? (n.textContent = v) : n.setAttribute(k, v);
-    n.append(...kids.filter(Boolean));
-    return n;
-  };
   const dialog = el('dialog', { id: 'briefing', 'aria-labelledby': 'briefing-title', 'aria-describedby': 'briefing-text' });
   const body = el('div', { class: 'briefing-body' });
   const when = [formatDate(scenario.date), words(scenario.start)].filter(Boolean).join(' · ');
@@ -434,9 +452,9 @@ export function mountBriefing({ scenario, phase, game, hud, effects, onBegin = (
   dialog.append(body, el('div', { class: 'briefing-foot' }, begin));
   (document.getElementById('battle') || document.body).append(dialog);
   game.paused = true; hud.setPaused(true);
-  let started = false;
+  let started = false, stoppedForReload = false;
   function start() {
-    if (started) return;
+    if (started || stoppedForReload) return;
     started = true; dialog.close(); dialog.remove();
     effects?.unlock?.();
     game.paused = false; hud.setPaused(false);
@@ -446,5 +464,7 @@ export function mountBriefing({ scenario, phase, game, hud, effects, onBegin = (
   dialog.addEventListener('cancel', (e) => { e.preventDefault(); start(); });
   begin.addEventListener('click', start);
   dialog.showModal(); begin.focus({ preventScroll: true });
-  return { dialog, begin: start, get open() { return !started; } };
+  return { dialog, begin: start,
+    stopForReload() { stoppedForReload=true;dialog.remove(); },
+    get open() { return !started && !stoppedForReload; } };
 }

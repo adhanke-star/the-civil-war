@@ -153,6 +153,21 @@ export const QUALIFIED_HYBRID = Object.freeze({
   review:Object.freeze({id:11762905334,name:'cs-close-qualification-review',size:79493756,
     digest:'b9b761a24435489cfe272c90cbe04b60f7b9eb62c8ffec5f1b0f1ae37454452b'}),
 });
+// Exact decoded members installed from the two digest-bound qualification archives, plus source binding.
+export const QUALIFIED_RUNTIME_MEMBERS = Object.freeze({
+  "cs-close-base-0-astc.ktx2": "b8166cadc1aeb0e7212bf81e9b105d5fb2e4e46c1912776289553028235677c5",
+  "cs-close-base-1-astc.ktx2": "47c36c5a0b215d47b16fdb3d647ef72913aa0a4f7ff9c2e3e487d09d9ff13a2c",
+  "cs-close-base-2-astc.ktx2": "ad30e65d87dbb9313f05f2548b85776e795e5cf58cd16ec2e9ad43f89f7491bc",
+  "cs-close-base-3-astc.ktx2": "4d5eca2159be8fca43dc7613f4a08b5cdb5d38c6ce736c1ddb64c8d39878a0bb",
+  "cs-close-base-4-original.png": "599389a3b48194eb65b6ed5d6dadbab6dbf2bb22bf8778084c0bf24f7900314b",
+  "cs-close-h2_slouch_roll_butternut-0-astc.ktx2": "16eb7e53c3a74011defa0cb040a5f7fe7ca0af37334624a249067bfa0efd8647",
+  "cs-close-h2_slouch_roll_butternut-1-astc.ktx2": "0beab1432ca741c779e17ce002db7efb562fc87530d3ad620d4ae5f25e12cdcd",
+  "cs-close-h2_slouch_roll_butternut-2-astc.ktx2": "8f0c7ed1bbed4c1630cf9fbe4f269e88b7ae0e783edbe203c6845177be6f6193",
+  "cs-close-h2_slouch_roll_butternut-3-astc.ktx2": "d3c434628b6c5f537e69b05d66f8f5c64b283a1c1bf8919b5118786aea816fad",
+  "cs-close-h2_slouch_roll_butternut-4-original.png": "8a0375329ad2f7e3c52d2221c09e64270155d0ef40d27ec458dde41e639fb699",
+  "soldier-hybrid.json": "4db73bbf381bdd5b0439c426d35e9a9097610569d57c7d483c424d3fc4111b08",
+  "soldier-source.json": "4323b2226041e8961ab08394335e42928252d096a3d4b817cdaf68de1a0e9243"
+});
 const acquiredSceneInputs=new WeakMap();
 export function validateQualifiedArtifacts(run,artifacts){
   const Q=QUALIFIED_HYBRID;

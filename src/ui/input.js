@@ -30,8 +30,28 @@ const MIN_ORDER_M = 22;
 const LONG_PRESS_MS = 350;
 const DOUBLE_TAP_MS = 380;
 const MOUSE_AFTER_TOUCH_MS = 800;
+const stoppedForReload = new WeakSet();
+const terminalFailures = new WeakMap();
+const terminalInProgress = new WeakSet();
 
 export class Input {
+  get stoppedForReload() { return stoppedForReload.has(this); }
+  stopForReload() {
+    if(terminalInProgress.has(this))throw new Error('Input: reentrant terminal stop');
+    if (stoppedForReload.has(this)) {if(terminalFailures.has(this))throw terminalFailures.get(this);return;}
+    stoppedForReload.add(this);
+    terminalInProgress.add(this);
+    let failed=false,failure;
+    const clean=fn=>{try{fn();}catch(error){if(!failed){failed=true;failure=error;}}};
+    clean(()=>this.cancel());
+    clean(()=>clearTimeout(this.longPress));this.longPress=0;this.drag=null;this.targeting=null;
+    clean(()=>this.pointers.clear());clean(()=>{this.panSamples.length=0;});this.wheelGesture=null;
+    clean(()=>this.rts.keys.clear());this.rts.inertia=null;
+    clean(()=>this.arrows.clearPreview());clean(()=>this.hud.setGhostLabel(null));clean(()=>this.hideBox());
+    clean(()=>this.soldierView?.end('graphics-loss'));
+    terminalInProgress.delete(this);
+    if(failed){terminalFailures.set(this,failure);throw failure;}
+  }
   constructor({ canvas, rts, game, arrows, hud, playerSide, onQualityKey }) {
     Object.assign(this, { canvas, rts, game, arrows, hud, playerSide, onQualityKey });
     this.drag = null;
@@ -49,10 +69,10 @@ export class Input {
     // A transient lens releases at window capture, before a reader or ordinary field picking owns
     // the event. Stop propagation, not immediate propagation: later capture observers see the return.
     const consumed = (e, handled) => { if (handled) { e.preventDefault(); e.stopPropagation(); } };
-    window.addEventListener('keydown', (e) => consumed(e, this.soldierView?.keyDown(e)), true);
-    window.addEventListener('keyup', (e) => consumed(e, this.soldierView?.keyUp(e)), true);
+    window.addEventListener('keydown', (e) => { if(!stoppedForReload.has(this))consumed(e, this.soldierView?.keyDown(e)); }, true);
+    window.addEventListener('keyup', (e) => { if(!stoppedForReload.has(this))consumed(e, this.soldierView?.keyUp(e)); }, true);
     for (const type of ['pointerdown', 'dblclick', 'wheel']) {
-      window.addEventListener(type, () => this.soldierView?.end(type === 'wheel' ? 'wheel' : 'pointer'), true);
+      window.addEventListener(type, () => { if(!stoppedForReload.has(this))this.soldierView?.end(type === 'wheel' ? 'wheel' : 'pointer'); }, true);
     }
     window.addEventListener('focusin', (e) => {
       if (this.soldierView?.active && !this.soldierView.isFieldFocus(e)) this.soldierView.end('focus');
@@ -65,6 +85,7 @@ export class Input {
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     canvas.addEventListener('pointerdown', (e) => this.down(e, null));
     canvas.addEventListener('dblclick', (e) => {
+      if (stoppedForReload.has(this)) return;
       if (this.isCompatMouse(e)) return;
       const u = this.unitAt(this.rts.pick(e.clientX, e.clientY, canvas));
       if (u) this.rts.flyTo(u.x, u.z);
@@ -80,6 +101,7 @@ export class Input {
 
     this.wheelGesture = null;
     const onWheel = (e) => {
+      if (stoppedForReload.has(this)) return;
       if (this.targeting?.mode !== 'delegate') this.cancelTargeting(); // zooming to find a place keeps the pick
       e.preventDefault();
       this.rts.inertia = null;
@@ -98,7 +120,7 @@ export class Input {
     // the flags sit over the canvas: wheel over a flag must still steer the camera
     document.getElementById('markers').addEventListener('wheel', onWheel, { passive: false });
     window.addEventListener('keydown', (e) => this.key(e));
-    window.addEventListener('keyup', (e) => rts.onKey(e, false));
+    window.addEventListener('keyup', (e) => { if(!stoppedForReload.has(this))rts.onKey(e, false); });
     window.addEventListener('blur', () => { rts.keys.clear(); this.cancel(); });
     game.on('select', () => this.cancelTargeting());
     game.on('remove', () => this.refreshTargeting());
@@ -148,6 +170,7 @@ export class Input {
 
   // ---------------------------------------------------------------------------------------------------
   down(e, markerUnit) {
+    if (stoppedForReload.has(this)) return;
     if (this.isCompatMouse(e)) return;
     if (this.targeting?.mode === 'delegate' && e.button === 0 && !this.drag && !this.pointers.size) {
       // picking a place to delegate to: a click or tap picks it (on a flag: that brigade's place); a drag pans
@@ -197,6 +220,7 @@ export class Input {
   }
 
   touchDown(e, markerUnit) {
+    if (stoppedForReload.has(this)) return;
     const n = this.pointers.size;
     const d = this.drag;
     if (n === 1) {
@@ -246,6 +270,7 @@ export class Input {
   }
 
   move(e) {
+    if (stoppedForReload.has(this)) return;
     if (this.isCompatMouse(e)) return;
     const ptr = this.pointers.get(e.pointerId);
     if (ptr) { ptr.x = e.clientX; ptr.y = e.clientY; }
@@ -291,6 +316,7 @@ export class Input {
   }
 
   pinchMove(d) {
+    if (stoppedForReload.has(this)) return;
     const a = this.pointers.get(d.ids[0]), b = this.pointers.get(d.ids[1]);
     if (!a || !b) return;
     const D = Math.max(10, Math.hypot(a.x - b.x, a.y - b.y));
@@ -304,12 +330,14 @@ export class Input {
 
   /** The order being drawn: preview line, ghost, arc and label (move, or attack when over an enemy). */
   orderPreview(d, cx, cy, shift) {
+    if (stoppedForReload.has(this)) return;
     const p = this.rts.pick(cx, cy, this.canvas);
     if (p) this.orderPreviewAt(d, p, shift);
   }
 
   /** Shared world-point preview: keyboard march forces ground, keyboard attack supplies its target. */
   orderPreviewAt(d, p, shift = false, target = undefined) {
+    if (stoppedForReload.has(this)) return;
     const g = this.game;
     const u = d.unit;
     const last = d.points[d.points.length - 1];
@@ -375,6 +403,7 @@ export class Input {
   }
 
   up(e) {
+    if (stoppedForReload.has(this)) return;
     if (this.isCompatMouse(e)) return;
     if (e.pointerType === 'touch') this.lastTouch = performance.now();
     this.pointers.delete(e.pointerId);
@@ -448,6 +477,7 @@ export class Input {
 
   /** A tap or click on a brigade that did not become a drag: select it alone; twice quickly flies to it. */
   tapUnit(u, e) {
+    if (stoppedForReload.has(this)) return;
     if (!u) return;
     if (this.game.selection.length > 1 || this.game.selected !== u) this.game.select(u);
     if (e.pointerType !== 'touch') return; // mouse double-click is the dblclick event
@@ -469,6 +499,7 @@ export class Input {
   }
 
   showBox(x0, y0, x1, y1) {
+    if (stoppedForReload.has(this)) return;
     const b = this.box;
     b.hidden = false;
     b.style.left = `${Math.min(x0, x1)}px`;
@@ -494,6 +525,7 @@ export class Input {
    * the brigades selected when the place was picked; cancelling changes nothing. Either way the field has focus.
    */
   chooseDelegate(p) {
+    if (stoppedForReload.has(this)) return;
     const units = this.delegable();
     if (!p || !units.length) { this.cancelTargeting(); this.hud.toast('Pick a place on the field to delegate to.'); return false; }
     this.targeting = null;
@@ -518,6 +550,7 @@ export class Input {
   }
 
   beginTargeting(mode, reverse = false) {
+    if (stoppedForReload.has(this)) return;
     const unit = this.game.selected;
     if (!unit || !this.game.units.includes(unit) || !this.mine(unit)) {
       this.cancelTargeting(); this.hud.toast('Select a brigade that can take orders.'); return;
@@ -539,6 +572,7 @@ export class Input {
   }
 
   refreshTargeting(announce = false) {
+    if (stoppedForReload.has(this)) return;
     const d = this.targeting;
     if (!d) return false;
     const g = this.game;
@@ -573,6 +607,7 @@ export class Input {
 
   /** Delegate targeting: lines from the selected brigades to the place and a ring there; the status names the keys. */
   refreshDelegate(d, announce) {
+    if (stoppedForReload.has(this)) return;
     const units = this.delegable(), p = d.point;
     if (!units.length) { this.cancelTargeting(); return false; }
     const previewKey = JSON.stringify(['delegate', p.x, p.z, units.map((u) => [u.id, Math.round(u.x), Math.round(u.z)]), this.arrows.mpp, this.arrows.styles()]);
@@ -591,6 +626,7 @@ export class Input {
   }
 
   targetingKey(e, k) {
+    if (stoppedForReload.has(this)) return false;
     if (!this.refreshTargeting()) return false;
     const d = this.targeting;
     if (k === 'escape') { this.cancelTargeting(); return true; }
@@ -622,6 +658,7 @@ export class Input {
   }
 
   key(e) {
+    if (stoppedForReload.has(this)) return;
     if (document.querySelector('main')?.inert || document.querySelector('dialog[open]')) { this.rts.keys.clear(); this.cancelTargeting(); return; }
     if (e.target?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"]), #sb-panel') || e.metaKey || e.ctrlKey || e.altKey) return;
     const k = e.key.toLowerCase();

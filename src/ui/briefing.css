@@ -1,4 +1,12 @@
 /* Campaign Briefing overlay (src/ui/briefing.js). The base dialog look comes from hud.css; Begin stays in view. */
+#graphics-reload { box-sizing: border-box; width: min(520px, calc(100vw - 24px)); max-width: none; max-height: calc(100dvh - 24px); padding: 0; overflow: hidden; }
+#graphics-reload[open] { display: flex; flex-direction: column; }
+#graphics-reload .briefing-body { overflow: auto; min-height: 0; padding: 18px 22px 8px; -webkit-user-select: text; user-select: text; }
+#graphics-reload .briefing-body:focus-visible { outline: 2px solid var(--focus); outline-offset: -3px; }
+#graphics-reload h2, #graphics-reload p { overflow-wrap: anywhere; }
+#graphics-reload p { font-size: 16px; line-height: 1.5; }
+#graphics-reload .briefing-foot { flex: none; padding: 8px 22px 16px; border-top: 1px solid var(--panel-edge, #6b6474); }
+#graphics-reload button { min-height: 48px; min-width: 140px; font-size: 17px; font-weight: 700; }
 #briefing { box-sizing: border-box; width: min(600px, calc(100vw - 24px)); max-width: none; max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); padding: 0; overflow: hidden; }
 #briefing[open] { display: flex; flex-direction: column; }
 #briefing .briefing-body { overflow: auto; padding: 18px 22px 8px; min-height: 0; -webkit-user-select: text; user-select: text; }

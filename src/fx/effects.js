@@ -13,6 +13,7 @@ import { LOOK } from '../ui/look.js';
 import { on } from '../settings.js';
 
 const POOL = 200;
+const stoppedForReload = new WeakSet(), terminalClosures = new WeakMap();
 
 function smokeTexture() {
   const size = 64;
@@ -34,6 +35,25 @@ function smokeTexture() {
 }
 
 export class Effects {
+  get stoppedForReload() { return stoppedForReload.has(this); }
+  stopForReload() {
+    if(stoppedForReload.has(this))return terminalClosures.get(this);
+    stoppedForReload.add(this);this.ok=false;this.smokeEpoch++;
+    let resolveTask,rejectTask;
+    const task=new Promise((resolve,reject)=>{resolveTask=resolve;rejectTask=reject;});
+    terminalClosures.set(this,task);task.catch(()=>{});
+    let failed=false,failure,closing=Promise.resolve();
+    const clean=fn=>{try{fn();}catch(error){if(!failed){failed=true;failure=error;}}};
+    clean(()=>this.clearMoments());clean(()=>this.director?.stop());
+    for(const {system} of this.systems)clean(()=>system.pause());
+    this.sound.enabled=false;
+    clean(()=>{closing=Promise.resolve(this.sound.ctx?.close?.());});
+    const retain=error=>{if(!failed){failed=true;failure=error;}};
+    Promise.allSettled([closing,this.sound.ready].map(p=>Promise.resolve(p).catch(retain)))
+      .then(()=>{if(failed)rejectTask(failure);else resolveTask();});
+    if(failed)throw failure;
+    return task;
+  }
   constructor(scene, terrain, rts) {
     this.scene = scene;
     this.terrain = terrain;
@@ -58,11 +78,13 @@ export class Effects {
   }
 
   /** The director, when its recorded sound `id` is ready to play. */
-  recorded(id) { const d = this.director; return d && d.mixer.has(id) ? d : null; }
+  recorded(id) { const d = this.director; return !stoppedForReload.has(this) && d && d.mixer.has(id) ? d : null; }
 
   async init() {
+    if(stoppedForReload.has(this))return false;
     try {
       const Q = await import('three.quarks');
+      if(stoppedForReload.has(this))return false;
       const material = new THREE.MeshBasicMaterial({ map: smokeTexture(), transparent: true, depthWrite: false, color: 0xffffff });
       const batch = new Q.BatchedRenderer();
       batch.name = 'smoke';
@@ -114,11 +136,13 @@ export class Effects {
   }
 
   setSmoke(v) {
+    if(stoppedForReload.has(this))return;
     if (this.smokeEnabled === Boolean(v)) return;
     this.smokeEnabled = Boolean(v); this.smokeEpoch++; this.syncSmoke();
   }
 
   syncSmoke() {
+    if(stoppedForReload.has(this))return;
     const visible = this.smokeEnabled && !this.reducedMotion;
     if (this.batch) this.batch.visible = visible;
     if (!visible) {
@@ -129,9 +153,11 @@ export class Effects {
   }
 
   puff(x, z, big = false, delay = 0) {
+    if(stoppedForReload.has(this))return;
     if (!this.ok || !this.smokeEnabled || this.reducedMotion) return;
     const epoch = this.smokeEpoch;
     const go = () => {
+      if(stoppedForReload.has(this))return;
       if (!this.ok || !this.smokeEnabled || this.reducedMotion || epoch !== this.smokeEpoch) return;
       let k = 0, s;
       do {
@@ -149,12 +175,14 @@ export class Effects {
   }
 
   volley(unit, muzzles) {
+    if(stoppedForReload.has(this))return;
     for (const [x, z, delay] of muzzles) this.puff(x, z, false, delay);
     const d = this.recorded('volley-1');
     if (d) d.volley(unit.x, unit.z, unit.men); else this.playVolley(unit);
   }
 
   boom(unit, target, canister) {
+    if(stoppedForReload.has(this))return;
     const s = Math.sin(unit.facing), c = Math.cos(unit.facing);
     for (const g of unit.gunPositions ? unit.gunPositions() : [[unit.x, unit.z]]) this.puff(g[0] + s * 4, g[1] + c * 4, true, Math.random() * 0.6);
     if (!canister && target) {
@@ -164,11 +192,12 @@ export class Effects {
     const d = this.recorded('cannon');
     if (!d) { this.playBoom(unit); return; }
     d.cannon(unit.x, unit.z);
-    if (!canister && target) { const x = target.x, z = target.z; setTimeout(() => d.burst(x, z), 900 + Math.random() * 400); }
+    if (!canister && target) { const x = target.x, z = target.z; setTimeout(() => {if(!stoppedForReload.has(this))d.burst(x, z);}, 900 + Math.random() * 400); }
   }
 
   /** A shell bursting at (x, z): a ring of cannon-sized clouds, a few small ones and a bang (sandbox moment). */
   shellBurst(x, z) {
+    if(stoppedForReload.has(this))return;
     for (let i = 0; i < 5; i++) {
       const a = (i / 5) * Math.PI * 2;
       this.puff(x + Math.cos(a) * 5, z + Math.sin(a) * 5, true, i * 0.04);
@@ -179,6 +208,7 @@ export class Effects {
   }
 
   update(dt) {
+    if(stoppedForReload.has(this))return;
     if (this.ok) this.batch.update(dt);
   }
 
@@ -188,6 +218,7 @@ export class Effects {
    * sting follow look.xFactorStyle and reduced motion; nothing here changes combat.
    */
   xFactor(unit, { preview = false, label = preview ? 'X-Factor preview' : 'X-Factor' } = {}) {
+    if(stoppedForReload.has(this))return false;
     if (!unit?.alive || LOOK.xFactorStyle === 'off') return false;
     this.stopMomentSound();
     // Bounded cues even when a caller cycles through many units. No scene allocation or combat change.
@@ -200,17 +231,21 @@ export class Effects {
     const play = () => {
       if (epoch === this.momentAudioEpoch && this.activeMoment === record && this.moments.get(unit) === record) this.playXFactor(unit);
     };
-    if (this.sound.zzfx) play(); else Promise.resolve(this.unlock()).then(play);
+    if (this.sound.zzfx) play(); else Promise.resolve(this.unlock()).then(play).catch(error=>{
+      if(!stoppedForReload.has(this))console.warn('X-Factor sound unavailable:',error?.message??error);
+    });
     return true;
   }
 
   momentStyle() { return this.reducedMotion ? 'subtle' : LOOK.xFactorStyle; }
   presentMoment() {
+    if(stoppedForReload.has(this))return;
     const style = this.momentStyle();
     for (const record of this.moments.values()) record.unit.momentGlow = style === 'full';
     this.onMoment?.(this.activeMoment ? { ...this.activeMoment, style } : null);
   }
   syncMoments() {
+    if(stoppedForReload.has(this))return;
     this.stopMomentSound();
     if (LOOK.xFactorStyle === 'off') this.clearMoments(); else this.presentMoment();
   }
@@ -221,6 +256,7 @@ export class Effects {
   }
   /** Real presentation seconds, independent of simulation pause/speed. */
   updateMoments(dt) {
+    if(stoppedForReload.has(this))return;
     if (Number.isFinite(dt) && dt > 0) this.momentNow += dt;
     let changed = false;
     for (const [unit, record] of this.moments) if (!unit.alive || record.until <= this.momentNow) {
@@ -239,8 +275,9 @@ export class Effects {
       this.momentVoice = null;
     }
   }
-  setSound(v) { this.sound.enabled = Boolean(v); if (!v) this.stopMomentSound(); }
+  setSound(v) { if(stoppedForReload.has(this))return; this.sound.enabled = Boolean(v); if (!v) this.stopMomentSound(); }
   playXFactor(unit) {
+    if(stoppedForReload.has(this))return;
     if (!unit?.alive || this.activeMoment?.unit !== unit || LOOK.xFactorStyle === 'off'
       || this.momentStyle() !== 'full' || !this.sound.enabled || !this.sound.zzfx) return;
     this.momentVoice = this.sound.zzfx(0.4, 0, 420, 0.02, 0.1, 0.5, 1, 1, 160);
@@ -249,15 +286,18 @@ export class Effects {
   // -------------------------------------------------------------------------------------------------
   // Sound
   unlock() {
+    if(stoppedForReload.has(this))return Promise.resolve(false);
     if (this.sound.unlocked) return this.sound.ready;
     this.sound.unlocked = true;
     this.sound.ready = import('zzfx')
       .then((m) => {
-        this.sound.zzfx = m.zzfx;
         this.sound.ctx = m.ZZFX.audioContext;
-        if (this.sound.ctx && this.sound.ctx.state === 'suspended') this.sound.ctx.resume();
+        if(stoppedForReload.has(this))return Promise.resolve(this.sound.ctx?.close?.()).then(()=>false);
+        this.sound.zzfx = m.zzfx;
+        if (this.sound.ctx && this.sound.ctx.state === 'suspended') this.sound.ctx.resume().catch(()=>{});
       })
-      .catch((err) => console.warn('ZzFX unavailable; continuing without sound:', err && err.message ? err.message : err));
+      .catch((err) => {if(stoppedForReload.has(this))throw err;
+        console.warn('ZzFX unavailable; continuing without sound:', err && err.message ? err.message : err);});
     return this.sound.ready;
   }
 
@@ -268,6 +308,7 @@ export class Effects {
   }
 
   _play(gain, fn) {
+    if(stoppedForReload.has(this))return;
     const s = this.sound;
     if (!s.enabled || !s.zzfx || gain < 0.05 || s.active > 6) return;
     s.active++;
@@ -276,14 +317,16 @@ export class Effects {
   }
 
   playVolley(unit) {
+    if(stoppedForReload.has(this))return;
     this._play(this._gain(unit), (g) => {
-      const crack = () => this.sound.zzfx(0.9 * g, 0.3, 90, 0.003, 0.03, 0.6, 4, 1.4, -1.5, 0, 0, 0, 0, 1.8, 0, 0.35, 0.05, 0.5, 0.1);
+      const crack = () => {if(!stoppedForReload.has(this))this.sound.zzfx(0.9 * g, 0.3, 90, 0.003, 0.03, 0.6, 4, 1.4, -1.5, 0, 0, 0, 0, 1.8, 0, 0.35, 0.05, 0.5, 0.1);};
       crack();
       for (let i = 1; i < 5; i++) setTimeout(crack, i * 90 + Math.random() * 140);
     });
   }
 
   playBoom(unit) {
+    if(stoppedForReload.has(this))return;
     this._play(this._gain(unit), (g) => {
       this.sound.zzfx(1.6 * g, 0.1, 42, 0.005, 0.12, 1.4, 4, 0.4, -0.3, 0, 0, 0, 0, 0.9, 0, 0.6, 0.02, 0.4, 0.3);
     });

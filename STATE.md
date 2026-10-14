@@ -1,6 +1,6 @@
 # STATE
-2026-10-13 — v1 released558456f; ACTIVE Codex sole writer /private/tmp/cw-v1-1-20261012;0208 immutable runtime-close API WIP.
-HEAD/origin4da9b66b3af2d718f15f35ce769b5ba24bec061b own38498469500 all9/full8 original roots/native265/raw1156395398945741580B/d93955891d52b2ece14f66cce744d79a42d15c01ad5e048ce3bfd8788c062fca root CLEAR.0208 runtime15+2/atlas39+39/Game23+5/inactive148+148 local; required CPU-only UNIT/syntax/diff/Astra CLEAR; own freshCI UNRUN. No startup/assets/quality activation. PriorREDs retained. Aaron seen6+candidate02/05 comparison APPROVED; graphics-loss stop/reload APPROVED. Runtime/v1.1/v2 incomplete; COORD absent.
+2026-10-13 — ACTIVE Codex sole writer /private/tmp/cw-v1-1-20261012;0209 default-off compact profile/terminal reload WIP.
+HEAD/origin6edaf4e1cb321f28db77f615e9e9ae29a5c962cd own38501333250 all9/full8/native265/raw runtime15+2 root CLEAR.0209 source-clear12 exact assets41528920B+opt-in profile/terminal stop/audio/briefing/SWv69/member hashes; profile28+8/affected CPU/final UNIT/syntax/YAML/diff/Astra CLEAR. Scoped commit/push and ownCI/full roots/raw28+8 next; native normal-entry250MB UNRUN. .out299193157B fixed. Aaron seen6+visual02/05 and stop/reload APPROVED. Default URL unchanged; COORD absent; protected MAIN11 byteexact.
 Accepted remote main9e72079; sourceCI38346843720 all9/full own251/365/171/159+201+three6smokes/digests clean.
 Main9eCI38349763169 all9/fullown/digests/rawprobe clear; Pages38349763192 exact9e/livev68 clear.
 MAIN13a7b136 exact protected11 dirty paths untouched; c328 failedmainCI38298643624 retained.

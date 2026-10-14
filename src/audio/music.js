@@ -19,6 +19,9 @@ const FADE = 2;
 let battle = false;
 let want = null; // the mood asked for (plays once unlocked and audible)
 let current = null; // { mood, el, gain, src, stopping }
+let stoppedForReload = false;
+let terminalFailed = false, terminalFailure;
+const fading = new Set();
 
 export function setBattle(onField) { battle = !!onField; if (battle) stopMusic(0.8); }
 export function currentMood() { return current && !current.stopping ? current.mood : null; }
@@ -26,6 +29,7 @@ export function wantedMood() { return want; }
 
 /** Ask for a mood's tune; returns false if refused (unknown mood or a battle is on). */
 export function playMusic(mood) {
+  if(stoppedForReload || mixer.stoppedForReload)return false;
   if (!MOODS[mood] || battle) return false;
   want = mood;
   if (currentMood() === mood) return true;
@@ -39,8 +43,18 @@ export function stopMusic(seconds = FADE) {
   current = null;
 }
 
+/** Terminal page shutdown: includes old crossfading streams and their direct-volume fallback. */
+export function stopMusicForReload() {
+  if(stoppedForReload){if(terminalFailed)throw terminalFailure;return;}
+  stoppedForReload=true;want=null;
+  const streams=new Set([...fading,...(current?[current]:[])]);current=null;
+  for(const stream of streams)try{finishStream(stream,true);}catch(error){if(!terminalFailed){terminalFailed=true;terminalFailure=error;}}
+  if(terminalFailed)throw terminalFailure;
+}
+
 /** Start or stop streaming to match what is wanted and audible (also on a volume or mute change). */
 function sync() {
+  if(stoppedForReload || mixer.stoppedForReload)return;
   if (!mixer.unlocked) return;
   const audible = mixer.level('music') > 0;
   if (!want || battle || !audible) { if (current) { fadeOut(current, 0.4); current = null; } return; }
@@ -49,6 +63,7 @@ function sync() {
 }
 
 function start(mood) {
+  if(stoppedForReload || mixer.stoppedForReload)return;
   const ctx = mixer.ctx, id = MOODS[mood];
   fadeOut(current, FADE);
   const el = typeof Audio === 'function' ? new Audio() : null;
@@ -66,16 +81,25 @@ function start(mood) {
   current = { mood, el, src, gain, stopping: false };
   mixer.log.push({ id, bus: 'music', gain: 1, pan: 0, ok: true });
   const p = el.play();
-  if (p && typeof p.catch === 'function') p.catch((err) => console.warn(`music: ${mood} did not start:`, err?.message ?? err));
+  if (p && typeof p.catch === 'function') p.catch((err) => {
+    if(stoppedForReload && err?.name==='AbortError')return;
+    console.warn(`music: ${mood} did not start:`, err?.message ?? err);
+  });
+}
+
+function finishStream(c, strict=false) {
+  let failed=false,failure;
+  for(const clean of [()=>c.el.pause(),()=>c.el.removeAttribute('src'),()=>c.el.load(),()=>c.src?.disconnect(),()=>c.gain?.disconnect()])
+    try{clean();}catch(error){if(!failed){failed=true;failure=error;}}
+  fading.delete(c);
+  if(strict&&failed)throw failure;
 }
 
 function fadeOut(c, seconds) {
   if (!c || c.stopping) return;
   c.stopping = true;
-  const done = () => {
-    try { c.el.pause(); c.el.removeAttribute('src'); c.el.load(); } catch { /* fine */ }
-    try { c.src?.disconnect(); c.gain?.disconnect(); } catch { /* fine */ }
-  };
+  fading.add(c);
+  const done = () => finishStream(c);
   if (c.gain && mixer.ctx && seconds > 0) {
     c.gain.gain.setTargetAtTime(0, mixer.ctx.currentTime, Math.max(0.02, seconds / 3));
     setTimeout(done, seconds * 1000 + 250);

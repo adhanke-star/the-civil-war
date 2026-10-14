@@ -9,7 +9,7 @@
 // on the game's simulation clock.
 
 import * as THREE from 'three';
-import { loadTerrainData } from './world/terrain.js';
+import { loadTerrainData, prepareTerrainPartition } from './world/terrain.js';
 import { buildWorld } from './world/world.js';
 import { Post, QUALITY_MODES, pinPostResourceDiagnostic } from './render/post.js';
 import { RtsCamera } from './render/rts-camera.js';
@@ -29,18 +29,99 @@ import { introScenario, fictionalSurrenderRoute } from './franchise/intro.js';
 import { attachPracticeField } from './ui/practice-field.js';
 import { prepareFieldScenario, loadFieldScenario, loadBattlePack } from './sim/phase.js';
 import { campaignPhase, applyCampaign } from './franchise/campaign.js';
-import { loadCampaign, mountBriefing } from './ui/briefing.js';
+import { loadCampaign, mountBriefing, showGraphicsReload } from './ui/briefing.js';
 import { get as getSetting, set as setSetting, on as onSetting } from './settings.js';
 import { mixer } from './audio/mixer.js';
 import { Director } from './audio/director.js';
-import { setBattle, playMusic, resultsMood, lossShareOf } from './audio/music.js';
+import { setBattle, playMusic, resultsMood, lossShareOf, stopMusicForReload } from './audio/music.js';
 import { setQualityHandler } from './ui/settings-panel.js';
 import { FALLEN } from './units/soldier-mesh.js';
+import { pinRuntimeClose } from './units/impostor.js';
+
+export function detectFieldGPUTier(renderer,post,stats,graphicsStop,load=()=>import('detect-gpu')) {
+  return load().then(({getGPUTier})=>{
+    if(graphicsStop && !graphicsStop.check())return null;
+    // The pinned detector performs all GL work synchronously before its first await.
+    return getGPUTier({benchmarksURL:'./vendor/detect-gpu/dist/benchmarks',glContext:renderer.getContext()});
+  }).then(t=>{
+    if(!t || graphicsStop?.stopped)return null;
+    stats.gpuTier=t.tier;stats.gpu=t.gpu||'';post.startFromTier(t.tier);return t;
+  }).catch(err=>{console.warn('detect-gpu unavailable; Auto starts at High:',err&&err.message?err.message:err);return null;});
+}
+
+export function fieldResourceProfile(search) {
+  const query=new URLSearchParams(search),names=query.getAll('resources');
+  if(!names.length)return null;
+  if(names.length!==1 || names[0]!=='compact-v1' || query.has('tune') || query.has('sandbox'))
+    throw new Error('Field: unknown or conflicting resource profile');
+  return Object.freeze({name:'compact-v1',pixelBytes:3639218});
+}
+
+/** Metadata only: all three fixed source files settle before any renderer allocation. */
+export async function prepareFieldResources(search,{fetcher=globalThis.fetch}={}) {
+  const profile=fieldResourceProfile(search);if(!profile)return null;
+  const base='./assets/figures/confederate-infantry/';
+  const read=async file=>{
+    const response=await fetcher(base+file);if(!response.ok)throw new Error('Field: resource metadata HTTP failure');
+    const limit=1024*1024,length=response.headers.get('content-length');
+    if(length!==null && (!Number.isSafeInteger(Number(length)) || Number(length)<0 || Number(length)>limit))
+      throw new Error('Field: resource metadata exceeds its bound');
+    const reader=response.body.getReader(),chunks=[];let size=0;
+    try{for(;;){const {done,value}=await reader.read();if(done)break;size+=value.byteLength;
+      if(size>limit){await reader.cancel();throw new Error('Field: resource metadata exceeds its bound');}chunks.push(value);}}
+    finally{reader.releaseLock();}
+    const bytes=new Uint8Array(size);let offset=0;for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.length;}
+    return JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(bytes));
+  };
+  const settled=await Promise.allSettled(['soldier.json','soldier-hybrid.json','soldier-source.json'].map(read));
+  const failure=settled.find(result=>result.status==='rejected');if(failure)throw failure.reason;
+  const [baseline,manifest,sourceManifest]=settled.map(result=>result.value);
+  return Object.freeze({...profile,csRuntimeClose:pinRuntimeClose({baseline,manifest,sourceManifest,base})});
+}
+
+/** One terminal field owner. This never resumes a context or claims whole-world retirement. */
+export function createFieldGraphicsStop(owners) {
+  const canvas=owners.renderer.domElement;
+  let stopped=false,eventProcessed=false,disposalQueued=false,rendererDisposed=false,failed=false,failure;
+  const retain=error=>{if(!failed){failed=true;failure=error;}};
+  const attempt=action=>{try{const result=action();if(result?.then)Promise.resolve(result).catch(retain);}catch(error){retain(error);}};
+  const publish=()=>{
+    attempt(()=>owners.briefing?.stopForReload());
+    attempt(()=>{const status=document.getElementById('status');if(status)status.textContent='Battle stopped. Reload to restart.';});
+    attempt(()=>showGraphicsReload());
+  };
+  const stop=()=>{
+    if(stopped)return;stopped=true;
+    attempt(()=>{if(owners.raf)cancelAnimationFrame(owners.raf);});owners.raf=0;
+    for(const action of [()=>owners.input?.stopForReload(),()=>owners.post?.stopForReload(),
+      ()=>owners.effects?.stopForReload(),()=>stopMusicForReload(),()=>mixer.stopForReload(),
+      ()=>{if(owners.game){owners.game.paused=true;return owners.game.closeFigureResources();}}])attempt(action);
+    publish();
+  };
+  const onLoss=()=>{
+    if(!owners.renderer.getContext().isContextLost())return;
+    eventProcessed=true;stop();publish();
+    if(disposalQueued)return;disposalQueued=true;
+    // Registered LAST: every owner loss listener has already retired its old callbacks.
+    // Game's one initial microtask retires materials/atlases before its network wait.
+    // FIFO puts renderer disposal after that phase, without awaiting pending atlas I/O.
+    queueMicrotask(()=>attempt(()=>{owners.renderer.dispose();rendererDisposed=true;}));
+  };
+  return Object.freeze({
+    listenLast(){canvas.removeEventListener('webglcontextlost',onLoss);canvas.addEventListener('webglcontextlost',onLoss);},
+    check(){if(owners.renderer.getContext().isContextLost())stop();return !stopped;},
+    get stopped(){return stopped;},
+    get snapshot(){return Object.freeze({stopped,eventProcessed,disposalQueued,rendererDisposed,failed,
+      error:failed?String(failure?.message??failure):null,figures:owners.game?.figureResourceSnapshot()??null});}
+  });
+}
 
 let fieldClaimed = false;
 // Importing this module has no field side effects. The owner commits navigation only after recheck.
 // A campaign launch ({ campaign: { slot, replay } }, from ?campaign=<slot>[&replay]) loads that slot's next phase.
 export async function startField({ manifest = null, campaign = null, isCurrent = () => true, onAdmitted = () => {}, diagnosticTerrainFactory = null, diagnosticPost = null } = {}) {
+  const resourceSearch=location.search,profile=fieldResourceProfile(resourceSearch);
+  if(profile && (diagnosticTerrainFactory!==null || diagnosticPost!==null))throw new Error('Field: resource profile conflicts with diagnostic owners');
   if (diagnosticTerrainFactory !== null && (typeof diagnosticTerrainFactory !== 'function'
     || Object.prototype.toString.call(diagnosticTerrainFactory) === '[object AsyncFunction]')) throw new Error('Field: synchronous diagnostic terrain factory required');
   const postDiagnostic = pinPostResourceDiagnostic(diagnosticPost);
@@ -88,6 +169,7 @@ export async function startField({ manifest = null, campaign = null, isCurrent =
       : prepareFieldScenario(routeId === 'first-command' ? introScenario(ground, { surrender: fictionalSurrenderRoute(location.search) }) : ground, routeId);
     document.getElementById('status').textContent = 'Loading the ground…';
     const terrain = await loadTerrainData('./assets/terrain', scenario.terrain ?? 'henry-hill');
+    const resources=profile ? await prepareFieldResources(resourceSearch) : null;
     currentOwner();
     if (manifest) {
       const current = await createProgressStore().load();
@@ -97,6 +179,9 @@ export async function startField({ manifest = null, campaign = null, isCurrent =
     }
 
 const stats = { fps: 0, scale: 1, quality: 'auto', drawCalls: 0, triangles: 0, figures: 0 };
+let graphicsStop=null;
+Object.defineProperties(stats,{resourceProfile:{value:resources?.name??null,enumerable:true},
+  resourceStop:{get:()=>graphicsStop?.snapshot??null,enumerable:true}});
 window.__stats = stats;
 window.__ready = false;
 
@@ -123,12 +208,16 @@ function savePref(key, value) {
 
 allocated = true;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
+const resourceOwners={renderer,post:null,game:null,effects:null,input:null,briefing:null,raf:0};
+graphicsStop=resources ? createFieldGraphicsStop(resourceOwners) : null;
+graphicsStop?.listenLast();
 renderer.autoClear = false;
 renderer.info.autoReset = false;
 // ?quality=auto|high|low overrides the saved choice for this visit (tests use low) without saving it.
 const urlQuality = new URLSearchParams(location.search).get('quality');
 const post = new Post(renderer, { mode: QUALITY_MODES.includes(urlQuality) ? urlQuality : loadPref('cw.quality', 'auto'),
-  diagnosticPixelBytes: postDiagnostic?.pixelBytes ?? null });
+  diagnosticPixelBytes: resources?.pixelBytes ?? postDiagnostic?.pixelBytes ?? null,resourceLifetime:!!resources });
+resourceOwners.post=post;graphicsStop?.listenLast();
 if (postDiagnostic) {
   const prepared = postDiagnostic.prepare({ post, renderer });
   if (prepared !== undefined) {
@@ -137,16 +226,21 @@ if (postDiagnostic) {
   }
 }
 post.setSize(window.innerWidth, window.innerHeight);
+if(graphicsStop && !graphicsStop.check())return;
 // GPU tier picks Auto's starting level; benchmark tables are vendored (no CDN). Failure keeps High.
-const gpuTier = import('detect-gpu')
-  .then(({ getGPUTier }) => getGPUTier({ benchmarksURL: './vendor/detect-gpu/dist/benchmarks', glContext: renderer.getContext() }))
-  .then((t) => { stats.gpuTier = t.tier; stats.gpu = t.gpu || ''; post.startFromTier(t.tier); return t; })
-  .catch((err) => { console.warn('detect-gpu unavailable; Auto starts at High:', err && err.message ? err.message : err); return null; });
+const gpuTier = detectFieldGPUTier(renderer,post,stats,graphicsStop);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 2, 6000);
 
 const world = buildWorld(scene, terrain, scenario, { terrainMeshFactory: diagnosticTerrainFactory });
+let terrainOwner=null;
+if(resources){
+  terrainOwner=prepareTerrainPartition(world.terrainMesh,renderer);graphicsStop.listenLast();
+  const installed=terrainOwner.install();
+  if(!graphicsStop.check())return;
+  if(installed!==true)throw new Error('Field: terrain resource preparation incomplete');
+}
 Object.assign(stats, world.stats);
 
 // Opening view: both armies between the clock and the bottom panels; the pitch follows the zoom.
@@ -156,7 +250,10 @@ const rts = new RtsCamera(camera, terrain, scenario.camera
   ? { target: [-300, -610], yaw: -Math.PI / 2 - 0.12, dist: 740 }
   : { target: [-60, 200], yaw: -Math.PI / 2 - 0.12, dist: 1150 });
 const effects = new Effects(scene, terrain, rts);
+resourceOwners.effects=effects;
+graphicsStop?.listenLast();
 await effects.init();
+if(graphicsStop && !graphicsStop.check())return;
 // Sound: no music over a battle; banks load after the first gesture (the mixer waits for it).
 setBattle(true);
 mixer.arm();
@@ -184,7 +281,9 @@ motion.addEventListener('change', (e) => { effects.reducedMotion = e.matches; })
   if (['rigged', 'baked'].includes(q.get('figures'))) LOOK.figureStyle = q.get('figures');
   if (['5', '10'].includes(q.get('mpf'))) LOOK.menPerFigure = Number(q.get('mpf'));
 }
-const game = new Game({ scene, terrain, scenario, world, effects, playerSide: 'US' });
+const game = new Game({ scene, terrain, scenario, world, effects, playerSide: 'US',
+  figureResourceLifetime:!!resources,renderer:resources?renderer:null,csRuntimeClose:resources?.csRuntimeClose??null });
+resourceOwners.game=game;
 FALLEN.clock = () => game.simTime; // gore off: the fallen fade on battle time (a pause holds them)
 {
   // profiling switches for the baked sprites: ?bakesoft=0 skips the soft edge/shadow pass, ?bakeclose=0 the close
@@ -254,6 +353,7 @@ const input = new Input({
     hud.toast(`Quality: ${next}`);
   },
 });
+resourceOwners.input=input;
 const readout = new Readout({ scene, terrain, camera, game, layer: document.getElementById('ticks') });
 defineSandboxTools({ game, rts, effects, hud });
 practiceFlow = attachPracticeFlow({ game, scenario, hud, mode, manifest, campaign: launch });
@@ -277,9 +377,11 @@ if (launch) {
   const campLink = document.querySelector('#menu a[href="?camp"]');
   if (campLink) { campLink.href = `?camp=${launch.slot}`; campLink.textContent = 'Campaign camp'; }
   briefing = mountBriefing({ scenario, phase: launch.phase, game, hud, effects });
+  resourceOwners.briefing=briefing;
 }
 
 window.addEventListener('resize', () => {
+  if(graphicsStop?.stopped)return;
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   post.setSize(window.innerWidth, window.innerHeight);
@@ -298,7 +400,7 @@ const fieldFocus = (event) => {
   const flag = owner.closest?.('.marker'), u = game.selected;
   return !!u && u.side === game.playerSide && game.controls(u) && hud.markers.get(u.id)?.el === flag;
 };
-const lensAvailable = () => !document.querySelector('main')?.inert && !document.querySelector('dialog[open]')
+const lensAvailable = () => !graphicsStop?.stopped && !document.querySelector('main')?.inert && !document.querySelector('dialog[open]')
   && !input.drag && !input.targeting && !input.pointers.size && !arrows.preview && !arrows.previewEnd;
 let eyeUI = null;
 const soldierView = new SoldierView({ camera, rts, game, terrain, post,
@@ -339,7 +441,7 @@ const soldierView = new SoldierView({ camera, rts, game, terrain, post,
   },
 });
 input.soldierView = soldierView;
-window.addEventListener('resize', () => soldierView.onResize());
+window.addEventListener('resize', () => {if(!graphicsStop?.stopped)soldierView.onResize();});
 for (const event of ['select', 'remove']) game.on(event, () => {
   if (soldierView.active && !soldierView.valid()) soldierView.end('selection');
 });
@@ -396,6 +498,8 @@ let fpsFrames = 0;
 let fpsTime = 0;
 let resultShown = false;
 function frame(now) {
+  resourceOwners.raf=0;
+  if(graphicsStop && !graphicsStop.check())return;
   const realDt = Math.max(0.0001, (now - last) / 1000); // true frame time, for FPS and the quality governor
   const dt = Math.min(0.1, realDt); // capped, for simulation and camera
   last = now;
@@ -420,7 +524,9 @@ function frame(now) {
   practiceField.update();
 
   renderer.info.reset();
+  if(graphicsStop && !graphicsStop.check())return;
   post.render(scene, camera);
+  if(graphicsStop && !graphicsStop.check())return;
   post.govern(realDt, now);
   stats.drawCalls = renderer.info.render.calls;
   stats.triangles = renderer.info.render.triangles;
@@ -466,11 +572,13 @@ function frame(now) {
       : pack ? scenario.statusText ?? `${scenario.title} is ready. Select a brigade, then drag to give it orders.`
       : 'Henry House Hill, 21 July 1861. Union brigades are below the hill; Jackson holds the crest.';
   }
-  requestAnimationFrame(frame);
+  if(!graphicsStop?.stopped)resourceOwners.raf=requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+graphicsStop?.listenLast();
+if(!graphicsStop || graphicsStop.check())resourceOwners.raf=requestAnimationFrame(frame);
 
 window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, readout, soldierView, gpuTier, practice: practiceFlow, practiceField, manifest,
+  resources:resources?Object.freeze({profile:resources.name,get terrain(){return terrainOwner.receipt;},get terminal(){return graphicsStop.snapshot;}}):null,
   audio: { mixer, director }, // the UI test spies on mixer.log; nothing plays without a gesture
   pack: pack ? { packId: pack.packId, phaseId: pack.phaseId, nextId: pack.nextId } : null,
   // Campaign phase launch (tests force a result through window.__game.game, then drive the real result dialog).
@@ -478,12 +586,12 @@ window.__game = { game, rts, terrain, scene, camera, post, world, effects, input
 
 // Developer tuning panel (lil-gui), only with ?tune in the URL; players never load it.
 if (new URLSearchParams(location.search).has('tune')) {
-  import('./dev/tune.js').then((m) => m.openTuner({ post, world }));
+  import('./dev/tune.js').then((m) => {if(!graphicsStop?.stopped)m.openTuner({ post, world });});
 }
 
 // Sandbox workbench panel, with ?sandbox in the URL (Menu > Sandbox).
 if (new URLSearchParams(location.search).has('sandbox')) {
-  import('./sandbox/panel.js').then((m) => m.mountSandbox({ game: window.__game }));
+  import('./sandbox/panel.js').then((m) => {if(!graphicsStop?.stopped)m.mountSandbox({ game: window.__game });});
 }
 
 // Installable app: the service worker only on the live https site (local http dev and tests never get one); ?nosw skips it.

@@ -91,6 +91,14 @@ these project licences do not replace them or restrict public-domain sources.
   buckle follow a sourced dress summary (authentic-campaigner.com, adolphusconfederateuniforms.com, NPS Vicksburg
   collection, tools/bake/README.md); colours and cut are **Inferred estimates, not Verified**. No person, unit or
   regiment is depicted.
+  The optional compact resource profile also ships the qualified close pack from
+  [run 38282452947](https://github.com/adhanke-star/the-civil-war/actions/runs/38282452947),
+  source `9d60c12cfddadac7c74e7126b33ba568071c2066`: `soldier-hybrid.json`, `soldier-source.json`,
+  eight `cs-close-*-astc.ktx2` pages and two unchanged `cs-close-*-original.png` pages.
+  These are derivatives of the same CC0 sources, with the base and butternut/slouch/blanket-roll close looks;
+  compression adds no historical verification. The original PNG baseline remains available for unsupported
+  hardware and clean fallback. Qualification ZIPs and decoded member hashes are bound by the source gates;
+  visual comparison approval does not establish normal-entry memory or device performance.
 
 ## Sound and music (`assets/audio/`)
 Downloaded once to a scratch folder (never committed), cut and normalised with ffmpeg 8.1: effects mono MP3 96 kbps

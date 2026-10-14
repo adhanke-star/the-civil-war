@@ -46,8 +46,32 @@ export function busGain(bus, v, duck = 1) { const l = busLevel(bus, v); return l
 
 const GESTURES = ['pointerdown', 'pointerup', 'keydown', 'touchend', 'click'];
 const LOG_MAX = 64;
+const stoppedForReload = new WeakSet(), terminalClosures = new WeakMap();
 
 export class Mixer {
+  get stoppedForReload() { return stoppedForReload.has(this); }
+  stopForReload() {
+    if(stoppedForReload.has(this))return terminalClosures.get(this);
+    stoppedForReload.add(this);
+    let resolveTask,rejectTask;
+    const task=new Promise((resolve,reject)=>{resolveTask=resolve;rejectTask=reject;});
+    terminalClosures.set(this,task);task.catch(()=>{});
+    let failed=false,failure,closing=Promise.resolve();
+    const clean=fn=>{try{fn();}catch(error){if(!failed){failed=true;failure=error;}}};
+    if(this.armGesture)for(const gesture of GESTURES)clean(()=>globalThis.window?.removeEventListener(gesture,this.armGesture,true));
+    this.armed=false;this.waiting.clear();
+    for(const resolve of this.waitingLoads)resolve(null);this.waitingLoads.clear();
+    this.pending.clear();
+    for(const bus of Object.values(this.buses))clean(()=>{
+      bus.gain.cancelScheduledValues?.(this.ctx.currentTime);bus.gain.value=0;
+      bus.gain.setValueAtTime?.(0,this.ctx.currentTime);
+    });
+    for(const handle of [...this.voices])clean(()=>handle.stop(0));this.voices.clear();
+    clean(()=>this.off?.());clean(()=>{closing=Promise.resolve(this.ctx?.close?.());});
+    closing.then(()=>{if(failed)rejectTask(failure);else resolveTask();},error=>rejectTask(failed?failure:error));
+    if(failed)throw failure;
+    return task;
+  }
   constructor({ read = get } = {}) {
     this.read = read;
     this.ctx = null;
@@ -56,28 +80,32 @@ export class Mixer {
     this.buffers = new Map(); // id -> AudioBuffer
     this.pending = new Map(); // id -> Promise<AudioBuffer|null>
     this.waiting = new Set(); // fns to run once unlocked
+    this.waitingLoads = new Set(); // resolve locked load requests when terminal shutdown cancels unlock
     this.voices = new Set(); // live handles
     this.log = [];
     this.armed = false;
     this.off = on('*', (_, key) => { if (String(key).startsWith('audio.')) this.applyLevels(); });
   }
 
-  get unlocked() { return !!this.ctx; }
-  get running() { return !!this.ctx && this.ctx.state === 'running'; }
+  get unlocked() { return !stoppedForReload.has(this) && !!this.ctx; }
+  get running() { return !stoppedForReload.has(this) && !!this.ctx && this.ctx.state === 'running'; }
 
   /** Listen for the first gesture (safe to call more than once); unlock() runs inside it. */
   arm() {
+    if(stoppedForReload.has(this))return;
     if (this.armed || typeof window === 'undefined') return;
     this.armed = true;
     const go = () => {
       this.unlock();
       if (this.running) for (const g of GESTURES) window.removeEventListener(g, go, true);
     };
+    this.armGesture=go;
     for (const g of GESTURES) window.addEventListener(g, go, true);
   }
 
   /** Build the graph (first call) and resume it. Call only from a user gesture. Returns the AudioContext or null. */
   unlock() {
+    if(stoppedForReload.has(this))return null;
     if (!this.ctx) {
       const AC = typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext);
       if (!AC) return null;
@@ -89,20 +117,21 @@ export class Mixer {
       for (const bus of BUSES) { const g = ctx.createGain(); g.gain.value = 0; g.connect(comp); this.buses[bus] = g; }
       this.applyLevels(true);
       const fns = [...this.waiting]; this.waiting.clear();
-      for (const fn of fns) { try { fn(); } catch (err) { console.warn('audio: an unlock task failed:', err?.message ?? err); } }
+      for (const fn of fns) { if(stoppedForReload.has(this))break; try { fn(); } catch (err) { console.warn('audio: an unlock task failed:', err?.message ?? err); } }
     }
     if (this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
     return this.ctx;
   }
 
   /** fn() once the graph exists (at once if it does). */
-  onUnlock(fn) { if (this.ctx) fn(); else this.waiting.add(fn); }
+  onUnlock(fn) { if(stoppedForReload.has(this))return; if (this.ctx) fn(); else this.waiting.add(fn); }
 
   bus(name) { return this.buses[name] || null; }
-  level(bus) { return busLevel(bus, levels(this.read)); }
-  gainOf(bus) { return busGain(bus, levels(this.read), this.ducks[bus] ?? 1); }
+  level(bus) { return stoppedForReload.has(this) ? 0 : busLevel(bus, levels(this.read)); }
+  gainOf(bus) { return stoppedForReload.has(this) ? 0 : busGain(bus, levels(this.read), this.ducks[bus] ?? 1); }
 
   applyLevels(now = false) {
+    if(stoppedForReload.has(this))return;
     if (!this.ctx) return;
     for (const bus of BUSES) {
       const g = this.buses[bus], v = this.gainOf(bus);
@@ -112,6 +141,7 @@ export class Mixer {
 
   /** Lower (factor < 1) or restore (1) one bus, gliding over about `seconds`. */
   duck(bus, factor, seconds = 0.4) {
+    if(stoppedForReload.has(this))return;
     const f = clamp01(factor);
     if (this.ducks[bus] === f) return;
     this.ducks[bus] = f;
@@ -123,25 +153,34 @@ export class Mixer {
 
   /** Fetch and decode one sound (after the first gesture); resolves to its buffer, or null if it cannot load. */
   load(id) {
+    if(stoppedForReload.has(this))return Promise.resolve(null);
     if (!SOUNDS[id] || SOUNDS[id].stream) return Promise.resolve(null);
     if (this.buffers.has(id)) return Promise.resolve(this.buffers.get(id));
     if (this.pending.has(id)) return this.pending.get(id);
-    const p = new Promise((resolve) => this.onUnlock(() => resolve(this.fetchDecode(id))));
+    const p = new Promise((resolve) => {
+      this.waitingLoads.add(resolve);
+      this.onUnlock(() => {this.waitingLoads.delete(resolve);resolve(this.fetchDecode(id));});
+    });
     this.pending.set(id, p);
     return p;
   }
   async fetchDecode(id) {
     try {
+      if(stoppedForReload.has(this))return null;
       const res = await fetch(this.url(id));
+      if(stoppedForReload.has(this))return null;
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const bytes = await res.arrayBuffer();
+      if(stoppedForReload.has(this))return null;
       const buf = await new Promise((ok, fail) => {
         const r = this.ctx.decodeAudioData(bytes, ok, fail); // callback form for older Safari; the promise form also returns
         if (r && typeof r.then === 'function') r.then(ok, fail);
       });
+      if(stoppedForReload.has(this))return null;
       this.buffers.set(id, buf);
       return buf;
     } catch (err) {
+      if(stoppedForReload.has(this))return null;
       console.warn(`audio: ${id} not loaded:`, err?.message ?? err);
       return null;
     } finally {
@@ -158,6 +197,7 @@ export class Mixer {
    * not loaded, or the bus is silent). Every request is recorded in mixer.log.
    */
   play(id, { bus = SOUNDS[id]?.bus || 'effects', gain = 1, pan = 0, rate = 1, lowpass = 0, loop = false } = {}) {
+    if(stoppedForReload.has(this))return null;
     const entry = { id, bus, gain: Math.round(gain * 1000) / 1000, pan: Math.round(pan * 100) / 100, ok: false };
     this.log.push(entry);
     if (this.log.length > LOG_MAX) this.log.shift();

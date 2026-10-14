@@ -24,6 +24,9 @@ export const DEPTH_DISTANCE = '(nearPlane * farPlane) / (farPlane - depth * (far
 export const DEPTH_BLEND = 'smoothstep(0.08, 0.40, abs(zDistance - focusDistance) / max(zDistance, nearPlane))';
 const LOW_SCALE = 0.7;
 const AUTO_LEVELS = [2, 1.6, 1.3, 1, 0.85, 0.7, 0.6];
+const stoppedForReload = new WeakSet();
+const terminalFailures = new WeakMap();
+const terminalInProgress = new WeakSet();
 
 export function pinPostResourceDiagnostic(input) {
   if (input === null) return null;
@@ -80,6 +83,15 @@ function fsMaterial(fragmentShader, uniforms) {
 }
 
 export class Post {
+  get stoppedForReload() { return stoppedForReload.has(this); }
+  stopForReload() {
+    if(terminalInProgress.has(this))throw new Error('Post: reentrant terminal stop');
+    if (stoppedForReload.has(this)) { if(terminalFailures.has(this))throw terminalFailures.get(this);return; }
+    stoppedForReload.add(this);
+    terminalInProgress.add(this);
+    try{this.endSoldierView();}catch(error){terminalFailures.set(this,error);throw error;}
+    finally{terminalInProgress.delete(this);}
+  }
   constructor(renderer, { mode = 'auto', diagnosticPixelBytes = null, resourceLifetime = false } = {}) {
     if (typeof resourceLifetime !== 'boolean') throw new Error('Post resource: explicit lifetime boolean required.');
     if (resourceLifetime) {
@@ -236,6 +248,7 @@ export class Post {
    * anything; Auto then governs by measured frame rate as usual (DECISIONS 0003, 0007).
    */
   startFromTier(tier) {
+    if (stoppedForReload.has(this)) return false;
     if (this.resourceLifetime) this._assertResourceOwners();
     if (this.mode !== 'auto' || this.adjusted) return false;
     const want = { 3: 2, 2: 1.6, 1: 1.3, 0: 1 }[tier] ?? this.maxScale;
@@ -250,6 +263,7 @@ export class Post {
   }
 
   setMode(mode) {
+    if (stoppedForReload.has(this)) return false;
     if (this.resourceLifetime) this._assertResourceOwners();
     this.mode = QUALITY_MODES.includes(mode) ? mode : 'auto';
     this.level = 0;
@@ -263,6 +277,7 @@ export class Post {
   }
 
   _apply() {
+    if (stoppedForReload.has(this)) return false;
     const owned = this.resourceLifetime === true;
     if (owned) {
       this._assertResourceOwners();
@@ -348,6 +363,7 @@ export class Post {
   }
 
   setSize(w, h) {
+    if (stoppedForReload.has(this)) return false;
     if (this.resourceLifetime) this._assertResourceOwners();
     this.width = w;
     this.height = h;
@@ -355,6 +371,7 @@ export class Post {
   }
 
   _alloc() {
+    if (stoppedForReload.has(this)) return false;
     const w = Math.max(1, Math.round(this.width * this.scale));
     const h = Math.max(1, Math.round(this.height * this.scale));
     this.rtScene.setSize(w, h);
@@ -370,6 +387,7 @@ export class Post {
   }
 
   _pass(mat, target) {
+    if (stoppedForReload.has(this)) return false;
     this.quad.material = mat;
     this.renderer.setRenderTarget(target);
     this.renderer.render(this.qScene, this.qCam);
@@ -377,6 +395,7 @@ export class Post {
 
   /** One transient native depth attachment; ordinary map materials and samplers stay intact. */
   beginSoldierView(camera, focus) {
+    if (stoppedForReload.has(this)) return false;
     if (this.resourceLifetime) {
       this._assertResourceOwners();
       if (this.renderer.getContext().isContextLost()) return false;
@@ -407,6 +426,7 @@ export class Post {
   }
 
   updateSoldierView(camera, focus) {
+    if (stoppedForReload.has(this)) return false;
     if (!this.soldierView) return;
     if (![camera.near, camera.far, focus].every(Number.isFinite)
       || camera.near <= 0 || camera.far <= camera.near || focus <= camera.near || focus >= camera.far) {
@@ -433,6 +453,7 @@ export class Post {
   }
 
   render(scene, camera) {
+    if (stoppedForReload.has(this)) return false;
     if (this.resourceLifetime) this._assertResourceOwners();
     const r = this.renderer;
     // Target setup also allocates outside THREE.render's own lost-context guard.
@@ -464,6 +485,7 @@ export class Post {
 
   /** Call once per frame (Auto mode only adjusts). */
   govern(dt, now) {
+    if (stoppedForReload.has(this)) return false;
     if (this.resourceLifetime) this._assertResourceOwners();
     if (this.mode !== 'auto') return;
     const log = this.samplesLog;
