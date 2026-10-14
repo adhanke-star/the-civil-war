@@ -9,6 +9,156 @@
 import * as THREE from 'three';
 import Martini from '@mapbox/martini';
 
+// Lossless Float32 partitions; index 65535 remains reserved for primitive restart.
+export function partitionTerrain({position,uv,index},limit=65535) {
+  const vertices=position.length/3;
+  if(!(position instanceof Float32Array)||!(uv instanceof Float32Array)||!(index instanceof Uint32Array||index instanceof Uint16Array)
+    ||!Number.isSafeInteger(vertices)||uv.length!==vertices*2||index.length%3||!Number.isSafeInteger(limit)||limit<3||limit>65535
+    ||index.some(i=>i>=vertices))throw new Error('terrain partition: invalid indexed attributes/limit');
+  const chunks=[];let ids=[],map=new Map(),indices=[];
+  const flush=()=>{if(!indices.length)return;const p=new Float32Array(ids.length*3),u=new Float32Array(ids.length*2);
+    ids.forEach((source,local)=>{p.set(position.subarray(source*3,source*3+3),local*3);u.set(uv.subarray(source*2,source*2+2),local*2);});
+    chunks.push({position:p,uv:u,index:new Uint16Array(indices),sourceVertices:new Uint32Array(ids)});ids=[];map=new Map();indices=[];
+  };
+  for(let i=0;i<index.length;i+=3){const triangle=[index[i],index[i+1],index[i+2]],fresh=new Set(triangle.filter(v=>!map.has(v)));
+    if(map.size+fresh.size>limit)flush();
+    for(const source of triangle){if(!map.has(source)){map.set(source,ids.length);ids.push(source);}indices.push(map.get(source));}
+  }flush();
+  const bytes=chunks.reduce((n,c)=>n+c.position.byteLength+c.uv.byteLength+c.index.byteLength,0);
+  return {chunks,triangles:index.length/3,sourceBytes:position.byteLength+uv.byteLength+index.byteLength,bytes};
+}
+
+/** Opt-in preparation only. No production caller selects this geometry lifetime yet.
+ * CPU construction precedes publication, so its receipt survives a failed install.
+ * Shared material/texture lifetime remains with the world (including repaint).
+ */
+export function prepareTerrainPartition(root,renderer,{limit=65535}={}) {
+  const source=root?.geometry,material=root?.material,attributes=[source?.attributes.position,source?.attributes.uv,source?.index];
+  if(!root?.isMesh||root.children.length||!material||Object.keys(source?.attributes||{}).sort().join(',')!=='position,uv'
+    ||attributes.some(a=>!a)||!source.boundingBox||!source.boundingSphere
+    ||attributes[0].itemSize!==3||attributes[1].itemSize!==2||attributes[2].itemSize!==1||!attributes[2].count
+    ||source.groups.length||source.drawRange.start!==0||source.drawRange.count!==Infinity
+    ||attributes.some(a=>a.normalized||a.gpuType!==THREE.FloatType)
+    ||typeof renderer?.getContext!=='function')throw Error('terrain owner: exact original geometry and renderer required');
+  const arrays=attributes.map(a=>a.array),oracles=arrays.map(a=>a.slice()),
+    shapes=attributes.map(a=>[a.itemSize,a.count,a.normalized,a.gpuType,a.usage]),
+    box=source.boundingBox,sphere=source.boundingSphere,bounds=[...box.min.toArray(),...box.max.toArray(),...sphere.center.toArray(),sphere.radius],
+    uniforms=material.uniforms,records=Object.entries(uniforms||{}),shader=[material.vertexShader,material.fragmentShader],
+    visible=root.visible,before=root.onBeforeRender,range=source.drawRange,groups=source.groups,
+    rootFlags=[root.frustumCulled,root.renderOrder,root.layers.mask],empty=new THREE.BufferGeometry(),children=[],geometries=[],chunks=[],chunkOwners=[];
+  let state='prepared',active=false,drawing=false,failed=false,failure,retired=new Set(),pending=null,cleanupCompletion=null;
+  const fail=error=>{if(!failed){failed=true;failure=error;}state='failed';throw failure;};
+  const guard=()=>{if(failed)throw failure;if(active||drawing)fail(Error('terrain owner: reentrant transition'));};
+  const bytesEqual=(a,b)=>{const x=new Uint8Array(a.buffer,a.byteOffset,a.byteLength),y=new Uint8Array(b.buffer,b.byteOffset,b.byteLength);return x.length===y.length&&x.every((v,i)=>v===y[i]);};
+  const verifySource=()=>{
+    if(root.material!==material||source.attributes.position!==attributes[0]||source.attributes.uv!==attributes[1]||source.index!==attributes[2]
+      ||Object.keys(source.attributes).sort().join(',')!=='position,uv'||source.boundingBox!==box||source.boundingSphere!==sphere
+      ||source.drawRange!==range||range.start!==0||range.count!==Infinity||source.groups!==groups||groups.length
+      ||root.frustumCulled!==rootFlags[0]||root.renderOrder!==rootFlags[1]||root.layers.mask!==rootFlags[2]
+      ||[...box.min.toArray(),...box.max.toArray(),...sphere.center.toArray(),sphere.radius].some((v,i)=>!Object.is(v,bounds[i]))
+      ||attributes.some((a,i)=>a.array!==arrays[i]||[a.itemSize,a.count,a.normalized,a.gpuType,a.usage].some((v,j)=>v!==shapes[i][j])||!bytesEqual(a.array,oracles[i]))
+      ||material.uniforms!==uniforms||Object.keys(uniforms||{}).length!==records.length||records.some(([k,r])=>uniforms[k]!==r)
+      ||material.vertexShader!==shader[0]||material.fragmentShader!==shader[1])throw Error('terrain owner: original owner changed');
+  };
+  const checkChunks=()=>{for(let i=0;i<children.length;i++){
+    const c=children[i],g=geometries[i],o=chunkOwners[i],attrs=[g.attributes.position,g.attributes.uv,g.index];
+    if(c.geometry!==g||c.material!==material||c.onBeforeRender!==drawGuard||c.frustumCulled!==rootFlags[0]||c.renderOrder!==rootFlags[1]||c.layers.mask!==rootFlags[2]||!c.visible
+      ||c.position!==o.position||c.quaternion!==o.quaternion||c.scale!==o.scale||c.matrix!==o.matrix||!c.matrixAutoUpdate||!c.matrixWorldAutoUpdate
+      ||c.position.x!==0||c.position.y!==0||c.position.z!==0||c.quaternion.x!==0||c.quaternion.y!==0||c.quaternion.z!==0||c.quaternion.w!==1
+      ||c.scale.x!==1||c.scale.y!==1||c.scale.z!==1||c.matrix.elements.some((v,j)=>v!==(j%5===0?1:0))
+      ||Object.keys(g.attributes).sort().join(',')!=='position,uv'||g.drawRange!==o.range||g.drawRange.start!==0||g.drawRange.count!==Infinity||g.groups!==o.groups||g.groups.length
+      ||g.boundingBox!==o.box||g.boundingSphere!==o.sphere||[...o.box.min.toArray(),...o.box.max.toArray(),...o.sphere.center.toArray(),o.sphere.radius].some((v,j)=>!Object.is(v,o.bounds[j]))
+      ||attrs.some((a,j)=>a!==o.attrs[j]||a.array!==o.arrays[j]||[a.itemSize,a.count,a.normalized,a.gpuType,a.usage].some((v,k)=>v!==o.shapes[j][k])))throw Error('terrain owner: partition layout changed');
+  }};
+  const checkGraph=()=>{
+    verifySource();const installed=state==='partitioned'||pending==='restore';
+    if(root.geometry!==(installed?empty:source)||root.children.length!==(installed?children.length:0)
+      ||installed&&children.some((c,i)=>root.children[i]!==c||c.parent!==root||c.geometry!==geometries[i]||c.material!==material)
+      ||root.onBeforeRender!==(state==='prepared'&&!pending?before:drawGuard))throw Error('terrain owner: published owner changed');
+    let corner=0;
+    if(installed)checkChunks();
+    if(installed)for(let i=0;i<children.length;i++){
+      const g=geometries[i],c=chunks[i];
+      if(g.attributes.position?.array!==c.position||g.attributes.uv?.array!==c.uv||g.index?.array!==c.index||children[i].onBeforeRender!==drawGuard)
+        throw Error('terrain owner: partition owner changed');
+      for(let j=0;j<c.sourceVertices.length;j++)for(const [key,stride,original]of [['position',3,arrays[0]],['uv',2,arrays[1]]])
+        for(let k=0;k<stride;k++)if(!Object.is(c[key][j*stride+k],original[c.sourceVertices[j]*stride+k]))throw Error('terrain owner: partition bytes changed');
+      for(const local of c.index)if(c.sourceVertices[local]!==arrays[2][corner++])throw Error('terrain owner: partition triangle changed');
+    }
+  };
+  function drawGuard(...args){
+    guard();if(pending)fail(Error('terrain owner: draw before completion'));
+    // Full byte reconstruction belongs at transitions, never in the frame loop.
+    try{if(root.material!==material||root.geometry!==empty||root.children.length!==children.length
+      ||children.some((c,i)=>root.children[i]!==c||c.geometry!==geometries[i]||c.material!==material))throw Error('terrain owner: draw owner changed');
+      if(this===root){drawing=true;try{before.apply(this,args);}finally{drawing=false;}}
+      guard();checkChunks();if(root.geometry!==empty||root.material!==material)throw Error('terrain owner: callback changed owner');
+    }catch(e){fail(e);}
+  }
+  const finish=()=>{
+    const gl=renderer.getContext();if(gl.isContextLost())return false;
+    if(gl.getError()!==gl.NO_ERROR)throw Error('terrain owner: native completion refused');
+    gl.finish();if(gl.isContextLost())return false;
+    if(gl.getError()!==gl.NO_ERROR)throw Error('terrain owner: native completion failed');return true;
+  };
+  const retire=owners=>{
+    for(const g of owners){if(retired.has(g))continue;retired.add(g);try{g.dispose();}catch(e){if(!failed){failed=true;failure=e;}}}
+    let completed=false;try{completed=finish();}catch(e){if(!failed){failed=true;failure=e;}}
+    if(failed)fail(failure);return completed;
+  };
+  const result=partitionTerrain({position:arrays[0],uv:arrays[1],index:arrays[2]},limit);
+  try {
+    empty.boundingBox=box.clone();empty.boundingSphere=sphere.clone();
+    for(const c of result.chunks){
+      const g=new THREE.BufferGeometry();geometries.push(g);chunks.push(c);
+      g.setAttribute('position',new THREE.BufferAttribute(c.position,3));g.setAttribute('uv',new THREE.BufferAttribute(c.uv,2));g.setIndex(new THREE.BufferAttribute(c.index,1));
+      [g.attributes.position,g.attributes.uv,g.index].forEach((a,i)=>a.setUsage(attributes[i].usage));
+      g.computeBoundingBox();g.computeBoundingSphere();
+      const mesh=new THREE.Mesh(g,material);children.push(mesh);mesh.name=`terrain-chunk-${children.length}`;mesh.onBeforeRender=drawGuard;
+      mesh.frustumCulled=rootFlags[0];mesh.renderOrder=rootFlags[1];mesh.layers.mask=rootFlags[2];
+      const attrs=[g.attributes.position,g.attributes.uv,g.index];
+      chunkOwners.push({position:mesh.position,quaternion:mesh.quaternion,scale:mesh.scale,matrix:mesh.matrix,attrs,arrays:attrs.map(a=>a.array),shapes:attrs.map(a=>[a.itemSize,a.count,a.normalized,a.gpuType,a.usage]),range:g.drawRange,groups:g.groups,
+        box:g.boundingBox,sphere:g.boundingSphere,bounds:[...g.boundingBox.min.toArray(),...g.boundingBox.max.toArray(),...g.boundingSphere.center.toArray(),g.boundingSphere.radius]});
+    }
+  }catch(e){const errors=[e];for(const g of [...geometries,empty])try{g.dispose();}catch(error){errors.push(error);}throw new AggregateError(errors,'terrain owner: preparation failed');}
+  const transition=target=>{
+    guard();if(target==='install'&&state==='partitioned'||target==='restore'&&state==='restored')return true;
+    if(target==='restore'&&state==='prepared')throw Error('terrain owner: install before restore');
+    if(state==='restored')throw Error('terrain owner: released owner');
+    if(pending&&pending!==target)throw Error('terrain owner: pending transition must finish');
+    try{checkGraph();}catch(e){fail(e);}active=true;
+    try{
+      if(!pending){retired=new Set();pending=target;root.onBeforeRender=drawGuard;root.visible=false;}
+      const gl=renderer.getContext();if(gl.isContextLost())return false;
+      const completed=retire(target==='install'?[source]:[...geometries,empty]);
+      if(!completed)return false;
+      checkGraph();
+      if(target==='install'){
+        root.geometry=empty;for(const child of children)root.add(child);
+        state='partitioned';pending=null;checkGraph();
+      }else{
+        for(const child of children)root.remove(child);
+        // Originals become drawable only after every outgoing native buffer has retired.
+        root.geometry=source;for(const a of attributes)a.needsUpdate=true;
+        state='restored';pending=null;root.onBeforeRender=before;
+        verifySource();if(root.children.length)throw Error('terrain owner: restoration left children');
+        children.length=0;geometries.length=0;chunks.length=0;chunkOwners.length=0;result.chunks.length=0;oracles.length=0;retired.clear();
+      }
+      root.visible=visible;return true;
+    }catch(e){
+      if(!failed){failed=true;failure=e;}root.visible=false;
+      // Keep exact failed owners for diagnosis; continue independent retirement.
+      for(const g of [...geometries,empty])if(!retired.has(g)){retired.add(g);try{g.dispose();}catch{}}
+      try{cleanupCompletion=finish();}catch{cleanupCompletion=false;}
+      fail(failure);
+    }finally{active=false;}
+  };
+  return Object.freeze({install:()=>transition('install'),restore:()=>transition('restore'),resume:()=>{guard();return pending?transition(pending):true;},
+    get state(){return state;},get pending(){return pending;},get failed(){return failed;},
+    get retainedArrays(){return state==='restored'?[]:[...arrays.map((array,i)=>({array,owner:`terrain-source/${i}`})),...oracles.map((array,i)=>({array,owner:`terrain-oracle/${i}`})),...chunks.flatMap((c,i)=>Object.entries(c).map(([k,array])=>({array,owner:`terrain-chunk-${i}/${k}`})))];},
+    get receipt(){return Object.freeze({state,pending,failed,cleanupCompletion,triangles:result.triangles,chunks:children.length,sourceBytes:result.sourceBytes,bytes:result.bytes});}});
+}
+
 export const EXAGGERATION = 2.0;
 
 export async function loadTerrainData(base, name = 'henry-hill') {

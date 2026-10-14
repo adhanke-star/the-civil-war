@@ -1,3 +1,5 @@
+import {partitionTerrain} from '../../src/world/terrain.js';
+export {partitionTerrain};
 // Pure storage prerequisite only; production terrain and the reversible monolithic path stay separate.
 export function prepareCanonicalTerrain({grid,cell,half,heights,vertices,triangles},limit=65535){
   const invalid=()=>{throw Error('canonical terrain: invalid grid/height/triangle input');};
@@ -158,24 +160,6 @@ export function registerTerrainPartition(scope,owner){
     if(scope.__sceneTerrainPartition!==registration)throw Error('terrain partition: diagnostic registration changed');
     if(failed)throw error;delete scope.__sceneTerrainPartition;
   }};scope.__sceneTerrainPartition=registration;return registration;
-}
-// Diagnostic-only lossless indexed geometry partition. Index65535 stays reserved for primitive restart.
-export function partitionTerrain({position,uv,index},limit=65535) {
-  const vertices=position.length/3;
-  if(!(position instanceof Float32Array)||!(uv instanceof Float32Array)||!(index instanceof Uint32Array||index instanceof Uint16Array)
-    ||!Number.isSafeInteger(vertices)||uv.length!==vertices*2||index.length%3||!Number.isSafeInteger(limit)||limit<3||limit>65535
-    ||index.some(i=>i>=vertices))throw new Error('terrain partition: invalid indexed attributes/limit');
-  const chunks=[];let ids=[],map=new Map(),indices=[];
-  const flush=()=>{if(!indices.length)return;const p=new Float32Array(ids.length*3),u=new Float32Array(ids.length*2);
-    ids.forEach((source,local)=>{p.set(position.subarray(source*3,source*3+3),local*3);u.set(uv.subarray(source*2,source*2+2),local*2);});
-    chunks.push({position:p,uv:u,index:new Uint16Array(indices),sourceVertices:new Uint32Array(ids)});ids=[];map=new Map();indices=[];
-  };
-  for(let i=0;i<index.length;i+=3){const triangle=[index[i],index[i+1],index[i+2]],fresh=new Set(triangle.filter(v=>!map.has(v)));
-    if(map.size+fresh.size>limit)flush();
-    for(const source of triangle){if(!map.has(source)){map.set(source,ids.length);ids.push(source);}indices.push(map.get(source));}
-  }flush();
-  const bytes=chunks.reduce((n,c)=>n+c.position.byteLength+c.uv.byteLength+c.index.byteLength,0);
-  return {chunks,triangles:index.length/3,sourceBytes:position.byteLength+uv.byteLength+index.byteLength,bytes};
 }
 /** Diagnostic original owners and byte oracle; never alters a shader, material or geometry. */
 export function captureFloat32TerrainOriginal(world){

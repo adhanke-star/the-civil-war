@@ -78,6 +78,89 @@ export async function sceneAllocationControls({browser,url,check,result,watchErr
   await canonicalTerrainControls({browser,url,check,result,watchErrors});
   await postPixelResourceControls({browser,url,check,result,watchErrors});
   await postOwnerResourceControls({browser,url,check,result,watchErrors});
+  await terrainOwnerResourceControls({browser,url,check,result,watchErrors});
+}
+
+// Exercise the runtime geometry owner directly; observation never supplies its lifecycle.
+async function terrainOwnerResourceControls({browser,url,check,result,watchErrors}){
+ const ctx=await browser.newContext({viewport:{width:128,height:96},deviceScaleFactor:1}),errors=[];
+ try{
+  await ctx.addInitScript(installAllocationObserver,{ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),nativeJournal:true});
+  const page=await ctx.newPage();watchErrors(page,url,errors);await page.goto(url+'?nosw');
+  await page.waitForFunction(()=>window.__entry&&!window.__entry.importing,null,{timeout:60000});
+  const proof=await page.evaluate(async()=>{
+   const THREE=await import('three'),{prepareTerrainPartition}=await import('./src/world/terrain.js'),{sampleSceneAllocations}=await import('./tools/bake/scene-allocation.mjs');
+   const renderer=new THREE.WebGLRenderer({antialias:false,preserveDrawingBuffer:true}),gl=renderer.getContext(),scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,10);
+   renderer.setSize(32,32);renderer.setClearColor(0x172433);camera.position.z=3;
+   const source=new THREE.PlaneGeometry(1.6,1.6,4,4);source.deleteAttribute('normal');
+   for(let i=0;i<source.attributes.position.count;i++)source.attributes.position.setZ(i,Math.sin(i)*.05);source.computeBoundingBox();source.computeBoundingSphere();
+   const material=new THREE.ShaderMaterial({uniforms:{uTint:{value:new THREE.Vector3(.4,.6,.2)}},vertexShader:'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',fragmentShader:'varying vec2 vUv; uniform vec3 uTint; void main(){gl_FragColor=vec4(uTint+vec3(vUv*.2,0.),1.);}'}),root=new THREE.Mesh(source,material);
+   root.name='terrain';root.userData.triangles=32;scene.add(root);
+   const scope={__game:{scene,world:{terrainMesh:root},post:{renderer},game:{baked:{atlases:{}}}},__allocation:window.__allocation,innerWidth:32,innerHeight:32,devicePixelRatio:1};
+   const receipt={states:[],frames:[],cleanup:[],errors:[],sourceBytes:[source.attributes.position,source.attributes.uv,source.index].reduce((n,a)=>n+a.array.byteLength,0)},before=root.onBeforeRender;
+   let owner;
+   const sample=label=>{const s={label,sequence:receipt.states.length+1,...sampleSceneAllocations(scope)};receipt.states.push(s);return s;};
+   const frame=(label,view)=>{camera.position.set(view==='boundary'?.06:0,view==='near'?.03:0,3);camera.zoom=view==='near'?1.5:1;camera.updateProjectionMatrix();camera.updateMatrixWorld();renderer.render(scene,camera);const pixels=new Uint8Array(32*32*4);gl.readPixels(0,0,32,32,gl.RGBA,gl.UNSIGNED_BYTE,pixels);const f={label,view,width:32,height:32,pixels:btoa(String.fromCharCode(...pixels)),glError:gl.getError(),drawCalls:renderer.info.render.calls,nonuniform:pixels.some((v,i)=>i%4<3&&v!==pixels[i%4])};receipt.frames.push(f);return f;};
+   const capture=label=>{for(const view of ['overview','near','boundary'])frame(label,view);};
+   const event=name=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>{renderer.domElement.removeEventListener(name,done);reject(Error('terrain native '+name+' timeout'));},20000);function done(){clearTimeout(timer);resolve();}renderer.domElement.addEventListener(name,done,{once:true});});
+   try{
+    capture('original');const warm=sample('warm-original');receipt.defaultOff=root.geometry===source&&root.children.length===0&&root.onBeforeRender===before;
+    const callBefore={...warm.allocation.calls};owner=prepareTerrainPartition(root,renderer,{limit:6});scope.__sceneTerrainPartition=owner;
+    const prepared=sample('prepared');receipt.cpuOnlyPreparation=JSON.stringify(callBefore)===JSON.stringify(prepared.allocation.calls)&&root.geometry===source&&root.children.length===0;
+    receipt.originalIds=warm.bufferOwnership.map(r=>r.id);receipt.installed=owner.install();const retired=sample('source-completed');receipt.installReceipt=owner.receipt;
+    capture('partition');const partition=sample('partition-uploaded');receipt.chunkIds=partition.bufferOwnership.map(r=>r.id);
+    const originals=[source.attributes.position,source.attributes.uv,source.index],originalArrays=originals.map(a=>a.array);
+    receipt.restored=owner.restore();const settled=sample('chunks-completed');receipt.restoreReceipt=owner.receipt;capture('restored');sample('original-reuploaded');
+    receipt.exactOriginal=root.geometry===source&&root.material===material&&root.children.length===0&&root.onBeforeRender===before&&originals.every((a,i)=>a.array===originalArrays[i])&&owner.retainedArrays.length===0;
+    // A second, separate owner exercises actual DOM loss and Three's fresh properties.
+    owner=prepareTerrainPartition(root,renderer,{limit:6});scope.__sceneTerrainPartition=owner;owner.install();capture('before-loss');sample('before-loss');
+    const oldProperties=renderer.properties,lost=event('webglcontextlost');renderer.forceContextLoss();await lost;
+    const beforeCalls=window.__allocation.nativeCalls(gl);receipt.lostRestore=owner.restore();const afterCalls=window.__allocation.nativeCalls(gl);
+    receipt.loss={actualLost:gl.isContextLost(),beforeCalls,afterCalls,pending:owner.pending,hidden:root.visible===false};
+    const restored=event('webglcontextrestored');renderer.forceContextRestore();await restored;
+    receipt.freshProperties=renderer.properties!==oldProperties;receipt.resumed=owner.resume();sample('context-completed');capture('context-restored');sample('context-reuploaded');
+    receipt.lossExactOriginal=root.geometry===source&&root.material===material&&!root.children.length&&root.onBeforeRender===before&&owner.retainedArrays.length===0;
+    receipt.retirement={sourceGone:receipt.originalIds.every(id=>!retired.bufferOwnership.some(r=>r.id===id)),chunksGone:receipt.chunkIds.every(id=>!settled.bufferOwnership.some(r=>r.id===id))};
+   }catch(e){receipt.errors.push(String(e?.message??e));}
+   finally{
+    const attempt=(name,fn)=>{try{fn();receipt.cleanup.push({name,ok:true});}catch(e){receipt.cleanup.push({name,ok:false,error:String(e?.message??e)});}};
+    if(owner?.pending&&!gl.isContextLost())attempt('pending',()=>owner.resume());
+    if(owner?.state==='partitioned')attempt('owner',()=>owner.restore());
+    attempt('detach',()=>scene.remove(root));attempt('source',()=>source.dispose());attempt('material',()=>material.dispose());attempt('renderer',()=>renderer.dispose());
+    attempt('finish',()=>{if(gl.isContextLost())throw Error('lost cleanup');gl.finish();});attempt('snapshot',()=>sample('cleanup'));attempt('context',()=>renderer.forceContextLoss());
+   }
+   return receipt;
+  });
+  result.terrainOwnerResourceProof=proof;
+  const healthy=s=>!s.glError&&!s.allocation.unknown.length&&!s.unmappedBufferBytes,
+   frameOk=f=>f.width===32&&f.height===32&&f.glError===0&&f.drawCalls>0&&f.nonuniform&&Buffer.from(f.pixels,'base64').length===4096,
+   equal=(a,b)=>['overview','near','boundary'].every(view=>{const x=proof.frames.find(f=>f.label===a&&f.view===view),y=proof.frames.find(f=>f.label===b&&f.view===view);return x&&y&&x.pixels===y.pixels;});
+  const warm=proof.states.find(s=>s.label==='warm-original'),partition=proof.states.find(s=>s.label==='partition-uploaded'),retired=proof.states.find(s=>s.label==='source-completed'),settled=proof.states.find(s=>s.label==='chunks-completed'),reuploaded=proof.states.find(s=>s.label==='original-reuploaded');
+  const retiredBeforeUpload=(ids,events)=>ids.length>0&&ids.every(id=>{const d=events.findIndex(e=>e.operation==='retire'&&e.kind==='buffer'&&e.id===id),r=events.findIndex(e=>e.operation==='release'&&e.kind==='buffer'&&e.id===id);return d>=0&&r>d&&events.slice(d+1,r).some(e=>e.operation==='finish');});
+  const noOverlap=(outgoing,incoming,events)=>{
+   if(!outgoing?.length||!incoming?.length||incoming.some(id=>outgoing.includes(id)))return false;
+   const released=outgoing.map(id=>events.findIndex(e=>e.operation==='release'&&e.kind==='buffer'&&e.id===id)),reserved=incoming.map(id=>events.findIndex(e=>e.operation==='reserve'&&e.kind==='buffer'&&e.id===id));
+   return released.every(i=>i>=0)&&reserved.every(i=>i>Math.max(...released));
+  };
+  const cleanRetirement=s=>s?.allocation.byKind.buffer===0&&s.allocation.pendingDeleteBytes===0&&s.bufferOwnership.length===0,
+   incoming=reuploaded?.bufferOwnership.map(r=>r.id)||[],events=partition?.allocation.nativeEvents||[],restoreEvents=reuploaded?.allocation.nativeEvents||[],
+   nonoverlap=noOverlap(proof.originalIds,proof.chunkIds,events)&&noOverlap(proof.chunkIds,incoming,restoreEvents);
+  check('terrain-owner-default-off',proof.defaultOff&&proof.cpuOnlyPreparation,'ordinary geometry/draw callback unchanged; preparation makes no native calls');
+  check('terrain-owner-native-install',proof.installed&&proof.installReceipt?.state==='partitioned'&&proof.originalIds?.length===3&&proof.retirement?.sourceGone&&cleanRetirement(retired)&&retiredBeforeUpload(proof.originalIds,retired?.allocation.nativeEvents||[])&&nonoverlap,'real source IDs retire/finish/release before replacement upload');
+  check('terrain-owner-native-restoration',proof.restored&&proof.exactOriginal&&proof.restoreReceipt?.state==='restored'&&proof.chunkIds?.length>3&&proof.retirement?.chunksGone&&cleanRetirement(settled)&&retiredBeforeUpload(proof.chunkIds,settled?.allocation.nativeEvents||[])&&nonoverlap,'all real outgoing IDs retire/finish/release before exact original becomes drawable');
+  const early=events.find(e=>e.operation==='reserve'&&e.kind==='buffer'&&proof.chunkIds?.includes(e.id)),mutated=early?[early,...events.filter(e=>e!==early)]:[];
+  check('terrain-owner-native-overlap-rejection',nonoverlap&&!!early&&!noOverlap(proof.originalIds,proof.chunkIds,mutated),'a replacement reserved before outgoing releases fails the actual overlap predicate');
+  check('terrain-owner-native-source-bytes',warm?.allocation.byKind.buffer===proof.sourceBytes&&partition?.allocation.byKind.buffer===proof.installReceipt?.bytes,'full actual source/partition backing accounted separately');
+  check('terrain-owner-native-whole-frames',proof.frames.length===15&&proof.frames.every(frameOk),'all 15 original/partition/restored/loss whole RGBA frames retained');
+  check('terrain-owner-native-pixel-equality',equal('original','partition')&&equal('original','restored'),'overview/near/actual interior seam exact whole RGBA');
+  check('terrain-owner-native-context-deferral',proof.loss?.actualLost&&proof.lostRestore===false&&proof.loss.pending==='restore'&&proof.loss.hidden&&isDeepStrictEqual(proof.loss.beforeCalls,proof.loss.afterCalls),'actual loss retains CPU owners, hides draw graph, adds no native call');
+  check('terrain-owner-native-context-restoration',proof.freshProperties&&proof.resumed&&proof.lossExactOriginal&&equal('original','context-restored'),'actual Three restoration, then owner completion and exact original whole frames');
+  let replay=false,reject=false;try{const history=createSceneHistory(),compact={history,states:proof.states.map(s=>compactSceneSample(history,s))};proof.nativeHistory=compact;replay=isDeepStrictEqual(expandSceneContext(compact).states,proof.states);const bad=structuredClone(compact);bad.history.nativeEvents[0].sequence=999999;try{expandSceneContext(bad);}catch{reject=true;}}catch(e){proof.replayError=String(e);}
+  check('terrain-owner-native-history',replay&&reject,'all native events/slots replayed; malformed chronology rejected');
+  const cleanup=proof.states.at(-1);
+  check('terrain-owner-native-cleanup',proof.cleanup.every(r=>r.ok)&&cleanup?.allocation.byKind.buffer===0&&cleanup?.allocation.pendingDeleteBytes===0,'independent cleanup, no surviving native geometry');
+  check('terrain-owner-native-health',proof.states.every(healthy)&&proof.errors.length===0&&errors.length===0,JSON.stringify({errors,owner:proof.errors}));
+ }finally{await ctx.close();}
 }
 
 // Actual opt-in owner, observed only. No diagnostic lifetime wrappers or budget adoption.
