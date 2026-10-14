@@ -1,5 +1,11 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0204 — Finish loss-event dispatch before the native restore request (2026-10-13)
+
+Required local UNIT rerun/syntax/diff and Astra scoped source review CLEAR before the repair commit; native restoration success remains UNRUN until its fresh exact-source result.
+
+0203 source8f64ec0 first native RED CI38490902852 retained: original11861957415 ZIP41772225B SHA3eda9451d12383fb941106e1954054edc160fa6af54c648e73bda12947d42631/digest/member CRC checked in RAM. Nine original/partition/restored wholeRGBA comparisons and source/chunk zero-buffer boundaries pass; no GL/console errors or warnings. Actual loss deferred restoration without changing native calls. The later restoration timed out: this fixture requested WEBGL_lose_context.restoreContext in the lost event's promise continuation before event-task dispatch completed. Match the already-native-proven Post fixture's single next-task yield before the one restore request; no retry, timeout extension, outcome waiver or owner change. Record successful first-cycle retirement immediately so a later failure cannot erase its evidence. Cleanup refuses deferred false returns and records lost observation unavailable while retaining all last live samples. Astra scoped fix CLEAR; fresh corrected-source native242/all9/whole original readback pending. Preserve the failed producer and complete original; no unchanged rerun.
+
 ## 0203 — Prepare actual terrain retirement without selecting it at startup (2026-10-13)
 
 Recovered the VS Code interruption at clean a40613743509bb2dc2a7cefcdf65d6cd2aea90bb. Its own CI38487260445 is all9 green; all eight original canonical reports/digests/member CRCs, native230 including actual Post/12 whole RGBA frames/context restoration, and raw probe115603792424/5740219B scene333+333/badge285+285/terrain80+80 are read back CLEAR. Initial readiness timeout and local RAM transport EPIPE retained as reader failures, not producer failures; verified originals remained in RAM and were reused.

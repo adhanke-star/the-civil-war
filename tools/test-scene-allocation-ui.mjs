@@ -112,22 +112,26 @@ async function terrainOwnerResourceControls({browser,url,check,result,watchError
     const originals=[source.attributes.position,source.attributes.uv,source.index],originalArrays=originals.map(a=>a.array);
     receipt.restored=owner.restore();const settled=sample('chunks-completed');receipt.restoreReceipt=owner.receipt;capture('restored');sample('original-reuploaded');
     receipt.exactOriginal=root.geometry===source&&root.material===material&&root.children.length===0&&root.onBeforeRender===before&&originals.every((a,i)=>a.array===originalArrays[i])&&owner.retainedArrays.length===0;
+    receipt.retirement={sourceGone:receipt.originalIds.every(id=>!retired.bufferOwnership.some(r=>r.id===id)),chunksGone:receipt.chunkIds.every(id=>!settled.bufferOwnership.some(r=>r.id===id))};
     // A second, separate owner exercises actual DOM loss and Three's fresh properties.
     owner=prepareTerrainPartition(root,renderer,{limit:6});scope.__sceneTerrainPartition=owner;owner.install();capture('before-loss');sample('before-loss');
     const oldProperties=renderer.properties,lost=event('webglcontextlost');renderer.forceContextLoss();await lost;
     const beforeCalls=window.__allocation.nativeCalls(gl);receipt.lostRestore=owner.restore();const afterCalls=window.__allocation.nativeCalls(gl);
     receipt.loss={actualLost:gl.isContextLost(),beforeCalls,afterCalls,pending:owner.pending,hidden:root.visible===false};
-    const restored=event('webglcontextrestored');renderer.forceContextRestore();await restored;
+    // The loss event must finish dispatching before WEBGL_lose_context accepts restoration.
+    // Match the actual Post fixture's next-task boundary, not a retry or longer timeout.
+    await new Promise(resolve=>setTimeout(resolve,0));const restored=event('webglcontextrestored');renderer.forceContextRestore();await restored;
     receipt.freshProperties=renderer.properties!==oldProperties;receipt.resumed=owner.resume();sample('context-completed');capture('context-restored');sample('context-reuploaded');
     receipt.lossExactOriginal=root.geometry===source&&root.material===material&&!root.children.length&&root.onBeforeRender===before&&owner.retainedArrays.length===0;
-    receipt.retirement={sourceGone:receipt.originalIds.every(id=>!retired.bufferOwnership.some(r=>r.id===id)),chunksGone:receipt.chunkIds.every(id=>!settled.bufferOwnership.some(r=>r.id===id))};
    }catch(e){receipt.errors.push(String(e?.message??e));}
    finally{
     const attempt=(name,fn)=>{try{fn();receipt.cleanup.push({name,ok:true});}catch(e){receipt.cleanup.push({name,ok:false,error:String(e?.message??e)});}};
-    if(owner?.pending&&!gl.isContextLost())attempt('pending',()=>owner.resume());
-    if(owner?.state==='partitioned')attempt('owner',()=>owner.restore());
+    if(owner?.pending&&!gl.isContextLost())attempt('pending',()=>{if(!owner.resume())throw Error('owner completion deferred');});
+    if(owner?.state==='partitioned')attempt('owner',()=>{if(!owner.restore())throw Error('owner restoration deferred');});
     attempt('detach',()=>scene.remove(root));attempt('source',()=>source.dispose());attempt('material',()=>material.dispose());attempt('renderer',()=>renderer.dispose());
-    attempt('finish',()=>{if(gl.isContextLost())throw Error('lost cleanup');gl.finish();});attempt('snapshot',()=>sample('cleanup'));attempt('context',()=>renderer.forceContextLoss());
+    attempt('finish',()=>{if(gl.isContextLost())throw Error('lost cleanup');gl.finish();});
+    if(!gl.isContextLost())attempt('snapshot',()=>sample('cleanup'));else receipt.cleanup.push({name:'snapshot',ok:false,error:'lost context; last live allocation samples retained'});
+    attempt('context',()=>renderer.forceContextLoss());
    }
    return receipt;
   });
