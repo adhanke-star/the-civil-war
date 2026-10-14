@@ -141,7 +141,7 @@ jobs:
             apt-get update -qq && apt-get install -y -qq libgl1-mesa-dri libegl1 libegl-mesa0 xvfb >/dev/null
             xvfb-run -a -s "-screen 0 1280x720x24" node tools/test-browsers.mjs --browser=firefox --headed
           else
-            node tools/test-browsers.mjs --browser=${{ matrix.browser }}
+            node tools/test-browsers.mjs --browser=${{ matrix.browser }} --trace-navigation
           fi
 
       - name: Upload browser output

@@ -16,6 +16,33 @@ const name = (process.argv.find((a) => a.startsWith('--browser=')) || '--browser
 if (!['firefox', 'webkit', 'chromium'].includes(name)) throw new Error(`unknown browser ${name}`);
 const OUT = path.join(ROOT, '.out', `browsers-${name}`);
 await fs.mkdir(OUT, { recursive: true });
+// Passive diagnosis of CI38506692812. No injected page code, routing, waits, retries or error filtering.
+const traceNavigation = process.argv.includes('--trace-navigation');
+const navigation = [], traceStart = performance.now();
+const record = (event, detail = {}) => {
+  if (traceNavigation) navigation.push({ sequence: navigation.length, ms: performance.now() - traceStart, event, ...detail });
+};
+
+function watchNavigation(page) {
+  if (!traceNavigation) return;
+  const requests = new Map();
+  const requestId = (req) => { if (!requests.has(req)) requests.set(req, requests.size + 1); return requests.get(req); };
+  const describe = (req) => ({ request: requestId(req), url: req.url(), method: req.method(), type: req.resourceType(),
+    navigation: req.isNavigationRequest(), redirectedFrom: req.redirectedFrom() ? requestId(req.redirectedFrom()) : null });
+  page.on('request', (req) => record('request', describe(req)));
+  page.on('response', (res) => record('response', { ...describe(res.request()), status: res.status(), headers: res.headers() }));
+  page.on('requestfinished', (req) => record('requestfinished', { ...describe(req), timing: req.timing() }));
+  page.on('requestfailed', (req) => record('requestfailed', { ...describe(req), failure: req.failure(), timing: req.timing() }));
+  page.on('framenavigated', (frame) => record('framenavigated', { url: frame.url(), main: frame === page.mainFrame() }));
+  page.on('domcontentloaded', () => record('domcontentloaded', { url: page.url() }));
+  page.on('load', () => record('load', { url: page.url() }));
+  page.on('pageerror', (err) => record('pageerror', { url: page.url(), name: err.name, message: err.message, stack: err.stack }));
+  page.on('console', (msg) => {
+    if (['error', 'warning'].includes(msg.type())) record('console', { type: msg.type(), text: msg.text(), location: msg.location() });
+  });
+  page.on('close', () => record('pageclose'));
+  page.on('crash', () => record('pagecrash'));
+}
 
 const results = [];
 const check = (id, ok, detail) => { results.push({ id, ok: !!ok, detail }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${id}: ${detail}`); };
@@ -31,6 +58,17 @@ function watch(page, url, into) {
 }
 
 const { server, url } = await startServer({ port: 0 });
+let serverRequestId = 0;
+if (traceNavigation) server.on('request', (req, res) => {
+  // Observe the relevant server response without changing the existing handler or its headers.
+  if (req.url !== '/' && req.url !== '/?intro' && req.url !== '/assets/art/manifest.json') return;
+  const serverRequest = ++serverRequestId;
+  record('server-request', { serverRequest, url: req.url, method: req.method, headers: req.headers });
+  // writeHead's direct headers are absent from getHeaders(); retain Node's actual serialized header when available.
+  res.on('finish', () => record('server-finish', { serverRequest, url: req.url, status: res.statusCode,
+    rawHeader: typeof res._header === 'string' ? res._header : null }));
+  res.on('close', () => record('server-close', { serverRequest, url: req.url, finished: res.writableFinished }));
+});
 // headless Firefox on CI has only a software GPU and blocklists WebGL 2 there; a real Firefox does not
 const headed = process.argv.includes('--headed'); // CI runs Firefox headed under xvfb for Mesa's software GL
 const browser = await playwright[name].launch({ headless: !headed, ...(name === 'firefox' ? { firefoxUserPrefs: {
@@ -42,17 +80,24 @@ try {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     const page = await ctx.newPage(), errors = [];
     watch(page, url, errors);
+    watchNavigation(page);
+    record('title-goto', { url });
     await page.goto(url);
     await page.waitForFunction(() => window.__entry && !window.__entry.importing, null, { timeout: 60_000 });
     const title = await page.evaluate(() => ({ mode: window.__entry.mode, focus: document.activeElement?.id }));
     await page.screenshot({ path: path.join(OUT, 'title.png') });
     check('title', title.mode === 'title' && title.focus === 'entry-continue' && errors.length === 0, JSON.stringify({ title, errors }));
+    record('continue-click-start', { title, errors: [...errors] });
     await page.locator('#entry-continue').click();
+    record('continue-click-end', { url: page.url() });
     await page.waitForFunction(() => window.__ready && window.__game, null, { timeout: 180_000, polling: 250 }).catch(() => {});
     const intro = await page.evaluate(() => ({ ready: !!window.__ready, intro: !!document.getElementById('intro')?.open }));
     await page.screenshot({ path: path.join(OUT, 'practice-intro.png') });
     check('continue-to-practice', intro.ready && intro.intro && errors.length === 0, JSON.stringify({ intro, errors: errors.slice(0, 5) }));
+    record('practice-check', { intro, errors: [...errors] });
+    record('context-close-start');
     await ctx.close();
+    record('context-close-end');
   }
   // 2. first and last campaign phases, baked figures, 20 s of battle
   for (const [pack, phase] of [['shiloh', 'camps-at-dawn'], ['chattanooga', 'missionary-ridge']]) {
@@ -100,8 +145,20 @@ try {
     }
   }
 } finally {
-  await browser.close();
-  server.close();
+  try { await browser.close(); }
+  finally {
+    server.close();
+    if (traceNavigation) {
+      try {
+        await fs.writeFile(path.join(OUT, 'navigation.json'), JSON.stringify({
+          browser: name, sha: process.env.GITHUB_SHA ?? null, run: process.env.GITHUB_RUN_ID ?? null, url, events: navigation,
+        }, null, 1));
+      } catch (error) {
+        // Missing trace blocks diagnosis; an observer write must not replace the original test exception.
+        console.error('navigation trace unavailable:', error);
+      }
+    }
+  }
 }
 const failed = results.filter((r) => !r.ok);
 await fs.writeFile(path.join(OUT, 'result.json'), JSON.stringify({ browser: name, results }, null, 1));
