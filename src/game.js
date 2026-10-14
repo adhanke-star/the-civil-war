@@ -714,7 +714,7 @@ export class Game {
 
   /** Re-form every infantry brigade at `n` men per figure (look.menPerFigure). */
   applyMenPerFigure(n) {
-    this.#assertFiguresOpen();
+    if(#figureClosed in this)this.#assertFiguresOpen();
     setMenPerFigure(n, minMenPerFigureOf(this));
     let changed = 0;
     for (const u of this.units) if (u.rebuildFigures()) changed++;
@@ -723,7 +723,7 @@ export class Game {
 
   /** Re-layout existing infantry without rerolling figures, including while paused. */
   applyFormationSpacing() {
-    this.#assertFiguresOpen();
+    if(#figureClosed in this)this.#assertFiguresOpen();
     let changed = 0;
     for (const u of this.units) {
       if (u.type !== 'infantry') continue;
@@ -823,7 +823,7 @@ export class Game {
    * that the sprites now draw.
    */
   updateFigureView() {
-    this.#assertFiguresOpen();
+    if(#figureClosed in this)this.#assertFiguresOpen();
     const V = FIGURE_VIEW;
     const cmp = compareState();
     let a = LOOK.figureStyle, b = null;
@@ -1472,7 +1472,7 @@ export class Game {
 
   /** Level of detail and outline width follow the camera (call before animate). */
   setView(camera, renderHeightPx) {
-    this.#assertFiguresOpen();
+    if(#figureClosed in this)this.#assertFiguresOpen();
     this.pools.US.setView(camera, renderHeightPx);
     this.pools.CS.setView(camera, renderHeightPx);
     this.impostors.US.setView(camera);
@@ -1482,7 +1482,7 @@ export class Game {
 
   /** Animate figures with the (speed-scaled) sim delta; refill and upload the instance buffers. */
   animate(simDt) {
-    this.#assertFiguresOpen();
+    if(#figureClosed in this)this.#assertFiguresOpen();
     this.updateFigureView();
     this.pools.US.begin();
     this.pools.CS.begin();
@@ -1497,7 +1497,7 @@ export class Game {
   }
 
   flushAll() {
-    this.#assertFiguresOpen();
+    if(#figureClosed in this)this.#assertFiguresOpen();
     this.pools.US.flush();
     this.pools.CS.flush();
     this.impostors.US.flush();
