@@ -47,7 +47,12 @@ jobs:
           "
 
       - name: Browser checks (shard ${{ matrix.shard }} of 4)
-        run: node tools/test.mjs --shard=${{ matrix.shard }}
+        run: |
+          if [ "${{ matrix.shard }}" = "3" ]; then
+            node tools/test.mjs --shard=3 --trace-screenshots
+          else
+            node tools/test.mjs --shard=${{ matrix.shard }}
+          fi
 
       - name: Upload test output
         if: always()

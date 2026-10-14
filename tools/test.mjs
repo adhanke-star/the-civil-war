@@ -75,6 +75,7 @@
 // Saves screenshots and .out/last-result.json, then prunes .out/. Exit 0 only if every check passes.
 
 import { promises as fs } from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { chromium } from 'playwright';
@@ -120,6 +121,40 @@ const checks = [];
 const consoleErrors = [];
 const consoleWarnings = [];
 const result = { ok: false, timestamp: new Date(started).toISOString(), url: null, browser: null, checks, stats: null, consoleErrors, consoleWarnings, axe: null, screenshots: [], durationMs: 0 };
+// Passive diagnosis of CI38618622919. Persist with the original canonical report; no screenshot retries or new waits.
+const traceScreenshots = process.argv.includes('--trace-screenshots');
+const screenshotPages = new WeakMap(), screenshotTraceStart = performance.now();
+let screenshotPageId = 0;
+let screenshotObserverFailures = 0;
+if (traceScreenshots) result.screenshotTrace = { sha: process.env.GITHUB_SHA ?? null, run: process.env.GITHUB_RUN_ID ?? null,
+  scope: 'shared shot() only; direct screenshots require separate observation', events: [], observerErrors: [], harnessError: null };
+function screenshotObserve(fn) {
+  if (!traceScreenshots) return null;
+  try { return fn(); }
+  catch (error) {
+    screenshotObserverFailures++;
+    try { result.screenshotTrace.observerErrors.push(String(error)); } catch {}
+    try { console.error('SCREENSHOT_OBSERVER_FAILED', screenshotObserverFailures); } catch {}
+    return null;
+  }
+}
+function screenshotEvent(event, detail = {}) {
+  return screenshotObserve(() => {
+    const events = result.screenshotTrace.events;
+    events.push({ sequence: events.length, ms: performance.now() - screenshotTraceStart, event,
+      ...(typeof detail === 'function' ? detail() : detail) });
+  });
+}
+function screenshotPage(page) {
+  if (!traceScreenshots) return null;
+  if (screenshotPages.has(page)) return screenshotPages.get(page);
+  const id = ++screenshotPageId;
+  screenshotPages.set(page, id);
+  page.on('close', () => screenshotEvent('page-close', { page: id }));
+  page.on('crash', () => screenshotEvent('page-crash', { page: id }));
+  page.on('framenavigated', frame => screenshotEvent('frame-navigated', () => ({ page: id, url: frame.url(), main: frame === page.mainFrame() })));
+  return id;
+}
 
 function check(name, ok, detail) {
   checks.push({ name, ok: Boolean(ok), detail });
@@ -128,7 +163,24 @@ function check(name, ok, detail) {
 
 async function shot(page, name) {
   const file = path.join(OUT_DIR, `m1-${name}-${stamp}.png`);
-  const buf = await page.screenshot({ path: file, type: 'png' });
+  let pageId = null;
+  if (traceScreenshots) {
+    screenshotObserve(() => {
+      pageId = screenshotPage(page);
+      screenshotEvent('screenshot-start', { page: pageId, name, file: path.relative(ROOT, file), url: page.url(), closed: page.isClosed() });
+    });
+  }
+  let buf;
+  try {
+    buf = await page.screenshot({ path: file, type: 'png' });
+  } catch (error) {
+    screenshotEvent('screenshot-failure', () => ({ page: pageId, name, nameOfError: error?.name ?? null,
+      message: error?.message ?? String(error), stack: error?.stack ?? null }));
+    // Log before browser/server cleanup can hang. A log alone does not satisfy persisted-trace acceptance.
+    screenshotObserve(() => console.error('SCREENSHOT_FAILURE_TRACE', JSON.stringify(result.screenshotTrace)));
+    throw error;
+  }
+  screenshotEvent('screenshot-finish', { page: pageId, name, bytes: buf.length });
   result.screenshots.push(path.relative(ROOT, file));
   return PNG.sync.read(buf);
 }
@@ -1963,19 +2015,32 @@ try {
   await main();
   exitCode = checks.length > 0 && checks.every((c) => c.ok) ? 0 : 1;
 } catch (err) {
+  if (traceScreenshots) {
+    screenshotObserve(() => {
+      result.screenshotTrace.harnessError = { name: err?.name ?? null, message: err?.message ?? String(err), stack: err?.stack ?? null };
+    });
+    screenshotEvent('harness-failure');
+  }
   check('harness', false, err.stack ? err.stack.split('\n').slice(0, 3).join(' ') : String(err));
 }
 result.ok = exitCode === 0;
 result.durationMs = Date.now() - started;
+let screenshotPersistence = null;
 try {
   await fs.mkdir(OUT_DIR, { recursive: true });
-  await fs.writeFile(path.join(OUT_DIR, 'last-result.json'), JSON.stringify(result) + '\n');
+  screenshotObserve(() => { result.screenshotTrace.observerFailureCount = screenshotObserverFailures; });
+  const serialized = JSON.stringify(result) + '\n';
+  await fs.writeFile(path.join(OUT_DIR, 'last-result.json'), serialized);
+  screenshotObserve(() => { screenshotPersistence = { sha: process.env.GITHUB_SHA ?? null, run: process.env.GITHUB_RUN_ID ?? null,
+    member: 'last-result.json', bytes: Buffer.byteLength(serialized), sha256: createHash('sha256').update(serialized).digest('hex'),
+    observerFailureCount: screenshotObserverFailures }; });
 } catch (err) {
   console.error(`FAIL write-result: ${err.message}`);
   exitCode = 1;
 }
 try {
   await prune();
+  screenshotObserve(() => console.log('SCREENSHOT_TRACE_PERSISTED', JSON.stringify(screenshotPersistence)));
 } catch (err) {
   console.error(`FAIL prune: ${err.message}`);
   exitCode = 1;
