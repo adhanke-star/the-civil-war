@@ -1,6 +1,35 @@
 // Diagnostic-only accounting of WebGL reservations. These are API bytes, not native driver measurements.
 import {deriveSceneStressContract} from './inactive-figures.mjs';
 
+// Lost retirement can delete stale owned handles, but cannot complete or allocate.
+// Both inputs are read-only retained journals, never synthetic full scene samples.
+export function lostRetirementValid(before,after,ids){
+  if(before?.kind!=='retained native journal'||after?.kind!==before.kind||!Array.isArray(ids)||!ids.length||new Set(ids).size!==ids.length||ids.some(id=>!Number.isSafeInteger(id)||id<1)
+    ||!before.calls||!after.calls||[before,after].some(s=>['bytes','pendingDeleteBytes','defaultFramebuffer','gpuCurrent'].some(k=>!Number.isSafeInteger(s[k])||s[k]<0))
+    ||!Array.isArray(before.bufferSlots)||!Array.isArray(after.bufferSlots)||!Array.isArray(before.nativeEvents)||!Array.isArray(after.nativeEvents)
+    ||before.bytes!==after.bytes||before.defaultFramebuffer!==after.defaultFramebuffer||after.gpuCurrent<before.gpuCurrent
+    ||before.bufferSlots.length!==after.bufferSlots.length||after.nativeEvents.length<before.nativeEvents.length
+    ||JSON.stringify(after.nativeEvents.slice(0,before.nativeEvents.length))!==JSON.stringify(before.nativeEvents))return false;
+  if([before,after].some(s=>new Set(s.bufferSlots.map(b=>b?.id)).size!==s.bufferSlots.length||s.bufferSlots.some(b=>!Number.isSafeInteger(b?.id)||b.id<1)))return false;
+  if([before,after].some(s=>!Array.isArray(s.vertexArrays)||!Array.isArray(s.vertexArrayEvents)||new Set(s.vertexArrays.map(v=>v?.id)).size!==s.vertexArrays.length||s.vertexArrays.some(v=>!Number.isSafeInteger(v?.id)||v.id<1||typeof v.deleted!=='boolean'))
+    ||before.vertexArrays.length!==after.vertexArrays.length||JSON.stringify(after.vertexArrayEvents.slice(0,before.vertexArrayEvents.length))!==JSON.stringify(before.vertexArrayEvents))return false;
+  const outgoingVaos=before.vertexArrays.filter(v=>!v.deleted).map(v=>v.id),vaoEvents=after.vertexArrayEvents.slice(before.vertexArrayEvents.length);
+  if(vaoEvents.length!==outgoingVaos.length||new Set(vaoEvents.map(e=>e.id)).size!==outgoingVaos.length||vaoEvents.some(e=>e.operation!=='delete'||!outgoingVaos.includes(e.id))
+    ||before.vertexArrays.some(v=>!after.vertexArrays.some(a=>a.id===v.id&&a.deleted===true)))return false;
+  let added=0;
+  for(const b of before.bufferSlots){const a=after.bufferSlots.find(a=>a.id===b.id);if(!a||a.bytes!==b.bytes||!Number.isSafeInteger(b.bytes)||b.bytes<1||typeof b.pendingDelete!=='boolean'||typeof a.pendingDelete!=='boolean')return false;
+    if(ids.includes(b.id)){if(b.pendingDelete||!a.pendingDelete)return false;added+=b.bytes;}else if(a.pendingDelete!==b.pendingDelete)return false;}
+  if(ids.some(id=>!before.bufferSlots.some(b=>b.id===id))||after.pendingDeleteBytes!==before.pendingDeleteBytes+added)return false;
+  const events=after.nativeEvents.slice(before.nativeEvents.length);
+  if(events.length!==ids.length||new Set(events.map(e=>e.id)).size!==ids.length||events.some(e=>e.operation!=='retire'||e.kind!=='buffer'||!ids.includes(e.id)))return false;
+  for(const key of new Set([...Object.keys(before.calls||{}),...Object.keys(after.calls||{})])){
+    if(!Number.isSafeInteger(before.calls[key]??0)||(before.calls[key]??0)<0||!Number.isSafeInteger(after.calls[key]??0)||(after.calls[key]??0)<0)return false;
+    const delta=(after.calls?.[key]||0)-(before.calls?.[key]||0);
+    if(key==='deleteBuffer'){if(delta!==ids.length)return false;}else if(key==='deleteVertexArray'){if(delta!==outgoingVaos.length)return false;}else if(delta!==0)return false;
+  }
+  return (after.calls?.deleteBuffer||0)-(before.calls?.deleteBuffer||0)===ids.length;
+}
+
 // Diagnostic capture only. Hidden tree chunks otherwise keep a previous view's LOD.
 // Settle every native geometry, then restore ordinary visibility before any draw.
 export function settleSceneCapture(scope,{framedUnitId=null}={}) {
@@ -951,7 +980,7 @@ export function installAllocationObserver(source) {
     const current=s.gpu.sample(bytes,gl.drawingBufferWidth,gl.drawingBufferHeight,attributes);
     s.defaultPeak=Math.max(s.defaultPeak,s.gpu.framebuffer+s.gpu.pendingFramebuffer);return current;
   };
-  const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),gpu:new Peak(),bufferArrays:new WeakMap(),bufferSources:new Map(),bufferIds:new Map(),bufferOwners:new Map(),nextBufferId:1,textures:new Map(),textureIds:new Map(),renderbufferIds:new Map(),nativeEvents:[],signatures:[],unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};s.ledger.onReservation=bytes=>sample(gl,s,bytes);
+  const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),gpu:new Peak(),bufferArrays:new WeakMap(),bufferSources:new Map(),bufferIds:new Map(),bufferOwners:new Map(),nextBufferId:1,textures:new Map(),textureIds:new Map(),renderbufferIds:new Map(),nativeEvents:[],vertexArrays:new Map(),vertexArrayEvents:[],nextVertexArrayId:1,signatures:[],unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};s.ledger.onReservation=bytes=>sample(gl,s,bytes);
     if(source.nativeJournal===true)s.ledger.onEvent=(operation,event)=>journal(s,operation,event);
     contexts.set(gl,s);}return s;};
   const unknown=(s,value)=>{if(!s.unknown.includes(value))s.unknown.push(value);};
@@ -1002,17 +1031,20 @@ export function installAllocationObserver(source) {
     signature(gl,s,id,compressed?'compressed image':'image',{target,level,format,w,h,d,type},{target,level,w,h,d,bytes});
     if(level===0)s.textures.set(id,{target,w,h,d,bpp:compressed?null:bpp(gl,s,format,type),immutable:false});
   };
-  const wrap=(proto,name,after)=>{
+  const wrap=(proto,name,after,observe=true)=>{
     const native=proto[name];if(typeof native!=='function')return;
     const descriptor=Object.getOwnPropertyDescriptor(proto,name);
     const wrapped=function(...args){const value=native.apply(this,args),s=state(this);s.calls[name]=(s.calls[name]||0)+1;
       const priorCall=s.activeCall;s.activeCall=name;
       if(source.nativeJournal===true)s.nativeCallOrdinal=(s.nativeCallOrdinal||0)+1;
-      try{sample(this,s);after(this,args,value);sample(this,s);}catch(error){unknown(s,`observer:${name}:${error.message}`);}finally{s.activeCall=priorCall;}return value;};
+      try{if(observe)sample(this,s);after(this,args,value);if(observe)sample(this,s);}catch(error){unknown(s,`observer:${name}:${error.message}`);}finally{s.activeCall=priorCall;}return value;};
     Object.defineProperty(proto,name,{value:wrapped,writable:descriptor?.writable??true,enumerable:descriptor?.enumerable??true,configurable:descriptor?.configurable??true});
     wrappers.push({proto,name,descriptor,wrapped});
   };
   try {for(const proto of [globalThis.WebGLRenderingContext?.prototype,globalThis.WebGL2RenderingContext?.prototype].filter(Boolean)) {
+    for(const name of ['drawArrays','drawElements','drawArraysInstanced','drawElementsInstanced'])wrap(proto,name,()=>{},false);
+    wrap(proto,'createVertexArray',(gl,args,value)=>{if(!value)return;const s=state(gl);if(s.vertexArrayEvents.length>=16384){unknown(s,'vertex array journal limit');return;}const id=s.nextVertexArrayId++;s.vertexArrays.set(value,{id,deleted:false});s.vertexArrayEvents.push({operation:'create',id});},false);
+    wrap(proto,'deleteVertexArray',(gl,[value])=>{if(!value)return;const s=state(gl),record=s.vertexArrays.get(value);if(s.vertexArrayEvents.length>=16384){unknown(s,'vertex array journal limit');return;}s.vertexArrayEvents.push({operation:'delete',id:record?.id??null});if(record)record.deleted=true;},false);
     for(const [name,compressed,volume]of [['texImage2D',false,false],['compressedTexImage2D',true,false],['texImage3D',false,true],['compressedTexImage3D',true,true]])
       wrap(proto,name,(gl,args)=>recordImage(gl,args,compressed,volume));
     for(const volume of [false,true])wrap(proto,volume?'texStorage3D':'texStorage2D',(gl,a)=>{
@@ -1063,7 +1095,12 @@ export function installAllocationObserver(source) {
       s.bufferArrays.get(s.bufferSources.get(id))?.delete(id);s.bufferSources.delete(id);s.bufferOwners.delete(id);s.bufferIds.delete(id);
     }});
   }
-  observer={restore,nativeCalls(gl){return {...state(gl).calls};},textureReservation(gl,texture){const s=state(gl),r=s.ledger.objects.get(texture);if(!r||r.kind!=='texture')return null;
+  observer={restore,nativeCalls(gl){return {...state(gl).calls};},
+  // Read retained records only, including while context attributes are unavailable.
+  // This does not replace a full allocation sample or reset any pending/default bytes.
+  nativeRetirementState(gl){const s=state(gl);return {kind:'retained native journal',...s.ledger.snapshot(),defaultFramebuffer:s.defaultBytes,gpuCurrent:s.gpu.current,
+    calls:{...s.calls},nativeEvents:structuredClone(s.nativeEvents),vertexArrays:[...s.vertexArrays.values()].map(v=>({...v})),vertexArrayEvents:structuredClone(s.vertexArrayEvents),bufferSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='buffer').map(([id,r])=>({id:s.bufferIds.get(id),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(id)}))};},
+  textureReservation(gl,texture){const s=state(gl),r=s.ledger.objects.get(texture);if(!r||r.kind!=='texture')return null;
     return {id:s.textureIds.get(texture),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(texture)};
   },renderbufferReservation(gl,buffer){const s=state(gl),r=s.ledger.objects.get(buffer);if(!r||r.kind!=='renderbuffer')return null;
     if(!s.renderbufferIds.has(buffer))s.renderbufferIds.set(buffer,s.renderbufferIds.size+1);

@@ -84,9 +84,11 @@ function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,s
     const lossGL=new GL(),lossTexture={};lossGL.bindings.set(lossGL.TEXTURE_BINDING_2D,lossTexture);lossGL.texImage2D(lossGL.TEXTURE_2D,0,lossGL.RGBA,lossGL.RGBA,0,{width:8,height:4});
     const lossBefore=window.__allocation.snapshot(lossGL);lossGL.getContextAttributes=()=>null;lossGL.isContextLost=()=>true;lossGL.deleteTexture(lossTexture);lossGL.finish();
     const lostCalls=window.__allocation.nativeCalls(lossGL),lostPrimary=window.__allocation.textureReservation(lossGL,lossTexture);lostCalls.deleteTexture=999;
-    const lostCallsFresh=window.__allocation.nativeCalls(lossGL);lossGL.getContextAttributes=()=>({depth:true,stencil:false,antialias:false});lossGL.isContextLost=()=>false;
+    const lostCallsFresh=window.__allocation.nativeCalls(lossGL),nativeCount=lossGL.native.length,retained=window.__allocation.nativeRetirementState(lossGL),copy=window.__allocation.nativeRetirementState(lossGL);
+    copy.calls.deleteTexture=999;copy.nativeEvents.push({operation:'forged'});const retainedFresh=window.__allocation.nativeRetirementState(lossGL),retainedCopiesStable=retainedFresh.calls.deleteTexture===1&&!retainedFresh.nativeEvents.some(e=>e.operation==='forged')&&lossGL.native.length===nativeCount;
+    lossGL.getContextAttributes=()=>({depth:true,stencil:false,antialias:false});lossGL.isContextLost=()=>false;
     const lossPending=window.__allocation.snapshot(lossGL);lossGL.finish();const lossRestored=window.__allocation.snapshot(lossGL);
-    const lossObservation={before:lossBefore,pending:lossPending,restored:lossRestored,lostPrimary,lostCallsFresh};
+    const lossObservation={before:lossBefore,pending:lossPending,restored:lossRestored,lostPrimary,lostCallsFresh,retained,retainedCopiesStable};
     const observer=window.__allocation;if(!skipRestore){observer.restore();observer.restore();}
     const after=Object.getOwnPropertyDescriptors(GL.prototype);
     const exactRestore=Object.keys(after).length===Object.keys(descriptors).length&&Object.entries(descriptors).every(([key,d])=>
@@ -850,6 +852,8 @@ checks.push(['post-owner-invalid-option',a=>withPostOwner((renderer)=>{const fai
 mutants['post-owner-invalid-option']={ownerPost:(renderer,options)=>new Post(renderer,{...options,resourceLifetime:false})};
 checks.push(['native-loss-retirement-observation',a=>{const r=a.observe().lossObservation;assert.ok(r.lostPrimary?.pendingDelete&&r.pending.bytes===r.before.bytes&&r.pending.gpuPeak>=r.before.gpuPeak&&!r.pending.unknown.length&&r.restored.bytes===0&&r.lostCallsFresh.deleteTexture===1&&r.lostCallsFresh.finish===1,'native-loss-retirement-observation: lost deletes remain pending and counted until actual healthy completion; call snapshot immutable');}]);
 mutants['native-loss-retirement-observation']={observe:()=>{const o=observed();o.lossObservation.pending.bytes=0;return o;}};
+checks.push(['native-loss-retained-journal',a=>{const r=a.observe(false,false,false,sampleSceneAllocations,false,true).lossObservation;assert.ok(r.retained.bytes===r.before.bytes&&r.retained.pendingDeleteBytes===r.before.bytes&&r.retained.defaultFramebuffer===r.before.defaultFramebuffer&&r.retainedCopiesStable&&r.retained.nativeEvents.some(e=>e.operation==='retire')&&!r.retained.nativeEvents.some(e=>e.operation==='finish'||e.operation==='release'),'native-loss-retained-journal: read-only retained bytes/defaults/events survive lost context without native calls or invented completion');}]);
+mutants['native-loss-retained-journal']={observe:(...args)=>{const o=observed(...args);o.lossObservation.retained.pendingDeleteBytes=0;return o;}};
 
 for(const [,check]of checks)await check(api);
 console.log(`SCENE-ALLOCATION OK (${checks.length}/${checks.length})`);

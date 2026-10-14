@@ -182,12 +182,95 @@ export function figureGeometry(lod, kit) {
   return geoCache.get(k);
 }
 
+// Actual pool-owned retirement. Defaults never select it; arrays and animation remain CPU-live.
+function poolResourceLifetime(renderer,entries,verifyPool) {
+  if(typeof renderer?.getContext!=='function')throw Error('figure resource: renderer required');
+  let busy=false,failed=false,failure,properties=renderer.properties,outlineOn=true,lostObserved=false,staleEpoch=false,closed=false,closeComplete=false;
+  const canvas=renderer.domElement;
+  const records=entries.map(({body,outline=null})=>{
+    const geometry=body.geometry,meshes=[body,...(outline?[outline]:[])],attributes=[...Object.entries(geometry.attributes),['index',geometry.index]].filter(([,a])=>a),
+      instances=meshes.flatMap(m=>[['instanceMatrix',m.instanceMatrix],['instanceColor',m.instanceColor]].map(([key,a])=>({mesh:m,key,a}))),
+      owners=[...attributes.map(([,a])=>a),...instances.map(r=>r.a).filter(Boolean)],arrays=owners.map(a=>a.array),arrayShapes=arrays.map(a=>[a.constructor,a.length,a.byteLength,a.buffer]),shapes=owners.map(a=>[a.itemSize,a.count,a.normalized,a.gpuType,a.usage,a.meshPerAttribute]);
+    if(outline&&(outline.geometry!==geometry||outline.instanceMatrix!==body.instanceMatrix))throw Error('figure resource: shared outline owners required');
+    const callbacks=meshes.map(m=>m.onBeforeRender),materials=meshes.map(m=>m.material),guards=meshes.map((m,i)=>function(...args){
+      idle();busy=true;try{verify();if(!record.active||record.pending)throw Error('figure resource: inactive draw');
+        const counts=record.meshes.map(m=>({m,count:m.count,parent:m.parent})),poolState=verifyPool(),result=callbacks[i].apply(this,args);
+        verify();if(counts.some(s=>s.m.count!==s.count||s.m.parent!==s.parent)||!sameState(poolState,verifyPool()))throw Error('figure resource: render callback changed draw state');
+        return result;
+      }catch(e){fail(e);}finally{busy=false;}
+    });
+    const record={body,outline,geometry,index:geometry.index,meshes,attributes,instances,owners,arrays,arrayShapes,shapes,materials,guards,active:false,requested:false,pending:false,retired:new Set()};
+    for(const [i,m]of meshes.entries()){m.visible=false;m.onBeforeRender=guards[i];}
+    return record;
+  });
+  const hide=()=>{for(const r of records)for(const m of r.meshes)m.visible=false;};
+  function fail(error){if(!failed){failed=true;failure=error;}hide();throw failure;}
+  function idle(){if(failed)throw failure;if(closed)throw Error('figure resource: closed owner');if(busy)fail(Error('figure resource: reentrant update'));}
+  function sameState(a,b){return a.length===b.length&&a.every((v,i)=>Object.is(v,b[i]));}
+  function verify(){verifyPool();for(const r of records){
+    if(r.geometry.index!==r.index||r.meshes.some((m,i)=>m.geometry!==r.geometry||m.material!==r.materials[i]||m.onBeforeRender!==r.guards[i])
+      ||Object.keys(r.geometry.attributes).sort().join(',')!==r.attributes.filter(([k])=>k!=='index').map(([k])=>k).sort().join(',')
+      ||r.attributes.some(([k,a])=>(k==='index'?r.geometry.index:r.geometry.attributes[k])!==a)
+      ||r.instances.some(x=>x.mesh[x.key]!==x.a)||r.owners.some((a,i)=>a.array!==r.arrays[i]||[a.array.constructor,a.array.length,a.array.byteLength,a.array.buffer].some((v,j)=>v!==r.arrayShapes[i][j])||[a.itemSize,a.count,a.normalized,a.gpuType,a.usage,a.meshPerAttribute].some((v,j)=>v!==r.shapes[i][j])))throw Error('figure resource: owner changed');
+  }}
+  function finish(){const gl=renderer.getContext();if(gl.isContextLost())return false;if(gl.getError()!==gl.NO_ERROR)throw Error('figure resource: completion refused');gl.finish();if(gl.isContextLost())return false;if(gl.getError()!==gl.NO_ERROR)throw Error('figure resource: completion failed');return true;}
+  function retire(records){
+    for(const r of records)for(const owner of [r.geometry,...r.meshes]){if(r.retired.has(owner))continue;r.retired.add(owner);try{owner.dispose();}catch(e){if(!failed){failed=true;failure=e;}}}
+    let complete=false;try{complete=finish();}catch(e){if(!failed){failed=true;failure=e;}}
+    if(failed)fail(failure);return complete;
+  }
+  function update(requests){
+    if(!busy)throw Error('figure resource: update outside flush');
+    verify();if(requests.length!==records.length)throw Error('figure resource: bucket count changed');
+    const gl=renderer.getContext(),newEpoch=renderer.properties!==properties;
+    if(gl.isContextLost())lostObserved=true;
+    if(newEpoch&&!lostObserved){staleEpoch=true;throw Error('figure resource: unobserved context epoch');}
+    for(const [i,r]of records.entries()){
+      r.requested=!!requests[i];
+      if(r.active&&!r.pending&&(!r.requested||newEpoch||gl.isContextLost())){r.pending=true;r.retired.clear();}
+    }
+    const pending=records.filter(r=>r.pending);
+    if(pending.length){
+      hide();const counts=records.flatMap(r=>r.meshes.map(m=>({m,count:m.count,parent:m.parent}))),poolState=verifyPool(),complete=retire(pending);
+      verify();if(counts.some(s=>s.m.count!==s.count||s.m.parent!==s.parent)||!sameState(poolState,verifyPool()))throw Error('figure resource: callback changed draw state');
+      if(!complete)return false;
+      for(const r of pending){r.pending=false;r.active=false;}
+    }
+    if(gl.isContextLost()){hide();return false;}
+    properties=renderer.properties;lostObserved=false;
+    for(const r of records){if(r.requested&&!r.active)r.retired.clear();r.active=r.requested;r.body.visible=r.active;if(r.outline)r.outline.visible=r.active&&outlineOn;}
+    return true;
+  }
+  function run(action){idle();busy=true;try{verify();return action();}catch(e){
+    if(!failed){failed=true;failure=e;}hide();for(const r of records)r.pending=true;
+    if(!staleEpoch)try{retire(records);}catch{}fail(failure);
+  }finally{busy=false;}}
+  function onLoss(){if(closed||failed||!renderer.getContext().isContextLost())return;try{run(()=>update(records.map(r=>r.requested)));}catch{ /* sticky receipt retains failure */ }}
+  canvas?.addEventListener?.('webglcontextlost',onLoss);
+  return Object.freeze({assertIdle:idle,run,update,
+  close(){
+    if(closed&&closeComplete){if(failed)throw failure;return true;}
+    if(busy)fail(Error('figure resource: reentrant close'));
+    canvas?.removeEventListener?.('webglcontextlost',onLoss);closed=true;hide();if(failed)throw failure;
+    busy=true;try{const completed=retire(records);closeComplete=completed;for(const r of records){r.active=false;r.requested=false;r.pending=!completed;}return completed;}finally{busy=false;}
+  },
+  setOutline(on){outlineOn=!!on;for(const r of records)if(r.outline)r.outline.visible=r.active&&!r.pending&&outlineOn&&!renderer.getContext().isContextLost();},
+  snapshot(){return Object.freeze({failed,busy,closed,buckets:records.map(r=>Object.freeze({active:r.active,requested:r.requested,pending:r.pending,visible:r.body.visible,outlineVisible:r.outline?.visible??null}))});}});
+}
+
+function validatePoolResourceOption(resourceLifetime,renderer){
+  if(typeof resourceLifetime!=='boolean'||resourceLifetime&&typeof renderer?.getContext!=='function')throw Error('figure resource: explicit boolean and renderer required');
+}
+
 /**
  * One side's standing figures. Each frame: begin(), push() every man, flush(). Men are bucketed by
  * their distance from the camera into three levels of detail; the near two also get an outline pass.
  */
 export class SoldierPool {
-  constructor(capacity, colors, { kit = 'US', outline = true } = {}) {
+  #resource = null;
+  constructor(capacity, colors, { kit = 'US', outline = true, resourceLifetime = false, renderer = null } = {}) {
+    validatePoolResourceOption(resourceLifetime,renderer);
+    Object.defineProperty(this,'resourceLifetime',{value:resourceLifetime});
     this.capacity = capacity;
     this.kit = kit;
     this.material = soldierMaterial(colors);
@@ -222,24 +305,29 @@ export class SoldierPool {
     this.cam = new THREE.Vector3(0, 800, 0);
     this.pushed = 0;
     this.triangles = { 2: figureGeometry(2, kit).userData.triangles, 1: figureGeometry(1, kit).userData.triangles, 0: figureGeometry(0, kit).userData.triangles };
+    if(resourceLifetime){const buckets=this.buckets,material=this.material,refs=buckets.map(b=>({b,body:b.mesh,outline:b.outline,anim:b.anim,tint:b.tint,clip:b.clip}));
+      this.#resource=poolResourceLifetime(renderer,refs,()=>{if(this.capacity!==capacity||this.material!==material||this.buckets!==buckets||this.buckets.length!==refs.length||refs.some((r,i)=>buckets[i]!==r.b||r.b.mesh!==r.body||r.b.outline!==r.outline||r.b.anim!==r.anim||r.b.tint!==r.tint||r.b.clip!==r.clip))throw Error('figure resource: bucket owner changed');return [this.pushed,...refs.map(r=>r.b.n)];});}
   }
 
   get mesh() { return this.group; }
 
   /** Camera position (for the level of detail) and the world size of one render pixel (for the outline). */
   setView(camera, renderHeightPx) {
+    this.#resource?.assertIdle();
     this.cam.copy(camera.position);
     const px = (2 * Math.tan((camera.fov * Math.PI) / 360)) / Math.max(1, renderHeightPx);
     for (const b of this.buckets) if (b.outline) b.outline.material.userData.uniforms.uPx.value = px * b.outline.material.userData.px;
   }
 
   begin() {
+    this.#resource?.assertIdle();
     for (const b of this.buckets) b.n = 0;
     this.pushed = 0;
   }
 
   /** One figure: position, yaw (forward = (sin yaw, cos yaw)), scale, frames A/B + blend, flash, tint, clip side. */
   push(x, y, z, yaw, s, posA, posB, blend, flash, coatVar, trouserVar, prop, officer, clip = 0) {
+    this.#resource?.assertIdle();
     const dx = x - this.cam.x, dy = y - this.cam.y, dz = z - this.cam.z;
     const d2 = dx * dx + dy * dy + dz * dz;
     const b = d2 < LOD_NEAR * LOD_NEAR ? this.buckets[0] : d2 < LOD_FAR * LOD_FAR ? this.buckets[1] : this.buckets[2];
@@ -261,6 +349,11 @@ export class SoldierPool {
   }
 
   flush() {
+    if(this.#resource)return this.#resource.run(()=>{this.#flush();return this.#resource.update(this.buckets.map(b=>b.n>0));});
+    this.#flush();
+  }
+
+  #flush() {
     for (const b of this.buckets) {
       b.mesh.count = b.n;
       if (b.outline) b.outline.count = b.n;
@@ -280,8 +373,12 @@ export class SoldierPool {
   }
 
   setOutline(on) {
+    if(this.#resource)return this.#resource.run(()=>this.#resource.setOutline(on));
     for (const b of this.buckets) if (b.outline) b.outline.visible = on;
   }
+
+  resourceSnapshot(){return this.#resource?.snapshot()??null;}
+  disposeResourceLifetime(){return this.#resource?.close()??true;}
 }
 
 /**
@@ -289,7 +386,10 @@ export class SoldierPool {
  * is "bakeable": while baked sprites draw the infantry, setBakedClip() hides (2) or clips (-1/+1) those.
  */
 export class FallenPool {
-  constructor(capacity, colors, { kit = 'US' } = {}) {
+  #resource = null;
+  constructor(capacity, colors, { kit = 'US', resourceLifetime = false, renderer = null } = {}) {
+    validatePoolResourceOption(resourceLifetime,renderer);
+    Object.defineProperty(this,'resourceLifetime',{value:resourceLifetime});
     const { anim, tint, clip } = makeBuffers(capacity);
     this.anim = anim;
     this.tint = tint;
@@ -311,15 +411,19 @@ export class FallenPool {
     this.capacity = capacity;
     this.used = 0;
     this.dirty = false;
+    if(resourceLifetime){const refs={capacity:this.capacity,mesh:this.mesh,material:this.material,anim:this.anim,tint:this.tint,clip:this.clip};
+      this.#resource=poolResourceLifetime(renderer,[{body:this.mesh}],()=>{if(Object.entries(refs).some(([k,v])=>this[k]!==v))throw Error('figure resource: fallen owner changed');return [this.used,this.hiddenTo,this.sunk,this.dirty,this.bakedClip];});}
   }
 
   alloc() {
+    this.#resource?.assertIdle();
     if (this.used >= this.capacity) return -1;
     return this.used++;
   }
 
   /** A lying man: feet toward `yaw`, on his back (front=false) or face down; bakeable = an infantryman. */
   set(i, x, y, z, yaw, s, front, coatVar, trouserVar, bakeable = false) {
+    this.#resource?.assertIdle();
     const te = this.mesh.instanceMatrix.array;
     const o = i * 16;
     const c = Math.cos(yaw) * s, sn = Math.sin(yaw) * s;
@@ -340,6 +444,7 @@ export class FallenPool {
 
   /** Clip side for the infantry casualties: 0 drawn, -1/+1 one side of the compare divider, 2 hidden. */
   setBakedClip(c) {
+    this.#resource?.assertIdle();
     if (c === this.bakedClip) return;
     this.bakedClip = c;
     const a = this.clip.array;
@@ -349,6 +454,10 @@ export class FallenPool {
 
   /** Gore off: sink the casualties older than GORE_FADE.delay and hide the faded; gore on: put every one back. */
   fade() {
+    this.#resource?.assertIdle();return this.#fade();
+  }
+
+  #fade() {
     const te = this.mesh.instanceMatrix.array, clip = this.clip.array;
     if (FALLEN.gore) {
       if (!this.sunk) return null;
@@ -372,8 +481,13 @@ export class FallenPool {
   }
 
   flush() {
+    if(this.#resource)return this.#resource.run(()=>{this.#flush();let active=false;for(let i=0;i<this.used;i++)if(this.clip.array[i]!==2){active=true;break;}return this.#resource.update([active]);});
+    this.#flush();
+  }
+
+  #flush() {
     this.mesh.count = this.used;
-    const range = this.fade();
+    const range = this.#fade();
     if (!this.dirty && range) {
       // only the fading casualties changed: upload just their rows
       const [lo, n] = [range[0], range[1] - range[0] + 1];
@@ -389,6 +503,9 @@ export class FallenPool {
     this.clip.needsUpdate = true;
     this.dirty = false;
   }
+
+  resourceSnapshot(){return this.#resource?.snapshot()??null;}
+  disposeResourceLifetime(){return this.#resource?.close()??true;}
 }
 
 export const UNIFORMS = {

@@ -47,6 +47,8 @@ export function prepareTerrainPartition(root,renderer,{limit=65535}={}) {
     visible=root.visible,before=root.onBeforeRender,range=source.drawRange,groups=source.groups,
     rootFlags=[root.frustumCulled,root.renderOrder,root.layers.mask],empty=new THREE.BufferGeometry(),children=[],geometries=[],chunks=[],chunkOwners=[];
   let state='prepared',active=false,drawing=false,failed=false,failure,retired=new Set(),pending=null,cleanupCompletion=null;
+  const canvas=renderer.domElement;
+  const disconnect=()=>canvas?.removeEventListener?.('webglcontextlost',onLoss);
   const fail=error=>{if(!failed){failed=true;failure=error;}state='failed';throw failure;};
   const guard=()=>{if(failed)throw failure;if(active||drawing)fail(Error('terrain owner: reentrant transition'));};
   const bytesEqual=(a,b)=>{const x=new Uint8Array(a.buffer,a.byteOffset,a.byteLength),y=new Uint8Array(b.buffer,b.byteOffset,b.byteLength);return x.length===y.length&&x.every((v,i)=>v===y[i]);};
@@ -122,20 +124,28 @@ export function prepareTerrainPartition(root,renderer,{limit=65535}={}) {
     }
   }catch(e){const errors=[e];for(const g of [...geometries,empty])try{g.dispose();}catch(error){errors.push(error);}throw new AggregateError(errors,'terrain owner: preparation failed');}
   const transition=target=>{
-    guard();if(target==='install'&&state==='partitioned'||target==='restore'&&state==='restored')return true;
+    guard();if(target==='install'&&state==='partitioned'&&!pending||target==='restore'&&state==='restored')return true;
+    if(target==='install'&&pending==='refresh')target='refresh';
     if(target==='restore'&&state==='prepared')throw Error('terrain owner: install before restore');
     if(state==='restored')throw Error('terrain owner: released owner');
-    if(pending&&pending!==target)throw Error('terrain owner: pending transition must finish');
+    if(pending&&pending!==target){if(pending==='refresh'&&target==='restore'||pending==='original'&&target==='install')pending=target;else throw Error('terrain owner: pending transition must finish');}
     try{checkGraph();}catch(e){fail(e);}active=true;
     try{
       if(!pending){retired=new Set();pending=target;root.onBeforeRender=drawGuard;root.visible=false;}
-      const gl=renderer.getContext();if(gl.isContextLost())return false;
-      const completed=retire(target==='install'?[source]:[...geometries,empty]);
+      // Dispose old Three listeners while lost. Their old GL handles must never be deleted
+      // in the restored epoch; all known bytes stay pending until a healthy finish.
+      const completed=retire(target==='install'||target==='original'?[source]:[...geometries,empty]);
       if(!completed)return false;
       checkGraph();
       if(target==='install'){
         root.geometry=empty;for(const child of children)root.add(child);
         state='partitioned';pending=null;checkGraph();
+      }else if(target==='refresh'){
+        for(const g of geometries)for(const a of [...Object.values(g.attributes),g.index])a.needsUpdate=true;
+        state='partitioned';pending=null;retired.clear();checkGraph();
+      }else if(target==='original'){
+        for(const a of attributes)a.needsUpdate=true;
+        state='prepared';pending=null;root.onBeforeRender=before;retired.clear();checkGraph();
       }else{
         for(const child of children)root.remove(child);
         // Originals become drawable only after every outgoing native buffer has retired.
@@ -143,6 +153,7 @@ export function prepareTerrainPartition(root,renderer,{limit=65535}={}) {
         state='restored';pending=null;root.onBeforeRender=before;
         verifySource();if(root.children.length)throw Error('terrain owner: restoration left children');
         children.length=0;geometries.length=0;chunks.length=0;chunkOwners.length=0;result.chunks.length=0;oracles.length=0;retired.clear();
+        disconnect();
       }
       root.visible=visible;return true;
     }catch(e){
@@ -153,7 +164,19 @@ export function prepareTerrainPartition(root,renderer,{limit=65535}={}) {
       fail(failure);
     }finally{active=false;}
   };
+  function onLoss(){
+    if(!renderer.getContext().isContextLost()||state==='restored'||failed)return;
+    try{transition(pending??(state==='partitioned'?'refresh':'original'));}catch{ /* sticky failure remains on the receipt */ }
+  }
+  canvas?.addEventListener?.('webglcontextlost',onLoss);
   return Object.freeze({install:()=>transition('install'),restore:()=>transition('restore'),resume:()=>{guard();return pending?transition(pending):true;},
+    // Explicitly release the loss notification when abandoning a failed/prepared receipt.
+    // This does not claim native cleanup or publish another representation.
+    disconnect(){
+      if(active||drawing)fail(Error('terrain owner: reentrant disconnect'));
+      if(!failed&&state!=='restored'&&(state!=='prepared'||pending))throw Error('terrain owner: restore before disconnect');
+      disconnect();if(!failed&&state==='prepared'){failed=true;failure=Error('terrain owner: preparation abandoned');state='failed';}
+    },
     get state(){return state;},get pending(){return pending;},get failed(){return failed;},
     get retainedArrays(){return state==='restored'?[]:[...arrays.map((array,i)=>({array,owner:`terrain-source/${i}`})),...oracles.map((array,i)=>({array,owner:`terrain-oracle/${i}`})),...chunks.flatMap((c,i)=>Object.entries(c).map(([k,array])=>({array,owner:`terrain-chunk-${i}/${k}`})))];},
     get receipt(){return Object.freeze({state,pending,failed,cleanupCompletion,triangles:result.triangles,chunks:children.length,sourceBytes:result.sourceBytes,bytes:result.bytes});}});

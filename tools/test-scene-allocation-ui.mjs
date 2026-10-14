@@ -1,6 +1,7 @@
 // Actions-only native lifecycle proof; this small fixture is not a whole-battle budget measurement.
 import {isDeepStrictEqual} from 'node:util';
-import {AllocationLedger,mipSizes,ReservationPeak,installAllocationObserver,createSceneHistory,compactSceneSample,expandSceneContext} from './bake/scene-allocation.mjs';
+import {poolResourceControls} from './test-pool-resource-ui.mjs';
+import {AllocationLedger,mipSizes,ReservationPeak,installAllocationObserver,createSceneHistory,compactSceneSample,expandSceneContext,lostRetirementValid} from './bake/scene-allocation.mjs';
 import {installSceneStartGate,restoreSceneDiagnostics} from './bake/inactive-figures.mjs';
 
 export async function sceneAllocationControls({browser,url,check,result,watchErrors}) {
@@ -79,6 +80,7 @@ export async function sceneAllocationControls({browser,url,check,result,watchErr
   await postPixelResourceControls({browser,url,check,result,watchErrors});
   await postOwnerResourceControls({browser,url,check,result,watchErrors});
   await terrainOwnerResourceControls({browser,url,check,result,watchErrors});
+  await poolResourceControls({browser,url,check,result,watchErrors});
 }
 
 // Exercise the runtime geometry owner directly; observation never supplies its lifecycle.
@@ -91,7 +93,7 @@ async function terrainOwnerResourceControls({browser,url,check,result,watchError
   const proof=await page.evaluate(async()=>{
    const THREE=await import('three'),{prepareTerrainPartition}=await import('./src/world/terrain.js'),{sampleSceneAllocations}=await import('./tools/bake/scene-allocation.mjs');
    const renderer=new THREE.WebGLRenderer({antialias:false,preserveDrawingBuffer:true}),gl=renderer.getContext(),scene=new THREE.Scene(),camera=new THREE.OrthographicCamera(-1,1,1,-1,.1,10);
-   renderer.setSize(32,32);renderer.setClearColor(0x172433);camera.position.z=3;
+   renderer.setSize(32,32);scene.background=new THREE.Color(0x172433);camera.position.z=3;
    const source=new THREE.PlaneGeometry(1.6,1.6,4,4);source.deleteAttribute('normal');
    for(let i=0;i<source.attributes.position.count;i++)source.attributes.position.setZ(i,Math.sin(i)*.05);source.computeBoundingBox();source.computeBoundingSphere();
    const material=new THREE.ShaderMaterial({uniforms:{uTint:{value:new THREE.Vector3(.4,.6,.2)}},vertexShader:'varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',fragmentShader:'varying vec2 vUv; uniform vec3 uTint; void main(){gl_FragColor=vec4(uTint+vec3(vUv*.2,0.),1.);}'}),root=new THREE.Mesh(source,material);
@@ -115,19 +117,20 @@ async function terrainOwnerResourceControls({browser,url,check,result,watchError
     receipt.retirement={sourceGone:receipt.originalIds.every(id=>!retired.bufferOwnership.some(r=>r.id===id)),chunksGone:receipt.chunkIds.every(id=>!settled.bufferOwnership.some(r=>r.id===id))};
     // A second, separate owner exercises actual DOM loss and Three's fresh properties.
     owner=prepareTerrainPartition(root,renderer,{limit:6});scope.__sceneTerrainPartition=owner;owner.install();capture('before-loss');sample('before-loss');
-    const oldProperties=renderer.properties,lost=event('webglcontextlost');renderer.forceContextLoss();await lost;
-    const beforeCalls=window.__allocation.nativeCalls(gl);receipt.lostRestore=owner.restore();const afterCalls=window.__allocation.nativeCalls(gl);
-    receipt.loss={actualLost:gl.isContextLost(),beforeCalls,afterCalls,pending:owner.pending,hidden:root.visible===false};
+    const oldProperties=renderer.properties,beforeLoss=window.__allocation.nativeRetirementState(gl),lost=event('webglcontextlost');renderer.forceContextLoss();await lost;
+    receipt.lostRestore=owner.restore();const after=window.__allocation.nativeRetirementState(gl);owner.restore();const repeated=window.__allocation.nativeRetirementState(gl);
+    receipt.loss={actualLost:gl.isContextLost(),before:beforeLoss,after,repeated,outgoing:beforeLoss.bufferSlots.filter(b=>!b.pendingDelete).map(b=>b.id),pending:owner.pending,hidden:root.visible===false};
     // The loss event must finish dispatching before WEBGL_lose_context accepts restoration.
     // Match the actual Post fixture's next-task boundary, not a retry or longer timeout.
     await new Promise(resolve=>setTimeout(resolve,0));const restored=event('webglcontextrestored');renderer.forceContextRestore();await restored;
-    receipt.freshProperties=renderer.properties!==oldProperties;receipt.resumed=owner.resume();sample('context-completed');capture('context-restored');sample('context-reuploaded');
+    receipt.freshProperties=renderer.properties!==oldProperties;sample('context-before-completion');receipt.resumed=owner.resume();sample('context-completed');capture('context-restored');sample('context-reuploaded');
     receipt.lossExactOriginal=root.geometry===source&&root.material===material&&!root.children.length&&root.onBeforeRender===before&&owner.retainedArrays.length===0;
    }catch(e){receipt.errors.push(String(e?.message??e));}
    finally{
     const attempt=(name,fn)=>{try{fn();receipt.cleanup.push({name,ok:true});}catch(e){receipt.cleanup.push({name,ok:false,error:String(e?.message??e)});}};
     if(owner?.pending&&!gl.isContextLost())attempt('pending',()=>{if(!owner.resume())throw Error('owner completion deferred');});
     if(owner?.state==='partitioned')attempt('owner',()=>{if(!owner.restore())throw Error('owner restoration deferred');});
+    if(owner)attempt('loss-listener',()=>owner.disconnect());
     attempt('detach',()=>scene.remove(root));attempt('source',()=>source.dispose());attempt('material',()=>material.dispose());attempt('renderer',()=>renderer.dispose());
     attempt('finish',()=>{if(gl.isContextLost())throw Error('lost cleanup');gl.finish();});
     if(!gl.isContextLost())attempt('snapshot',()=>sample('cleanup'));else receipt.cleanup.push({name:'snapshot',ok:false,error:'lost context; last live allocation samples retained'});
@@ -157,7 +160,8 @@ async function terrainOwnerResourceControls({browser,url,check,result,watchError
   check('terrain-owner-native-source-bytes',warm?.allocation.byKind.buffer===proof.sourceBytes&&partition?.allocation.byKind.buffer===proof.installReceipt?.bytes,'full actual source/partition backing accounted separately');
   check('terrain-owner-native-whole-frames',proof.frames.length===15&&proof.frames.every(frameOk),'all 15 original/partition/restored/loss whole RGBA frames retained');
   check('terrain-owner-native-pixel-equality',equal('original','partition')&&equal('original','restored'),'overview/near/actual interior seam exact whole RGBA');
-  check('terrain-owner-native-context-deferral',proof.loss?.actualLost&&proof.lostRestore===false&&proof.loss.pending==='restore'&&proof.loss.hidden&&isDeepStrictEqual(proof.loss.beforeCalls,proof.loss.afterCalls),'actual loss retains CPU owners, hides draw graph, adds no native call');
+  const lossValid=proof.loss?.actualLost&&proof.lostRestore===false&&proof.loss.pending==='restore'&&proof.loss.hidden&&lostRetirementValid(proof.loss.before,proof.loss.after,proof.loss.outgoing)&&isDeepStrictEqual(proof.loss.after,proof.loss.repeated),pending=proof.states.find(s=>s.label==='context-before-completion');
+  check('terrain-owner-native-context-deferral',lossValid&&proof.loss.outgoing.every(id=>pending?.bufferOwnership.some(b=>b.id===id&&b.pendingDelete)),'actual loss deletes only captured outgoing buffers/VAOs once; no uploads/draws/finish/releases, pending bytes conserved until restored completion');
   check('terrain-owner-native-context-restoration',proof.freshProperties&&proof.resumed&&proof.lossExactOriginal&&equal('original','context-restored'),'actual Three restoration, then owner completion and exact original whole frames');
   let replay=false,reject=false;try{const history=createSceneHistory(),compact={history,states:proof.states.map(s=>compactSceneSample(history,s))};proof.nativeHistory=compact;replay=isDeepStrictEqual(expandSceneContext(compact).states,proof.states);const bad=structuredClone(compact);bad.history.nativeEvents[0].sequence=999999;try{expandSceneContext(bad);}catch{reject=true;}}catch(e){proof.replayError=String(e);}
   check('terrain-owner-native-history',replay&&reject,'all native events/slots replayed; malformed chronology rejected');
