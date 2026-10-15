@@ -35,7 +35,7 @@ import { shopStock, buyLot, turnInCard, markShopSeen, levelUps, turnInPoints, ne
   storesOf, upgradesOf, depotCapacity, buyStores, buyUpgrade, buyTraining, buySlot, trainingOffer, rerollPreview, rerollAffix } from '../franchise/economy.js';
 import { TIER_BY_ID, STORE_ITEMS, STORE_BY_ID, VETERANCY, itemDef, conditionEffect } from '../reward/data.js';
 import { compare, bestFit } from '../reward/model.js';
-import { savedDeployment } from '../franchise/practice.js';
+import { savedDeployment, assertSavedLaunch } from '../franchise/practice.js';
 import { loadFieldScenario, loadBattlePack } from '../sim/phase.js';
 import { prepareBattleRecordings } from '../audio/bank.js';
 
@@ -1400,7 +1400,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       if (preparation.cancelled || !currentDeployment(task)) return;
       const raw = await store.readRawBaseline();
       if (!currentDeployment(task)) return;
-      if (raw === null || exportSnapshot(parseSnapshot(raw)) !== task.raw) throw new Error('Practice: progress changed since this army was reviewed.');
+      assertSavedLaunch(task.manifest, raw === null ? null : parseSnapshot(raw));
       await onDeploy({ manifest: task.manifest, isCurrent: () => currentDeployment(task), onAdmitted: () => {
         if (!currentDeployment(task)) throw new Error('Practice: deployment review was cancelled.');
         task.admitted = true; task.abort.abort(); disposed = true; reviewDialog.close('launch'); root.remove();

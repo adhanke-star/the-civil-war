@@ -172,8 +172,31 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
       && (await counters()).gpu === 0, 'repeat event cannot acquire another field or allocation');
     await page.locator('#deploy-cancel').click(); releaseModule(); await handled; await page.unroute('**/src/main.js');
     verdict('launch-cancel', await cancelled(), 'cancelled import does not call launcher or start its canonical read');
-    await review();
-    // busy begins before module import. Observe the real canonical request, not that earlier phase.
+    // A fresh document retains the actual equipped IndexedDB save and clears the cancelled module's cache.
+    assert.equal(await raw(), JSON.stringify(equipped), 'canonical launch stage keeps the actual equipped save');
+    await load(); await review();
+    assert.equal(await raw(), JSON.stringify(equipped), 'fresh document must not reseed or change equipped progress');
+    let releaseCanonicalModule, canonicalModuleSeen, canonicalModuleHandled, canonicalModulePending = false;
+    const canonicalGate = new Promise(resolve => { releaseCanonicalModule = resolve; });
+    const canonicalSeen = new Promise(resolve => { canonicalModuleSeen = resolve; });
+    const canonicalHandled = new Promise(resolve => { canonicalModuleHandled = resolve; });
+    const canonicalModule = async route => {
+      canonicalModulePending = true; canonicalModuleSeen(); await canonicalGate;
+      try { await route.continue(); } finally { canonicalModuleHandled(); }
+    };
+    await page.route('**/src/main.js', canonicalModule);
+    let heldOwner, cancelledLaunch, restored = false, releasedHold = false, primaryFailed = false;
+    const launchRead = result.deploymentLaunchRead = {};
+    const boundedStage = async (task, label) => {
+      let timer;
+      try { return await Promise.race([task, new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Canonical launch stage deadline: ' + label)), 30000);
+      })]); } finally { clearTimeout(timer); }
+    };
+    try {
+    // Preparation and its readonly baseline check precede this gate; the original main readwrite read follows it.
+    // Observe that actual canonical request with the unchanged owner/mode/Escape oracle.
+
     await page.evaluate(() => {
       if (window.__launchReadProbe) throw new Error('Launch-read observer already owned');
       const task = window.__entry.deployment, rows = [], events = [], byTransaction = new WeakMap();
@@ -247,11 +270,15 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
         }
       };
     });
-    let heldOwner, cancelledLaunch, restored = false, releasedHold = false;
-    const launchRead = result.deploymentLaunchRead = {};
-    try {
       launchRead.preStageRefused = !await page.evaluate(() => window.__launchReadProbe.ready());
-      await holdProgressTransaction(page); await page.locator('#deploy-launch').click();
+      await page.locator('#deploy-launch').click(); await boundedStage(canonicalSeen, 'actual main request');
+      launchRead.preparation = { mainRequested: canonicalModulePending, raw: await raw(), counters: await counters(),
+        beforeMain: await page.evaluate(() => window.__launchReadProbe.capture()) };
+      assert.equal(launchRead.preparation.raw, JSON.stringify(equipped));
+      assert.equal(launchRead.preparation.counters.gpu, 0);
+      assert.equal(launchRead.preparation.beforeMain.rows.length, 0);
+      await holdProgressTransaction(page); releaseCanonicalModule(); await boundedStage(canonicalHandled, 'actual main continuation');
+      await page.unroute('**/src/main.js', canonicalModule);
       await page.waitForFunction(() => window.__launchReadProbe.ready());
       launchRead.beforeEscape = await page.evaluate(() => window.__launchReadProbe.capture());
       launchRead.controls = await page.evaluate(() => window.__launchReadProbe.controls());
@@ -260,18 +287,30 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
       await releaseProgressTransaction(page); releasedHold = true; cancelledLaunch = await cancelled();
       launchRead.afterSettlement = await page.evaluate(() => window.__launchReadProbe.capture());
     } catch (error) {
-      launchRead.error = error.message;
+      primaryFailed = true; launchRead.error = error.message;
       try { launchRead.failureSnapshot = await page.evaluate(() => window.__launchReadProbe.capture()); }
       catch (captureError) { launchRead.captureError = captureError.message; }
       throw error;
     } finally {
-      try { if (!releasedHold) await releaseProgressTransaction(page); }
-      finally { launchRead.restored = restored = await page.evaluate(() => window.__launchReadProbe.restore()); }
+      releaseCanonicalModule(); launchRead.cleanupErrors = [];
+      const clean = async (label, operation) => {
+        try { await boundedStage(operation(), label); }
+        catch (error) { launchRead.cleanupErrors.push({ label, message: error.message }); }
+      };
+      if (!releasedHold) await clean('release original transaction', () => releaseProgressTransaction(page));
+      if (canonicalModulePending) await clean('finish original module continuation', () => canonicalHandled);
+      await clean('remove owned module route', () => page.unroute('**/src/main.js', canonicalModule));
+      await clean('restore original read observer', async () => {
+        launchRead.restored = restored = await page.evaluate(() => window.__launchReadProbe?.restore() ?? false);
+      });
+      if (launchRead.cleanupErrors.length && !primaryFailed) throw new Error('Canonical launch cleanup failed: ' + JSON.stringify(launchRead.cleanupErrors));
     }
     launchRead.restored = restored;
     const before = launchRead.beforeEscape.state, retained = launchRead.beforeRelease.state, after = launchRead.afterSettlement.state;
     const nativeEscape = launchRead.beforeRelease.events.filter(e => e.type === 'keydown' || e.type === 'keyup');
-    verdict('launch-escape', launchRead.preStageRefused && Object.values(launchRead.controls).every(Boolean)
+    verdict('launch-escape', launchRead.cleanupErrors.length === 0 && launchRead.preStageRefused && launchRead.preparation.mainRequested
+      && launchRead.preparation.raw === JSON.stringify(equipped) && launchRead.preparation.counters.gpu === 0
+      && launchRead.preparation.beforeMain.rows.length === 0 && Object.values(launchRead.controls).every(Boolean)
       && restored && heldOwner && retained.importing && retained.busy && retained.cancelled && !retained.open
       && retained.held && !retained.released && retained.gpu === 0 && nativeEscape.length === 2
       && nativeEscape.every(e => e.trusted) && cancelledLaunch && after.gpu === 0

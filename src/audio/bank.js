@@ -94,7 +94,7 @@ export async function prepareBattleRecordings(resolveScenario, {
     const worker = async () => {
       while (current() && next < ids.length) {
         const id = ids[next++];
-        let reader, response;
+        let reader, response, drained = false;
         try {
           if (!SOUNDS[id] || SOUNDS[id].stream) throw new Error('Unavailable recording');
           const url = new URL('../../' + AUDIO_DIR + SOUNDS[id].file, import.meta.url).href;
@@ -109,7 +109,7 @@ export async function prepareBattleRecordings(resolveScenario, {
           while (current()) {
             const chunk = await reader.read();
             if (!current()) return;
-            if (chunk.done) break;
+            if (chunk.done) { drained = true; break; }
             bytes += chunk.value.byteLength;
             if (bytes > length || bytes > AUDIO_BUDGET.file) throw new Error('Recording body exceeds its bound');
           }
@@ -117,7 +117,7 @@ export async function prepareBattleRecordings(resolveScenario, {
         } catch { /* Missing recordings do not prevent the original departure. */ }
         finally {
           // A foreign or stuck body must not hold departure after cancellation/deadline.
-          try { Promise.resolve(reader ? reader.cancel() : response?.body?.cancel()).catch(() => {}); } catch {}
+          if (!drained) try { Promise.resolve(reader ? reader.cancel() : response?.body?.cancel()).catch(() => {}); } catch {}
           try { reader?.releaseLock(); } catch {}
         }
       }
@@ -135,7 +135,8 @@ export async function prepareBattleRecordings(resolveScenario, {
   }, deadlineMs);
   try { outcome = await Promise.race([run().catch(() => 'unavailable'), early]); }
   finally {
-    closed = true; clearTimeout(timer); controller.abort();
+    closed = true; clearTimeout(timer);
+    if (stale() || deadlineHit) controller.abort();
     signal?.removeEventListener('abort', stop);
     globalThis.removeEventListener?.('pagehide', stop);
   }

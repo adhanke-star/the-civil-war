@@ -11,6 +11,12 @@
 // 5. Feed and toasts: no box (transparent feed, translucent row backing, text shadow), at most 3 rows in view, clear of
 //    the objective line and the dock, at 1280x720 and 320x568 (screenshots).
 import { AxeBuilder } from '@axe-core/playwright';
+import { AUDIO_DIR, SOUNDS } from '../src/audio/bank.js';
+import { parseSnapshot, exportSnapshot, MAX_SAVE_BYTES } from '../src/franchise/save.js';
+import { breakCamp } from '../src/franchise/camp-orders.js';
+import { reconcileLevelRewards } from '../src/franchise/level-rewards.js';
+import { campaignPhase } from '../src/franchise/campaign.js';
+import { cardsFor, chooseDecision, optionOpen } from '../src/franchise/decisions.js';
 
 const settle = (page) => page.evaluate(() => new Promise((r) => { let n = 0; const f = () => (++n >= 3 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); }));
 
@@ -161,4 +167,154 @@ export async function audioControls({ browser, url, check, shot, result, watchEr
       JSON.stringify({ ...fit, axe: axe320.violations.map((v) => v.id) }));
     check('audio-no-console-errors', errors.length === 0, errors.join('\n') || '0 errors');
   } finally { await ctx.close(); }
+}
+
+
+/** Observe one real ZzFX delegation without changing its receiver, arguments, return or thrown value. */
+export function observeFallbackCall(sound) {
+  const descriptor = Object.getOwnPropertyDescriptor(sound, 'zzfx');
+  if (!descriptor || !('value' in descriptor) || typeof descriptor.value !== 'function' || !descriptor.configurable)
+    throw new Error('fallback observer: expected owned configurable function');
+  const original = descriptor.value, rows = [];
+  let failed = false, closed = false;
+  function wrapper(...args) {
+    let value, threw = false, error;
+    try { value = Reflect.apply(original, this, args); } catch (caught) { threw = true; error = caught; }
+    try {
+      if (rows.length >= 8) failed = true;
+      else {
+        const scalar = (number, max, integer = false) => {
+          if (typeof number !== 'number' || !Number.isFinite(number) || number < 0 || number > max
+            || (integer && !Number.isSafeInteger(number))) { failed = true; return 0; }
+          return number;
+        };
+        rows.push({ delegated: true, threw,
+          nativeSource: !threw && typeof AudioBufferSourceNode !== 'undefined' && value instanceof AudioBufferSourceNode,
+          nativeBuffer: !threw && typeof AudioBuffer !== 'undefined' && value?.buffer instanceof AudioBuffer,
+          length: !threw ? scalar(value?.buffer?.length ?? 0, 100000000, true) : 0,
+          duration: !threw ? scalar(value?.buffer?.duration ?? 0, 600) : 0,
+          channels: !threw ? scalar(value?.buffer?.numberOfChannels ?? 0, 8, true) : 0,
+          contextRunning: sound.ctx?.state === 'running' });
+      }
+    } catch { failed = true; }
+    if (threw) throw error;
+    return value;
+  }
+  Object.defineProperty(sound, 'zzfx', { ...descriptor, value: wrapper });
+  const installed = Object.getOwnPropertyDescriptor(sound, 'zzfx');
+  return { close() {
+    if (closed) return { owned: false, restored: false, failed: true, rows: rows.map(r => ({ ...r })) };
+    closed = true;
+    const current = Object.getOwnPropertyDescriptor(sound, 'zzfx');
+    const owned = current && Object.keys(installed).every(k => current[k] === installed[k]);
+    if (owned) Object.defineProperty(sound, 'zzfx', descriptor);
+    const after = Object.getOwnPropertyDescriptor(sound, 'zzfx');
+    const restored = !!after && Object.keys(descriptor).every(k => after[k] === descriptor[k]);
+    return { owned: !!owned, restored, failed, rows: rows.map(r => ({ ...r })) };
+  } };
+}
+
+
+/** Separate replay of recorded/synthetic execution; source inputs come from committed files, never the report. */
+export function recordingProofErrors(report, { sha, run, manifest, campaign, fielded, expectedIds, initial, deck, guardRaw }) {
+  const errors = [], need = (ok, name) => { if (!ok) errors.push(name); };
+  try {
+    const positiveInt = (n, max = 100000000) => typeof n === 'number' && Number.isSafeInteger(n) && n > 0 && n <= max;
+    const positive = (n, max) => typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= max;
+    need(typeof run === 'string' && report.run === run && expectedIds.length === 18 && new Set(expectedIds).size === 18, 'exact-run/source-ids');
+    need(exportSnapshot(parseSnapshot(guardRaw)) === guardRaw && parseSnapshot(guardRaw).kind === 'completed-reward', 'source-guard-baseline');
+    need(!initial.ready && initial.campaign.index === 0 && initial.campaign.history.length === 0, 'source-fresh-prefix');
+    const sourceDecisions = [], phase = campaignPhase(initial, campaign);
+    let decisionPrefix = initial;
+    for (const card of cardsFor(deck, phase)) {
+      const option = card.options.find(o => optionOpen(decisionPrefix, o).ok);
+      decisionPrefix = reconcileLevelRewards(chooseDecision(decisionPrefix, { campaign, deck, cardId: card.id, optionId: option.id }), MAX_SAVE_BYTES);
+      sourceDecisions.push(exportSnapshot(decisionPrefix));
+    }
+    need(sourceDecisions.length === 2 && !decisionPrefix.ready, 'source-decision-prefix');
+    need(Array.isArray(report.console) && report.console.length <= 256 && Array.isArray(report.requests) && report.requests.length <= 4096, 'raw-diagnostic-containers');
+    need(report.requests.every((r, i) => r.id === i + 1 && ['healthy', 'unavailable', 'guards'].includes(r.case)
+      && typeof r.path === 'string' && r.path.length < 2048 && ['GET', 'HEAD'].includes(r.method)
+      && (r.status === null || (positiveInt(r.status, 599) && r.status >= 100))), 'raw-request-shapes');
+    need(report.requests.every(r => !r.failed && (r.status === 200 || (r.case === 'unavailable' && r.phase === 'prepare'
+      && r.status === 503 && expectedIds.some(id => r.path === AUDIO_DIR + SOUNDS[id].file)))), 'unexplained-request-failure');
+    need(report.schema === 'battle-recordings-v1' && report.complete === true && report.sha === sha
+      && /^[1-9][0-9]*$/.test(report.run) && report.attempt === '1' && report.failure === null, 'identity/completion');
+    need(report.generation === manifest.generation && report.errors.length === 0 && report.overflow === false, 'source/errors/overflow');
+    need(report.cases.length === 2 && report.cases[0].name === 'healthy' && report.cases[1].name === 'unavailable', 'two-distinct-cases');
+    for (const c of report.cases) {
+      const healthy = c.name === 'healthy', prefix = c.name + ':';
+      need(new URL(c.origin).origin === c.origin.slice(0, -1) && new URL(c.origin).hostname === '127.0.0.1', prefix + 'origin');
+      need(c.metadata.schema === 1 && c.metadata.scope === c.origin && c.metadata.generation === manifest.generation
+        && manifest.base.every(p => c.metadata.members.includes(p)), prefix + 'admission');
+      need(c.controller === true && c.beforeGesture.requests === 0 && c.beforeGesture.audioContexts === 0, prefix + 'pre-gesture');
+      need(c.beforeBegin.simTime === 0 && c.beforeBegin.paused === true && c.beforeBegin.briefing === true
+        && c.beforeBegin.decoded === 0 && c.restartBeforeBegin.simTime === 0 && c.restartBeforeBegin.paused === true
+        && c.restartBeforeBegin.briefing === true && c.restartBeforeBegin.decoded === 0, prefix + 'unbegun/restarted');
+      need(c.online.reachable === true && c.online.status === 200 && c.closed.reachable === false
+        && c.closed.error === 'ECONNREFUSED' && c.listenerClosed === true && c.browserRestarted === true, prefix + 'actual-offline');
+      need(c.saves.before === exportSnapshot(decisionPrefix) && JSON.stringify(c.decisionSaves) === JSON.stringify(sourceDecisions), prefix + 'source-decision-saves');
+      const before = parseSnapshot(c.saves.before), expected = exportSnapshot(reconcileLevelRewards(
+        breakCamp(before, { campaign, fielded }), MAX_SAVE_BYTES));
+      need(c.saves.departed === expected && c.saves.restart === expected && c.saves.played === expected, prefix + 'whole-save/one-charge');
+      const requests = report.requests.filter(r => r.case === c.name && r.phase === 'prepare' && expectedIds.some(id => r.path === AUDIO_DIR + SOUNDS[id].file));
+      need(requests.length === 18 && expectedIds.every(id => requests.filter(r => r.path === AUDIO_DIR + SOUNDS[id].file
+        && r.method === 'GET' && r.range === null && r.status === (healthy ? 200 : 503) && r.finished === true).length === 1), prefix + 'actual-preparation-requests');
+      need(c.decisionSaves.length === 2 && c.decisionSaves[1] === c.saves.before && c.departures === 1, prefix + 'decisions/departure');
+      for (const key of ['coldCache', 'cache', 'restartCache']) {
+        const rows = c[key]; need(rows.length === 18 && new Set(rows.map(r => r.id)).size === 18
+          && expectedIds.every(id => rows.some(r => r.id === id)), prefix + key + ':coverage');
+        for (const row of rows) {
+          const source = manifest.files[AUDIO_DIR + SOUNDS[row.id].file], present = healthy && key !== 'coldCache';
+          need(row.present === present, prefix + key + ':presence:' + row.id);
+          if (present) need(row.status === 200 && row.type === 'basic' && row.contentRange === null
+            && row.bytes === source.bytes && row.contentLength === String(source.bytes) && row.sha256 === source.sha256,
+            prefix + key + ':body:' + row.id);
+        }
+      }
+      need(c.playback.running === true && typeof c.playback.simTime === 'number' && Number.isFinite(c.playback.simTime) && c.playback.simTime >= 0 && c.playback.selectedUS === true, prefix + 'live-playback');
+      if (healthy) {
+        need(c.playback.decoded.length === 18 && new Set(c.playback.decoded.map(r => r.id)).size === 18
+          && expectedIds.every(id => c.playback.decoded.some(r => r.id === id && r.native === true && positiveInt(r.length) && positiveInt(r.channels, 8) && positiveInt(r.sampleRate, 384000))), prefix + 'decoded');
+        need(c.playback.volley.some(r => expectedIds.includes(r.id) && ['volley', 'shot'].includes(SOUNDS[r.id]?.role) && r.ok === true && r.bus === 'effects'), prefix + 'recorded-volley');
+        need(c.playback.order.some(r => r.id === 'call-recall' && r.ok === true), prefix + 'keyboard-call');
+        need(c.playback.ambient.id === expectedIds[17] && c.playback.ambient.loop === true
+          && c.playback.ambient.live === true && c.playback.ambient.stopped === false, prefix + 'ambient-loop');
+      } else {
+        need(c.rejectedPaths.length === 18 && new Set(c.rejectedPaths).size === 18
+          && expectedIds.every(id => c.rejectedPaths.includes(AUDIO_DIR + SOUNDS[id].file)), prefix + 'declared-503');
+        need(c.playback.decoded.length === 0 && c.notice.visible === true && c.notice.status === true, prefix + 'limited-notice');
+        const f = c.playback.fallback;
+        need(f.owned === true && f.restored === true && f.failed === false && f.rows.length > 0 && f.rows.length <= 8
+          && f.rows.every(r => r.delegated === true && r.threw === false && r.nativeSource === true && r.nativeBuffer === true
+            && positiveInt(r.length) && positive(r.duration, 600) && positiveInt(r.channels, 8) && r.contextRunning === true), prefix + 'real-fallback');
+      }
+      need(c.cleanup.length === 3 && c.cleanup.every(r => r.ok === true), prefix + 'cleanup');
+    }
+    const g = report.guards;
+    need(g.cancel.queued === true && g.cancel.currentCalls === 1 && g.cancel.puts === 0 && g.cancel.before === guardRaw && g.cancel.after === guardRaw
+      && g.cancel.rejected === true && typeof g.cancel.error === 'string' && g.cancel.error.startsWith('Progress:') && g.cancel.error.includes('cancelled'), 'native-queued-cancel');
+    need(g.healthy.queued === true && g.healthy.currentCalls === 1 && g.healthy.puts === 1 && g.healthy.before === guardRaw && g.healthy.after === guardRaw, 'native-queued-healthy');
+    need(g.ui.preparing === true && g.ui.cancelled === true && g.ui.rawBefore === guardRaw && g.ui.rawAfter === guardRaw
+      && g.ui.gpu === 0 && g.ui.departures === 0 && g.ui.closed === true, 'native-ui-cancel');
+    for (const row of report.console) {
+      const c = report.cases.find(c => c.name === row.case);
+      let allowed = false;
+      if (c && typeof row.text === 'string' && row.text.length <= 16384 && typeof row.url === 'string' && row.url.length < 2048) {
+        const target = new URL(row.url || c.origin, c.origin), audioTarget = target.origin === new URL(c.origin).origin
+          && expectedIds.some(id => target.pathname === '/' + AUDIO_DIR + SOUNDS[id].file);
+        if (c.name === 'unavailable' && ['prepare', 'playback'].includes(row.phase)) {
+          allowed = row.type === 'error' && audioTarget && ['Failed to load resource: net::ERR_FAILED',
+            'Failed to load resource: the server responded with a status of 503 (Service Unavailable)'].includes(row.text);
+          if (row.type === 'warning' && row.phase === 'playback') allowed = expectedIds.some(id => row.text === 'audio: ' + id + ' not loaded: Failed to fetch');
+        }
+        if (row.type === 'warning' && row.phase === 'restart' && c.closed.reachable === false && c.controller === true)
+          allowed = row.text === "service worker not registered: Failed to register a ServiceWorker for scope ('" + c.origin
+            + "') with script ('" + c.origin + "sw.js'): An unknown error occurred when fetching the script.";
+      }
+      need(allowed, 'unexplained-console');
+    }
+    need(report.cleanup.every(r => r.ok === true) && report.cleanup.length > 0, 'outer-cleanup');
+  } catch { errors.push('malformed-report'); }
+  return [...new Set(errors)].slice(0, 128);
 }

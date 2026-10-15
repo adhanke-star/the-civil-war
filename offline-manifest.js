@@ -672,8 +672,8 @@ self.CW_OFFLINE = {
    "sha256": "a1d5a00953530f82805abec582633ee8bb62204bd09d784589dbd10c66a7984d"
   },
   "src/audio/bank.js": {
-   "bytes": 10875,
-   "sha256": "198408fd7c6366958bd3457efc063cb3c54c39e2b43bb4e65e70ad706c2b3d9c"
+   "bytes": 10958,
+   "sha256": "35ea603a3aa5cf96d6058cb614f650622853c38745351e0498c410caacc53d00"
   },
   "src/audio/director.js": {
    "bytes": 7213,
@@ -852,8 +852,8 @@ self.CW_OFFLINE = {
    "sha256": "7bb8bbc7e6e5669262e248e8fdcd683c6f53f09b517077f224d9396c2fb5da3d"
   },
   "src/ui/entry.js": {
-   "bytes": 120899,
-   "sha256": "42b1d9b1d77fe1de5d80088364a36fd11c1eea2965329e8670d392ac417882f5"
+   "bytes": 120848,
+   "sha256": "90154c9a5b75ed52243d001f5401918f0a5756beea331167e8663093ee137fb1"
   },
   "src/ui/hud.css": {
    "bytes": 44196,
@@ -1472,5 +1472,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "9701a7e06c0f3305dd6f2c7c83b661fbeab1df1157f953dd91d4d595ff773358"
+ "generation": "55e33e318fbb83f0b674bf9a137dc97f112f4d2e8d88820f8d754e0670ca6e90"
 };

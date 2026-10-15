@@ -28,6 +28,8 @@ import { FallenPool, FALLEN, fadeOf, UNIFORMS } from '../src/units/soldier-mesh.
 import * as settings from '../src/settings.js';
 import { henryHillRun } from './test-packs.mjs'; // sets the same flat-ground rules the Henry Hill oracle uses
 import { Game } from '../src/game.js';
+import { observeFallbackCall, recordingProofErrors } from './test-audio-ui.mjs';
+import { observeAudioTransport } from './test-field-admission-ui.mjs';
 import { setPlan } from '../src/world/landscape.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -140,10 +142,173 @@ function recordingFixture(mode = 'complete') {
 const recordingScenario = async () => ({ season: 'autumn' });
 const prepareOptions = fetcher => ({ fetcher, deadlineMs: 1000 });
 
-const API = { prepareBattleRecordings, SOUNDS, AUDIO_BUDGET, ALLOWED_LICENCES, ORDER_CALLS, busLevel, busGain, Director, FallenPool, fadeOf, Mixer,
+
+let recordingReaderFixture;
+async function recordingProofFixture() {
+  if (recordingReaderFixture) return structuredClone(recordingReaderFixture);
+  const { newCampaign, campaignPhase } = await import('../src/franchise/campaign.js');
+  const { validateDeck, cardsFor, chooseDecision } = await import('../src/franchise/decisions.js');
+  const { breakCamp } = await import('../src/franchise/camp-orders.js');
+  const { exportSnapshot } = await import('../src/franchise/save.js');
+  const target = {}; Function('self', fs.readFileSync(path.join(ROOT, 'offline-manifest.js'), 'utf8'))(target);
+  const manifest = target.CW_OFFLINE, campaign = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/campaign.json')));
+  const scenario = JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/packs/shiloh.json'))).phases[0].scenario;
+  const fielded = [...scenario.units, ...(scenario.reinforcements || [])].filter(u => u.side === 'US').map(u => u.id);
+  const expectedIds = [...Object.keys(SOUNDS).filter(id => SOUNDS[id].bank === 'battle'), ambientFor(scenario.season)];
+  const deck = validateDeck(JSON.parse(fs.readFileSync(path.join(ROOT, 'assets/decisions.json'))));
+  let save = newCampaign({ campaign, slot: 1, seed: 1861, at: '2026-10-15T00:00:00Z', difficulty: 'veteran' });
+  const initial = structuredClone(save), decisionSaves = [];
+  for (const card of cardsFor(deck, campaignPhase(save, campaign))) {
+    save = chooseDecision(save, { campaign, deck, cardId: card.id, optionId: card.options[0].id });
+    decisionSaves.push(exportSnapshot(save));
+  }
+  const before = exportSnapshot(save), departed = exportSnapshot(breakCamp(save, { campaign, fielded }));
+  const sha = 'a'.repeat(40), report = { schema: 'battle-recordings-v1', complete: true, sha, run: '123', attempt: '1',
+    generation: manifest.generation, failure: null, errors: [], console: [], requests: [], overflow: false, cases: [], cleanup: [{ ok: true }] };
+  for (const name of ['healthy', 'unavailable']) {
+    const healthy = name === 'healthy', origin = 'http://127.0.0.1:12345/';
+    const cache = expectedIds.map(id => ({ id, present: healthy, ...(healthy ? { status: 200, type: 'basic', contentRange: null,
+      bytes: manifest.files[AUDIO_DIR + SOUNDS[id].file].bytes, contentLength: String(manifest.files[AUDIO_DIR + SOUNDS[id].file].bytes),
+      sha256: manifest.files[AUDIO_DIR + SOUNDS[id].file].sha256 } : {}) }));
+    for (const id of expectedIds) report.requests.push({ id: report.requests.length + 1, case: name, phase: 'prepare', path: AUDIO_DIR + SOUNDS[id].file, method: 'GET', range: null, status: healthy ? 200 : 503, finished: true });
+    report.cases.push({ name, origin, metadata: { schema: 1, scope: origin, generation: manifest.generation, members: manifest.base },
+      controller: true, beforeGesture: { requests: 0, audioContexts: 0 },
+      beforeBegin: { simTime: 0, paused: true, briefing: true, decoded: 0 }, restartBeforeBegin: { simTime: 0, paused: true, briefing: true, decoded: 0 },
+      online: { reachable: true, status: 200 }, closed: { reachable: false, error: 'ECONNREFUSED' }, listenerClosed: true, browserRestarted: true,
+      saves: { before, departed, restart: departed, played: departed }, decisionSaves, departures: 1,
+      coldCache: expectedIds.map(id => ({ id, present: false })), cache, restartCache: structuredClone(cache),
+      rejectedPaths: healthy ? [] : expectedIds.map(id => AUDIO_DIR + SOUNDS[id].file), notice: { visible: !healthy, status: !healthy },
+      playback: { running: true, simTime: 0, selectedUS: true,
+        decoded: healthy ? expectedIds.map(id => ({ id, native: true, length: 100, channels: 1, sampleRate: 44100 })) : [],
+        volley: healthy ? [{ id: 'volley-1', ok: true, bus: 'effects' }] : [], order: healthy ? [{ id: 'call-recall', ok: true }] : [],
+        ambient: { id: expectedIds[17], loop: true, live: true, stopped: false }, fallback: healthy ? null
+          : { owned: true, restored: true, failed: false, rows: [{ delegated: true, threw: false, nativeSource: true,
+            nativeBuffer: true, length: 100, duration: 1, channels: 1, contextRunning: true }] } }, cleanup: [{ ok: true }, { ok: true }, { ok: true }] });
+  }
+  const { completedSnapshot } = await import('../src/franchise/save.js');
+  const { SAMPLE_ARMY } = await import('../src/reward/data.js');
+  const guardRaw = exportSnapshot(completedSnapshot({ awardId: 'recording-guard-fixture', army: structuredClone(SAMPLE_ARMY), depot: [], issued: [], seed: 1861, grade: 'Victory' }));
+  report.guards = { cancel: { queued: true, currentCalls: 1, puts: 0, before: guardRaw, after: guardRaw, rejected: true, error: 'Progress: the reviewed exchange was cancelled.' },
+    healthy: { queued: true, currentCalls: 1, puts: 1, before: guardRaw, after: guardRaw },
+    ui: { preparing: true, cancelled: true, rawBefore: guardRaw, rawAfter: guardRaw, gpu: 0, departures: 0, closed: true } };
+  recordingReaderFixture = { report, expected: { sha, run: '123', manifest, campaign, fielded, expectedIds, initial, deck, guardRaw } };
+  return structuredClone(recordingReaderFixture);
+}
+const recordingProofMutations = [
+  ['failed-healthy-request', r => { r.requests[0].failed = 'net::ERR_ABORTED'; }],
+  ['unknown-healthy500', r => { r.requests.push({ id: r.requests.length + 1, case: 'healthy', phase: 'prepare', path: 'unknown.json', method: 'GET', range: null, status: 500, finished: true }); }],
+  ['unshipped-volley', r => { r.cases[0].playback.volley[0].id = 'volley-9'; }],
+  ['fallback-overflow', r => { r.cases[1].playback.fallback.rows = Array.from({ length: 9 }, () => ({ ...r.cases[1].playback.fallback.rows[0] })); }],
+  ['numeric-simtime-string', r => { r.cases[0].playback.simTime = '0'; }],
+  ['unbound-run', r => { r.run = '999999'; }],
+  ['unexplained-console', r => { r.console.push({ case: 'healthy', phase: 'playback', type: 'error', text: 'Uncaught unexpected error', url: r.cases[0].origin + 'src/main.js' }); }],
+  ['first-decision-garbage', r => { r.cases[0].decisionSaves[0] = 'not a saved campaign'; }],
+  ['already-departed-prefix', r => { for (const c of r.cases) { c.saves.before = c.saves.departed; c.decisionSaves[1] = c.saves.departed; } }],
+  ['invalid-cancel-raw', r => { r.guards.cancel.before = r.guards.cancel.after = 'not JSON'; }],
+  ['invalid-healthy-raw', r => { r.guards.healthy.before = r.guards.healthy.after = 'not JSON'; }],
+  ['numeric-decoded-string', r => { r.cases[0].playback.decoded[0].length = '100'; }],
+  ['numeric-fallback-string', r => { r.cases[1].playback.fallback.rows[0].duration = '1'; }],
+  ['missing-request', r => { r.requests.pop(); }],
+  ['changed-request-status', r => { r.requests[0].status = 503; }],
+  ['source-SHA', r => { r.sha = 'b'.repeat(40); }], ['incomplete', r => { r.complete = false; }],
+  ['generation', r => { r.generation = 'f'.repeat(64); }], ['overflow', r => { r.overflow = true; }],
+  ['pageerror', r => { r.errors.push('native failure'); }], ['same-case', r => { r.cases[1].name = 'healthy'; }],
+  ['cache-omission', r => { r.cases[0].cache.pop(); }], ['cache-digest', r => { r.cases[0].cache[0].sha256 = '0'.repeat(64); }],
+  ['cache-length', r => { r.cases[0].cache[0].bytes--; }], ['cache-type', r => { r.cases[0].cache[0].type = 'opaque'; }],
+  ['cache-range', r => { r.cases[0].cache[0].contentRange = 'bytes 0-3/100'; }], ['restart-cache', r => { r.cases[0].restartCache[0].present = false; }],
+  ['cold-warmed', r => { r.cases[0].coldCache[0].present = true; }], ['missing-decoded', r => { r.cases[0].playback.decoded.pop(); }],
+  ['fake-buffer', r => { r.cases[0].playback.decoded[0].native = false; }], ['fake-volley', r => { r.cases[0].playback.volley[0].ok = false; }],
+  ['missing-order', r => { r.cases[0].playback.order = []; }], ['stopped-ambient', r => { r.cases[0].playback.ambient.stopped = true; }],
+  ['fake-fallback', r => { r.cases[1].playback.fallback.rows[0].nativeSource = false; }], ['broken-restore', r => { r.cases[1].playback.fallback.restored = false; }],
+  ['hidden-notice', r => { r.cases[1].notice.visible = false; }], ['missing-status', r => { r.cases[1].notice.status = false; }],
+  ['503-warmed', r => { r.cases[1].cache[0].present = true; }], ['503-targets', r => { r.cases[1].rejectedPaths.pop(); }],
+  ['origin-still-online', r => { r.cases[0].closed.reachable = true; }], ['not-restarted', r => { r.cases[0].browserRestarted = false; }],
+  ['begun-early', r => { r.cases[0].beforeBegin.simTime = 1; }], ['pre-gesture-fetch', r => { r.cases[0].beforeGesture.requests = 1; }],
+  ['second-departure', r => { r.cases[0].departures = 2; }], ['duplicate-charge', r => { const s = JSON.parse(r.cases[0].saves.departed); s.stores.ammunition++; r.cases[0].saves.departed = JSON.stringify(s); }],
+  ['restart-save-change', r => { r.cases[0].saves.restart += ' '; }], ['queued-cancel-write', r => { r.guards.cancel.puts = 1; }],
+  ['no-healthy-write', r => { r.guards.healthy.puts = 0; }], ['late-ui-departure', r => { r.guards.ui.departures = 1; }],
+  ['ui-save-change', r => { r.guards.ui.rawAfter += ' '; }], ['cleanup-failure', r => { r.cases[0].cleanup[0].ok = false; }],
+];
+
+const API = { observeAudioTransport, observeFallbackCall, recordingProofErrors, prepareBattleRecordings, SOUNDS, AUDIO_BUDGET, ALLOWED_LICENCES, ORDER_CALLS, busLevel, busGain, Director, FallenPool, fadeOf, Mixer,
   defineAudio: defineAudioSettings, resultsMood: music.resultsMood, lossShareOf: music.lossShareOf, audioFiles, attributionText, goreHook: () => {} };
 
 export const AUDIO_CHECKS = [
+
+  ['audio-transport-observer', async api => {
+    const listeners = new Map(), page = { on(type, fn) { listeners.set(type, fn); } }, emit = (type, value) => listeners.get(type)(value);
+    let at = 0, phase = 'loading'; const r = api.observeAudioTransport(page, { phase: () => phase, now: () => ++at });
+    const req = (file = 'volley-1.mp3') => ({ url: () => 'http://example.test/assets/audio/sfx/' + file, method: () => 'GET', failure: () => ({ errorText: 'net::ERR_ABORTED' }) });
+    const first = req(), second = req(); emit('request', first); emit('request', second);
+    emit('response', { request: () => first, status: () => 200 }); emit('requestfinished', first);
+    emit('request', { url: () => 'http://example.test/src/main.js' }); phase = 'closing'; emit('requestfailed', second);
+    assert.ok(r.requests.length === 2 && r.requests[0].id === 1 && r.requests[1].id === 2
+      && r.requests[0].terminal.type === 'finished' && r.requests[1].terminal.type === 'failed'
+      && r.requests[1].terminal.phase === 'closing' && r.main?.type === 'main-request'
+      && r.events.every((e, i) => e.sequence === i + 1 && e.at === i + 1) && !r.overflow && !r.observerFailure,
+      'audio-transport-observer: identity, terminal facts, Node ordering or phases lost');
+    emit('requestfinished', second); assert.ok(r.observerFailure, 'audio-transport-observer: contradictory terminal event hidden');
+    const bounded = api.observeAudioTransport(page);
+    for (let i = 0; i < 65; i++) emit('request', req('shot-1.mp3'));
+    assert.ok(bounded.requests.length === 64 && bounded.overflow, 'audio-transport-observer: request cap not rejecting');
+    const fault = api.observeAudioTransport(page); emit('request', { url() { throw false; } });
+    assert.ok(fault.observerFailure, 'audio-transport-observer: metadata failure escaped observation');
+  }],
+
+  ['prepare-transport-cleanup', async api => {
+    for (const mode of ['complete', 'truncated', 'overrun', '503', 'length']) {
+      const f = recordingFixture(mode), r = await api.prepareBattleRecordings(recordingScenario, prepareOptions(f.fetcher));
+      const expectedCancel = ['overrun', '503', 'length'].includes(mode) ? 1 : 0;
+      assert.ok(f.stats.readersCancelled === expectedCancel && f.stats.signals.every(s => !s.aborted)
+        && r.complete === (mode === 'complete') && !r.cancelled,
+        'prepare-transport-cleanup: EOF/nonEOF cleanup or normal abort wrong for ' + mode);
+    }
+  }],
+  ['recordings-proof-reader', async api => {
+    const f = await recordingProofFixture(); assert.deepEqual(api.recordingProofErrors(f.report, f.expected), [], 'recordings-proof-reader: complete constructed evidence rejected');
+    for (const [name, mutate] of recordingProofMutations) {
+      const changed = structuredClone(f.report); mutate(changed);
+      assert.ok(api.recordingProofErrors(changed, f.expected).length > 0, 'recordings-proof-reader: accepted ' + name);
+    }
+    console.log('RECORDING READER ' + recordingProofMutations.length + ' intended field mutations rejected; CPU constructed evidence only');
+  }],
+
+  ['fallback-observer', async (api) => {
+    const args = [0, false, null, Symbol('argument')], returned = {}, sound = { ctx: { state: 'running' } }; let calls = 0;
+    sound.zzfx = function (...actual) { calls++; assert.equal(this, sound, 'fallback-observer: receiver changed'); assert.deepEqual(actual, args, 'fallback-observer: arguments changed'); return returned; };
+    const descriptor = Object.getOwnPropertyDescriptor(sound, 'zzfx'), observer = api.observeFallbackCall(sound);
+    assert.equal(sound.zzfx(...args), returned, 'fallback-observer: returned identity changed');
+    const receipt = observer.close();
+    assert.ok(calls === 1 && receipt.owned && receipt.restored && !receipt.failed && receipt.rows.length === 1 && receipt.rows[0].delegated,
+      'fallback-observer: delegation or owned restoration failed');
+    assert.deepEqual(Object.getOwnPropertyDescriptor(sound, 'zzfx'), descriptor, 'fallback-observer: descriptor changed');
+    for (const thrown of [undefined, null, false, 0, '', Symbol('thrown')]) {
+      sound.zzfx = () => { throw thrown; }; const o = api.observeFallbackCall(sound); let caught = false, value;
+      try { sound.zzfx(); } catch (e) { caught = true; value = e; }
+      const r = o.close(); assert.ok(caught && value === thrown && r.rows[0]?.threw === true && r.restored, 'fallback-observer: falsy thrown identity changed');
+    }
+  }],
+  ['fallback-observer-foreign', async (api) => {
+    const sound = { zzfx() {}, ctx: { state: 'running' } }, observer = api.observeFallbackCall(sound), foreign = () => 7;
+    sound.zzfx = foreign; const r = observer.close();
+    assert.ok(!r.owned && !r.restored && sound.zzfx === foreign, 'fallback-observer-foreign: foreign replacement was hidden or overwritten');
+  }],
+  ['fallback-observer-metadata', async api => {
+    for (const [field, value] of [['length', () => {}], ['duration', Symbol('duration')], ['numberOfChannels', 'x'.repeat(20000)], ['length', Infinity]]) {
+      const returned = { buffer: { length: 100, duration: 1, numberOfChannels: 1, [field]: value } };
+      const sound = { zzfx: () => returned, ctx: { state: 'running' } }, observer = api.observeFallbackCall(sound);
+      assert.equal(sound.zzfx(), returned, 'fallback-observer-metadata: actual returned identity changed');
+      const receipt = observer.close();
+      assert.ok(receipt.failed === true && receipt.restored && JSON.stringify(receipt).length < 2000
+        && structuredClone(receipt).rows.length === 1, 'fallback-observer-metadata: unsafe metadata escaped bounded cloneable receipt');
+    }
+  }],
+  ['fallback-observer-failure', async (api) => {
+    const originalResult = {}, sound = { zzfx: () => originalResult, get ctx() { throw false; } };
+    const observer = api.observeFallbackCall(sound), returned = sound.zzfx(), r = observer.close();
+    assert.ok(returned === originalResult && r.failed && r.restored, 'fallback-observer-failure: metadata failure changed the delegated result or disappeared');
+  }],
+
 
   ['prepare-complete', async (api) => {
     const f = recordingFixture(), result = await api.prepareBattleRecordings(recordingScenario, prepareOptions(f.fetcher));
@@ -151,7 +316,7 @@ export const AUDIO_CHECKS = [
     assert.equal(f.stats.calls.length, 18, 'prepare-complete: every selected recording must be fetched once');
     assert.equal(new Set(f.stats.calls).size, 18, 'prepare-complete: duplicate recording request');
     assert.ok(f.stats.calls.some(u => u.endsWith('/amb-autumn.mp3')) && !f.stats.calls.some(u => /music\/|amb-spring|amb-winter/.test(u)), 'prepare-complete: wrong season or streamed music requested');
-    assert.ok(f.stats.signals.every(s => s.aborted) && Object.isFrozen(result), 'prepare-complete: attempt must close before publishing detached metadata');
+    assert.ok(f.stats.signals.every(s => s === f.stats.signals[0] && !s.aborted) && Object.isFrozen(result), 'prepare-complete: normal completion must close metadata without aborting settled transports');
   }],
   ['prepare-unavailable', async (api) => {
     for (const mode of ['reject', '503', '206', 'opaque', 'range', 'length', 'oversized', 'truncated', 'overrun']) {
@@ -430,6 +595,17 @@ export const AUDIO_CHECKS = [
 
 // One semantic mutant per check: each must fail that check's own assertion.
 const MUTANTS = {
+  'audio-transport-observer': { observeAudioTransport: (...args) => { const r = observeAudioTransport(...args); Object.defineProperty(r, 'main', { configurable: true, get: () => null, set() {} }); return r; } },
+  'fallback-observer-metadata': { observeFallbackCall: sound => { const o = observeFallbackCall(sound); return { close: () => ({ ...o.close(), failed: false }) }; } },
+  'prepare-transport-cleanup': { prepareBattleRecordings: async (resolve, options) => {
+    const c = new AbortController();
+    const r = await prepareBattleRecordings(resolve, { ...options, fetcher: (url, init) => options.fetcher(url, { ...init, signal: c.signal }) });
+    c.abort(); return r;
+  } },
+  'recordings-proof-reader': { recordingProofErrors: () => [] },
+  'fallback-observer': { observeFallbackCall: () => ({ close: () => ({ owned: true, restored: true, failed: false, rows: [] }) }) },
+  'fallback-observer-foreign': { observeFallbackCall: sound => { const o = observeFallbackCall(sound); return { close: () => ({ ...o.close(), owned: true }) }; } },
+  'fallback-observer-failure': { observeFallbackCall: sound => { const o = observeFallbackCall(sound); return { close: () => ({ ...o.close(), failed: false }) }; } },
 
   'prepare-complete': { prepareBattleRecordings: async (...args) => ({ ...await prepareBattleRecordings(...args), complete: false }) },
   'prepare-unavailable': { prepareBattleRecordings: async (...args) => ({ ...await prepareBattleRecordings(...args), complete: true }) },

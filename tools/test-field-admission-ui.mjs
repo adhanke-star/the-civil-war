@@ -120,6 +120,7 @@ export async function fieldAdmissionControls({ browser, url, check, shot, result
   const cleanPage = async (label = 'camp') => {
     const page = await ctx.newPage(); watchErrors(page, url, record.errors);
     const diagnostic = { label, phase: 'loading', errors: [], requests: [], markers: [{ phase: 'loading', at: Date.now() }] }, requests = new Map();
+    diagnostic.audio = observeAudioTransport(page, { phase: () => diagnostic.phase });
     pageDiagnostics.set(page, diagnostic); record.pageDiagnostics.push(diagnostic); watchErrors(page, url, diagnostic.errors);
     page.on('request', request => { if (request.url().endsWith('/assets/scenarios/henry-hill.json')) { const row = { id: diagnostic.requests.length + 1, url: request.url(), method: request.method(), requestBody: request.postData(), at: Date.now() }; requests.set(request, row); diagnostic.requests.push(row); } });
     page.on('requestfailed', request => { const row = requests.get(request); if (row) Object.assign(row, { failed: request.failure()?.errorText, terminalPhase: diagnostic.phase, terminalAt: Date.now() }); });
@@ -361,6 +362,7 @@ export async function fieldAdmissionControls({ browser, url, check, shot, result
       }
     }
     verdict('clean-console', record.errors.length === 0 && record.warnings.length === 0 && record.restored.every(Boolean)
+      && record.pageDiagnostics.every(d => !d.audio.overflow && !d.audio.observerFailure)
       && record.requestBindings.every(r => r.exact), 'zero candidate errors/warnings; actual bounded GET transports finished; observers restored exactly; injected BASE/HTTP fault diagnostics separate');
   } finally {
     for (const page of ctx.pages()) {
@@ -371,4 +373,49 @@ export async function fieldAdmissionControls({ browser, url, check, shot, result
     }
     await ctx.close();
   }
+}
+
+
+/** Passive Playwright events only: timestamps/order are Node observations, never browser-internal causation. */
+export function observeAudioTransport(page, { phase = () => 'loading', now = () => Date.now() } = {}) {
+  const report = { schema: 'audio-transport-node-v1', requests: [], events: [], main: null, overflow: false, observerFailure: false };
+  const requests = new Map();
+  const note = (type, id, extra = {}) => {
+    if (report.events.length >= 256) { report.overflow = true; return; }
+    const at = now(), stage = phase();
+    if (!Number.isFinite(at) || typeof stage !== 'string' || stage.length > 80) { report.observerFailure = true; return; }
+    const event = { sequence: report.events.length + 1, type, id, at, phase: stage, ...extra };
+    report.events.push(event); return event;
+  };
+  const observe = action => { try { action(); } catch { report.observerFailure = true; } };
+  page.on('request', request => observe(() => {
+    const url = request.url();
+    if (typeof url !== 'string' || url.length > 2048) { report.overflow = true; return; }
+    const path = new URL(url).pathname;
+    if (path.endsWith('/src/main.js') && !report.main) report.main = note('main-request', null);
+    if (!path.includes('/assets/audio/')) return;
+    if (report.requests.length >= 64) { report.overflow = true; return; }
+    const method = request.method();
+    if (typeof method !== 'string' || method.length > 16 || requests.has(request)) { report.observerFailure = true; return; }
+    const row = { id: report.requests.length + 1, url, method, start: note('request', report.requests.length + 1) };
+    requests.set(request, row); report.requests.push(row);
+  }));
+  page.on('response', response => observe(() => {
+    const row = requests.get(response.request()); if (!row) return;
+    const status = response.status();
+    if (!Number.isInteger(status) || status < 100 || status > 599 || row.response) { report.observerFailure = true; return; }
+    row.response = note('response', row.id, { status });
+  }));
+  page.on('requestfinished', request => observe(() => {
+    const row = requests.get(request); if (!row) return;
+    if (row.terminal) { report.observerFailure = true; return; }
+    row.terminal = note('finished', row.id);
+  }));
+  page.on('requestfailed', request => observe(() => {
+    const row = requests.get(request); if (!row) return;
+    const failure = request.failure()?.errorText;
+    if (typeof failure !== 'string' || failure.length > 2048 || row.terminal) { report.observerFailure = true; return; }
+    row.terminal = note('failed', row.id, { failure });
+  }));
+  return report;
 }
