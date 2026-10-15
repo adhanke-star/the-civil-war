@@ -656,10 +656,11 @@ export function createProgressStore(storage, { locks, slot = 1 } = {}) {
      * One reviewed exchange computed by a pure `transform(baseline, command)` (buy, turn in, shop seen; see economy.js),
      * written only if stored progress still equals the reviewed baseline (the depot exchange's compare-and-set).
      */
-    async exchange(transform, command, { previous } = {}) {
+    async exchange(transform, command, { previous, isCurrent = () => true } = {}) {
       if (typeof transform !== 'function') bad('an exchange needs its rule.');
       const baseline = owned(validateSnapshot(previous)), draft = owned(validateSnapshot(transform(baseline, command)));
       return locked((s) => {
+        if (typeof isCurrent !== 'function' || !isCurrent()) bad('the reviewed exchange was cancelled.');
         const raw = read(s), current = raw === null ? null : parseSnapshot(raw);
         if (JSON.stringify(current) !== JSON.stringify(baseline)) bad('progress changed since this exchange was reviewed. Export the pending army or reload saved progress.');
         return write(s, reconciled(draft));

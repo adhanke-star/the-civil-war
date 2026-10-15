@@ -672,8 +672,8 @@ self.CW_OFFLINE = {
    "sha256": "a1d5a00953530f82805abec582633ee8bb62204bd09d784589dbd10c66a7984d"
   },
   "src/audio/bank.js": {
-   "bytes": 6574,
-   "sha256": "9b436ae8d297605789cc9a152454c2fd02deee32d7531cc87372463ff1a613d0"
+   "bytes": 10875,
+   "sha256": "198408fd7c6366958bd3457efc063cb3c54c39e2b43bb4e65e70ad706c2b3d9c"
   },
   "src/audio/director.js": {
    "bytes": 7213,
@@ -736,8 +736,8 @@ self.CW_OFFLINE = {
    "sha256": "bd6c04c050c4afcbc1d2e499e6467d1157fa7bd3d8eeef6ece3e2d020d8404c8"
   },
   "src/franchise/save.js": {
-   "bytes": 42716,
-   "sha256": "4887b9c80d370087d3a4442a34f507484b551b4a28a222db6f0d96bd0db51e97"
+   "bytes": 42846,
+   "sha256": "edea2a587cc4fdda2ea8e9218f617a299cbf1578568dee299fc3d7dae7af3799"
   },
   "src/franchise/tuning.js": {
    "bytes": 15340,
@@ -752,8 +752,8 @@ self.CW_OFFLINE = {
    "sha256": "0a75d6581cb1053c10b8dd91fb1e91d5a054f4d34fe13a61ad5f54729f1a0e3f"
   },
   "src/main.js": {
-   "bytes": 33340,
-   "sha256": "2d9ddeaf4c3646c26b96fc85b0c1245d770e0a60e8e6ea82767af3cf403023fa"
+   "bytes": 34166,
+   "sha256": "9acbc23dcd53e244485395043a56856814690f56903f863dbac1149bc3120a41"
   },
   "src/render/post.js": {
    "bytes": 26769,
@@ -852,8 +852,8 @@ self.CW_OFFLINE = {
    "sha256": "7bb8bbc7e6e5669262e248e8fdcd683c6f53f09b517077f224d9396c2fb5da3d"
   },
   "src/ui/entry.js": {
-   "bytes": 117823,
-   "sha256": "414ce3dec8bd328c67f49dfe625eaa0b93740c91437f51ee35c37ade806cbef4"
+   "bytes": 120899,
+   "sha256": "42b1d9b1d77fe1de5d80088364a36fd11c1eea2965329e8670d392ac417882f5"
   },
   "src/ui/hud.css": {
    "bytes": 44196,
@@ -1472,5 +1472,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "caf211a2a5513b8526ef3d4aab30d84494f44377da0cbf7afda888b3a7ba39ae"
+ "generation": "9701a7e06c0f3305dd6f2c7c83b661fbeab1df1157f953dd91d4d595ff773358"
 };

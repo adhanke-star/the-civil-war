@@ -1,7 +1,7 @@
 # STATE
 2026-10-15 —0234camera native8exactPASS;38803959464 ordinaryRED resident253439864/288852540>250M+2readbackwarnings; originalretained/root+Astra.
 Root owns /private/tmp/cw-v1-1-20261012 branchv1-1-gaps-20261012; COORD absent; one read-only Astra; no simultaneous provider/file edits; capacityunknown.
-Next:0235native38811427465 completedMISS releaseexpired/noawards;0238accounting SOURCEclear/ownCIUNRUN; resource-nativeHALT untilsufficientCPU/ownerdesign, no mip/filter/budgetwaiver;0236audio reviewed/unimplemented.
+Next:0235native38811427465 completedMISS releaseexpired/noawards;0238accounting own38816942416 ROOT+AstraCLEAR; resource-nativeHALT untilsufficientCPU/ownerdesign, no mip/filter/budgetwaiver;0236audio SOURCEwritten/CPU+WCAGclear/ownCIUNRUN.
 0230 manifest/syntax/requiredCPU/UNIT/YAML51+27 CLEAR; aa probes134PASS/fresh6PASS; wholeREDuncachedroute withreachableupstream.
 Camera settlement passive eight exact RAFsnapshots/reset/cap4096/measurement30s, no appclock/render/readiness/pixel changes; naturallyuploaded fieldpages retained.
 Ordinarypilot38789128604 two fresh actualentry/store/Lookout contexts, pausedbriefing/explicitthreeUSclose hydration workload; no automaticclose/zoom proof.

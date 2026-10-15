@@ -36,7 +36,8 @@ import { shopStock, buyLot, turnInCard, markShopSeen, levelUps, turnInPoints, ne
 import { TIER_BY_ID, STORE_ITEMS, STORE_BY_ID, VETERANCY, itemDef, conditionEffect } from '../reward/data.js';
 import { compare, bestFit } from '../reward/model.js';
 import { savedDeployment } from '../franchise/practice.js';
-import { loadFieldScenario } from '../sim/phase.js';
+import { loadFieldScenario, loadBattlePack } from '../sim/phase.js';
+import { prepareBattleRecordings } from '../audio/bank.js';
 
 const PAGE_SIZE = 12;
 const ART_DELAY_MS = 900; // backdrop, portraits and card pictures follow the first render (P6b)
@@ -600,6 +601,8 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     if (importing || pendingImport || pendingExchange || marching) return;
     const link = e.currentTarget, href = link.href, march = say('camp-march-status');
     marching = true;
+    const departure = new AbortController(), cancel = () => departure.abort();
+    window.addEventListener('pagehide', cancel, { once: true });
     try {
       let phaseNow;
       try { phaseNow = campaignPhase(saved, ladder.raw, { replay }); } catch (err) { march(`${err.message} Your army is unchanged.`); return; }
@@ -610,15 +613,42 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
         if (recorded(saved, phaseNow, cards[i].id)) continue;
         if (!await decide(cards[i], i, cards.length, phaseNow, replay)) { march('You stayed in camp. Choices already made are saved; Next continues from the first open card.'); link.focus(); return; }
       }
-      if (!(saved.ready && saved.ready.awardId === phaseNow.awardId)) {
-        let fielded;
-        try { fielded = (await loadPackSummary(phaseNow.packId)).phases.find((p) => p.id === phaseNow.phaseId)?.us; } catch { fielded = undefined; }
-        const before = saved;
-        const ok = await runEconomy(breakCamp, { campaign: ladder.raw, replay, fielded }, (next) => `The army marches. ${(campReport(before, next) || []).join(' ')}`, march);
-        if (!ok) { node('camp-march-status').focus(); return; }
+      const before = saved, displayed = exportSnapshot(before), ladderBefore = ladder;
+      const phaseKey = JSON.stringify(campaignPhase(before, ladderBefore.raw, { replay }));
+      const owner = () => !disposed && root.isConnected && marching && !departure.signal.aborted && ladder === ladderBefore;
+      const current = () => owner() && saved === before && !importing && !pendingImport && !pendingExchange && phase === 'idle';
+      const raw = await store.readRawBaseline();
+      if (!current() || raw === null || exportSnapshot(parseSnapshot(raw)) !== displayed) {
+        march('Progress changed. Reload camp before taking the field.'); return;
       }
-      location.assign(href);
-    } finally { marching = false; }
+      let fielded;
+      if (!(before.ready && before.ready.awardId === phaseNow.awardId)) {
+        try { fielded = (await loadPackSummary(phaseNow.packId)).phases.find((p) => p.id === phaseNow.phaseId)?.us; } catch { fielded = undefined; }
+      }
+      if (!current()) return;
+      march('Preparing recorded battle sounds…');
+      const preparation = await prepareBattleRecordings(async (signal) => (await loadBattlePack({
+        packId: phaseNow.packId, phaseId: phaseNow.phaseId, isCurrent: current,
+        fetcher: (url, options) => fetch(url, { ...options, signal }),
+      })).scenario, { isCurrent: current, signal: departure.signal });
+      if (preparation.cancelled || !current()) return;
+      const finalRaw = await store.readRawBaseline();
+      if (!current() || finalRaw !== raw || exportSnapshot(saved) !== displayed
+        || JSON.stringify(campaignPhase(saved, ladderBefore.raw, { replay })) !== phaseKey) {
+        march('Progress changed. Reload camp before taking the field.'); return;
+      }
+      let departed = before;
+      if (!(before.ready && before.ready.awardId === phaseNow.awardId)) {
+        const ok = await runEconomy(breakCamp, { campaign: ladderBefore.raw, replay, fielded }, (next) => {
+          departed = next; return `The army marches. ${(campReport(before, next) || []).join(' ')}`;
+        }, march, () => owner() && saved === before);
+        if (!ok) { if (owner()) node('camp-march-status').focus(); return; }
+      }
+      // A cancellation after a committed exchange retains that save and suppresses stale navigation.
+      if (owner() && saved === departed && !pendingImport && !pendingExchange && phase === 'idle') location.assign(href);
+    } catch (error) {
+      if (!disposed && root.isConnected && !departure.signal.aborted) march(`${error.message} Reload camp before taking the field.`);
+    } finally { departure.abort(); window.removeEventListener('pagehide', cancel); marching = false; }
   }
   node('camp-next').addEventListener('click', (e) => leaveCamp(e, false));
   node('camp-replay').addEventListener('click', (e) => leaveCamp(e, true));
@@ -652,11 +682,11 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
   });
   /** One economy exchange through the store's compare-and-set; plays the level-up moment if it reached a level. */
-  async function runEconomy(rule, command, done, say = shopStatus) {
+  async function runEconomy(rule, command, done, say = shopStatus, isCurrent) {
     const baseline = saved;
     importing = true; controls(); say('Saving…');
     try {
-      const next = await store.exchange(rule, command, { previous: baseline });
+      const next = await store.exchange(rule, command, { previous: baseline, isCurrent });
       const ups = levelUps(baseline, next);
       saved = next; failed = false;
       let text = done(next);
@@ -1274,14 +1304,14 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
   }
   function finishDeployment(task) {
     if (disposed || activeDeployment !== task || task.busy || task.admitted) return;
-    activeDeployment = null; importing = false; phase = 'idle'; render();
+    task.abort.abort(); activeDeployment = null; importing = false; phase = 'idle'; render();
     const target = task.trigger?.isConnected && !task.trigger.disabled && task.trigger.getClientRects().length
       ? task.trigger : saved && !failed ? node(saved.version === 2 ? 'camp-campaign-heading' : 'camp-deploy') : node('entry-retry').hidden ? node('entry-continue') : node('entry-retry');
     target.focus(); target.scrollIntoView({ block: 'nearest' });
   }
   function cancelDeployment() {
     const task = activeDeployment; if (!task || task.admitted) return;
-    task.cancelled = true; if (reviewDialog.open) reviewDialog.close('cancel');
+    task.cancelled = true; task.abort?.abort(); if (reviewDialog.open) reviewDialog.close('cancel');
     finishDeployment(task); // an outstanding operation retains its owner until settlement
   }
   function deploymentFailure(task, error) {
@@ -1296,8 +1326,9 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     importing = true; phase = 'reading'; controls();
     const awardId = `saved-${globalThis.crypto.randomUUID()}`;
     const task = { awardId, seed: awardId, trigger, cancelled: false, admitted: false, busy: true,
-      manifest: null, baseline: null, raw: null };
+      manifest: null, baseline: null, raw: null, abort: new AbortController() };
     activeDeployment = task; reviewDialog.returnValue = 'cancel';
+    window.addEventListener('pagehide', cancelDeployment, { once: true, signal: task.abort.signal });
     node('deploy-formations').replaceChildren(); node('deploy-dormant-names').replaceChildren();
     node('deploy-dormant-count').textContent = ''; node('deploy-dormant').hidden = true; node('deploy-dormant').open = false;
     node('deploy-export').disabled = true; node('deploy-again').hidden = true;
@@ -1363,9 +1394,16 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     phase = 'launching'; deploymentBusy(task, 'Rechecking the reviewed army before loading the field… Return to camp cancels this handoff.');
     try {
       if (typeof onDeploy !== 'function') throw new Error('Practice: the field launcher is unavailable.');
+      node('deploy-note').textContent = 'Preparing recorded battle sounds… Return to camp cancels this handoff.';
+      const preparation = await prepareBattleRecordings(async () => task.manifest.scenario,
+        { isCurrent: () => currentDeployment(task), signal: task.abort.signal });
+      if (preparation.cancelled || !currentDeployment(task)) return;
+      const raw = await store.readRawBaseline();
+      if (!currentDeployment(task)) return;
+      if (raw === null || exportSnapshot(parseSnapshot(raw)) !== task.raw) throw new Error('Practice: progress changed since this army was reviewed.');
       await onDeploy({ manifest: task.manifest, isCurrent: () => currentDeployment(task), onAdmitted: () => {
         if (!currentDeployment(task)) throw new Error('Practice: deployment review was cancelled.');
-        task.admitted = true; disposed = true; reviewDialog.close('launch'); root.remove();
+        task.admitted = true; task.abort.abort(); disposed = true; reviewDialog.close('launch'); root.remove();
         delete window.__entry;
         const q = new URLSearchParams(location.search); q.delete('camp'); q.set('saved', '');
         history.replaceState(null, '', location.pathname + '?' + q.toString());

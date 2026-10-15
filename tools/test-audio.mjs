@@ -20,7 +20,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Scene } from 'three';
-import { SOUNDS, AUDIO_BUDGET, ALLOWED_LICENCES, ORDER_CALLS, AUDIO_DIR, ambientFor } from '../src/audio/bank.js';
+import { SOUNDS, AUDIO_BUDGET, ALLOWED_LICENCES, ORDER_CALLS, AUDIO_DIR, ambientFor, prepareBattleRecordings } from '../src/audio/bank.js';
 import { busLevel, busGain, defineAudioSettings, AUDIO_SETTINGS, Mixer } from '../src/audio/mixer.js';
 import { Director, DIRECTOR } from '../src/audio/director.js';
 import * as music from '../src/audio/music.js';
@@ -106,10 +106,115 @@ async function freshSettings(stored, tag) {
   return { S, store };
 }
 
-const API = { SOUNDS, AUDIO_BUDGET, ALLOWED_LICENCES, ORDER_CALLS, busLevel, busGain, Director, FallenPool, fadeOf, Mixer,
+
+/** Full real MP3 bytes in a bounded fake same-origin response; no decode, browser or disk output. */
+function recordingFixture(mode = 'complete') {
+  const stats = { calls: [], signals: [], readersCancelled: 0, releases: 0 };
+  const fetcher = async (url, options) => {
+    const index = stats.calls.length; stats.calls.push(String(url)); stats.signals.push(options.signal);
+    if (mode === 'fetch-hang') return new Promise(() => {});
+    const file = Object.values(SOUNDS).find(s => String(url).endsWith('/' + s.file));
+    if (!file || file.stream) throw new Error('Unexpected recording request');
+    const bytes = fs.readFileSync(path.join(AUDIO, file.file));
+    const faulty = index === 0;
+    if (mode === 'reject' && faulty) throw new Error('Declared unavailable recording');
+    const headers = new Headers({ 'content-length': String(bytes.length) });
+    if (faulty && mode === 'range') headers.set('content-range', 'bytes 0-4/100');
+    if (faulty && mode === 'length') headers.set('content-length', 'garbage');
+    if (faulty && mode === 'oversized') headers.set('content-length', String(AUDIO_BUDGET.file + 1));
+    const value = faulty && mode === 'truncated' ? bytes.subarray(0, bytes.length - 1)
+      : faulty && mode === 'overrun' ? Buffer.concat([bytes, Buffer.from([1])]) : bytes;
+    let read = 0;
+    return { status: faulty && mode === '503' ? 503 : faulty && mode === '206' ? 206 : 200,
+      type: faulty && mode === 'opaque' ? 'opaque' : 'basic', headers,
+      body: { cancel() { stats.readersCancelled++; }, getReader() { return {
+        read() { if (mode === 'body-hang') return new Promise(() => {});
+          return Promise.resolve(read++ ? { done: true } : { done: false, value }); },
+        cancel() { stats.readersCancelled++; return mode === 'body-hang' ? new Promise(() => {}) : Promise.resolve(); },
+        releaseLock() { stats.releases++; },
+      }; } },
+    };
+  };
+  return { stats, fetcher };
+}
+const recordingScenario = async () => ({ season: 'autumn' });
+const prepareOptions = fetcher => ({ fetcher, deadlineMs: 1000 });
+
+const API = { prepareBattleRecordings, SOUNDS, AUDIO_BUDGET, ALLOWED_LICENCES, ORDER_CALLS, busLevel, busGain, Director, FallenPool, fadeOf, Mixer,
   defineAudio: defineAudioSettings, resultsMood: music.resultsMood, lossShareOf: music.lossShareOf, audioFiles, attributionText, goreHook: () => {} };
 
 export const AUDIO_CHECKS = [
+
+  ['prepare-complete', async (api) => {
+    const f = recordingFixture(), result = await api.prepareBattleRecordings(recordingScenario, prepareOptions(f.fetcher));
+    assert.ok(result.complete && result.available === 18 && result.requested === 18 && !result.cancelled, 'prepare-complete: full recorded banks were not prepared');
+    assert.equal(f.stats.calls.length, 18, 'prepare-complete: every selected recording must be fetched once');
+    assert.equal(new Set(f.stats.calls).size, 18, 'prepare-complete: duplicate recording request');
+    assert.ok(f.stats.calls.some(u => u.endsWith('/amb-autumn.mp3')) && !f.stats.calls.some(u => /music\/|amb-spring|amb-winter/.test(u)), 'prepare-complete: wrong season or streamed music requested');
+    assert.ok(f.stats.signals.every(s => s.aborted) && Object.isFrozen(result), 'prepare-complete: attempt must close before publishing detached metadata');
+  }],
+  ['prepare-unavailable', async (api) => {
+    for (const mode of ['reject', '503', '206', 'opaque', 'range', 'length', 'oversized', 'truncated', 'overrun']) {
+      const f = recordingFixture(mode), r = await api.prepareBattleRecordings(recordingScenario, prepareOptions(f.fetcher));
+      assert.ok(!r.complete && !r.cancelled && r.reason === 'unavailable' && r.available === 17 && r.requested === 18,
+        'prepare-unavailable: ' + mode + ' was accepted or prevented ordinary limited departure');
+    }
+  }],
+  ['prepare-deadline', async (api) => {
+    const f = recordingFixture('fetch-hang'), r = await api.prepareBattleRecordings(recordingScenario, { fetcher: f.fetcher, deadlineMs: 15 });
+    assert.ok(r.reason === 'deadline' && !r.cancelled && !r.complete && r.available === 0 && f.stats.calls.length === 3,
+      'prepare-deadline: stuck fetch must settle limited with at most three in flight');
+    assert.ok(f.stats.signals.every(s => s.aborted), 'prepare-deadline: deadline did not abort requests');
+  }],
+  ['prepare-scenario-deadline', async (api) => {
+    const f = recordingFixture(); let signal;
+    const r = await api.prepareBattleRecordings(s => { signal = s; return new Promise(() => {}); }, { fetcher: f.fetcher, deadlineMs: 15 });
+    assert.ok(r.reason === 'deadline' && !r.complete && !r.cancelled && r.requested === 0 && f.stats.calls.length === 0 && signal.aborted,
+      'prepare-scenario-deadline: deadline must include actual scenario resolution');
+  }],
+  ['prepare-cancel', async (api) => {
+    const controller = new AbortController(), f = recordingFixture('fetch-hang');
+    const p = api.prepareBattleRecordings(recordingScenario, { ...prepareOptions(f.fetcher), signal: controller.signal });
+    await Promise.resolve(); controller.abort(); const r = await p;
+    assert.ok(r.cancelled && r.reason === 'cancelled' && !r.complete && f.stats.calls.length <= 3, 'prepare-cancel: explicit cancellation did not suppress departure');
+    const early = recordingFixture(), r0 = await api.prepareBattleRecordings(recordingScenario, { ...prepareOptions(early.fetcher), signal: controller.signal });
+    assert.ok(r0.cancelled && early.stats.calls.length === 0, 'prepare-cancel: cancelled attempt started requests');
+  }],
+  ['prepare-stale', async (api) => {
+    let current = true; const f = recordingFixture('fetch-hang');
+    const p = api.prepareBattleRecordings(recordingScenario, { fetcher: f.fetcher, deadlineMs: 15, isCurrent: () => current });
+    await Promise.resolve(); current = false; const r = await p;
+    assert.ok(r.cancelled && r.reason === 'cancelled' && !r.complete, 'prepare-stale: deadline classification overrode stale ownership');
+  }],
+  ['prepare-late', async (api) => {
+    const f = recordingFixture(); let release; const held = new Promise(resolve => { release = resolve; }); let calls = 0;
+    const p = api.prepareBattleRecordings(recordingScenario, { deadlineMs: 15, fetcher: async (...args) => { calls++; await held; return f.fetcher(...args); } });
+    const r = await p, snapshot = JSON.stringify(r); release();
+    await new Promise(resolve => setTimeout(resolve, 5));
+    assert.ok(r.reason === 'deadline' && r.available === 0 && JSON.stringify(r) === snapshot && calls === 3,
+      'prepare-late: late work changed metadata or started another request');
+    assert.equal(f.stats.readersCancelled, 3, 'prepare-late: late response bodies were not cancelled');
+  }],
+  ['prepare-body-deadline', async (api) => {
+    const f = recordingFixture('body-hang'), r = await api.prepareBattleRecordings(recordingScenario, { fetcher: f.fetcher, deadlineMs: 15 });
+    assert.ok(r.reason === 'deadline' && !r.complete && !r.cancelled && r.available === 0 && f.stats.calls.length === 3,
+      'prepare-body-deadline: stuck read/cancel held departure or escaped concurrency bound');
+  }],
+  ['prepare-pagehide', async (api) => {
+    const add = Object.getOwnPropertyDescriptor(globalThis, 'addEventListener'), remove = Object.getOwnPropertyDescriptor(globalThis, 'removeEventListener');
+    let listener, removed = false;
+    Object.defineProperty(globalThis, 'addEventListener', { configurable: true, value: (name, fn) => { if (name === 'pagehide') listener = fn; } });
+    Object.defineProperty(globalThis, 'removeEventListener', { configurable: true, value: (name, fn) => { if (name === 'pagehide' && fn === listener) removed = true; } });
+    try {
+      const f = recordingFixture('fetch-hang'), p = api.prepareBattleRecordings(recordingScenario, prepareOptions(f.fetcher));
+      await Promise.resolve(); listener(); const r = await p;
+      assert.ok(r.cancelled && !r.complete && removed, 'prepare-pagehide: page departure did not cancel and remove its exact listener');
+    } finally {
+      if (add) Object.defineProperty(globalThis, 'addEventListener', add); else delete globalThis.addEventListener;
+      if (remove) Object.defineProperty(globalThis, 'removeEventListener', remove); else delete globalThis.removeEventListener;
+    }
+  }],
+
   ['bank-files', (api) => {
     const files = api.audioFiles(), listed = Object.values(api.SOUNDS).map((s) => s.file).sort();
     assert.ok(files.length > 0, 'bank-files: no files under assets/audio');
@@ -325,6 +430,17 @@ export const AUDIO_CHECKS = [
 
 // One semantic mutant per check: each must fail that check's own assertion.
 const MUTANTS = {
+
+  'prepare-complete': { prepareBattleRecordings: async (...args) => ({ ...await prepareBattleRecordings(...args), complete: false }) },
+  'prepare-unavailable': { prepareBattleRecordings: async (...args) => ({ ...await prepareBattleRecordings(...args), complete: true }) },
+  'prepare-deadline': { prepareBattleRecordings: async (...args) => ({ ...await prepareBattleRecordings(...args), reason: 'complete' }) },
+  'prepare-scenario-deadline': { prepareBattleRecordings: async (...args) => ({ ...await prepareBattleRecordings(...args), reason: 'complete' }) },
+  'prepare-cancel': { prepareBattleRecordings: async (...args) => ({ ...await prepareBattleRecordings(...args), cancelled: false }) },
+  'prepare-stale': { prepareBattleRecordings: async (...args) => ({ ...await prepareBattleRecordings(...args), cancelled: false, reason: 'deadline' }) },
+  'prepare-late': { prepareBattleRecordings: async (...args) => ({ ...await prepareBattleRecordings(...args), available: 18 }) },
+  'prepare-body-deadline': { prepareBattleRecordings: async (...args) => ({ ...await prepareBattleRecordings(...args), complete: true }) },
+  'prepare-pagehide': { prepareBattleRecordings: async (...args) => ({ ...await prepareBattleRecordings(...args), cancelled: false }) },
+
   'bank-files': { audioFiles: () => [...audioFiles(), 'sfx/stray.mp3'] },
   attribution: { attributionText: () => attributionText().replace('`assets/audio/sfx/cannon.mp3` — CC0 1.0', '`assets/audio/sfx/cannon.mp3` — CC BY-NC 4.0') },
   budget: { AUDIO_BUDGET: { ...AUDIO_BUDGET, effects: 1 * MB } },

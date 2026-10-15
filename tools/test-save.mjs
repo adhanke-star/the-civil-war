@@ -52,6 +52,30 @@ const command = (snap) => ({ brigadeId: snap.army[0].id, itemUid: snap.depot[0].
 const status = (promise) => promise.then((value) => ({ ok: true, value }), (error) => ({ ok: false, error }));
 
 const CHECKS = [
+
+  ['exchange-current-cancel', async (s, name) => {
+    const before = fixture(), { store, mem, locks } = env(s, before), raw = await store.readRawBaseline();
+    const release = await hold(locks); let current = true;
+    const queued = status(store.exchange(real.exchangeDepot, command(before), { previous: before, isCurrent: () => current }));
+    current = false; await release(); const result = await queued;
+    assert(name, !result.ok && result.error?.message.includes('cancelled') && mem.writes === 0 && await store.readRawBaseline() === raw,
+      'cancelled queued exchange wrote progress or missed the transaction guard');
+  }],
+  ['exchange-current-commit', async (s, name) => {
+    const before = fixture(), { store, mem, locks } = env(s, before); const release = await hold(locks); let calls = 0;
+    const queued = status(store.exchange(real.exchangeDepot, command(before), { previous: before, isCurrent: () => { calls++; return mem.writes === 0; } }));
+    const guardedBeforeLock = calls; await release(); const result = await queued;
+    assert(name, guardedBeforeLock === 0 && calls === 1 && result.ok && mem.writes === 1
+      && same(await store.load(), real.exchangeDepot(before, command(before))), 'guard must run exactly once inside the transaction and retain one healthy write');
+  }],
+  ['exchange-current-stale', async (s, name) => {
+    const before = fixture(), { store, mem, locks } = env(s, before), replacement = fixture('changed-during-queue');
+    const release = await hold(locks), queued = status(store.exchange(real.exchangeDepot, command(before), { previous: before, isCurrent: () => true }));
+    mem.data.set(real.SAVE_KEY, JSON.stringify(replacement)); await release(); const result = await queued;
+    assert(name, !result.ok && result.error?.message.includes('changed') && mem.writes === 0 && same(await store.load(), replacement),
+      'current ownership bypassed original compare-and-set conflict');
+  }],
+
   ['exchange-state', async (s, name) => {
     const before = fixture(), bytes = JSON.stringify(before), c = command(before), next = s.exchangeDepot(before, c);
     const expected = equip(before.army[0], before.depot[0]);
@@ -240,6 +264,11 @@ const unsafeRetryIssue = { ...real, createProgressStore(mem, opts) {
   } };
 } };
 const MUTANTS = {
+
+  'exchange-current-cancel': wrap(st => ({ exchange(rule, command, options) { return st.exchange(rule, command, { ...options, isCurrent: () => true }); } })),
+  'exchange-current-commit': wrap(st => ({ exchange(rule, command, options) { options.isCurrent(); return st.exchange(rule, command, options); } })),
+  'exchange-current-stale': wrap((st, mem) => ({ exchange(rule, command, options) { return Promise.resolve(rule(options.previous, command)).then(next => { mem.setItem(real.SAVE_KEY, JSON.stringify(next)); return next; }); } })),
+
   'exchange-state': { ...real, exchangeDepot: (v) => clone(v) },
   'exchange-cycles': { ...real, exchangeDepot: (v, c) => ({ ...real.exchangeDepot(v, c), issued: [] }) },
   'exchange-refusals': { ...real, exchangeDepot: (v) => clone(v) },

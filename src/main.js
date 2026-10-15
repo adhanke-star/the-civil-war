@@ -32,6 +32,7 @@ import { campaignPhase, applyCampaign } from './franchise/campaign.js';
 import { loadCampaign, mountBriefing, showGraphicsReload } from './ui/briefing.js';
 import { get as getSetting, set as setSetting, on as onSetting } from './settings.js';
 import { mixer } from './audio/mixer.js';
+import { bankIds } from './audio/bank.js';
 import { Director } from './audio/director.js';
 import { setBattle, playMusic, resultsMood, lossShareOf, stopMusicForReload } from './audio/music.js';
 import { setQualityHandler } from './ui/settings-panel.js';
@@ -257,8 +258,9 @@ if(graphicsStop && !graphicsStop.check())return;
 // Sound: no music over a battle; banks load after the first gesture (the mixer waits for it).
 setBattle(true);
 mixer.arm();
-mixer.loadBank('battle');
-mixer.loadBank('ambient', { season: scenario.season });
+const recordingLoads = [mixer.loadBank('battle'), mixer.loadBank('ambient', { season: scenario.season })];
+let recordingsLimited = false;
+const recordingsNotice = 'Some recorded battle sounds are unavailable. You can still play.';
 const _snd = new THREE.Vector3();
 /** Where a field point sits for the ear: pan by screen x, quieter and duller with distance from the camera. */
 const locate = (x, z) => {
@@ -571,6 +573,7 @@ function frame(now) {
       : launch ? `${scenario.title}: campaign briefing. Begin starts the phase.`
       : pack ? scenario.statusText ?? `${scenario.title} is ready. Select a brigade, then drag to give it orders.`
       : 'Henry House Hill, 21 July 1861. Union brigades are below the hill; Jackson holds the crest.';
+    if (recordingsLimited) statusEl.textContent += ' ' + recordingsNotice;
   }
   if(!graphicsStop?.stopped)resourceOwners.raf=requestAnimationFrame(frame);
 }
@@ -584,6 +587,16 @@ window.__game = { game, rts, terrain, scene, camera, post, world, effects, input
   pack: pack ? { packId: pack.packId, phaseId: pack.phaseId, nextId: pack.nextId } : null,
   // Campaign phase launch (tests force a result through window.__game.game, then drive the real result dialog).
   campaign: launch ? { slot: launch.slot, phase: launch.phase, briefing } : null };
+
+// The current field reports actual decoded availability, without carrying a preparation flag across pages.
+Promise.allSettled(recordingLoads).then(() => {
+  if (window.__game?.game !== game || !statusEl.isConnected || game.over || graphicsStop?.stopped || mixer.stoppedForReload) return;
+  const ids = [...bankIds('battle'), ...bankIds('ambient', { season: scenario.season })];
+  if (ids.every(id => mixer.has(id))) return;
+  recordingsLimited = true;
+  hud.toast(recordingsNotice);
+  if (window.__ready) statusEl.textContent += ' ' + recordingsNotice;
+});
 
 // Developer tuning panel (lil-gui), only with ?tune in the URL; players never load it.
 if (new URLSearchParams(location.search).has('tune')) {

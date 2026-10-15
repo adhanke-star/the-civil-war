@@ -67,3 +67,79 @@ export function bankIds(bank, { season } = {}) {
   if (bank === 'ambient') return [ambientFor(season)];
   return Object.keys(SOUNDS).filter((id) => SOUNDS[id].bank === bank);
 }
+
+/**
+ * Called only by an explicit departure gesture. Fetch complete recorded battle/season files without
+ * decoding or playing them; the existing worker owns hash verification and durable admission.
+ * The client deadline closes this attempt. An already dispatched worker acquisition may still finish.
+ */
+export async function prepareBattleRecordings(resolveScenario, {
+  isCurrent = () => true, signal = null, fetcher = globalThis.fetch, deadlineMs = 6000,
+} = {}) {
+  const controller = new AbortController();
+  let closed = false, cancelled = false, deadlineHit = false, available = 0, requested = 0, next = 0, timer, finishEarly;
+  const stale = () => { try { return cancelled || signal?.aborted === true || !isCurrent(); } catch { return true; } };
+  const current = () => !closed && !stale();
+  const early = new Promise(resolve => { finishEarly = resolve; });
+  const stop = () => { cancelled = true; if (!closed) { closed = true; controller.abort(); finishEarly('cancelled'); } };
+  const run = async () => {
+    if (!Number.isSafeInteger(deadlineMs) || deadlineMs < 1 || deadlineMs > 10000
+      || typeof resolveScenario !== 'function' || !current()) return 'cancelled';
+    const scenario = await resolveScenario(controller.signal);
+    if (!current()) return 'cancelled';
+    if (!scenario || typeof scenario !== 'object') return 'unavailable';
+    const ids = [...bankIds('battle'), ...bankIds('ambient', { season: scenario.season })];
+    requested = ids.length;
+    if (ids.length !== 18 || new Set(ids).size !== 18) return 'unavailable';
+    const worker = async () => {
+      while (current() && next < ids.length) {
+        const id = ids[next++];
+        let reader, response;
+        try {
+          if (!SOUNDS[id] || SOUNDS[id].stream) throw new Error('Unavailable recording');
+          const url = new URL('../../' + AUDIO_DIR + SOUNDS[id].file, import.meta.url).href;
+          response = await fetcher(url, { signal: controller.signal });
+          if (!current()) return;
+          const rawLength = response.headers.get('content-length'), length = Number(rawLength);
+          if (response.status !== 200 || response.type !== 'basic' || response.headers.get('content-range') !== null
+            || !rawLength || !/^\d+$/.test(rawLength) || !Number.isSafeInteger(length)
+            || length < 1 || length > AUDIO_BUDGET.file) throw new Error('Incomplete recording response');
+          reader = response.body.getReader();
+          let bytes = 0;
+          while (current()) {
+            const chunk = await reader.read();
+            if (!current()) return;
+            if (chunk.done) break;
+            bytes += chunk.value.byteLength;
+            if (bytes > length || bytes > AUDIO_BUDGET.file) throw new Error('Recording body exceeds its bound');
+          }
+          if (current() && bytes === length) available++;
+        } catch { /* Missing recordings do not prevent the original departure. */ }
+        finally {
+          // A foreign or stuck body must not hold departure after cancellation/deadline.
+          try { Promise.resolve(reader ? reader.cancel() : response?.body?.cancel()).catch(() => {}); } catch {}
+          try { reader?.releaseLock(); } catch {}
+        }
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    return available === requested ? 'complete' : 'unavailable';
+  };
+  let outcome;
+  if (stale()) return Object.freeze({ complete: false, available: 0, requested: 0, cancelled: true, reason: 'cancelled' });
+  signal?.addEventListener('abort', stop, { once: true });
+  globalThis.addEventListener?.('pagehide', stop, { once: true });
+  timer = setTimeout(() => {
+    if (closed) return;
+    deadlineHit = true; closed = true; controller.abort(); finishEarly('deadline');
+  }, deadlineMs);
+  try { outcome = await Promise.race([run().catch(() => 'unavailable'), early]); }
+  finally {
+    closed = true; clearTimeout(timer); controller.abort();
+    signal?.removeEventListener('abort', stop);
+    globalThis.removeEventListener?.('pagehide', stop);
+  }
+  const reason = stale() ? 'cancelled' : deadlineHit ? 'deadline' : outcome;
+  return Object.freeze({ complete: reason === 'complete' && requested === 18 && available === requested,
+    available, requested, cancelled: reason === 'cancelled', reason });
+}
