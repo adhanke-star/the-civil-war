@@ -16,6 +16,41 @@ function settle(r) { for (let i = 0; i < 70; i++) { r.update(0.1); r.camera.upda
 const dom = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 1280, height: 720 }) };
 const api = { camera, marker: Hud.prototype.applyMarkerScale, position: markerPosition };
 const tests = [
+  ['initial-ground-at-authored-target', (a) => {
+    for (const height of [408.3726151699219, 0, -37.25]) {
+      const calls = [], terrain = { half: 3000, heightAt: (x, z) => { calls.push([x, z]); return height; } };
+      const r = a.camera({ terrain, target: [-1208, 637] });
+      assert.equal(r.groundY, height, 'initial ground uses the authored target elevation');
+      assert.deepEqual(calls, [[-1208, 637]], 'constructor samples the actual initial target');
+      assert.deepEqual([r.target.x, r.target.z, r.goal.x, r.goal.z], [-1208, 637, -1208, 637]);
+    }
+  }, { ...api, camera: (o) => { const r = camera(o); r.groundY = 0; return r; } }],
+  ['initial-target-height-coherent', (a) => {
+    const r = a.camera({ terrain: { half: 3000, heightAt: () => -37.25 } });
+    assert.equal(r.target.y, -37.25, 'initial target is on the terrain before any update');
+    assert.equal(r.target.y, r.groundY);
+  }, { ...api, camera: (o) => { const r = camera(o); r.target.y = 0; return r; } }],
+  ['stationary-first-and-later-matrices-exact', (a) => {
+    const r = a.camera({ terrain: { half: 3000, heightAt: () => 408.3726151699219 }, target: [-1208, 637], yaw: -0.785, dist: 2000 });
+    const read = () => JSON.stringify([r.groundY, r.target.toArray(), r.goal, r.yaw, r.pitch, r.dist,
+      r.camera.position.toArray(), r.camera.matrixWorld.toArray(), r.camera.matrixWorldInverse.toArray(),
+      r.camera.projectionMatrix.toArray(), r.camera.projectionMatrixInverse.toArray()]);
+    r.update(0.0166); const first = read();
+    for (const dt of [0, 0.1, 0.05, 0.0167, 0.1, 0.0333, 0.1, 0.0166]) {
+      r.update(dt); assert.equal(read(), first, 'stationary elevated camera stays exactly at its first published pose');
+    }
+  }, { ...api, camera: (o) => { const r = camera(o); r.groundY = 0; r.target.y = 0; return r; } }],
+  ['later-pan-ground-easing-unchanged', (a) => {
+    const terrain = { half: 3000, heightAt: (x, z) => 400 + x * 0.01 + z * 0.02 };
+    const r = a.camera({ terrain }), before = r.groundY;
+    r.panBy(100, 60); r.update(0.1);
+    const nextHeight = terrain.heightAt(r.target.x, r.target.z);
+    assert.notEqual(nextHeight, before, 'pan actually crosses changing elevation');
+    assert.equal(r.groundY, before + (nextHeight - before) * 0.4, 'later terrain following retains its original easing');
+    assert.equal(r.target.y, r.groundY);
+  }, { ...api, camera: (o) => { const r = camera(o), update = r.update;
+    r.update = (dt) => { update.call(r, dt); r.groundY = o.terrain.heightAt(r.target.x, r.target.z); r.target.y = r.groundY; }; return r;
+  } }],
   ['update-publishes-coherent-world-and-inverse', (a) => {
     const r = a.camera(); r.update(0.1); S.set('look.cameraElevation', 30);
     r.rotateBy(0.2, 0); r.update(0.1);

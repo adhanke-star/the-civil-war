@@ -760,8 +760,8 @@ self.CW_OFFLINE = {
    "sha256": "417feb0b82bc3a6e61970947a14dd7132d9dbd2a1c0a93920f67154ca715ca7a"
   },
   "src/render/rts-camera.js": {
-   "bytes": 11463,
-   "sha256": "5b6f12dc44d5f03056c94285927141bc115e64af9749264869ec4e875d161af8"
+   "bytes": 11542,
+   "sha256": "bf8916cf16b6476a0ca5e89ef8d0104533fb06ae03586d7857cd816db323b061"
   },
   "src/render/soldier-view.js": {
    "bytes": 6995,
@@ -1472,5 +1472,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "c5a0eedf18073d963c05b18ad0d80e33ae514cd50b0430ecc017fe7f0110b71a"
+ "generation": "bc92a46b28a4a6e501bf015efbae3e5a9f583b57f19865ecbb3cb76d7502a58f"
 };

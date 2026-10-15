@@ -41,7 +41,8 @@ export class RtsCamera {
     this.maxDist = 2000;
     this.keys = new Set();
     this.bound = terrain.half - 120;
-    this.groundY = 0;
+    this.groundY = terrain.heightAt(this.target.x, this.target.z);
+    this.target.y = this.groundY;
     on('look.cameraElevation', () => { this.goal.pitch = this._pitch(this.goal.dist); });
     this.inertia = null; // { vx, vz } m/s of goal drift after a released pan
   }
