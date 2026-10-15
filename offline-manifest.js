@@ -932,8 +932,8 @@ self.CW_OFFLINE = {
    "sha256": "f02ce1ca86bdb58932df68eb5d2e0e37cf9ca3046bb339ad3ff3b27982f65fd4"
   },
   "src/units/soldier-mesh.js": {
-   "bytes": 34536,
-   "sha256": "947e2400d39135257f364f8f4d3482aa6c7633ddf8258f12d0d018088aed8f8b"
+   "bytes": 35840,
+   "sha256": "1517846da294c87f71a9a4b0bce389a618bcf7d5f2042f48e9c484685f2bd883"
   },
   "src/units/unit.js": {
    "bytes": 57181,
@@ -952,8 +952,8 @@ self.CW_OFFLINE = {
    "sha256": "20333df6c2e463e84f937f303502ba3c51a4870ba05a15a71caea16ada0b0deb"
   },
   "src/world/props.js": {
-   "bytes": 18895,
-   "sha256": "7432ce899a6b5be1ce3bce85c00c9483613a94db8efbc4617e08beb14c0aa9f2"
+   "bytes": 20194,
+   "sha256": "694308e5ac838df6bd4e3d59e77aab72ae2d94e08c6a38ca09f02daf6b48898e"
   },
   "src/world/terrain.js": {
    "bytes": 30234,
@@ -1472,5 +1472,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "bc92a46b28a4a6e501bf015efbae3e5a9f583b57f19865ecbb3cb76d7502a58f"
+ "generation": "caf211a2a5513b8526ef3d4aab30d84494f44377da0cbf7afda888b3a7ba39ae"
 };

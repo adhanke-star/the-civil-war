@@ -82,6 +82,25 @@ function pineGeometry(tiers = 4, seg = 7) {
 // depth, so a chunk whose nearest point lies deeper than this is drawn entirely in the flat fog colour.
 export const TREE_FAR = 3600;
 const _forward = new THREE.Vector3(); // per-frame scratch (no allocations in updateLod)
+const retainedTreeOwners=new WeakMap();
+
+/** Borrow only the geometry already retained by a live tree group's LOD closure. */
+export function retainedTreeGeometryArrays(group){
+  const lods=retainedTreeOwners.get(group);if(!lods)throw Error('tree templates: unknown owner');
+  const geometries=new Set(),rows=[],own=(o,k,optional=false)=>{const d=Object.getOwnPropertyDescriptor(o,k);
+    if(!d&&optional)return undefined;if(!d||!Object.hasOwn(d,'value'))throw Error('tree templates: missing or accessor owner');return d.value;};
+  for(const lod of lods)for(const key of ['hi','lo'])geometries.add(own(lod,key));
+  let i=0;for(const geometry of geometries){
+    const attrs=own(geometry,'attributes'),entries=Object.keys(Object.getOwnPropertyDescriptors(attrs)).map(key=>[key,own(attrs,key)]);
+    entries.push(['index',own(geometry,'index')]);
+    if(Object.keys(own(geometry,'morphAttributes')).length)throw Error('tree templates: unexpected morph owner');
+    for(const [key,a]of entries)if(a){const array=own(a,'array');
+      if(!ArrayBuffer.isView(array)||rows.length>=256)throw Error('tree templates: invalid array or bound');
+      rows.push(Object.freeze({owner:`world/tree-template/${i}/${key}`,array}));}
+    i++;
+  }
+  return Object.freeze(rows);
+}
 
 export function buildTrees(terrain, trees, { far = TREE_FAR } = {}) {
   const group = new THREE.Group();
@@ -151,6 +170,7 @@ export function buildTrees(terrain, trees, { far = TREE_FAR } = {}) {
       if (l.mesh.geometry !== g) l.mesh.geometry = g;
     }
   };
+  retainedTreeOwners.set(group,lods);
   return group;
 }
 

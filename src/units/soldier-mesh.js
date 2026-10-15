@@ -176,6 +176,25 @@ function makeBuffers(capacity) {
 }
 
 const geoCache = new Map();
+/** Existing retained templates only. No cache population, copy, upload or owner mutation. */
+export function retainedFigureGeometryArrays() {
+  const rows=[],own=(o,k,optional=false)=>{const d=Object.getOwnPropertyDescriptor(o,k);
+    if(!d&&optional)return undefined;
+    if(!d||!Object.hasOwn(d,'value'))throw Error('figure templates: missing or accessor owner');return d.value;},
+    entries=o=>Object.keys(Object.getOwnPropertyDescriptors(o)).map(k=>[k,own(o,k)]),
+    add=(a,owner)=>{const array=own(a,'isInterleavedBufferAttribute',true)===true?own(own(a,'data'),'array'):own(a,'array');
+      if(!ArrayBuffer.isView(array)||rows.length>=256)throw Error('figure templates: invalid array or bound');
+      rows.push(Object.freeze({owner,array}));};
+  for(const [key,g]of geoCache){
+    for(const [name,a]of [...entries(own(g,'attributes')),['index',own(g,'index')]].filter(([,a])=>a))add(a,`figure-template/${key}/${name}`);
+    for(const [name,list]of entries(own(g,'morphAttributes'))){
+      if(!Array.isArray(list))throw Error('figure templates: invalid morph list');const n=own(list,'length');
+      if(n>256)throw Error('figure templates: morph bound');
+      for(let i=0;i<n;i++)add(own(list,String(i)),`figure-template/${key}/morph/${name}/${i}`);
+    }
+  }
+  return Object.freeze(rows);
+}
 export function figureGeometry(lod, kit) {
   const k = `${lod}:${kit}`;
   if (!geoCache.has(k)) geoCache.set(k, buildFigureGeometry(lod, kit));

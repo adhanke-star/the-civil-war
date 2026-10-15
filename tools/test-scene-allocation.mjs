@@ -6,11 +6,13 @@ import {deriveSceneStressContract} from './bake/inactive-figures.mjs';
 import {QUALIFIED_HYBRID} from './bake/review-current-compression.mjs';
 import {settleSceneCapture} from './bake/scene-allocation.mjs';
 import * as THREE from 'three';
-import {buildTrees} from '../src/world/props.js';
+import {buildTrees,retainedTreeGeometryArrays} from '../src/world/props.js';
 import {RtsCamera} from '../src/render/rts-camera.js';
 import {scenePostAdmissionSnapshot,scenePostAdmissionValid,sceneTerrainContractValid,sceneFullFloat32HeaderValid,reduceFullFloat32SceneObservations} from './bake/scene-allocation.mjs';
 import {Post} from '../src/render/post.js';
 import {readSceneTerrainContracts} from './bake/scene-terrain-contract.mjs';
+import {inventoryRetainedBuffers,retainedBufferInventoryErrors} from './bake/scene-allocation.mjs';
+import {SoldierPool,FallenPool,UNIFORMS,retainedFigureGeometryArrays,figureGeometry} from '../src/units/soldier-mesh.js';
 
 function observed(skipRestore=false,dropSamplePeak=false,forgetOldBuffer=false,sampler=sampleSceneAllocations,forgetOwners=false,nativeJournal=false) {
   const saved={window:globalThis.window,WebGLRenderingContext:globalThis.WebGLRenderingContext,WebGL2RenderingContext:globalThis.WebGL2RenderingContext};
@@ -854,6 +856,129 @@ checks.push(['native-loss-retirement-observation',a=>{const r=a.observe().lossOb
 mutants['native-loss-retirement-observation']={observe:()=>{const o=observed();o.lossObservation.pending.bytes=0;return o;}};
 checks.push(['native-loss-retained-journal',a=>{const r=a.observe(false,false,false,sampleSceneAllocations,false,true).lossObservation;assert.ok(r.retained.bytes===r.before.bytes&&r.retained.pendingDeleteBytes===r.before.bytes&&r.retained.defaultFramebuffer===r.before.defaultFramebuffer&&r.retainedCopiesStable&&r.retained.nativeEvents.some(e=>e.operation==='retire')&&!r.retained.nativeEvents.some(e=>e.operation==='finish'||e.operation==='release'),'native-loss-retained-journal: read-only retained bytes/defaults/events survive lost context without native calls or invented completion');}]);
 mutants['native-loss-retained-journal']={observe:(...args)=>{const o=observed(...args);o.lossObservation.retained.pendingDeleteBytes=0;return o;}};
+
+Object.assign(api,{bufferInventory:inventoryRetainedBuffers,bufferReader:retainedBufferInventoryErrors,figureTemplates:retainedFigureGeometryArrays,treeTemplates:retainedTreeGeometryArrays});
+const bufferRows=(views)=>views.map((array,i)=>({array,owner:'owner/'+i,role:'cpu-state'}));
+const bufferCoverage={requiredGroups:['explicit'],observedGroups:['explicit']};
+const bufferChecks=[
+  ['backing-template-cache',a=>{for(const side of ['US','CS']){new SoldierPool(3,UNIFORMS[side],{kit:side});new FallenPool(3,UNIFORMS[side],{kit:side});}
+    const before=a.figureTemplates(),after=a.figureTemplates(),r=inventoryRetainedBuffers(before.map(v=>({...v,role:'template'})),bufferCoverage);
+    assert.deepEqual([r.backings.length,r.retainedBackingBytes],[48,59972],'backing-template-cache: actual six retained figure templates counted');
+    assert.ok(before.length===after.length&&before.every((v,i)=>v.array===after[i].array&&v.owner===after[i].owner),'backing-template-cache: accessor borrows stable existing arrays without copies');}],
+  ['backing-template-accessor',a=>{const geometry=figureGeometry(0,'US'),descriptor=Object.getOwnPropertyDescriptor(geometry.attributes,'position');let calls=0;
+    try{Object.defineProperty(geometry.attributes,'position',{configurable:true,get(){calls++;throw null;}});
+      let rejected=false;try{a.figureTemplates();}catch(error){rejected=error instanceof Error;}
+      assert.ok(rejected&&calls===0,'backing-template-accessor: descriptor guard refuses foreign template getter');
+    }finally{Object.defineProperty(geometry.attributes,'position',descriptor);}}],
+  ['backing-template-live-clone',a=>{const pool=new SoldierPool(3,UNIFORMS.US,{kit:'US'}),templates=new Set(a.figureTemplates().map(v=>v.array.buffer)),live=pool.buckets.flatMap(b=>[...Object.values(b.mesh.geometry.attributes),b.mesh.geometry.index]).filter(Boolean);
+    assert.ok(templates.size===48&&live.every(v=>!templates.has(v.array.buffer)),'backing-template-live-clone: cached originals and live geometry clones retain separate storage');}],
+  ['backing-overlap',a=>{const b=new ArrayBuffer(16),r=a.bufferInventory(bufferRows([new Uint8Array(b,0,12),new Uint8Array(b,4,12)]),bufferCoverage);
+    assert.equal(r.retainedBackingBytes,16,'backing-overlap: overlapping views retain one whole backing');assert.equal(r.views.length,2,'backing-overlap: distinct ranges retained');}],
+  ['backing-small-view',a=>{const b=new ArrayBuffer(64),r=a.bufferInventory(bufferRows([new Uint8Array(b,16,4)]),bufferCoverage);
+    assert.equal(r.retainedBackingBytes,64,'backing-small-view: tiny view retains all backing storage');assert.deepEqual([r.views[0].byteOffset,r.views[0].byteLength],[16,4],'backing-small-view: exact byte range');}],
+  ['backing-alias-copy',a=>{const v=new Float32Array(4),r=a.bufferInventory(bufferRows([v,v,v.slice()]),bufferCoverage);
+    assert.deepEqual([r.retainedBackingBytes,r.backings.length,r.views.length,r.views[0].owners.length],[32,2,2,2],'backing-alias-copy: alias once, detached copy separately');}],
+  ['backing-no-getter',a=>{let calls=0;const row={owner:'hostile',role:'cpu-state'};Object.defineProperty(row,'array',{get(){calls++;return new Uint8Array(99);}});
+    const r=a.bufferInventory([row],bufferCoverage);assert.ok(calls===0&&!r.coverage.complete&&r.coverage.errors.length>0,'backing-no-getter: refuse accessor without invoking it');}],
+  ['backing-shared',a=>{const r=a.bufferInventory(bufferRows([new Uint8Array(new SharedArrayBuffer(8))]),bufferCoverage);
+    assert.ok(!r.coverage.complete&&r.coverage.errors.length>0,'backing-shared: shared mutable storage unsupported');}],
+  ['backing-detached',a=>{const b=new ArrayBuffer(8),v=new Uint8Array(b);structuredClone(b,{transfer:[b]});const r=a.bufferInventory(bufferRows([v]),bufferCoverage);
+    assert.ok(!r.coverage.complete&&r.coverage.errors.length>0,'backing-detached: detached zero-length cannot become zero storage');}],
+  ['backing-resizable',a=>{const b=new ArrayBuffer(8,{maxByteLength:16}),r=a.bufferInventory(bufferRows([new Uint8Array(b)]),bufferCoverage);
+    assert.ok(!r.coverage.complete&&r.coverage.errors.length>0,'backing-resizable: unsupported mutable backing bound rejects');}],
+  ['backing-missing-group',a=>{const r=a.bufferInventory(bufferRows([new Uint8Array(4)]),{requiredGroups:['explicit'],observedGroups:[]});
+    assert.ok(!r.coverage.complete&&r.coverage.errors.length>0,'backing-missing-group: absent owner group never counts as complete');}],
+  ['backing-row-overflow',a=>{const row=bufferRows([new Uint8Array(1)])[0],r=a.bufferInventory(Array(16385).fill(row),bufferCoverage);
+    assert.ok(!r.coverage.complete&&r.coverage.errors.length>0,'backing-row-overflow: no silent truncated acceptance');}],
+  ['backing-hostile-throw',a=>{let calls=0;const hostile={get message(){calls++;throw null;}},row=new Proxy({},{getOwnPropertyDescriptor(){throw hostile;}}),r=a.bufferInventory([row],bufferCoverage);
+    assert.ok(calls===0&&!r.coverage.complete&&r.coverage.errors.length>0,'backing-hostile-throw: preserve readable failure without hostile getters');}],
+  ['backing-error-bound',a=>{const r=a.bufferInventory([{array:new Uint8Array(1),owner:'x'.repeat(300000),role:'cpu-state'}],bufferCoverage);
+    assert.ok(!r.coverage.complete&&r.coverage.errors.length>0&&r.coverage.errors.every(e=>typeof e==='string'&&e.length<=1024),'backing-error-bound: bounded failure strings');}],
+  ['backing-error-serialization',a=>{const r=a.bufferInventory([],{...bufferCoverage,errors:[()=>{}]});
+    assert.ok(!r.coverage.complete&&r.coverage.errors.every(e=>typeof e==='string'),'backing-error-serialization: no function retained in failure receipt');}],
+  ['backing-reader-positive',a=>{const r=inventoryRetainedBuffers(bufferRows([new Uint8Array(new ArrayBuffer(64),8,4)]),bufferCoverage);
+    assert.deepEqual(a.bufferReader(r,{requiredGroups:['explicit'],ownerShapes:[{owner:'owner/0',type:'Uint8Array',byteLength:4,byteOffset:8,backing:'source/0',backingByteLength:64,role:'cpu-state'}]}),[],'backing-reader-positive: independently sum whole backings and match source shape');}],
+];
+const bufferMutations=[
+  ['sum',r=>r.retainedBackingBytes=4],['range',r=>r.views[0].byteOffset=64],['old-schema',r=>r.version=1],
+  ['coverage',r=>r.coverage.observedGroups=[]],['missing-owner',r=>r.views[0].owners=['different']],
+  ['backing-shrink',r=>{r.backings[0].byteLength=12;r.retainedBackingBytes=12;}],
+  ['unused-backing',r=>{r.backings.push({id:2,byteLength:1});r.retainedBackingBytes++;}],
+];
+for(const [suffix,mutate]of bufferMutations){const name='backing-reader-'+suffix;bufferChecks.push([name,a=>{
+  const r=inventoryRetainedBuffers(bufferRows([new Uint8Array(new ArrayBuffer(64),8,4)]),bufferCoverage);mutate(r);
+  assert.ok(a.bufferReader(r,{requiredGroups:['explicit'],ownerShapes:[{owner:'owner/0',type:'Uint8Array',byteLength:4,byteOffset:8,backing:'source/0',backingByteLength:64,role:'cpu-state'}]}).length>0,name+': altered storage proof rejected');}]);}
+bufferChecks.push(['backing-reader-false-alias',a=>{const r=inventoryRetainedBuffers(bufferRows([new Float32Array(4),new Float32Array(4)]),bufferCoverage),
+  ownerShapes=[0,1].map(i=>({owner:'owner/'+i,type:'Float32Array',byteLength:16,byteOffset:0,backing:'source/'+i,backingByteLength:16,role:'cpu-state'}));
+  r.views[1].backingId=1;r.backings.pop();r.retainedBackingBytes=16;
+  assert.ok(a.bufferReader(r,{requiredGroups:['explicit'],ownerShapes}).length>0,'backing-reader-false-alias: distinct source storage cannot collapse');}]);
+bufferChecks.push(['backing-reader-alignment',a=>{const r=inventoryRetainedBuffers(bufferRows([new Float32Array(4)]),bufferCoverage);
+  r.views[0].byteOffset=1;r.backings[0].byteLength=17;r.retainedBackingBytes=17;
+  assert.ok(a.bufferReader(r,{requiredGroups:['explicit']}).length>0,'backing-reader-alignment: typed offsets require element alignment');}]);
+bufferChecks.push(['backing-reader-geometry-role',a=>{const v=new Float32Array(4),r=inventoryRetainedBuffers([{array:v,owner:'mesh',role:'geometry'}],bufferCoverage);
+  r.views[0].roles=['cpu-state'];r.geometryBindings=[];
+  assert.ok(a.bufferReader(r,{requiredGroups:['explicit'],geometryArrays:[{id:1,arrayType:'Float32Array',bytes:16,owners:['mesh']}],bufferOwnership:[]}).length>0,'backing-reader-geometry-role: unuploaded geometry cannot disappear by relabelling');}]);
+bufferChecks.push(['backing-reader-geometry-alias',a=>{const cpu=new Float32Array(4),geometry=new Float32Array(4),r=inventoryRetainedBuffers([
+  {array:cpu,owner:'cpu',role:'cpu-state'},{array:geometry,owner:'scene/trees',role:'geometry'}],bufferCoverage),
+  options={requiredGroups:['explicit'],ownerShapes:[{owner:'cpu',type:'Float32Array',byteOffset:0,byteLength:16,backing:'source',backingByteLength:16,role:'cpu-state'}],
+    geometryArrays:[{id:1,arrayType:'Float32Array',bytes:16,owners:['scene/trees']}],bufferOwnership:[{id:1,bytes:16,owners:['scene/trees']}]};
+  r.geometryBindings=[{viewId:2,geometryArrayId:1,nativeReservationIds:[1]}];assert.deepEqual(retainedBufferInventoryErrors(r,options),[]);
+  r.views[1].backingId=1;r.backings.pop();r.retainedBackingBytes=16;
+  assert.ok(a.bufferReader(r,options).length>0,'backing-reader-geometry-alias: native view equality cannot justify a false CPU backing merge');}]);
+const treeFixture=kinds=>buildTrees({heightAt:()=>0},kinds.map((kind,i)=>[i*500,0,2,kind]));
+for(const [suffix,kinds,views,bytes]of [['empty',[],0,0],['deciduous',[0],8,null],['pine',[1],8,null],['both',[0,1],16,4758]]){
+  const name='backing-tree-'+suffix;bufferChecks.push([name,a=>{const group=treeFixture(kinds),before=a.treeTemplates(group),after=a.treeTemplates(group),
+    r=inventoryRetainedBuffers(before.map(v=>({...v,role:'template'})),bufferCoverage);
+    assert.ok(before.length===views&&r.views.length===views&&(bytes===null||r.retainedBackingBytes===bytes),name+': only actual LOD-owned geometry retained');
+    assert.ok(before.every((row,i)=>row.array===after[i].array&&row.owner===after[i].owner),name+': stable borrowed refs');}]);
+}
+bufferChecks.push(['backing-tree-lod',a=>{const group=treeFixture([0,1]),camera=new THREE.PerspectiveCamera(),before=a.treeTemplates(group),
+  instances=group.children.map(mesh=>[mesh.instanceMatrix.array,mesh.instanceColor.array]),high=group.children.map(mesh=>mesh.geometry);
+  group.userData.updateLod(camera,0,Infinity);const low=group.children.map(mesh=>mesh.geometry),after=a.treeTemplates(group);
+  assert.ok(high.every((g,i)=>g!==low[i])&&before.length===16&&before.every((row,i)=>row.array===after[i].array),'backing-tree-lod: inactive and active arrays remain retained across selector');
+  assert.ok(group.children.every((mesh,i)=>mesh.instanceMatrix.array===instances[i][0]&&mesh.instanceColor.array===instances[i][1]),'backing-tree-lod: observation never copies or replaces instance storage');}]);
+bufferChecks.push(['backing-tree-accessor',a=>{const group=treeFixture([0]),attributes=group.children[0].geometry.attributes,descriptor=Object.getOwnPropertyDescriptor(attributes,'position');let calls=0;
+  try{Object.defineProperty(attributes,'position',{configurable:true,get(){calls++;throw null;}});let rejected=false;try{a.treeTemplates(group);}catch(error){rejected=error instanceof Error;}
+    assert.ok(rejected&&calls===0,'backing-tree-accessor: no foreign getter call');
+  }finally{Object.defineProperty(attributes,'position',descriptor);}}]);
+checks.push(...bufferChecks);
+for(const[name]of bufferChecks)mutants[name]=name.startsWith('backing-tree-')?{treeTemplates:()=>name==='backing-tree-empty'?[{}]:[]}:name.startsWith('backing-template-')?{figureTemplates:()=>[]}:
+  name==='backing-reader-positive'?{bufferReader:()=>['mutated']}:
+  name.startsWith('backing-reader-')?{bufferReader:()=>[]}:{bufferInventory:()=>({retainedBackingBytes:0,backings:[],views:[{owners:[],byteOffset:0,byteLength:0}],coverage:{complete:true,errors:[]}})};
+
+
+const strictFixture=()=>{const scene=new THREE.Scene(),mesh=new THREE.Mesh(new THREE.PlaneGeometry(1,1),new THREE.MeshBasicMaterial());scene.add(mesh);
+  const scope={__game:{scene,post:{},game:{pools:{US:{group:new THREE.Group()}},fallen:{},impostors:{},baked:{atlases:{}}}},__sceneTerrainPartition:{retainedArrays:[]}};
+  return {scope,mesh,options:{retainedContext:{},retainedBuffers:{phase:'field',figureTemplates:[]}}};};
+for(const kind of ['pool','geometry','attributes','array','texture','children']){
+  const name='backing-strict-getter-'+kind;
+  checks.push([name,a=>{const f=strictFixture();let calls=0;const getter={configurable:true,get(){calls++;throw null;}};
+    if(kind==='pool')Object.defineProperty(f.scope.__game.game.pools,'US',getter);
+    if(kind==='geometry')Object.defineProperty(f.mesh,'geometry',getter);
+    if(kind==='attributes')Object.defineProperty(f.mesh.geometry.attributes,'position',getter);
+    if(kind==='array')Object.defineProperty(f.mesh.geometry.attributes.position,'array',getter);
+    if(kind==='texture')Object.defineProperty(f.mesh.material.map={},'isTexture',getter);
+    if(kind==='children')Object.defineProperty(f.scope.__game.scene.children,'0',getter);
+    const r=a.sampler(f.scope,f.options);
+    assert.ok(calls===0&&r.retainedBufferInventory?.coverage.complete===false&&r.retainedBufferInventory.coverage.errors.length>0,name+': reject unexpected accessor without calling it or escaping');
+    assert.doesNotThrow(()=>structuredClone(r),name+': bounded cloneable incomplete receipt');}]);
+  mutants[name]={sampler:()=>({retainedBufferInventory:{coverage:{complete:true,errors:[]}}})};
+}
+for(const key of ['rows','requiredGroups','observedGroups','errors']){
+  const name='backing-sequence-getter-'+key;
+  checks.push([name,a=>{let calls=0;const hostile=[];Object.defineProperty(hostile,'0',{get(){calls++;throw null;}});
+    const r=a.bufferInventory(key==='rows'?hostile:[],{...bufferCoverage,...(key==='rows'?{}:{[key]:hostile})});
+    assert.ok(calls===0&&!r.coverage.complete&&r.coverage.errors.length>0,name+': dense descriptor sequence guard');
+    assert.doesNotThrow(()=>structuredClone(r),name+': cloneable metadata');}]);
+  mutants[name]={bufferInventory:()=>({coverage:{complete:true,errors:[]}})};
+}
+for(const key of ['requiredGroups','observedGroups']){
+  const name='backing-group-scalar-'+key;
+  checks.push([name,a=>{const r=a.bufferInventory([],{...bufferCoverage,[key]:[()=>{}]});
+    assert.ok(!r.coverage.complete&&r.coverage.errors.length>0,name+': non-string group refuses completeness');
+    assert.doesNotThrow(()=>structuredClone(r),name+': no function retained');}]);
+  mutants[name]={bufferInventory:()=>({coverage:{complete:true,errors:[]}})};
+}
 
 for(const [,check]of checks)await check(api);
 console.log(`SCENE-ALLOCATION OK (${checks.length}/${checks.length})`);

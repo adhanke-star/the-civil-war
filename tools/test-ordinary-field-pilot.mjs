@@ -2,8 +2,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {installOrdinaryAstcMask,readOrdinaryFrame,observeOrdinaryStability,observeOrdinaryStabilityOnPage,ordinaryVisualSnapshot,ordinaryBaselineErrors,ordinaryPilotExpected} from './bake/ordinary-field-pilot.mjs';
-import {AllocationLedger,mipSizes,ReservationPeak,installAllocationObserver,installFieldContextObserver,defaultSurfaceHistoryErrors} from './bake/scene-allocation.mjs';
+import {execFileSync} from 'node:child_process';
+import {installOrdinaryAstcMask,readOrdinaryFrame,observeOrdinaryStability,observeOrdinaryStabilityOnPage,ordinaryVisualSnapshot,ordinaryBaselineErrors,ordinaryPilotExpected,constructOrdinaryOwnerShapes} from './bake/ordinary-field-pilot.mjs';
+import {AllocationLedger,mipSizes,ReservationPeak,installAllocationObserver,installFieldContextObserver,defaultSurfaceHistoryErrors,inventoryRetainedBuffers,RETAINED_BUFFER_GROUPS} from './bake/scene-allocation.mjs';
 let maskChecks=0,frameChecks=0,readerChecks=0,sourceChecks=0,stabilityChecks=0,progressChecks=0;
 // Execute the actual source expression: serializing debug receipts must not materialize typed arrays.
 const mainSource=fs.readFileSync(new URL('../src/main.js',import.meta.url),'utf8'),resourceStart=mainSource.indexOf('resources:resources?'),
@@ -147,8 +148,8 @@ for(const mode of ['resolve','reject-null','read-failure','dispose-failure','pri
 }
 
 const expected={sha:'a'.repeat(40),run:'123',attempt:'1',inputs:{settings:{viewport:[10,10],dpr:1},save:'canonical save',applied:JSON.stringify({units:[{id:'fixture',side:'US',men:1,x:0,z:0,facing:0}]}),documentSha256:'b'.repeat(64)},
-  terrain:[{owner:'terrain-source/0',arrayType:'Float32Array',bytes:8,sha256:'c'.repeat(64)}],textures:{}};
-const report={schema:'ordinary-lookout-baselines-v1',sha:expected.sha,run:expected.run,attempt:expected.attempt,inputs:expected.inputs,complete:true,cases:[]};
+  terrain:[{owner:'terrain-source/0',arrayType:'Float32Array',bytes:8,sha256:'c'.repeat(64)}],textures:{},retainedOwners:Object.fromEntries(['capable','unsupported'].map(route=>[route,Object.fromEntries(['field','close'].map(phase=>[phase,[{owner:'terrain-source/0',type:'Float32Array',byteOffset:0,byteLength:8,backing:'source',backingByteLength:64,role:'oracle'}]]))]))};
+const report={schema:'ordinary-lookout-baselines-v2',sha:expected.sha,run:expected.run,attempt:expected.attempt,inputs:expected.inputs,complete:true,cases:[]};
 let lateRetainedObservation;
 for(const route of ['capable','unsupported'])await globals({window:{addEventListener(){},removeEventListener(){}},document:{},HTMLCanvasElement:undefined,WebGL2RenderingContext:undefined,WebGLRenderingContext:undefined},async()=>{
   class GL{
@@ -175,7 +176,9 @@ for(const route of ['capable','unsupported'])await globals({window:{addEventList
     descriptors.push(page);textures.push({...page,native,uuid:'texture-'+native});
     if(side==='US'&&tier==='close')hydrationCPU.push({before:start.nativeEvents.length,after:end.nativeEvents.length,callsBefore:start.calls,callsAfter:end.calls});
   }};
-  const sample=pages=>{const allocation=window.__allocation.peek(gl);return{allocation,declaredArrayBytes:8,cpuDeclaredArrayBytes:8,retainedTerrainArrayBytes:8,
+  const sample=pages=>{const allocation=window.__allocation.peek(gl),retainedBufferInventory=inventoryRetainedBuffers([{array:new Float32Array(new ArrayBuffer(64),0,2),owner:'terrain-source/0',role:'oracle'}],{requiredGroups:[...RETAINED_BUFFER_GROUPS],observedGroups:[...RETAINED_BUFFER_GROUPS]});
+    retainedBufferInventory.phase=pages.US.close?'close':'field';retainedBufferInventory.geometryBindings=[];
+    return{allocation,retainedBufferInventory,retainedBackingBytes:64,geometryArrayIds:[],declaredArrayBytes:8,cpuDeclaredArrayBytes:8,retainedTerrainArrayBytes:8,
     cpuArrays:[{id:1,arrayType:'Float32Array',bytes:8,owners:['terrain-source/0']}],viewport:[10,10],dpr:1,glError:null,conservativeReservation:null,
     bufferOwnership:allocation.bufferSlots,mappedBufferBytes:0,unmappedBufferBytes:0,gpuReservation:allocation.gpuPeak,atlasPages:pages};};
   load('US','field',2);load('CS','field',4);const first=sample({US:{field:2},CS:{field:4}});
@@ -200,7 +203,16 @@ assert.deepEqual(ordinaryBaselineErrors(report,expected),[]);readerChecks++;
 assert.deepEqual(defaultSurfaceHistoryErrors(lateRetainedObservation.states[0].retained),[]);
 const lateBad=structuredClone(report);lateBad.cases[0].observation=lateRetainedObservation;
 assert(ordinaryBaselineErrors(lateBad,expected).length);readerChecks+=2;
-const mutations=[r=>r.complete=false,r=>r.sha='f'.repeat(40),r=>r.inputs={},r=>r.cases.reverse(),r=>r.cases.pop(),
+const mutations=[r=>r.schema='ordinary-lookout-baselines-v1',
+  r=>delete r.cases[0].samples[0].retainedBufferInventory,
+  r=>r.cases[0].samples[0].retainedBackingBytes=8,
+  r=>r.cases[0].samples[0].retainedBufferInventory.coverage.complete=false,
+  r=>r.cases[0].samples[0].retainedBufferInventory.coverage.observedGroups.pop(),
+  r=>r.cases[0].samples[0].retainedBufferInventory.phase='close',
+  r=>r.cases[0].samples[0].retainedBufferInventory.views[0].owners=['invented'],
+  r=>{const s=r.cases[0].samples[0];s.retainedBufferInventory.backings[0].byteLength=8;s.retainedBufferInventory.retainedBackingBytes=8;s.retainedBackingBytes=8;},
+  r=>r.cases[0].samples[0].geometryArrayIds=[1],
+  r=>r.complete=false,r=>r.sha='f'.repeat(40),r=>r.inputs={},r=>r.cases.reverse(),r=>r.cases.pop(),
   r=>r.cases[0].errors.push('native failure'),r=>r.cases[0].warnings.push('warning'),r=>r.cases[0].rawAfter+='changed',r=>r.cases[0].applied+='changed',
   r=>r.cases[0].terrain[0].bytes++,r=>r.cases[0].genuineAstc=false,r=>r.cases[0].maskRestoration.restored=false,
   r=>r.cases[1].maskRestoration.masked=0,r=>r.cases[0].observation.restored=true,r=>r.cases[0].observation.receipts[0].target=false,
@@ -230,4 +242,70 @@ for(const mutate of mutations){const bad=structuredClone(report);mutate(bad);ass
 const actual=ordinaryPilotExpected('d'.repeat(40));assert.equal(actual.inputs.phase.index,9);assert(actual.terrain.some(a=>a.owner.endsWith('/sourceVertices')));
 assert.equal(actual.textures.capable.filter(p=>p.side==='CS'&&p.tier==='close').length,10);
 assert.equal(actual.textures.unsupported.filter(p=>p.side==='CS'&&p.tier==='close').length,5);readerChecks+=4;
+
+// Independent shape oracle and browser collector traverse the same actual constructor owners separately.
+// The renderer boundary below is a CPU model; this does not admit native bytes or the resource budget.
+async function checkConstructedOwners(field,expectedShapes){
+  const assert=(await import('node:assert/strict')).default,
+    {sampleSceneAllocations,collectRetainedBufferRows,inventoryRetainedBuffers,retainedBufferInventoryErrors,RETAINED_BUFFER_GROUPS}=await import('./tools/bake/scene-allocation.mjs'),
+    {retainedFigureGeometryArrays,figureGeometry}=await import('./src/units/soldier-mesh.js');
+  let labels=0,rejectControls=0;const journal={observed:true,bufferSlots:[],byKind:{buffer:0},gpuPeak:0},context={},
+    observer={assertOwned(value){assert.equal(value,context);},peek(value){assert.equal(value,context);return journal;},labelBufferOwners(value){assert.equal(value,context);labels++;return[];}},
+    scope={__game:field,__allocation:observer,__sceneTerrainPartition:{retainedArrays:field.terrainRows},innerWidth:960,innerHeight:540,devicePixelRatio:1},
+    options={retainedContext:context,retainedBuffers:{phase:field.phase,figureTemplates:retainedFigureGeometryArrays()}};
+  const sampled=sampleSceneAllocations(scope,options),inventory=sampled.retainedBufferInventory;
+  assert.equal(inventory.coverage.complete,true);assert(labels>0);assert.equal(inventory.phase,field.phase);
+  assert.deepEqual(retainedBufferInventoryErrors(inventory,{requiredGroups:[...RETAINED_BUFFER_GROUPS],ownerShapes:expectedShapes,
+    geometryArrays:sampled.cpuArrays.filter(a=>sampled.geometryArrayIds.includes(a.id)),bufferOwnership:[]}),[]);
+  assert(inventory.retainedBackingBytes>sampled.cpuDeclaredArrayBytes);
+  assert(expectedShapes.filter(s=>s.owner.startsWith('figure-template/')).length===48);
+  for(const prefix of ['terrain.heights','terrain.normalPixels','terrain.noisePixels','texture/bones/','texture/flags/','world/parcels/delaunator/'])assert(expectedShapes.some(s=>s.owner.startsWith(prefix)));
+  for(const owner of ['terrain.heights','terrain.normalPixels','texture/bones/source/data','world/parcels/delaunay/points','figure-template/']){
+    const bad=structuredClone(inventory),view=bad.views.find(v=>v.owners.some(o=>o.startsWith(owner)));assert(view);
+    view.owners=view.owners.filter(o=>!o.startsWith(owner));
+    assert(retainedBufferInventoryErrors(bad,{requiredGroups:[...RETAINED_BUFFER_GROUPS],ownerShapes:expectedShapes}).length>0);rejectControls++;
+  }
+  const inactive=inventory.views.find(v=>v.owners.some(o=>o.startsWith('world/tree-template/'))&&!v.roles.includes('geometry'));assert(inactive);
+  const missingInactive=structuredClone(inventory);missingInactive.views.find(v=>v.id===inactive.id).owners=[];
+  assert(retainedBufferInventoryErrors(missingInactive,{requiredGroups:[...RETAINED_BUFFER_GROUPS],ownerShapes:expectedShapes}).length>0);rejectControls++;
+  const aliased=structuredClone(inventory),tree=aliased.views.find(v=>v.id===inactive.id),height=aliased.views.find(v=>v.owners.includes('terrain.heights')),
+    oldBacking=tree.backingId;
+  // Coherently collapse every alias of one retained tree backing into terrain storage.
+  for(const view of aliased.views)if(view.backingId===oldBacking)view.backingId=height.backingId;
+  aliased.backings=aliased.backings.filter(b=>b.id!==oldBacking);const ids=new Map(aliased.backings.map((b,i)=>[b.id,i+1]));
+  aliased.backings.forEach(b=>b.id=ids.get(b.id));aliased.views.forEach(v=>v.backingId=ids.get(v.backingId));
+  aliased.retainedBackingBytes=aliased.backings.reduce((n,b)=>n+b.byteLength,0);
+  assert(retainedBufferInventoryErrors(aliased,{requiredGroups:[...RETAINED_BUFFER_GROUPS],ownerShapes:expectedShapes}).length>0);rejectControls++;
+  const missingGroup=structuredClone(inventory);missingGroup.coverage.observedGroups.pop();
+  assert(retainedBufferInventoryErrors(missingGroup,{requiredGroups:[...RETAINED_BUFFER_GROUPS],ownerShapes:expectedShapes}).length>0);rejectControls++;
+  const rejectMutation=(object,key,value)=>{const descriptor=Object.getOwnPropertyDescriptor(object,key),before=labels;
+    try{Object.defineProperty(object,key,{value,writable:true,configurable:true,enumerable:descriptor?.enumerable??true});
+      const result=sampleSceneAllocations(scope,options);assert.equal(result.retainedBufferInventory.coverage.complete,false);assert.equal(labels,before);assert.doesNotThrow(()=>structuredClone(result));rejectControls++;
+    }finally{if(descriptor)Object.defineProperty(object,key,descriptor);else delete object[key];}};
+  let coercions=0;const hostile={valueOf(){coercions++;throw null;},[Symbol.toPrimitive](){coercions++;throw null;}};
+  rejectMutation(field.terrain,'grid',hostile);rejectMutation(field.world.parcels,'rn',hostile);
+  const pageCount={get length(){coercions++;throw null;}};rejectMutation(field.game.baked.atlases.US.layout.tiers.field,'pages',pageCount);
+  rejectMutation(field.game.baked.atlases.US.textures,'field',pageCount);
+  rejectMutation(field.world,'fenceField',null);
+  rejectMutation(field.game.impostors.US,'fallen',new Float32Array(field.game.impostors.US.fallen.length-1));
+  assert.equal(coercions,0);
+  const prototype=Object.getPrototypeOf(field.game.baked.atlases.US),descriptor=Object.getOwnPropertyDescriptor(prototype,'loadsSettled'),before=labels;
+  try{Object.defineProperty(prototype,'loadsSettled',{...descriptor,get(){coercions++;throw null;}});
+    const rejected=sampleSceneAllocations(scope,options);assert.equal(rejected.retainedBufferInventory.coverage.complete,false);assert.equal(coercions,0);assert.equal(labels,before);rejectControls++;
+  }finally{Object.defineProperty(prototype,'loadsSettled',descriptor);}
+  const firstTemplate=retainedFigureGeometryArrays()[0].owner.split('/')[1],split=firstTemplate.indexOf(':'),geometry=figureGeometry(Number(firstTemplate.slice(0,split)),firstTemplate.slice(split+1)),
+    position=Object.getOwnPropertyDescriptor(geometry.attributes,'position'),supplied=options.retainedBuffers.figureTemplates,labelsBeforeCache=labels;
+  try{delete options.retainedBuffers.figureTemplates;Object.defineProperty(geometry.attributes,'position',{configurable:true,get(){coercions++;throw null;}});
+    const rejected=sampleSceneAllocations(scope,options);assert.equal(rejected.retainedBufferInventory.coverage.complete,false);assert.equal(coercions,0);assert.equal(labels,labelsBeforeCache);rejectControls++;
+  }finally{Object.defineProperty(geometry.attributes,'position',position);options.retainedBuffers.figureTemplates=supplied;}
+  console.log(JSON.stringify({checkpoint:field.phase,sourceOwners:expectedShapes.length,views:inventory.views.length,bytes:inventory.retainedBackingBytes,geometry:sampled.geometryArrayIds.length,controls:rejectControls}));
+}
+
+for(const route of ['capable','unsupported']){
+  const output=execFileSync('node',['--input-type=module','-e','('+constructOrdinaryOwnerShapes.toString()+')('+checkConstructedOwners.toString()+').catch(error=>{console.error(error);process.exitCode=1;})'],
+    {cwd:new URL('..',import.meta.url),input:JSON.stringify({scenario:JSON.parse(actual.inputs.applied),route}),encoding:'utf8',maxBuffer:1000000,timeout:60000});
+  const rows=output.trim().split('\n').map(line=>JSON.parse(line));assert.deepEqual(rows.map(r=>r.checkpoint),['field','close']);
+  assert(rows.every(row=>row.sourceOwners===actual.retainedOwners[route][row.checkpoint].length&&row.controls===16));
+  console.log('SOURCE-OWNERS '+route+' '+output.trim());
+}
 console.log(`ORDINARY-PILOT CPU OK (source ${sourceChecks}, mask ${maskChecks}, frame ${frameChecks}, stability ${stabilityChecks}, progress ${progressChecks}, reader ${readerChecks}); native entry/budget UNRUN`);

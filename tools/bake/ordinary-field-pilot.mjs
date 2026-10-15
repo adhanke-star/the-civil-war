@@ -8,7 +8,7 @@ import {PNG} from 'pngjs';
 import {startServer,ROOT} from '../serve.mjs';
 import {ordinaryLookoutFixture,ordinaryCapacityContract} from '../resource-profile-fixture.mjs';
 import {readSceneTerrainContracts} from './scene-terrain-contract.mjs';
-import {AllocationLedger,mipSizes,ReservationPeak,installAllocationObserver,installFieldContextObserver,defaultSurfaceHistoryErrors} from './scene-allocation.mjs';
+import {AllocationLedger,mipSizes,ReservationPeak,installAllocationObserver,installFieldContextObserver,defaultSurfaceHistoryErrors,RETAINED_BUFFER_GROUPS,retainedBufferInventoryErrors} from './scene-allocation.mjs';
 import {AtlasLayout} from '../../src/units/impostor.js';
 import {pageMipBytes} from '../../src/units/atlas-compression.js';
 
@@ -160,7 +160,7 @@ export function readOrdinaryFrame(gl,{snapshot=ordinaryVisualSnapshot}={}){
 export function ordinaryBaselineErrors(report,expected){
   const errors=[];
   try{
-    requireTrue(report?.schema==='ordinary-lookout-baselines-v1'&&report.complete===true,'complete schema');
+    requireTrue(report?.schema==='ordinary-lookout-baselines-v2'&&report.complete===true,'complete schema');
     requireTrue(report.sha===expected.sha&&same(report.inputs,expected.inputs),'source/input binding');
     requireTrue(typeof expected.run==='string'&&/^[1-9][0-9]*$/.test(expected.run)&&expected.attempt==='1'
       &&report.run===expected.run&&report.attempt===expected.attempt,'exact original run/attempt');
@@ -204,7 +204,14 @@ export function ordinaryBaselineErrors(report,expected){
         const original=c.observation.states[0].retained;
         for(const key of ['nativeEvents','defaultEvents','signatures'])requireTrue(same(s.allocation[key],original[key].slice(0,s.allocation[key].length)),'checkpoint is exact original '+key+' prefix');
         requireTrue(Object.entries(s.allocation.calls).every(([key,n])=>n<=(original.calls[key]??-1)),'checkpoint calls are original prefix');
-        requireTrue(s.gpuReservation+s.cpuDeclaredArrayBytes<=250000000,'baseline conservative GPU peak plus actual CPU inventory');
+        requireTrue(!s.accountingFailure&&s.retainedBufferInventory?.phase===['field','close'][j],'explicit complete retained checkpoint');
+        const sourceOwners=expected.retainedOwners?.[c.route]?.[['field','close'][j]];
+        requireTrue(Array.isArray(sourceOwners)&&sourceOwners.length>0,'independent source owner expectations');
+        const geometryArrays=s.cpuArrays.filter(a=>a.owners.some(o=>!o.startsWith('terrain-')));
+        requireTrue(same(s.geometryArrayIds,geometryArrays.map(a=>a.id)),'original geometry views independent of submitted bindings');
+        requireTrue(retainedBufferInventoryErrors(s.retainedBufferInventory,{requiredGroups:[...RETAINED_BUFFER_GROUPS],ownerShapes:sourceOwners,geometryArrays,bufferOwnership:s.bufferOwnership}).length===0,'whole backing topology/source owner/geometry binding');
+        requireTrue(s.retainedBackingBytes===s.retainedBufferInventory.retainedBackingBytes&&Number.isSafeInteger(s.retainedBackingBytes),'explicit retained backing total');
+        requireTrue(s.gpuReservation+s.retainedBackingBytes<=250000000,'baseline conservative GPU peak plus retained application backings');
         const f=c.frames[j],bytes=Buffer.from(f.rgba,'base64');
         requireTrue(f.simTime===0&&f.paused===true&&Number.isSafeInteger(f.width)&&Number.isSafeInteger(f.height)
           &&f.width>0&&f.height>0&&f.width*f.height<=1048576&&bytes.length===f.width*f.height*4&&f.transportBytes===bytes.length,'complete original RGBA');
@@ -224,7 +231,7 @@ export function ordinaryBaselineErrors(report,expected){
         requireTrue(bytes.some((v,k)=>v!==bytes[k%4]),'nonuniform original RGBA');
       }
       const final=c.observation.states[0].retained,last=c.samples[1].allocation;
-      requireTrue(final.gpuPeak+Math.max(...c.samples.map(s=>s.cpuDeclaredArrayBytes))<=250000000,'final original peak plus maximum observed CPU inventory');
+      requireTrue(final.gpuPeak+Math.max(...c.samples.map(s=>s.retainedBackingBytes))<=250000000,'final original peak plus maximum observed CPU inventory');
       for(const key of ['nativeEvents','defaultEvents','signatures','bufferSlots','textureSlots','renderbufferSlots'])
         requireTrue(same(final[key],last[key]),'no unmeasured allocating/retiring tail after final checkpoint: '+key);
       requireTrue(same(c.frames[0].camera,c.frames[1].camera)&&same(c.frames[0].post,c.frames[1].post)
@@ -281,6 +288,108 @@ export function ordinaryBaselineErrors(report,expected){
   return errors;
 }
 
+
+/** Fresh-process source construction. This traversal is deliberately separate from the browser collector. */
+export async function constructOrdinaryOwnerShapes(observe=null){
+  const fs=await import('node:fs'),{gunzipSync}=await import('node:zlib'),THREE=await import('three'),
+    {Game}=await import('./src/game.js'),{LOOK}=await import('./src/ui/look.js'),
+    {TerrainData,EXAGGERATION,buildTerrainMesh,buildApron,partitionTerrain}=await import('./src/world/terrain.js'),
+    {buildTrees,buildBuildings,buildFences}=await import('./src/world/props.js'),{PLAN}=await import('./src/world/landscape.js'),
+    {planGround}=await import('./src/world/world.js'),{BakedAtlas,AtlasLayout}=await import('./src/units/impostor.js'),
+    {retainedFigureGeometryArrays}=await import('./src/units/soldier-mesh.js'),
+    {createAtlasAstcTexture}=await import('./src/units/atlas-compression.js');
+  const input=JSON.parse(fs.readFileSync(0,'utf8')),json=file=>JSON.parse(fs.readFileSync(file,'utf8'));
+  if(!['capable','unsupported'].includes(input.route))throw Error('source owner route');
+  const scenario=input.scenario,name=scenario.terrain,meta=json('assets/terrain/'+name+'.json'),
+    raw=gunzipSync(fs.readFileSync('assets/terrain/'+name+'.bin'),{maxOutputLength:meta.grid*meta.grid*2}),heights=new Float32Array(meta.grid*meta.grid);
+  for(let y=0;y<meta.grid;y++){let height=0;for(let x=0;x<meta.grid;x++){height+=raw.readInt16LE((y*meta.grid+x)*2);heights[y*meta.grid+x]=height*meta.heights.stepM*EXAGGERATION;}}
+  const terrain=new TerrainData(meta,heights),world=planGround(terrain,scenario),scene=new THREE.Scene(),
+    sun={direction:new THREE.Vector3(),color:new THREE.Color(),sky:new THREE.Color(),earth:new THREE.Color(),fog:new THREE.Color()},root=buildTerrainMesh(terrain,null,null,sun);
+  world.terrainMesh=root;scene.add(root);
+  const apron=buildApron(terrain,sun),trees=buildTrees(terrain,world.trees),buildings=buildBuildings(terrain,PLAN.sites),fences=buildFences(terrain,world.fences);
+  scene.add(apron,trees,buildings,fences);world.trees=trees;
+  const post={quad:new THREE.Mesh(new THREE.PlaneGeometry(2,2)),qScene:new THREE.Scene()};post.qScene.add(post.quad);
+  // Independently reveal the retained LOD alternatives through the actual CPU selector,
+  // rather than using the browser's private-owner accessor as the expected traversal.
+  const treeHi=trees.children.map(mesh=>mesh.geometry),camera=new THREE.PerspectiveCamera();
+  trees.userData.updateLod(camera,0,Infinity);const treeLo=trees.children.map(mesh=>mesh.geometry);
+  trees.userData.updateLod(camera,Infinity,Infinity);
+  const treeTemplates=[...new Set(treeHi.flatMap((hi,i)=>[hi,treeLo[i]]))];
+  const source=[root.geometry.attributes.position.array,root.geometry.attributes.uv.array,root.geometry.index.array],
+    terrainRows=[...source.map((array,i)=>({owner:'terrain-source/'+i,array})),...source.map((array,i)=>({owner:'terrain-oracle/'+i,array:array.slice()})),
+      ...partitionTerrain({position:source[0],uv:source[1],index:source[2]}).chunks.flatMap((chunk,i)=>Object.entries(chunk).map(([key,array])=>({owner:'terrain-chunk-'+i+'/'+key,array})))];
+  // Rigged constructor view suppresses asynchronous URL loads; all actual pools are still constructed.
+  // Only publication/image metadata is constructed here; no shipping renderer or entry proof is claimed.
+  let fetches=0;globalThis.fetch=()=>{fetches++;throw Error('source owner preflight attempted network');};
+  LOOK.figureStyle='rigged';const game=new Game({scene,terrain,scenario,world,effects:{volley(){},boom(){}}});
+  game.baked.state='ready';game.baked.atlases={};
+  const manifests={US:json('assets/figures/union-infantry/soldier.json'),CS:json('assets/figures/confederate-infantry/soldier.json')},
+    hybrid=json('assets/figures/confederate-infantry/soldier-hybrid.json'),
+    pages=(side,tier)=>tier.pages.map(page=>page.encoding==='astc4x4'
+      ?createAtlasAstcTexture(THREE,new Uint8Array(fs.readFileSync('assets/figures/'+(side==='US'?'union-infantry/':'confederate-infantry/')+page.file)),page)
+      :new THREE.Texture({width:page.w,height:page.h}));
+  for(const side of ['US','CS']){const atlas=new BakedAtlas(manifests[side]);atlas.textures.field=pages(side,atlas.layout.tiers.field);game.baked.atlases[side]=atlas;game.impostors[side].attach(atlas);}
+  const snapshot=()=>{
+    const shapes=[],backings=new Map(),labels=new Set();
+    const add=(array,owner,role)=>{if(!ArrayBuffer.isView(array)||labels.has(owner))throw Error('source duplicate or missing array '+owner);
+      labels.add(owner);if(!backings.has(array.buffer))backings.set(array.buffer,'source-backing/'+backings.size);
+      shapes.push({owner,type:array instanceof DataView?'DataView':array.constructor.name,byteOffset:array.byteOffset,byteLength:array.byteLength,
+        backing:backings.get(array.buffer),backingByteLength:array.buffer.byteLength,role});};
+    const mesh=(object,label)=>{
+      for(const [key,a]of Object.entries(object.geometry.attributes))add(a.isInterleavedBufferAttribute?a.data.array:a.array,label+'/geometry/'+key,'geometry');
+      if(object.geometry.index)add(object.geometry.index.array,label+'/geometry/index','geometry');
+      for(const [key,list]of Object.entries(object.geometry.morphAttributes))list.forEach((a,i)=>add(a.array,label+'/morph/'+key+'/'+i,'geometry'));
+      for(const key of ['instanceMatrix','instanceColor'])if(object[key])add(object[key].array,label+'/'+key,'geometry');
+    };
+    mesh(apron,'world/apron');mesh(buildings,'world/buildings');fences.children.forEach((child,i)=>mesh(child,'world/fences/'+i));
+    mesh(post.quad,'post/quad');
+    trees.children.forEach((child,i)=>{for(const key of ['instanceMatrix','instanceColor'])add(child[key].array,'world/trees/'+i+'/'+key,'geometry');});
+    treeTemplates.forEach((geometry,i)=>{for(const [key,a]of [...Object.entries(geometry.attributes),['index',geometry.index]].filter(([,a])=>a))
+      add(a.array,'world/tree-template/'+i+'/'+key,'template');});
+    add(terrain.heights,'terrain.heights','cpu-state');terrainRows.forEach(r=>add(r.array,r.owner,'oracle'));
+    for(const [key,name]of [['uNormal','normalPixels'],['uNoise','noisePixels']])add(root.material.uniforms[key].value.source.data.data,'terrain.'+name,'texture-payload');
+    const bones=game.pools.US.material.userData.uniforms.uBones.value;
+    add(bones.source.data.data,'texture/bones/source/data','texture-payload');
+    const colours=[];scene.traverse(o=>{if(o.name==='colours')colours.push(o);});if(colours.length!==1)throw Error('source flag owner');
+    add(colours[0].material.map.source.data.data,'texture/flags/source/data','texture-payload');mesh(colours[0],'flags');
+    for(const side of ['US','CS']){
+      const standing=game.pools[side],fallen=game.fallen[side],sprites=game.impostors[side],atlas=game.baked.atlases[side];
+      standing.buckets.forEach((bucket,i)=>{mesh(bucket.mesh,'pools/'+side+'/'+i);if(bucket.outline)mesh(bucket.outline,'pools/'+side+'/'+i+'/outline');});mesh(fallen.mesh,'fallen/'+side);
+      for(const key of ['fallen','poses','looks'])add(sprites[key],'impostors/'+side+'/'+key,'cpu-state');
+      for(const key of ['bakeable','born','baseY'])add(fallen[key],'fallen/'+side+'/'+key,'cpu-state');
+      for(const [tier,batches]of Object.entries(sprites.batches))batches.forEach((batch,i)=>{const label='impostors/'+side+'/'+tier+'/'+i;
+        add(batch.data,label+'/data','geometry');mesh(batch.body,label+'/body');mesh(batch.soft,label+'/soft');});
+      add(atlas.layout.slotClip,'atlas/'+side+'/slotClip','cpu-state');
+      for(const [tier,layout]of Object.entries(atlas.layout.tiers))for(const key of ['rects','dirTable'])add(layout[key],'atlas/'+side+'/'+tier+'/'+key,'cpu-state');
+      for(const [tier,textures]of Object.entries(atlas.textures))textures.forEach((texture,i)=>{if(texture.isCompressedTexture)
+        texture.mipmaps.forEach((mip,k)=>add(mip.data,'atlas/'+side+'/'+tier+'/'+i+'/mip/'+k,'texture-payload'));});
+    }
+    for(const name of ['roadField','streamField','fenceField'])add(world[name].d,'world/'+name+'/d','cpu-state');
+    const parcels=world.parcels;add(parcels.P,'world/parcels/P','cpu-state');add(parcels.reg,'world/parcels/reg','cpu-state');
+    parcels.nbrs.forEach((array,i)=>add(array,'world/parcels/nbrs/'+i,'cpu-state'));
+    // Independently enumerate the actual pinned library owners; an added array changes this contract.
+    for(const [key,array]of Object.entries(parcels.delaunay))if(ArrayBuffer.isView(array))add(array,'world/parcels/delaunay/'+key,'cpu-state');
+    for(const [key,array]of Object.entries(parcels.delaunay._delaunator))if(ArrayBuffer.isView(array))add(array,'world/parcels/delaunator/'+key,'cpu-state');
+    for(const row of retainedFigureGeometryArrays())add(row.array,row.owner,'template');
+    return shapes;
+  };
+  try{const field=snapshot();
+    if(observe)await observe({scene,game,terrain,world,post,terrainRows,phase:'field'},field);
+    for(const side of ['US','CS']){const atlas=game.baked.atlases[side],tier=side==='CS'&&input.route==='capable'?new AtlasLayout(hybrid).tiers.close:atlas.layout.tiers.close;
+      atlas.publishTier('close',tier,pages(side,tier));}
+    if(fetches!==0)throw Error('source owner network calls');
+    const close=snapshot();if(observe)await observe({scene,game,terrain,world,post,terrainRows,phase:'close'},close);
+    return {kind:'source CPU constructors; rigged constructor view; constructed PNG image metadata; no native upload, decode, ticks or transient proof',field,close};
+  }finally{await game.closeFigureResources();root.geometry.dispose();root.material.dispose();}
+}
+
+export function ordinaryRetainedOwnerExpected(scenario){
+  const result={};for(const route of ['capable','unsupported'])result[route]=JSON.parse(execFileSync('node',
+    ['--input-type=module','-e','('+constructOrdinaryOwnerShapes.toString()+')().then(value=>console.log(JSON.stringify(value)))'],
+    {cwd:ROOT,input:JSON.stringify({scenario,route}),encoding:'utf8',maxBuffer:8000000,timeout:60000}));
+  return result;
+}
+
 export function ordinaryPilotExpected(sha,{run=null,attempt=null}={}){
   requireTrue(/^[a-f0-9]{40}$/.test(sha),'full source SHA');
   const json=file=>JSON.parse(fs.readFileSync(ROOT+'/'+file)),campaign=json('assets/campaign.json'),pack=json('assets/packs/chattanooga.json'),
@@ -313,7 +422,7 @@ export function ordinaryPilotExpected(sha,{run=null,attempt=null}={}){
   const inputs={kind:fixture.kind,settings:{viewport:[960,540],dpr:1,profile:'compact-v1',quality:'low',figures:'baked'},save:JSON.stringify(fixture.save),applied:JSON.stringify(fixture.applied),phase:fixture.phase,
     capacities,documentSha256:digest(fs.readFileSync(ROOT+'/index.html')),
     assets:[...files].sort().map(file=>{const bytes=fs.readFileSync(ROOT+'/'+file);requireTrue(bytes.length<99000000,'bounded committed source');return{file,bytes:bytes.length,sha256:digest(bytes)};})};
-  return {sha,run,attempt,inputs,textures,terrain};
+  return {sha,run,attempt,inputs,textures,terrain,retainedOwners:ordinaryRetainedOwnerExpected(fixture.applied)};
 }
 
 // Producer implementation follows the independently reviewed ordinary route, never the focused bootstrap.
@@ -322,7 +431,7 @@ export async function runOrdinaryLookoutBaselines(){
   requireTrue(process.env.GITHUB_SHA===execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim(),'exact checked-out SHA');
   const expected=ordinaryPilotExpected(process.env.GITHUB_SHA,{run:process.env.GITHUB_RUN_ID,attempt:process.env.GITHUB_RUN_ATTEMPT}),out=ROOT+'/.out/ordinary-lookout';
   fs.mkdirSync(out,{recursive:true});
-  const report={schema:'ordinary-lookout-baselines-v1',sha:expected.sha,run:process.env.GITHUB_RUN_ID,attempt:process.env.GITHUB_RUN_ATTEMPT,
+  const report={schema:'ordinary-lookout-baselines-v2',sha:expected.sha,run:process.env.GITHUB_RUN_ID,attempt:process.env.GITHUB_RUN_ATTEMPT,
     complete:false,inputs:expected.inputs,cases:[],limitations:['two normal routes only; remaining14 pilot cases/full110/stress/default adoption UNRUN',
       'checkpoint CPU inventory plus every-event GPU reservations; transient CPU construction and driver/decode memory unmeasured',
       'field-view readback plus explicit original US published-page hydration; automatic US close upload/close-view quality/zoom not proved']};
@@ -381,7 +490,7 @@ export async function runOrdinaryLookoutBaselines(){
         const checkpoint=()=>page.evaluate(async()=>{
           const {sampleSceneAllocations}=await import('./tools/bake/scene-allocation.mjs'),field=window.__game,gl=window.__fieldContextObservation.context(1);
           return sampleSceneAllocations({__game:field,__allocation:window.__allocation,__sceneTerrainPartition:{retainedArrays:field.resources.terrainArrays},
-            innerWidth,innerHeight,devicePixelRatio},{retainedContext:gl});
+            innerWidth,innerHeight,devicePixelRatio},{retainedContext:gl,retainedBuffers:{phase:field.game.baked.atlases.US.textures.close?'close':'field'}});
         });
         c.samples.push(await checkpoint());
         // Original shipping loader and pools; deliberate tier workload, no UI-zoom claim.

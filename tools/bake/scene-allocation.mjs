@@ -1,5 +1,38 @@
 // Diagnostic-only accounting of WebGL reservations. These are API bytes, not native driver measurements.
 import {deriveSceneStressContract} from './inactive-figures.mjs';
+import {BakedAtlas} from '../../src/units/impostor.js';
+import {retainedFigureGeometryArrays} from '../../src/units/soldier-mesh.js';
+import {retainedTreeGeometryArrays} from '../../src/world/props.js';
+
+const retainedAtlasPrototype=BakedAtlas.prototype,
+  retainedAtlasGetters=Object.fromEntries(['loadsSettled','cleanupFailure'].map(key=>[key,Object.getOwnPropertyDescriptor(retainedAtlasPrototype,key).get]));
+function retainedOwn(object,key,optional=false){
+  const d=object!=null&&Object.getOwnPropertyDescriptor(object,key);
+  if(!d){if(optional)return undefined;throw Error('missing '+key);}
+  if(!Object.hasOwn(d,'value'))throw Error('unexpected accessor '+key);return d.value;
+}
+function retainedSequence(value,limit=16384){
+  if(!Array.isArray(value))throw Error('expected owner sequence');
+  const length=retainedOwn(value,'length');
+  if(!Number.isSafeInteger(length)||length<0||length>limit)throw Error('owner sequence bound');
+  const result=[];for(let i=0;i<length;i++)result.push(retainedOwn(value,String(i)));return result;
+}
+function retainedEntries(object){
+  if(!object||typeof object!=='object')throw Error('missing owner object');
+  const descriptors=Object.getOwnPropertyDescriptors(object),keys=Object.keys(descriptors).filter(k=>descriptors[k].enumerable);
+  if(keys.length>4096)throw Error('owner property bound');
+  return keys.map(k=>{if(!Object.hasOwn(descriptors[k],'value'))throw Error('unexpected accessor '+k);return[k,descriptors[k].value];});
+}
+function retainedMessage(error){
+  try{const d=error!=null&&Object.getOwnPropertyDescriptor(error,'message');if(typeof d?.value==='string')return d.value.slice(0,1024);}catch{}
+  return 'invalid retained owner';
+}
+function retainedSceneObjects(root){
+  const pending=[root],seen=new Set(),objects=[];
+  while(pending.length){const object=pending.pop();if(!object||seen.has(object)||seen.size>=16384)throw Error('scene owner cycle or bound');
+    seen.add(object);objects.push(object);pending.push(...retainedSequence(retainedOwn(object,'children'),16384));}
+  return objects;
+}
 
 // Lost retirement can delete stale owned handles, but cannot complete or allocate.
 // Both inputs are read-only retained journals, never synthetic full scene samples.
@@ -238,8 +271,372 @@ export class AllocationLedger {
   }
 }
 
+/** Whole backing storage; view lengths explain aliases and never form the storage sum. */
+export function inventoryRetainedBuffers(rows,{requiredGroups=[],observedGroups=[],errors=[]}={}) {
+  const backings=new Map(),views=new Map(),issues=[];
+  const sequence=(value,limit,label)=>{try{return retainedSequence(value,limit);}catch(error){if(issues.length<32)issues.push(label+': '+retainedMessage(error));return [];}};
+  for(const e of sequence(errors,32,'coverage errors'))issues.push(typeof e==='string'?e.slice(0,1024):'invalid coverage error');
+  requiredGroups=sequence(requiredGroups,32,'required groups');observedGroups=sequence(observedGroups,32,'observed groups');
+  for(const groups of [requiredGroups,observedGroups])for(let i=0;i<groups.length;i++)if(typeof groups[i]!=='string'||!groups[i]||groups[i].length>128){groups[i]='invalid-group';if(issues.length<32)issues.push('invalid owner group');}
+  const issue=message=>{if(issues.length<32)issues.push(message.slice(0,1024));};
+  const typed=Object.getPrototypeOf(Uint8Array.prototype),get=(p,k,v)=>Object.getOwnPropertyDescriptor(p,k).get.call(v);
+  for(const row of sequence(rows,16384,'retained view row bound')){
+    let owner='unknown';
+    try{
+      const own=key=>{const d=Object.getOwnPropertyDescriptor(row,key);if(!d||!Object.hasOwn(d,'value'))throw Error('view data descriptor');return d.value;},
+        v=own('array'),label=own('owner'),role=own('role');owner=typeof label==='string'?label.slice(0,256):'unknown';
+      if(!ArrayBuffer.isView(v)||typeof label!=='string'||!label||label.length>512
+        ||!['geometry','texture-payload','cpu-state','oracle','template'].includes(role))throw Error('view owner/role');
+      const proto=v instanceof DataView?DataView.prototype:typed,
+        buffer=get(proto,'buffer',v),offset=get(proto,'byteOffset',v),length=get(proto,'byteLength',v),
+        bytes=get(ArrayBuffer.prototype,'byteLength',buffer),resize=Object.getOwnPropertyDescriptor(ArrayBuffer.prototype,'resizable');
+      if(resize?.get.call(buffer)||!Number.isSafeInteger(bytes)||!Number.isSafeInteger(offset)||!Number.isSafeInteger(length)
+        ||offset<0||length<0||offset+length>bytes)throw Error('unsupported backing/range');
+      new Uint8Array(buffer,0,0); // Detached buffers reject even when their reported length is zero.
+      if(!backings.has(buffer))backings.set(buffer,{id:backings.size+1,byteLength:bytes});
+      if(!views.has(v))views.set(v,{id:views.size+1,backingId:backings.get(buffer).id,
+        type:v instanceof DataView?'DataView':get(typed,Symbol.toStringTag,v),byteOffset:offset,byteLength:length,owners:new Set(),roles:new Set()});
+      const entry=views.get(v);entry.owners.add(label);entry.roles.add(role);
+    }catch(error){
+      let message='invalid retained view';try{const d=Object.getOwnPropertyDescriptor(error,'message');if(typeof d?.value==='string')message=d.value;}catch{}
+      issue('retained '+owner+': '+message);
+    }
+  }
+  if(!Array.isArray(requiredGroups)||!Array.isArray(observedGroups)||new Set(requiredGroups).size!==requiredGroups.length
+    ||new Set(observedGroups).size!==observedGroups.length||requiredGroups.some(g=>typeof g!=='string'||!g||!observedGroups.includes(g)))issue('missing required owner group');
+  const retainedBackingBytes=[...backings.values()].reduce((n,b)=>n+b.byteLength,0);
+  if(!Number.isSafeInteger(retainedBackingBytes))issue('unsafe retained total');
+  return {version:2,kind:'explicit retained application buffer owners; not whole heap or transient coverage',
+    coverage:{requiredGroups:Array.isArray(requiredGroups)?[...requiredGroups]:[],observedGroups:Array.isArray(observedGroups)?[...observedGroups]:[],complete:issues.length===0,errors:issues},
+    backings:[...backings.values()],views:[...views.values()].map(v=>({...v,owners:[...v.owners],roles:[...v.roles]})),retainedBackingBytes};
+}
+
+/** Independent serialized arithmetic and geometry-view binding; no application or GL access. */
+export function retainedBufferInventoryErrors(r,{requiredGroups,ownerShapes,geometryArrays,bufferOwnership}={}) {
+  const errors=[];const must=(ok,message)=>{if(!ok)throw Error(message);};
+  try{
+    must(r?.version===2&&r.coverage?.complete===true&&r.coverage.errors?.length===0,'complete version2 inventory');
+    must(Array.isArray(requiredGroups)&&JSON.stringify(r.coverage.requiredGroups)===JSON.stringify(requiredGroups)
+      &&Array.isArray(r.coverage.observedGroups)&&new Set(r.coverage.observedGroups).size===r.coverage.observedGroups.length
+      &&requiredGroups.every(g=>r.coverage.observedGroups.includes(g)),'required owner coverage');
+    must(Array.isArray(r.backings)&&r.backings.length<=16384&&Array.isArray(r.views)&&r.views.length<=16384,'inventory bounds');
+    let bytes=0;const backing=new Map(),owners=new Set(),anchoredViews=new Set();
+    for(const [i,b]of r.backings.entries()){
+      must(b.id===i+1&&Number.isSafeInteger(b.byteLength)&&b.byteLength>=0,'backing identity/bytes');backing.set(b.id,b.byteLength);bytes+=b.byteLength;
+    }
+    must(Number.isSafeInteger(bytes)&&bytes===r.retainedBackingBytes,'whole backing equation');
+    for(const [i,v]of r.views.entries()){
+      must(v.id===i+1&&backing.has(v.backingId)&&Number.isSafeInteger(v.byteOffset)&&v.byteOffset>=0
+        &&Number.isSafeInteger(v.byteLength)&&v.byteLength>=0&&v.byteOffset+v.byteLength<=backing.get(v.backingId),'view identity/range');
+      must(['Int8Array','Uint8Array','Uint8ClampedArray','Int16Array','Uint16Array','Int32Array','Uint32Array','Float32Array','Float64Array','BigInt64Array','BigUint64Array','DataView'].includes(v.type),'view storage type');
+      const elementBytes={Int8Array:1,Uint8Array:1,Uint8ClampedArray:1,Int16Array:2,Uint16Array:2,Int32Array:4,Uint32Array:4,Float32Array:4,Float64Array:8,BigInt64Array:8,BigUint64Array:8,DataView:1}[v.type];
+      must(v.byteOffset%elementBytes===0&&v.byteLength%elementBytes===0,'typed view alignment/length');
+      must(Array.isArray(v.owners)&&v.owners.length>0&&new Set(v.owners).size===v.owners.length
+        &&v.owners.every(o=>typeof o==='string'&&o&&o.length<=512),'view owner labels');
+      must(Array.isArray(v.roles)&&v.roles.length>0&&new Set(v.roles).size===v.roles.length
+        &&v.roles.every(x=>['geometry','texture-payload','cpu-state','oracle','template'].includes(x)),'view roles');
+      v.owners.forEach(o=>owners.add(o));
+    }
+    must(r.backings.every(b=>r.views.some(v=>v.backingId===b.id)),'no invented unused backing');
+    if(ownerShapes!==undefined){
+      must(Array.isArray(ownerShapes)&&ownerShapes.length<=16384&&new Set(ownerShapes.map(s=>s.owner)).size===ownerShapes.length,'source owner contract');
+      const forward=new Map(),reverse=new Map();
+      for(const shape of ownerShapes){
+        must(typeof shape.backing==='string'&&shape.backing&&Number.isSafeInteger(shape.backingByteLength)
+          &&shape.backingByteLength>=0&&Number.isSafeInteger(shape.byteOffset)&&shape.byteOffset>=0
+          &&['geometry','texture-payload','cpu-state','oracle','template'].includes(shape.role),'source backing contract');
+        const matches=r.views.filter(v=>v.owners.includes(shape.owner)&&v.type===shape.type&&v.byteLength===shape.byteLength
+          &&v.byteOffset===shape.byteOffset&&v.roles.includes(shape.role)&&backing.get(v.backingId)===shape.backingByteLength);
+        must(matches.length===1,'mandatory source owner '+shape.owner);const id=matches[0].backingId;
+        anchoredViews.add(matches[0].id);
+        must(!forward.has(shape.backing)||forward.get(shape.backing)===id,'source aliases share backing');
+        must(!reverse.has(id)||reverse.get(id)===shape.backing,'distinct source backings stay distinct');
+        forward.set(shape.backing,id);reverse.set(id,shape.backing);
+      }
+    }
+    if(geometryArrays!==undefined){
+      must(Array.isArray(geometryArrays)&&Array.isArray(bufferOwnership)&&Array.isArray(r.geometryBindings),'geometry bindings');
+      const geometry=r.views.filter(v=>v.roles.includes('geometry'));
+      must(r.geometryBindings.length===geometry.length&&geometry.length===geometryArrays.length
+        &&new Set(r.geometryBindings.map(g=>g.geometryArrayId)).size===geometryArrays.length
+        &&geometryArrays.every(a=>r.geometryBindings.some(g=>g.geometryArrayId===a.id)),'complete geometry bindings');
+      for(const [i,v]of geometry.entries()){
+        // Generic world/label/Post geometry has no DOM-independent shape oracle. Refuse
+        // cross-view storage sharing there rather than accepting an unproved byte discount.
+        // Shared storage is accepted only when the source owner contract anchors that view.
+        if(!anchoredViews.has(v.id))must(v.byteOffset===0&&v.byteLength===backing.get(v.backingId)
+          &&r.views.filter(other=>other.backingId===v.backingId).length===1,'unanchored geometry requires a distinct full backing');
+        const binding=r.geometryBindings[i],matching=geometryArrays.find(a=>a.id===binding.geometryArrayId);
+        must(binding.viewId===v.id&&matching?.bytes===v.byteLength&&matching.arrayType===v.type
+          &&matching.owners.every(o=>v.owners.includes(o)),'geometry view matches original CPU view');
+        must(Array.isArray(binding.nativeReservationIds)&&new Set(binding.nativeReservationIds).size===binding.nativeReservationIds.length
+          &&binding.nativeReservationIds.every(id=>bufferOwnership.some(b=>b.id===id&&b.bytes===v.byteLength
+            &&b.owners.some(o=>v.owners.includes(o)))),'native geometry owner binding');
+      }
+      must(bufferOwnership.every(b=>r.geometryBindings.some(g=>g.nativeReservationIds.includes(b.id))),'all native buffers have geometry views');
+    }
+  }catch(error){errors.push(error.message);}
+  return errors;
+}
+
+export const RETAINED_BUFFER_GROUPS=Object.freeze(['geometry','terrain','textures','atlases','pools','ground','templates']);
+
+/** Named application owners only. No arbitrary getter walk, upload, draw or application mutation. */
+export function collectRetainedBufferRows(field,{geometryRows,textures,terrainArrays,figureTemplates,phase}={}) {
+  const rows=[],observedGroups=[],errors=[],unmeasuredImages=[];
+  const own=retainedOwn,entries=retainedEntries,sequence=retainedSequence;
+  const add=(array,owner,role,type=null,length=null)=>{
+    if(!ArrayBuffer.isView(array)||type&&! (array instanceof type))throw Error('typed owner '+owner);
+    if(length!==null&&Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype),'length').get.call(array)!==length)throw Error('owner capacity '+owner);
+    if(rows.length>=16384)throw Error('retained owner row bound');rows.push({array,owner,role});
+  };
+  const group=(name,fn)=>{try{fn();observedGroups.push(name);}catch(error){
+    let message='invalid owner';try{const d=Object.getOwnPropertyDescriptor(error,'message');if(typeof d?.value==='string')message=d.value;}catch{}
+    if(errors.length<32)errors.push((name+': '+message).slice(0,1024));
+  }};
+  const image=(value,owner)=>{
+    if(ArrayBuffer.isView(value)){add(value,owner,'texture-payload');return;}
+    if(Array.isArray(value)){if(value.length>64)throw Error('texture image bound');sequence(value,64).forEach((v,i)=>image(v,owner+'/'+i));return;}
+    if(value&&typeof value==='object'){
+      const data=own(value,'data',true);
+      if(ArrayBuffer.isView(data)){add(data,owner+'/data','texture-payload');return;}
+    }
+    if(unmeasuredImages.length>=4096)throw Error('unmeasured image bound');
+    unmeasuredImages.push(owner);
+  };
+  const texture=(t,owner)=>{
+    if(own(t,'isTexture')!==true)throw Error('texture owner '+owner);
+    const compressed=own(t,'isCompressedTexture',true)===true;
+    if(!compressed)image(own(own(t,'source'),'data'),owner+'/source');
+    const mips=own(t,'mipmaps');if(!Array.isArray(mips)||mips.length>32)throw Error('texture mip bound');
+    for(const [i,mip]of sequence(mips,32).entries()){
+      if(compressed)add(own(mip,'data'),owner+'/mip/'+i,'texture-payload');
+      else image(mip,owner+'/mip/'+i);
+    }
+  };
+  const uniformTexture=(material,key,owner,userData=false)=>{
+    const uniforms=userData?own(own(material,'userData'),'uniforms'):own(material,'uniforms');
+    const t=own(own(uniforms,key),'value');texture(t,owner);return t;
+  };
+  const geometryAttribute=(a,label)=>{
+    const data=own(a,'isInterleavedBufferAttribute',true)===true?own(own(a,'data'),'array'):own(a,'array');
+    if(!sequence(geometryRows).some(r=>own(r,'array')===data))throw Error('owned mesh absent from scene/Post inventory '+label);
+    add(data,label,'geometry');
+  };
+  const mesh=(m,owner)=>{
+    const g=own(m,'geometry'),attributes=entries(own(g,'attributes'));
+    if(!attributes.length)throw Error('missing owned geometry '+owner);
+    const attribute=geometryAttribute;
+    for(const [key,a]of attributes)attribute(a,owner+'/geometry/'+key);
+    const index=own(g,'index');if(index)attribute(index,owner+'/geometry/index');
+    for(const [key,list]of entries(own(g,'morphAttributes')))for(const [i,a]of sequence(list).entries())attribute(a,owner+'/morph/'+key+'/'+i);
+    for(const key of ['instanceMatrix','instanceColor']){const a=own(m,key,true);if(a)attribute(a,owner+'/'+key);}
+  };
+  let game,world,terrain;
+  try{game=own(field,'game');world=own(field,'world');terrain=own(field,'terrain');}
+  catch{return {rows,requiredGroups:[...RETAINED_BUFFER_GROUPS],observedGroups,errors:['missing or accessor field roots'],unmeasuredImages,
+    unmeasured:['unread field owners','loader-private pending storage','construction/upload intervals','HTML image/canvas backing','third-party private heap','decoder and physical driver memory']};}
+  group('geometry',()=>{
+    if(!Array.isArray(geometryRows)||!geometryRows.length)throw Error('missing scene/Post geometry');
+    for(const r of sequence(geometryRows))add(own(r,'array'),own(r,'owner'),'geometry');
+  });
+  group('terrain',()=>{
+    const grid=own(terrain,'grid');if(!Number.isSafeInteger(grid)||grid<3||grid>2049)throw Error('terrain grid');
+    add(own(terrain,'heights'),'terrain.heights','cpu-state',Float32Array,grid*grid);
+    if(!Array.isArray(terrainArrays)||terrainArrays.length<6||terrainArrays.length>256)throw Error('missing terrain original/oracle owners');
+    for(const r of sequence(terrainArrays,256))add(own(r,'array'),own(r,'owner'),'oracle');
+  });
+  group('textures',()=>{
+    if(!Array.isArray(textures)||!textures.length||textures.length>4096)throw Error('missing referenced textures');
+    for(const [i,t]of sequence(textures,4096).entries())texture(t,'referenced-texture/'+i);
+    const material=own(own(world,'terrainMesh'),'material');
+    const normal=uniformTexture(material,'uNormal','texture/terrain-normal'),noise=uniformTexture(material,'uNoise','texture/terrain-noise');
+    const payload=t=>own(own(own(t,'source'),'data'),'data');
+    const grid=own(terrain,'grid');if(!Number.isSafeInteger(grid)||grid<3||grid>2049)throw Error('terrain texture grid');
+    add(payload(normal),'terrain.normalPixels','texture-payload',Uint8Array,grid*grid*4);
+    add(payload(noise),'terrain.noisePixels','texture-payload',Uint8Array,256*256*4);
+    uniformTexture(own(own(own(game,'pools'),'US'),'material'),'uBones','texture/bones',true);
+    const colours=[];for(const o of retainedSceneObjects(own(field,'scene')))if(own(o,'name',true)==='colours')colours.push(o);
+    if(colours.length!==1)throw Error('actual flag texture owner');
+    texture(own(own(colours[0],'material'),'map'),'texture/flags');
+    mesh(colours[0],'flags');
+  });
+  group('atlases',()=>{
+    if(!['field','close'].includes(phase))throw Error('declared settled checkpoint');
+    const baked=own(game,'baked');if(own(baked,'state')!=='ready')throw Error('published baked state');
+    const atlases=own(baked,'atlases');
+    for(const side of ['US','CS']){
+      const atlas=own(atlases,side);
+      // Identity-bound reviewed getters only; shadowing or prototype replacement rejects before invocation.
+      if(Object.getPrototypeOf(atlas)!==retainedAtlasPrototype
+        ||['loadsSettled','cleanupFailure'].some(key=>Object.getOwnPropertyDescriptor(atlas,key)
+          ||Object.getOwnPropertyDescriptor(retainedAtlasPrototype,key)?.get!==retainedAtlasGetters[key])
+        ||retainedAtlasGetters.loadsSettled.call(atlas)!==true
+        ||own(retainedAtlasGetters.cleanupFailure.call(atlas),'failed')!==false
+        ||own(atlas,'disposed',true))throw Error('atlas load or cleanup pending');
+      const layout=own(atlas,'layout'),slots=own(layout,'slots'),directions=own(layout,'n'),clips=own(layout,'clipNames');
+      if(!Number.isSafeInteger(slots)||slots<1||!Number.isSafeInteger(directions)||directions<1||!Array.isArray(clips))throw Error('atlas lookup dimensions');
+      add(own(layout,'slotClip'),'atlas/'+side+'/slotClip','cpu-state',Uint8Array,slots);
+      for(const [tier,t]of entries(own(layout,'tiers'))){
+        if(!['field','close'].includes(tier))throw Error('unknown atlas tier');
+        const looks=own(t,'looks');if(!Array.isArray(looks)||!looks.length)throw Error('atlas looks');
+        add(own(t,'rects'),'atlas/'+side+'/'+tier+'/rects','cpu-state',Float32Array,looks.length*slots*directions*8);
+        add(own(t,'dirTable'),'atlas/'+side+'/'+tier+'/dirTable','cpu-state',Uint8Array,clips.length*directions*8);
+      }
+      const published=own(atlas,'textures'),tiers=phase==='field'?['field']:['field','close'];
+      if(entries(published).length!==tiers.length)throw Error('unexpected published tier');
+      for(const tier of tiers){
+        const pages=own(published,tier),metadata=own(own(layout,'tiers'),tier);
+        if(!Array.isArray(pages)||pages.length!==sequence(own(metadata,'pages'),64).length)throw Error('published page count');
+        for(const [i,t]of sequence(pages,64).entries())texture(t,'atlas/'+side+'/'+tier+'/'+i);
+      }
+      const pool=own(own(game,'impostors'),side);
+      if(own(pool,'atlas')!==atlas||own(pool,'layout')!==layout)throw Error('actual pool/atlas lookup identity');
+    }
+  });
+  group('pools',()=>{
+    for(const side of ['US','CS']){
+      const standing=own(own(game,'pools'),side),fallen=own(own(game,'fallen'),side),sprite=own(own(game,'impostors'),side),capacity=own(standing,'capacity');
+      if(!Number.isSafeInteger(capacity)||capacity<1||own(fallen,'capacity')!==capacity||own(sprite,'capacity')!==capacity)throw Error('source pool capacity');
+      const buckets=own(standing,'buckets');if(!Array.isArray(buckets)||buckets.length!==3)throw Error('all standing LOD owners');
+      for(const [i,b]of sequence(buckets,3).entries()){
+        mesh(own(b,'mesh'),'pools/'+side+'/'+i);const outline=own(b,'outline');if(outline)mesh(outline,'pools/'+side+'/'+i+'/outline');
+      }
+      mesh(own(fallen,'mesh'),'fallen/'+side);
+      for(const [key,type,stride]of [['fallen',Float32Array,8],['poses',Uint32Array,0],['looks',Uint32Array,0]])
+        add(own(sprite,key),'impostors/'+side+'/'+key,'cpu-state',type,stride?capacity*stride:8);
+      for(const [key,type]of [['bakeable',Uint8Array],['born',Float32Array],['baseY',Float32Array]])add(own(fallen,key),'fallen/'+side+'/'+key,'cpu-state',type,capacity);
+      for(const [tier,batches]of entries(own(sprite,'batches'))){
+        if(!['field','close'].includes(tier)||!Array.isArray(batches))throw Error('sprite batch owners');
+        const published=own(own(own(own(game,'baked'),'atlases'),side),'textures'),pages=own(published,tier,true);
+        if(batches.length!==(pages===undefined?0:sequence(pages,64).length))throw Error('complete published sprite batches');
+        for(const [i,b]of sequence(batches,64).entries()){
+          add(own(b,'data'),'impostors/'+side+'/'+tier+'/'+i+'/data','geometry',Float32Array,capacity*12);
+          mesh(own(b,'body'),'impostors/'+side+'/'+tier+'/'+i+'/body');
+          mesh(own(b,'soft'),'impostors/'+side+'/'+tier+'/'+i+'/soft');
+        }
+      }
+    }
+  });
+  group('ground',()=>{
+    const objects=retainedSceneObjects(own(field,'scene'));
+    for(const name of ['apron','buildings','fences']){
+      const matches=objects.filter(o=>own(o,'name',true)===name);if(matches.length!==1)throw Error('world geometry owner '+name);
+      if(name==='fences')for(const [i,child]of sequence(own(matches[0],'children'),4096).entries())mesh(child,'world/fences/'+i);
+      else mesh(matches[0],'world/'+name);
+    }
+    const trees=own(world,'trees');
+    for(const [i,child]of sequence(own(trees,'children'),4096).entries())for(const key of ['instanceMatrix','instanceColor'])
+      geometryAttribute(own(child,key),'world/trees/'+i+'/'+key);
+    mesh(own(own(field,'post'),'quad'),'post/quad');
+    for(const key of ['roadField','streamField','fenceField']){
+      const f=own(world,key),n=own(f,'n');if(!Number.isSafeInteger(n)||n<1)throw Error('ground field grid');
+      add(own(f,'d'),'world/'+key+'/d','cpu-state',Float32Array,n*n);
+    }
+    const parcels=own(world,'parcels'),points=own(parcels,'P'),n=own(parcels,'rn'),neighbors=own(parcels,'nbrs');
+    if(!Number.isSafeInteger(n)||n<1||n>4096)throw Error('parcel region grid');
+    add(points,'world/parcels/P','cpu-state',Float64Array);
+    add(own(parcels,'reg'),'world/parcels/reg','cpu-state',Int16Array,n*n);
+    const pointCount=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype),'length').get.call(points);
+    if(!Array.isArray(neighbors)||neighbors.length!==pointCount/2||neighbors.length>4096)throw Error('parcel neighbor count');
+    sequence(neighbors,4096).forEach((v,i)=>add(v,'world/parcels/nbrs/'+i,'cpu-state',Int32Array));
+    const d=own(parcels,'delaunay');
+    for(const key of ['inedges','_hullIndex','points','halfedges','hull','triangles'])add(own(d,key),'world/parcels/delaunay/'+key,'cpu-state');
+    const collinear=own(d,'collinear',true);if(collinear!==undefined)add(collinear,'world/parcels/delaunay/collinear','cpu-state',Int32Array);
+    const internal=own(d,'_delaunator');
+    for(const key of ['coords','_triangles','_halfedges','_hullPrev','_hullNext','_hullTri','_hullHash','_ids','_dists','hull','triangles','halfedges'])
+      add(own(internal,key),'world/parcels/delaunator/'+key,'cpu-state');
+  });
+  group('templates',()=>{
+    if(!Array.isArray(figureTemplates)||!figureTemplates.length||figureTemplates.length>256)throw Error('missing existing figure templates');
+    for(const r of sequence(figureTemplates,256))add(own(r,'array'),own(r,'owner'),'template');
+    for(const r of retainedTreeGeometryArrays(own(world,'trees')))add(own(r,'array'),own(r,'owner'),'template');
+  });
+  return {rows,requiredGroups:[...RETAINED_BUFFER_GROUPS],observedGroups,errors,unmeasuredImages,
+    unmeasured:['loader-private pending storage','construction/upload intervals','HTML image/canvas backing','third-party private heap','decoder and physical driver memory']};
+}
+
 /** Observe existing native reservations only. Never upload, draw, flush or finish here. */
-export function sampleSceneAllocations(scope=globalThis.window,{retainedContext=null}={}) {
+export function sampleSceneAllocations(scope=globalThis.window,{retainedContext=null,retainedBuffers=null}={}) {
+  if(retainedBuffers===null)return sampleLegacySceneAllocations(scope,{retainedContext});
+  try{return sampleRetainedSceneAllocations(scope,{retainedContext,retainedBuffers});}
+  catch(error){const message=retainedMessage(error);return {accountingFailure:message,
+    retainedBufferInventory:inventoryRetainedBuffers([],{requiredGroups:[...RETAINED_BUFFER_GROUPS],errors:[message]})};}
+}
+
+function sampleRetainedSceneAllocations(scope,{retainedContext,retainedBuffers}) {
+  const own=retainedOwn,entries=retainedEntries,sequence=retainedSequence,values=o=>entries(o).map(([,v])=>v),
+    field=own(scope,'__game'),scene=own(field,'scene'),post=own(field,'post'),game=own(field,'game'),
+    phase=own(retainedBuffers,'phase'),figureTemplates=own(retainedBuffers,'figureTemplates',true)??retainedFigureGeometryArrays(),
+    partition=own(scope,'__sceneTerrainPartition'),terrainArrays=sequence(own(partition,'retainedArrays'),256);
+  if(!['field','close'].includes(phase)||retainedContext===null)throw Error('allocation: explicit settled checkpoint and retained context required');
+  const arrays=new Map(),textures=new Set(),owners=new Map(),typed=Object.getPrototypeOf(Uint8Array.prototype),
+    byteLength=a=>Object.getOwnPropertyDescriptor(a instanceof DataView?DataView.prototype:typed,'byteLength').get.call(a),
+    arrayType=a=>a instanceof DataView?'DataView':Object.getOwnPropertyDescriptor(typed,Symbol.toStringTag).get.call(a);
+  let declaredArrayBytes=0;
+  for(const key of ['pools','fallen','impostors'])for(const [side,pool]of entries(own(game,key)))
+    owners.set(own(pool,key==='fallen'?'mesh':'group'),key+'.'+side);
+  const array=(a,owner)=>{if(a!=null){if(!ArrayBuffer.isView(a))throw Error('allocation: typed geometry owner');
+    if(typeof owner!=='string'||!owner||owner.length>512)throw Error('allocation: bounded owner label');
+    if(!arrays.has(a)){if(arrays.size>=16384)throw Error('allocation: geometry view bound');
+      arrays.set(a,new Set());declaredArrayBytes+=byteLength(a);if(!Number.isSafeInteger(declaredArrayBytes))throw Error('allocation: unsafe CPU sum');}arrays.get(a).add(owner);}};
+  const attribute=(a,owner)=>{if(a!=null)array(own(a,'isInterleavedBufferAttribute',true)===true?own(own(a,'data'),'array'):own(a,'array'),owner);};
+  const texture=x=>{if(Array.isArray(x)){sequence(x,4096).forEach(texture);return;}
+    if(x&&typeof x==='object'&&own(x,'isTexture',true)===true)textures.add(x);};
+  for(const root of [scene,own(post,'qScene',true)].filter(Boolean))for(const o of retainedSceneObjects(root)){
+    let ancestor=o,owner;const seen=new Set();
+    while(ancestor&&!owner){if(seen.has(ancestor)||seen.size>16384)throw Error('allocation: ancestor cycle');seen.add(ancestor);
+      owner=owners.get(ancestor);ancestor=own(ancestor,'parent',true);}
+    const name=own(o,'name',true),type=own(o,'type',true);
+    if(name!==undefined&&typeof name!=='string'||type!==undefined&&typeof type!=='string')throw Error('allocation: object label');
+    owner=(owner||'scene')+'/'+(name||type||'Object')+(own(o,'visible',true)?'':'(hidden)');
+    const g=own(o,'geometry',true);if(g){for(const a of values(own(g,'attributes')))attribute(a,owner);
+      attribute(own(g,'index'),owner);for(const list of values(own(g,'morphAttributes')))for(const a of sequence(list))attribute(a,owner);}
+    attribute(own(o,'instanceMatrix',true),owner);attribute(own(o,'instanceColor',true),owner);
+    const material=own(o,'material',true);
+    for(const m of (Array.isArray(material)?sequence(material,64):[material]).filter(Boolean)){
+      values(m).forEach(texture);const uniforms=own(m,'uniforms',true);
+      if(uniforms)for(const u of values(uniforms))texture(own(u,'value'));
+    }
+  }
+  const atlases=own(own(game,'baked'),'atlases');
+  for(const atlas of values(atlases))for(const pages of values(own(atlas,'textures')))sequence(pages,64).forEach(texture);
+  const sceneArrayBytes=declaredArrayBytes,sceneArrays=new Set(arrays.keys());
+  for(const retained of terrainArrays){const a=own(retained,'array'),owner=own(retained,'owner');
+    if(!ArrayBuffer.isView(a)||typeof owner!=='string'||!owner)throw Error('allocation: invalid retained terrain array');array(a,owner);}
+  // Validate every named owner before calling even the read-only native owner-label boundary.
+  const geometryRows=[...sceneArrays].flatMap(array=>[...arrays.get(array)].map(owner=>({array,owner}))),
+    graph=collectRetainedBufferRows(field,{geometryRows,textures:[...textures],terrainArrays,figureTemplates,phase}),
+    inventory=inventoryRetainedBuffers(graph.rows,graph);
+  inventory.phase=phase;inventory.unmeasured=graph.unmeasured;inventory.unmeasuredImages=graph.unmeasuredImages;
+  if(!inventory.coverage.complete)return {retainedBufferInventory:inventory,accountingFailure:'incomplete retained owner graph'};
+  const observer=own(scope,'__allocation'),gl=retainedContext;
+  own(observer,'assertOwned').call(observer,gl);
+  if(own(own(observer,'peek').call(observer,gl),'observed')!==true)throw Error('allocation: registered retained context required');
+  const nativeGeometry=new Map(),unuploaded=[];
+  for(const [a,labels]of arrays){const records=sceneArrays.has(a)?own(observer,'labelBufferOwners').call(observer,gl,a,[...labels]):[];
+    if(sceneArrays.has(a))nativeGeometry.set(a,records);
+    if(!records.length)unuploaded.push({bytes:byteLength(a),owners:[...labels]});}
+  const allocation=own(observer,'peek').call(observer,gl),bufferOwnership=allocation.bufferSlots;
+  if(allocation.observed!==true)throw Error('allocation: registered retained context required');
+  const mappedBufferBytes=bufferOwnership.filter(r=>r.owners.length).reduce((n,r)=>n+r.bytes,0),
+    references=[...new Set(graph.rows.map(r=>r.array))],legacyIds=new Map([...arrays.keys()].map((a,i)=>[a,i+1]));
+  inventory.geometryBindings=[];
+  for(const v of inventory.views.filter(v=>v.roles.includes('geometry'))){const a=references[v.id-1];
+    if(!sceneArrays.has(a))throw Error('geometry owner missing original scene view');
+    inventory.geometryBindings.push({viewId:v.id,geometryArrayId:legacyIds.get(a),nativeReservationIds:nativeGeometry.get(a).map(r=>r.id)});}
+  const cpuArrays=[...arrays].map(([a,labels],i)=>({id:i+1,arrayType:arrayType(a),bytes:byteLength(a),owners:[...labels]}));
+  return {allocation,declaredArrayBytes,retainedTerrainArrayBytes:declaredArrayBytes-sceneArrayBytes,textureObjects:textures.size,glError:null,
+    retainedBufferInventory:inventory,retainedBackingBytes:inventory.retainedBackingBytes,cpuArrays,
+    geometryArrayIds:[...sceneArrays].map(a=>legacyIds.get(a)),bufferOwnership,mappedBufferBytes,
+    unmappedBufferBytes:allocation.byKind.buffer-mappedBufferBytes,unuploadedArrays:unuploaded,conservativeReservation:null,
+    gpuReservation:allocation.gpuPeak,cpuDeclaredArrayBytes:declaredArrayBytes,
+    accounting:'GPU: synchronized API reservations, pending deletes and same-time default surfaces. Explicit retained application backing storage separate; driver, private heap and transient memory unmeasured.',
+    atlasPages:Object.fromEntries(entries(atlases).map(([side,a])=>[side,Object.fromEntries(entries(own(a,'textures')).map(([tier,t])=>[tier,sequence(t,64).length]))])),
+    lens:!!own(post,'soldierView',true),viewport:[own(scope,'innerWidth'),own(scope,'innerHeight')],dpr:own(scope,'devicePixelRatio')};
+}
+
+function sampleLegacySceneAllocations(scope=globalThis.window,{retainedContext=null}={}) {
   const {scene,post,game}=scope.__game,arrays=new Map(),textures=new Set();let declaredArrayBytes=0;
   const owners=new Map();for(const key of ['pools','fallen','impostors'])for(const [side,pool]of Object.entries(game[key]||{}))owners.set(pool.mesh,`${key}.${side}`);
   const array=(a,owner)=>{if(a){if(!arrays.has(a)){arrays.set(a,new Set());declaredArrayBytes+=a.byteLength;}arrays.get(a).add(owner);}};
