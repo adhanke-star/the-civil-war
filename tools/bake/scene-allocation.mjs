@@ -131,6 +131,87 @@ export function defaultSurfaceHistoryErrors(retained){
   }catch(error){errors.push(error.message);}
   return errors;
 }
+// This checks retained graphics evidence only. Native event ordering and game/audio/reload proof remain separate.
+export function fieldEpochObservationErrors(observation){
+  const errors=[],fail=message=>{throw Error('field epoch history: '+message);};
+  try{
+    const rows=observation?.epochs,natural=n=>Number.isSafeInteger(n)&&n>=0;
+    if(observation?.enabled!==true||observation.epochCapture!==true||observation.overflow!==false||observation.restored!==false
+      ||observation.observerFailureCount!==0||!Array.isArray(observation.observerErrors)||observation.observerErrors.length
+      ||!Array.isArray(rows)||rows.length!==2||!Array.isArray(observation.states))fail('incomplete observation');
+    for(const [i,row]of rows.entries())if(row.sequence!==i+1||row.event!==['webglcontextlost','webglcontextrestored'][i]
+      ||row.trusted!==true||row.phase!==1||row.windowTarget!==true||row.targetBound!==true||row.connected!==true
+      ||row.documentOwned!==true||!Number.isSafeInteger(row.context)||row.context<1||row.context!==rows[0].context
+      ||row.retained?.context!==row.context)fail('event identity/order');
+    const matches=observation.states.filter(s=>s.id===rows[0].context);
+    if(matches.length!==1)fail('missing context state');
+    const after=matches[0].retained,native=after?.nativeEvents;
+    if(after?.observed!==true||after.nativeFailureCapture!==true||after.defaultSurfaceCapture!==true||after.surfaceRegistered!==true
+      ||!Array.isArray(native)||native.length>16384||!Array.isArray(after.defaultEvents)||after.observerFailureCount!==0
+      ||!Array.isArray(after.nativeFailures)||after.nativeFailures.length>128||after.nativeFailures.length!==after.nativeFailureCount
+      ||JSON.stringify(after.epochUploadMethods)!==JSON.stringify(['bufferSubData','texSubImage2D','texSubImage3D']))fail('missing retained journal/upload coverage');
+    sceneNativeReplay(native)(native.length,after);
+    const allowedUnknown=new Set(['default surface loss/restoration epoch unproved','default surface unavailable during loss']);
+    const scalar=['bytes','peak','pendingDeleteBytes','gpuCurrent','gpuPeak','defaultFramebuffer','pendingDefaultFramebuffer','nativeFailureCount','observerFailureCount'];
+    const snapshots=[...rows.map(r=>r.retained),{...after,nativeEventsEnd:native.length,surfaceEventsEnd:after.defaultEvents.length,
+      setterAttempts:observation.setterAttempts,setterCompletions:observation.setterCompletions}];
+    let previousEnd=0,previousSurfaces=0;
+    for(const s of snapshots){
+      if(scalar.some(k=>!natural(s[k]))||s.observerFailureCount!==0||!s.calls||typeof s.calls!=='object'||Array.isArray(s.calls)
+        ||Object.keys(s.calls).length>64||Object.keys(s.calls).some(k=>k.length>128)||!Object.values(s.calls).every(natural)||!natural(s.nativeEventsEnd)
+        ||s.nativeEventsEnd<previousEnd||s.nativeEventsEnd>native.length||!natural(s.surfaceEventsEnd)
+        ||s.surfaceEventsEnd<previousSurfaces||s.surfaceEventsEnd>after.defaultEvents.length
+        ||!natural(s.setterAttempts)||!natural(s.setterCompletions)||s.setterCompletions>s.setterAttempts
+        ||!Array.isArray(s.unknown)||s.unknown.length>128||s.unknown.some(u=>!allowedUnknown.has(u)))fail('projection shape/unknown');
+      const last=native[s.nativeEventsEnd-1],total=Object.values(s.calls).reduce((n,c)=>n+c,0);
+      if(!natural(total)||(last?.callOrdinal||0)>total||s.bytes!==(last?.current||0)||s.peak!==(last?.peak||0))fail('projection raw prefix');
+      previousEnd=s.nativeEventsEnd;previousSurfaces=s.surfaceEventsEnd;
+    }
+    const baseline=snapshots[0],forbidden=['drawArrays','drawElements','drawArraysInstanced','drawElementsInstanced',
+      'createVertexArray','bufferData','bufferSubData','texSubImage2D','texSubImage3D','texImage2D','texImage3D','compressedTexImage2D','compressedTexImage3D',
+      'texStorage2D','texStorage3D','compressedTexSubImage2D','compressedTexSubImage3D','generateMipmap',
+      'renderbufferStorage','renderbufferStorageMultisample','finish'];
+    for(const s of snapshots.slice(1)){
+      if(forbidden.some(k=>(s.calls[k]||0)!==(baseline.calls[k]||0))||s.nativeFailureCount!==baseline.nativeFailureCount
+        ||s.setterAttempts!==baseline.setterAttempts||s.setterCompletions!==baseline.setterCompletions
+        ||s.surfaceEventsEnd!==baseline.surfaceEventsEnd||s.gpuPeak!==baseline.gpuPeak||s.gpuCurrent!==baseline.gpuCurrent
+        ||s.defaultFramebuffer!==baseline.defaultFramebuffer||s.pendingDefaultFramebuffer!==baseline.pendingDefaultFramebuffer)
+        fail('post-loss graphics activity');
+      for(const key of new Set([...Object.keys(baseline.calls),...Object.keys(s.calls)]))if((s.calls[key]||0)<(baseline.calls[key]||0))fail('counter reset');
+    }
+    if(native.slice(baseline.nativeEventsEnd).some(e=>e.operation!=='retire'))fail('post-loss native allocation/completion');
+    const lastSurface=after.defaultEvents[baseline.surfaceEventsEnd-1],cut=lastSurface?.nativeEventsEnd;
+    if(!natural(cut)||cut>baseline.nativeEventsEnd||native.slice(cut).some(e=>e.operation!=='retire'))fail('pre-loss surface prefix missing');
+    for(const s of snapshots)if(['gpuCurrent','gpuPeak','defaultFramebuffer','pendingDefaultFramebuffer'].some((k,i)=>
+      s[k]!==lastSurface[['current','peak','framebuffer','pending'][i]]))fail('projection not bound to surface prefix');
+    const resources=new Map();
+    for(const e of native.slice(0,cut)){
+      const key=e.kind+'/'+e.id;
+      if(e.operation==='reserve'){
+        if(!resources.has(key))resources.set(key,{kind:e.kind,id:e.id,slots:new Map(),pending:false});
+        resources.get(key).slots.set(String(e.slot),e.bytes);
+      }else if(e.operation==='retire')resources.get(key).pending=true;
+      else if(e.operation==='release')resources.delete(key);
+    }
+    const slots={bufferSlots:[],textureSlots:[],renderbufferSlots:[]},byKind={buffer:0,texture:0,renderbuffer:0};let pendingDeleteBytes=0;
+    for(const r of resources.values()){
+      const bytes=[...r.slots.values()].reduce((n,v)=>n+v,0);byKind[r.kind]+=bytes;if(r.pending)pendingDeleteBytes+=bytes;
+      slots[r.kind==='buffer'?'bufferSlots':r.kind==='texture'?'textureSlots':'renderbufferSlots'].push(r.kind==='texture'?
+        {texture:r.id,slots:Object.fromEntries(r.slots),pendingDelete:r.pending}:{id:r.id,bytes,pendingDelete:r.pending});
+    }
+    // Only the two explicit loss-status markers are excluded from this earlier, complete live prefix.
+    // The retire-only tail is verified above; no samples or completion fences are invented.
+    const prefix={...after,...slots,byKind,pendingDeleteBytes,objects:resources.size,calls:baseline.calls,unknown:[],
+      nativeEvents:native.slice(0,cut),defaultEvents:after.defaultEvents.slice(0,baseline.surfaceEventsEnd),
+      bytes:native[cut-1]?.current||0,peak:native[cut-1]?.peak||0,
+      signatures:after.signatures.filter(s=>s.callOrdinal<=lastSurface.nativeCallOrdinal),
+      nativeFailureCount:baseline.nativeFailureCount,nativeFailures:after.nativeFailures.slice(0,baseline.nativeFailureCount),
+      gpuCurrent:baseline.gpuCurrent,gpuPeak:baseline.gpuPeak,defaultFramebuffer:baseline.defaultFramebuffer,
+      pendingDefaultFramebuffer:baseline.pendingDefaultFramebuffer,sampledDimensions:`${lastSurface.width}:${lastSurface.height}`};
+    if(defaultSurfaceHistoryErrors(prefix).length)fail('invalid complete pre-loss surface history');
+  }catch(error){errors.push(error.message);}
+  return errors;
+}
 export function mipSizes(w,h,bpp,levels=Math.floor(Math.log2(Math.max(w,h)))+1) {
   if(![w,h,bpp,levels].every(Number.isSafeInteger)||w<1||h<1||bpp<1||levels<1||levels>32)throw new Error('allocation: invalid mip dimensions');
   const out=[];for(let i=0;i<levels;i++){out.push({w,h,bytes:w*h*bpp});w=Math.max(1,w>>1);h=Math.max(1,h>>1);}return out;
@@ -1024,9 +1105,10 @@ function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) 
 
 /** Installed only in an owned diagnostic context before game boot. No product code or GL arguments changed. */
 /** Acquisition is query-free by default; optional surface capture reads live dimensions/attributes. */
-export function installFieldContextObserver({enabled=false,observeSurfaces=false}={}) {
-  if(typeof enabled!=='boolean'||typeof observeSurfaces!=='boolean')throw Error('field context observer: explicit boolean required');
+export function installFieldContextObserver({enabled=false,observeSurfaces=false,observeEpochs=false}={}) {
+  if([enabled,observeSurfaces,observeEpochs].some(v=>typeof v!=='boolean'))throw Error('field context observer: explicit boolean required');
   if(!enabled)return Object.freeze({read:()=>({enabled:false}),restore(){}});
+  if(observeEpochs&&!observeSurfaces)throw Error('field context observer: epochs require surface capture');
   const proto=globalThis.HTMLCanvasElement?.prototype,native=proto?.getContext;
   if(typeof native!=='function')throw Error('field context observer: canvas API unavailable');
   const original=Object.getOwnPropertyDescriptor(proto,'getContext'),prior=Object.getOwnPropertyDescriptor(window,'__fieldContextObservation'),
@@ -1034,7 +1116,11 @@ export function installFieldContextObserver({enabled=false,observeSurfaces=false
   if(!allocation||typeof allocation.peek!=='function')throw Error('field context observer: retained allocation observer required');
   if(prior&&!prior.configurable)throw Error('field context observer: observation property is not configurable');
   const receipts=[],contexts=new Map(),ids=new WeakMap(),errors=[],peek=allocation.peek,
-    surface=allocation.surfaceBoundary,surfaceFailure=allocation.surfaceFailure,canvasContexts=new WeakMap(),accessors=[],lossListeners=[],lostCanvases=new WeakSet();
+    surface=allocation.surfaceBoundary,surfaceFailure=allocation.surfaceFailure,canvasContexts=new WeakMap(),accessors=[],lossListeners=[],lostCanvases=new WeakSet(),
+    epochs=[],epochListeners=[],canvasRecords=new Map(),epochOptions=Object.freeze({capture:true,passive:true}),
+    addEpoch=window.addEventListener,removeEpoch=window.removeEventListener,allocationAssertion=allocation.assertOwned;
+  if(observeEpochs&&(typeof addEpoch!=='function'||typeof removeEpoch!=='function'))throw Error('field context observer: window events unavailable');
+  if(observeEpochs&&typeof allocationAssertion!=='function')throw Error('field context observer: allocation ownership assertion required');
   if(observeSurfaces){
     if(typeof surface!=='function'||typeof surfaceFailure!=='function'||allocation.defaultSurfaceCapture!==true)
       throw Error('field context observer: default surface capture required');
@@ -1046,7 +1132,8 @@ export function installFieldContextObserver({enabled=false,observeSurfaces=false
       accessors.push({name,descriptor,nativeDescriptor,restored:false,installed:null});
     }
   }
-  let failures=0,overflow=false,ignored=0,methodRestored=false,propertyRestored=false,installedDescriptor,installedProperty;
+  let failures=0,overflow=false,ignored=0,methodRestored=false,propertyRestored=false,installedDescriptor,installedProperty,
+    setterAttempts=0,setterCompletions=0;
   const metadata=error=>{
     const type=typeof error,primitive=error===null||['string','number','boolean','undefined'].includes(type);
     let unavailable=!primitive&&type!=='object';
@@ -1063,6 +1150,43 @@ export function installFieldContextObserver({enabled=false,observeSurfaces=false
     try{errors.push({kind:'observation failed',...metadata(error)});}
     catch{errors.push({kind:'observation failed; error metadata unavailable'});}
   }};
+  const assertFieldOwned=gl=>{
+    if(!matches(Object.getOwnPropertyDescriptor(proto,'getContext'),methodRestored?original:installedDescriptor)
+      ||!matches(Object.getOwnPropertyDescriptor(window,'__fieldContextObservation'),propertyRestored?prior:installedProperty)
+      ||accessors.some(a=>!matches(Object.getOwnPropertyDescriptor(proto,a.name),a.restored?a.descriptor:a.installed)))
+      throw Error('field observer descriptor ownership changed');
+    for(const [canvas,record]of canvasRecords)if(Object.getPrototypeOf(canvas)!==record.prototype
+      ||Object.keys(record.own).some(name=>!matches(Object.getOwnPropertyDescriptor(canvas,name),record.own[name])))
+      throw Error('field canvas instance ownership changed');
+    if(observeEpochs&&(allocation.assertOwned!==allocationAssertion||Reflect.apply(allocationAssertion,allocation,[gl])!==true))
+      throw Error('allocation wrapper ownership changed');
+  };
+  const epochProjection=gl=>{
+    assertFieldOwned(gl);
+    if(Object.getOwnPropertyDescriptor(window,'__allocation')?.value!==allocation||allocation.peek!==peek)throw Error('epoch allocation ownership changed');
+    const r=Reflect.apply(peek,allocation,[gl]),natural=n=>Number.isSafeInteger(n)&&n>=0;
+    const fields=['bytes','peak','pendingDeleteBytes','gpuCurrent','gpuPeak','defaultFramebuffer','pendingDefaultFramebuffer','nativeFailureCount','observerFailureCount'];
+    if(r?.observed!==true||fields.some(k=>!natural(r[k]))||!Array.isArray(r.nativeEvents)||!Array.isArray(r.defaultEvents)
+      ||!r.calls||typeof r.calls!=='object'||Array.isArray(r.calls)||Object.keys(r.calls).length>64||Object.keys(r.calls).some(k=>k.length>128)||!Object.values(r.calls).every(natural)
+      ||!Array.isArray(r.unknown)||r.unknown.length>128||r.unknown.some(v=>typeof v!=='string'||v.length>16384))
+      throw Error('epoch retained evidence unavailable');
+    return {context:ids.get(gl),...Object.fromEntries(fields.map(k=>[k,r[k]])),calls:{...r.calls},unknown:[...r.unknown],
+      nativeEventsEnd:r.nativeEvents.length,surfaceEventsEnd:r.defaultEvents.length,setterAttempts,setterCompletions};
+  };
+  const onEpoch=event=>observed(()=>{
+    const canvas=event.target,gl=canvasContexts.get(canvas);
+    try{
+      if(epochs.length>=8){overflow=true;return;}
+      const context=gl?ids.get(gl):null;
+      epochs.push({sequence:epochs.length+1,event:event.type,trusted:event.isTrusted===true,phase:event.eventPhase,
+        windowTarget:event.currentTarget===window,context,targetBound:!!context&&canvas===document.getElementById('battlefield'),
+        connected:canvas?.isConnected===true,documentOwned:canvas?.ownerDocument===document&&document.defaultView===window,
+        retained:gl?epochProjection(gl):null});
+    }finally{
+      if(event.type==='webglcontextlost'&&gl){lostCanvases.add(canvas);
+        Reflect.apply(surfaceFailure,allocation,[gl,'default surface loss/restoration epoch unproved',true]);}
+    }
+  });
   const observeSurface=(canvas,gl,boundary)=>observed(()=>{
     if(Object.getOwnPropertyDescriptor(window,'__allocation')?.value!==allocation||allocation.surfaceBoundary!==surface
       ||allocation.surfaceFailure!==surfaceFailure||accessors.some(a=>!matches(Object.getOwnPropertyDescriptor(proto,a.name),a.installed)))
@@ -1084,6 +1208,9 @@ export function installFieldContextObserver({enabled=false,observeSurfaces=false
         const id=contexts.size+1;ids.set(value,id);contexts.set(id,value);
         if(observeSurfaces){
           canvasContexts.set(receiver,value);
+          const own=Object.fromEntries(['getContext','width','height'].map(name=>[name,Object.getOwnPropertyDescriptor(receiver,name)]));
+          canvasRecords.set(receiver,{prototype:Object.getPrototypeOf(receiver),own});
+          if(observeEpochs&&Object.values(own).some(Boolean))throw Error('field canvas has unobserved own methods/accessors');
           const loss=()=>{lostCanvases.add(receiver);observed(()=>Reflect.apply(surfaceFailure,allocation,[value,'default surface loss/restoration epoch unproved',true]));};
           receiver.addEventListener('webglcontextlost',loss);lossListeners.push({canvas:receiver,loss});
           observeSurface(receiver,value,'creation');
@@ -1107,16 +1234,22 @@ export function installFieldContextObserver({enabled=false,observeSurfaces=false
     read(){
       const states=[];
       observed(()=>{
+        if(observeEpochs)assertFieldOwned();
         if(Object.getOwnPropertyDescriptor(window,'__allocation')?.value!==allocation||allocation.peek!==peek)throw Error('allocation ownership changed');
-        for(const[id,gl]of contexts)states.push({id,retained:Reflect.apply(peek,allocation,[gl])});
+        for(const[id,gl]of contexts){if(observeEpochs)assertFieldOwned(gl);states.push({id,retained:Reflect.apply(peek,allocation,[gl])});}
       });
       return {enabled:true,receipts:structuredClone(receipts),states,observerFailureCount:failures,
-        observerErrors:structuredClone(errors),overflow,ignored,restored:methodRestored&&propertyRestored&&accessors.every(a=>a.restored),
+        observerErrors:structuredClone(errors),overflow,ignored,restored:methodRestored&&propertyRestored&&accessors.every(a=>a.restored)&&epochListeners.every(l=>l.removed),
+        epochCapture:observeEpochs,epochs:structuredClone(epochs),setterAttempts,setterCompletions,
         coverage:observeSurfaces?'acquisition and synchronous native width/height setter boundaries only; other mutation and restoration paths unproved':
           'acquisition and retained records only; default-only startup and unsampled resize unproved'};
     },
     restore(){
       const failed=[];
+      for(const listener of epochListeners)if(!listener.removed){
+        try{Reflect.apply(removeEpoch,window,[listener.type,onEpoch,epochOptions]);listener.removed=true;}
+        catch{failed.push('epoch listener removal failed');}
+      }
       for(const {canvas,loss}of lossListeners)canvas.removeEventListener('webglcontextlost',loss);
       if(!methodRestored){
         if(!matches(Object.getOwnPropertyDescriptor(proto,'getContext'),installedDescriptor))failed.push('foreign canvas descriptor');
@@ -1139,25 +1272,39 @@ export function installFieldContextObserver({enabled=false,observeSurfaces=false
   try{
     for(const a of accessors){
       const set=function(value){const gl=canvasContexts.get(this);
+        if(gl)setterAttempts++;
         if(gl)observeSurface(this,gl,a.name+'-before');
         let result;
         try{result=Reflect.apply(a.nativeDescriptor.set,this,[value]);}catch(error){
           if(gl)observed(()=>Reflect.apply(surfaceFailure,allocation,[gl,'native canvas '+a.name+' setter threw']));
           throw error;
         }
-        if(gl)observeSurface(this,gl,a.name+'-after');return result;
+        if(gl){setterCompletions++;observeSurface(this,gl,a.name+'-after');}return result;
       };
       Object.defineProperty(proto,a.name,{get:a.nativeDescriptor.get,set,enumerable:a.nativeDescriptor.enumerable,configurable:true});
       a.installed=Object.getOwnPropertyDescriptor(proto,a.name);
     }
     Object.defineProperty(window,'__fieldContextObservation',{value:observer,writable:false,configurable:true});
-    installedProperty=Object.getOwnPropertyDescriptor(window,'__fieldContextObservation');}
-  catch(error){if(matches(Object.getOwnPropertyDescriptor(proto,'getContext'),installedDescriptor)){
+    installedProperty=Object.getOwnPropertyDescriptor(window,'__fieldContextObservation');
+    if(observeEpochs)for(const type of ['webglcontextlost','webglcontextrestored']){
+      epochListeners.push({type,removed:false});Reflect.apply(addEpoch,window,[type,onEpoch,epochOptions]);
+    }
+  }
+  catch(error){let cleanupError;
+    for(const listener of epochListeners)try{Reflect.apply(removeEpoch,window,[listener.type,onEpoch,epochOptions]);}
+    catch(e){cleanupError ||= e;}
+    if(installedProperty){
+      if(matches(Object.getOwnPropertyDescriptor(window,'__fieldContextObservation'),installedProperty)){
+        if(prior)Object.defineProperty(window,'__fieldContextObservation',prior);else delete window.__fieldContextObservation;
+      }else cleanupError ||= Error('foreign observation owner during installation cleanup');
+    }
+    if(matches(Object.getOwnPropertyDescriptor(proto,'getContext'),installedDescriptor)){
     if(original)Object.defineProperty(proto,'getContext',original);else delete proto.getContext;
   }
     for(const a of accessors)if(a.installed&&matches(Object.getOwnPropertyDescriptor(proto,a.name),a.installed)){
       if(a.descriptor)Object.defineProperty(proto,a.name,a.descriptor);else delete proto[a.name];
     }
+    if(cleanupError)throw new AggregateError([error,cleanupError],'field context observer installation cleanup failed');
     throw error;}
   return observer;
 }
@@ -1166,16 +1313,17 @@ export function installAllocationObserver(source) {
   if(source.captureDefaultSurfaces===true&&(source.nativeJournal!==true||source.captureNativeFailures!==true))
     throw Error('allocation: default surface capture requires native journal and failed-call capture');
   const Ledger=(0,eval)('('+source.ledger+')'),mips=(0,eval)('('+source.mips+')'),Peak=(0,eval)('('+source.reservationPeak+')');
-  const wrappers=[],prior=Object.getOwnPropertyDescriptor(window,'__allocation');let observer,installed=false,restored=false;
+  const wrappers=[],prior=Object.getOwnPropertyDescriptor(window,'__allocation');let observer,installed=false,restored=false,installedAllocationDescriptor;
+  const matches=(a,b)=>['value','get','set','writable','enumerable','configurable'].every(k=>a?.[k]===b?.[k]);
   const restore=()=>{
     if(restored)return;
     let failure;
-    for(const {proto,name,descriptor,wrapped}of [...wrappers].reverse()){
-      if(Object.getOwnPropertyDescriptor(proto,name)?.value!==wrapped){failure ||= new Error('allocation: wrapper ownership changed');continue;}
+    for(const {proto,name,descriptor,installedDescriptor}of [...wrappers].reverse()){
+      if(!matches(Object.getOwnPropertyDescriptor(proto,name),installedDescriptor)){failure ||= new Error('allocation: wrapper ownership changed');continue;}
       if(descriptor)Object.defineProperty(proto,name,descriptor);else delete proto[name];
     }
     if(installed){
-      if(Object.getOwnPropertyDescriptor(window,'__allocation')?.value!==observer)failure ||= new Error('allocation: observer ownership changed');
+      if(!matches(Object.getOwnPropertyDescriptor(window,'__allocation'),installedAllocationDescriptor))failure ||= new Error('allocation: observer ownership changed');
       else if(prior)Object.defineProperty(window,'__allocation',prior);else delete window.__allocation;
     }
     if(failure)throw failure;restored=true;
@@ -1295,10 +1443,11 @@ export function installAllocationObserver(source) {
       if(source.nativeJournal===true)s.nativeCallOrdinal=(s.nativeCallOrdinal||0)+1;
       try{if(observe)sample(this,s);after(this,args,value);if(observe)sample(this,s);}catch(error){unknown(s,`observer:${name}:${error.message}`);}finally{s.activeCall=priorCall;}return value;};
     Object.defineProperty(proto,name,{value:wrapped,writable:descriptor?.writable??true,enumerable:descriptor?.enumerable??true,configurable:descriptor?.configurable??true});
-    wrappers.push({proto,name,descriptor,wrapped});
+    wrappers.push({proto,name,descriptor,wrapped,installedDescriptor:Object.getOwnPropertyDescriptor(proto,name)});
   };
   try {for(const proto of [globalThis.WebGLRenderingContext?.prototype,globalThis.WebGL2RenderingContext?.prototype].filter(Boolean)) {
     for(const name of ['drawArrays','drawElements','drawArraysInstanced','drawElementsInstanced'])wrap(proto,name,()=>{},false);
+    if(source.captureDefaultSurfaces===true)for(const name of ['bufferSubData','texSubImage2D','texSubImage3D'])wrap(proto,name,()=>{},false);
     wrap(proto,'createVertexArray',(gl,args,value)=>{if(!value)return;const s=state(gl);if(s.vertexArrayEvents.length>=16384){unknown(s,'vertex array journal limit');return;}const id=s.nextVertexArrayId++;s.vertexArrays.set(value,{id,deleted:false});s.vertexArrayEvents.push({operation:'create',id});},false);
     wrap(proto,'deleteVertexArray',(gl,[value])=>{if(!value)return;const s=state(gl),record=s.vertexArrays.get(value);if(s.vertexArrayEvents.length>=16384){unknown(s,'vertex array journal limit');return;}s.vertexArrayEvents.push({operation:'delete',id:record?.id??null});if(record)record.deleted=true;},false);
     for(const [name,compressed,volume]of [['texImage2D',false,false],['compressedTexImage2D',true,false],['texImage3D',false,true],['compressedTexImage3D',true,true]])
@@ -1353,7 +1502,20 @@ export function installAllocationObserver(source) {
       s.bufferArrays.get(s.bufferSources.get(id))?.delete(id);s.bufferSources.delete(id);s.bufferOwners.delete(id);s.bufferIds.delete(id);
     }});
   }
-  observer={restore,nativeCalls(gl){return {...state(gl).calls};},defaultSurfaceCapture:source.captureDefaultSurfaces===true,
+  observer={restore,assertOwned(gl){
+    if(restored||!matches(Object.getOwnPropertyDescriptor(window,'__allocation'),installedAllocationDescriptor)
+      ||wrappers.some(w=>!matches(Object.getOwnPropertyDescriptor(w.proto,w.name),w.installedDescriptor)))
+      throw Error('allocation: observer/wrapper ownership changed');
+    if(gl){
+      const names=new Set(wrappers.filter(w=>Object.prototype.isPrototypeOf.call(w.proto,gl)).map(w=>w.name));
+      for(const name of names){let owner=gl,descriptor;
+        while(owner&&!(descriptor=Object.getOwnPropertyDescriptor(owner,name)))owner=Object.getPrototypeOf(owner);
+        const expected=wrappers.find(w=>w.proto===owner&&w.name===name);
+        if(!expected||!matches(descriptor,expected.installedDescriptor))throw Error('allocation: context wrapper shadowed');
+      }
+    }
+    return true;
+  },nativeCalls(gl){return {...state(gl).calls};},defaultSurfaceCapture:source.captureDefaultSurfaces===true,
   surfaceFailure(gl,reason,lost=false){if(source.captureDefaultSurfaces!==true)throw Error('allocation: default surface capture disabled');
     const s=state(gl);if(lost===true)s.surfaceLost=true;unknown(s,typeof reason==='string'?reason:'default surface observer failed');
   },
@@ -1380,6 +1542,8 @@ export function installAllocationObserver(source) {
       nativeFailureCapture:source.captureNativeFailures===true,nativeFailureCount:s.nativeFailureCount,
       nativeFailures:structuredClone(s.nativeFailures),observerFailureCount:nativeFailureObserverFailures,
       defaultSurfaceCapture:source.captureDefaultSurfaces===true,surfaceRegistered:s.surfaceRegistered,defaultEvents:structuredClone(s.defaultEvents),
+      epochUploadMethods:wrappers.filter(w=>['bufferSubData','texSubImage2D','texSubImage3D'].includes(w.name)
+        &&Object.prototype.isPrototypeOf.call(w.proto,gl)).map(w=>w.name).filter((name,i,a)=>a.indexOf(name)===i).sort(),
       limits:{nativeEvents:16384,signatures:256,nativeFailures:128,defaultEvents:16384},
       bufferSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='buffer').map(([id,r])=>({id:s.bufferIds.get(id),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(id),owners:[...s.bufferOwners.get(id)||[]]})),
       textureSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='texture').map(([id,r])=>({texture:s.textureIds.get(id),slots:Object.fromEntries(r.slots),pendingDelete:s.ledger.retired.has(id)})),
@@ -1417,5 +1581,6 @@ export function installAllocationObserver(source) {
       ...(source.nativeJournal===true?{nativeEvents:structuredClone(s.nativeEvents),renderbufferSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='renderbuffer').map(([id,r])=>({id:s.renderbufferIds.get(id),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(id)}))}: {})};
   }};
   Object.defineProperty(window,'__allocation',{value:observer,writable:true,enumerable:prior?.enumerable??true,configurable:true});installed=true;
+  installedAllocationDescriptor=Object.getOwnPropertyDescriptor(window,'__allocation');
   }catch(error){restore();throw error;}
 }
