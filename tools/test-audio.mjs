@@ -16,6 +16,7 @@
 // `node tools/test-audio.mjs` prints AUDIO OK (n/n); `--prove-fail` also runs one mutant per check and requires each to
 // fail that check, with the check's own name in the failure text. No browser, no GPU, writes nothing.
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -29,7 +30,7 @@ import * as settings from '../src/settings.js';
 import { henryHillRun } from './test-packs.mjs'; // sets the same flat-ground rules the Henry Hill oracle uses
 import { Game } from '../src/game.js';
 import { observeFallbackCall, recordingProofErrors } from './test-audio-ui.mjs';
-import { observeAudioTransport } from './test-field-admission-ui.mjs';
+import { observeAudioTransport, fieldAdmissionProbe } from './test-field-admission-ui.mjs';
 import { setPlan } from '../src/world/landscape.js';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -231,10 +232,108 @@ const recordingProofMutations = [
 ];
 
 const API = { observeAudioTransport, observeFallbackCall, recordingProofErrors, prepareBattleRecordings, SOUNDS, AUDIO_BUDGET, ALLOWED_LICENCES, ORDER_CALLS, busLevel, busGain, Director, FallenPool, fadeOf, Mixer,
-  defineAudio: defineAudioSettings, resultsMood: music.resultsMood, lossShareOf: music.lossShareOf, audioFiles, attributionText, goreHook: () => {} };
+  fieldAdmissionProbe, defineAudio: defineAudioSettings, resultsMood: music.resultsMood, lossShareOf: music.lossShareOf, audioFiles, attributionText, goreHook: () => {} };
 
 export const AUDIO_CHECKS = [
 
+  ['audio-body-observer', async api => {
+    const fixture = async mode => {
+      const sandbox = { URL, Headers, AbortController, performance, mode };
+      const code = `(async () => {
+        const signalOwner = new AbortController(), failure = mode === 'read-falsy' ? 0 : mode === 'fetch-falsy' ? null : false;
+        const counts = { fetch: 0, acquire: 0, read: 0, cancel: 0, release: 0 }, cancelResolvers = [];
+        const reader = { async read() { counts.read++; if (mode === 'read-falsy') throw failure;
+            return counts.read === 1 ? { done: false, value: new Uint8Array(7) } : { done: true }; },
+          cancel() { counts.cancel++; if (mode === 'cancel-falsy') throw failure;
+            if (mode === 'repeat-cancel') return new Promise(resolve => cancelResolvers.push(resolve));
+            return Promise.resolve('cancelled'); },
+          releaseLock() { counts.release++; return 'released'; } };
+        class Stream { getReader() { counts.acquire++; if (mode === 'acquire-falsy') throw failure; return reader; }
+          cancel() { counts.cancel++; return Promise.resolve('body cancelled'); } }
+        class Response { clone() { return this; } async arrayBuffer() { return new ArrayBuffer(0); } }
+        class Canvas { getContext() { return null; } }
+        const body = new Stream();
+        globalThis.HTMLCanvasElement = Canvas; globalThis.ReadableStream = Stream; globalThis.Response = Response;
+        globalThis.window = globalThis; globalThis.location = { href: 'http://example.test/', search: '' };
+        globalThis.document = { getElementById: () => null };
+        const nativeFetch = globalThis.fetch = async function(input, init) {
+          counts.fetch++; if (mode === 'fetch-falsy') throw failure;
+          const response = { status: 200, type: 'basic', url: input, body,
+            headers: new Headers({ 'content-length': '7', 'content-type': 'audio/mpeg' }) };
+          if (mode === 'metadata-fault') Object.defineProperty(response, 'url', { get() { throw failure; } });
+          return response;
+        };
+        const original = [Canvas.prototype.getContext, Stream.prototype.getReader, Stream.prototype.cancel,
+          Response.prototype.clone, Response.prototype.arrayBuffer, globalThis.fetch, JSON.parse];
+        if (mode === 'cleanup-fault') signalOwner.signal.removeEventListener = () => { throw false; };
+        (PROBE)();
+        const method = mode === 'method-function' ? () => 'GET' : mode === 'method-symbol' ? Symbol('GET')
+          : mode === 'method-large' ? 'X'.repeat(20000) : 'GET';
+        const first = await fetch('http://example.test/assets/audio/sfx/volley-1.mp3', { signal: signalOwner.signal, method }).then(
+          response => ({ response }), error => ({ rejected: true, exact: error === failure }));
+        let readExact = false, acquireExact = false, cancelExact = false, returnExact = false;
+        if (first.response) {
+          let active;
+          try { active = first.response.body.getReader(); } catch (error) { acquireExact = error === failure; }
+          if (active) {
+            try { await active.read(); await active.read(); } catch (error) { readExact = error === failure; }
+            try { const pending = active.cancel();
+              if (mode === 'repeat-cancel') { active.cancel(); cancelResolvers[0]('cancelled'); }
+              returnExact = await pending === 'cancelled'; } catch (error) { cancelExact = error === failure; }
+            returnExact = active.releaseLock() === 'released' && (mode === 'cancel-falsy' || returnExact);
+          }
+        }
+        if (mode === 'aborted') signalOwner.abort();
+        if (mode === 'cap') for (let i = 0; i < 65; i++) await fetch('http://example.test/assets/audio/sfx/volley-1.mp3');
+        const report = globalThis.__admissionAudio;
+        const restored = globalThis.__admissionRestore?.() === true;
+        signalOwner.abort();
+        const descriptors = original.every((v, i) => v === [Canvas.prototype.getContext, Stream.prototype.getReader, Stream.prototype.cancel,
+          Response.prototype.clone, Response.prototype.arrayBuffer, globalThis.fetch, JSON.parse][i]);
+        const readerRestored = reader.read.name === 'read' && reader.cancel.name === 'cancel' && reader.releaseLock.name === 'releaseLock';
+        return { counts, first: { rejected: first.rejected, exact: first.exact }, readExact, acquireExact, cancelExact,
+          returnExact, report, restored, descriptors, readerRestored };
+      })()`.replace('PROBE', api.fieldAdmissionProbe.toString());
+      return vm.runInNewContext(code, sandbox);
+    };
+    const healthy = await fixture('healthy');
+    assert.ok(healthy.report && healthy.restored && healthy.descriptors && healthy.readerRestored && healthy.returnExact,
+      'audio-body-observer: delegation or exact restoration lost');
+    const row = healthy.report.requests[0];
+    assert.ok(healthy.counts.fetch === 1 && healthy.counts.acquire === 1 && healthy.counts.read === 2
+      && healthy.counts.cancel === 1 && healthy.counts.release === 1 && row.bytes === 7 && row.reads === 2
+      && row.eof && row.readerCancel.settled && row.release.settled && !row.aborted
+      && row.response.type === 'basic' && row.response.headers['content-length'] === '7'
+      && !healthy.report.observerFailure && !healthy.report.overflow, 'audio-body-observer: real call facts lost or extra work performed');
+    for (const [mode, flag] of [['fetch-falsy', 'fetchRejected'], ['read-falsy', 'readRejected'], ['acquire-falsy', 'getReader'], ['cancel-falsy', 'readerCancel']]) {
+      const r = await fixture(mode), row = r.report.requests[0];
+      assert.ok(r.restored && r.descriptors && row[flag] && (r.first.exact || r.readExact || r.acquireExact || r.cancelExact),
+        'audio-body-observer: falsy original failure identity lost');
+    }
+    const aborted = await fixture('aborted');
+    assert.ok(aborted.report.requests[0].aborted && !aborted.report.requests[0].signalInitiallyAborted,
+      'audio-body-observer: actual signal abort lost');
+    const capped = await fixture('cap');
+    assert.ok(capped.report.requests.length === 64 && capped.report.overflow && capped.counts.fetch === 66,
+      'audio-body-observer: cap must reject without suppressing native fetch');
+    const repeated = await fixture('repeat-cancel');
+    assert.ok(repeated.counts.cancel === 2 && repeated.report.observerFailure && !repeated.restored
+      && repeated.descriptors && repeated.report.requests[0].readerCancel.calls === 2
+      && !repeated.report.requests[0].readerCancel.settled,
+      'audio-body-observer: first cancellation settled a different pending operation');
+    const cleanup = await fixture('cleanup-fault');
+    assert.ok(cleanup.report.observerFailure && !cleanup.restored && cleanup.descriptors,
+      'audio-body-observer: cleanup observer fault escaped restoration gate');
+    for (const mode of ['method-function', 'method-symbol', 'method-large']) {
+      const r = await fixture(mode);
+      assert.ok(r.report.observerFailure && r.report.requests[0].method === null && !r.restored && r.descriptors
+        && r.counts.fetch === 1 && r.counts.read === 2 && JSON.stringify(r.report).length < 12000,
+        'audio-body-observer: unsafe method escaped bound or changed native delegation');
+    }
+    const faulty = await fixture('metadata-fault');
+    assert.ok(faulty.report.observerFailure && faulty.counts.fetch === 1 && faulty.counts.read === 2 && !faulty.restored && faulty.descriptors,
+      'audio-body-observer: observer metadata fault changed delegation');
+  }],
   ['audio-transport-observer', async api => {
     const listeners = new Map(), page = { on(type, fn) { listeners.set(type, fn); } }, emit = (type, value) => listeners.get(type)(value);
     let at = 0, phase = 'loading'; const r = api.observeAudioTransport(page, { phase: () => phase, now: () => ++at });
@@ -595,6 +694,7 @@ export const AUDIO_CHECKS = [
 
 // One semantic mutant per check: each must fail that check's own assertion.
 const MUTANTS = {
+  'audio-body-observer': { fieldAdmissionProbe: () => {} },
   'audio-transport-observer': { observeAudioTransport: (...args) => { const r = observeAudioTransport(...args); Object.defineProperty(r, 'main', { configurable: true, get: () => null, set() {} }); return r; } },
   'fallback-observer-metadata': { observeFallbackCall: sound => { const o = observeFallbackCall(sound); return { close: () => ({ ...o.close(), failed: false }) }; } },
   'prepare-transport-cleanup': { prepareBattleRecordings: async (resolve, options) => {

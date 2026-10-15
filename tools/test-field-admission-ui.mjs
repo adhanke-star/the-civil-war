@@ -16,99 +16,8 @@ export async function fieldAdmissionControls({ browser, url, check, shot, result
   const verdict = (name, ok, detail) => { check('field-admission-' + name, ok, detail); assert.ok(ok, name); };
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, reducedMotion: 'reduce' });
   await probeProgress(ctx, { prefix: '__admission' });
-  await ctx.addInitScript(() => {
-    const canvas = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, 'getContext');
-    const fetchDescriptor = Object.getOwnPropertyDescriptor(window, 'fetch');
-    const parseDescriptor = Object.getOwnPropertyDescriptor(JSON, 'parse');
-    const readers = Object.getOwnPropertyDescriptor(ReadableStream.prototype, 'getReader');
-    const bodyCancel = Object.getOwnPropertyDescriptor(ReadableStream.prototype, 'cancel');
-    const clone = Object.getOwnPropertyDescriptor(Response.prototype, 'clone');
-    const buffer = Object.getOwnPropertyDescriptor(Response.prototype, 'arrayBuffer');
-    const seen = new WeakSet(), readerBindings = [], bodies = new WeakMap(); window.__admissionGpu = 0; window.__admissionBody = { bytes: 0, cancelled: false, largeParses: 0, stripped: false, requests: [], cancellations: [] };
-    const cancellation = (binding, kind, action) => {
-      if (!binding) return action();
-      const row = { ...binding, kind, at: performance.timeOrigin + performance.now(), phase: document.getElementById('field-failure-heading') ? 'recovered' : 'loading', settled: false };
-      window.__admissionBody.cancelled = true; window.__admissionBody.cancellations.push(row);
-      const pending = action(); pending.then(() => { row.settled = true; row.settledAt = performance.timeOrigin + performance.now(); }, error => { row.error = error.message; }); return pending;
-    };
-    HTMLCanvasElement.prototype.getContext = function (...args) {
-      const value = canvas.value.apply(this, args);
-      if (/^webgl/.test(args[0]) && value && !seen.has(this)) { seen.add(this); window.__admissionGpu++; }
-      return value;
-    };
-    window.fetch = async function (...args) {
-      const response = await fetchDescriptor.value.apply(this, args);
-      let output = response;
-      if (location.search.includes('fieldfixture=body') && String(args[0]).includes('/scenarios/henry-hill.json')) {
-        const headers = new Headers(response.headers); headers.delete('content-length'); window.__admissionBody.stripped = true;
-        output = new Response(response.body, { status: response.status, headers });
-      }
-      if (location.search.includes('fieldfixture=announced') && String(args[0]).includes('/scenarios/henry-hill.json')) {
-        const headers = new Headers(response.headers); headers.set('content-length', '1048577');
-        window.__admissionBody.announced = true; output = new Response(response.body, { status: response.status, headers });
-      }
-      if (String(args[0]).includes('/scenarios/henry-hill.json')) {
-        const binding = { id: window.__admissionBody.requests.length + 1, url: new URL(args[0], location.href).href, method: args[1]?.method || 'GET', requestBody: args[1]?.body ?? null, keepalive: args[1]?.keepalive === true, fixture: new URLSearchParams(location.search).get('fieldfixture'), status: output.status,
-          consumption: { guards: 0, guardBytes: 0, guardEOF: false, guardReleased: false, nativeStarted: false, nativeFinished: false, nativeBytes: 0, events: [] } };
-        window.__admissionBody.requests.push(binding); if (output.body) bodies.set(output.body, binding);
-      }
-      return output;
-    };
-    Response.prototype.clone = function (...args) {
-      const binding = bodies.get(this.body), copied = clone.value.apply(this, args);
-      if (binding) {
-        binding.consumption.guards++;
-        bodies.set(this.body, { ...binding, branch: 'original' }); bodies.set(copied.body, { ...binding, branch: 'guard' });
-      }
-      return copied;
-    };
-    Response.prototype.arrayBuffer = async function (...args) {
-      const binding = bodies.get(this.body), c = binding?.consumption;
-      if (c) { c.nativeStarted = true; c.nativeStartGuardBytes = c.guardBytes; c.nativeStartGuardEOF = c.guardEOF; c.events.push('nativeStarted'); }
-      const bytes = await buffer.value.apply(this, args);
-      if (c) { c.nativeBytes = bytes.byteLength; c.nativeFinished = true; }
-      return bytes;
-    };
-    ReadableStream.prototype.cancel = function (...args) { return cancellation(bodies.get(this), 'body', () => bodyCancel.value.apply(this, args)); };
-    JSON.parse = function (...args) { if (typeof args[0] === 'string' && args[0].length > 1048576) window.__admissionBody.largeParses++; return parseDescriptor.value.apply(this, args); };
-    ReadableStream.prototype.getReader = function (...args) {
-      const reader = readers.value.apply(this, args), read = reader.read, cancel = reader.cancel, releaseLock = reader.releaseLock, binding = bodies.get(this);
-      readerBindings.push({ reader, read, cancel, releaseLock, readDescriptor: Object.getOwnPropertyDescriptor(reader, 'read'), cancelDescriptor: Object.getOwnPropertyDescriptor(reader, 'cancel'), releaseDescriptor: Object.getOwnPropertyDescriptor(reader, 'releaseLock') });
-      reader.read = async function (...a) {
-        const value = await read.apply(this, a);
-        if (binding) {
-          window.__admissionBody.bytes += value.value?.byteLength || 0;
-          if (binding.branch === 'guard') {
-            binding.consumption.guardBytes += value.value?.byteLength || 0;
-            if (value.done) { binding.consumption.guardEOF = true; binding.consumption.events.push('guardEOF'); }
-          }
-        }
-        return value;
-      };
-      reader.cancel = function (...a) { return cancellation(binding, 'reader', () => cancel.apply(this, a)); };
-      reader.releaseLock = function (...a) { const value = releaseLock.apply(this, a); if (binding?.branch === 'guard') binding.consumption.guardReleased = true; return value; };
-      return reader;
-    };
-    window.__admissionRestore = () => {
-      let local = true;
-      for (const { reader, read, cancel, releaseLock, readDescriptor, cancelDescriptor, releaseDescriptor } of readerBindings) {
-        if (readDescriptor) Object.defineProperty(reader, 'read', readDescriptor); else delete reader.read;
-        if (cancelDescriptor) Object.defineProperty(reader, 'cancel', cancelDescriptor); else delete reader.cancel;
-        if (releaseDescriptor) Object.defineProperty(reader, 'releaseLock', releaseDescriptor); else delete reader.releaseLock;
-        local = reader.read === read && reader.cancel === cancel && reader.releaseLock === releaseLock
-          && !!Object.getOwnPropertyDescriptor(reader, 'read') === !!readDescriptor
-          && !!Object.getOwnPropertyDescriptor(reader, 'cancel') === !!cancelDescriptor
-          && !!Object.getOwnPropertyDescriptor(reader, 'releaseLock') === !!releaseDescriptor && local;
-      }
-      Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', canvas); Object.defineProperty(window, 'fetch', fetchDescriptor);
-      Object.defineProperty(JSON, 'parse', parseDescriptor); Object.defineProperty(ReadableStream.prototype, 'getReader', readers);
-      Object.defineProperty(ReadableStream.prototype, 'cancel', bodyCancel);
-      Object.defineProperty(Response.prototype, 'clone', clone); Object.defineProperty(Response.prototype, 'arrayBuffer', buffer);
-      return local && [[HTMLCanvasElement.prototype, 'getContext', canvas], [window, 'fetch', fetchDescriptor], [JSON, 'parse', parseDescriptor], [ReadableStream.prototype, 'getReader', readers], [ReadableStream.prototype, 'cancel', bodyCancel], [Response.prototype, 'clone', clone], [Response.prototype, 'arrayBuffer', buffer]]
-        .every(([object, key, descriptor]) => { const actual = Object.getOwnPropertyDescriptor(object, key); return Reflect.ownKeys(descriptor).every(k => actual[k] === descriptor[k]) && Reflect.ownKeys(actual).length === Reflect.ownKeys(descriptor).length; });
-    };
-  });
-  const counters = page => page.evaluate(() => ({ gpu: window.__admissionGpu, writes: window.__admissionWrites, puts: window.__progressPuts, body: window.__admissionBody }));
+  await ctx.addInitScript(fieldAdmissionProbe);
+  const counters = page => page.evaluate(() => ({ gpu: window.__admissionGpu, writes: window.__admissionWrites, puts: window.__progressPuts, body: window.__admissionBody, audioBody: window.__admissionAudio }));
   record.pageDiagnostics = []; const pageDiagnostics = new Map();
   async function close(page) {
     const diagnostic = pageDiagnostics.get(page);
@@ -362,7 +271,8 @@ export async function fieldAdmissionControls({ browser, url, check, shot, result
       }
     }
     verdict('clean-console', record.errors.length === 0 && record.warnings.length === 0 && record.restored.every(Boolean)
-      && record.pageDiagnostics.every(d => !d.audio.overflow && !d.audio.observerFailure)
+      && record.pageDiagnostics.every(d => !d.audio.overflow && !d.audio.observerFailure
+        && !d.counters.audioBody.overflow && !d.counters.audioBody.observerFailure)
       && record.requestBindings.every(r => r.exact), 'zero candidate errors/warnings; actual bounded GET transports finished; observers restored exactly; injected BASE/HTTP fault diagnostics separate');
   } finally {
     for (const page of ctx.pages()) {
@@ -418,4 +328,175 @@ export function observeAudioTransport(page, { phase = () => 'loading', now = () 
     row.terminal = note('failed', row.id, { failure });
   }));
   return report;
+}
+
+/** Existing native admission probes, exported for isolated CPU delegation/restoration controls. */
+export function fieldAdmissionProbe() {
+    const canvas = Object.getOwnPropertyDescriptor(HTMLCanvasElement.prototype, 'getContext');
+    const fetchDescriptor = Object.getOwnPropertyDescriptor(window, 'fetch');
+    const parseDescriptor = Object.getOwnPropertyDescriptor(JSON, 'parse');
+    const readers = Object.getOwnPropertyDescriptor(ReadableStream.prototype, 'getReader');
+    const bodyCancel = Object.getOwnPropertyDescriptor(ReadableStream.prototype, 'cancel');
+    const clone = Object.getOwnPropertyDescriptor(Response.prototype, 'clone');
+    const buffer = Object.getOwnPropertyDescriptor(Response.prototype, 'arrayBuffer');
+    const seen = new WeakSet(), readerBindings = [], bodies = new WeakMap(); window.__admissionGpu = 0; window.__admissionBody = { bytes: 0, cancelled: false, largeParses: 0, stripped: false, requests: [], cancellations: [] };
+
+    // Diagnostic only: observe original fetch/read/cancel calls; never consume or replace a response.
+    const audioBodies = new WeakMap(), audioSignals = [], audio = window.__admissionAudio = {
+      schema: 'audio-body-browser-v1', requests: [], sequence: 0, overflow: false, observerFailure: false,
+    };
+    const observe = action => { try { return action(); } catch { audio.observerFailure = true; } };
+    const integer = (value, min, max) => {
+      if (!Number.isSafeInteger(value) || value < min || value > max) { audio.observerFailure = true; return null; }
+      return value;
+    };
+    const text = (value, max, nullable = false) => {
+      if (nullable && value === null) return null;
+      if (typeof value !== 'string' || value.length > max) { audio.observerFailure = true; return null; }
+      return value;
+    };
+    const stamp = () => {
+      if (audio.sequence >= 65536) audio.overflow = true;
+      const at = performance.timeOrigin + performance.now();
+      if (typeof at !== 'number' || !Number.isFinite(at) || at < 0 || at > Number.MAX_SAFE_INTEGER) audio.observerFailure = true;
+      return { sequence: Math.min(++audio.sequence, 65536), at: typeof at === 'number' && Number.isFinite(at) ? at : null };
+    };
+    const errorText = error => typeof error?.message === 'string' ? error.message.slice(0, 2048) : typeof error;
+    const audioAction = (row, kind, action) => {
+      if (!row) return action();
+      let operation;
+      observe(() => {
+        operation = { ...stamp(), calls: integer((row[kind]?.calls || 0) + 1, 1, 65536) };
+        if (operation.calls !== 1) audio.observerFailure = true;
+        row[kind] = operation;
+      });
+      let pending;
+      try { pending = action(); }
+      catch (error) { observe(() => { operation.threw = { ...stamp(), error: errorText(error) }; }); throw error; }
+      // Preserve the exact original return, including non-promises and falsy throws.
+      observe(() => {
+        if (pending && typeof pending.then === 'function') pending.then(
+          () => observe(() => { operation.settled = stamp(); }),
+          error => observe(() => { operation.rejected = { ...stamp(), error: errorText(error) }; }));
+        else operation.settled = stamp();
+      });
+      return pending;
+    };
+    const cancellation = (binding, kind, action) => {
+      if (!binding) return action();
+      const row = { ...binding, kind, at: performance.timeOrigin + performance.now(), phase: document.getElementById('field-failure-heading') ? 'recovered' : 'loading', settled: false };
+      window.__admissionBody.cancelled = true; window.__admissionBody.cancellations.push(row);
+      const pending = action(); pending.then(() => { row.settled = true; row.settledAt = performance.timeOrigin + performance.now(); }, error => { row.error = error.message; }); return pending;
+    };
+    HTMLCanvasElement.prototype.getContext = function (...args) {
+      const value = canvas.value.apply(this, args);
+      if (/^webgl/.test(args[0]) && value && !seen.has(this)) { seen.add(this); window.__admissionGpu++; }
+      return value;
+    };
+    window.fetch = async function (...args) {
+      let audioRow;
+      observe(() => {
+        if (typeof args[0] !== 'string') { audio.observerFailure = true; return; }
+        const href = new URL(args[0], location.href).href;
+        if (!new URL(href).pathname.includes('/assets/audio/')) return;
+        if (audio.requests.length >= 64) { audio.overflow = true; return; }
+        audioRow = { id: audio.requests.length + 1, url: text(href, 2048), method: text(args[1]?.method ?? 'GET', 16),
+          start: stamp(), signalInitiallyAborted: args[1]?.signal?.aborted === true, reads: 0, bytes: 0 };
+        audio.requests.push(audioRow);
+        const signal = args[1]?.signal;
+        if (signal) {
+          const abort = () => observe(() => { audioRow.aborted = stamp(); });
+          signal.addEventListener('abort', abort, { once: true }); audioSignals.push({ signal, abort });
+        }
+      });
+      let response;
+      try { response = await fetchDescriptor.value.apply(this, args); }
+      catch (error) { observe(() => { if (audioRow) audioRow.fetchRejected = { ...stamp(), error: errorText(error) }; }); throw error; }
+      observe(() => {
+        if (!audioRow) return;
+        audioRow.response = { ...stamp(), status: integer(response.status, 0, 599), type: text(response.type, 32), url: text(response.url, 2048),
+          headers: Object.fromEntries(['content-length', 'content-range', 'content-type', 'content-encoding'].map(k => [k, text(response.headers.get(k), 2048, true)])), body: !!response.body };
+        if (response.body) audioBodies.set(response.body, audioRow);
+      });
+      let output = response;
+      if (location.search.includes('fieldfixture=body') && String(args[0]).includes('/scenarios/henry-hill.json')) {
+        const headers = new Headers(response.headers); headers.delete('content-length'); window.__admissionBody.stripped = true;
+        output = new Response(response.body, { status: response.status, headers });
+      }
+      if (location.search.includes('fieldfixture=announced') && String(args[0]).includes('/scenarios/henry-hill.json')) {
+        const headers = new Headers(response.headers); headers.set('content-length', '1048577');
+        window.__admissionBody.announced = true; output = new Response(response.body, { status: response.status, headers });
+      }
+      if (String(args[0]).includes('/scenarios/henry-hill.json')) {
+        const binding = { id: window.__admissionBody.requests.length + 1, url: new URL(args[0], location.href).href, method: args[1]?.method || 'GET', requestBody: args[1]?.body ?? null, keepalive: args[1]?.keepalive === true, fixture: new URLSearchParams(location.search).get('fieldfixture'), status: output.status,
+          consumption: { guards: 0, guardBytes: 0, guardEOF: false, guardReleased: false, nativeStarted: false, nativeFinished: false, nativeBytes: 0, events: [] } };
+        window.__admissionBody.requests.push(binding); if (output.body) bodies.set(output.body, binding);
+      }
+      return output;
+    };
+    Response.prototype.clone = function (...args) {
+      const binding = bodies.get(this.body), copied = clone.value.apply(this, args);
+      if (binding) {
+        binding.consumption.guards++;
+        bodies.set(this.body, { ...binding, branch: 'original' }); bodies.set(copied.body, { ...binding, branch: 'guard' });
+      }
+      return copied;
+    };
+    Response.prototype.arrayBuffer = async function (...args) {
+      const binding = bodies.get(this.body), c = binding?.consumption;
+      if (c) { c.nativeStarted = true; c.nativeStartGuardBytes = c.guardBytes; c.nativeStartGuardEOF = c.guardEOF; c.events.push('nativeStarted'); }
+      const bytes = await buffer.value.apply(this, args);
+      if (c) { c.nativeBytes = bytes.byteLength; c.nativeFinished = true; }
+      return bytes;
+    };
+    ReadableStream.prototype.cancel = function (...args) { return audioAction(audioBodies.get(this), 'bodyCancel',
+      () => cancellation(bodies.get(this), 'body', () => bodyCancel.value.apply(this, args))); };
+    JSON.parse = function (...args) { if (typeof args[0] === 'string' && args[0].length > 1048576) window.__admissionBody.largeParses++; return parseDescriptor.value.apply(this, args); };
+    ReadableStream.prototype.getReader = function (...args) {
+      const audioRow = audioBodies.get(this);
+      const reader = audioAction(audioRow, 'getReader', () => readers.value.apply(this, args)), read = reader.read, cancel = reader.cancel, releaseLock = reader.releaseLock, binding = bodies.get(this);
+      readerBindings.push({ reader, read, cancel, releaseLock, readDescriptor: Object.getOwnPropertyDescriptor(reader, 'read'), cancelDescriptor: Object.getOwnPropertyDescriptor(reader, 'cancel'), releaseDescriptor: Object.getOwnPropertyDescriptor(reader, 'releaseLock') });
+      reader.read = async function (...a) {
+        observe(() => { if (audioRow) { audioRow.reads = integer(audioRow.reads + 1, 1, 65536); audioRow.lastRead = stamp(); } });
+        let value;
+        try { value = await read.apply(this, a); }
+        catch (error) { observe(() => { if (audioRow) audioRow.readRejected = { ...stamp(), error: errorText(error) }; }); throw error; }
+        observe(() => { if (audioRow) {
+          const bytes = value.value === undefined ? 0 : integer(value.value.byteLength, 0, 10000000);
+          audioRow.bytes = bytes === null ? null : integer(audioRow.bytes + bytes, 0, 10000000);
+          if (typeof value.done !== 'boolean') audio.observerFailure = true;
+          if (value.done === true) audioRow.eof = stamp();
+        } });
+        if (binding) {
+          window.__admissionBody.bytes += value.value?.byteLength || 0;
+          if (binding.branch === 'guard') {
+            binding.consumption.guardBytes += value.value?.byteLength || 0;
+            if (value.done) { binding.consumption.guardEOF = true; binding.consumption.events.push('guardEOF'); }
+          }
+        }
+        return value;
+      };
+      reader.cancel = function (...a) { return audioAction(audioRow, 'readerCancel', () => cancellation(binding, 'reader', () => cancel.apply(this, a))); };
+      reader.releaseLock = function (...a) { const value = audioAction(audioRow, 'release', () => releaseLock.apply(this, a)); if (binding?.branch === 'guard') binding.consumption.guardReleased = true; return value; };
+      return reader;
+    };
+    window.__admissionRestore = () => {
+      let local = true;
+      for (const { signal, abort } of audioSignals) observe(() => signal.removeEventListener('abort', abort));
+      for (const { reader, read, cancel, releaseLock, readDescriptor, cancelDescriptor, releaseDescriptor } of readerBindings) {
+        if (readDescriptor) Object.defineProperty(reader, 'read', readDescriptor); else delete reader.read;
+        if (cancelDescriptor) Object.defineProperty(reader, 'cancel', cancelDescriptor); else delete reader.cancel;
+        if (releaseDescriptor) Object.defineProperty(reader, 'releaseLock', releaseDescriptor); else delete reader.releaseLock;
+        local = reader.read === read && reader.cancel === cancel && reader.releaseLock === releaseLock
+          && !!Object.getOwnPropertyDescriptor(reader, 'read') === !!readDescriptor
+          && !!Object.getOwnPropertyDescriptor(reader, 'cancel') === !!cancelDescriptor
+          && !!Object.getOwnPropertyDescriptor(reader, 'releaseLock') === !!releaseDescriptor && local;
+      }
+      Object.defineProperty(HTMLCanvasElement.prototype, 'getContext', canvas); Object.defineProperty(window, 'fetch', fetchDescriptor);
+      Object.defineProperty(JSON, 'parse', parseDescriptor); Object.defineProperty(ReadableStream.prototype, 'getReader', readers);
+      Object.defineProperty(ReadableStream.prototype, 'cancel', bodyCancel);
+      Object.defineProperty(Response.prototype, 'clone', clone); Object.defineProperty(Response.prototype, 'arrayBuffer', buffer);
+      return local && !audio.observerFailure && !audio.overflow && [[HTMLCanvasElement.prototype, 'getContext', canvas], [window, 'fetch', fetchDescriptor], [JSON, 'parse', parseDescriptor], [ReadableStream.prototype, 'getReader', readers], [ReadableStream.prototype, 'cancel', bodyCancel], [Response.prototype, 'clone', clone], [Response.prototype, 'arrayBuffer', buffer]]
+        .every(([object, key, descriptor]) => { const actual = Object.getOwnPropertyDescriptor(object, key); return Reflect.ownKeys(descriptor).every(k => actual[k] === descriptor[k]) && Reflect.ownKeys(actual).length === Reflect.ownKeys(descriptor).length; });
+    };
 }
