@@ -637,6 +637,7 @@ const success=s=>['accepted','already-satisfied'].includes(s);
 export function badgeObservationSelection(args){
   if(!dense(args)||args.some(a=>typeof a!=='string'))fail('mode arguments');
   if(!args.some(a=>a.startsWith('--badge-')))return null;
+  if(args.length===1&&args[0]==='--badge-stanley-held')return {mode:'stanley-held',shard:1};
   if(args.length===1&&args[0]==='--badge-observer')return {mode:'prerequisite',shard:null};
   if(args.length===1&&args[0]==='--badge-level10')return {mode:'level10',shard:null};
   if(args.length===1&&args[0]==='--badge-missionary')return {mode:'missionary',shard:1};
@@ -818,6 +819,213 @@ export function badgeTactic(game,observation,revision=0){
   return {kind:revision===1?'Astra-approved single legal revision; no natural result guaranteed':'Astra-approved first finite tactic; natural results unproved',revision,recipe,plan,cadence:1,roster};
 }
 
+/** Separate two-command adjunct; the original twelve-stage tactic stays byte-identical. */
+export function stanleyHeldAdjunct(game) {
+  const original=badgeTactic(game,'slaughter-fire',1),actor='us-stanley-brigade';
+  if(game.scenario.seed!==18621232||!original.roster.includes(actor))fail('held witness original Stanley/seed');
+  return {actorId:actor,cadence:1,roster:original.roster.slice(),opponents:[...game.scenario.units,...(game.scenario.reinforcements||[])].filter(u=>u.side==='CS').map(u=>u.id),plan:[
+    {id:'stanley-held-on',notBefore:600,expires:601,after:[],condition:[{kind:'actor-orderable'}],
+      command:{type:'holdfire',unitId:actor,enabled:true}},
+    {id:'stanley-held-off',notBefore:602,expires:1000,after:[{id:'stanley-held-on',require:'invoked-success'}],
+      condition:[{kind:'actor-orderable'},{kind:'fire-ready',maxDistance:55}],command:{type:'holdfire',unitId:actor,enabled:false}},
+  ]};
+}
+
+// Diagnostics must not coerce a hostile thrown object or replace a native thrown value.
+const heldErrorMessage=error=>{
+  if(typeof error==='string')return error.slice(0,1024);
+  if(error===null)return 'null';
+  if(typeof error!=='object'&&typeof error!=='function')return String(error).slice(0,1024);
+  try{const d=Object.getOwnPropertyDescriptor(error,'message');if(typeof d?.value==='string')return d.value.slice(0,1024);}catch{}
+  return 'observation failure';
+};
+
+/** Private finite witness. Public feat copies prove effects; target/hold facts prove only opportunity. */
+export function createStanleyHeldWitness(game) {
+  const specification=stanleyHeldAdjunct(game),policy=createBadgeStages(specification.plan,1,specification.roster),
+    actorId=specification.actorId,ticks=[],volleys=[];
+  let failure=null,stopped=false,lastTick=-1,tickOrdinal=0,holdTick=null,totalVolleys=0,
+    release=null,firstOrdinal=null,endAt=null,windowClosedAt=null,truncated=false,endedAt=null,active=null;
+  const mark=(operation,error)=>{if(!failure)failure={operation,message:heldErrorMessage(error),at:Number.isFinite(game.simTime)?game.simTime:null};};
+  const safe=(operation,fn)=>{
+    if(stopped){mark(operation,'late witness callback');return null;}
+    if(failure)return null;
+    try{return fn();}catch(error){mark(operation,error);return null;}
+  };
+  const feats=()=>{
+    const f=structuredClone(game.featReport()[actorId]);
+    if(!f||f.side!=='US'||!Number.isFinite(f.menStart)||f.menStart<=0||!Number.isFinite(f.xp)
+      ||FEAT_STATS.some(k=>!Number.isFinite(f[k])||f[k]<0))fail('held witness complete public feats');
+    return f;
+  };
+  const actor=()=>{
+    const u=game.units.find(u=>u.id===actorId);
+    if(!u||u.side!=='US'||typeof u.holdFire!=='boolean'||![u.x,u.z,u.reload].every(Number.isFinite))fail('held witness actual actor');
+    return u;
+  };
+  return Object.freeze({specification,
+    sample(at,publicFeats){return safe('tick',()=>{
+      if(at!==game.simTime||!Number.isFinite(at)||at<0||at<lastTick||lastTick<0&&at!==0)fail('held witness native tick chronology');
+      if(at>lastTick){tickOrdinal++;lastTick=at;}
+      const u=actor();
+      policy.advance(game);
+      const rows=policy.receipt().stages,on=rows[0],off=rows[1];
+      if(holdTick===null&&on.state==='accepted'&&on.trace?.invoked===true&&on.trace?.accepted===true&&on.trace.result?.holdFire===true)holdTick=tickOrdinal;
+      if(!release&&off.state==='accepted'){
+        if(on.state!=='accepted'||on.trace?.invoked!==true||on.trace?.accepted!==true||on.trace.result?.holdFire!==true
+          ||off.trace?.invoked!==true||off.trace?.accepted!==true||off.trace.result?.holdFire!==false||u.holdFire!==false
+          ||off.at!==at||off.at<=on.at||holdTick===null||tickOrdinal<=holdTick)fail('held witness release invocation and intervening tick');
+        release={at,tickOrdinal,ordinalBefore:totalVolleys,holdTick,holdAt:on.at,trace:structuredClone(off.trace),feats:feats()};
+      }
+      if(firstOrdinal!==null&&windowClosedAt===null&&!truncated){
+        if(ticks.length>=1024)fail('held witness tick bound');
+        const f=structuredClone(publicFeats?.[actorId]);
+        if(!f||FEAT_STATS.some(k=>!Number.isFinite(f[k])||f[k]<0))fail('held witness tick public report');
+        ticks.push({at,tickOrdinal,volleyOrdinal:totalVolleys,holdFire:u.holdFire,targetId:u.target?.id??null,reload:u.reload,position:[u.x,u.z],feats:f});
+        if(at>=endAt)windowClosedAt=at;
+        else if(game.over)truncated=true;
+      }
+      if(game.over)endedAt=at;
+    });},
+    before(receiver,args){
+      if(args[0]?.id!==actorId)return null;
+      // Count every invocation from T0, including an unsuitable or throwing first post-release call.
+      totalVolleys++;
+      return safe('volley-before',()=>{
+        if(!Number.isSafeInteger(totalVolleys)||totalVolleys>100000)fail('held witness volley ordinal bound');
+        if(receiver!==game.combat||active)fail('held witness native receiver/reentrant invocation');
+        const u=actor(),target=args[1],at=args[2];
+        if(args[0]!==u||!game.units.includes(target)||target.side===u.side||at!==game.simTime
+          ||!Number.isFinite(at)||![target.x,target.z].every(Number.isFinite))fail('held witness native volley arguments');
+        if(!release)return null;
+        if(at<release.at)fail('held witness volley precedes release');
+        if(firstOrdinal===null){firstOrdinal=totalVolleys;endAt=at+15;}
+        if(totalVolleys===firstOrdinal&&firstOrdinal!==release.ordinalBefore+1)fail('held witness skipped first invocation');
+        if(at>endAt||windowClosedAt!==null||truncated)return null;
+        if(volleys.length>=64)fail('held witness volley bound');
+        const row={ordinal:totalVolleys,at,targetId:target.id,actor:[u.x,u.z],target:[target.x,target.z],
+          distance:Math.hypot(u.x-target.x,u.z-target.z),holdFire:u.holdFire,before:feats(),after:null,outcome:'pending',error:null};
+        volleys.push(row);active=row;return row;
+      });
+    },
+    after(token,{failed=false,error}={}){
+      if(!token)return;
+      return safe('volley-after',()=>{
+        if(active!==token||!volleys.includes(token)||token.outcome!=='pending')fail('held witness foreign/duplicate completion');
+        token.outcome=failed?'throw':'return';
+        if(failed)token.error={type:typeof error,message:heldErrorMessage(error)};
+        if(failed)mark('native-volley',error);
+        token.after=feats();active=null;
+        if(FEAT_STATS.some(k=>token.after[k]<token.before[k]))fail('held witness public counters regressed');
+      });
+    },
+    stop(){stopped=true;},
+    receipt(){return structuredClone({kind:'one actual Stanley held-fire opportunity; public effects and saved awards separate',
+      specification,stages:policy.receipt(),totalTicks:tickOrdinal,lastTick,totalVolleys,release,firstOrdinal,endAt,windowClosedAt,truncated,endedAt,
+      ticks,volleys,stopped,failure});},
+  });
+}
+
+/** Derive effects from raw public rows. A valid completed miss never becomes an earned badge. */
+export function readStanleyHeldWitness(r,{specification,simTime,finalFeats}={}) {
+  const equal=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+  const require=(ok,message)=>{if(!ok)fail('held reader '+message);};
+  const validFeat=f=>f&&f.side==='US'&&Number.isFinite(f.menStart)&&f.menStart>0&&Number.isFinite(f.xp)
+    &&FEAT_STATS.every(k=>Number.isFinite(f[k])&&f[k]>=0);
+  require(specification?.actorId==='us-stanley-brigade'&&specification.cadence===1&&specification.plan?.length===2,'expected adjunct');
+  require(r&&equal(r.specification,specification)&&!r.failure&&!r.stages?.failure&&r.stopped===true,'source plan and stopped observer');
+  require(Number.isFinite(simTime)&&simTime>=0&&r.endedAt===simTime&&validFeat(finalFeats),'actual natural ending/final public row');
+  require(Number.isSafeInteger(r.totalTicks)&&r.totalTicks>0&&r.lastTick===simTime,'complete tick observer endpoint');
+  require(Number.isSafeInteger(r.totalVolleys)&&r.totalVolleys>=0&&r.totalVolleys<=100000,'total invocation ordinal');
+  require(Array.isArray(r.stages?.stages)&&r.stages.stages.length===2&&Array.isArray(r.ticks)&&r.ticks.length<=1024
+    &&Array.isArray(r.volleys)&&r.volleys.length<=64,'bounded complete arrays');
+  for(const [i,s]of r.stages.stages.entries()){
+    const expected=specification.plan[i];
+    for(const key of ['id','command','after','condition','notBefore','expires'])require(equal(s[key],expected[key]),'exact stage '+key);
+    require(['accepted','already-satisfied','refused','expired','skipped','ended'].includes(s.state),'terminal stage');
+    require(Number.isFinite(s.at)&&s.at>=0&&s.at<=simTime,'terminal stage time');
+    if(['accepted','already-satisfied','refused'].includes(s.state)){
+      require(s.trace&&s.at>=s.notBefore&&s.at<=s.expires,'attempted stage trace/window');
+      if(s.state==='accepted')require(s.trace.invoked===true&&s.trace.accepted===true&&s.trace.result?.holdFire===s.command.enabled,'accepted toggle');
+      if(s.state==='already-satisfied')require(s.trace.invoked===false&&s.trace.accepted===null&&s.trace.reason==='already in requested state','already satisfied trace');
+      if(s.state==='refused')require(s.trace.accepted===false,'refused trace');
+    }else require(s.trace===null,'unattempted terminal stage');
+    if(s.state==='expired')require(s.at>s.expires,'expired stage time');
+    if(s.state==='ended')require(s.at===simTime,'natural ending stage time');
+    if(s.trace){require(s.trace.at===s.at&&s.trace.command?.unitId===specification.actorId&&equal(s.trace.command,expected.command),'actual command/time');}
+  }
+  const on=r.stages.stages[0],off=r.stages.stages[1];
+  if(!r.release){
+    require(!(off.state==='accepted'&&off.trace?.invoked===true&&off.trace.accepted===true),'missing actual release');
+    require(r.firstOrdinal===null&&r.endAt===null&&r.windowClosedAt===null&&r.truncated===false&&r.volleys.length===0&&r.ticks.length===0,'no invented opportunity');
+    return {receiptValid:true,witnessValid:false,status:'no-invoked-release',firstVolleyKills:0,disciplineKills:0};
+  }
+  const release=r.release;
+  require(on.state==='accepted'&&on.trace?.invoked===true&&on.trace.accepted===true&&on.trace.result?.holdFire===true,'invoked accepted hold');
+  require(off.state==='accepted'&&off.trace?.invoked===true&&off.trace.accepted===true&&off.trace.result?.holdFire===false,'invoked accepted release');
+  for(const s of [on,off])require(Array.isArray(s.lastFacts)&&s.lastFacts.length===s.condition.length
+    &&s.lastFacts.every((f,i)=>f?.kind===s.condition[i].kind&&f.ok===true),'accepted condition facts');
+  const ready=off.lastFacts[1];
+  require(specification.opponents.includes(ready.targetId)
+    &&Number.isFinite(ready.distance)&&ready.distance>=0&&ready.distance<=55
+    &&Number.isFinite(ready.reload)&&ready.reload>=1&&ready.masked===false&&ready.melee===false
+    &&ready.switching===false,'actual release fire readiness');
+  require(on.at>=600&&on.at<=601&&off.at>=602&&off.at<=1000&&release.at===off.at&&release.holdAt===on.at,'fixed windows');
+  require(Number.isSafeInteger(release.holdTick)&&release.holdTick>0&&Number.isSafeInteger(release.tickOrdinal)&&release.tickOrdinal>release.holdTick&&release.tickOrdinal<=r.totalTicks
+    &&Number.isSafeInteger(release.ordinalBefore)&&release.ordinalBefore>=0&&release.ordinalBefore<=r.totalVolleys,'intervening tick and release ordinal');
+  require(equal(release.trace,off.trace)&&validFeat(release.feats),'release trace/public baseline');
+  require(finalFeats.menStart===release.feats.menStart&&finalFeats.xp===release.feats.xp,'final actor identity');
+  if(r.firstOrdinal===null){
+    require(r.totalVolleys===release.ordinalBefore&&r.volleys.length===0&&r.ticks.length===0&&r.endAt===null
+      &&r.windowClosedAt===null&&r.truncated===false,'no skipped first invocation');
+    require(['heldVolley','disciplineKills'].every(k=>finalFeats[k]===release.feats[k]),'no volley means no later volley effects');
+    return {receiptValid:true,witnessValid:false,status:'no-volley-after-release',firstVolleyKills:0,disciplineKills:0};
+  }
+  require(r.firstOrdinal===release.ordinalBefore+1&&r.volleys.length>0,'first invocation locked');
+  const first=r.volleys[0];
+  require(first.ordinal===r.firstOrdinal&&first.at>release.at&&r.endAt===first.at+15,'first time and exact window');
+  let held=0,discipline=0,previous=null;
+  for(const row of r.volleys){
+    require(Number.isSafeInteger(row.ordinal)&&row.ordinal===(previous?previous.ordinal+1:r.firstOrdinal)
+      &&row.ordinal<=r.totalVolleys&&Number.isFinite(row.at)&&row.at>=first.at&&row.at<=r.endAt
+      &&(!previous||row.at>previous.at),'complete ordered invocation rows');
+    require(specification.opponents.includes(row.targetId)&&row.holdFire===false&&row.outcome==='return'&&row.error===null,'actual released volley outcome');
+    require([row.actor,row.target].every(p=>Array.isArray(p)&&p.length===2&&p.every(Number.isFinite))
+      &&row.distance===Math.hypot(row.actor[0]-row.target[0],row.actor[1]-row.target[1]),'actual positions/distance');
+    require(validFeat(row.before)&&validFeat(row.after)&&FEAT_STATS.every(k=>row.after[k]>=row.before[k]),'complete monotonic public effects');
+    require([row.before,row.after].every(f=>f.menStart===release.feats.menStart&&f.xp===release.feats.xp),'volley actor identity');
+    const baseline=previous?previous.after:release.feats;
+    require(['heldVolley','disciplineKills'].every(k=>row.before[k]===baseline[k]),'no unobserved volley effects');
+    const h=row.after.heldVolley-row.before.heldVolley,d=row.after.disciplineKills-row.before.disciplineKills;
+    require(!previous||h===0,'no repeated held-fire episode');
+    held+=h;discipline+=d;previous=row;
+  }
+  require(first.distance<=60||held===0,'out-of-range first is a retained miss');
+  require(r.ticks.length>0&&r.ticks[0].at===first.at&&r.ticks[0].tickOrdinal>release.tickOrdinal,'first native tick retained after release');
+  let last=null;
+  for(const tick of r.ticks){
+    require(Number.isFinite(tick.at)&&Number.isSafeInteger(tick.tickOrdinal)&&tick.tickOrdinal<=r.totalTicks&&tick.holdFire===false&&validFeat(tick.feats)
+      &&Number.isFinite(tick.reload)&&Array.isArray(tick.position)&&tick.position.length===2&&tick.position.every(Number.isFinite)
+      &&(tick.targetId===null||specification.opponents.includes(tick.targetId)),'actual tick row');
+    require(tick.feats.menStart===release.feats.menStart&&tick.feats.xp===release.feats.xp,'tick actor identity');
+    if(last)require(tick.tickOrdinal===last.tickOrdinal+1&&tick.at>last.at&&tick.at-last.at<=0.05+1e-8,'no skipped native tick');
+    require(tick.volleyOrdinal>=r.firstOrdinal&&tick.volleyOrdinal<=r.totalVolleys,'tick invocation binding');
+    const observed=release.ordinalBefore+r.volleys.filter(v=>v.at<=tick.at).length;
+    require(tick.volleyOrdinal===observed||tick.at>r.endAt&&tick.volleyOrdinal===observed+1,'every in-window invocation retained');
+    const effects=r.volleys.filter(v=>v.at<=tick.at).at(-1)?.after??release.feats;
+    require(['heldVolley','disciplineKills'].every(k=>tick.feats[k]===effects[k]),'every tick public volley effects');
+    last=tick;
+  }
+  require(last.at<=simTime&&['heldVolley','disciplineKills'].every(k=>last.feats[k]===previous.after[k]
+    &&finalFeats[k]>=last.feats[k]),'tick endpoint/last volley/final public effects');
+  const complete=r.windowClosedAt!==null;
+  if(complete)require(!r.truncated&&r.windowClosedAt===last.at&&last.at>=r.endAt&&last.at-r.endAt<=0.05+1e-8,'native endpoint without another volley');
+  else require(r.truncated===true&&last.at===simTime&&simTime<r.endAt,'explicit natural truncation');
+  return {receiptValid:true,witnessValid:complete,status:!complete?'truncated':first.distance>60?'first-out-of-range':held<=0?'no-held-feat':'observed-held-window',
+    firstOrdinal:r.firstOrdinal,firstTargetId:first.targetId,firstDistance:first.distance,firstVolleyKills:held,disciplineKills:discipline,
+    windowStart:first.at,windowEnd:r.endAt,windowComplete:complete};
+}
+
 /** Finite data-only conditional stages. Facts are read from native units, never badge counters. */
 export function createBadgeStages(plan,cadence,roster){
   if(!dense(plan)||!plan.length||plan.length>128||!Number.isFinite(cadence)||cadence<=0||cadence>20
@@ -835,7 +1043,7 @@ export function createBadgeStages(plan,cadence,roster){
     if(!plain(row,['id','after','notBefore','expires','condition','command'])||typeof row.id!=='string'||!row.id||ids.has(row.id)
       ||!Number.isFinite(row.notBefore)||row.notBefore<0||!Number.isFinite(row.expires)||row.expires<row.notBefore
       ||!dense(row.after)||!dense(row.condition)||row.condition.length>12)fail('stage schema/window');
-    for(const dep of row.after)if(!plain(dep,['id','require'])||!ids.has(dep.id)||!['success','terminal'].includes(dep.require))fail('earlier stage dependency required');
+    for(const dep of row.after)if(!plain(dep,['id','require'])||!ids.has(dep.id)||!['success','terminal','invoked-success'].includes(dep.require))fail('earlier stage dependency required');
     if(new Set(row.after.map(d=>d.id)).size!==row.after.length)fail('duplicate stage dependency');
     for(const c of row.condition){
       if(!plain(c,['kind','actorId','targetId','afterStage','max','radius','min','types','maxDistance','moraleMax','moraleMin','requirePriorRouting','quietSeconds','minDistance','point','crateId','side','enemyRadius','fatigueMax'])
@@ -991,7 +1199,7 @@ export function createBadgeStages(plan,cadence,roster){
         const u=g.units.find(v=>v.id===row.command.unitId);
         row.lastFacts=row.condition.map(c=>fact(g,u,c));row.unmet=row.lastFacts.filter(f=>!f.ok).map(f=>f.kind);
         if(g.simTime>row.expires){row.state='expired';row.at=g.simTime;continue;}
-        const failed=row.after.find(d=>d.require==='success'&&terminal(byId.get(d.id).state)&&!success(byId.get(d.id).state));
+        const failed=row.after.find(d=>{const prior=byId.get(d.id);return terminal(prior.state)&&(d.require==='success'&&!success(prior.state)||d.require==='invoked-success'&&!(prior.state==='accepted'&&prior.trace?.invoked===true&&prior.trace?.accepted===true&&(prior.command.type!=='holdfire'||prior.trace?.result?.holdFire===prior.command.enabled)));});
         const targetId=row.command.targetId,t=g.units.find(v=>v.id===targetId);
         const permanent=!u&&seen.has(row.command.unitId)||u&&(!u.alive||u.state==='captured')
           ||targetId&&(!t&&seen.has(targetId)||t&&(!t.alive||t.state==='captured'));
@@ -1009,14 +1217,17 @@ export function createBadgeStages(plan,cadence,roster){
 }
 
 /** Private native-call observer. Aggregates opportunities without changing RNG, counters or arguments. */
-export function installBadgeCombatObserver(game,stages){
+export function installBadgeCombatObserver(game,stages,{volleyObserver=null}={}){
   const combat=game.combat,names=['volleyAt','chargeFeat','routFeat','moraleStep'];
   if(!combat||typeof stages?.contact!=='function')fail('native combat observer prerequisites');
+  if(volleyObserver!==null&&['before','after','stop'].some(k=>typeof volleyObserver[k]!=='function'))fail('native volley witness callbacks');
   const saved=names.map(name=>{const descriptor=Object.getOwnPropertyDescriptor(combat,name),native=combat[name];
     if(typeof native!=='function'||descriptor&&(!Object.hasOwn(descriptor,'value')||!descriptor.configurable))fail('reversible native combat method required');
     return {name,descriptor,native,installed:null,restored:false};});
   if(!Object.isExtensible(combat)&&saved.some(o=>!o.descriptor))fail('extensible native combat owner required');
-  const aggregate=new Map(),errors=[],equipmentCopies=new WeakMap();let failure=null,lastAt=-1;
+  const aggregate=new Map(),errors=[],equipmentCopies=new WeakMap();let failure=null,lastAt=-1,witnessFailure=null,witnessStopped=false;
+  const witness=(method,...args)=>{if(!volleyObserver)return null;try{return volleyObserver[method](...args);}
+    catch(error){witnessFailure??={message:heldErrorMessage(error),at:Number.isFinite(game.simTime)?game.simTime:null,kind:'volley witness '+method};return null;}};
   const snapshot=u=>{
     if(!game.units.includes(u)||!['US','CS'].includes(u.side)||![u.x,u.z,u.men,u.morale,u.cover,u.underFire,u.flanked].every(Number.isFinite)
       ||typeof u.follow?.active!=='boolean'||typeof u.melee!=='boolean'||typeof u.firing!=='boolean'||!u.order)fail('malformed native combat actor');
@@ -1046,7 +1257,7 @@ export function installBadgeCombatObserver(game,stages){
     if(!row){if(aggregate.size>=10000)fail('native combat aggregation bound');row={method:event.method,actorId:event.actor.id,targetId:event.target?.id||null,
       calls:0,succeeded:0,failed:0,first:event.at,last:event.at,opportunities:{},firstInputs:event,lastInputs:event};aggregate.set(key,row);}
     row.calls++;row.last=event.at;row.lastInputs=event;
-    if(failed){row.failed++;if(errors.length>=20)fail('native combat error bound');errors.push({method:event.method,at:event.at,actorId:event.actor.id,error:String(error?.message??error)});return;}
+    if(failed){row.failed++;if(errors.length>=20)fail('native combat error bound');errors.push({method:event.method,at:event.at,actorId:event.actor.id,error:heldErrorMessage(error)});return;}
     row.succeeded++;
     for(const[k,eligible]of Object.entries(event.opportunities))if(eligible){const o=row.opportunities[k]||{calls:0,seconds:0,first:event.at,last:event.at};o.calls++;o.seconds+=event.dt||0;o.last=event.at;row.opportunities[k]=o;}
   };
@@ -1054,26 +1265,32 @@ export function installBadgeCombatObserver(game,stages){
     const wrapped=function(...args){
       if(this!==combat)return owner.native.apply(this,args);
       if(failure)fail('native combat observer already failed');
-      let event;try{event=capture(owner.name,args);}catch(error){failure={message:String(error?.message??error),at:game.simTime};throw error;}
+      let event;try{event=capture(owner.name,args);}catch(error){failure={message:heldErrorMessage(error),at:game.simTime};throw error;}
+      const token=owner.name==='volleyAt'?witness('before',this,args):null;
       let value;
       try{value=owner.native.apply(this,args);}catch(error){
-        failure={message:String(error?.message??error),at:game.simTime,kind:'native exception'};
-        try{store(event,true,error);}catch(secondary){failure={message:String(secondary?.message??secondary),at:game.simTime,primary:String(error?.message??error)};}
+        if(owner.name==='volleyAt')witness('after',token,{failed:true,error});
+        failure={message:heldErrorMessage(error),at:game.simTime,kind:'native exception'};
+        try{store(event,true,error);}catch(secondary){failure={message:heldErrorMessage(secondary),at:game.simTime,primary:heldErrorMessage(error)};}
         throw error;
       }
+      if(owner.name==='volleyAt')witness('after',token,{failed:false});
       try{store(event,false,null);if(['volleyAt','chargeFeat'].includes(owner.name))stages.contact(game,args[0],args[1],event.at,owner.name);}
-      catch(error){failure={message:String(error?.message??error),at:game.simTime};throw error;}return value;
+      catch(error){failure={message:heldErrorMessage(error),at:game.simTime};throw error;}return value;
     };
     Object.defineProperty(combat,owner.name,{value:wrapped,writable:true,configurable:true,enumerable:owner.descriptor?.enumerable??false});
     owner.installed=Object.getOwnPropertyDescriptor(combat,owner.name);
   }
-  return {receipt:()=>({kind:'actual native call opportunities; nearby support/cover and numeric tiers require separate outcomes',rows:structuredClone([...aggregate.values()]),errors:structuredClone(errors),failure:structuredClone(failure)}),
+  return {receipt:()=>({kind:'actual native call opportunities; nearby support/cover and numeric tiers require separate outcomes',rows:structuredClone([...aggregate.values()]),errors:structuredClone(errors),failure:structuredClone(failure??witnessFailure),
+      ...(volleyObserver?{witnessFailure:structuredClone(witnessFailure)}:{})}),
     restore(){const cleanup=[];for(const owner of saved){if(owner.restored)continue;try{
       const current=Object.getOwnPropertyDescriptor(combat,owner.name);
       if(!current||!['value','writable','enumerable','configurable','get','set'].every(k=>current[k]===owner.installed[k]))fail('foreign native combat method owner '+owner.name);
       if(owner.descriptor)Object.defineProperty(combat,owner.name,owner.descriptor);else delete combat[owner.name];
       if(combat[owner.name]!==owner.native)fail('inherited native combat method drift '+owner.name);owner.restored=true;
     }catch(error){cleanup.push(String(error?.message??error));}}
+    if(!witnessStopped){witnessStopped=true;witness('stop');}
+    if(witnessFailure)cleanup.push(witnessFailure.message);
     return {ok:cleanup.length===0,errors:cleanup};},
   };
 }

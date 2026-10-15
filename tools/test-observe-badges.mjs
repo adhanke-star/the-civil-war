@@ -15,6 +15,7 @@ import {admitBadgeMarchCheckpoint} from './test-badges-ui.mjs';
 import {BADGE_RIDGE_ORIGIN,validateBadgeRidgeOrigin,badgeRidgeComplete} from './observe-badges.mjs';
 import {admitBadgeRidgeCheckpoint} from './test-badges-ui.mjs';
 import {FEAT_STATS} from '../src/franchise/badges.js';
+import {stanleyHeldAdjunct,createStanleyHeldWitness,readStanleyHeldWitness} from './observe-badges.mjs';
 const campaign=JSON.parse(fs.readFileSync(new URL('../assets/campaign.json',import.meta.url)));
 const zero=()=>({side:'US',xp:0,menStart:1000,...Object.fromEntries(FEAT_STATS.map(k=>[k,0]))});
 const api={recipes:BADGE_OBSERVATIONS,prefix:badgePrefix,crossings:createBadgeCrossings,command:validateBadgeCommand,receipt:badgePrefixReceipt,execute:executeBadgeCommand,tick:installBadgeTickObserver,policy:createBadgePolicy,stages:createBadgeStages,combat:installBadgeCombatObserver,tactic:badgeTactic,selection:badgeObservationSelection,origin:admitLevel10Origin,advance:advanceBadgeChunk,complete:badgeObservationComplete,promotion:badgePromotionTactic,promotionSpecs:BADGE_PROMOTION_PHASES};
@@ -443,6 +444,130 @@ for(const [suffix,change]of [
 ]){const name='column-'+suffix;columnChecks.push([name,a=>{const f=columnFixture();change(f);assert.equal(a.columnOrders(f.t,f.r,f.end,f.scenario),false,name+': altered native plan, readiness or order proof refused');}]);}
 checks.push(...columnChecks);
 
+api.heldAdjunct=stanleyHeldAdjunct;
+function heldGuardFixture(a,mode,require='invoked-success'){
+  const g=nativeStages(),u=g.units[0];u.target=g.units[1];u.holdFire=mode==='already-held';
+  g.orderSelected=function(kind){this.calls.push({at:this.simTime,kind});
+    if(mode==='refused')return false;
+    if(mode!=='accepted-without-toggle')this.selected.holdFire=!this.selected.holdFire;
+    return true;
+  };
+  const p=a.stages([
+    stage('held-on',{notBefore:600,expires:601,command:{type:'holdfire',unitId:'a',enabled:true}}),
+    stage('held-off',{notBefore:602,expires:1000,after:[{id:'held-on',require}],
+      condition:[{kind:'fire-ready',maxDistance:55}],command:{type:'holdfire',unitId:'a',enabled:false}}),
+  ],1,['a','b']);
+  for(let at=0;at<=603;at++){g.simTime=at;p.advance(g);}
+  return {calls:g.calls.filter(c=>c.kind),rows:p.receipt().stages};
+}
+const heldGuardChecks=[
+  ['held-invoked-accepted',a=>{const f=heldGuardFixture(a,'accepted');assert.deepEqual(f.calls,[{at:600,kind:'holdfire'},{at:602,kind:'holdfire'}],'held-invoked-accepted: exactly one hold and one later release');}],
+  ['held-already-no-release',a=>{const f=heldGuardFixture(a,'already-held');assert.equal(f.calls.length,0,'held-already-no-release: no actual hold means no release invocation');assert.equal(f.rows[1]?.state,'skipped','held-already-no-release: pre-control dependency refusal');}],
+  ['held-refused-no-release',a=>{const f=heldGuardFixture(a,'refused');assert.equal(f.rows[1]?.state,'skipped','held-refused-no-release: refused hold skips release before controls');assert.equal(f.calls.length,1,'held-refused-no-release: no second attempt');}],
+  ['held-result-no-release',a=>{const f=heldGuardFixture(a,'accepted-without-toggle');assert.equal(f.rows[1]?.state,'skipped','held-result-no-release: accepted return without requested state cannot release');assert.equal(f.calls.length,1,'held-result-no-release: postcondition checked before release');}],
+  ['held-legacy-success-unchanged',a=>{const f=heldGuardFixture(a,'already-held','success');assert.deepEqual(f.calls,[{at:602,kind:'holdfire'}],'held-legacy-success-unchanged: old success retains already-satisfied semantics');}],
+  ['held-adjunct-exact',a=>{const scenario=JSON.parse(fs.readFileSync(new URL('../assets/packs/stones-river.json',import.meta.url))).phases.find(p=>p.id==='slaughter-pen').scenario;
+    const g={scenario,simTime:0,playerSide:'US'},before=badgeTactic(g,'slaughter-fire',1),held=a.heldAdjunct(g);
+    assert.deepEqual(held,{actorId:'us-stanley-brigade',cadence:1,roster:before.roster,opponents:[...scenario.units,...(scenario.reinforcements||[])].filter(u=>u.side==='CS').map(u=>u.id),plan:[
+      {id:'stanley-held-on',notBefore:600,expires:601,after:[],condition:[{kind:'actor-orderable'}],command:{type:'holdfire',unitId:'us-stanley-brigade',enabled:true}},
+      {id:'stanley-held-off',notBefore:602,expires:1000,after:[{id:'stanley-held-on',require:'invoked-success'}],condition:[{kind:'actor-orderable'},{kind:'fire-ready',maxDistance:55}],command:{type:'holdfire',unitId:'us-stanley-brigade',enabled:false}},
+    ]},'held-adjunct-exact: separate finite two-command policy');
+    assert.equal(before.plan.length,12,'held-adjunct-exact: original twelve stages retained');assert.deepEqual(badgeTactic(g,'slaughter-fire',1),before,'held-adjunct-exact: original policy unchanged');
+  }],
+];
+checks.push(...heldGuardChecks);
+
+Object.assign(api,{heldWitness:createStanleyHeldWitness,heldReader:readStanleyHeldWitness});
+// Constructed CPU effects exercise forwarding and evidence bookkeeping; never natural battle proof.
+function heldWindowFixture(a,{changedFirst=false,truncate=false,throwValue,throwNative=false,alreadyHeld=false,noVolley=false}={}){
+  const g=nativeStages(),u=g.units[0],target=g.units[1],f=zero(),nativeCalls=[],token={native:true};
+  u.id='us-stanley-brigade';target.id='cs-anderson-brigade';
+  const other={...target,id:'cs-manigault-brigade',x:100,order:{type:'hold'},follow:{active:false}};
+  g.units.push(other);u.target=target;
+  g.scenario=JSON.parse(fs.readFileSync(new URL('../assets/packs/stones-river.json',import.meta.url))).phases.find(p=>p.id==='slaughter-pen').scenario;
+  g.featReport=()=>({[u.id]:structuredClone(f)});if(alreadyHeld)u.holdFire=true;
+  g.orderSelected=function(){this.selected.holdFire=!this.selected.holdFire;return true;};
+  let first=null,eligible=false;
+  g.combat={masks:()=>false,volleyAt(...args){
+    nativeCalls.push({receiver:this,args});
+    if(throwNative&&args[2]>602)throw throwValue;
+    if(args[2]>602){
+      if(first===null){first=args[2];eligible=Math.hypot(args[0].x-args[1].x,args[0].z-args[1].z)<=60;
+        if(eligible){f.heldVolley+=20;f.disciplineKills+=20;}}
+      else if(eligible&&args[2]<=first+15)f.disciplineKills+=10;
+    }
+    return token;
+  },chargeFeat(){},routFeat(){},moraleStep(){}};
+  const specification=stanleyHeldAdjunct(g),held=a.heldWitness(g),
+    original=createBadgeStages([stage('wait',{notBefore:2000,expires:2001,command:{type:'hold',unitId:u.id}})],1,specification.roster),
+    methods=Object.fromEntries(['volleyAt','chargeFeat','routFeat','moraleStep'].map(k=>[k,Object.getOwnPropertyDescriptor(g.combat,k)])),
+    observer=installBadgeCombatObserver(g,original,{volleyObserver:held});
+  let caught=false,thrown,identity=true,restore;
+  try{
+    for(let at=0;at<=602;at++){g.simTime=at;if(at===100)identity&&=g.combat.volleyAt(u,target,at)===token;held.sample(at,g.featReport());}
+    for(let i=1;i<=(truncate?100:302);i++){
+      g.simTime=602+i*.05;
+      if(!alreadyHeld&&!noVolley&&[1,81,161,241].includes(i)){
+        u.target=i===1&&changedFirst?other:target;
+        identity&&=g.combat.volleyAt(u,u.target,g.simTime)===token;
+      }
+      if(truncate&&i===100)g.over=true;
+      held.sample(g.simTime,g.featReport());
+    }
+    if(!truncate){g.over=true;g.simTime=1050;held.sample(g.simTime,g.featReport());}
+  }catch(error){caught=true;thrown=error;}
+  finally{restore=observer.restore();}
+  const exact=Object.entries(methods).every(([k,d])=>Object.keys(d).every(p=>Object.getOwnPropertyDescriptor(g.combat,k)?.[p]===d[p]));
+  return {g,r:held.receipt(),held,specification,finalFeats:structuredClone(f),nativeCalls,token,caught,thrown,identity,restore,exact};
+}
+const readHeld=(a,f)=>a.heldReader(f.r,{specification:f.specification,simTime:f.g.simTime,finalFeats:f.finalFeats});
+function heldReaderReject(name,a,change,options){const f=heldWindowFixture(api,options);change(f);let error;try{readHeld(a,f);}catch(e){error=e;}
+  assert.ok(error&&/^badge observation: held reader /.test(error.message),name+': altered actual evidence must be refused');}
+const heldWitnessChecks=[
+  ['held-singleton-mode',a=>assert.deepEqual(a.selection(['--badge-stanley-held']),{mode:'stanley-held',shard:1},'held-singleton-mode: exact independent singleton')],
+  ['held-singleton-refusal',a=>{for(const extra of ['--unit','--badge-shard=1','--badge-revisions','--badge-promotion'])rejects('held-singleton-refusal',()=>a.selection(['--badge-stanley-held',extra]));}],
+  ['held-terminal-misses',a=>{for(const [options,status]of [[{alreadyHeld:true},'no-invoked-release'],[{noVolley:true},'no-volley-after-release']]){
+    const r=readHeld(a,heldWindowFixture(api,options));assert.deepEqual([r.receiptValid,r.witnessValid,r.status],[true,false,status],'held-terminal-misses: completed legal misses remain explicit');}}],
+  ['held-first-lock',a=>{const f=heldWindowFixture(a,{changedFirst:true});assert.equal(f.r.firstOrdinal,f.r.release.ordinalBefore+1,'held-first-lock: first invocation cannot be skipped');
+    assert.equal(f.r.volleys[0]?.targetId,'cs-manigault-brigade','held-first-lock: changed first target retained');assert.equal(f.r.volleys[0]?.distance,100,'held-first-lock: unfavorable range retained');}],
+  ['held-native-forwarding',a=>{const f=heldWindowFixture(a);assert.ok(f.identity&&f.nativeCalls.length===5&&f.nativeCalls.every(c=>c.receiver===f.g.combat&&c.args[0]===f.g.units[0]),'held-native-forwarding: original receiver/arguments/return and exactly five delegates');assert.ok(f.restore.ok&&f.exact,'held-native-forwarding: original descriptors restored');}],
+  ['held-public-window',a=>{const f=heldWindowFixture(a),r=readHeld(a,f);assert.deepEqual([r.receiptValid,r.witnessValid,r.firstVolleyKills,r.disciplineKills],[true,true,20,50],'held-public-window: derive first and inclusive window effects from public rows');
+    assert.equal(f.r.windowClosedAt,f.r.ticks.at(-1)?.at,'held-public-window: closes without a later volley');assert.ok(f.r.windowClosedAt>=f.r.endAt,'held-public-window: actual endpoint reached');}],
+  ['held-unfavorable-miss',a=>{const r=readHeld(a,heldWindowFixture(api,{changedFirst:true}));assert.deepEqual([r.status,r.firstTargetId,r.firstDistance,r.firstVolleyKills,r.disciplineKills],['first-out-of-range','cs-manigault-brigade',100,0,0],'held-unfavorable-miss: later favorable target cannot replace first');}],
+  ['held-truncated-miss',a=>{const r=readHeld(a,heldWindowFixture(api,{truncate:true}));assert.deepEqual([r.receiptValid,r.witnessValid,r.status],[true,false,'truncated'],'held-truncated-miss: natural short window stays incomplete');}],
+  ['held-native-throw-identity',a=>{for(const value of [undefined,null,false,0,'',Object.freeze({get message(){throw Error('hostile getter');},toString(){throw Error('hostile coercion');}})]){
+    const f=heldWindowFixture(a,{throwNative:true,throwValue:value});assert.ok(f.caught&&f.thrown===value,'held-native-throw-identity: original thrown value survives observation');
+    assert.equal(f.r.firstOrdinal,f.r.release.ordinalBefore+1,'held-native-throw-identity: throwing first invocation locked');assert.equal(f.r.volleys[0]?.outcome,'throw','held-native-throw-identity: actual failure retained');assert.ok(f.exact,'held-native-throw-identity: failure owners restored');}}],
+  ['held-late-callback',a=>{const f=heldWindowFixture(a);f.held.sample(f.g.simTime,f.g.featReport());assert.ok(f.held.receipt().failure,'held-late-callback: restored observer refuses late mutation');}],
+  ['held-detached-receipt',a=>{const f=heldWindowFixture(a),r=f.held.receipt();r.volleys[0].before.heldVolley=999;
+    assert.equal(f.held.receipt().volleys[0]?.before.heldVolley,0,'held-detached-receipt: public receipts do not alias retained rows');}],
+  ['held-read-first-ordinal',a=>heldReaderReject('held-read-first-ordinal',a,f=>f.r.firstOrdinal++)],
+  ['held-read-delta',a=>heldReaderReject('held-read-delta',a,f=>f.r.volleys[0].after.heldVolley++)],
+  ['held-read-chronology',a=>heldReaderReject('held-read-chronology',a,f=>f.r.volleys.reverse())],
+  ['held-read-endpoint',a=>heldReaderReject('held-read-endpoint',a,f=>f.r.windowClosedAt=null)],
+  ['held-read-skipped-tick',a=>heldReaderReject('held-read-skipped-tick',a,f=>f.r.ticks.splice(2,1))],
+  ['held-read-hidden-shortfall',a=>heldReaderReject('held-read-hidden-shortfall',a,f=>f.finalFeats.disciplineKills=0)],
+  ['held-read-no-release',a=>heldReaderReject('held-read-no-release',a,f=>f.r.release=null)],
+  ['held-read-hold-invocation',a=>heldReaderReject('held-read-hold-invocation',a,f=>f.r.stages.stages[0].trace.invoked=false)],
+  ['held-read-forged-plan',a=>heldReaderReject('held-read-forged-plan',a,f=>f.r.specification.plan[0].notBefore=599)],
+  ['held-read-release-facts',a=>heldReaderReject('held-read-release-facts',a,f=>f.r.stages.stages[1].lastFacts=[])],
+  ['held-read-release-readiness',a=>heldReaderReject('held-read-release-readiness',a,f=>Object.assign(f.r.stages.stages[1].lastFacts[1],{ok:false,distance:999}))],
+  ['held-read-middle-effects',a=>heldReaderReject('held-read-middle-effects',a,f=>Object.assign(f.r.ticks[2].feats,{heldVolley:900,disciplineKills:900}))],
+  ['held-read-release-tick-order',a=>heldReaderReject('held-read-release-tick-order',a,f=>{const first=f.r.ticks[0].tickOrdinal;for(const t of f.r.ticks)t.tickOrdinal-=first;})],
+  ['held-read-tick-position',a=>heldReaderReject('held-read-tick-position',a,f=>f.r.ticks[2].position=['bad',0])],
+  ['held-read-stopped-owner',a=>heldReaderReject('held-read-stopped-owner',a,f=>f.r.stopped=false)],
+  ['held-read-volley-roster',a=>heldReaderReject('held-read-volley-roster',a,f=>f.r.volleys[0].targetId='unknown')],
+  ['held-read-tick-roster',a=>heldReaderReject('held-read-tick-roster',a,f=>f.r.ticks[2].targetId='unknown')],
+  ['held-read-friendly-target',a=>heldReaderReject('held-read-friendly-target',a,f=>{f.r.stages.stages[1].lastFacts[1].targetId='us-roberts-brigade';f.r.volleys[0].targetId='us-roberts-brigade';})],
+  ['held-read-same-release-time',a=>heldReaderReject('held-read-same-release-time',a,f=>{const delta=f.r.volleys[0].at-f.r.release.at;for(const v of f.r.volleys)v.at-=delta;for(const t of f.r.ticks)t.at-=delta;f.r.endAt-=delta;f.r.windowClosedAt-=delta;})],
+  ['held-read-miss-accepted-trace',a=>heldReaderReject('held-read-miss-accepted-trace',a,f=>Object.assign(f.r.stages.stages[1],{state:'accepted',trace:null}),{alreadyHeld:true})],
+  ['held-read-miss-stage-time',a=>heldReaderReject('held-read-miss-stage-time',a,f=>f.r.stages.stages[1].at=999999,{alreadyHeld:true})],
+  ['held-read-miss-window',a=>heldReaderReject('held-read-miss-window',a,f=>f.r.windowClosedAt=900,{alreadyHeld:true})],
+  ['held-read-miss-truncation',a=>heldReaderReject('held-read-miss-truncation',a,f=>f.r.truncated=true,{noVolley:true})],
+  ['held-read-no-volley-effects',a=>heldReaderReject('held-read-no-volley-effects',a,f=>Object.assign(f.finalFeats,{heldVolley:99,disciplineKills:99}),{noVolley:true})],
+];
+checks.push(...heldWitnessChecks);
+
 for(const[,check]of checks)check(api);
 console.log(`BADGE-OBSERVATION CPU BOOKKEEPING OK (${checks.length}/${checks.length}); natural combat/storage/level10 UNRUN`);
 if(process.argv.includes('--prove-fail')){
@@ -564,6 +689,25 @@ if(process.argv.includes('--prove-fail')){
   for(const[name]of ridgeChecks)mutants[name]=name==='ridge-mode'?{selection:()=>null}:name==='ridge-mode-refusal'?{selection:()=>({})}:name==='ridge-origin'?{ridgeOrigin:()=>null}:name==='ridge-origin-refusal'?{ridgeOrigin:o=>o}:name==='ridge-checkpoint-refusal'?{ridgeCheckpoint:()=>true}:name==='ridge-plan'?{ridge:()=>({plan:[],cadence:1})}:name==='ridge-phase-refusal'?{ridge:()=>({})}:name==='ridge-orders'?{ridgeOrders:()=>false}:name==='ridge-complete'?{ridgeComplete:()=>false}:name==='ridge-incomplete'?{ridgeComplete:()=>true}:{ridgeOrders:()=>true};
   for(const[name]of columnChecks)mutants[name]=name==='column-mode'?{selection:()=>null}:name==='column-mode-refusal'?{selection:()=>({})}:name==='column-plan'?{column:()=>({plan:[],cadence:1})}:name==='column-phase-refusal'?{column:()=>({})}:name==='column-orders'?{columnOrders:()=>false}:name==='column-complete'?{columnComplete:()=>false}:name==='column-incomplete'?{columnComplete:()=>true}:{columnOrders:()=>true};
   for(const[name]of marchFactChecks)mutants[name]={stages:()=>({advance(){},receipt:()=>({stages:[{state:['march-live-contact','march-ready-actual'].includes(name)?'pending':'accepted'}]})})};
+  const changedHeldRequirement=require=>(plan,...args)=>createBadgeStages(plan.map(r=>({...r,after:r.after.map(d=>({...d,require}))})),...args);
+  mutants['held-invoked-accepted']={stages:(plan,...args)=>createBadgeStages(plan.map(r=>r.id==='held-off'?{...r,notBefore:1000}:r),...args)};
+  for(const name of ['held-already-no-release','held-result-no-release'])mutants[name]={stages:changedHeldRequirement('success')};
+  mutants['held-refused-no-release']={stages:changedHeldRequirement('terminal')};
+  mutants['held-legacy-success-unchanged']={stages:changedHeldRequirement('invoked-success')};
+  mutants['held-adjunct-exact']={heldAdjunct:g=>({...stanleyHeldAdjunct(g),plan:[]})};
+  const alterHeld=change=>g=>{const h=createStanleyHeldWitness(g);return {...h,receipt(){const r=h.receipt();change(r);return r;}};};
+  mutants['held-singleton-mode']={selection:()=>null};
+  mutants['held-singleton-refusal']={selection:()=>({})};
+  mutants['held-terminal-misses']={heldReader:()=>({receiptValid:true,witnessValid:true,status:'observed-held-window'})};
+  mutants['held-first-lock']={heldWitness:alterHeld(r=>r.firstOrdinal++)};
+  mutants['held-native-forwarding']={heldWitness:g=>({...createStanleyHeldWitness(g),after(){throw Error('observer failed');}})};
+  mutants['held-public-window']={heldReader:()=>({receiptValid:true,witnessValid:true,firstVolleyKills:0,disciplineKills:0})};
+  mutants['held-unfavorable-miss']={heldReader:()=>({status:'observed-held-window',firstTargetId:'cs-anderson-brigade',firstDistance:40,firstVolleyKills:20,disciplineKills:50})};
+  mutants['held-truncated-miss']={heldReader:()=>({receiptValid:true,witnessValid:true,status:'observed-held-window'})};
+  mutants['held-native-throw-identity']={heldWitness:alterHeld(r=>{if(r.volleys[0])r.volleys[0].outcome='return';})};
+  mutants['held-late-callback']={heldWitness:g=>{const h=createStanleyHeldWitness(g);return {...h,receipt:()=>({...h.receipt(),failure:null})};}};
+  mutants['held-detached-receipt']={heldWitness:g=>{const h=createStanleyHeldWitness(g);let retained;return {...h,receipt:()=>retained??=h.receipt()};}};
+  for(const[name]of heldWitnessChecks.filter(([n])=>n.startsWith('held-read-')))mutants[name]={heldReader:()=>({receiptValid:true})};
   for(const[name,check]of checks){let error;try{check({...api,...mutants[name]});}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&error.message.startsWith(name),`${name}: mutant must fail its own assertion`);}
   console.log(`BADGE-OBSERVATION CONTROLS OK (${checks.length}/${checks.length})`);
 }
