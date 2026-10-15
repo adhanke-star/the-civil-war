@@ -5,6 +5,7 @@ import path from 'node:path';
 import os from 'node:os';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
+import {realpathSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {chromium} from 'playwright';
 import {startServer,ROOT} from './serve.mjs';
@@ -13,7 +14,7 @@ import {createOfflineManifest,serializeOfflineManifest} from './build-offline-ma
 if(!process.env.CI)throw Error('offline upgrade: Actions only; no local browser runs');
 const OLD='9e7207982005ded754657f6cc1b319a982014a2f';
 const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
-const git=args=>execFileSync('git',args,{cwd:ROOT,encoding:'utf8',maxBuffer:8000000,timeout:60000});
+const git=args=>execFileSync('git',['-c','safe.directory='+realpathSync(ROOT),...args],{cwd:ROOT,encoding:'utf8',maxBuffer:8000000,timeout:60000});
 const report={schema:'offline-upgrade-v1',sha:git(['rev-parse','HEAD']).trim(),old:OLD,
   run:process.env.GITHUB_RUN_ID,attempt:process.env.GITHUB_RUN_ATTEMPT,complete:false,checks:[],requests:[],errors:[],console:[],cleanup:[]};
 const out=path.join(ROOT,'.out/offline');await fs.mkdir(out,{recursive:true});
@@ -87,7 +88,7 @@ try{
       if(release==='old'){
         if(!oldFiles.has(p)){row.status=404;res.writeHead(404);res.end();return;}
         if(!p.startsWith('assets/')){
-          if(!oldBytes.has(p))oldBytes.set(p,execFileSync('git',['show',OLD+':'+p],{cwd:ROOT,maxBuffer:8000000,timeout:30000}));
+          if(!oldBytes.has(p))oldBytes.set(p,execFileSync('git',['-c','safe.directory='+realpathSync(ROOT),'show',OLD+':'+p],{cwd:ROOT,maxBuffer:8000000,timeout:30000}));
           const bytes=oldBytes.get(p);row.status=200;row.bytes=bytes.length;row.sha256=hash(bytes);
           const type=p.endsWith('.js')?'text/javascript':p.endsWith('.css')?'text/css':p.endsWith('.webmanifest')?'application/manifest+json':'text/html';
           res.writeHead(200,{'Content-Type':type,'Content-Length':bytes.length,'Cache-Control':'no-store'});res.end(bytes);return;

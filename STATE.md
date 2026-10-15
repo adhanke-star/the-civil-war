@@ -1,7 +1,7 @@
 # STATE
-2026-10-15 —0222 own3e66/38785452473 all9/full8/raw132/native/pixels root+Astra admitted; ONCE ordinarypilot38789128604 exact3e running/UNRUN outcome. SW0224 ownedWIP.
+2026-10-15 —0225 ordinarypilot38789128604 exact3e FAILED capable30s stabilitydeadline beforeframes/samples, unsupportedUNRUN. Firstoriginalbound/preserved; independenttelemetrydesign active.
 Root owns /private/tmp/cw-v1-1-20261012 branchv1-1-gaps-20261012; COORD absent; one read-only Astra; no simultaneous provider/file edits; capacityunknown.
-Next: read originalordinarypilot38789128604; SW0224source/producer71+4mutants/UNIT/requiredCPU/syntax/YAML51/mode27 root+Astra CLEAR; scoped12pathcommit/push next.
+Next: scoped0226exact-rootGitrepair source/forcedownercontrols/71+4/UNIT root+Astra CLEAR; commit/push/newownCI, then0225unchangeddeadline progressreceipt source.
 0222 CPU source7/mask45/frame15/stability31/reader58; resource56/198/180/114/20/profile28+8/required8/UNIT clear; unchanged scene334+334 lastRUN0221.
 Camera settlement passive eight exact RAFsnapshots/reset/cap4096/measurement30s, no appclock/render/readiness/pixel changes; naturallyuploaded fieldpages retained.
 Ordinarypilot38789128604 two fresh actualentry/store/Lookout contexts, pausedbriefing/explicitthreeUSclose hydration workload; no automaticclose/zoom proof.
@@ -10,7 +10,7 @@ Prior fullFloat32 diagnostic38477052623/exact07ca110contexts168wholePNG admitted
 Aaron seen six actual numbered artfiles and visual02/05 APPROVED; stop/reload APPROVED; no recurring hands-on requests.
 Badge genuine Gibson Bronze1033→Silver2238→Gold3688/absentLookout save-reload-import root+Astra accepted; Defeat notwinningbalance; all20amounts unchanged.
 0223 root12nativecase award/save replay:14of20badges earned/persisted; FirstVolley/FireDiscipline/Stormers/Shock/Relentless/RearGuard proof gaps, independentreview pending.
-SW actualv68→v69 modeled CacheStorage update loses4previouslycached route/resource fallbacks; noDBaccess/savecorruption proof. Read-only narrowrepair design pending; nativeupgradeUNRUN.
+SWd10 own38789462816 probe+upgrade-startup RED actualGitdubiousownership; firstfreshoffline6originalPASS only. 0226 exact-rootper-commandrepair READY; no unchangedrerun.
 Campaign201 actualend/loot/camp/end/reload/import/export/defeat/replay accepted; no demonstrated missing corefeature.
 Historical WebKit38506692812/Chromium38618622919 REDs retained/unexplained; equivalent currentacceptance doesnot claimcause/repair/flake.
 Originmain9e720798 acceptedCI/Pages; protectedMAIN13a7b1368tracked+3untracked untouched/11hashes exact. No integration throughMAIN.

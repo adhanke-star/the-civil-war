@@ -13,7 +13,7 @@ const sorted=a=>[...new Set(a)].sort();
 const fail=message=>{throw Error('offline manifest: '+message);};
 
 export function createOfflineManifest({root=ROOT}={}){
-  const tracked=execFileSync('git',['ls-files','-z','src','vendor','assets','index.html','manifest.webmanifest'],{cwd:root,encoding:'utf8'})
+  const tracked=execFileSync('git',['-c','safe.directory='+fs.realpathSync(root),'ls-files','-z','src','vendor','assets','index.html','manifest.webmanifest'],{cwd:root,encoding:'utf8'})
     .split('\0').filter(Boolean).sort();
   const files={};
   for(const p of tracked){
