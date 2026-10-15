@@ -67,6 +67,31 @@ export function observeWorkerUpdate(registration){
 const update=page=>page.evaluate(async source=>{
   const registration=await navigator.serviceWorker.getRegistration();return(0,eval)('('+source+')')(registration);
 },observeWorkerUpdate.toString());
+// Browser offline emulation did not block this worker's upstream requests.
+// A closed, owned origin listener supplies the actual transport boundary.
+export function inspectOrigin(origin){
+  return new Promise(resolve=>{
+    let settled=false;
+    const finish=receipt=>{if(settled)return;settled=true;clearTimeout(timer);resolve(receipt);};
+    const request=http.get(origin,{agent:false,method:'HEAD'},response=>{
+      response.resume();finish({reachable:true,status:response.statusCode});
+    });
+    const timer=setTimeout(()=>{request.destroy();finish({reachable:null,error:'probe deadline'});},2000);
+    request.on('error',error=>finish({reachable:false,error:error.code??null}));
+  });
+}
+export async function reopenOrigin(server,origin){
+  const url=new URL(origin);
+  assert.equal(url.protocol,'http:');assert.equal(url.hostname,'127.0.0.1');
+  assert.equal(server.listening,false,'owned origin must already be closed');
+  await new Promise((resolve,reject)=>{
+    const failed=error=>{server.removeListener('listening',ready);reject(error);};
+    const ready=()=>{server.removeListener('error',failed);resolve();};
+    server.once('error',failed);server.once('listening',ready);
+    try{server.listen(Number(url.port),'127.0.0.1');}
+    catch(error){server.removeListener('error',failed);server.removeListener('listening',ready);reject(error);}
+  });
+}
 try{
   check('exact-ci-source',process.env.GITHUB_SHA===report.sha&&/^[1-9][0-9]*$/.test(report.run)&&report.attempt==='1',
     {git:report.sha,workflow:process.env.GITHUB_SHA,run:report.run,attempt:report.attempt});
@@ -137,9 +162,14 @@ try{
   const second=await context.newPage();await second.goto(origin+'?sw');await second.waitForFunction(()=>!!navigator.serviceWorker.controller&&!!window.__entry);
   phase='interrupted-update';release='new';blocked=true;
   check('interrupted-install-rejected',await update(page)==='redundant','503 on changed terrain module; predecessor must remain');
+  const online=await inspectOrigin(origin);check('origin-online-before-interruption',online.reachable&&online.status===200,online);
+  await closeServer(proxy);const interrupted=await inspectOrigin(origin);
+  check('interruption-origin-unavailable',!proxy.listening&&interrupted.reachable===false&&interrupted.error==='ECONNREFUSED',interrupted);
   await context.setOffline(true);await page.reload();await ready(page);
   await observeSave(page,'interruption-offline-save',before);
   check('interruption-old-cache',await page.evaluate(()=>caches.has('cw-v68')),'old generation retained');
+  await reopenOrigin(proxy,origin);const reopened=await inspectOrigin(origin);
+  check('healthy-origin-reopened',proxy.listening&&reopened.reachable&&reopened.status===200,reopened);
   await context.setOffline(false);blocked=false;phase='healthy-update';
   check('healthy-install-waits',await update(page)==='installed','two old controlled clients remain open');
   check('two-client-no-takeover',await page.evaluate(async()=>{const r=await navigator.serviceWorker.getRegistration();return!!r.waiting&&r.active.state==='activated';}),'waiting successor, active predecessor');
@@ -160,6 +190,9 @@ try{
     return{bytes:bytes.byteLength,sha256:Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('')};
   },late);
   report.lateMember.old=await readLate();check('late-old-bytes',JSON.stringify(report.lateMember.old)===JSON.stringify(manifest.files[late]),report.lateMember);
+  const onlineAdoption=await inspectOrigin(origin);await closeServer(proxy);const unavailable=await inspectOrigin(origin);
+  check('adoption-origin-unavailable',onlineAdoption.reachable&&onlineAdoption.status===200&&!proxy.listening
+    &&unavailable.reachable===false&&unavailable.error==='ECONNREFUSED',{online:onlineAdoption,closed:unavailable});
   await context.setOffline(true);phase='activation';await page.close();await second.close();
   // Persistent contexts have an initial about:blank page; close every old client.
   for(const p of context.pages())await p.close();
@@ -190,7 +223,7 @@ try{
   await page.goto(origin+'?camp=1&sw');await page.waitForFunction(()=>window.__entry?.mode==='camp'&&!window.__entry.importing);
   await observeSave(page,'failure-camp-recovery',before);
   check('no-page-errors',report.errors.length===0,report.errors);
-  assert.equal(report.checks.length,22);assert.equal(new Set(report.checks.map(c=>c.id)).size,22);
+  assert.equal(report.checks.length,26);assert.equal(new Set(report.checks.map(c=>c.id)).size,26);
   assert.equal(report.saves.length,6);
   report.complete=true;
 }catch(error){failOnce(error);}

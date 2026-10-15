@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import http from 'node:http';
 import {createHash,webcrypto} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
@@ -253,5 +254,46 @@ for(const [relative,tier,which]of [
     check(primary.results[0].detail==='ORIGINAL FAILURE','cleanup never mutates original failure');
     check(cleared===1&&cleanupErrors.length===(mode==='normal'?0:mode==='both-writes'?2:1),'cleanup errors and timer exact');
   }
+}
+{
+  const producer=fs.readFileSync(new URL('./test-offline-upgrade.mjs',import.meta.url),'utf8');
+  const code=producer.slice(producer.indexOf('export function inspectOrigin('),producer.indexOf('\ntry{\n  check(\'exact-ci-source\''))
+    .replaceAll('export ','');
+  const api=vm.runInNewContext(code+';({inspectOrigin,reopenOrigin})',{http,URL,assert,setTimeout,clearTimeout});
+  const methods=[];
+  const server=http.createServer((req,res)=>{methods.push(req.method);res.writeHead(200);res.end('owned fixture');});
+  const close=()=>new Promise((resolve,reject)=>{server.close(e=>e?reject(e):resolve());server.closeAllConnections();});
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const origin='http://127.0.0.1:'+server.address().port+'/';
+  try{
+    check((await api.inspectOrigin(origin)).status===200,'actual origin initially reachable');
+    await assert.rejects(api.reopenOrigin(server,origin),/already be closed/);assertions++;
+    await close();const interrupted=await api.inspectOrigin(origin);
+    check(interrupted.reachable===false&&interrupted.error==='ECONNREFUSED','actual interruption listener unavailable');
+    await api.reopenOrigin(server,origin);check((await api.inspectOrigin(origin)).status===200,'actual same-port listener reopened');
+    await close();const adopted=await api.inspectOrigin(origin);
+    check(adopted.reachable===false&&adopted.error==='ECONNREFUSED','actual final listener unavailable');
+    for(const bad of ['https://127.0.0.1:1/','http://example.com:1/']){
+      await assert.rejects(api.reopenOrigin(server,bad),/AssertionError/);assertions++;
+    }
+    check(methods.length===2&&methods.every(m=>m==='HEAD'),'availability probes use body-free HEAD requests');
+    const blocker=http.createServer();await new Promise(resolve=>blocker.listen(Number(new URL(origin).port),'127.0.0.1',resolve));
+    const listeners=['error','listening'].map(n=>server.listenerCount(n));
+    try{
+      await assert.rejects(api.reopenOrigin(server,origin),e=>e.code==='EADDRINUSE');assertions++;
+      check(!server.listening&&['error','listening'].every((n,i)=>server.listenerCount(n)===listeners[i]),'occupied original port rejects without listener leaks');
+    }finally{await new Promise(resolve=>blocker.close(resolve));}
+  }finally{if(server.listening)await close();}
+  // Closed emulation that still returns200 must not satisfy either unavailable oracle.
+  const refused=r=>r.reachable===false&&r.error==='ECONNREFUSED';
+  check(!refused({reachable:true,status:200})&&!refused({reachable:false,error:'ENOTFOUND'})
+    &&!refused({reachable:null,error:'probe deadline'}),'reachable/foreign failure/deadline are not connection-refused proof');
+  let fired,cleared=0,destroyed=0,errorCallback;
+  const mock=vm.runInNewContext(code+';inspectOrigin',{URL,assert,
+    http:{get:(address,options)=>{assert.equal(address,origin);assert.equal(options.agent,false);assert.equal(options.method,'HEAD');
+      return{destroy(){destroyed++;},on(name,fn){assert.equal(name,'error');errorCallback=fn;}};}},
+    setTimeout:(fn,ms)=>{assert.equal(ms,2000);fired=fn;return 1;},clearTimeout:id=>{assert.equal(id,1);cleared++;}});
+  const pending=mock(origin);fired();const timed=await pending;errorCallback({code:'ECONNREFUSED'});
+  check(timed.reachable===null&&timed.error==='probe deadline'&&destroyed===1&&cleared===1,'probe deadline stays incomplete despite late refused event');
 }
 console.log('OFFLINE WORKER CPU OK ('+assertions+'); native update/save proof UNRUN');
