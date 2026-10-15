@@ -1,5 +1,5 @@
 # STATE
-2026-10-15 —0218 acquisition/retained observer SOURCE CLEAR:114CPU/ordinary20/profile28+8/scene334+334/required CPU/UNIT/YAML46/Astra. Parent1849 own38765615053 all9/full8/raw/native CLEAR; independent all8probe images CLEAR. Default-only/unsampled resize/fullnative250MB UNPROVED. Six owned paths dirty/indexempty/MAIN11/.out exact/COORD absent/capacityunknown.
+2026-10-15 —0219 SOURCE CLEAR180CPU/rawledgerbind+114acquisition+20ordinary/profile28+8; scene334+334/required8/UNIT/YAML46/root+Astra CLEAR. Parent7ea8cd9 own38769640377 all9/full8/raw/native/independent originalsubset ADMITTED.5readerdefects+sourceanchorRED fixed/preserved. Explicit6filecommitnext; epochs/otherresize/ordinary250MB/adoption/releaseUNRUN. MAIN11/.out exact/COORDabsent/capacityunknown.
 Parent6edaf4e own38501333250 all9/full8/native265/raw runtime15+2 root CLEAR.0209 exact12assets41528920B+opt-in profile/terminal stop/audio/briefing/SWv69/member hashes; profile28+8/affected CPU/final UNIT/syntax/YAML/diff/Astra CLEAR. .out299193157B fixed. Aaron seen6+visual02/05 and stop/reload APPROVED. Default URL unchanged; COORD absent; protected MAIN11 byteexact.
 Accepted remote main9e72079; sourceCI38346843720 all9/full own251/365/171/159+201+three6smokes/digests clean.
 Main9eCI38349763169 all9/fullown/digests/rawprobe clear; Pages38349763192 exact9e/livev68 clear.

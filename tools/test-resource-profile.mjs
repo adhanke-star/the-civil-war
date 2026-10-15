@@ -20,7 +20,7 @@ import {parseAtlasAstc,pageMipBytes} from '../src/units/atlas-compression.js';
 import {ordinaryLookoutFixture,ordinaryCapacityContract} from './resource-profile-fixture.mjs';
 import {applyCampaign} from '../src/franchise/campaign.js';
 import {validateSnapshot} from '../src/franchise/save.js';
-import {installFieldContextObserver,installAllocationObserver,AllocationLedger,mipSizes,ReservationPeak} from './bake/scene-allocation.mjs';
+import {installFieldContextObserver,installAllocationObserver,AllocationLedger,mipSizes,ReservationPeak,defaultSurfaceHistoryErrors} from './bake/scene-allocation.mjs';
 
 const base='assets/figures/confederate-infantry/';
 const turn=async()=>{for(let i=0;i<60;i++)await Promise.resolve();};
@@ -343,6 +343,160 @@ async function contextObserverControls() {
   console.log(`CONTEXT-OBSERVER CPU OK (${checks} assertions); default-only startup/unsampled resize/native coverage UNRUN`);
 }
 await contextObserverControls();
+async function defaultSurfaceControls(){
+  let checks=0;
+  async function fixture(run,{inherited=false}={}){
+    await globals({window:{},document:{},HTMLCanvasElement:undefined,WebGLRenderingContext:undefined,WebGL2RenderingContext:undefined},async()=>{
+      let queries=0,conversions=0;const calls=[],nativeError=new Error('native setter/finish'),returned={native:true};
+      class GL{
+        constructor(){this.drawingBufferWidth=10;this.drawingBufferHeight=10;this.buffer={};}
+        getContextAttributes(){queries++;if(this.queryError)throw nativeError;return this.nullAttrs?null:{depth:true,stencil:false};}
+        isContextLost(){return !!this.lost;}
+        getParameter(){queries++;return this.buffer;}
+        bufferData(...args){calls.push(['bufferData',this,args]);return returned;}
+        finish(){calls.push(['finish',this]);if(this.finishError)throw nativeError;return returned;}
+      }
+      GL.prototype.ARRAY_BUFFER=34962;GL.prototype.ARRAY_BUFFER_BINDING=34964;
+      class Base extends EventTarget{
+        constructor(){super();this.w=10;this.h=10;this.gl=new GL();}
+        getContext(...args){calls.push(['getContext',this,args]);return this.gl;}
+      }
+      for(const name of ['width','height'])Object.defineProperty(Base.prototype,name,{
+        configurable:true,enumerable:true,get(){return name==='width'?this.w:this.h;},
+        set(value){calls.push([name,this,value]);if(this.setterError)throw nativeError;
+          const applied=Number(value);if(name==='width')this.w=applied;else this.h=applied;
+          if(!this.deferred){this.gl.drawingBufferWidth=this.w;this.gl.drawingBufferHeight=this.h;}return returned;},
+      });
+      class FieldCanvas extends Base{}
+      if(!inherited)for(const name of ['width','height'])Object.defineProperty(FieldCanvas.prototype,name,Object.getOwnPropertyDescriptor(Base.prototype,name));
+      HTMLCanvasElement=FieldCanvas;WebGL2RenderingContext=GL;
+      const target=new FieldCanvas();document.getElementById=()=>target;
+      const descriptors=Object.fromEntries(['width','height','getContext'].map(k=>[k,Object.getOwnPropertyDescriptor(FieldCanvas.prototype,k)]));
+      installAllocationObserver({ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),
+        nativeJournal:true,captureNativeFailures:true,captureDefaultSurfaces:true});
+      const allocation=window.__allocation,observer=installFieldContextObserver({enabled:true,observeSurfaces:true}),gl=target.gl;
+      try{await run({target,gl,FieldCanvas,allocation,observer,calls,nativeError,returned,descriptors,
+        queries:()=>queries,conversions:()=>conversions,value:{valueOf(){conversions++;return 20;}}});}
+      finally{observer.restore();allocation.restore();}
+      for(const name of Object.keys(descriptors))assert.deepEqual(Object.getOwnPropertyDescriptor(FieldCanvas.prototype,name),descriptors[name]);checks+=3;
+    });
+  }
+  for(const inherited of [false,true])await fixture(f=>{
+    const {target,gl,allocation,observer,calls,value}=f;
+    target.width=10;assert.equal(f.queries(),0);checks++;
+    const other=new f.FieldCanvas();other.width=42;assert.equal(f.queries(),0);checks++;
+    assert.equal(target.getContext('webgl2'),gl);const first=allocation.peek(gl);
+    assert.equal(first.bytes,0);assert.equal(first.defaultFramebuffer,1200);assert.equal(first.gpuPeak,1200);checks+=4;
+    target.getContext('webgl2');assert.equal(allocation.peek(gl).defaultEvents.length,1);checks++;
+    const get=Object.getOwnPropertyDescriptor(f.FieldCanvas.prototype,'width').get;
+    assert.equal(Reflect.apply(get,target,[]),10);checks++;
+    target.width=value;assert.equal(f.conversions(),1);assert.equal(calls.filter(c=>c[0]==='width'&&c[1]===target).length,2);checks+=2;
+    target.height=30;target.width=20;
+    const grown=allocation.peek(gl);assert.equal(grown.pendingDefaultFramebuffer,10800);assert.equal(grown.gpuPeak,18000);checks+=2;
+    assert.equal(gl.bufferData(34962,new Float32Array(8),35044),f.returned);
+    const allocated=allocation.peek(gl);assert.equal(allocated.bytes,32);assert.equal(allocated.gpuPeak,18032);checks+=3;
+    assert.deepEqual(defaultSurfaceHistoryErrors(allocated),[]);checks++;
+    assert.equal(gl.finish(),f.returned);const completed=allocation.peek(gl);
+    assert.equal(completed.pendingDefaultFramebuffer,0);assert.equal(completed.gpuCurrent,7232);assert.equal(completed.gpuPeak,18032);
+    assert.deepEqual(defaultSurfaceHistoryErrors(completed),[]);checks+=5;
+    const mutations=[r=>r.defaultEvents.shift(),r=>r.defaultEvents[1].sequence++,r=>r.defaultEvents[2].generation=false,
+      r=>r.defaultEvents[2].pending=0,r=>r.defaultEvents[2].current--,r=>r.defaultEvents[2].peak--,
+      r=>r.defaultEvents[2].framebuffer++,r=>r.defaultEvents[2].applied[0]++,r=>r.defaultEvents[2].attributes.depth=false,
+      r=>r.defaultEvents.find(e=>e.kind==='finish').nativeEventsEnd=0,r=>r.nativeEvents.find(e=>e.operation==='finish').call='forged',
+      r=>r.unknown.push('lost'),r=>r.observerFailureCount=1,r=>r.defaultEvents[1].boundary='height-after',
+      r=>r.gpuPeak--,r=>r.gpuCurrent++,r=>r.pendingDefaultFramebuffer++,r=>r.defaultSurfaceCapture=false,
+      r=>{const at=r.defaultEvents.findIndex(e=>e.kind==='finish');r.defaultEvents=r.defaultEvents.slice(at);r.defaultEvents.forEach((e,i)=>e.sequence=i+1);},
+      r=>r.nativeFailureCapture=false,r=>r.nativeFailureCount=1,r=>r.nativeFailures.push({call:'finish'}),
+      r=>r.nativeEvents.push({...r.nativeEvents.at(-1),sequence:r.nativeEvents.length+1,callOrdinal:99}),
+      r=>{r.nativeEvents.push({...r.nativeEvents.at(-1),sequence:r.nativeEvents.length+1,callOrdinal:99});r.defaultEvents.at(-1).nativeEventsEnd=r.nativeEvents.length;},
+      r=>{let peak=0;for(const row of r.defaultEvents)if(row.kind==='sample'){
+        if(row.apiBytes)row.apiBytes+=64;row.current=row.apiBytes+row.framebuffer+row.pending;row.peak=peak=Math.max(peak,row.current);
+      }r.gpuCurrent=r.defaultEvents.at(-1).current;r.gpuPeak=peak;},
+      r=>{const index=r.nativeEvents.findIndex(e=>e.operation==='reserve');
+        r.defaultEvents=r.defaultEvents.filter(e=>!(e.kind==='sample'&&e.nativeEventsEnd===index&&e.apiBytes===r.nativeEvents[index].transient));
+        r.defaultEvents.forEach((e,i)=>e.sequence=i+1);},
+      r=>r.nativeEvents[0].bytes++,r=>r.defaultEvents.at(-1).nativeCallOrdinal=999999];
+    for(const mutate of mutations){const bad=structuredClone(completed);mutate(bad);assert(defaultSurfaceHistoryErrors(bad).length);}checks+=mutations.length;
+    completed.defaultEvents[0].apiBytes=999;assert.equal(allocation.peek(gl).defaultEvents[0].apiBytes,0);checks++;
+    assert.equal(observer.read().observerFailureCount,0);assert.equal(observer.read().overflow,false);checks+=2;
+  },{inherited});
+  await fixture(f=>{
+    f.target.getContext('webgl2');f.target.width=20;const before=f.allocation.peek(f.gl);
+    f.target.setterError=true;assert.throws(()=>{f.target.height=20;},e=>e===f.nativeError);
+    assert.equal(f.allocation.peek(f.gl).pendingDefaultFramebuffer,before.pendingDefaultFramebuffer);
+    assert(defaultSurfaceHistoryErrors(f.allocation.peek(f.gl)).length);checks+=3;
+  });
+  await fixture(f=>{
+    f.target.getContext('webgl2');const data=new Float32Array(8);
+    f.gl.bufferData(34962,data,35044);f.gl.bufferData(34962,data,35044);
+    const r=f.allocation.peek(f.gl);assert.equal(r.bytes,32);assert.equal(r.peak,64);assert.equal(r.gpuPeak,1264);
+    assert.deepEqual(defaultSurfaceHistoryErrors(r),[]);checks+=4;
+  });
+  await fixture(f=>{
+    f.target.getContext('webgl2');f.target.width=20;f.gl.finishError=true;
+    assert.throws(()=>f.gl.finish(),e=>e===f.nativeError);const r=f.allocation.peek(f.gl);
+    assert.equal(r.pendingDefaultFramebuffer,1200);assert.equal(r.defaultEvents.filter(e=>e.kind==='finish').length,0);
+    assert.equal(r.nativeFailures.length,1);assert(defaultSurfaceHistoryErrors(r).length);checks+=5;
+  });
+  await fixture(f=>{
+    f.target.getContext('webgl2');f.target.deferred=true;f.target.width=20;
+    assert(f.allocation.peek(f.gl).unknown.includes('default surface boundary failed'));assert.equal(f.observer.read().observerFailureCount,1);
+    assert(defaultSurfaceHistoryErrors(f.allocation.peek(f.gl)).length);checks+=3;
+  });
+  for(const mode of ['queryError','nullAttrs'])await fixture(f=>{
+    f.gl[mode]=true;f.gl.lost=mode==='nullAttrs';assert.equal(f.target.getContext('webgl2'),f.gl);
+    assert(defaultSurfaceHistoryErrors(f.allocation.peek(f.gl)).length);checks+=2;
+    if(mode==='nullAttrs'){
+      const before=f.queries();f.target.width=20;f.target.height=20;f.gl.nullAttrs=false;f.gl.lost=false;f.target.width=30;
+      assert.equal(f.queries(),before);assert(defaultSurfaceHistoryErrors(f.allocation.peek(f.gl)).length);checks+=2;
+    }
+  });
+  await fixture(f=>{
+    f.target.getContext('webgl2');const before=f.queries();f.target.dispatchEvent(new Event('webglcontextlost'));
+    f.target.width=20;f.target.height=20;f.target.dispatchEvent(new Event('webglcontextrestored'));f.target.width=30;
+    assert.equal(f.queries(),before);assert(defaultSurfaceHistoryErrors(f.allocation.peek(f.gl)).length);
+    assert(f.allocation.peek(f.gl).unknown.includes('default surface loss/restoration epoch unproved'));checks+=3;
+  });
+  await fixture(f=>{
+    f.target.getContext('webgl2');f.target.width=20;f.gl.nullAttrs=true;f.gl.lost=true;
+    f.gl.finish();const r=f.allocation.peek(f.gl);
+    assert.equal(r.pendingDefaultFramebuffer,1200);assert.equal(r.defaultEvents.filter(e=>e.kind==='finish').length,0);
+    assert(defaultSurfaceHistoryErrors(r).length);checks+=3;
+  });
+  await fixture(f=>{
+    f.target.getContext('webgl2');f.gl.drawingBufferWidth=99;
+    f.gl.bufferData(34962,new Float32Array(8),35044);
+    assert(f.allocation.peek(f.gl).unknown.includes('unobserved default surface dimension change'));
+    assert(defaultSurfaceHistoryErrors(f.allocation.peek(f.gl)).length);checks+=2;
+  });
+  await fixture(f=>{
+    f.target.getContext('webgl2');
+    const descriptor=Object.getOwnPropertyDescriptor(f.FieldCanvas.prototype,'width');
+    assert.equal(Reflect.apply(descriptor.set,f.target,[10]),f.returned);checks++;
+    const foreign={...descriptor,enumerable:!descriptor.enumerable};
+    Object.defineProperty(f.FieldCanvas.prototype,'width',foreign);
+    assert.throws(()=>f.observer.restore(),/foreign canvas width descriptor/);
+    assert.deepEqual(Object.getOwnPropertyDescriptor(f.FieldCanvas.prototype,'width'),foreign);checks+=2;
+    Object.defineProperty(f.FieldCanvas.prototype,'width',descriptor);
+  });
+  await fixture(f=>{
+    f.target.getContext('webgl2');for(let i=0;i<8200;i++)f.target.width=10;
+    const r=f.allocation.peek(f.gl);assert.equal(r.defaultEvents.length,16384);
+    assert(r.unknown.includes('default surface journal limit'));assert(defaultSurfaceHistoryErrors(r).length);checks+=3;
+  });
+  await globals({window:{},document:{},HTMLCanvasElement:undefined},()=>{
+    class FieldCanvas{getContext(){return{};}}
+    for(const name of ['width','height'])Object.defineProperty(FieldCanvas.prototype,name,{get(){return 10;},set(){},configurable:true});
+    HTMLCanvasElement=FieldCanvas;
+    const original=Object.getOwnPropertyDescriptors(FieldCanvas.prototype);
+    window.__allocation={peek(){},surfaceBoundary(){},surfaceFailure(){},defaultSurfaceCapture:true};
+    Object.preventExtensions(window);
+    assert.throws(()=>installFieldContextObserver({enabled:true,observeSurfaces:true}),TypeError);
+    assert.deepEqual(Object.getOwnPropertyDescriptors(FieldCanvas.prototype),original);checks+=2;
+  });
+  console.log(`DEFAULT-SURFACE CPU OK (${checks} assertions); native synchronous setter coverage/restoration epochs UNRUN`);
+}
+await defaultSurfaceControls();
 const checks=[
   ['pending-gpu-import',async a=>{
     let release,calls=0;const stats={},stop={stopped:false,check(){return !this.stopped;}},renderer={getContext(){calls++;return {};}};

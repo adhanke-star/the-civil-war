@@ -54,14 +54,82 @@ export async function rejectionObservation(run) {
 // Synchronized GPU estimate, including a resize's old/new default surfaces. CPU arrays are separate.
 export class ReservationPeak {
   constructor(){this.peak=0;this.framebuffer=0;this.pendingFramebuffer=0;this.dimensions='';this.current=0;}
-  sample(apiBytes,width,height,attributes){
+  sample(apiBytes,width,height,attributes,generation=false){
     const framebuffer=width*height*(8+(attributes.depth?4:0)+(attributes.stencil?4:0));
     const dimensions=`${width}:${height}`;
-    if(dimensions!==this.dimensions)this.pendingFramebuffer+=this.framebuffer;
+    if(generation||dimensions!==this.dimensions)this.pendingFramebuffer+=this.framebuffer;
     this.current=apiBytes+framebuffer+this.pendingFramebuffer;this.peak=Math.max(this.peak,this.current);
     this.framebuffer=framebuffer;this.dimensions=dimensions;return this.current;
   }
   finish(){this.pendingFramebuffer=0;}
+}
+// Recompute raw ledger/surface equations and finish binds; live accessor identity is a separate producer control.
+export function defaultSurfaceHistoryErrors(retained){
+  const errors=[],fail=message=>{throw Error('default surface history: '+message);};
+  try{
+    const rows=retained?.defaultEvents,native=retained?.nativeEvents;
+    if(retained?.defaultSurfaceCapture!==true||retained.surfaceRegistered!==true||retained.observerFailureCount!==0
+      ||retained.nativeFailureCapture!==true||retained.nativeFailureCount!==0||!Array.isArray(retained.nativeFailures)||retained.nativeFailures.length
+      ||!Array.isArray(retained.unknown)||retained.unknown.length||!Array.isArray(rows)||!rows.length||rows.length>16384
+      ||!Array.isArray(native)||native.length>16384)fail('incomplete capture');
+    if(rows[0].kind!=='sample'||rows[0].boundary!=='creation')fail('first creation missing');
+    const natural=n=>Number.isSafeInteger(n)&&n>=0;
+    if(!retained.calls||typeof retained.calls!=='object'||Array.isArray(retained.calls)||!Object.values(retained.calls).every(natural)
+      ||retained.limits?.defaultEvents!==16384||retained.limits?.nativeEvents!==16384
+      ||retained.limits?.signatures!==256||retained.limits?.nativeFailures!==128)fail('calls/limits');
+    const callTotal=Object.values(retained.calls).reduce((sum,n)=>sum+n,0);
+    if(!natural(callTotal))fail('native call total');
+    sceneNativeReplay(native)(native.length,retained);
+    const apiAt=[0,...native.map(e=>e.current)];
+    const reservationSamples=new Set(rows.filter(row=>row.kind==='sample'&&row.boundary==='native')
+      .map(row=>`${row.nativeEventsEnd}/${row.nativeCallOrdinal}/${row.apiBytes}`));
+    for(const [index,event]of native.entries())if(event.operation==='reserve'
+      &&!reservationSamples.has(`${index}/${event.callOrdinal}/${event.transient}`))
+      fail('missing native reservation peak sample');
+    let framebuffer=0,pending=0,peak=0,current=0,ordinal=0,end=0,dimensions='',setter=null,finishes=0,attributes=null;
+    for(const [i,row]of rows.entries()){
+      if(row.sequence!==i+1||!natural(row.nativeCallOrdinal)||row.nativeCallOrdinal<ordinal||row.nativeCallOrdinal>callTotal
+        ||!natural(row.nativeEventsEnd)||row.nativeEventsEnd<end||row.nativeEventsEnd>native.length)fail('sequence/native ordering');
+      if(row.nativeEventsEnd&&row.nativeCallOrdinal<native[row.nativeEventsEnd-1].callOrdinal)fail('sample precedes consumed native event');
+      if(row.kind==='finish'){
+        if(setter||native.slice(end,row.nativeEventsEnd).filter(e=>e.operation==='finish'&&e.call==='finish'&&e.callOrdinal===row.nativeCallOrdinal).length!==1)
+          fail('unbound native finish');
+        pending=0;finishes++;
+      }else{
+        if(row.kind!=='sample'||![row.width,row.height,row.apiBytes,row.framebuffer,row.pending,row.current,row.peak].every(natural)
+          ||typeof row.attributes?.depth!=='boolean'||typeof row.attributes?.stencil!=='boolean'||typeof row.generation!=='boolean')fail('sample shape');
+        const boundary=row.boundary,d=`${row.width}:${row.height}`;
+        const next=native[row.nativeEventsEnd];
+        if(row.apiBytes!==apiAt[row.nativeEventsEnd]&&!(boundary==='native'&&next?.operation==='reserve'
+          &&next.callOrdinal===row.nativeCallOrdinal&&row.apiBytes===next.transient))fail('API bytes not bound to raw native ledger');
+        if(attributes&&(row.attributes.depth!==attributes.depth||row.attributes.stencil!==attributes.stencil))fail('attributes changed without proved epoch');
+        attributes=row.attributes;
+        if(i===0){if(boundary!=='creation'||row.generation||row.nativeCallOrdinal!==0||row.nativeEventsEnd!==0)fail('first creation');}
+        else if(boundary==='creation')fail('duplicate creation');
+        if(['width-before','height-before'].includes(boundary)){
+          if(setter||row.generation)fail('setter start');setter={axis:boundary.split('-')[0],width:row.width,height:row.height,ordinal:row.nativeCallOrdinal};
+        }else if(['width-after','height-after'].includes(boundary)){
+          if(setter?.axis!==boundary.split('-')[0]||!row.generation||setter.ordinal!==row.nativeCallOrdinal
+            ||(setter.axis==='width'?setter.height!==row.height:setter.width!==row.width))fail('setter completion');setter=null;
+        }else if(!['creation','native'].includes(boundary)||row.generation||setter)fail('unknown/interleaved boundary');
+        if(boundary!=='native'){
+          if(!Array.isArray(row.applied)||row.applied.length!==2||row.applied[0]!==row.width||row.applied[1]!==row.height)fail('applied dimensions');
+        }else if(row.applied!==null)fail('native boundary shape');
+        if(dimensions&&d!==dimensions&&!row.generation)fail('unobserved dimensions');
+        if(row.generation)pending+=framebuffer;
+        framebuffer=row.width*row.height*(8+(row.attributes.depth?4:0)+(row.attributes.stencil?4:0));
+        current=row.apiBytes+framebuffer+pending;peak=Math.max(peak,current);dimensions=d;
+        if(![framebuffer,pending,current,peak].every(natural)||row.framebuffer!==framebuffer||row.pending!==pending||row.current!==current||row.peak!==peak)
+          fail('surface equation');
+      }
+      ordinal=row.nativeCallOrdinal;end=row.nativeEventsEnd;
+    }
+    if(end!==native.length||finishes!==native.filter(e=>e.operation==='finish').length)fail('unconsumed native history/finish');
+    if(setter||rows.at(-1).kind!=='sample'||retained.gpuPeak!==peak||retained.gpuCurrent!==current
+      ||retained.defaultFramebuffer!==framebuffer||retained.pendingDefaultFramebuffer!==pending
+      ||retained.sampledDimensions!==dimensions||finishes!==(retained.calls?.finish||0))fail('terminal totals');
+  }catch(error){errors.push(error.message);}
+  return errors;
 }
 export function mipSizes(w,h,bpp,levels=Math.floor(Math.log2(Math.max(w,h)))+1) {
   if(![w,h,bpp,levels].every(Number.isSafeInteger)||w<1||h<1||bpp<1||levels<1||levels>32)throw new Error('allocation: invalid mip dimensions');
@@ -955,9 +1023,9 @@ function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) 
 }
 
 /** Installed only in an owned diagnostic context before game boot. No product code or GL arguments changed. */
-/** Optional acquisition evidence only: no GL queries and no complete startup/resize budget claim. */
-export function installFieldContextObserver({enabled=false}={}) {
-  if(typeof enabled!=='boolean')throw Error('field context observer: explicit boolean required');
+/** Acquisition is query-free by default; optional surface capture reads live dimensions/attributes. */
+export function installFieldContextObserver({enabled=false,observeSurfaces=false}={}) {
+  if(typeof enabled!=='boolean'||typeof observeSurfaces!=='boolean')throw Error('field context observer: explicit boolean required');
   if(!enabled)return Object.freeze({read:()=>({enabled:false}),restore(){}});
   const proto=globalThis.HTMLCanvasElement?.prototype,native=proto?.getContext;
   if(typeof native!=='function')throw Error('field context observer: canvas API unavailable');
@@ -965,7 +1033,19 @@ export function installFieldContextObserver({enabled=false}={}) {
     allocation=Object.getOwnPropertyDescriptor(window,'__allocation')?.value;
   if(!allocation||typeof allocation.peek!=='function')throw Error('field context observer: retained allocation observer required');
   if(prior&&!prior.configurable)throw Error('field context observer: observation property is not configurable');
-  const receipts=[],contexts=new Map(),ids=new WeakMap(),errors=[],peek=allocation.peek;
+  const receipts=[],contexts=new Map(),ids=new WeakMap(),errors=[],peek=allocation.peek,
+    surface=allocation.surfaceBoundary,surfaceFailure=allocation.surfaceFailure,canvasContexts=new WeakMap(),accessors=[],lossListeners=[],lostCanvases=new WeakSet();
+  if(observeSurfaces){
+    if(typeof surface!=='function'||typeof surfaceFailure!=='function'||allocation.defaultSurfaceCapture!==true)
+      throw Error('field context observer: default surface capture required');
+    for(const name of ['width','height']){
+      let owner=proto;while(owner&&!Object.getOwnPropertyDescriptor(owner,name))owner=Object.getPrototypeOf(owner);
+      const nativeDescriptor=owner&&Object.getOwnPropertyDescriptor(owner,name),descriptor=Object.getOwnPropertyDescriptor(proto,name);
+      if(typeof nativeDescriptor?.get!=='function'||typeof nativeDescriptor?.set!=='function'||descriptor?.configurable===false)
+        throw Error('field context observer: configurable native canvas accessors required');
+      accessors.push({name,descriptor,nativeDescriptor,restored:false,installed:null});
+    }
+  }
   let failures=0,overflow=false,ignored=0,methodRestored=false,propertyRestored=false,installedDescriptor,installedProperty;
   const metadata=error=>{
     const type=typeof error,primitive=error===null||['string','number','boolean','undefined'].includes(type);
@@ -983,6 +1063,14 @@ export function installFieldContextObserver({enabled=false}={}) {
     try{errors.push({kind:'observation failed',...metadata(error)});}
     catch{errors.push({kind:'observation failed; error metadata unavailable'});}
   }};
+  const observeSurface=(canvas,gl,boundary)=>observed(()=>{
+    if(Object.getOwnPropertyDescriptor(window,'__allocation')?.value!==allocation||allocation.surfaceBoundary!==surface
+      ||allocation.surfaceFailure!==surfaceFailure||accessors.some(a=>!matches(Object.getOwnPropertyDescriptor(proto,a.name),a.installed)))
+      throw Error('default surface observation ownership changed');
+    if(lostCanvases.has(canvas))return;
+    const width=Reflect.apply(accessors[0].nativeDescriptor.get,canvas,[]),height=Reflect.apply(accessors[1].nativeDescriptor.get,canvas,[]);
+    Reflect.apply(surface,allocation,[gl,{boundary,width,height}]);
+  });
   const emit=(receiver,args,value,threw,error)=>observed(()=>{
     const target=receiver===document.getElementById('battlefield'),type=typeof args[0]==='string'?args[0]:null,
       supported=['webgl','webgl2','experimental-webgl'].includes(type);
@@ -994,6 +1082,12 @@ export function installFieldContextObserver({enabled=false}={}) {
       if(!ids.has(value)){
         if(contexts.size>=8){overflow=true;return;}
         const id=contexts.size+1;ids.set(value,id);contexts.set(id,value);
+        if(observeSurfaces){
+          canvasContexts.set(receiver,value);
+          const loss=()=>{lostCanvases.add(receiver);observed(()=>Reflect.apply(surfaceFailure,allocation,[value,'default surface loss/restoration epoch unproved',true]));};
+          receiver.addEventListener('webglcontextlost',loss);lossListeners.push({canvas:receiver,loss});
+          observeSurface(receiver,value,'creation');
+        }
       }
       context=ids.get(value);
     }
@@ -1017,14 +1111,20 @@ export function installFieldContextObserver({enabled=false}={}) {
         for(const[id,gl]of contexts)states.push({id,retained:Reflect.apply(peek,allocation,[gl])});
       });
       return {enabled:true,receipts:structuredClone(receipts),states,observerFailureCount:failures,
-        observerErrors:structuredClone(errors),overflow,ignored,restored:methodRestored&&propertyRestored,
-        coverage:'acquisition and retained records only; default-only startup and unsampled resize unproved'};
+        observerErrors:structuredClone(errors),overflow,ignored,restored:methodRestored&&propertyRestored&&accessors.every(a=>a.restored),
+        coverage:observeSurfaces?'acquisition and synchronous native width/height setter boundaries only; other mutation and restoration paths unproved':
+          'acquisition and retained records only; default-only startup and unsampled resize unproved'};
     },
     restore(){
       const failed=[];
+      for(const {canvas,loss}of lossListeners)canvas.removeEventListener('webglcontextlost',loss);
       if(!methodRestored){
         if(!matches(Object.getOwnPropertyDescriptor(proto,'getContext'),installedDescriptor))failed.push('foreign canvas descriptor');
         else{if(original)Object.defineProperty(proto,'getContext',original);else delete proto.getContext;methodRestored=true;}
+      }
+      for(const a of accessors)if(!a.restored){
+        if(!matches(Object.getOwnPropertyDescriptor(proto,a.name),a.installed))failed.push('foreign canvas '+a.name+' descriptor');
+        else{if(a.descriptor)Object.defineProperty(proto,a.name,a.descriptor);else delete proto[a.name];a.restored=true;}
       }
       if(!propertyRestored){
         if(!matches(Object.getOwnPropertyDescriptor(window,'__fieldContextObservation'),installedProperty))failed.push('foreign observation owner');
@@ -1036,15 +1136,35 @@ export function installFieldContextObserver({enabled=false}={}) {
   Object.defineProperty(proto,'getContext',{value:wrapped,writable:original?.writable??true,
     enumerable:original?.enumerable??true,configurable:original?.configurable??true});
   installedDescriptor=Object.getOwnPropertyDescriptor(proto,'getContext');
-  try{Object.defineProperty(window,'__fieldContextObservation',{value:observer,writable:false,configurable:true});
+  try{
+    for(const a of accessors){
+      const set=function(value){const gl=canvasContexts.get(this);
+        if(gl)observeSurface(this,gl,a.name+'-before');
+        let result;
+        try{result=Reflect.apply(a.nativeDescriptor.set,this,[value]);}catch(error){
+          if(gl)observed(()=>Reflect.apply(surfaceFailure,allocation,[gl,'native canvas '+a.name+' setter threw']));
+          throw error;
+        }
+        if(gl)observeSurface(this,gl,a.name+'-after');return result;
+      };
+      Object.defineProperty(proto,a.name,{get:a.nativeDescriptor.get,set,enumerable:a.nativeDescriptor.enumerable,configurable:true});
+      a.installed=Object.getOwnPropertyDescriptor(proto,a.name);
+    }
+    Object.defineProperty(window,'__fieldContextObservation',{value:observer,writable:false,configurable:true});
     installedProperty=Object.getOwnPropertyDescriptor(window,'__fieldContextObservation');}
   catch(error){if(matches(Object.getOwnPropertyDescriptor(proto,'getContext'),installedDescriptor)){
     if(original)Object.defineProperty(proto,'getContext',original);else delete proto.getContext;
-  }throw error;}
+  }
+    for(const a of accessors)if(a.installed&&matches(Object.getOwnPropertyDescriptor(proto,a.name),a.installed)){
+      if(a.descriptor)Object.defineProperty(proto,a.name,a.descriptor);else delete proto[a.name];
+    }
+    throw error;}
   return observer;
 }
 
 export function installAllocationObserver(source) {
+  if(source.captureDefaultSurfaces===true&&(source.nativeJournal!==true||source.captureNativeFailures!==true))
+    throw Error('allocation: default surface capture requires native journal and failed-call capture');
   const Ledger=(0,eval)('('+source.ledger+')'),mips=(0,eval)('('+source.mips+')'),Peak=(0,eval)('('+source.reservationPeak+')');
   const wrappers=[],prior=Object.getOwnPropertyDescriptor(window,'__allocation');let observer,installed=false,restored=false;
   const restore=()=>{
@@ -1072,15 +1192,37 @@ export function installAllocationObserver(source) {
     }
     return {...out,metadataUnavailable:unavailable};
   };
-  const sample=(gl,s,bytes=s.ledger.bytes)=>{
+  const surfaceEvent=(s,event)=>{
+    if(s.defaultEvents.length>=16384){unknown(s,'default surface journal limit');return;}
+    s.defaultEvents.push({sequence:s.defaultEvents.length+1,nativeCallOrdinal:s.nativeCallOrdinal||0,
+      nativeEventsEnd:s.nativeEvents.length,...event});
+  };
+  const sample=(gl,s,bytes=s.ledger.bytes,options={})=>{
+    if(s.surfaceLost)return s.gpu.current;
     const attributes=gl.getContextAttributes();
     // Actual loss returns null attributes. Retain the last conservative surface cost;
     // disposal calls still retire known owners, without inventing a completed fence.
-    if(attributes===null&&gl.isContextLost?.())return s.gpu.current;
-    const current=s.gpu.sample(bytes,gl.drawingBufferWidth,gl.drawingBufferHeight,attributes);
+    if(attributes===null&&gl.isContextLost?.()){
+      if(s.surfaceRegistered){s.surfaceLost=true;unknown(s,'default surface unavailable during loss');}
+      return s.gpu.current;
+    }
+    const width=gl.drawingBufferWidth,height=gl.drawingBufferHeight;
+    if(s.surfaceRegistered){
+      if(!attributes||typeof attributes.depth!=='boolean'||typeof attributes.stencil!=='boolean'
+        ||![width,height,bytes].every(n=>Number.isSafeInteger(n)&&n>=0))throw Error('default surface dimensions/attributes unavailable');
+      if(options.width!==undefined&&(width!==options.width||height!==options.height))
+        throw Error('default surface drawing dimensions differ from applied canvas');
+      if(!options.generation&&s.gpu.dimensions&&s.gpu.dimensions!==`${width}:${height}`)
+        unknown(s,'unobserved default surface dimension change');
+    }
+    const current=s.gpu.sample(bytes,width,height,attributes,options.generation===true);
+    if(s.surfaceRegistered)surfaceEvent(s,{kind:'sample',boundary:options.boundary||'native',generation:options.generation===true,
+      width,height,attributes:{depth:attributes.depth,stencil:attributes.stencil},apiBytes:bytes,
+      framebuffer:s.gpu.framebuffer,pending:s.gpu.pendingFramebuffer,current,peak:s.gpu.peak,
+      applied:options.width===undefined?null:[options.width,options.height]});
     s.defaultPeak=Math.max(s.defaultPeak,s.gpu.framebuffer+s.gpu.pendingFramebuffer);return current;
   };
-  const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),gpu:new Peak(),bufferArrays:new WeakMap(),bufferSources:new Map(),bufferIds:new Map(),bufferOwners:new Map(),nextBufferId:1,textures:new Map(),textureIds:new Map(),renderbufferIds:new Map(),nativeEvents:[],nativeFailures:[],nativeFailureCount:0,vertexArrays:new Map(),vertexArrayEvents:[],nextVertexArrayId:1,signatures:[],unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};s.ledger.onReservation=bytes=>sample(gl,s,bytes);
+  const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),gpu:new Peak(),surfaceRegistered:false,defaultEvents:[],bufferArrays:new WeakMap(),bufferSources:new Map(),bufferIds:new Map(),bufferOwners:new Map(),nextBufferId:1,textures:new Map(),textureIds:new Map(),renderbufferIds:new Map(),nativeEvents:[],nativeFailures:[],nativeFailureCount:0,vertexArrays:new Map(),vertexArrayEvents:[],nextVertexArrayId:1,signatures:[],unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};s.ledger.onReservation=bytes=>sample(gl,s,bytes);
     if(source.nativeJournal===true)s.ledger.onEvent=(operation,event)=>journal(s,operation,event);
     contexts.set(gl,s);}return s;};
   const unknown=(s,value)=>{if(!s.unknown.includes(value))s.unknown.push(value);};
@@ -1205,11 +1347,29 @@ export function installAllocationObserver(source) {
     });
     for(const [name,kind]of [['deleteTexture','texture'],['deleteBuffer','buffer'],['deleteRenderbuffer','renderbuffer']])
       wrap(proto,name,(gl,a)=>{const s=state(gl);s.ledger.retire(a[0]);if(kind==='texture')s.textures.delete(a[0]);});
-    wrap(proto,'finish',gl=>{const s=state(gl);if(gl.isContextLost?.())return;journal(s,'finish');s.ledger.sync();s.gpu.finish();for(const id of s.bufferIds.keys())if(!s.ledger.objects.has(id)){
+    wrap(proto,'finish',gl=>{const s=state(gl);if(gl.isContextLost?.())return;journal(s,'finish');s.ledger.sync();s.gpu.finish();
+      if(s.surfaceRegistered)surfaceEvent(s,{kind:'finish'});
+      for(const id of s.bufferIds.keys())if(!s.ledger.objects.has(id)){
       s.bufferArrays.get(s.bufferSources.get(id))?.delete(id);s.bufferSources.delete(id);s.bufferOwners.delete(id);s.bufferIds.delete(id);
     }});
   }
-  observer={restore,nativeCalls(gl){return {...state(gl).calls};},
+  observer={restore,nativeCalls(gl){return {...state(gl).calls};},defaultSurfaceCapture:source.captureDefaultSurfaces===true,
+  surfaceFailure(gl,reason,lost=false){if(source.captureDefaultSurfaces!==true)throw Error('allocation: default surface capture disabled');
+    const s=state(gl);if(lost===true)s.surfaceLost=true;unknown(s,typeof reason==='string'?reason:'default surface observer failed');
+  },
+  surfaceBoundary(gl,{boundary,width,height}){
+    if(source.captureDefaultSurfaces!==true)throw Error('allocation: default surface capture disabled');
+    const s=state(gl);
+    try{
+      if(!['creation','width-before','width-after','height-before','height-after'].includes(boundary)
+        ||![width,height].every(n=>Number.isSafeInteger(n)&&n>=0))throw Error('invalid default surface boundary');
+      if(boundary==='creation'){
+        if(s.surfaceRegistered||s.gpu.dimensions||Object.keys(s.calls).length)throw Error('default surface registered late/duplicate');
+        s.surfaceRegistered=true;
+      }else if(!s.surfaceRegistered)throw Error('default surface creation missing');
+      sample(gl,s,s.ledger.bytes,{boundary,width,height,generation:boundary.endsWith('-after')});
+    }catch(error){unknown(s,'default surface boundary failed');throw error;}
+  },
   // Retained data only. Reading an unseen/lost context never creates state or calls GL.
   peek(gl){const s=contexts.get(gl);
     if(!s)return {observed:false,observerFailureCount:nativeFailureObserverFailures};
@@ -1219,11 +1379,13 @@ export function installAllocationObserver(source) {
       unknown:[...s.unknown],calls:{...s.calls},signatures:structuredClone(s.signatures),nativeEvents:structuredClone(s.nativeEvents),
       nativeFailureCapture:source.captureNativeFailures===true,nativeFailureCount:s.nativeFailureCount,
       nativeFailures:structuredClone(s.nativeFailures),observerFailureCount:nativeFailureObserverFailures,
-      limits:{nativeEvents:16384,signatures:256,nativeFailures:128},
+      defaultSurfaceCapture:source.captureDefaultSurfaces===true,surfaceRegistered:s.surfaceRegistered,defaultEvents:structuredClone(s.defaultEvents),
+      limits:{nativeEvents:16384,signatures:256,nativeFailures:128,defaultEvents:16384},
       bufferSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='buffer').map(([id,r])=>({id:s.bufferIds.get(id),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(id),owners:[...s.bufferOwners.get(id)||[]]})),
       textureSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='texture').map(([id,r])=>({texture:s.textureIds.get(id),slots:Object.fromEntries(r.slots),pendingDelete:s.ledger.retired.has(id)})),
       renderbufferSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='renderbuffer').map(([id,r])=>({id:s.renderbufferIds.get(id),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(id)})),
-      coverage:'retained sampled calls only; default-only startup and unsampled resize unproved'};
+      coverage:s.surfaceRegistered?'retained calls plus synchronous creation/width/height evidence; other mutation and restoration epochs unproved':
+        'retained sampled calls only; default-only startup and unsampled resize unproved'};
   },
   // Read retained records only, including while context attributes are unavailable.
   // This does not replace a full allocation sample or reset any pending/default bytes.
