@@ -20,6 +20,7 @@ import {parseAtlasAstc,pageMipBytes} from '../src/units/atlas-compression.js';
 import {ordinaryLookoutFixture,ordinaryCapacityContract} from './resource-profile-fixture.mjs';
 import {applyCampaign} from '../src/franchise/campaign.js';
 import {validateSnapshot} from '../src/franchise/save.js';
+import {installFieldContextObserver,installAllocationObserver,AllocationLedger,mipSizes,ReservationPeak} from './bake/scene-allocation.mjs';
 
 const base='assets/figures/confederate-infantry/';
 const turn=async()=>{for(let i=0;i<60;i++)await Promise.resolve();};
@@ -227,6 +228,121 @@ async function ordinaryInputControls() {
   console.log(`ORDINARY-INPUTS OK (constructor/prefix/determinism/shipping-composition/two-route-capacity); CONTROLS OK (${mutations.length+3}/${mutations.length+3}); native entry/250MB UNRUN`);
 }
 await ordinaryInputControls();
+async function contextObserverControls() {
+  let checks=0;
+  for(const inherited of [false,true])await globals({window:{},document:{},HTMLCanvasElement:undefined},()=>{
+    const calls=[],peekCalls=[],gl={},otherGL={};let target,throwValue;
+    const native=function(...args){calls.push({receiver:this,args});if(throwValue!==undefined)throw throwValue;
+      return args[0]==='null'?null:this===target?gl:otherGL;};
+    class Base{}Object.defineProperty(Base.prototype,'getContext',{value:native,writable:true,configurable:true});
+    class Canvas extends Base{}if(!inherited)Object.defineProperty(Canvas.prototype,'getContext',{value:native,writable:true,configurable:true});
+    HTMLCanvasElement=Canvas;target=new Canvas();document.getElementById=()=>target;
+    Object.defineProperty(window,'__allocation',{value:{peek(context){peekCalls.push(context);return{observed:false};}},configurable:true});
+    const before=Object.getOwnPropertyDescriptor(Canvas.prototype,'getContext');
+    const disabled=installFieldContextObserver();assert.equal(disabled.read().enabled,false);
+    assert.deepEqual(Object.getOwnPropertyDescriptor(Canvas.prototype,'getContext'),before);disabled.restore();checks+=2;
+    const observer=installFieldContextObserver({enabled:true}),options={alpha:false};
+    assert.equal(target.getContext('webgl2',options),gl);assert.equal(calls.length,1);
+    assert.equal(calls[0].receiver,target);assert.equal(calls[0].args[1],options);assert.equal(peekCalls.length,0);checks+=5;
+    target.getContext('webgl2',options);new Canvas().getContext('webgl2');target.getContext('2d');target.getContext('null');
+    const r=observer.read();assert.deepEqual(r.receipts.map(e=>e.context),[1,1,null,null,null]);
+    assert.equal(r.receipts.at(-1).outcome,'null');assert.equal(r.states.length,1);assert.equal(peekCalls[0],gl);checks+=4;
+    const error=new Error('native context failure');throwValue=error;
+    assert.throws(()=>target.getContext('webgl2'),e=>e===error);assert.equal(observer.read().receipts.at(-1).outcome,'throw');checks+=2;
+    throwValue={get message(){throw Error('observation getter failed');}};
+    assert.throws(()=>target.getContext('webgl2'),e=>e===throwValue);assert.equal(observer.read().observerFailureCount,1);checks+=2;
+    for(const unavailable of [()=>{},Symbol('metadata')]){
+      throwValue={name:unavailable,message:'native original failure'};
+      assert.throws(()=>target.getContext('webgl2'),e=>e===throwValue);
+      const r=observer.read();assert(r.receipts.at(-1).error.metadataUnavailable);
+      assert.equal(r.receipts.at(-1).error.name,null);assert.doesNotThrow(()=>structuredClone(r));checks+=4;
+    }
+    observer.restore();observer.restore();assert.equal(target.getContext,native);
+    assert.deepEqual(Object.getOwnPropertyDescriptor(Canvas.prototype,'getContext'),before);
+    assert.equal(Object.hasOwn(window,'__fieldContextObservation'),false);checks+=3;
+  });
+  await globals({window:{},document:{},HTMLCanvasElement:undefined},()=>{
+    const contexts=Array.from({length:10},()=>({}));let index=0,calls=0;class Canvas{getContext(){calls++;return contexts[index];}}
+    HTMLCanvasElement=Canvas;const target=new Canvas();document.getElementById=()=>target;
+    window.__allocation={peek:()=>({observed:false})};
+    const o=installFieldContextObserver({enabled:true});
+    target.getContext('webgl2');index=1;target.getContext('webgl2');
+    assert.deepEqual(o.read().receipts.map(r=>r.context),[1,2]);checks++;
+    for(let i=0;i<130;i++)target.getContext('webgl2');assert(o.read().overflow);assert.equal(o.read().receipts.length,128);assert.equal(calls,132);checks+=3;o.restore();
+    const p=installFieldContextObserver({enabled:true}),foreign=()=>null;Canvas.prototype.getContext=foreign;
+    assert.throws(()=>p.restore(),/foreign canvas descriptor/);assert.equal(Canvas.prototype.getContext,foreign);checks+=2;
+  });
+  await globals({window:{},document:{},HTMLCanvasElement:undefined},()=>{
+    class Canvas{getContext(){return{};}}HTMLCanvasElement=Canvas;const target=new Canvas();document.getElementById=()=>target;
+    window.__allocation={peek:()=>({observed:false})};const o=installFieldContextObserver({enabled:true}),foreign={foreign:true};
+    Object.defineProperty(window,'__fieldContextObservation',{value:foreign,configurable:true});
+    assert.throws(()=>o.restore(),/foreign observation owner/);assert.equal(window.__fieldContextObservation,foreign);checks+=2;
+  });
+  await globals({window:{},document:{},HTMLCanvasElement:undefined},()=>{
+    let current=0;const values=Array.from({length:9},()=>({})),prior={prior:true};
+    class Canvas{getContext(){return values[current];}}HTMLCanvasElement=Canvas;const target=new Canvas();document.getElementById=()=>target;
+    window.__allocation={peek:()=>({observed:false})};
+    Object.defineProperty(window,'__fieldContextObservation',{value:prior,writable:true,enumerable:true,configurable:true});
+    const before=Object.getOwnPropertyDescriptor(window,'__fieldContextObservation'),o=installFieldContextObserver({enabled:true});
+    for(current=0;current<9;current++)assert.equal(target.getContext('webgl2'),values[current]);
+    assert.equal(o.read().states.length,8);assert(o.read().overflow);checks+=2;
+    o.restore();assert.deepEqual(Object.getOwnPropertyDescriptor(window,'__fieldContextObservation'),before);checks++;
+    const p=installFieldContextObserver({enabled:true});document.getElementById=()=>{throw Error('DOM observation failure');};
+    current=0;assert.equal(target.getContext('webgl2'),values[0]);assert.equal(p.read().observerFailureCount,1);checks+=2;p.restore();
+  });
+  await globals({window:{},WebGLRenderingContext:undefined,WebGL2RenderingContext:undefined},()=>{
+    let queries=0;const original=new Error('native allocation failure');let failure=original;
+    class GL {
+      bufferData(){throw failure;}
+      getContextAttributes(){queries++;throw Error('unexpected GL query');}
+      isContextLost(){queries++;throw Error('unexpected GL loss query');}
+      getError(){queries++;throw Error('unexpected GL error query');}
+    }
+    WebGL2RenderingContext=GL;const native=GL.prototype.bufferData;
+    installAllocationObserver({ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),nativeJournal:true,captureNativeFailures:true});
+    const gl=new GL(),o=window.__allocation;assert.equal(o.peek(gl).observed,false);assert.equal(queries,0);checks+=2;
+    assert.throws(()=>gl.bufferData(1,2,3),e=>e===original);const r=o.peek(gl);
+    assert.equal(r.observed,true);assert.equal(r.sampled,false);assert.equal(r.bytes,0);assert.equal(r.gpuPeak,0);
+    assert.equal(r.nativeFailures.length,1);assert.equal(r.nativeFailures[0].call,'bufferData');assert.equal(r.nativeFailures[0].error.message,original.message);
+    assert.equal(Object.keys(r.calls).length,0);assert.equal(r.nativeEvents.length,0);assert.equal(queries,0);checks+=11;
+    failure={get message(){throw Error('metadata failure');}};assert.throws(()=>gl.bufferData(),e=>e===failure);
+    assert.equal(o.peek(gl).observerFailureCount,1);assert(o.peek(gl).unknown.includes('native failure observer failed'));checks+=3;
+    for(const unavailable of [()=>{},Symbol('metadata')]){
+      failure={name:unavailable,message:'native original failure'};
+      assert.throws(()=>gl.bufferData(),e=>e===failure);const r=o.peek(gl);
+      assert(r.nativeFailures.at(-1).error.metadataUnavailable);assert.equal(r.nativeFailures.at(-1).error.name,null);
+      assert.doesNotThrow(()=>structuredClone(r));checks+=4;
+    }
+    failure=original;for(let i=0;i<130;i++)try{gl.bufferData();}catch(e){assert.equal(e,original);}
+    assert(o.peek(gl).unknown.includes('native failure receipt limit'));assert.equal(o.peek(gl).nativeFailures.length,128);assert.equal(queries,0);checks+=3;
+    o.restore();assert.equal(GL.prototype.bufferData,native);checks++;
+  });
+  await globals({window:{},WebGLRenderingContext:undefined,WebGL2RenderingContext:undefined},()=>{
+    let queries=0;const nativeCalls=[],returned={},error=new Error('lost native failure');
+    class GL {
+      constructor(){this.drawingBufferWidth=10;this.drawingBufferHeight=10;this.buffer={};this.lost=false;}
+      bufferData(...args){nativeCalls.push({receiver:this,args});if(this.fail)throw error;return returned;}
+      getParameter(){queries++;if(this.lost)throw Error('query during loss');return this.buffer;}
+      getContextAttributes(){queries++;if(this.lost)throw Error('attributes during loss');return{depth:true,stencil:false};}
+    }
+    GL.prototype.ARRAY_BUFFER=34962;GL.prototype.ARRAY_BUFFER_BINDING=34964;WebGL2RenderingContext=GL;
+    installAllocationObserver({ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),nativeJournal:true,captureNativeFailures:true});
+    const gl=new GL(),o=window.__allocation,data=new Float32Array(8);
+    assert.equal(gl.bufferData(34962,data,35044),returned);assert.equal(nativeCalls.length,1);
+    assert.equal(nativeCalls[0].receiver,gl);assert.equal(nativeCalls[0].args[1],data);checks+=4;
+    const first=o.peek(gl);assert(first.sampled);assert.equal(first.bytes,32);assert.equal(first.defaultFramebuffer,1200);assert.equal(first.gpuPeak,1232);checks+=4;
+    gl.drawingBufferWidth=20;gl.bufferData(34962,data,35044);const resized=o.peek(gl);
+    assert.equal(resized.defaultFramebuffer,2400);assert.equal(resized.pendingDefaultFramebuffer,1200);assert.equal(resized.gpuPeak,3664);checks+=3;
+    gl.drawingBufferWidth=30;gl.lost=true;const queryCount=queries,retained=o.peek(gl);
+    assert.equal(retained.sampledDimensions,'20:10');assert.equal(retained.gpuPeak,3664);assert.equal(queries,queryCount);checks+=3;
+    retained.nativeEvents[0].bytes=999999;retained.bufferSlots[0].bytes=999999;
+    assert.equal(o.peek(gl).nativeEvents[0].bytes,32);assert.equal(o.peek(gl).bufferSlots[0].bytes,32);checks+=2;
+    gl.fail=true;assert.throws(()=>gl.bufferData(34962,data,35044),e=>e===error);
+    assert.equal(o.peek(gl).nativeFailures.length,1);assert.equal(o.peek(gl).bytes,32);assert.equal(o.peek(gl).gpuPeak,3664);assert.equal(queries,queryCount);checks+=5;o.restore();
+  });
+  console.log(`CONTEXT-OBSERVER CPU OK (${checks} assertions); default-only startup/unsampled resize/native coverage UNRUN`);
+}
+await contextObserverControls();
 const checks=[
   ['pending-gpu-import',async a=>{
     let release,calls=0;const stats={},stop={stopped:false,check(){return !this.stopped;}},renderer={getContext(){calls++;return {};}};

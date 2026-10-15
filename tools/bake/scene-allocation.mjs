@@ -955,6 +955,95 @@ function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) 
 }
 
 /** Installed only in an owned diagnostic context before game boot. No product code or GL arguments changed. */
+/** Optional acquisition evidence only: no GL queries and no complete startup/resize budget claim. */
+export function installFieldContextObserver({enabled=false}={}) {
+  if(typeof enabled!=='boolean')throw Error('field context observer: explicit boolean required');
+  if(!enabled)return Object.freeze({read:()=>({enabled:false}),restore(){}});
+  const proto=globalThis.HTMLCanvasElement?.prototype,native=proto?.getContext;
+  if(typeof native!=='function')throw Error('field context observer: canvas API unavailable');
+  const original=Object.getOwnPropertyDescriptor(proto,'getContext'),prior=Object.getOwnPropertyDescriptor(window,'__fieldContextObservation'),
+    allocation=Object.getOwnPropertyDescriptor(window,'__allocation')?.value;
+  if(!allocation||typeof allocation.peek!=='function')throw Error('field context observer: retained allocation observer required');
+  if(prior&&!prior.configurable)throw Error('field context observer: observation property is not configurable');
+  const receipts=[],contexts=new Map(),ids=new WeakMap(),errors=[],peek=allocation.peek;
+  let failures=0,overflow=false,ignored=0,methodRestored=false,propertyRestored=false,installedDescriptor,installedProperty;
+  const metadata=error=>{
+    const type=typeof error,primitive=error===null||['string','number','boolean','undefined'].includes(type);
+    let unavailable=!primitive&&type!=='object';
+    const out={type,value:primitive?error??null:null};
+    if(type==='number'&&!Number.isFinite(error)||type==='string'&&error.length>16384){out.value=null;unavailable=true;}
+    for(const key of ['name','message','stack']){const value=error?.[key];
+      out[key]=typeof value==='string'&&value.length<=16384?value:null;
+      if(value!==undefined&&value!==null&&(typeof value!=='string'||value.length>16384))unavailable=true;
+    }
+    return {...out,metadataUnavailable:unavailable};
+  };
+  const observed=fn=>{try{fn();}catch(error){failures++;
+    if(errors.length>=128){overflow=true;return;}
+    try{errors.push({kind:'observation failed',...metadata(error)});}
+    catch{errors.push({kind:'observation failed; error metadata unavailable'});}
+  }};
+  const emit=(receiver,args,value,threw,error)=>observed(()=>{
+    const target=receiver===document.getElementById('battlefield'),type=typeof args[0]==='string'?args[0]:null,
+      supported=['webgl','webgl2','experimental-webgl'].includes(type);
+    if(!target&&!supported){ignored++;return;}
+    if(receipts.length>=128){overflow=true;return;}
+    let context=null;
+    if(target&&supported&&!threw&&value!==null){
+      if((typeof value!=='object'&&typeof value!=='function')||value===undefined)throw Error('unexpected context result');
+      if(!ids.has(value)){
+        if(contexts.size>=8){overflow=true;return;}
+        const id=contexts.size+1;ids.set(value,id);contexts.set(id,value);
+      }
+      context=ids.get(value);
+    }
+    const errorInfo=threw?metadata(error):null;
+    if(errorInfo?.metadataUnavailable){failures++;if(errors.length<128)errors.push({kind:'native error metadata unavailable'});else overflow=true;}
+    receipts.push({sequence:receipts.length+1,target,type,argumentCount:args.length,supported,context,
+      outcome:threw?'throw':value===null?'null':'return',
+      ...(threw?{error:errorInfo}:{})});
+  });
+  const wrapped=function(...args){
+    let value;
+    try{value=Reflect.apply(native,this,args);}catch(error){emit(this,args,null,true,error);throw error;}
+    emit(this,args,value,false,null);return value;
+  };
+  const matches=(a,b)=>['value','get','set','writable','enumerable','configurable'].every(k=>a?.[k]===b?.[k]);
+  const observer=Object.freeze({
+    read(){
+      const states=[];
+      observed(()=>{
+        if(Object.getOwnPropertyDescriptor(window,'__allocation')?.value!==allocation||allocation.peek!==peek)throw Error('allocation ownership changed');
+        for(const[id,gl]of contexts)states.push({id,retained:Reflect.apply(peek,allocation,[gl])});
+      });
+      return {enabled:true,receipts:structuredClone(receipts),states,observerFailureCount:failures,
+        observerErrors:structuredClone(errors),overflow,ignored,restored:methodRestored&&propertyRestored,
+        coverage:'acquisition and retained records only; default-only startup and unsampled resize unproved'};
+    },
+    restore(){
+      const failed=[];
+      if(!methodRestored){
+        if(!matches(Object.getOwnPropertyDescriptor(proto,'getContext'),installedDescriptor))failed.push('foreign canvas descriptor');
+        else{if(original)Object.defineProperty(proto,'getContext',original);else delete proto.getContext;methodRestored=true;}
+      }
+      if(!propertyRestored){
+        if(!matches(Object.getOwnPropertyDescriptor(window,'__fieldContextObservation'),installedProperty))failed.push('foreign observation owner');
+        else{if(prior)Object.defineProperty(window,'__fieldContextObservation',prior);else delete window.__fieldContextObservation;propertyRestored=true;}
+      }
+      if(failed.length){failures++;throw Error('field context observer: '+failed.join('; '));}
+    },
+  });
+  Object.defineProperty(proto,'getContext',{value:wrapped,writable:original?.writable??true,
+    enumerable:original?.enumerable??true,configurable:original?.configurable??true});
+  installedDescriptor=Object.getOwnPropertyDescriptor(proto,'getContext');
+  try{Object.defineProperty(window,'__fieldContextObservation',{value:observer,writable:false,configurable:true});
+    installedProperty=Object.getOwnPropertyDescriptor(window,'__fieldContextObservation');}
+  catch(error){if(matches(Object.getOwnPropertyDescriptor(proto,'getContext'),installedDescriptor)){
+    if(original)Object.defineProperty(proto,'getContext',original);else delete proto.getContext;
+  }throw error;}
+  return observer;
+}
+
 export function installAllocationObserver(source) {
   const Ledger=(0,eval)('('+source.ledger+')'),mips=(0,eval)('('+source.mips+')'),Peak=(0,eval)('('+source.reservationPeak+')');
   const wrappers=[],prior=Object.getOwnPropertyDescriptor(window,'__allocation');let observer,installed=false,restored=false;
@@ -971,7 +1060,18 @@ export function installAllocationObserver(source) {
     }
     if(failure)throw failure;restored=true;
   };
-  const contexts=new WeakMap();
+  const contexts=new WeakMap();let nativeFailureObserverFailures=0;
+  const failureMetadata=error=>{
+    const type=typeof error,primitive=error===null||['string','number','boolean','undefined'].includes(type);
+    let unavailable=!primitive&&type!=='object';
+    const out={type,value:primitive?error??null:null};
+    if(type==='number'&&!Number.isFinite(error)||type==='string'&&error.length>16384){out.value=null;unavailable=true;}
+    for(const key of ['name','message','stack']){const value=error?.[key];
+      out[key]=typeof value==='string'&&value.length<=16384?value:null;
+      if(value!==undefined&&value!==null&&(typeof value!=='string'||value.length>16384))unavailable=true;
+    }
+    return {...out,metadataUnavailable:unavailable};
+  };
   const sample=(gl,s,bytes=s.ledger.bytes)=>{
     const attributes=gl.getContextAttributes();
     // Actual loss returns null attributes. Retain the last conservative surface cost;
@@ -980,7 +1080,7 @@ export function installAllocationObserver(source) {
     const current=s.gpu.sample(bytes,gl.drawingBufferWidth,gl.drawingBufferHeight,attributes);
     s.defaultPeak=Math.max(s.defaultPeak,s.gpu.framebuffer+s.gpu.pendingFramebuffer);return current;
   };
-  const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),gpu:new Peak(),bufferArrays:new WeakMap(),bufferSources:new Map(),bufferIds:new Map(),bufferOwners:new Map(),nextBufferId:1,textures:new Map(),textureIds:new Map(),renderbufferIds:new Map(),nativeEvents:[],vertexArrays:new Map(),vertexArrayEvents:[],nextVertexArrayId:1,signatures:[],unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};s.ledger.onReservation=bytes=>sample(gl,s,bytes);
+  const state=gl=>{let s=contexts.get(gl);if(!s){s={ledger:new Ledger(),gpu:new Peak(),bufferArrays:new WeakMap(),bufferSources:new Map(),bufferIds:new Map(),bufferOwners:new Map(),nextBufferId:1,textures:new Map(),textureIds:new Map(),renderbufferIds:new Map(),nativeEvents:[],nativeFailures:[],nativeFailureCount:0,vertexArrays:new Map(),vertexArrayEvents:[],nextVertexArrayId:1,signatures:[],unknown:[],calls:{},defaultPeak:0,defaultBytes:0,defaultDimensions:''};s.ledger.onReservation=bytes=>sample(gl,s,bytes);
     if(source.nativeJournal===true)s.ledger.onEvent=(operation,event)=>journal(s,operation,event);
     contexts.set(gl,s);}return s;};
   const unknown=(s,value)=>{if(!s.unknown.includes(value))s.unknown.push(value);};
@@ -1034,7 +1134,21 @@ export function installAllocationObserver(source) {
   const wrap=(proto,name,after,observe=true)=>{
     const native=proto[name];if(typeof native!=='function')return;
     const descriptor=Object.getOwnPropertyDescriptor(proto,name);
-    const wrapped=function(...args){const value=native.apply(this,args),s=state(this);s.calls[name]=(s.calls[name]||0)+1;
+    const wrapped=function(...args){let value;
+      try{value=native.apply(this,args);}catch(error){
+        if(source.captureNativeFailures===true){
+          let s;
+          try{s=state(this);s.nativeFailureCount++;
+            if(s.nativeFailures.length>=128)unknown(s,'native failure receipt limit');
+            else{const info=failureMetadata(error);
+              if(info.metadataUnavailable){nativeFailureObserverFailures++;unknown(s,'native failure metadata unavailable');}
+              s.nativeFailures.push({sequence:s.nativeFailures.length+1,call:name,completedCallOrdinal:s.nativeCallOrdinal||0,
+                nativeEventsEnd:s.nativeEvents.length,error:info});}
+          }catch{nativeFailureObserverFailures++;if(s)unknown(s,'native failure observer failed');}
+        }
+        throw error;
+      }
+      const s=state(this);s.calls[name]=(s.calls[name]||0)+1;
       const priorCall=s.activeCall;s.activeCall=name;
       if(source.nativeJournal===true)s.nativeCallOrdinal=(s.nativeCallOrdinal||0)+1;
       try{if(observe)sample(this,s);after(this,args,value);if(observe)sample(this,s);}catch(error){unknown(s,`observer:${name}:${error.message}`);}finally{s.activeCall=priorCall;}return value;};
@@ -1096,6 +1210,21 @@ export function installAllocationObserver(source) {
     }});
   }
   observer={restore,nativeCalls(gl){return {...state(gl).calls};},
+  // Retained data only. Reading an unseen/lost context never creates state or calls GL.
+  peek(gl){const s=contexts.get(gl);
+    if(!s)return {observed:false,observerFailureCount:nativeFailureObserverFailures};
+    return {observed:true,sampled:s.gpu.dimensions!=='',...s.ledger.snapshot(),
+      gpuCurrent:s.gpu.current,gpuPeak:s.gpu.peak,defaultFramebuffer:s.gpu.framebuffer,
+      pendingDefaultFramebuffer:s.gpu.pendingFramebuffer,sampledDimensions:s.gpu.dimensions,
+      unknown:[...s.unknown],calls:{...s.calls},signatures:structuredClone(s.signatures),nativeEvents:structuredClone(s.nativeEvents),
+      nativeFailureCapture:source.captureNativeFailures===true,nativeFailureCount:s.nativeFailureCount,
+      nativeFailures:structuredClone(s.nativeFailures),observerFailureCount:nativeFailureObserverFailures,
+      limits:{nativeEvents:16384,signatures:256,nativeFailures:128},
+      bufferSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='buffer').map(([id,r])=>({id:s.bufferIds.get(id),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(id),owners:[...s.bufferOwners.get(id)||[]]})),
+      textureSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='texture').map(([id,r])=>({texture:s.textureIds.get(id),slots:Object.fromEntries(r.slots),pendingDelete:s.ledger.retired.has(id)})),
+      renderbufferSlots:[...s.ledger.objects].filter(([,r])=>r.kind==='renderbuffer').map(([id,r])=>({id:s.renderbufferIds.get(id),bytes:[...r.slots.values()].reduce((a,b)=>a+b,0),pendingDelete:s.ledger.retired.has(id)})),
+      coverage:'retained sampled calls only; default-only startup and unsampled resize unproved'};
+  },
   // Read retained records only, including while context attributes are unavailable.
   // This does not replace a full allocation sample or reset any pending/default bytes.
   nativeRetirementState(gl){const s=state(gl);return {kind:'retained native journal',...s.ledger.snapshot(),defaultFramebuffer:s.defaultBytes,gpuCurrent:s.gpu.current,
