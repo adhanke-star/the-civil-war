@@ -83,6 +83,9 @@ jobs:
 
       - run: npm ci
 
+      - name: Exact generated offline admission manifest
+        run: node tools/build-offline-manifest.mjs --check
+
       - name: Node behaviour files and their --prove-fail controls
         run: |
           set -euo pipefail
@@ -90,7 +93,7 @@ jobs:
             surrender-runtime surrender-result surrender-result-ui equipment reward save practice captures intro \
             sandbox-rules look view spacing residency moments keyboard soldier-view surrender-activation \
             captured-guns battery-overrun captured-loadouts packs large ai masking campaign campaign-ui ground delegation shiloh command stones-river \
-            cavalry chattanooga economy badges observe-badges orders history audio art hooks traits command-chain current-compression scene-allocation foragers progression difficulty-matrix inactive-figures terrain-partition terrain-owner pool-resource game-figure-resource runtime-close resource-profile level-rewards atlas-compression atlas-loader ordinary-field-pilot; do
+            cavalry chattanooga economy badges observe-badges orders history audio art hooks traits command-chain current-compression scene-allocation foragers progression difficulty-matrix inactive-figures terrain-partition terrain-owner pool-resource game-figure-resource runtime-close resource-profile level-rewards atlas-compression atlas-loader ordinary-field-pilot offline-worker; do
             for mode in "" --prove-fail; do
               echo "::group::node tools/test-$name.mjs $mode"
               node "tools/test-$name.mjs" $mode
@@ -141,6 +144,7 @@ jobs:
           if [ "${{ matrix.browser }}" = offline ]; then
             # the service worker: a battle visited once plays with the network off
             node tools/test-offline.mjs
+            node tools/test-offline-upgrade.mjs
           elif [ "${{ matrix.browser }}" = firefox ]; then
             # headless Firefox has no GL driver in this container: Mesa's software GL under xvfb instead
             apt-get update -qq && apt-get install -y -qq libgl1-mesa-dri libegl1 libegl-mesa0 xvfb >/dev/null
