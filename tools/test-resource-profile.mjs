@@ -11,12 +11,15 @@ import {Mixer,BUSES} from '../src/audio/mixer.js';
 import {Effects} from '../src/fx/effects.js';
 import {Game} from '../src/game.js';
 import {LOOK} from '../src/ui/look.js';
-import {prepareFieldScenario} from '../src/sim/phase.js';
-import {setPlan} from '../src/world/landscape.js';
+import {prepareFieldScenario,loadBattlePack} from '../src/sim/phase.js';
+import {setPlan,PLAN} from '../src/world/landscape.js';
 import {showGraphicsReload} from '../src/ui/briefing.js';
 import {QUALIFIED_RUNTIME_MEMBERS,QUALIFIED_HYBRID} from './bake/review-current-compression.mjs';
 import {AtlasLayout} from '../src/units/impostor.js';
 import {parseAtlasAstc,pageMipBytes} from '../src/units/atlas-compression.js';
+import {ordinaryLookoutFixture,ordinaryCapacityContract} from './resource-profile-fixture.mjs';
+import {applyCampaign} from '../src/franchise/campaign.js';
+import {validateSnapshot} from '../src/franchise/save.js';
 
 const base='assets/figures/confederate-infantry/';
 const turn=async()=>{for(let i=0;i<60;i++)await Promise.resolve();};
@@ -162,6 +165,68 @@ assert.equal(warnings.length,process.argv[2]==='terminal'?0:1);console.log('PEND
 `;
 
 const api={profile:fieldResourceProfile,prepare:prepareFieldResources,ordering,Mixer,Effects,Post,Input,detect:detectFieldGPUTier};
+async function ordinaryInputControls() {
+  const campaign=JSON.parse(fs.readFileSync('assets/campaign.json')),
+    pack=JSON.parse(fs.readFileSync('assets/packs/chattanooga.json')),
+    original=JSON.stringify({campaign,pack}),fixture=ordinaryLookoutFixture(campaign,pack);
+  assert.match(fixture.kind,/NOT PLAYED/);
+  assert.equal(fixture.records.length,9);
+  assert.equal(fixture.save.campaign.index,9);
+  assert.equal(fixture.save.campaign.history.length,9);
+  assert.equal(fixture.phase.awardId,'west.3.chattanooga.lookout-mountain.1');
+  assert.ok(fixture.records.every(r=>r.winner===null&&r.grade==='Draw'&&r.units.length===0&&r.loot.length===0));
+  assert.deepEqual(validateSnapshot(fixture.save),fixture.save);
+  assert.deepEqual(ordinaryLookoutFixture(campaign,pack),fixture);
+  assert.equal(JSON.stringify({campaign,pack}),original);
+  const loaded=await loadBattlePack({packId:'chattanooga',phaseId:fixture.phase.phaseId,
+    fetcher:async()=>new Response(JSON.stringify(pack))});
+  assert.deepEqual(loaded.scenario,fixture.authored);
+  assert.deepEqual(prepareFieldScenario(applyCampaign(loaded.scenario,fixture.save,fixture.phase),'pack'),fixture.applied);
+  const manifest=dir=>JSON.parse(fs.readFileSync('assets/figures/'+dir+'/soldier.json')),
+    US=new AtlasLayout(manifest('union-infantry')),CS=new AtlasLayout(manifest('confederate-infantry')),
+    hybrid=new AtlasLayout(JSON.parse(fs.readFileSync(base+'soldier-hybrid.json')));
+  const routes=Object.fromEntries(['capable','unsupported'].map(route=>[route,{US:{field:US.tiers.field.pages.length,close:US.tiers.close.pages.length},
+    CS:{field:CS.tiers.field.pages.length,close:(route==='capable'?hybrid:CS).tiers.close.pages.length}}]));
+  for(const [route,pages]of Object.entries(routes)) {
+    const c=ordinaryCapacityContract(fixture.authored,fixture.applied,pages);
+    assert.deepEqual([c.authored.US,c.applied.US,c.authored.CS,c.applied.CS],[3744,3732,2905,2905]);
+    for(const side of ['authored','applied'])assert.deepEqual(
+      [c[side].ratio,c[side].reserve,c[side].definitions,c[side].scheduled,c[side].horses,c[side].mounts,c[side].flags,c[side].guns],
+      [5,2100,13,4,15,4200,90,{US:8,CS:2,limbers:10}]);
+    assert.equal(pages.CS.close,route==='capable'?10:5);
+  }
+  // Real Game constructor, CPU arrays on labelled flat ground; no WebGL or ordinary-entry claim.
+  const beforeStyle=LOOK.figureStyle,beforePlan=Object.getOwnPropertyDescriptors(PLAN);let game;
+  try {
+    LOOK.figureStyle='rigged';setPlan(fixture.applied);
+    game=new Game({scene:new Scene(),terrain:{half:3500,heightAt:()=>0,slopeAt:()=>0,inBounds:()=>true},
+      scenario:fixture.applied,world:{fenceField:null},effects:{volley(){},boom(){}}});
+    assert.equal(game.pools.US.capacity,3732);assert.equal(game.pools.CS.capacity,2905);
+    assert.equal(game.scenario,fixture.applied);
+  }finally{try{await game?.closeFigureResources();}finally{LOOK.figureStyle=beforeStyle;Object.defineProperties(PLAN,beforePlan);}}
+  const mutations=[
+    s=>s.units.pop(),s=>s.units.push(structuredClone(s.units[0])),
+    s=>s.reinforcements.pop(),s=>s.reinforcements.reverse(),
+    s=>{s.units.find(d=>d.type==='artillery').guns++;},
+    s=>{s.reinforcements[0].atSec++;},s=>{s.reinforcements[0].entry+=' changed';},
+    s=>{s.reinforcements[0].noticeSec=(s.reinforcements[0].noticeSec??60)+1;},
+    s=>{s.reinforcements[0].x++;},s=>{s.units[0].side='CS';},
+    s=>{s.units[0].name='Changed historical label';},
+    s=>{s.units[0].sources=['changed source'];},s=>{s.menPerFigure=10;},
+    s=>{const us=s.units.filter(d=>d.side==='US');us[0].men++;us[1].men-=20;},
+    s=>{s.units[0].men+=100000;},s=>{s.terrain='henry-hill';},s=>{s.id='different';},
+  ];
+  for(const mutate of mutations){const bad=structuredClone(fixture.applied);mutate(bad);
+    assert.throws(()=>ordinaryCapacityContract(fixture.authored,bad,routes.capable),/^Error: ordinary resource inputs: /);}
+  const changed=structuredClone(campaign);changed.phases.splice(0,1);
+  assert.throws(()=>ordinaryLookoutFixture(changed,pack),/^Error: ordinary resource inputs: /);
+  assert.throws(()=>ordinaryLookoutFixture(campaign,{...pack,id:'different'}),/^Error: ordinary resource inputs: /);
+  const oversized=structuredClone(pack);
+  oversized.phases.find(p=>p.id==='lookout-mountain').scenario.units[0].men=100000;
+  assert.throws(()=>ordinaryLookoutFixture(campaign,oversized),/^Error: Field: /);
+  console.log(`ORDINARY-INPUTS OK (constructor/prefix/determinism/shipping-composition/two-route-capacity); CONTROLS OK (${mutations.length+3}/${mutations.length+3}); native entry/250MB UNRUN`);
+}
+await ordinaryInputControls();
 const checks=[
   ['pending-gpu-import',async a=>{
     let release,calls=0;const stats={},stop={stopped:false,check(){return !this.stopped;}},renderer={getContext(){calls++;return {};}};
