@@ -170,4 +170,88 @@ for(const [relative,tier,which]of [
     worker.state='redundant';worker.emit('statechange');registration.emit('updatefound');check(cleared===1,'late update callbacks no-op');
   }
 }
+{
+  const producer=fs.readFileSync(new URL('./test-offline.mjs',import.meta.url),'utf8');
+  const functions=producer.slice(producer.indexOf('export function offlineRecorder()'),producer.indexOf('\nconst OUT =')).replaceAll('export ','');
+  const bodies={'src/main.js':'MAIN','src/ui/entry.js':'ENTRY','assets/terrain/shiloh.bin':'HEIGHTS'};
+  const expected=Object.fromEntries(Object.entries(bodies).map(([p,b])=>[p,{bytes:Buffer.byteLength(b),sha256:hash(b)}]));
+  for(const mode of ['valid','missing','corrupt','metadata','ownership','reader-reject','oversized-body','oversized-admission']){
+    const calls=[],worker={scriptURL:scope+'sw.js',state:'activated'};
+    const api={keys:async()=>['current'],match:async(address,options)=>{
+      calls.push([address,options]);assert.equal(options.cacheName,'current');
+      const p=address.slice(scope.length);
+      if(p==='__cw_offline_admission__')return new Response(mode==='oversized-admission'?'x'.repeat(32769):'{"scope":"'+scope+'"}');
+      if(mode==='reader-reject'&&p==='src/main.js')throw null;
+      if(mode==='missing'&&p==='src/main.js')return undefined;
+      const response=new Response(p==='src/main.js'&&mode==='corrupt'?'BAD!':p==='src/main.js'&&mode==='oversized-body'?'x'.repeat(1000):bodies[p],
+        {headers:{'content-type':mode==='metadata'?'text/plain':'text/javascript','content-length':Buffer.byteLength(bodies[p])}});
+      Object.defineProperty(response,'type',{value:mode==='metadata'?'opaque':'basic'});return response;
+    },open:()=>assert.fail('observer must not open caches'),delete:()=>assert.fail('observer must not delete caches')};
+    const env={URL,Response,TextEncoder,TextDecoder,performance,setTimeout,clearTimeout,crypto:webcrypto,caches:api,
+      navigator:{serviceWorker:{controller:worker,getRegistration:async()=>({scope:mode==='ownership'?'https://foreign.example/':scope,active:worker})}},
+      fetch:()=>assert.fail('observer must not fetch')};
+    const inspect=vm.runInNewContext(functions+';inspectOfflineCaches',env);
+    const r=await inspect({scope,expected,hashes:true}),rows=r.caches[0].members;
+    check(calls.length===4,'diagnostic uses only four exact named reads');
+    if(mode==='valid')check(rows.every(r=>r.matches),'actual cached bytes match expectations');
+    if(mode==='missing')check(rows[0].present===false,'missing cached member retained');
+    if(mode==='corrupt')check(rows[0].matches===false,'mismatched cached bytes retained');
+    if(mode==='metadata')check(rows[0].type==='opaque'&&rows[0].mime==='text/plain','wrong metadata retained independently of bytes');
+    if(mode==='ownership')check(r.registration.scope==='https://foreign.example/','ownership mismatch retained');
+    if(mode==='reader-reject')check(r.observerErrors.length===1&&rows.length===2,'falsy reader error retained without losing other members');
+    if(mode==='oversized-body')check(rows[0].bodyTruncated===true&&r.observerErrors.length===1,'actual body bound rejects misleading declared length');
+    if(mode==='oversized-admission')check(r.caches[0].admissionTruncated&&r.observerErrors.length===1,'admission body bound is explicit');
+  }
+  {
+    let deadline,resolveMetadata;const calls=[];
+    const inspect=vm.runInNewContext(functions+';inspectOfflineCaches',{URL,Response,TextEncoder,TextDecoder,performance,crypto:webcrypto,
+      navigator:{serviceWorker:{getRegistration:async()=>null}},caches:{keys:async()=>['current'],match:address=>{
+        calls.push(address);return new Promise(resolve=>{resolveMetadata=resolve;});}},
+      setTimeout:(f,ms)=>{assert.equal(ms,9000);deadline=f;return 1;},clearTimeout:()=>{}});
+    const pending=inspect({scope,expected,hashes:true});
+    for(let n=0;n<8;n++)await Promise.resolve();
+    assert.equal(calls.length,1);deadline();resolveMetadata(undefined);
+    await assert.rejects(pending,/inventory deadline/);assertions++;
+    check(calls.length===1,'late cache completion cannot start another cache read');
+  }
+  const make=vm.runInNewContext(functions+';offlineRecorder',{TextEncoder,performance});
+  const r=make(),input={value:{n:1}};r.record('one',input);input.value.n=99;
+  check(r.read().events[0].value.n===1,'trace captures detached input');
+  const copy=r.read();copy.events[0].value.n=99;check(r.read().events[0].value.n===1,'trace read is detached');
+  for(let n=0;n<2100;n++)r.record('row');
+  check(r.read().events.length===2048&&r.read().overflow,'trace row overflow explicit');
+  const unicode=make();unicode.record('wide',{text:'\u{1f600}'.repeat(270000)});
+  check(unicode.read().overflow&&unicode.read().events.length===0,'UTF8 byte overflow rejects full event');
+  const circular={};circular.self=circular;const bad=make();bad.record('circular',circular);
+  check(bad.read().observerErrors.length===1,'serialization fault explicit');
+  const auditCode=producer.slice(producer.indexOf('const audit = async hashes =>'),producer.indexOf('\nconst persist ='));
+  for(const mode of ['success','reject','deadline']){
+    const audits=[],auditErrors=[];let timer,cleared=0;
+    const audit=vm.runInNewContext(auditCode+';audit',{audits,auditErrors,stage:'first-failure',url:scope,expected,
+      inspectOfflineCaches:()=>{},page:{evaluate:()=>mode==='success'?Promise.resolve({caches:[]}):mode==='reject'?Promise.reject(null):new Promise(()=>{})},
+      setTimeout:(f,ms)=>{assert.equal(ms,10000);timer=f;return 1;},clearTimeout:id=>{assert.equal(id,1);cleared++;}});
+    const pending=audit(true);if(mode==='deadline')timer();await pending;
+    check(mode==='success'?audits.length===1&&!auditErrors.length:!audits.length&&auditErrors.length===1,'audit success/rejection/deadline remains separate');
+    check(cleared===1,'audit timer cleared');
+  }
+  const start=producer.indexOf('  const terminal = setTimeout('),end=producer.indexOf('\n}\nconst failed',start);
+  assert(start>0&&end>start);const finish=producer.slice(start,end);
+  for(const mode of ['normal','first-write','both-writes','browser','server','stuck-write']){
+    const primary={results:[{id:'harness',ok:false,detail:'ORIGINAL FAILURE'}]},cleanupErrors=[],calls=[];
+    let timer,cleared=0,writes=0;
+    const run=vm.runInNewContext('(async()=>{'+finish+'})',{cleanupErrors,
+      persist:async()=>{calls.push('persist');writes++;if(mode==='stuck-write')return new Promise(()=>{});
+        if(mode==='both-writes'||mode==='first-write'&&writes===1)throw null;},
+      browser:{close:async()=>{calls.push('browser');if(mode==='browser')throw null;}},
+      server:{close:()=>{calls.push('server');if(mode==='server')throw null;}},
+      setTimeout:(f,ms)=>{assert.equal(ms,20000);timer=f;return 2;},clearTimeout:id=>{assert.equal(id,2);cleared++;},
+      process:{exit:code=>{assert.equal(code,1);calls.push('terminal');}}});
+    const pending=run();
+    if(mode==='stuck-write'){timer();check(calls.join(',')==='persist,terminal','watchdog armed before hanging persistence');continue;}
+    await pending;
+    check(calls.join(',')==='persist,browser,server,persist','independent cleanup and second persistence always attempted');
+    check(primary.results[0].detail==='ORIGINAL FAILURE','cleanup never mutates original failure');
+    check(cleared===1&&cleanupErrors.length===(mode==='normal'?0:mode==='both-writes'?2:1),'cleanup errors and timer exact');
+  }
+}
 console.log('OFFLINE WORKER CPU OK ('+assertions+'); native update/save proof UNRUN');
