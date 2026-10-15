@@ -2,9 +2,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {installOrdinaryAstcMask,readOrdinaryFrame,ordinaryBaselineErrors,ordinaryPilotExpected} from './bake/ordinary-field-pilot.mjs';
+import {installOrdinaryAstcMask,readOrdinaryFrame,observeOrdinaryStability,ordinaryVisualSnapshot,ordinaryBaselineErrors,ordinaryPilotExpected} from './bake/ordinary-field-pilot.mjs';
 import {AllocationLedger,mipSizes,ReservationPeak,installAllocationObserver,installFieldContextObserver,defaultSurfaceHistoryErrors} from './bake/scene-allocation.mjs';
-let maskChecks=0,frameChecks=0,readerChecks=0,sourceChecks=0;
+let maskChecks=0,frameChecks=0,readerChecks=0,sourceChecks=0,stabilityChecks=0;
 // Execute the actual source expression: serializing debug receipts must not materialize typed arrays.
 const mainSource=fs.readFileSync(new URL('../src/main.js',import.meta.url),'utf8'),resourceStart=mainSource.indexOf('resources:resources?'),
   resourceEnd=mainSource.indexOf('\n  audio:',resourceStart),sourceArray=new Float32Array([1,2]);let retainedReads=0;
@@ -51,16 +51,47 @@ for(const mode of ['normal','deadline','unpaused','bound-target','wrong-framebuf
     getParameter(key){assert.equal(key,1);return mode==='wrong-framebuffer'?{}:null;},
     readPixels(x,y,w,h,format,type,bytes){reads++;assert.deepEqual([x,y,w,h,format,type],[0,0,2,1,2,3]);bytes.set([1,2,3,255,4,5,6,255]);}};
   window.__ready=true;window.__fieldContextObservation={context:id=>{assert.equal(id,1);return mode==='bound-target'?{}:gl;}};
-  window.__game={game:{paused:mode!=='unpaused',simTime:0},camera:{matrixWorld:{elements:[1]},projectionMatrix:{elements:[2]}},
+  window.__game={game:{paused:mode!=='unpaused',simTime:0,units:[{def:{id:'fixture'},side:'US',men:1,x:0,z:0,facing:0}]},
+    rts:{groundY:0,target:{x:0,y:0,z:0},goal:{x:0,z:0,yaw:0,pitch:1,dist:2000},yaw:0,pitch:1,dist:2000},camera:{matrixWorld:{elements:[1]},projectionMatrix:{elements:[2]}},
     post:{mode:'low',scale:1,rtScene:{width:2,height:1},rtSmall:{width:1,height:1},rtBlur:{width:1,height:1}}};
   document.getElementById=()=>({open:true});
-  const promise=readOrdinaryFrame(gl);
+  const read=mode==='normal'?vm.runInNewContext('('+readOrdinaryFrame.toString()+')',{
+    window,document,requestAnimationFrame,cancelAnimationFrame,setTimeout,clearTimeout,btoa}):readOrdinaryFrame;
+  const snapshot=mode==='normal'?vm.runInNewContext('('+ordinaryVisualSnapshot.toString()+')',{document}):ordinaryVisualSnapshot;
+  const promise=read(gl,{snapshot});
   if(mode==='normal'){callback();const r=await promise;assert.equal(Buffer.from(r.rgba,'base64').length,8);assert.equal(reads,1);assert.equal(clears,1);frameChecks+=3;}
   else if(mode==='deadline'){timer();await assert.rejects(promise,/deadline/);callback();assert.equal(reads,0);assert.equal(cancels,1);frameChecks+=3;}
   else{callback();await assert.rejects(promise,/framebuffer/);assert.equal(reads,0);assert.equal(clears,1);frameChecks+=3;}
 });
 
-const expected={sha:'a'.repeat(40),run:'123',attempt:'1',inputs:{settings:{viewport:[10,10],dpr:1},save:'canonical save',applied:'applied scenario',documentSha256:'b'.repeat(64)},
+for(const mode of ['normal','reset','deadline','exception','falsy-exception','cap','schedule-error','time-not-zero'])await globals({window:{},requestAnimationFrame:undefined,cancelAnimationFrame:undefined,
+  setTimeout:undefined,clearTimeout:undefined},async()=>{
+  let callback,timer,reads=0,scheduled=0,cancelled=0,cleared=0;
+  const error=mode==='falsy-exception'?null:{observed:true};
+  requestAnimationFrame=fn=>{if(mode==='schedule-error')throw error;callback=fn;return++scheduled;};
+  cancelAnimationFrame=id=>{assert.equal(id,scheduled);cancelled++;};
+  setTimeout=(fn,ms)=>{assert.equal(ms,30000);timer=fn;return 99;};clearTimeout=id=>{assert.equal(id,99);cleared++;};
+  const snapshot=()=>{reads++;if(mode==='exception'||mode==='falsy-exception')throw error;
+    return{paused:true,simTime:mode==='time-not-zero'?1:0,briefing:true,position:mode==='reset'&&reads<=2?0:mode==='cap'?reads:1};};
+  const observe=mode==='normal'?vm.runInNewContext('('+observeOrdinaryStability.toString()+')',{
+    window,requestAnimationFrame,cancelAnimationFrame,setTimeout,clearTimeout}):observeOrdinaryStability;
+  const pending=observe({snapshot});
+  if(mode==='normal'||mode==='reset'){
+    const total=mode==='normal'?8:10;for(let i=0;i<total;i++)callback();
+    const result=await pending;assert.equal(result.frames,total);assert.equal(result.consecutive,8);assert.equal(reads,total);assert.equal(cleared,1);assert.equal(scheduled,total);stabilityChecks+=5;
+  }else if(mode==='deadline'){
+    timer();await assert.rejects(pending,/measurement deadline/);callback();assert.equal(reads,0);assert.equal(cancelled,1);assert.equal(scheduled,1);assert.equal(cleared,1);stabilityChecks+=5;
+  }else if(mode==='cap'){
+    for(let i=0;i<4096;i++)callback();await assert.rejects(pending,/frame cap/);assert.equal(reads,4096);assert.equal(scheduled,4096);assert.equal(cleared,1);stabilityChecks+=4;
+  }else{
+    if(mode!=='schedule-error')callback();
+    if(mode==='time-not-zero')await assert.rejects(pending,/time-zero briefing/);
+    else{let threw=false;try{await pending;}catch(value){threw=true;assert.equal(value,error);}assert(threw);}
+    assert.equal(cleared,1);stabilityChecks+=3;
+  }
+});
+
+const expected={sha:'a'.repeat(40),run:'123',attempt:'1',inputs:{settings:{viewport:[10,10],dpr:1},save:'canonical save',applied:JSON.stringify({units:[{id:'fixture',side:'US',men:1,x:0,z:0,facing:0}]}),documentSha256:'b'.repeat(64)},
   terrain:[{owner:'terrain-source/0',arrayType:'Float32Array',bytes:8,sha256:'c'.repeat(64)}],textures:{}};
 const report={schema:'ordinary-lookout-baselines-v1',sha:expected.sha,run:expected.run,attempt:expected.attempt,inputs:expected.inputs,complete:true,cases:[]};
 let lateRetainedObservation;
@@ -98,10 +129,12 @@ for(const route of ['capable','unsupported'])await globals({window:{addEventList
   const order=(a,b)=>['US','CS'].indexOf(a.side)-['US','CS'].indexOf(b.side)||['field','close'].indexOf(a.tier)-['field','close'].indexOf(b.tier)||a.index-b.index;
   descriptors.sort(order);textures.sort(order);expected.textures[route]=descriptors;
   const frame={width:10,height:10,rgba:Buffer.from(Array.from({length:400},(_,i)=>i%256)).toString('base64'),transportBytes:400,simTime:0,paused:true,
-    camera:{world:Array.from({length:16},(_,i)=>i%5===0?1:0),projection:Array.from({length:16},(_,i)=>i%5===0?1:0)},post:{mode:'low',scale:1,targets:[[10,10],[2,2],[2,2]]}};
+    camera:{world:Array.from({length:16},(_,i)=>i%5===0?1:0),projection:Array.from({length:16},(_,i)=>i%5===0?1:0)},post:{mode:'low',scale:1,targets:[[10,10],[2,2],[2,2]]},
+    rts:{groundY:0,target:[0,0,0],goal:[0,0,0,1,2000],yaw:0,pitch:1,dist:2000},roster:[{id:'fixture',side:'US',men:1,x:0,z:0,facing:0}],briefing:true};
   report.cases.push({route,complete:true,captureOverflow:false,errors:[],warnings:[],cleanupErrors:[],rawBefore:expected.inputs.save,rawAfter:expected.inputs.save,applied:expected.inputs.applied,
     genuineAstc:true,documentSha256:expected.inputs.documentSha256,terrain:expected.terrain,maskRestoration:{restored:true,masked:route==='capable'?0:1},
     observation:field.read(),samples:[first,second],frames:[frame,structuredClone(frame)],textures,restoration:{field:true,allocation:true},
+    stability:{frames:8,consecutive:8,state:Object.fromEntries(['camera','post','rts','roster','simTime','paused','briefing'].map(k=>[k,structuredClone(frame[k])]))},
     uploadWorkload:{kind:'explicit original published US close hydration; no render/finish',before:first.allocation.nativeEvents.length,
       after:first.allocation.nativeEvents.length+3,pages:textures.filter(t=>t.side==='US'&&t.tier==='close').map((t,i)=>({side:t.side,tier:t.tier,index:t.index,native:t.native,uuid:t.uuid,...hydrationCPU[i]})),
       nativeHealth:{error:0,valid:true,textures:textures.length}}});
@@ -132,10 +165,14 @@ const mutations=[r=>r.complete=false,r=>r.sha='f'.repeat(40),r=>r.inputs={},r=>r
   r=>r.cases[0].samples[0].bufferOwnership.push({id:99,bytes:32,owners:[]}),r=>r.cases[0].samples[0].mappedBufferBytes=1,
   r=>r.cases[0].uploadWorkload.pages[0].callsAfter.finish=1,
   r=>r.cases[0].uploadWorkload.pages[0].before=0,
-  r=>{for(const p of r.cases[0].uploadWorkload.pages){p.callsBefore={};p.callsAfter={texStorage2D:100000};}}];
+  r=>{for(const p of r.cases[0].uploadWorkload.pages){p.callsBefore={};p.callsAfter={texStorage2D:100000};}},
+  r=>r.cases[0].stability.consecutive=7,r=>r.cases[0].stability.state.camera.world[0]++,
+  r=>r.cases[0].frames[1].rts.groundY++,r=>r.cases[0].frames[1].roster[0].men++,
+  r=>r.cases[0].frames[1].roster[0].x++,r=>r.cases[0].frames[1].briefing=false,
+  r=>{for(const f of r.cases[0].frames)f.roster[0].x=999999;r.cases[0].stability.state.roster[0].x=999999;}];
 for(const mutate of mutations){const bad=structuredClone(report);mutate(bad);assert(ordinaryBaselineErrors(bad,expected).length,'mutant must reject '+mutate);readerChecks++;}
 // The actual independent terrain and committed asset constructor is CPU-only.
 const actual=ordinaryPilotExpected('d'.repeat(40));assert.equal(actual.inputs.phase.index,9);assert(actual.terrain.some(a=>a.owner.endsWith('/sourceVertices')));
 assert.equal(actual.textures.capable.filter(p=>p.side==='CS'&&p.tier==='close').length,10);
 assert.equal(actual.textures.unsupported.filter(p=>p.side==='CS'&&p.tier==='close').length,5);readerChecks+=4;
-console.log(`ORDINARY-PILOT CPU OK (source ${sourceChecks}, mask ${maskChecks}, frame ${frameChecks}, reader ${readerChecks}); native entry/budget UNRUN`);
+console.log(`ORDINARY-PILOT CPU OK (source ${sourceChecks}, mask ${maskChecks}, frame ${frameChecks}, stability ${stabilityChecks}, reader ${readerChecks}); native entry/budget UNRUN`);

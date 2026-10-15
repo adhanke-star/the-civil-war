@@ -41,8 +41,40 @@ export function installOrdinaryAstcMask(gl){
       restored=true;return{masked,delegated,restored};}});
 }
 
+/** Plain copied state only; no GL, camera, simulation or owner mutation. */
+export function ordinaryVisualSnapshot(field){
+  const r=field.rts;
+  return{camera:{world:[...field.camera.matrixWorld.elements],projection:[...field.camera.projectionMatrix.elements]},
+    rts:{groundY:r.groundY,target:[r.target.x,r.target.y,r.target.z],goal:[r.goal.x,r.goal.z,r.goal.yaw,r.goal.pitch,r.goal.dist],yaw:r.yaw,pitch:r.pitch,dist:r.dist},
+    post:{mode:field.post.mode,scale:field.post.scale,targets:[field.post.rtScene,field.post.rtSmall,field.post.rtBlur].map(t=>[t.width,t.height])},
+    roster:field.game.units.map(u=>({id:u.def.id,side:u.side,men:u.men,x:u.x,z:u.z,facing:u.facing})),
+    simTime:field.game.simTime,paused:field.game.paused,briefing:document.getElementById('briefing')?.open===true};
+}
+
+/** Observe the shipping camera's easing. This is a measurement prerequisite, not application readiness. */
+export function observeOrdinaryStability({snapshot=ordinaryVisualSnapshot}={}){
+  return new Promise((resolve,reject)=>{
+    let settled=false,handle,previous=null,consecutive=0,frames=0;
+    const end=(failed,value)=>{if(settled)return;settled=true;clearTimeout(timer);if(failed)reject(value);else resolve(value);};
+    const timer=setTimeout(()=>{if(settled)return;cancelAnimationFrame(handle);end(true,Error('ordinary stability: measurement deadline'));},30000);
+    const observe=()=>{
+      if(settled)return;
+      try{
+        const state=snapshot(window.__game);
+        if(state.paused!==true||state.simTime!==0||state.briefing!==true)throw Error('ordinary stability: time-zero briefing required');
+        const value=JSON.stringify(state);frames++;
+        consecutive=value===previous?consecutive+1:1;previous=value;
+        if(consecutive===8){end(false,{frames,consecutive,state});return;}
+        if(frames>=4096)throw Error('ordinary stability: frame cap');
+        handle=requestAnimationFrame(observe);
+      }catch(error){end(true,error);}
+    };
+    try{handle=requestAnimationFrame(observe);}catch(error){end(true,error);}
+  });
+}
+
 /** Read the actual shipping frame; never draw, finish, resize, bind or replace RAF. */
-export function readOrdinaryFrame(gl){
+export function readOrdinaryFrame(gl,{snapshot=ordinaryVisualSnapshot}={}){
   return new Promise((resolve,reject)=>{
     let settled=false,handle;
     const timer=setTimeout(()=>{if(settled)return;settled=true;cancelAnimationFrame(handle);reject(Error('ordinary frame: readback deadline'));},10000);
@@ -57,10 +89,8 @@ export function readOrdinaryFrame(gl){
       const bytes=new Uint8Array(width*height*4);
       gl.readPixels(0,0,width,height,gl.RGBA,gl.UNSIGNED_BYTE,bytes);
       let base64='';for(let i=0;i<bytes.length;i+=32768)base64+=String.fromCharCode(...bytes.subarray(i,i+32768));
-      resolve({width,height,rgba:btoa(base64),transportBytes:bytes.byteLength,
-        camera:{world:[...field.camera.matrixWorld.elements],projection:[...field.camera.projectionMatrix.elements]},
-        post:{mode:field.post.mode,scale:field.post.scale,targets:[field.post.rtScene,field.post.rtSmall,field.post.rtBlur].map(t=>[t.width,t.height])},
-        simTime:field.game.simTime,paused:field.game.paused,kind:'one-shot readPixels after ordinary RAF; no added render/finish'});
+      resolve({...snapshot(field),width,height,rgba:btoa(base64),transportBytes:bytes.byteLength,
+        kind:'one-shot readPixels after ordinary RAF; no added render/finish'});
     }catch(error){reject(error);}finally{clearTimeout(timer);}});
   });
 }
@@ -87,6 +117,7 @@ export function ordinaryBaselineErrors(report,expected){
       requireTrue(c.observation.states[0].id===1&&c.observation.receipts?.length>0&&c.observation.receipts.every(r=>r.target===true&&r.supported===true&&r.outcome==='return'&&r.context===1),'exact original context acquisition');
       requireTrue(defaultSurfaceHistoryErrors(c.observation.states[0].retained).length===0,'original complete native/default history');
       requireTrue(c.samples?.length===2&&c.frames?.length===2,'two original settled checkpoints');
+      requireTrue(Number.isSafeInteger(c.stability?.frames)&&c.stability.frames>=8&&c.stability.frames<=4096&&c.stability.consecutive===8,'measured stable camera prerequisite');
       for(const [j,s]of c.samples.entries()){
         requireTrue(s.glError===null&&s.conservativeReservation===null,'health status explicitly unread');
         requireTrue(Number.isSafeInteger(s.cpuDeclaredArrayBytes)&&s.cpuDeclaredArrayBytes>0&&s.retainedTerrainArrayBytes>0,'actual retained CPU inventory');
@@ -118,6 +149,12 @@ export function ordinaryBaselineErrors(report,expected){
         requireTrue(bytes.toString('base64')===f.rgba,'canonical original RGBA encoding');
         const surface=s.allocation.defaultEvents.at(-1),matrix=a=>Array.isArray(a)&&a.length===16&&a.every(Number.isFinite),v=expected.inputs.settings.viewport;
         requireTrue(matrix(f.camera?.world)&&matrix(f.camera?.projection)&&f.post?.mode==='low'&&Number.isFinite(f.post.scale)&&f.post.scale>0&&f.post.scale<=1,'camera/Post state');
+        const source=JSON.parse(expected.inputs.applied),finite=values=>Array.isArray(values)&&values.every(Number.isFinite);
+        requireTrue(Number.isFinite(f.rts?.groundY)&&finite(f.rts.target)&&f.rts.target.length===3&&finite(f.rts.goal)&&f.rts.goal.length===5
+          &&[f.rts.yaw,f.rts.pitch,f.rts.dist].every(Number.isFinite)&&f.briefing===true,'actual RTS/briefing state');
+        requireTrue(Array.isArray(f.roster)&&f.roster.length===source.units.length&&f.roster.every((u,k)=>u.id===source.units[k].id
+          &&u.side===source.units[k].side&&u.men===source.units[k].men&&[u.x,u.z,u.facing].every(Number.isFinite)
+          &&['x','z','facing'].every(key=>u[key]===source.units[k][key])),'actual initial roster, strength and placement');
         requireTrue(same(s.viewport,v)&&s.dpr===expected.inputs.settings.dpr&&f.width===surface.width&&f.height===surface.height
           &&f.width===Math.floor(v[0]*f.post.scale)&&f.height===Math.floor(v[1]*f.post.scale),'frame dimensions bound to original surface/settings');
         const w=Math.max(1,Math.round(v[0]*f.post.scale)),h=Math.max(1,Math.round(v[1]*f.post.scale));
@@ -129,7 +166,10 @@ export function ordinaryBaselineErrors(report,expected){
       for(const key of ['nativeEvents','defaultEvents','signatures','bufferSlots','textureSlots','renderbufferSlots'])
         requireTrue(same(final[key],last[key]),'no unmeasured allocating/retiring tail after final checkpoint: '+key);
       requireTrue(same(c.frames[0].camera,c.frames[1].camera)&&same(c.frames[0].post,c.frames[1].post)
+        &&same(c.frames[0].rts,c.frames[1].rts)&&same(c.frames[0].roster,c.frames[1].roster)
         &&c.frames[0].rgba===c.frames[1].rgba,'unchanged actual field view after close workload');
+      for(const key of ['camera','post','rts','roster','simTime','paused','briefing'])
+        requireTrue(same(c.stability.state?.[key],c.frames[0][key]),'initial frame bound to observed stability: '+key);
       requireTrue(c.samples[0].atlasPages?.US?.field===2&&c.samples[0].atlasPages?.CS?.field===4
         &&c.samples[0].atlasPages?.US?.close===undefined&&c.samples[0].atlasPages?.CS?.close===undefined,'field-only initial publication');
       requireTrue(c.samples[1].atlasPages?.US?.close===3&&c.samples[1].atlasPages?.CS?.close===(i===0?10:5),'actual route publication');
@@ -254,6 +294,11 @@ export async function runOrdinaryLookoutBaselines(){
         const response=await page.goto(server.url+'?campaign=3&resources=compact-v1&quality=low&figures=baked&nosw',{waitUntil:'domcontentloaded',timeout:30000});
         requireTrue(response?.status()===200,'ordinary document200');c.documentSha256=digest(await response.body());
         await page.waitForFunction(()=>window.__ready&&window.__game?.game?.baked?.state==='ready'&&document.getElementById('briefing')?.open===true,{},{timeout:60000});
+        c.stability=await page.evaluate(({observe,snapshot})=>(0,eval)('('+observe+')')({snapshot:(0,eval)('('+snapshot+')')}),
+          {observe:observeOrdinaryStability.toString(),snapshot:ordinaryVisualSnapshot.toString()});
+        const frame=()=>page.evaluate(({read,snapshot})=>(0,eval)('('+read+')')(window.__fieldContextObservation.context(1),{snapshot:(0,eval)('('+snapshot+')')}),
+          {read:readOrdinaryFrame.toString(),snapshot:ordinaryVisualSnapshot.toString()});
+        c.frames.push(await frame());
         const closeFiles=new Set(expected.textures.capable.filter(p=>p.tier==='close').map(p=>p.file));
         requireTrue(!c.requests.some(r=>closeFiles.has(new URL(r.url).pathname.split('/').pop())),'no premature close requests');
         const setup=await page.evaluate(({route,mask})=>{
@@ -277,8 +322,7 @@ export async function runOrdinaryLookoutBaselines(){
           return sampleSceneAllocations({__game:field,__allocation:window.__allocation,__sceneTerrainPartition:{retainedArrays:field.resources.terrainArrays},
             innerWidth,innerHeight,devicePixelRatio},{retainedContext:gl});
         });
-        const frame=()=>page.evaluate(code=>(0,eval)('('+code+')')(window.__fieldContextObservation.context(1)),readOrdinaryFrame.toString());
-        c.frames.push(await frame());c.samples.push(await checkpoint());
+        c.samples.push(await checkpoint());
         // Original shipping loader and pools; deliberate tier workload, no UI-zoom claim.
         await page.evaluate(async()=>{await Promise.all(Object.values(window.__game.game.baked.atlases).map(a=>a.load('close')));});
         c.uploadWorkload=await page.evaluate(()=>{
@@ -327,6 +371,10 @@ export async function runOrdinaryLookoutBaselines(){
         if(page&&!c.complete){
           try{c.failureObservation=await page.evaluate(()=>window.__fieldContextObservation?.read()??{unavailable:true});}
           catch(error){c.cleanupErrors.push('retained failure read: '+String(error));}
+          try{c.failureVisualState=await page.evaluate(snapshot=>window.__game
+            ?{kind:'external state after primary failure; not the last stability observation',state:(0,eval)('('+snapshot+')')(window.__game)}
+            :{unavailable:true},ordinaryVisualSnapshot.toString());}
+          catch(error){c.cleanupErrors.push('external visual failure read: '+String(error));}
           for(const operation of ['mask','field','allocation'])try{await page.evaluate(operation=>{
             if(operation==='mask')window.__ordinaryMask?.restore();
             if(operation==='field')window.__fieldContextObservation?.restore();
