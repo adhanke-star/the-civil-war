@@ -107,6 +107,13 @@ try{
   await wait(()=>page.evaluate(()=>!!navigator.serviceWorker.controller),'v68 control');
   check('actual-predecessor-worker',await context.serviceWorkers()[0].evaluate(()=>VERSION)==='cw-v68',report.oldWorker);
   await page.reload();await page.waitForFunction(()=>window.__entry&&!window.__entry.importing);
+  // The shipped player default is rigged. This fixture deliberately covers loaded baked assets.
+  const figureChoice=await page.evaluate(async()=>{
+    const{LOOK}=await import('./src/ui/look.js'),{get,set}=await import('./src/settings.js');
+    const before=get('look.figureStyle');set('look.figureStyle','baked');
+    return{before,after:get('look.figureStyle'),live:LOOK.figureStyle};
+  });report.figureChoice=figureChoice;
+  check('explicit-player-baked-choice',figureChoice.before==='rigged'&&figureChoice.after==='baked'&&figureChoice.live==='baked',figureChoice);
   // A genuinely persisted new campaign, with no invented earlier battles or awards.
   await page.evaluate(async()=>{
     const C=await import('./src/franchise/campaign.js'),{createProgressStore}=await import('./src/franchise/save.js');
@@ -183,7 +190,7 @@ try{
   await page.goto(origin+'?camp=1&sw');await page.waitForFunction(()=>window.__entry?.mode==='camp'&&!window.__entry.importing);
   await observeSave(page,'failure-camp-recovery',before);
   check('no-page-errors',report.errors.length===0,report.errors);
-  assert.equal(report.checks.length,21);assert.equal(new Set(report.checks.map(c=>c.id)).size,21);
+  assert.equal(report.checks.length,22);assert.equal(new Set(report.checks.map(c=>c.id)).size,22);
   assert.equal(report.saves.length,6);
   report.complete=true;
 }catch(error){failOnce(error);}

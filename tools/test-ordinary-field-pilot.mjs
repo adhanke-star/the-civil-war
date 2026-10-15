@@ -2,9 +2,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-import {installOrdinaryAstcMask,readOrdinaryFrame,observeOrdinaryStability,ordinaryVisualSnapshot,ordinaryBaselineErrors,ordinaryPilotExpected} from './bake/ordinary-field-pilot.mjs';
+import {installOrdinaryAstcMask,readOrdinaryFrame,observeOrdinaryStability,observeOrdinaryStabilityOnPage,ordinaryVisualSnapshot,ordinaryBaselineErrors,ordinaryPilotExpected} from './bake/ordinary-field-pilot.mjs';
 import {AllocationLedger,mipSizes,ReservationPeak,installAllocationObserver,installFieldContextObserver,defaultSurfaceHistoryErrors} from './bake/scene-allocation.mjs';
-let maskChecks=0,frameChecks=0,readerChecks=0,sourceChecks=0,stabilityChecks=0;
+let maskChecks=0,frameChecks=0,readerChecks=0,sourceChecks=0,stabilityChecks=0,progressChecks=0;
 // Execute the actual source expression: serializing debug receipts must not materialize typed arrays.
 const mainSource=fs.readFileSync(new URL('../src/main.js',import.meta.url),'utf8'),resourceStart=mainSource.indexOf('resources:resources?'),
   resourceEnd=mainSource.indexOf('\n  audio:',resourceStart),sourceArray=new Float32Array([1,2]);let retainedReads=0;
@@ -91,6 +91,61 @@ for(const mode of ['normal','reset','deadline','exception','falsy-exception','ca
   }
 });
 
+for(const mode of ['constant','reset','changing','zero','cap','falsy','clock-fault','clock-symbol','clock-object','clock-infinite','clock-nan','overflow']){
+  const results=[];
+  for(const captureProgress of [false,true]){
+    let callback,timer,reads=0,scheduled=0,cancelled=0,cleared=0,now=100;
+    const snapshot=()=>{reads++;if(mode==='falsy')throw null;const position=mode==='reset'&&reads<=2?0:['changing','cap'].includes(mode)?reads:1;
+      return{paused:true,simTime:0,briefing:true,camera:{world:[position],projection:[1]},rts:{groundY:position},post:{mode:'low'},roster:[{id:'fixture'}],
+        ...(mode==='overflow'?{large:'x'.repeat(100000)}:{})};};
+    const observe=vm.runInNewContext('('+observeOrdinaryStability.toString()+')',{window:{},performance:{now(){if(mode==='clock-fault')throw Error('clock diagnostic fault');
+      if(mode==='clock-symbol')return Symbol('invalid');if(mode==='clock-object')return{};if(mode==='clock-infinite')return Infinity;if(mode==='clock-nan')return NaN;return now;}},
+      requestAnimationFrame:fn=>{callback=fn;return++scheduled;},cancelAnimationFrame:id=>{assert.equal(id,scheduled);cancelled++;},
+      setTimeout:(fn,ms)=>{assert.equal(ms,30000);timer=fn;return 99;},clearTimeout:id=>{assert.equal(id,99);cleared++;}});
+    const pending=observe({snapshot,captureProgress});let result,error,rejected=false;
+    const total=mode==='zero'?0:mode==='reset'?10:mode==='changing'?129:mode==='cap'?4096:mode==='falsy'?1:8;
+    for(let i=0;i<total;i++){now+=16;callback(now);}
+    if(['changing','zero'].includes(mode)){now=30100;timer();}
+    try{result=await pending;}catch(value){rejected=true;error=value;}
+    const receipt=pending.read();
+    if(captureProgress){
+      assert.equal(receipt.enabled,true);assert.equal(receipt.frames,reads-(mode==='falsy'?1:0));
+      assert.equal(receipt.status,rejected?'rejected':'resolved');assert(receipt.last.length<=16);assert(receipt.retainedByteUpperBound<=262144);progressChecks+=5;
+      if(mode==='changing'){
+        assert.equal(receipt.periodic.length,1);assert.equal(receipt.periodic[0].sequence,128);assert.equal(receipt.last[0].sequence,114);
+        assert.equal(receipt.changes.world,128);assert.equal(receipt.changes.rts,128);assert.equal(receipt.changes.post,0);progressChecks+=6;
+      }
+      if(mode==='overflow'){assert.equal(receipt.overflow,true);assert.equal(receipt.first,null);progressChecks+=2;}
+      if(mode.startsWith('clock-')){assert(receipt.observerErrors>0);assert.equal(receipt.elapsedMs,null);progressChecks+=2;}
+      if(mode==='zero'){assert.equal(receipt.first,null);assert.equal(receipt.firstRaf,null);progressChecks+=2;}
+      receipt.status='FOREIGN';if(receipt.first)receipt.first.state.rts.groundY=999;
+      assert.notEqual(pending.read().status,'FOREIGN');if(pending.read().first)assert.notEqual(pending.read().first.state.rts.groundY,999);progressChecks++;
+      const before=JSON.stringify(pending.read());callback(40000);assert.equal(JSON.stringify(pending.read()),before);progressChecks++;
+    }else{assert.equal(JSON.stringify(receipt),'{"enabled":false}');progressChecks++;}
+    assert.equal(cleared,1);progressChecks++;
+    results.push({reads,scheduled,cancelled,rejected,result:result?JSON.stringify(result):null,error:rejected?error===null?'null':error.message:null});
+  }
+  assert.deepEqual(results[0],results[1],'telemetry preserves scheduling and original result/failure '+mode);progressChecks++;
+}
+for(const mode of ['resolve','reject-null','read-failure','dispose-failure','primary-plus-cleanup','primary-hostile-read','primary-hostile-dispose']){
+  const c={cleanupErrors:[]},primary=mode==='reject-null'?null:{primary:true};let evaluations=0,disposed=0,handled=0,coercions=0;
+  const hostile={get message(){coercions++;throw Error('foreign getter');},toString(){coercions++;throw Error('foreign coercion');}};
+  const rejects=mode==='reject-null'||mode.startsWith('primary-');
+  const promise=rejects?Promise.reject(primary):Promise.resolve({stable:true});
+  const originalCatch=promise.catch;promise.catch=function(...args){handled++;return Reflect.apply(originalCatch,this,args);};
+  promise.read=()=>{if(mode==='primary-hostile-read')throw hostile;if(['read-failure','primary-plus-cleanup'].includes(mode))throw Error('read fault');return{frames:8};};
+  const page={async evaluateHandle(fn,args){assert(args.observe.includes('captureProgress'));assert(args.snapshot.includes('matrixWorld'));
+    // Execute the actual serialized holder callback in an isolated browser-like scope.
+    const holder=vm.runInNewContext('('+fn.toString()+')',{mockPromise:promise})({observe:'()=>mockPromise',snapshot:'()=>({})'});
+    assert.equal(holder.promise,promise);return{async evaluate(read){evaluations++;return read(holder);},async dispose(){disposed++;if(mode==='primary-hostile-dispose')throw hostile;
+      if(['dispose-failure','primary-plus-cleanup'].includes(mode))throw Error('dispose fault');}};}};
+  let result,rejected=false;
+  try{result=await observeOrdinaryStabilityOnPage(page,c);}catch(error){rejected=true;assert.equal(error,primary);progressChecks++;}
+  assert.equal(rejected,rejects);assert.equal(handled,1);assert.equal(evaluations,2);assert.equal(disposed,1);assert.equal(coercions,0);progressChecks+=5;
+  if(!rejected){assert.deepEqual(result,{stable:true});progressChecks++;}
+  assert.equal(c.cleanupErrors.length,mode==='primary-plus-cleanup'?2:['read-failure','dispose-failure','primary-hostile-read','primary-hostile-dispose'].includes(mode)?1:0);progressChecks++;
+}
+
 const expected={sha:'a'.repeat(40),run:'123',attempt:'1',inputs:{settings:{viewport:[10,10],dpr:1},save:'canonical save',applied:JSON.stringify({units:[{id:'fixture',side:'US',men:1,x:0,z:0,facing:0}]}),documentSha256:'b'.repeat(64)},
   terrain:[{owner:'terrain-source/0',arrayType:'Float32Array',bytes:8,sha256:'c'.repeat(64)}],textures:{}};
 const report={schema:'ordinary-lookout-baselines-v1',sha:expected.sha,run:expected.run,attempt:expected.attempt,inputs:expected.inputs,complete:true,cases:[]};
@@ -175,4 +230,4 @@ for(const mutate of mutations){const bad=structuredClone(report);mutate(bad);ass
 const actual=ordinaryPilotExpected('d'.repeat(40));assert.equal(actual.inputs.phase.index,9);assert(actual.terrain.some(a=>a.owner.endsWith('/sourceVertices')));
 assert.equal(actual.textures.capable.filter(p=>p.side==='CS'&&p.tier==='close').length,10);
 assert.equal(actual.textures.unsupported.filter(p=>p.side==='CS'&&p.tier==='close').length,5);readerChecks+=4;
-console.log(`ORDINARY-PILOT CPU OK (source ${sourceChecks}, mask ${maskChecks}, frame ${frameChecks}, stability ${stabilityChecks}, reader ${readerChecks}); native entry/budget UNRUN`);
+console.log(`ORDINARY-PILOT CPU OK (source ${sourceChecks}, mask ${maskChecks}, frame ${frameChecks}, stability ${stabilityChecks}, progress ${progressChecks}, reader ${readerChecks}); native entry/budget UNRUN`);

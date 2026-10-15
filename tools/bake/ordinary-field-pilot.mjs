@@ -52,18 +52,57 @@ export function ordinaryVisualSnapshot(field){
 }
 
 /** Observe the shipping camera's easing. This is a measurement prerequisite, not application readiness. */
-export function observeOrdinaryStability({snapshot=ordinaryVisualSnapshot}={}){
-  return new Promise((resolve,reject)=>{
+export function observeOrdinaryStability({snapshot=ordinaryVisualSnapshot,captureProgress=false}={}){
+  const progress={enabled:captureProgress===true,status:'running',frames:0,consecutive:0,maxConsecutive:0,
+    elapsedMs:null,firstRaf:null,lastRaf:null,minGapMs:null,maxGapMs:null,changes:{world:0,projection:0,rts:0,post:0,roster:0},
+    first:null,periodic:[],last:[],overflow:false,observerErrors:0,retainedByteUpperBound:8192};
+  let read=()=>({enabled:false});
+  const promise=new Promise((resolve,reject)=>{
     let settled=false,handle,previous=null,consecutive=0,frames=0;
-    const end=(failed,value)=>{if(settled)return;settled=true;clearTimeout(timer);if(failed)reject(value);else resolve(value);};
+    let start=null,parts=null;
+    const clock=()=>{try{const value=performance.now();if(typeof value==='number'&&Number.isFinite(value))return value;}catch{}
+      progress.observerErrors++;return null;};
+    if(captureProgress===true){start=clock();read=()=>JSON.parse(JSON.stringify(progress));}
+    const record=(value,timestamp)=>{
+      if(captureProgress!==true)return;
+      try{
+        progress.frames=frames;progress.consecutive=consecutive;progress.maxConsecutive=Math.max(progress.maxConsecutive,consecutive);
+        const now=clock();progress.elapsedMs=start!==null&&now!==null?now-start:null;
+        if(Number.isFinite(timestamp)){
+          if(progress.firstRaf===null)progress.firstRaf=timestamp;
+          if(progress.lastRaf!==null){const gap=timestamp-progress.lastRaf;progress.minGapMs=progress.minGapMs===null?gap:Math.min(progress.minGapMs,gap);progress.maxGapMs=Math.max(progress.maxGapMs??gap,gap);}
+          progress.lastRaf=timestamp;
+        }
+        // Three bytes per UTF-16 code unit bounds UTF-8; reserve metadata overhead.
+        const bytes=value.length*3+512;
+        if(bytes+8192>262144){progress.overflow=true;return;}
+        const state=JSON.parse(value),next={world:JSON.stringify(state.camera?.world),projection:JSON.stringify(state.camera?.projection),
+          rts:JSON.stringify(state.rts),post:JSON.stringify(state.post),roster:JSON.stringify(state.roster)};
+        if(parts)for(const key of Object.keys(next))if(next[key]!==parts[key])progress.changes[key]++;
+        parts=next;
+        const row={sequence:frames,rafTimestamp:Number.isFinite(timestamp)?timestamp:null,consecutive,state,byteUpperBound:bytes};
+        let available=262144-progress.retainedByteUpperBound;
+        if(progress.last.length===16)available+=progress.last[0].byteUpperBound;
+        const copies=(progress.first===null?1:0)+(frames%128===0?1:0)+1;
+        if(bytes*copies>available){progress.overflow=true;return;}
+        if(progress.first===null){progress.first=row;progress.retainedByteUpperBound+=bytes;}
+        if(frames%128===0){progress.periodic.push(row);progress.retainedByteUpperBound+=bytes;}
+        if(progress.last.length===16)progress.retainedByteUpperBound-=progress.last.shift().byteUpperBound;
+        progress.last.push(row);progress.retainedByteUpperBound+=bytes;
+      }catch{progress.observerErrors++;}
+    };
+    const end=(failed,value)=>{if(settled)return;settled=true;clearTimeout(timer);
+      if(captureProgress===true){progress.status=failed?'rejected':'resolved';const now=clock();progress.elapsedMs=start!==null&&now!==null?now-start:null;}
+      if(failed)reject(value);else resolve(value);};
     const timer=setTimeout(()=>{if(settled)return;cancelAnimationFrame(handle);end(true,Error('ordinary stability: measurement deadline'));},30000);
-    const observe=()=>{
+    const observe=timestamp=>{
       if(settled)return;
       try{
         const state=snapshot(window.__game);
         if(state.paused!==true||state.simTime!==0||state.briefing!==true)throw Error('ordinary stability: time-zero briefing required');
         const value=JSON.stringify(state);frames++;
         consecutive=value===previous?consecutive+1:1;previous=value;
+        record(value,timestamp);
         if(consecutive===8){end(false,{frames,consecutive,state});return;}
         if(frames>=4096)throw Error('ordinary stability: frame cap');
         handle=requestAnimationFrame(observe);
@@ -71,6 +110,29 @@ export function observeOrdinaryStability({snapshot=ordinaryVisualSnapshot}={}){
     };
     try{handle=requestAnimationFrame(observe);}catch(error){end(true,error);}
   });
+  Object.defineProperty(promise,'read',{value:()=>read()});
+  return promise;
+}
+
+/** Retain the original browser promise; read and disposal failures never replace it. */
+export async function observeOrdinaryStabilityOnPage(page,c){
+  const detail=error=>{
+    if(error===null)return'null';
+    if(typeof error==='string')return error.slice(0,512);
+    if(['number','boolean','undefined','bigint'].includes(typeof error))return String(error).slice(0,512);
+    try{const descriptor=Object.getOwnPropertyDescriptor(error,'message');if(typeof descriptor?.value==='string')return descriptor.value.slice(0,512);}catch{}
+    return typeof error+' error (opaque)';
+  };
+  const handle=await page.evaluateHandle(({observe,snapshot})=>{
+    const promise=(0,eval)('('+observe+')')({snapshot:(0,eval)('('+snapshot+')'),captureProgress:true});
+    promise.catch(()=>{});return{promise};
+  },{observe:observeOrdinaryStability.toString(),snapshot:ordinaryVisualSnapshot.toString()});
+  try{return await handle.evaluate(async holder=>await holder.promise);}
+  finally{
+    try{c.stabilityProgress=await handle.evaluate(holder=>holder.promise.read());}
+    catch(error){c.cleanupErrors.push('stability progress read: '+detail(error));}
+    try{await handle.dispose();}catch(error){c.cleanupErrors.push('stability handle dispose: '+detail(error));}
+  }
 }
 
 /** Read the actual shipping frame; never draw, finish, resize, bind or replace RAF. */
@@ -274,7 +336,7 @@ export async function runOrdinaryLookoutBaselines(){
     browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader']});
     const bootstrap=`(${installAllocationObserver.toString()})(${JSON.stringify({ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),nativeJournal:true,captureNativeFailures:true,captureDefaultSurfaces:true})});(${installFieldContextObserver.toString()})({enabled:true,observeSurfaces:true,observeEpochs:true,enableContextHandles:true});`;
     for(const route of ['capable','unsupported']){
-      const c={route,complete:false,captureOverflow:false,errors:[],warnings:[],requests:[],samples:[],frames:[]};report.cases.push(c);
+      const c={route,complete:false,captureOverflow:false,errors:[],warnings:[],requests:[],samples:[],frames:[],cleanupErrors:[]};report.cases.push(c);
       const ctx=await browser.newContext({viewport:{width:960,height:540},deviceScaleFactor:1,serviceWorkers:'block'});
       let page;
       try{
@@ -294,8 +356,7 @@ export async function runOrdinaryLookoutBaselines(){
         const response=await page.goto(server.url+'?campaign=3&resources=compact-v1&quality=low&figures=baked&nosw',{waitUntil:'domcontentloaded',timeout:30000});
         requireTrue(response?.status()===200,'ordinary document200');c.documentSha256=digest(await response.body());
         await page.waitForFunction(()=>window.__ready&&window.__game?.game?.baked?.state==='ready'&&document.getElementById('briefing')?.open===true,{},{timeout:60000});
-        c.stability=await page.evaluate(({observe,snapshot})=>(0,eval)('('+observe+')')({snapshot:(0,eval)('('+snapshot+')')}),
-          {observe:observeOrdinaryStability.toString(),snapshot:ordinaryVisualSnapshot.toString()});
+        c.stability=await observeOrdinaryStabilityOnPage(page,c);
         const frame=()=>page.evaluate(({read,snapshot})=>(0,eval)('('+read+')')(window.__fieldContextObservation.context(1),{snapshot:(0,eval)('('+snapshot+')')}),
           {read:readOrdinaryFrame.toString(),snapshot:ordinaryVisualSnapshot.toString()});
         c.frames.push(await frame());
@@ -367,7 +428,6 @@ export async function runOrdinaryLookoutBaselines(){
       }catch(error){c.failure=String(error?.stack??error);throw error;}
       finally{
         // Retain the failed context before teardown. Never let cleanup replace its primary error.
-        c.cleanupErrors=[];
         if(page&&!c.complete){
           try{c.failureObservation=await page.evaluate(()=>window.__fieldContextObservation?.read()??{unavailable:true});}
           catch(error){c.cleanupErrors.push('retained failure read: '+String(error));}
