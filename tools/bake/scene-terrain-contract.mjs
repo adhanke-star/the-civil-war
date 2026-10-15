@@ -35,7 +35,8 @@ export function readSceneTerrainContracts(phases){
       contracts.set(terrain,{terrain,metadataSha256:digest(metadata),heightSha256:digest(packed),
         sourceBytes:partition.sourceBytes,partitionBytes:partition.bytes,triangles:partition.triangles,
         sourceArrays:Object.entries(source).map(([key,array])=>describe(key,array)),
-        chunks:partition.chunks.map(c=>['position','uv','index'].map(key=>describe(key,c[key])))});
+        chunks:partition.chunks.map(c=>['position','uv','index'].map(key=>describe(key,c[key]))),
+        sourceVertices:partition.chunks.map(c=>describe('sourceVertices',c.sourceVertices))});
     }finally{
       mesh.geometry.dispose();for(const u of Object.values(mesh.material.uniforms))if(u.value?.isTexture)u.value.dispose();mesh.material.dispose();
     }

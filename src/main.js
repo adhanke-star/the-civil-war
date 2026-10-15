@@ -578,7 +578,8 @@ graphicsStop?.listenLast();
 if(!graphicsStop || graphicsStop.check())resourceOwners.raf=requestAnimationFrame(frame);
 
 window.__game = { game, rts, terrain, scene, camera, post, world, effects, input, hud, arrows, readout, soldierView, gpuTier, practice: practiceFlow, practiceField, manifest,
-  resources:resources?Object.freeze({profile:resources.name,get terrain(){return terrainOwner.receipt;},get terminal(){return graphicsStop.snapshot;}}):null,
+  resources:resources?Object.freeze(Object.defineProperty({profile:resources.name,get terrain(){return terrainOwner.receipt;},get terminal(){return graphicsStop.snapshot;}},
+    'terrainArrays',{get:()=>terrainOwner.retainedArrays})):null,
   audio: { mixer, director }, // the UI test spies on mixer.log; nothing plays without a gesture
   pack: pack ? { packId: pack.packId, phaseId: pack.phaseId, nextId: pack.nextId } : null,
   // Campaign phase launch (tests force a result through window.__game.game, then drive the real result dialog).

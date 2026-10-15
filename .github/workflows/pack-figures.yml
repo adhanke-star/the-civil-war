@@ -9,6 +9,7 @@ on:
         options:
           - current
           - navigation-diagnostic
+          - ordinary-lookout
           - cs-close
           - cs-hybrid
           - scene
@@ -72,7 +73,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   package:
-    if: inputs.mode != 'scene-transport' && inputs.mode != 'badge-observations' && inputs.mode != 'badge-level10' && inputs.mode != 'badge-missionary' && inputs.mode != 'badge-missionary-revision' && inputs.mode != 'badge-revisions' && inputs.mode != 'badge-promotion' && inputs.mode != 'badge-promotion-relief' && inputs.mode != 'badge-promotion-open-line' && inputs.mode != 'badge-promotion-clock-relief' && inputs.mode != 'badge-promotion-forward-defence' && inputs.mode != 'badge-promotion-lookout' && inputs.mode != 'badge-promotion-lookout-west' && inputs.mode != 'badge-promotion-march' && inputs.mode != 'badge-promotion-flank' && inputs.mode != 'badge-promotion-ridge' && inputs.mode != 'badge-promotion-column' && inputs.mode != 'navigation-diagnostic'
+    if: inputs.mode != 'scene-transport' && inputs.mode != 'badge-observations' && inputs.mode != 'badge-level10' && inputs.mode != 'badge-missionary' && inputs.mode != 'badge-missionary-revision' && inputs.mode != 'badge-revisions' && inputs.mode != 'badge-promotion' && inputs.mode != 'badge-promotion-relief' && inputs.mode != 'badge-promotion-open-line' && inputs.mode != 'badge-promotion-clock-relief' && inputs.mode != 'badge-promotion-forward-defence' && inputs.mode != 'badge-promotion-lookout' && inputs.mode != 'badge-promotion-lookout-west' && inputs.mode != 'badge-promotion-march' && inputs.mode != 'badge-promotion-flank' && inputs.mode != 'badge-promotion-ridge' && inputs.mode != 'badge-promotion-column' && inputs.mode != 'navigation-diagnostic' && inputs.mode != 'ordinary-lookout'
     runs-on: ubuntu-24.04
     timeout-minutes: ${{ (inputs.mode == 'candidate' || inputs.mode == 'current' || inputs.mode == 'cs-close' || inputs.mode == 'cs-hybrid' || (inputs.mode == 'scene' && inputs.scene_routes == 'qualified-both')) && 90 || 40 }}
     env:
@@ -771,5 +772,33 @@ jobs:
             .out/badge-observations.json
             .out/badge-level10.json
             .out/last-result.json
+          retention-days: 7
+          if-no-files-found: error
+
+  ordinary-lookout:
+    if: inputs.mode == 'ordinary-lookout'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: lts/*
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Ordinary baseline source and rejecting reader controls
+        run: |
+          set -euo pipefail
+          node tools/test-ordinary-field-pilot.mjs --prove-fail
+          node tools/test-resource-profile.mjs --prove-fail
+      - name: Two ordinary Lookout routes only
+        run: node tools/bake/ordinary-field-pilot.mjs
+      - name: Original completed or incomplete ordinary baseline evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ordinary-lookout
+          path: .out/ordinary-lookout/
           retention-days: 7
           if-no-files-found: error

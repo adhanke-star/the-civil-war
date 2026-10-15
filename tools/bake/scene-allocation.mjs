@@ -239,7 +239,7 @@ export class AllocationLedger {
 }
 
 /** Observe existing native reservations only. Never upload, draw, flush or finish here. */
-export function sampleSceneAllocations(scope=globalThis.window) {
+export function sampleSceneAllocations(scope=globalThis.window,{retainedContext=null}={}) {
   const {scene,post,game}=scope.__game,arrays=new Map(),textures=new Set();let declaredArrayBytes=0;
   const owners=new Map();for(const key of ['pools','fallen','impostors'])for(const [side,pool]of Object.entries(game[key]||{}))owners.set(pool.mesh,`${key}.${side}`);
   const array=(a,owner)=>{if(a){if(!arrays.has(a)){arrays.set(a,new Set());declaredArrayBytes+=a.byteLength;}arrays.get(a).add(owner);}};
@@ -259,16 +259,20 @@ export function sampleSceneAllocations(scope=globalThis.window) {
     if(!ArrayBuffer.isView(retained?.array)||typeof retained.owner!=='string'||!retained.owner)throw Error('allocation: invalid retained terrain array');
     array(retained.array,retained.owner);
   }
-  const renderer=post.renderer,gl=renderer.getContext(),unuploaded=[];
+  const renderer=post.renderer,gl=retainedContext??renderer.getContext(),unuploaded=[];
+  if(retainedContext!==null){scope.__allocation.assertOwned(gl);
+    if(scope.__allocation.peek(gl)?.observed!==true)throw Error('allocation: registered retained context required');}
   for(const [array,labels]of arrays){
     const records=scope.__allocation.labelBufferOwners(gl,array,[...labels]);
     if(!records.length)unuploaded.push({bytes:array.byteLength,owners:[...labels]});
   }
-  const allocation=scope.__allocation.snapshot(gl),bufferOwnership=allocation.bufferSlots;
+  const allocation=retainedContext===null?scope.__allocation.snapshot(gl):scope.__allocation.peek(gl),bufferOwnership=allocation.bufferSlots;
+  if(retainedContext!==null&&allocation.observed!==true)throw Error('allocation: registered retained context required');
   const mappedBufferBytes=bufferOwnership.filter(r=>r.owners.length).reduce((n,r)=>n+r.bytes,0);
-  return {allocation,declaredArrayBytes,retainedTerrainArrayBytes:declaredArrayBytes-sceneArrayBytes,textureObjects:textures.size,glError:gl.getError(),
+  return {allocation,declaredArrayBytes,retainedTerrainArrayBytes:declaredArrayBytes-sceneArrayBytes,textureObjects:textures.size,glError:retainedContext===null?gl.getError():null,
+    ...(retainedContext===null?{}:{cpuArrays:[...arrays].map(([a,labels],i)=>({id:i+1,arrayType:a.constructor.name,bytes:a.byteLength,owners:[...labels]}))}),
     bufferOwnership,mappedBufferBytes,unmappedBufferBytes:allocation.byKind.buffer-mappedBufferBytes,unuploadedArrays:unuploaded,
-    conservativeReservation:allocation.peak+allocation.defaultPeak+declaredArrayBytes,
+    conservativeReservation:retainedContext===null?allocation.peak+allocation.defaultPeak+declaredArrayBytes:null,
     gpuReservation:allocation.gpuPeak,cpuDeclaredArrayBytes:declaredArrayBytes,
     accounting:'GPU: synchronized API reservations, pending deletes and same-time default surfaces. CPU arrays separate; conservative upper adds independent maxima. Native driver memory unmeasured.',
     atlasPages:Object.fromEntries(Object.entries(game.baked?.atlases||{}).map(([side,a])=>[side,Object.fromEntries(Object.entries(a.textures).map(([tier,t])=>[tier,t.length]))])),
@@ -1105,10 +1109,11 @@ function reduceSceneScope(report, phases, requiredPhases,canonicalPolicy=false) 
 
 /** Installed only in an owned diagnostic context before game boot. No product code or GL arguments changed. */
 /** Acquisition is query-free by default; optional surface capture reads live dimensions/attributes. */
-export function installFieldContextObserver({enabled=false,observeSurfaces=false,observeEpochs=false}={}) {
-  if([enabled,observeSurfaces,observeEpochs].some(v=>typeof v!=='boolean'))throw Error('field context observer: explicit boolean required');
+export function installFieldContextObserver({enabled=false,observeSurfaces=false,observeEpochs=false,enableContextHandles=false}={}) {
+  if([enabled,observeSurfaces,observeEpochs,enableContextHandles].some(v=>typeof v!=='boolean'))throw Error('field context observer: explicit boolean required');
   if(!enabled)return Object.freeze({read:()=>({enabled:false}),restore(){}});
   if(observeEpochs&&!observeSurfaces)throw Error('field context observer: epochs require surface capture');
+  if(enableContextHandles&&!observeEpochs)throw Error('field context observer: handles require epoch ownership');
   const proto=globalThis.HTMLCanvasElement?.prototype,native=proto?.getContext;
   if(typeof native!=='function')throw Error('field context observer: canvas API unavailable');
   const original=Object.getOwnPropertyDescriptor(proto,'getContext'),prior=Object.getOwnPropertyDescriptor(window,'__fieldContextObservation'),
@@ -1231,6 +1236,12 @@ export function installFieldContextObserver({enabled=false,observeSurfaces=false
   };
   const matches=(a,b)=>['value','get','set','writable','enumerable','configurable'].every(k=>a?.[k]===b?.[k]);
   const observer=Object.freeze({
+    context(id){
+      if(!enableContextHandles||methodRestored||propertyRestored||accessors.some(a=>a.restored)||epochListeners.some(l=>l.removed))
+        throw Error('field context observer: context handles inactive');
+      if(!Number.isSafeInteger(id)||id<1||contexts.size!==1||!contexts.has(id))throw Error('field context observer: exact unique registered context required');
+      const gl=contexts.get(id);assertFieldOwned(gl);return gl;
+    },
     read(){
       const states=[];
       observed(()=>{

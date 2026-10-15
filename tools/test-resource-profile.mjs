@@ -20,7 +20,7 @@ import {parseAtlasAstc,pageMipBytes} from '../src/units/atlas-compression.js';
 import {ordinaryLookoutFixture,ordinaryCapacityContract} from './resource-profile-fixture.mjs';
 import {applyCampaign} from '../src/franchise/campaign.js';
 import {validateSnapshot} from '../src/franchise/save.js';
-import {installFieldContextObserver,installAllocationObserver,AllocationLedger,mipSizes,ReservationPeak,defaultSurfaceHistoryErrors,fieldEpochObservationErrors} from './bake/scene-allocation.mjs';
+import {installFieldContextObserver,installAllocationObserver,AllocationLedger,mipSizes,ReservationPeak,defaultSurfaceHistoryErrors,fieldEpochObservationErrors,sampleSceneAllocations} from './bake/scene-allocation.mjs';
 
 const base='assets/figures/confederate-infantry/';
 const turn=async()=>{for(let i=0;i<60;i++)await Promise.resolve();};
@@ -344,8 +344,8 @@ async function contextObserverControls() {
 }
 await contextObserverControls();
 async function defaultSurfaceControls(){
-  let checks=0,epochChecks=0;
-  async function fixture(run,{inherited=false,epochs=false}={}){
+  let checks=0,epochChecks=0,handleChecks=0;
+  async function fixture(run,{inherited=false,epochs=false,handles=false,ordinary=false}={}){
     await globals({window:{},document:{},HTMLCanvasElement:undefined,WebGLRenderingContext:undefined,WebGL2RenderingContext:undefined},async()=>{
       let queries=0,conversions=0;const calls=[],registrations=[],removals=[],nativeError=new Error('native setter/finish'),returned={native:true};
       window.addEventListener=function(type,fn,options){assert.equal(this,window);registrations.push({type,fn,options,removed:false});};
@@ -382,7 +382,7 @@ async function defaultSurfaceControls(){
       const descriptors=Object.fromEntries(['width','height','getContext'].map(k=>[k,Object.getOwnPropertyDescriptor(FieldCanvas.prototype,k)]));
       installAllocationObserver({ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),
         nativeJournal:true,captureNativeFailures:true,captureDefaultSurfaces:true});
-      const allocation=window.__allocation,observer=installFieldContextObserver({enabled:true,observeSurfaces:true,observeEpochs:epochs}),gl=target.gl;
+      const allocation=window.__allocation,observer=installFieldContextObserver({enabled:true,observeSurfaces:true,observeEpochs:epochs,enableContextHandles:handles}),gl=target.gl;
       const emitEpoch=(type,overrides={})=>{const event={type,target,isTrusted:true,eventPhase:1,currentTarget:window,...overrides};
         for(const r of registrations.filter(r=>!r.removed&&r.type===type))r.fn(event);return event;};
       try{await run({target,gl,FieldCanvas,allocation,observer,calls,nativeError,returned,descriptors,
@@ -390,7 +390,7 @@ async function defaultSurfaceControls(){
         queries:()=>queries,conversions:()=>conversions,value:{valueOf(){conversions++;return 20;}}});}
       finally{observer.restore();allocation.restore();}
       for(const name of Object.keys(descriptors))assert.deepEqual(Object.getOwnPropertyDescriptor(FieldCanvas.prototype,name),descriptors[name]);
-      if(epochs)epochChecks+=3;else checks+=3;
+      if(handles||ordinary)handleChecks+=3;else if(epochs)epochChecks+=3;else checks+=3;
     });
   }
   for(const inherited of [false,true])await fixture(f=>{
@@ -630,6 +630,29 @@ async function defaultSurfaceControls(){
     assert.equal(listeners.size,0);assert.deepEqual(Object.getOwnPropertyDescriptors(FieldCanvas.prototype),before);
     assert.deepEqual(Object.getOwnPropertyDescriptor(window,'__fieldContextObservation'),prior);epochChecks+=4;
   });
+  for(const inherited of [false,true])await fixture(f=>{
+    assert.throws(()=>f.observer.context(1),/registered context/);handleChecks++;
+    f.target.getContext('webgl2');const before=f.queries(),calls=f.calls.length;
+    assert.equal(f.observer.context(1),f.gl);assert.equal(f.queries(),before);assert.equal(f.calls.length,calls);handleChecks+=3;
+    for(const id of [undefined,null,0,-1,2,1.5,'1',NaN]){assert.throws(()=>f.observer.context(id),/registered context/);handleChecks++;}
+    const array=new Float32Array(12),oracle=array.slice(),scene={traverse(fn){fn({type:'Mesh',visible:true,
+      geometry:{attributes:{position:{array}},index:null,morphAttributes:{}},material:null});}};
+    const scope={__game:{scene,post:{renderer:{getContext(){throw Error('unexpected context discovery');}}},game:{}},__allocation:f.allocation,
+      __sceneTerrainPartition:{retainedArrays:[{array,owner:'same'},{array:oracle,owner:'oracle'}]},innerWidth:10,innerHeight:10,devicePixelRatio:1};
+    f.gl.getError=()=>{throw Error('unexpected native health query');};
+    const s=sampleSceneAllocations(scope,{retainedContext:f.observer.context(1)});
+    assert.equal(s.declaredArrayBytes,96);assert.equal(s.retainedTerrainArrayBytes,48);assert.equal(s.glError,null);
+    assert.equal(s.conservativeReservation,null);assert.equal(s.gpuReservation,1200);assert.equal(f.queries(),before);handleChecks+=6;
+    assert.throws(()=>sampleSceneAllocations(scope,{retainedContext:new WebGL2RenderingContext()}),/registered retained context/);handleChecks++;
+    f.gl.lost=true;assert.equal(f.observer.context(1),f.gl);assert.equal(f.queries(),before);handleChecks+=2;
+    const descriptor=Object.getOwnPropertyDescriptor(f.FieldCanvas.prototype,'getContext');
+    Object.defineProperty(f.FieldCanvas.prototype,'getContext',{...descriptor,value(){return f.gl;}});
+    assert.throws(()=>f.observer.context(1),/ownership changed/);handleChecks++;
+    Object.defineProperty(f.FieldCanvas.prototype,'getContext',descriptor);
+    f.observer.restore();assert.throws(()=>f.observer.context(1),/inactive/);handleChecks++;
+  },{inherited,epochs:true,handles:true});
+  await fixture(f=>{f.target.getContext('webgl2');assert.throws(()=>f.observer.context(1),/inactive/);handleChecks++;},{ordinary:true});
+  console.log(`ORDINARY-OBSERVATION CPU OK (${handleChecks} assertions); retained context/CPU inventory only; native entry UNRUN`);
   console.log(`DEFAULT-SURFACE CPU OK (${checks} assertions); native synchronous setter coverage/restoration epochs UNRUN`);
   console.log(`FIELD-EPOCH CPU OK (${epochChecks} assertions); modeled capture dispatch only; native propagation/trust/restoration behavior UNRUN`);
 }
