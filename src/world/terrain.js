@@ -9,6 +9,338 @@
 import * as THREE from 'three';
 import Martini from '@mapbox/martini';
 
+// Terminal storage is opt-in through the mesh factory. No ordinary caller selects it.
+// Identity witnesses are weak: neither receipts nor validation retain source DEMs or render arrays.
+const terminalSamplers = new WeakMap(), terminalWorlds = new WeakMap(), terminalMeshes = new WeakMap(), terminalIdentities = new WeakMap();
+const typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype);
+const typedBacking = Object.getOwnPropertyDescriptor(typedArrayPrototype, 'buffer').get;
+const typedBytes = Object.getOwnPropertyDescriptor(typedArrayPrototype, 'byteLength').get;
+const backingBytes = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype, 'byteLength').get;
+const terminalRefuse = () => { throw new Error('terminal terrain: reload required or immutable owner changed'); };
+const terminalMethods = ['heightAt', 'normalAt', 'slopeAt', 'inBounds'];
+const terminalData = (object, key) => {
+  const descriptor = Object.getOwnPropertyDescriptor(object, key);
+  if (!descriptor || !Object.hasOwn(descriptor, 'value')) terminalRefuse();
+  return descriptor.value;
+};
+const terminalIdentity = object => {
+  let id = terminalIdentities.get(object);
+  if (!id) { id = Symbol(); terminalIdentities.set(object, id); }
+  return id;
+};
+const wholeTypedBytes = array => {
+  const backing = Reflect.apply(typedBacking, array, []), bytes = Reflect.apply(typedBytes, array, []);
+  if (Reflect.apply(backingBytes, backing, []) !== bytes) terminalRefuse();
+  return bytes;
+};
+
+function packedTerrainCodes(codes) {
+  if (!(codes instanceof Uint16Array) || !codes.length || codes.length > 1025 * 1025) terminalRefuse();
+  let maximum = 0;
+  for (const code of codes) maximum = Math.max(maximum, code);
+  const bits = Math.max(1, Math.ceil(Math.log2(maximum + 1))), mask = 2 ** bits - 1;
+  const bytes = new Uint8Array(Math.ceil(codes.length * bits / 8));
+  for (let i = 0; i < codes.length; i++) {
+    const offset = i * bits, at = offset >>> 3, word = codes[i] << (offset & 7);
+    bytes[at] |= word & 255;
+    if (at + 1 < bytes.length) bytes[at + 1] |= (word >>> 8) & 255;
+    if (at + 2 < bytes.length) bytes[at + 2] |= (word >>> 16) & 255;
+  }
+  const row = { bytes, bits, mask, length: codes.length };
+  validatePackedTerrainCodes(row);
+  for (let i = 0; i < codes.length; i++) if (terrainCodeAt(row, i) !== codes[i]) terminalRefuse();
+  return row;
+}
+
+function validatePackedTerrainCodes(row) {
+  if (!Number.isSafeInteger(row.bits) || row.bits < 1 || row.bits > 16 || row.mask !== 2 ** row.bits - 1
+    || !Number.isSafeInteger(row.length) || row.length < 1 || row.length > 1025 * 1025
+    || !(row.bytes instanceof Uint8Array) || row.bytes.length !== Math.ceil(row.length * row.bits / 8)
+    || wholeTypedBytes(row.bytes) !== row.bytes.length) terminalRefuse();
+  const used = (row.length * row.bits) & 7;
+  if (used && row.bytes[row.bytes.length - 1] >>> used) terminalRefuse();
+}
+
+function terrainCodeAt(row, i) {
+  if (!Number.isSafeInteger(i) || i < 0 || i >= row.length) terminalRefuse();
+  const offset = i * row.bits, at = offset >>> 3;
+  return ((row.bytes[at] | ((row.bytes[at + 1] ?? 0) << 8) | ((row.bytes[at + 2] ?? 0) << 16)) >>> (offset & 7)) & row.mask;
+}
+
+function terminalHeightAt(row, x, z) {
+  const G = row.grid;
+  let gx = (x + row.half) / row.cell, gz = (z + row.half) / row.cell;
+  gx = gx < 0 ? 0 : gx > G - 1.001 ? G - 1.001 : gx;
+  gz = gz < 0 ? 0 : gz > G - 1.001 ? G - 1.001 : gz;
+  const x0 = gx | 0, z0 = gz | 0, fx = gx - x0, fz = gz - z0, i = z0 * G + x0;
+  // Reconstruct Float32 BEFORE the original JavaScript interpolation operations.
+  const h00 = Math.fround(terrainCodeAt(row, i) * row.step), h10 = Math.fround(terrainCodeAt(row, i + 1) * row.step);
+  const h01 = Math.fround(terrainCodeAt(row, i + G) * row.step), h11 = Math.fround(terrainCodeAt(row, i + G + 1) * row.step);
+  const a = h00 + (h10 - h00) * fx, b = h01 + (h11 - h01) * fx;
+  return a + (b - a) * fz;
+}
+
+const terminalSamplerReceipt = row => Object.freeze({ state: row.state, published: row.published,
+  cells: row.length, bits: row.bits, bytes: row.bytes ? wholeTypedBytes(row.bytes) : 0, stagingBytes: row.stagingBytes });
+
+function verifyTerminalTerrainData(data, row) {
+  if (Object.getPrototypeOf(data) !== TerrainData.prototype || terminalData(data, 'grid') !== row.grid || terminalData(data, 'cell') !== row.cell
+    || terminalData(data, 'half') !== row.half || terminalData(data, 'size') !== row.half * 2
+    || terminalMethods.some((k, i) => {
+      const own = Object.getOwnPropertyDescriptor(data, k);
+      return row.state === 'prepared' ? !!own || terminalIdentities.get(terminalData(TerrainData.prototype, k)) !== row.methods[i]
+        : !own || !Object.hasOwn(own, 'value') || own.writable || own.configurable || terminalIdentities.get(own.value) !== row.methods[i];
+    })) terminalRefuse();
+}
+
+function disposeTerminalLookup(texture, image, expected) {
+  let failed = false, failure;
+  try { texture.dispose(); } catch (e) { failed = true; failure = e; }
+  try {
+    const d = Object.getOwnPropertyDescriptor(image, 'data');
+    if (!d || !Object.hasOwn(d, 'value') || d.value !== expected || !d.configurable) terminalRefuse();
+    Object.defineProperty(image, 'data', { ...d, value: null });
+  } catch (e) { if (!failed) { failed = true; failure = e; } }
+  if (failed) throw failure;
+}
+
+function closeTerminalTerrain(state) {
+  if (state.closed) return;
+  state.closed = true;
+  state.row.state = state.row.state === 'committed' ? 'stopped' : 'aborted';
+  state.row.bytes = null; state.row.stagingBytes = 0;
+  if (state.row.state === 'aborted' && terminalSamplers.get(state.data) === state.row) terminalSamplers.delete(state.data);
+  if (terminalWorlds.get(state.data) === state) terminalWorlds.delete(state.data);
+  try { disposeTerminalLookup(state.lookup, state.image, state.lookupData); }
+  finally { state.lookupData = null; }
+}
+
+/** Scalar receipts only. Commit is legal only after the complete mesh factory publication returns.
+ * Abort preserves the old DEM; a committed owner is terminal and requires a new field after disposal.
+ */
+export function terminalTerrainSampler(data) {
+  const row = terminalSamplers.get(data), state = terminalWorlds.get(data);
+  if (!row || !state || state.row !== row) terminalRefuse();
+  return Object.freeze({
+    snapshot: () => terminalSamplerReceipt(row),
+    commit: () => {
+      if (terminalSamplers.get(data) !== row || terminalWorlds.get(data) !== state || row.state !== 'prepared' || !row.published || state.closed) terminalRefuse();
+      verifyTerminalTerrainData(data, row); validatePackedTerrainCodes(row); verifyTerminalMesh(state);
+      const descriptor = Object.getOwnPropertyDescriptor(data, 'heights');
+      if (!descriptor || !Object.hasOwn(descriptor, 'value') || !descriptor.configurable || !descriptor.writable
+        || descriptor.enumerable !== row.enumerable || !(descriptor.value instanceof Float32Array)
+        || terminalIdentities.get(descriptor.value) !== row.sourceIdentity || wholeTypedBytes(descriptor.value) !== row.length * 4) terminalRefuse();
+      for (let i = 0; i < row.length; i++) if (!Object.is(descriptor.value[i], Math.fround(terrainCodeAt(row, i) * row.step))) terminalRefuse();
+      // Complete descriptor preflight before the irreversible DEM transition.
+      if (!Object.isExtensible(data)) terminalRefuse();
+      const pins = { heights: { value: null, configurable: false, writable: false, enumerable: row.enumerable } };
+      for (const k of ['grid', 'cell', 'half', 'size']) {
+        const d = Object.getOwnPropertyDescriptor(data, k);
+        if (!d || !Object.hasOwn(d, 'value') || !d.configurable || !d.writable) terminalRefuse();
+        pins[k] = { ...d, configurable: false, writable: false };
+      }
+      for (const k of terminalMethods) pins[k] = { value: terminalData(TerrainData.prototype, k), configurable: false, writable: false, enumerable: false };
+      Object.defineProperties(data, pins);
+      row.state = 'committed';
+      return terminalSamplerReceipt(row);
+    },
+    abort: () => {
+      if (row.state !== 'prepared' || terminalSamplers.get(data) !== row || terminalWorlds.get(data) !== state) terminalRefuse();
+      // Dispose the factory's material; its owned lookup cleanup is also used by rejected publication.
+      let failed = false, failure;
+      try { state.material.dispose(); } catch (e) { failed = true; failure = e; }
+      try { closeTerminalTerrain(state); } catch (e) { if (!failed) { failed = true; failure = e; } }
+      if (failed) throw failure;
+      return terminalSamplerReceipt(row);
+    },
+  });
+}
+
+function terminalAttributeWitness(attribute) {
+  const a = Object.getOwnPropertyDescriptor(attribute, 'array');
+  if (!a || !Object.hasOwn(a, 'value')) terminalRefuse();
+  return { attribute, arrayIdentity: terminalIdentity(a.value), bytes: wholeTypedBytes(a.value),
+    prototype: Object.getPrototypeOf(attribute), upload: attribute.onUploadCallback,
+    values: ['itemSize', 'count', 'normalized', 'gpuType', 'usage', 'version'].map(k => attribute[k]) };
+}
+
+function verifyTerminalMesh(state) {
+  verifyTerminalTerrainData(state.data, state.row);
+  if (state.closed || terminalData(state.root, 'material') !== state.material || terminalData(state.material, 'wireframe') !== false
+    || terminalData(state.material, 'vertexShader') !== state.vertex || terminalData(state.material, 'fragmentShader') !== state.fragment
+    || terminalData(state.material, 'uniforms') !== state.uniforms || Object.keys(state.uniforms).length !== state.records.length
+    || state.records.some(([k, record, value]) => terminalData(state.uniforms, k) !== record || terminalData(record, 'value') !== value)) terminalRefuse();
+  const children = terminalData(state.root, 'children');
+  if (children !== state.children || children.length !== state.nodes.length - 1 || state.nodes.slice(1).some((r, i) => terminalData(children, String(i)) !== r.mesh)) terminalRefuse();
+  const source = terminalData(state.lookup, 'source');
+  if (source !== state.source) terminalRefuse();
+  const image = terminalData(source, 'data');
+  if (image !== state.image || terminalData(image, 'data') !== state.lookupData || terminalData(image, 'width') !== state.width || terminalData(image, 'height') !== state.height
+    || terminalData(state.lookup, 'version') !== state.lookupVersion || terminalData(state.lookup, 'internalFormat') !== 'R32F' || terminalData(state.lookup, 'format') !== THREE.RedFormat
+    || terminalData(state.lookup, 'type') !== THREE.FloatType || terminalData(state.lookup, 'minFilter') !== THREE.NearestFilter || terminalData(state.lookup, 'magFilter') !== THREE.NearestFilter
+    || terminalData(state.lookup, 'generateMipmaps') || terminalData(state.lookup, 'flipY') || terminalData(state.lookup, 'unpackAlignment') !== 1) terminalRefuse();
+  for (const r of state.nodes) {
+    const m = r.mesh, g = r.geometry, binding = Object.getOwnPropertyDescriptor(m, 'geometry');
+    if (!binding || binding.get !== r.geometryGuard || binding.set || binding.configurable) terminalRefuse();
+    const table = Object.getOwnPropertyDescriptor(g, 'attributes');
+    if (!table || table.get !== r.attributeGuard || table.set || table.configurable) terminalRefuse();
+    const attributes = r.attributeTable;
+    const components = object => ['x', 'y', 'z'].map(k => terminalData(object, k));
+    if (g !== r.geometry || terminalData(m, 'material') !== state.material || terminalData(m, 'onBeforeRender') !== state.drawGuard || terminalData(m, 'raycast') !== terminalRefuse
+      || attributes !== r.attributeTable || Object.keys(attributes).join(',') !== r.attributeNames || terminalData(g, 'index') !== r.index
+      || terminalData(g, 'boundingBox') !== r.box || terminalData(g, 'boundingSphere') !== r.sphere
+      || terminalData(r.box, 'min') !== r.min || terminalData(r.box, 'max') !== r.max || terminalData(r.sphere, 'center') !== r.center
+      || [...components(r.min), ...components(r.max), ...components(r.center), terminalData(r.sphere, 'radius')].some((v, i) => !Object.is(v, r.bounds[i]))
+      || terminalData(g, 'groups') !== r.groups || r.groups.length || terminalData(g, 'drawRange') !== r.range
+      || terminalData(r.range, 'start') !== 0 || terminalData(r.range, 'count') !== Infinity
+      || terminalData(m, 'position') !== r.position || terminalData(m, 'scale') !== r.scale || terminalData(m, 'quaternion') !== r.quaternion
+      || components(r.position).some(v => v !== 0) || components(r.scale).some(v => v !== 1)
+      || ['_x', '_y', '_z', '_w'].some((k, i) => terminalData(r.quaternion, k) !== (i === 3 ? 1 : 0))
+      || !terminalData(m, 'matrixAutoUpdate') || !terminalData(m, 'matrixWorldAutoUpdate')
+      || terminalData(m, 'matrix') !== r.matrix || terminalData(r.matrix, 'elements') !== r.matrixElements) terminalRefuse();
+    for (let i = 0; i < 16; i++) if (terminalData(r.matrixElements, String(i)) !== (i % 5 === 0 ? 1 : 0)) terminalRefuse();
+    if (terminalData(m, 'matrixWorld') !== r.matrixWorld || terminalData(r.matrixWorld, 'elements') !== r.worldElements
+      || terminalData(m, 'frustumCulled') !== r.frustum || terminalData(m, 'renderOrder') !== r.renderOrder
+      || terminalData(m, 'layers') !== r.layers || terminalData(r.layers, 'mask') !== r.layerMask) terminalRefuse();
+    for (let i = 0; i < 16; i++) if (terminalData(r.worldElements, String(i)) !== (i % 5 === 0 ? 1 : 0)) terminalRefuse();
+    for (const w of r.attributes) {
+      const a = Object.getOwnPropertyDescriptor(w.attribute, 'array');
+      if (!a || !Object.hasOwn(a, 'value') || terminalIdentities.get(a.value) !== w.arrayIdentity || wholeTypedBytes(a.value) !== w.bytes
+        || Object.getPrototypeOf(w.attribute) !== w.prototype || Object.hasOwn(w.attribute, 'onUploadCallback')
+        || terminalData(w.prototype, 'onUploadCallback') !== w.upload
+        || ['itemSize', 'count', 'normalized', 'gpuType', 'usage', 'version'].some((k, i) => terminalData(w.attribute, k) !== w.values[i])) terminalRefuse();
+    }
+    if (r.attributes.some((w, i) => i === r.attributes.length - 1 ? terminalData(g, 'index') !== w.attribute : terminalData(attributes, 'position') !== w.attribute)) terminalRefuse();
+  }
+}
+
+function guardTerminalDraw(state) { return function () { verifyTerminalMesh(state); }; }
+function ownedTerminalDisposal(state) { return function () { closeTerminalTerrain(state); }; }
+function guardTerminalAttributes(state, geometry, table) {
+  // WebGLGeometries.update reads this BEFORE WebGLAttributes touches any array.
+  // Native disposal needs the registered table. Even during its callbacks the
+  // mesh binding refuses closed-owner renderer reentry before this exception.
+  return function () { if (!state.disposing.has(geometry)) verifyTerminalMesh(state); return table; };
+}
+function guardTerminalGeometry(state, geometry) {
+  return function () { if (state.closed) terminalRefuse(); return geometry; };
+}
+function disposeTerminalGeometry(state, geometry, dispose) {
+  return function () {
+    if (state.disposing.has(geometry)) terminalRefuse();
+    // Native geometry deletion is irreversible too. Close BEFORE listeners can
+    // reenter the renderer, even when disposal began on a still-open owner.
+    let failed = false, failure;
+    try { closeTerminalTerrain(state); } catch (e) { failed = true; failure = e; }
+    state.disposing.add(geometry);
+    try { Reflect.apply(dispose, geometry, []); }
+    catch (e) { failure = failed ? new AggregateError([failure, e], 'terminal terrain: close and geometry cleanup failed') : e; failed = true; }
+    finally { state.disposing.delete(geometry); }
+    if (failed) throw failure;
+  };
+}
+
+function protectTerminalGeometry(mesh) {
+  for (const name of ['raycast', 'clone', 'copy']) Object.defineProperty(mesh, name, { value: terminalRefuse });
+  for (const name of ['computeBoundingBox', 'computeBoundingSphere', 'computeVertexNormals', 'computeTangents', 'applyMatrix4', 'clone', 'copy', 'toNonIndexed', 'setAttribute', 'deleteAttribute', 'setIndex'])
+    Object.defineProperty(mesh.geometry, name, { value: terminalRefuse });
+  Object.freeze(mesh.geometry.attributes); Object.freeze(mesh.geometry.groups); Object.freeze(mesh.geometry.drawRange); Object.freeze(mesh.geometry.morphAttributes);
+}
+
+/** Default-off six-byte geometry constructor for buildTerrainMesh's existing synchronous factory seam.
+ * This owns its added lookup texture, borrows the original uniform records, and performs no upload.
+ */
+export function createTerminalTerrainMesh({ data, vertices, triangles, material: original }) {
+  if (terminalSamplers.has(data) || terminalWorlds.has(data) || Object.getPrototypeOf(data) !== TerrainData.prototype) terminalRefuse();
+  const descriptor = Object.getOwnPropertyDescriptor(data, 'heights');
+  if (!descriptor || !Object.hasOwn(descriptor, 'value') || !descriptor.configurable || !descriptor.writable
+    || !(descriptor.value instanceof Float32Array)
+    || ['buffer', 'byteLength', 'byteOffset', 'length'].some(k => Object.hasOwn(descriptor.value, k))) terminalRefuse();
+  wholeTypedBytes(descriptor.value);
+  const p = prepareTerminalTerrain(data, vertices, triangles), row = packedTerrainCodes(p.heightCodes);
+  Object.assign(row, { grid: p.grid, cell: p.cell, half: p.half, step: p.step, state: 'prepared', published: false,
+    sourceIdentity: terminalIdentity(descriptor.value), enumerable: descriptor.enumerable, stagingBytes: wholeTypedBytes(p.heightCodes),
+    methods: terminalMethods.map(k => terminalIdentity(terminalData(TerrainData.prototype, k))) });
+  verifyTerminalTerrainData(data, row);
+  const uvSeam = 'vUv = uv;', positionSeam = 'vec4 w = modelMatrix * vec4(position, 1.0);';
+  if (!original?.isShaderMaterial || original.isRawShaderMaterial || original.vertexShader.split(uvSeam).length !== 2
+    || original.vertexShader.split(positionSeam).length !== 2 || /\buTerminal(Lookup|Grid)\b/.test(original.vertexShader)
+    || ['uTerminalLookup', 'uTerminalGrid'].some(k => Object.hasOwn(original.uniforms, k))) terminalRefuse();
+  const owned = [], geometries = [];
+  let state, ownedLookup, ownedImage, ownedLookupData;
+  terminalSamplers.set(data, row); // Reserve ownership before constructors or callbacks can reenter.
+  try {
+    const lookup = new THREE.DataTexture(p.lookup, p.width, p.height, THREE.RedFormat, THREE.FloatType); owned.push(lookup);
+    ownedLookup = lookup; ownedImage = lookup.image; ownedLookupData = p.lookup;
+    lookup.internalFormat = 'R32F'; lookup.minFilter = THREE.NearestFilter; lookup.magFilter = THREE.NearestFilter;
+    lookup.generateMipmaps = false; lookup.flipY = false; lookup.unpackAlignment = 1; lookup.needsUpdate = true;
+    Object.defineProperty(lookup, 'onUpdate', { value: null, writable: false, configurable: false });
+    const material = original.clone(); owned.push(material);
+    material.uniforms = { ...original.uniforms, uTerminalLookup: { value: lookup }, uTerminalGrid: { value: p.grid } };
+    material.vertexShader = 'uniform sampler2D uTerminalLookup;\nuniform float uTerminalGrid;\nfloat terminalValue(float value){int i=int(value);return texelFetch(uTerminalLookup,ivec2(i%256,i/256),0).r;}\n' + original.vertexShader
+      .replace(uvSeam, 'vUv = position.xy / (uTerminalGrid - 1.0);')
+      .replace(positionSeam, 'vec3 decodedPosition = vec3(terminalValue(position.x),terminalValue(uTerminalGrid+position.z),terminalValue(position.y));\nvec4 w = modelMatrix * vec4(decodedPosition, 1.0);');
+    Object.defineProperty(material, 'wireframe', { value: false, writable: false, configurable: false });
+    for (const k of ['onBeforeCompile', 'customProgramCacheKey', 'onBeforeRender'])
+      Object.defineProperty(material, k, { value: material[k], writable: false, configurable: false });
+    for (const k of ['defines', 'extensions']) Object.freeze(material[k]);
+    for (const k of ['defines', 'extensions', 'vertexShader', 'fragmentShader', 'glslVersion', 'precision', 'lights', 'fog', 'clipping', 'side', 'shadowSide', 'transparent', 'blending', 'blendSrc', 'blendDst', 'blendEquation', 'depthTest', 'depthWrite', 'depthFunc', 'colorWrite', 'alphaTest', 'alphaHash', 'alphaToCoverage', 'premultipliedAlpha', 'toneMapped', 'dithering', 'forceSinglePass'])
+      Object.defineProperty(material, k, { value: material[k], writable: false, configurable: false });
+    const geometry = new THREE.BufferGeometry(); geometries.push(geometry);
+    const root = new THREE.Mesh(geometry, material); root.name = 'terrain'; root.userData.triangles = p.triangles;
+    const bounds = (g, b) => { g.boundingBox = new THREE.Box3(new THREE.Vector3(...b.min), new THREE.Vector3(...b.max)); g.boundingSphere = new THREE.Sphere(new THREE.Vector3(...b.center), b.radius); };
+    bounds(geometry, p.bounds);
+    for (const [i, c] of p.chunks.entries()) {
+      const geo = new THREE.BufferGeometry(); geometries.push(geo);
+      geo.setAttribute('position', new THREE.BufferAttribute(c.packed, 3, false)); geo.setIndex(new THREE.BufferAttribute(c.index, 1, false)); bounds(geo, c.bounds);
+      const child = new THREE.Mesh(geo, material); child.name = `terminal-terrain-chunk-${i + 1}`;
+      // Avoid per-chunk culling. A later first-frame barrier must still prove
+      // visibility, ancestor/layer eligibility and every actual upload.
+      child.frustumCulled = false; root.add(child);
+    }
+    state = { data, row, root, children: root.children, material, lookup, source: lookup.source, image: lookup.image, lookupData: p.lookup, width: p.width, height: p.height,
+      lookupVersion: lookup.version, vertex: material.vertexShader, fragment: material.fragmentShader, uniforms: material.uniforms,
+      records: Object.entries(material.uniforms).map(([k, record]) => [k, record, record.value]), closed: false, disposing: new Set(), nodes: [] };
+    state.drawGuard = guardTerminalDraw(state);
+    for (const mesh of [root, ...root.children]) {
+      const geo = mesh.geometry;
+      mesh.onBeforeRender = state.drawGuard; protectTerminalGeometry(mesh);
+      state.nodes.push({ mesh, geometry: geo, index: geo.index, attributeTable: geo.attributes, attributeNames: Object.keys(geo.attributes).join(','),
+        attributes: [...Object.values(geo.attributes), ...(geo.index ? [geo.index] : [])].map(terminalAttributeWitness),
+        box: geo.boundingBox, sphere: geo.boundingSphere, min: geo.boundingBox.min, max: geo.boundingBox.max, center: geo.boundingSphere.center,
+        position: mesh.position, scale: mesh.scale, quaternion: mesh.quaternion, matrix: mesh.matrix, matrixElements: mesh.matrix.elements,
+        matrixWorld: mesh.matrixWorld, worldElements: mesh.matrixWorld.elements, frustum: mesh.frustumCulled, renderOrder: mesh.renderOrder, layers: mesh.layers, layerMask: mesh.layers.mask,
+        bounds: [...geo.boundingBox.min.toArray(), ...geo.boundingBox.max.toArray(), ...geo.boundingSphere.center.toArray(), geo.boundingSphere.radius],
+        groups: geo.groups, range: geo.drawRange });
+    }
+    for (const r of state.nodes) {
+      r.attributeGuard = guardTerminalAttributes(state, r.geometry, r.attributeTable);
+      Object.defineProperty(r.geometry, 'attributes', { get: r.attributeGuard, configurable: false, enumerable: true });
+      r.geometryGuard = guardTerminalGeometry(state, r.geometry);
+      Object.defineProperty(r.mesh, 'geometry', { get: r.geometryGuard, configurable: false, enumerable: true });
+      Object.defineProperty(r.geometry, 'dispose', { value: disposeTerminalGeometry(state, r.geometry, THREE.BufferGeometry.prototype.dispose) });
+    }
+    material.addEventListener('dispose', ownedTerminalDisposal(state));
+    terminalSamplers.set(data, row); terminalWorlds.set(data, state); terminalMeshes.set(root, state);
+    verifyTerminalMesh(state);
+    return root;
+  } catch (error) {
+    const failures = [];
+    if (state) { try { closeTerminalTerrain(state); } catch (e) { failures.push(e); } }
+    else if (terminalSamplers.get(data) === row) {
+      terminalSamplers.delete(data); row.bytes = null; row.stagingBytes = 0; row.state = 'aborted';
+    }
+    // The material listener owns lookup disposal once installed; the Set also handles earlier construction.
+    for (const resource of [...geometries, ...owned.slice().reverse()]) {
+      if (state && resource === state.lookup) continue;
+      try { if (resource === ownedLookup) disposeTerminalLookup(resource, ownedImage, ownedLookupData); else resource.dispose(); }
+      catch (e) { failures.push(e); }
+    }
+    if (failures.length) throw new AggregateError([error, ...failures], 'terminal terrain: construction and cleanup failed');
+    throw error;
+  }
+}
+
 // Lossless Float32 partitions; index 65535 remains reserved for primitive restart.
 export function partitionTerrain({position,uv,index},limit=65535) {
   const vertices=position.length/3;
@@ -301,6 +633,12 @@ export class TerrainData {
 
   /** Bilinear height (world y) at world x,z; clamped to the map edge. */
   heightAt(x, z) {
+    const h = this.heights;
+    if (h === null) {
+      const terminal = terminalSamplers.get(this);
+      if (terminal?.state === 'committed') return terminalHeightAt(terminal, x, z);
+      terminalRefuse();
+    }
     const G = this.grid;
     let gx = (x + this.half) / this.cell;
     let gz = (z + this.half) / this.cell;
@@ -310,7 +648,6 @@ export class TerrainData {
     const z0 = gz | 0;
     const fx = gx - x0;
     const fz = gz - z0;
-    const h = this.heights;
     const i = z0 * G + x0;
     const a = h[i] + (h[i + 1] - h[i]) * fx;
     const b = h[i + G] + (h[i + G + 1] - h[i + G]) * fx;
@@ -421,6 +758,7 @@ function buildNormalTexture(data) {
 }
 
 export function buildTerrainMesh(data, groundTexture, infoTexture, sun, { meshFactory = null } = {}) {
+  if (terminalSamplers.get(data)?.state === 'committed' || terminalSamplers.get(data)?.state === 'stopped') terminalRefuse();
   if (meshFactory !== null && (typeof meshFactory !== 'function'
     || Object.prototype.toString.call(meshFactory) === '[object AsyncFunction]')) throw new Error('terrain: synchronous diagnostic mesh factory required');
   const G = data.grid;
@@ -563,6 +901,13 @@ export function buildTerrainMesh(data, groundTexture, infoTexture, sun, { meshFa
       const published = meshResources(mesh);
       if (!validPublication() || published.size !== transferred.size || [...transferred].some(r => !published.has(r))) {
         throw new Error('terrain: diagnostic factory publication changed during shell disposal');
+      }
+      const terminal = terminalMeshes.get(mesh);
+      if (terminal) {
+        if (terminal.data !== data || terminalSamplers.get(data) !== terminal.row || terminalWorlds.get(data) !== terminal) terminalRefuse();
+        verifyTerminalMesh(terminal);
+        // The factory call has returned and its private Uint16 staging has no retained owner.
+        terminal.row.stagingBytes = 0; terminal.row.published = true;
       }
       return mesh;
     } catch (error) {

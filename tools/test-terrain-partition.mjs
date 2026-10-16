@@ -1,7 +1,11 @@
 import assert from 'node:assert/strict';import * as THREE from 'three';
 import fs from 'node:fs';import {gunzipSync} from 'node:zlib';import Martini from '../vendor/@mapbox/martini/index.js';
+import {execFileSync} from 'node:child_process';
+import {WebGLAttributes} from 'three/src/renderers/webgl/WebGLAttributes.js';
+import {WebGLGeometries} from 'three/src/renderers/webgl/WebGLGeometries.js';
+import {WebGLObjects} from 'three/src/renderers/webgl/WebGLObjects.js';
 import {captureFloat32TerrainOriginal,partitionTerrain,installTerrainPartition,registerTerrainPartition,prepareCanonicalTerrain,createCanonicalTerrainMesh,installCanonicalTerrain} from './bake/partition-terrain.mjs';
-import {TerrainData,buildTerrainMesh,prepareTerminalTerrain} from '../src/world/terrain.js';
+import {TerrainData,buildTerrainMesh,prepareTerminalTerrain,createTerminalTerrainMesh,terminalTerrainSampler} from '../src/world/terrain.js';
 const size=257,position=new Float32Array(size*size*3),uv=new Float32Array(size*size*2),indices=[];
 for(let z=0;z<size;z++)for(let x=0;x<size;x++){const i=z*size+x;position.set([x,x===0&&z===0?-0:Math.sin(x+z),z],i*3);uv.set([x/(size-1),z/(size-1)],i*2);if(x<size-1&&z<size-1)indices.push(i,i+size,i+1,i+1,i+size,i+size+1);}
 const source={position,uv,index:new Uint32Array(indices)},api={partition:partitionTerrain,install:installTerrainPartition,register:registerTerrainPartition,canonical:prepareCanonicalTerrain,canonicalMesh:createCanonicalTerrainMesh};
@@ -9,6 +13,7 @@ api.build=buildTerrainMesh;
 api.replaceCanonical=installCanonicalTerrain;
 api.originalProof=captureFloat32TerrainOriginal;
 api.terminal=prepareTerminalTerrain;
+api.terminalFactory=createTerminalTerrainMesh;api.terminalSampler=terminalTerrainSampler;api.badPackedPadding=false;
 function retainedFixture(a){
  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array([0,0,0,1,0,0,0,0,1]),3));geo.setAttribute('uv',new THREE.BufferAttribute(new Float32Array([0,0,1,0,0,1]),2));geo.setIndex(new THREE.BufferAttribute(new Uint16Array([0,1,2]),1));geo.computeBoundingBox();geo.computeBoundingSphere();
  const root=new THREE.Mesh(geo,new THREE.MeshBasicMaterial()),receipt=a.install({terrainMesh:root},THREE,partitionTerrain,{reversible:true});return {geo,root,receipt};
@@ -263,5 +268,159 @@ checks.push(['terminal-input-refusal',a=>{
 mutants['terminal-six-byte']={terminal:(...args)=>{const p=prepareTerminalTerrain(...args);new Uint32Array(p.lookup.buffer)[0]^=1;return p;}};
 mutants['terminal-input-refusal']={terminal:()=>({})};
 mutants['terminal-bounds']={terminal:(...args)=>{const p=prepareTerminalTerrain(...args);p.bounds.radius=0;return p;}};
-for(const [,check]of checks)await check(api);console.log(`TERRAIN-PARTITION OK (${checks.length}/${checks.length})`);
-if(process.argv.includes('--prove-fail')){for(const [name,check]of checks){let error;try{await check({...api,...mutants[name]});}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&error.message.startsWith(name),`${name}: mutant must fail its own assertion`);console.log(`CAUGHT ${name}`);}console.log(`TERRAIN-PARTITION CONTROLS OK (${checks.length}/${checks.length})`);}
+
+function terminalOwnerFixture(){
+ const meta={grid:3,cellSize:1,halfSize:1,heights:{stepM:.05}},data=new TerrainData(meta,new Float32Array([0,.1,.2,.3,.4,.5,.6,.7,.8]));
+ return{data,ground:new THREE.Texture(),info:new THREE.Texture(),sun:{direction:new THREE.Vector3(1,1,1),color:new THREE.Color(1,1,1),sky:new THREE.Color(1,1,1),earth:new THREE.Color(1,1,1),fog:new THREE.Color(1,1,1)}};
+}
+function constructTerminal(a,f,name,factory=a.terminalFactory){
+ let mesh,failure;try{mesh=buildTerrainMesh(f.data,f.ground,f.info,f.sun,{meshFactory:factory});}catch(e){failure={value:e};}
+ assert.equal(failure,undefined,name+': exact factory and publication admission');return mesh;
+}
+
+checks.push(['terminal-sampler-owner',a=>{
+ const name='terminal-sampler-owner',f=terminalOwnerFixture(),source=f.data.heights,descriptor=Object.getOwnPropertyDescriptor(f.data,'heights'),method=f.data.heightAt;
+ const points=[[-1,-1],[1,1],[.1,.7],[-.43,.92],[-10,8],[Infinity,-Infinity],[NaN,0]],expected=points.map(([x,z])=>[f.data.heightAt(x,z),f.data.normalAt(x,z).toArray(),f.data.slopeAt(x,z)]);
+ const mesh=constructTerminal(a,f,name),owner=a.terminalSampler(f.data),before=owner.snapshot();
+ assert.equal(f.data.heights,source,name+': preparation preserves original backing');assert.equal(f.data.heightAt,method,name+': method identity unchanged');
+ assert.deepEqual(before,{state:'prepared',published:true,cells:9,bits:4,bytes:5,stagingBytes:0},name+': complete private whole backing and returned staging accounted');
+ assert.ok(Object.values(before).every(v=>v===null||typeof v!=='object'),name+': no typed arrays/source/closures exposed by receipt');
+ owner.commit();assert.equal(f.data.heights,null,name+': original source reference removed on commit');assert.equal(f.data.heightAt,method,name+': same TerrainData method');
+ for(const k of ['grid','cell','half','size','heightAt','normalAt','slopeAt','inBounds']){
+  const old=f.data[k];assert.throws(()=>{f.data[k]=typeof old==='function'?()=>0:10;},TypeError,name+': committed '+k+' cannot diverge');
+  assert.throws(()=>Object.defineProperty(f.data,k,{get(){return 10;}}),TypeError,name+': committed descriptor '+k+' pinned');assert.equal(f.data[k],old);
+ }
+ for(const [i,[x,z]]of points.entries()){assert.ok(Object.is(f.data.heightAt(x,z),expected[i][0]),name+': exact Float32 interpolation');assert.deepEqual(f.data.normalAt(x,z).toArray(),expected[i][1],name+': exact original normal');assert.ok(Object.is(f.data.slopeAt(x,z),expected[i][2]),name+': exact original slope');}
+ assert.throws(()=>owner.commit(),/terminal terrain/,name+': duplicate commit refuses');assert.throws(()=>owner.abort(),/terminal terrain/,name+': committed owner cannot restore');
+ assert.throws(()=>buildTerrainMesh(f.data,f.ground,f.info,f.sun),/terminal terrain/,name+': no rebuild after retirement');
+ mesh.onBeforeRender();mesh.material.dispose();assert.equal(owner.snapshot().bytes,0,name+': stopped private backing cleared');assert.throws(()=>f.data.heightAt(0,0),/terminal terrain/,name+': stopped sampler cannot resurrect');
+ const q=terminalOwnerFixture(),original=q.data.heights,old=Object.getOwnPropertyDescriptor(q.data,'heights');const candidate=constructTerminal(a,q,name),aborted=a.terminalSampler(q.data);
+ aborted.abort();assert.equal(q.data.heights,original,name+': abort keeps original identity');assert.deepEqual(Object.getOwnPropertyDescriptor(q.data,'heights'),old,name+': abort keeps exact descriptor');
+ assert.equal(aborted.snapshot().state,'aborted',name+': aborted receipt');assert.throws(()=>aborted.commit(),/terminal terrain/,name+': stale abort cannot commit');
+ const next=constructTerminal(a,q,name);assert.throws(()=>aborted.commit(),/terminal terrain/,name+': stale prior owner cannot commit replacement');a.terminalSampler(q.data).abort();
+ assert.equal(descriptor.value,source,name+': external test oracle stays outside production owner');candidate.material.dispose();next.material.dispose();
+ for(const change of [d=>{d.heights=d.heights.slice();},d=>{d.heights[3]+=.1;},d=>{Object.defineProperty(d,'heights',{writable:false});},d=>{d.cell=2;},d=>Object.preventExtensions(d),d=>Object.defineProperty(d,'size',{configurable:false})]){
+  const q=terminalOwnerFixture(),mesh=constructTerminal(a,q,name),owner=a.terminalSampler(q.data);change(q.data);
+  const descriptors=Object.getOwnPropertyDescriptors(q.data);
+  assert.throws(()=>owner.commit(),/terminal terrain/,name+': changed source/descriptor/scalars refuses before commit');assert.notEqual(q.data.heights,null,name+': failed commit preserves source');assert.deepEqual(Object.getOwnPropertyDescriptors(q.data),descriptors,name+': failed preflight leaves all descriptors exact');mesh.material.dispose();
+ }
+}]);
+mutants['terminal-sampler-owner']={terminalSampler:data=>{const o=terminalTerrainSampler(data);return{...o,commit:()=>o.snapshot()};}};
+
+checks.push(['terminal-mesh-constructor',a=>{
+ const name='terminal-mesh-constructor',f=terminalOwnerFixture(),ordinary=buildTerrainMesh(f.data,f.ground,f.info,f.sun);let shell;
+ const mesh=constructTerminal(a,f,name,args=>{shell=args.material;return a.terminalFactory(args);});
+ assert.ok(mesh.material.vertexShader.includes('texelFetch(')&&!mesh.material.vertexShader.includes('texture2D(uTerminalLookup'),name+': integer lookup in pinned GLSL300 translation');
+ assert.equal(mesh.material.fragmentShader,ordinary.material.fragmentShader,name+': original fragment shader');
+ for(const k of Object.keys(shell.uniforms))assert.equal(mesh.material.uniforms[k],shell.uniforms[k],name+': exact original uniform records');
+ assert.deepEqual(mesh.geometry.boundingBox,ordinary.geometry.boundingBox,name+': decoded root box');assert.deepEqual(mesh.geometry.boundingSphere,ordinary.geometry.boundingSphere,name+': decoded root sphere');
+ const lookup=mesh.material.uniforms.uTerminalLookup.value;assert.equal(lookup.internalFormat,'R32F',name+': exact Float32 texture');assert.equal(lookup.minFilter,THREE.NearestFilter,name+': no interpolation');assert.equal(lookup.generateMipmaps,false,name+': exact base lookup');
+ for(const m of [mesh,...mesh.children]){
+  for(const k of ['raycast','clone','copy'])assert.throws(()=>m[k](),/terminal terrain/,name+': immutable mesh '+k);
+  for(const k of ['computeBoundingBox','computeBoundingSphere','computeVertexNormals','computeTangents','applyMatrix4','clone','copy','toNonIndexed','setAttribute','deleteAttribute','setIndex'])assert.throws(()=>m.geometry[k](),/terminal terrain/,name+': immutable geometry '+k);
+ }
+ assert.throws(()=>{mesh.material.wireframe=true;},TypeError,name+': no generated wireframe index');
+ for(const k of ['onBeforeCompile','customProgramCacheKey','onBeforeRender','vertexShader','fragmentShader','side','depthWrite','toneMapped']){
+  assert.throws(()=>{mesh.material[k]=()=>{};},TypeError,name+': shader/render property '+k+' pinned');
+  assert.throws(()=>Object.defineProperty(mesh.material,k,{get(){return ()=>{};}}),TypeError,name+': shader/render descriptor '+k+' pinned');
+ }
+ assert.throws(()=>{mesh.children[0].geometry.attributes={};},TypeError,name+': pre-upload table cannot be replaced');
+ assert.throws(()=>{mesh.children[0].geometry=new THREE.BufferGeometry();},TypeError,name+': renderer geometry cannot be replaced');
+ let corner=0;for(const child of mesh.children){const g=child.geometry,p=g.attributes.position.array;assert.ok(p instanceof Uint16Array&&g.index.array instanceof Uint16Array,name+': native U16 attributes');
+  for(const i of g.index.array){const id=ordinary.geometry.index.array[corner++],decoded=new Float32Array([lookup.image.data[p[i*3]],lookup.image.data[f.data.grid+p[i*3+2]],lookup.image.data[p[i*3+1]]]),uv=new Float32Array([p[i*3]/(f.data.grid-1),p[i*3+1]/(f.data.grid-1)]);
+   assert.deepEqual(Buffer.from(decoded.buffer),Buffer.from(ordinary.geometry.attributes.position.array.buffer,id*12,12),name+': actual constructor ordered positions');assert.deepEqual(Buffer.from(uv.buffer),Buffer.from(ordinary.geometry.attributes.uv.array.buffer,id*8,8),name+': actual constructor ordered UVs');}}
+ assert.equal(corner,ordinary.geometry.index.count,name+': every ordered triangle');
+ const changes=[
+  m=>{const g=m.children[0].geometry,old=g.index;g.index=new THREE.BufferAttribute(new Uint16Array([0,1,2]),1);return()=>{g.index=old;};},
+  m=>{const b=m.children[0].geometry.boundingSphere,old=b.radius;b.radius++;return()=>{b.radius=old;};},
+  m=>{const v=m.children[0].geometry.attributes.position;v.version++;return()=>{v.version--;};},
+  m=>{const old=m.material.uniforms;m.material.uniforms={...old};return()=>{m.material.uniforms=old;};},
+  m=>{const u=m.material.uniforms.uTerminalGrid,old=u.value;u.value++;return()=>{u.value=old;};},
+  m=>{const image=m.material.uniforms.uTerminalLookup.value.image;image.width++;return()=>{image.width--;};},
+  m=>{const t=m.material.uniforms.uTerminalLookup.value,old=t.minFilter;t.minFilter=THREE.LinearFilter;return()=>{t.minFilter=old;};},
+  m=>{m.children[0].matrix.elements[0]=2;return()=>{m.children[0].matrix.elements[0]=1;};}];
+ for(const change of changes){const restore=change(mesh);try{assert.throws(()=>mesh.onBeforeRender(),/terminal terrain/,name+': direct replacement/mutation refused');}finally{restore();}mesh.onBeforeRender();}
+ let foreign=0;const attr=mesh.children[0].geometry.attributes.position,old=Object.getOwnPropertyDescriptor(attr,'array'),receipt=a.terminalSampler(f.data).snapshot();
+ Object.defineProperty(attr,'array',{get(){foreign++;a.terminalSampler(f.data).abort();return old.value;},configurable:true});
+ let uploads=0;const gl={ARRAY_BUFFER:34962,createBuffer(){return{};},bindBuffer(){},bufferData(){uploads++;},deleteBuffer(){}},info={memory:{geometries:0},render:{frame:1}},binding={releaseStatesOfGeometry(){},releaseStatesOfObject(){}},attributes=WebGLAttributes(gl),geometries=WebGLGeometries(gl,attributes,info,binding),objects=WebGLObjects(gl,geometries,attributes,binding,info);
+ try{assert.throws(()=>mesh.onBeforeRender(),/terminal terrain/,name+': observer refuses array getter');assert.throws(()=>objects.update(mesh.children[0]),/terminal terrain/,name+': actual renderer upload path refuses BEFORE foreign array');assert.equal(uploads,0,name+': rejected path performs zero native uploads');assert.equal(foreign,0,name+': observation never invokes foreign retirement');assert.deepEqual(a.terminalSampler(f.data).snapshot(),receipt,name+': observation cannot retire private storage');}finally{Object.defineProperty(attr,'array',old);}
+ objects.update(mesh.children[0]);assert.equal(uploads,1,name+': actual unchanged renderer path uploads position');
+ let callbacks=0;attr.onUploadCallback=()=>{callbacks++;};info.render.frame++;
+ try{assert.throws(()=>objects.update(mesh.children[0]),/terminal terrain/,name+': foreign upload callback rejected before upload');assert.equal(callbacks,0);assert.equal(uploads,1);}finally{delete attr.onUploadCallback;}
+ mesh.onBeforeRender();const closedGeometry=mesh.children[0].geometry;mesh.material.dispose();
+ info.render.frame++;assert.throws(()=>objects.update(mesh.children[0]),/terminal terrain/,name+': closed owner refuses renderer upload');
+ assert.throws(()=>geometries.update(closedGeometry),/terminal terrain/,name+': closed direct geometry update refuses');
+ let reentry=0;closedGeometry.addEventListener('dispose',()=>{assert.throws(()=>objects.update(mesh.children[0]),/terminal terrain/);reentry++;});
+ closedGeometry.dispose();assert.equal(reentry,1,name+': native disposal permits zero-upload renderer reentry refusal');assert.equal(info.memory.geometries,0,name+': registered native geometry removed');assert.equal(uploads,1,name+': no resurrection upload');
+ ordinary.geometry.dispose();ordinary.material.dispose();
+ const open=terminalOwnerFixture(),openMesh=constructTerminal(a,open,name),openOwner=a.terminalSampler(open.data),openChild=openMesh.children[0],openGeometry=openChild.geometry;
+ openOwner.commit();let openReentry=0;
+ openGeometry.addEventListener('dispose',()=>{assert.throws(()=>objects.update(openChild),/terminal terrain/,name+': open-dispose renderer reentry refuses');openReentry++;});
+ openGeometry.dispose();assert.equal(openOwner.snapshot().state,'stopped',name+': disposing geometry closes committed sampler before callbacks');assert.equal(openOwner.snapshot().bytes,0);assert.equal(openReentry,1);
+ info.render.frame++;assert.throws(()=>objects.update(openChild),/terminal terrain/,name+': disposed open geometry cannot upload later');assert.equal(uploads,1);openMesh.material.dispose();
+ let seed=25,totalSamples=0;const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+ for(const [terrain,bits,packedBytes]of [['henry-hill',10,328962],['shiloh',11,1444610],['stones-river',10,1313282],['chattanooga',12,1575938],['lookout-mountain',14,1838594]]){
+  const base=new URL('../assets/terrain/',import.meta.url),meta=JSON.parse(fs.readFileSync(new URL(terrain+'.json',base))),raw=gunzipSync(fs.readFileSync(new URL(meta.heights.file,base))),delta=new Int16Array(raw.buffer,raw.byteOffset,raw.byteLength/2),heights=new Float32Array(meta.grid*meta.grid);
+  for(let z=0;z<meta.grid;z++){let sum=0;for(let x=0;x<meta.grid;x++){sum+=delta[z*meta.grid+x];heights[z*meta.grid+x]=sum*(meta.heights.stepM*2);}}
+  const data=new TerrainData(meta,heights),oracle=new TerrainData(meta,heights),f={...terminalOwnerFixture(),data},old=buildTerrainMesh(data,f.ground,f.info,f.sun),candidate=constructTerminal(a,f,name),lookup=candidate.material.uniforms.uTerminalLookup.value,owner=a.terminalSampler(data);
+  assert.deepEqual(candidate.geometry.boundingBox,old.geometry.boundingBox,name+': actual '+terrain+' root bounds');assert.deepEqual(candidate.geometry.boundingSphere,old.geometry.boundingSphere,name+': actual '+terrain+' root sphere');
+  let corner=0;for(const child of candidate.children){const p=child.geometry.attributes.position.array,positions=new Float32Array(p.length);
+   for(let i=0;i<p.length/3;i++)positions.set([lookup.image.data[p[i*3]],lookup.image.data[meta.grid+p[i*3+2]],lookup.image.data[p[i*3+1]]],i*3);
+   const expected=originalBounds(positions),box=child.geometry.boundingBox,sphere=child.geometry.boundingSphere;
+   assert.deepEqual({min:box.min.toArray(),max:box.max.toArray(),center:sphere.center.toArray(),radius:sphere.radius},expected,name+': actual '+terrain+' chunk bounds');
+   for(const i of child.geometry.index.array){const original=old.geometry.index.array[corner++],uv=new Float32Array([p[i*3]/(meta.grid-1),p[i*3+1]/(meta.grid-1)]);
+    assert.deepEqual(Buffer.from(positions.buffer,i*12,12),Buffer.from(old.geometry.attributes.position.array.buffer,original*12,12),name+': actual '+terrain+' ordered triangle position');assert.deepEqual(Buffer.from(uv.buffer),Buffer.from(old.geometry.attributes.uv.array.buffer,original*8,8),name+': actual '+terrain+' ordered UV');}}
+  assert.equal(corner,old.geometry.index.count,name+': actual '+terrain+' complete triangles');assert.equal(owner.snapshot().bits,bits,name+': minimal private code width');assert.equal(owner.snapshot().bytes,packedBytes,name+': exact private whole backing');owner.commit();assert.equal(data.heights,null,name+': no DEM owner in committed '+terrain);
+  const probe=(x,z)=>{assert.ok(Object.is(data.heightAt(x,z),oracle.heightAt(x,z)),name+': actual '+terrain+' height sampler');assert.deepEqual(data.normalAt(x,z).toArray(),oracle.normalAt(x,z).toArray(),name+': actual '+terrain+' normal sampler');assert.ok(Object.is(data.slopeAt(x,z),oracle.slopeAt(x,z)),name+': actual '+terrain+' slope sampler');totalSamples++;};
+  for(let z=0;z<meta.grid;z+=3)for(let x=0;x<meta.grid;x+=3)probe(x*data.cell-data.half,z*data.cell-data.half);for(let i=0;i<20000;i++)probe((random()*2.8-1.4)*data.half,(random()*2.8-1.4)*data.half);for(const x of[-Infinity,Infinity,NaN,-data.half,data.half])for(const z of[-Infinity,Infinity,NaN,-data.half,data.half])probe(x,z);
+  candidate.onBeforeRender();candidate.material.dispose();old.geometry.dispose();old.material.dispose();
+ }
+ assert.equal(totalSamples,597222,name+': all actual terrain sampler points');
+}]);
+mutants['terminal-mesh-constructor']={terminalFactory:args=>{const mesh=createTerminalTerrainMesh(args);mesh.geometry.boundingSphere.radius++;return mesh;}};
+
+checks.push(['terminal-lookup-cleanup',a=>{
+ const name='terminal-lookup-cleanup';
+ for(const doubleFailure of [false,true]){
+  const f=terminalOwnerFixture(),mesh=constructTerminal(a,f,name),geometry=mesh.children[0].geometry,lookup=mesh.material.uniforms.uTerminalLookup.value,owner=a.terminalSampler(f.data);
+  if(doubleFailure)lookup.addEventListener('dispose',()=>{throw 0;});geometry.addEventListener('dispose',()=>{throw null;});let failure;
+  try{geometry.dispose();}catch(e){failure={value:e};}
+  assert.ok(failure,name+': geometry cleanup failure surfaced');if(doubleFailure){assert.ok(failure.value instanceof AggregateError);assert.deepEqual(failure.value.errors,[0,null],name+': both falsy close/native failures retained');}else assert.equal(failure.value,null,name+': native falsy failure preserved');
+  assert.equal(owner.snapshot().state,'aborted');assert.equal(owner.snapshot().bytes,0);assert.equal(lookup.image.data,null);assert.throws(()=>mesh.children[0].geometry,/terminal terrain/,name+': failed disposal cannot reopen renderer');mesh.material.dispose();
+ }
+ for(const kind of ['normal','rejected','shell-failure']){
+  const f=terminalOwnerFixture(),original=f.data.heights;let lookup,count=0,owner,mesh,failure;let borrowed=0;f.ground.addEventListener('dispose',()=>borrowed++);f.info.addEventListener('dispose',()=>borrowed++);
+  const factory=args=>{const m=a.terminalFactory(args);owner=a.terminalSampler(args.data);lookup=m.material.uniforms.uTerminalLookup.value;lookup.addEventListener('dispose',()=>count++);
+   assert.throws(()=>owner.commit(),/terminal terrain/,name+': cannot commit inside factory before shell publication');
+   if(kind==='rejected')m.name='invalid';if(kind==='shell-failure')args.material.addEventListener('dispose',()=>{throw 0;});return m;};
+  try{mesh=buildTerrainMesh(f.data,f.ground,f.info,f.sun,{meshFactory:factory});}catch(e){failure={value:e};}
+  if(kind==='normal'){assert.equal(failure,undefined,name+': ordinary publication');mesh.material.dispose();mesh.material.dispose();}
+  else{assert.ok(failure,name+': publication rejected');if(kind==='shell-failure')assert.equal(failure.value,0,name+': first falsy shell failure preserved');}
+  assert.equal(count,1,name+': owned lookup disposed exactly once on '+kind);assert.equal(lookup.image.data,null,name+': lookup strong data cleared');assert.equal(owner.snapshot().bytes,0,name+': prepared private storage released');
+  assert.equal(f.data.heights,original,name+': failed publication/abort keeps source');assert.equal(borrowed,0,name+': borrowed ground/info never disposed');assert.throws(()=>owner.commit(),/terminal terrain/,name+': failed/closed publication cannot commit');
+ }
+ for(const cleanupThrows of [false,true]){
+  const addOwn=Object.getOwnPropertyDescriptor(THREE.Mesh.prototype,'add'),disposeOwn=Object.getOwnPropertyDescriptor(THREE.Texture.prototype,'dispose'),dispose=THREE.Texture.prototype.dispose;let lookup,count=0,throwing;
+  Object.defineProperty(THREE.Mesh.prototype,'add',{value(){throw 0;},configurable:true,writable:true});
+  Object.defineProperty(THREE.Texture.prototype,'dispose',{...disposeOwn,value:function(...args){if(this.internalFormat==='R32F'){lookup=this;count++;if(cleanupThrows)throw null;}return dispose.apply(this,args);}});
+  const f=terminalOwnerFixture(),original=f.data.heights;
+  try{try{buildTerrainMesh(f.data,f.ground,f.info,f.sun,{meshFactory:a.terminalFactory});}catch(e){throwing={value:e};}}
+  finally{if(addOwn)Object.defineProperty(THREE.Mesh.prototype,'add',addOwn);else delete THREE.Mesh.prototype.add;Object.defineProperty(THREE.Texture.prototype,'dispose',disposeOwn);}
+  assert.ok(throwing,name+': actual constructor failure observed');if(cleanupThrows){assert.ok(throwing.value instanceof AggregateError,name+': cleanup failures retained');assert.equal(throwing.value.errors[0],0,name+': primary falsy constructor failure first');assert.ok(throwing.value.errors.includes(null),name+': falsy cleanup failure retained');}else assert.equal(throwing.value,0,name+': original constructor throw returned');
+  assert.equal(count,1,name+': constructor-owned lookup cleanup attempted once');assert.equal(lookup.image.data,null,name+': failed-constructor backing released even after dispose throw');assert.equal(f.data.heights,original,name+': construction never changes source');
+  assert.throws(()=>a.terminalSampler(f.data),/terminal terrain/,name+': failed reservation removed');
+ }
+}]);
+mutants['terminal-lookup-cleanup']={terminalFactory:args=>{const mesh=createTerminalTerrainMesh(args);const listener=mesh.material._listeners.dispose[0];mesh.material.removeEventListener('dispose',listener);return mesh;}};
+
+checks.push(['terminal-packed-private',a=>{
+ const name='terminal-packed-private';
+ const code=`import fs from'node:fs';import assert from'node:assert/strict';let source=fs.readFileSync('src/world/terrain.js','utf8');source=source.replace("from 'three'",'from '+JSON.stringify(import.meta.resolve('three'))).replace("from '@mapbox/martini'",'from '+JSON.stringify(import.meta.resolve('@mapbox/martini')));${a.badPackedPadding?`source=source.replace('if (used && row.bytes[row.bytes.length - 1] >>> used) terminalRefuse();','if (false) terminalRefuse();');`:''}source+='\\nexport {packedTerrainCodes,validatePackedTerrainCodes,terrainCodeAt};';const{packedTerrainCodes:pack,validatePackedTerrainCodes:validate,terrainCodeAt:read}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));let values=0;for(let bits=1;bits<=16;bits++)for(const n of[1,2,3,7,9,31,127,257]){const max=2**bits-1,c=new Uint16Array(n);for(let i=0;i<n;i++)c[i]=(Math.imul(i,641)+i*i)%(max+1);c[n-1]=max;const p=pack(c);assert.equal(p.bits,bits);assert.equal(p.bytes.length,Math.ceil(n*bits/8));for(let i=0;i<n;i++){assert.equal(read(p,i),c[i]);values++;}for(const i of[-1,n,.5])assert.throws(()=>read(p,i));}const zero=pack(new Uint16Array(13));assert.equal(zero.bits,1);assert.equal(read(zero,12),0);for(const c of[null,[],new Float32Array(3),new Uint16Array(0)])assert.throws(()=>pack(c));const p=pack(new Uint16Array([0,1,2,3,4,5,6,7,8]));for(const change of[q=>q.bits=17,q=>q.mask=0,q=>q.length=0,q=>q.length=1025*1025+1,q=>q.bytes=new Uint8Array(q.bytes.length+1),q=>q.bytes=new Uint8Array(q.bytes.length+1).subarray(1),q=>q.bytes[q.bytes.length-1]|=128]){const q={...p,bytes:p.bytes.slice()};change(q);assert.throws(()=>validate(q));}console.log(JSON.stringify({values,widths:16,privateMetadataRejects:7}));`;
+ let output,failure;try{output=execFileSync(process.execPath,['--input-type=module','-e',code],{cwd:new URL('..',import.meta.url),encoding:'utf8',maxBuffer:1024*1024,stdio:['ignore','pipe','pipe']});}catch(e){failure={status:e.status,error:String(e.stderr).split('\n').filter(l=>/Error:/.test(l)&&!l.includes('data:text')).map(l=>l.slice(0,200)).slice(0,2).join(' ')};}
+ assert.equal(failure,undefined,name+': actual private packing and admission rejects malformed width/length/padding');assert.deepEqual(JSON.parse(output),{values:6992,widths:16,privateMetadataRejects:7},name+': all widths and exact whole-buffer domain');
+}]);
+mutants['terminal-packed-private']={badPackedPadding:true};
+const only=process.argv.find(x=>x.startsWith('--only='))?.slice(7),selected=only?checks.filter(([name])=>only.split(',').includes(name)):checks;
+assert.ok(selected.length>0,'terrain-partition: unknown/empty check selection');
+for(const [,check]of selected)await check(api);console.log(`TERRAIN-PARTITION OK (${selected.length}/${selected.length})`);
+if(process.argv.includes('--prove-fail')){for(const [name,check]of selected){let error;try{await check({...api,...mutants[name]});}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&error.message.startsWith(name),`${name}: mutant must fail its own assertion`);console.log(`CAUGHT ${name}`);}console.log(`TERRAIN-PARTITION CONTROLS OK (${selected.length}/${selected.length})`);}

@@ -956,8 +956,8 @@ self.CW_OFFLINE = {
    "sha256": "694308e5ac838df6bd4e3d59e77aab72ae2d94e08c6a38ca09f02daf6b48898e"
   },
   "src/world/terrain.js": {
-   "bytes": 34694,
-   "sha256": "74b4394ae4945b7c684b4752e9bd4bf4e12371fc953d7997a7a85fbdc6e45b4c"
+   "bytes": 60030,
+   "sha256": "220cc89b5f0ad19c2edda88cbf603ef923e54a4dec4a92cc4faee8099e814713"
   },
   "src/world/world.js": {
    "bytes": 5717,
@@ -1472,5 +1472,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "c30c6eed0d4ca1884fba91bd7cd55ecd822eef07982628aff8ba09862286e23c"
+ "generation": "0fa78f046d8001a9b2feefdf1fa285ccfe7c2c7f01ac9c762b2a3098ee26de21"
 };
