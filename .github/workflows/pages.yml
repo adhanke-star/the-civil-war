@@ -27,10 +27,19 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p _site
-          cp index.html device.html reward.html manifest.webmanifest sw.js _site/
+          cp index.html device.html reward.html manifest.webmanifest sw.js offline-manifest.js _site/
           cp -R src vendor _site/
           if [ -d assets ]; then cp -R assets _site/; fi
           touch _site/.nojekyll
+          # sw.js importScripts offline-manifest.js and installs every file it lists; refuse a site missing any.
+          node -e '
+            const fs = require("fs"), vm = require("vm"), box = {};
+            vm.runInNewContext(fs.readFileSync("_site/offline-manifest.js", "utf8"), { self: box });
+            const m = Object.values(box)[0];
+            const missing = Object.keys(m.files).filter((p) => !fs.existsSync("_site/" + p));
+            if (missing.length) { console.error("missing from _site:", missing); process.exit(1); }
+            console.log("site has all", Object.keys(m.files).length, "offline files");
+          '
 
       - uses: actions/configure-pages@v5
 
