@@ -22,7 +22,7 @@ const mutations={
     to:'cleanup.removed++;',message:'trace removes only its exact listeners'},
   'trace-ignore-bound':{target:'producer',from:'if (events.length >= 8192 || bytes + size > 4194304)',
     to:'if (false)',message:'malformed or excessive CDP metadata is sticky invalid'},
-  'trace-block-cleanup':{target:'producer',from:"admissionPrimaryWrite = admissionPersist('primary');",
+  'trace-block-cleanup':{target:'producer',from:"admissionPrimaryWrite = admissionPersist('primary').then(() => admissionCleanupMark('primary-trace:return'));",
     to:"await admissionPersist('primary');",message:'hanging trace preserves original owner cleanup'},
 };
 const args=process.argv.slice(2),mutation=args.length===1&&args[0].startsWith('--mutation=')?args[0].slice(11):null;
@@ -249,7 +249,7 @@ for(const [relative,tier,which]of [
   for(const mode of ['normal','first-write','both-writes','browser','server','stuck-write']){
     const primary={results:[{id:'harness',ok:false,detail:'ORIGINAL FAILURE'}]},cleanupErrors=[],calls=[];
     let timer,cleared=0,writes=0;
-    const run=vm.runInNewContext('(async()=>{'+finish+'})',{cleanupErrors,admission:null,
+    const run=vm.runInNewContext('(async()=>{'+finish+'})',{cleanupErrors,admission:null,admissionCleanupMark:()=>{},
       persist:async()=>{calls.push('persist');writes++;if(mode==='stuck-write')return new Promise(()=>{});
         if(mode==='both-writes'||mode==='first-write'&&writes===1)throw null;},
       browser:{close:async()=>{calls.push('browser');if(mode==='browser')throw null;}},
@@ -263,7 +263,7 @@ for(const [relative,tier,which]of [
     check(primary.results[0].detail==='ORIGINAL FAILURE','cleanup never mutates original failure');
     check(cleared===1&&cleanupErrors.length===(mode==='normal'?0:mode==='both-writes'?2:1),'cleanup errors and timer exact');
   }
-  const traceAPI=vm.runInNewContext(functions+';({make:offlineAdmissionRecorder,session:offlineAdmissionSession,setup:offlineAdmissionSetup,error:offlineAdmissionError,read:readOfflineAdmissionTrace,write:writeOfflineAdmissionReport})',{TextEncoder,performance});
+  const traceAPI=vm.runInNewContext(functions+';({make:offlineAdmissionRecorder,session:offlineAdmissionSession,setup:offlineAdmissionSetup,close:closeOfflineAdmission,error:offlineAdmissionError,read:readOfflineAdmissionTrace,write:writeOfflineAdmissionReport})',{TextEncoder,performance});
   function cdpFixture(mode='normal',failure=null){
     const listeners=new Map(),calls=[],foreign=()=>{},recorder=traceAPI.make();
     listeners.set('Network.loadingFailed',new Set([foreign]));
@@ -289,7 +289,7 @@ for(const [relative,tier,which]of [
     f.emit('Network.requestWillBeSent',request('unfinished','document-3'));
     f.emit('ServiceWorker.workerVersionUpdated',{versions:[{versionId:'v1',status:'activated',runningStatus:'running'}]});
     const primary={setupComplete:f.owner.setupComplete,primaryFailure:null,trace:f.recorder.freeze()},cleanup=await f.owner.close(),
-      report={schema:'offline-admission-v1',primary,cleanup};
+      report={schema:'offline-admission-v1',primary,cleanup:{...cleanup,timedOut:false}};
     const read=traceAPI.read(report);assert.deepEqual(JSON.parse(JSON.stringify(read)),{requests:4,redirects:1,terminals:2,orphans:0,missingTerminals:1});admissionChecks++;
     check(f.listeners.get('Network.loadingFailed').size===1&&f.listeners.get('Network.loadingFailed').has(f.foreign),'trace removes only its exact listeners');
     assert.equal((await f.owner.close()),cleanup);assert.equal(f.calls.filter(c=>c==='detach').length,1);admissionChecks+=2;
@@ -297,7 +297,7 @@ for(const [relative,tier,which]of [
     check(failure.canceled===true&&failure.blockedReason==='other'&&failure.corsErrorStatus.corsError==='DisallowedByMode','all native failure fields retained');
     for(const change of[r=>r.primary.setupComplete=false,r=>r.primary.trace.overflow=true,r=>r.primary.trace.events[0].sequence=8,
       r=>r.primary.trace.clocks.cdpTimestamp='same clock',r=>r.primary.trace.events.find(e=>e.event==='setup-return').raw.command='wrong-domain',
-      r=>r.cleanup.detached=false,r=>r.primary.trace.events.find(e=>e.event==='Network.requestWillBeSent').raw.loaderId=3,
+      r=>r.cleanup.detached=false,r=>r.cleanup.timedOut=true,r=>{delete r.cleanup.timedOut;},r=>r.primary.trace.events.find(e=>e.event==='Network.requestWillBeSent').raw.loaderId=3,
       r=>{const e=r.primary.trace.events.find(e=>e.event==='Network.loadingFailed');e.raw.canceled='yes';},
       r=>{const i=r.primary.trace.events.findIndex(e=>e.event==='Network.loadingFinished'),e=structuredClone(r.primary.trace.events[i]);r.primary.trace.events.splice(i+1,0,e);r.primary.trace.events.forEach((e,i)=>e.sequence=i);}]){
       const bad=structuredClone(report);change(bad);bad.primary.trace.bytes=bad.primary.trace.events.reduce((n,e)=>n+Buffer.byteLength(JSON.stringify(e)),0);assert.throws(()=>traceAPI.read(bad));admissionChecks++;
@@ -328,10 +328,11 @@ for(const [relative,tier,which]of [
     if(mode==='freeze')admission.recorder.freeze=()=>{throw null;};
     let timer,cleared=0;
     const run=vm.runInNewContext('(async()=>{'+finish+'})',{cleanupErrors,admission,results:[{id:'harness',ok:false,detail:'0'}],offlineAdmissionError:traceAPI.error,
-      admissionMark:()=>{},admissionPersist:async phase=>{calls.push('trace:'+phase);if(phase==='primary'&&mode==='stuck-trace-write')return new Promise(()=>{});if(phase==='primary'&&mode==='primary-trace-write')admission.persistenceErrors.push({phase});},
+      admissionMark:()=>{},admissionCleanupMark:()=>{},closeOfflineAdmission:(owner,mark)=>traceAPI.close(owner,mark,{set:()=>9,clear:()=>{}}),
+      admissionPersist:async phase=>{calls.push('trace:'+phase);if(phase==='primary'&&mode==='stuck-trace-write')return new Promise(()=>{});if(phase==='primary'&&mode==='primary-trace-write')admission.persistenceErrors.push({phase});},
       persist:async()=>calls.push('persist'),browser:{close:async()=>calls.push('browser')},server:{close:()=>calls.push('server')},
       setTimeout:(fn,ms)=>{assert.equal(ms,20000);timer=fn;return 2;},clearTimeout:()=>cleared++,process:{exit:n=>{assert.equal(n,1);calls.push('terminal');}}});
-    const pending=run();for(let n=0;n<12;n++)await Promise.resolve();
+    const pending=run();for(let n=0;n<128&&(!calls.includes('server')||calls.filter(c=>c==='persist').length<2);n++)await Promise.resolve();
     if(mode==='stuck-trace-write'){assert(calls.includes('browser')&&calls.includes('server'),'hanging trace preserves original owner cleanup');assert.equal(calls.filter(c=>c==='persist').length,2);timer();assert(calls.includes('terminal'));admissionChecks+=4;continue;}
     await pending;assert(calls.includes('browser')&&calls.includes('server'));assert.equal(calls.filter(c=>c==='persist').length,2);assert.equal(cleared,1);assert.equal(admission.primaryFailure.message,'0');admissionChecks+=4;
   }
@@ -357,6 +358,34 @@ for(const [relative,tier,which]of [
     release(mode==='pending-create'?f.session:undefined);for(let n=0;n<16;n++)await Promise.resolve();
     const cleanup=await owner.close();assert.equal(cleanup.detached,true);assert(!f.calls.includes('Page.enable'));assert.equal(navigations,0);
     assert.equal(f.calls.filter(c=>c==='detach').length,1);assert.equal(f.listeners.get('Network.loadingFailed').size,1);admissionChecks+=8;
+  }
+  for(const mode of['delayed','never','late','falsy','mutable']){
+    let deadline,cleared=0,release,attempts=0;const stages=[],raw={attempted:true,removed:14,detached:true,errors:[]},
+      held=new Promise(resolve=>release=resolve),owner={close:async()=>{attempts++;if(mode==='falsy')throw 0;if(mode==='mutable')return raw;await held;return raw;}};
+    const pending=traceAPI.close(owner,s=>stages.push(s),{set:(fn,ms)=>{assert.equal(ms,5000);deadline=fn;return 3;},clear:id=>{assert.equal(id,3);cleared++;}});
+    if(mode==='delayed')release();if(mode==='never'||mode==='late')deadline();
+    const result=await pending;assert.equal(attempts,1);assert.equal(cleared,1);
+    if(mode==='never'||mode==='late'){
+      assert.equal(result.timedOut,true);assert.equal(result.detached,false);assert.equal(result.removed,null);assert.equal(result.errors[0].stage,'detach-deadline');
+      if(mode==='late'){release();for(let n=0;n<8;n++)await Promise.resolve();assert.equal(result.timedOut,true);assert.equal(result.detached,false);assert(stages.includes('detach:late-return'));}
+    }else if(mode==='falsy'){assert.equal(result.errors[0].type,'number');assert.equal(result.errors[0].message,'0');}
+    else{assert.equal(result.detached,true);assert.equal(result.timedOut,false);raw.detached=false;raw.errors.push({stage:'foreign',type:'string',message:'changed'});assert.equal(result.detached,true);assert.equal(result.errors.length,0);}
+    admissionChecks+=7;
+  }
+  for(const mode of['delayed-detach','never-detach']){
+    const calls=[],cleanupErrors=[];let timer,closeDeadline,release,detached=false;
+    const held=new Promise(resolve=>release=resolve),admission={recorder:traceAPI.make(),owner:{setupComplete:true,close:async()=>{
+      calls.push('detach:start');await held;detached=true;calls.push('detach:return');return{attempted:true,removed:14,detached:true,errors:[]};}},
+      primary:null,primaryFailure:{type:'number',message:'0'},persistenceErrors:[],cleanup:null};
+    const run=vm.runInNewContext('(async()=>{'+finish+'})',{cleanupErrors,admission,results:[{id:'harness',ok:false,detail:'0'}],offlineAdmissionError:traceAPI.error,
+      admissionMark:()=>{},admissionCleanupMark:()=>{},admissionPersist:async phase=>calls.push('trace:'+phase),
+      closeOfflineAdmission:(owner,mark)=>traceAPI.close(owner,mark,{set:(fn,ms)=>{assert.equal(ms,5000);closeDeadline=fn;return 3;},clear:()=>{}}),
+      persist:async()=>calls.push('persist'),browser:{close:async()=>{calls.push('browser');if(mode==='delayed-detach')assert(detached,'observer detach settles before browser closes');}},
+      server:{close:()=>calls.push('server')},setTimeout:(fn,ms)=>{assert.equal(ms,20000);timer=fn;return 2;},clearTimeout:()=>{},process:{exit:()=>assert.fail('bounded detach must reach final trace without overall watchdog')}});
+    const pending=run();for(let n=0;n<8;n++)await Promise.resolve();assert(!calls.includes('browser'));
+    if(mode==='delayed-detach')release();else closeDeadline();await pending;
+    assert(calls.includes('browser')&&calls.includes('server')&&calls.includes('trace:final'));assert.equal(calls.filter(c=>c==='persist').length,2);
+    assert.equal(admission.primaryFailure.message,'0');assert.equal(admission.cleanup.timedOut,mode==='never-detach');admissionChecks+=6;
   }
   console.log('OFFLINE ADMISSION TRACE CPU OK ('+admissionChecks+' checks; no native execution)');
 }

@@ -159,12 +159,48 @@ export function offlineAdmissionSetup(create, recorder, stage, timers = { set: s
   };
 }
 
+export async function closeOfflineAdmission(owner, mark = () => {}, timers = { set: setTimeout, clear: clearTimeout }) {
+  let timer, timedOut = false; const markerErrors = [];
+  const signal = name => { try { mark(name); } catch (error) { markerErrors.push({ stage: 'cleanup-marker', ...offlineAdmissionError(error) }); } };
+  const failed = (stage, error) => ({ attempted: true, removed: null, detached: false, timedOut,
+    errors: [{ stage, ...offlineAdmissionError(error) }] });
+  const snapshot = value => {
+    const own = (object, key) => { const d = Object.getOwnPropertyDescriptor(object, key);
+      if (!d || !Object.hasOwn(d, 'value')) throw Error('cleanup receipt data required'); return d.value; };
+    const attempted = own(value, 'attempted'), removed = own(value, 'removed'), detached = own(value, 'detached'), errors = own(value, 'errors');
+    if (typeof attempted !== 'boolean' || !Number.isSafeInteger(removed) || removed < 0 || removed > 14
+      || typeof detached !== 'boolean' || !Array.isArray(errors) || errors.length > 32) throw Error('cleanup receipt shape');
+    const copy = [];
+    for (let i = 0; i < errors.length; i++) {
+      const input = own(errors, String(i)), row = {};
+      for (const key of ['stage', 'type', 'message']) {
+        const text = own(input, key); if (typeof text !== 'string' || text.length > 4096) throw Error('cleanup error shape'); row[key] = text;
+      }
+      copy.push(Object.freeze(row));
+    }
+    return { attempted, removed, detached, timedOut: false, errors: copy };
+  };
+  signal('detach:start');
+  const deadline = new Promise(resolve => { timer = timers.set(() => {
+    timedOut = true; signal('detach:deadline'); resolve(failed('detach-deadline', 'diagnostic detach exceeded 5000ms'));
+  }, 5000); });
+  const closing = (async () => {
+    try { const value = await owner.close(); signal(timedOut ? 'detach:late-return' : 'detach:return');
+      return timedOut ? failed('detach-late', 'late completion cannot heal timeout') : snapshot(value);
+    } catch (error) { signal(timedOut ? 'detach:late-rejection' : 'detach:rejection'); return failed('detach', error); }
+  })();
+  try {
+    const result = await Promise.race([closing, deadline]);
+    return Object.freeze({ ...result, errors: Object.freeze([...result.errors, ...markerErrors.map(Object.freeze)]) });
+  } finally { timers.clear(timer); }
+}
+
 export function readOfflineAdmissionTrace(report) {
   const refuse = () => { throw Error('offline admission: invalid diagnostic'); }, p = report?.primary;
   if (report?.schema !== 'offline-admission-v1' || !p || p.setupComplete !== true || !Array.isArray(p.trace?.events)
     || p.trace.overflow !== false || !Array.isArray(p.trace.errors) || p.trace.errors.length || !Array.isArray(report.cleanup?.errors) || report.cleanup.errors.length
     || report.persistenceErrors !== undefined && (!Array.isArray(report.persistenceErrors) || report.persistenceErrors.length)
-    || report.cleanup?.attempted !== true || report.cleanup.detached !== true || report.cleanup.removed !== 14) refuse();
+    || report.cleanup?.attempted !== true || report.cleanup.detached !== true || report.cleanup.removed !== 14 || report.cleanup.timedOut !== false) refuse();
   if (p.trace.clocks?.nodeMs !== 'Node performance.now receipt milliseconds'
     || p.trace.clocks.cdpTimestamp !== 'raw CDP monotonic seconds; not synchronized to nodeMs') refuse();
   const setup = p.trace.events.filter(e => e.event.startsWith('setup-')).map(e => [e.event, e.raw.command ?? null]);
@@ -307,6 +343,12 @@ const admissionPersist = async phase => {
       hash: bytes => createHash('sha256').update(bytes).digest('hex'), log: message => console.log(message) });
   } catch (error) { admission.persistenceErrors.push({ phase, ...offlineAdmissionError(error) }); }
 };
+const admissionCleanupMark = phase => {
+  if (!admission) return;
+  try { console.log('OFFLINE_ADMISSION_CLEANUP ' + JSON.stringify({ run: process.env.GITHUB_RUN_ID ?? null,
+    sha: process.env.GITHUB_SHA ?? null, phase })); }
+  catch (error) { admission.persistenceErrors.push({ phase: 'cleanup-marker', ...offlineAdmissionError(error) }); }
+};
 const requestIds = new WeakMap();
 const requestId = req => { if (!requestIds.has(req)) requestIds.set(req, ++nextRequest); return requestIds.get(req); };
 const describe = req => ({ stage, request: requestId(req), url: req.url(), method: req.method(), type: req.resourceType(),
@@ -402,25 +444,41 @@ try {
   // Freeze the primary result before cleanup; a stuck close cannot erase it.
   const terminal = setTimeout(() => process.exit(1), 20000);
   try {
-    let admissionPrimaryWrite, admissionClose;
+    let admissionPrimaryWrite;
     if (admission) {
       try {
         admissionMark('primary-freeze-before-cleanup');
         admission.primary = { setupComplete: admission.owner?.setupComplete ?? false, primaryFailure: admission.primaryFailure,
           results: JSON.parse(JSON.stringify(results)), trace: admission.recorder.freeze() };
-        admissionPrimaryWrite = admissionPersist('primary');
+        admissionCleanupMark('primary-trace:start');
+        admissionPrimaryWrite = admissionPersist('primary').then(() => admissionCleanupMark('primary-trace:return'));
       } catch (error) { admission.persistenceErrors.push({ phase: 'freeze', ...offlineAdmissionError(error) }); }
-      if (admission.owner) admissionClose = admission.owner.close();
     }
+    admissionCleanupMark('primary-result:start');
     try { await persist(); } catch { cleanupErrors.push('primary persistence'); }
+    admissionCleanupMark('primary-result:return');
+    if (admission?.owner) {
+      try { admission.cleanup = await closeOfflineAdmission(admission.owner, admissionCleanupMark); }
+      catch (error) { admission.cleanup = { attempted: true, removed: null, detached: false, timedOut: false,
+        errors: [{ stage: 'cleanup-wrapper', ...offlineAdmissionError(error) }] }; }
+    }
+    admissionCleanupMark('browser-close:start');
     try { await browser.close(); } catch { cleanupErrors.push('browser close'); }
+    admissionCleanupMark('browser-close:return');
+    admissionCleanupMark('server-close:start');
     try { server.close(); } catch { cleanupErrors.push('server close'); }
+    admissionCleanupMark('server-close:return');
+    admissionCleanupMark('final-result:start');
     try { await persist(); } catch { cleanupErrors.push('final persistence'); }
+    admissionCleanupMark('final-result:return');
     if (admission) {
-      if (admissionClose) admission.cleanup = await admissionClose;
-      admission.cleanup.postFreezeEvents = admission.recorder.read().late;
+      admission.cleanup = { ...admission.cleanup, postFreezeEvents: admission.recorder.read().late };
+      admissionCleanupMark('primary-trace-join:start');
       await admissionPrimaryWrite;
+      admissionCleanupMark('primary-trace-join:return');
+      admissionCleanupMark('final-trace:start');
       await admissionPersist('final');
+      admissionCleanupMark('final-trace:return');
     }
   } finally { clearTimeout(terminal); }
 }
