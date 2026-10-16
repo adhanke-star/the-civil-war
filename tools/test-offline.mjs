@@ -311,7 +311,11 @@ export async function inspectOfflineCaches({ scope, expected, hashes }) {
   } finally { clearTimeout(timer); }
 }
 
-const OUT = path.join(ROOT, '.out', 'offline');
+const OUT = path.join(ROOT, '.out', process.env.OFFLINE_OUT_DIR ?? 'offline');
+// OFFLINE_OUT_DIR (a bare name under .out/, default "offline") lets CI keep two samples from one push. The line above
+// stays first and uncommented: tools/test-offline-worker.mjs evaluates everything before "const OUT =" without process.
+const OUT_NAME = process.env.OFFLINE_OUT_DIR ?? 'offline';
+if (!OUT_NAME || OUT_NAME === '.' || /[\/\\]/.test(OUT_NAME) || OUT_NAME.includes('..')) { console.error('offline: OFFLINE_OUT_DIR must be a bare directory name'); process.exit(1); }
 const cli = process.argv.slice(2), traceAdmission = cli.length === 1 && cli[0] === '--trace-admission';
 if (cli.length && !traceAdmission) { console.error('offline: unknown diagnostic option'); process.exit(1); }
 await fs.mkdir(OUT, { recursive: true });
@@ -325,8 +329,74 @@ const expected = Object.fromEntries(auditPaths.map(p => [p, manifest.files[p]]))
 const check = (id, ok, detail) => { results.push({ id, ok: !!ok, detail }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${id}: ${detail}`); };
 const BATTLE = '?battle=shiloh&phase=camps-at-dawn&quality=low&sw';
 
+// --trace-admission extras (Decision 0274): netlog, a browser trace of the online battle load, long tasks and the
+// failure page. Best-effort: each fault lands in diagnosticErrors and never changes the OFFLINE OK/FAILED verdict.
+const diagnosticErrors = [], longTasks = {}, deepTrace = traceAdmission ? { started: false, ended: false, file: null,
+  bytes: 0, truncated: false, dataLossOccurred: null, detached: false } : null;
+let failureState = null, traceSession = null;
+const diagFault = (where, error) => { if (diagnosticErrors.length < 64) diagnosticErrors.push({ stage: where, ...offlineAdmissionError(error) }); };
+const within = (promise, ms, label) => { let timer; return Promise.race([promise, new Promise((_, reject) => {
+  timer = setTimeout(() => reject(Error(label + ' exceeded ' + ms + 'ms')), ms); })]).finally(() => clearTimeout(timer)); };
+const launchArgs = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
+if (traceAdmission) {
+  try { launchArgs.push('--log-net-log=' + path.join(OUT, 'netlog.json'), '--net-log-capture-mode=Default'); }
+  catch (error) { diagFault('netlog-args', error); }
+}
+const TRACE_LIMIT = 96 * 1024 * 1024;
+const traceStart = async () => {
+  if (!traceAdmission) return;
+  try {
+    traceSession = await browser.newBrowserCDPSession();
+    await traceSession.send('Tracing.start', { traceConfig: { recordMode: 'recordContinuously', includedCategories: ['blink', 'blink.net',
+      'blink.resource', 'blink.user_timing', 'loading', 'navigation', 'ServiceWorker', 'devtools.timeline',
+      'disabled-by-default-devtools.timeline', 'v8', 'v8.execute', 'toplevel', 'ipc', 'mojom', 'net', 'safe_browsing', 'benchmark'],
+      excludedCategories: ['*'] }, transferMode: 'ReturnAsStream', streamFormat: 'json', streamCompression: 'gzip' });
+    deepTrace.started = true;
+  } catch (error) { diagFault('trace-start', error); }
+};
+const traceEnd = async () => {
+  if (!traceSession || deepTrace.ended) return;
+  deepTrace.ended = true;
+  const session = traceSession; let listener;
+  try {
+    if (!deepTrace.started) throw Error('tracing never started');
+    const complete = within(new Promise(resolve => { listener = resolve; session.on('Tracing.tracingComplete', listener); }), 60000, 'Tracing.tracingComplete');
+    complete.catch(() => {});
+    await session.send('Tracing.end');
+    const { stream, dataLossOccurred } = await complete;
+    deepTrace.dataLossOccurred = dataLossOccurred ?? null;
+    if (!stream) throw Error('tracingComplete carried no stream');
+    const file = path.join(OUT, 'trace-online-battle.json.gz'), handle = await fs.open(file, 'w');
+    deepTrace.file = path.relative(ROOT, file);
+    try {
+      while (true) {
+        const { data, eof, base64Encoded } = await within(session.send('IO.read', { handle: stream, size: 1048576 }), 30000, 'IO.read');
+        const chunk = Buffer.from(data ?? '', base64Encoded ? 'base64' : 'utf8');
+        if (deepTrace.bytes + chunk.length > TRACE_LIMIT) {
+          const room = TRACE_LIMIT - deepTrace.bytes;
+          if (room > 0) { await handle.write(chunk.subarray(0, room)); deepTrace.bytes += room; }
+          deepTrace.truncated = true; break;
+        }
+        if (chunk.length) { await handle.write(chunk); deepTrace.bytes += chunk.length; }
+        if (eof) break;
+      }
+    } finally { await handle.close(); }
+    try { await within(session.send('IO.close', { handle: stream }), 10000, 'IO.close'); } catch (error) { diagFault('trace-io-close', error); }
+  } catch (error) { diagFault('trace-end', error); }
+  finally {
+    try { if (listener) session.removeListener('Tracing.tracingComplete', listener); } catch (error) { diagFault('trace-listener', error); }
+    try { await within(session.detach(), 10000, 'trace detach'); deepTrace.detached = true; } catch (error) { diagFault('trace-detach', error); }
+  }
+};
+const readLongTasks = async label => {
+  if (!traceAdmission) return;
+  try { longTasks[label] = await within(page.evaluate(() => { const rows = Array.isArray(window.__longTasks) ? window.__longTasks : [];
+    return { count: rows.length, rows: rows.slice(0, 256) }; }), 10000, 'long-task read'); }
+  catch (error) { diagFault('longtasks:' + label, error); }
+};
+
 const { server, url } = await startServer({ port: 0 });
-const browser = await chromium.launch({ headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const browser = await chromium.launch({ headless: true, args: launchArgs });
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
 const page = await ctx.newPage(), errors = [];
 let stage = 'registration', nextRequest = 0;
@@ -378,10 +448,21 @@ const audit = async hashes => {
   finally { clearTimeout(timer); }
 };
 const persist = () => fs.writeFile(path.join(OUT, 'result.json'), JSON.stringify({ results, diagnostic: {
-  generation: manifest.generation, ...diagnostic.read(), expected, audits, auditErrors, cleanupErrors } }, null, 1));
+  generation: manifest.generation, ...diagnostic.read(), expected, audits, auditErrors, cleanupErrors,
+  outDir: OUT_NAME, diagnosticErrors, longTasks, failureState, deepTrace } }, null, 1));
 page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR_INTERNET_DISCONNECTED/.test(m.text())) errors.push(`console.error: ${m.text()}`); });
 const battleReady = () => page.waitForFunction(() => window.__ready === true, null, { timeout: 240_000, polling: 500 });
+if (traceAdmission) {
+  try {
+    await ctx.addInitScript(() => {
+      try {
+        new PerformanceObserver(list => { (window.__longTasks ??= []).push(...list.getEntries().map(e => ({ start: e.startTime,
+          duration: e.duration, name: e.name, container: e.attribution?.[0]?.containerSrc ?? null }))); }).observe({ type: 'longtask', buffered: true });
+      } catch {}
+    });
+  } catch (error) { diagFault('longtask-init', error); }
+}
 try {
   if (admission) {
     admission.owner = offlineAdmissionSetup(() => ctx.newCDPSession(page), admission.recorder, () => stage);
@@ -401,9 +482,11 @@ try {
   admissionMark('controlled-title-reload:start');
   await page.reload(); await page.waitForFunction(() => window.__entry && !window.__entry.importing, null, { timeout: 60_000 });
   admissionMark('controlled-title-ready');
+  await traceStart();
   admissionMark('online-battle-goto:start', { url: url + BATTLE });
   await page.goto(url + BATTLE); await battleReady(); await page.waitForTimeout(3000);
   admissionMark('online-battle-ready');
+  await traceEnd(); await readLongTasks('online-battle-ready');
   const cached = await page.evaluate(async () => { let n = 0; for (const k of await caches.keys()) n += (await (await caches.open(k)).keys()).length; return n; });
   check('cache-filled', cached > 50, `${cached} cached responses after the title and one battle`);
   stage = 'before-offline'; await audit(false);
@@ -420,6 +503,7 @@ try {
   admissionMark('offline-battle-goto:start');
   await page.goto(url + BATTLE); await battleReady();
   admissionMark('offline-battle-ready');
+  await readLongTasks('offline-battle-ready');
   const run = await page.evaluate(() => {
     const { game, pack, terrain } = window.__game, t0 = game.simTime;
     if (game.paused) game.togglePause();
@@ -439,6 +523,16 @@ try {
 } catch (e) {
   if (admission) { admission.primaryFailure = offlineAdmissionError(e); admissionMark('primary-failure', admission.primaryFailure); }
   check('harness', false, `${offlineAdmissionError(e).message.split('\n')[0]} | ${errors.slice(0, 3).join(' | ')}`);
+  if (traceAdmission) {
+    await traceEnd();
+    try { failureState = await within(page.evaluate(() => ({ href: location.href, entryMode: window.__entry?.mode ?? null,
+      ready: window.__ready ?? null, failureHeading: document.getElementById('field-failure-heading')?.textContent ?? null,
+      failureNote: document.getElementById('entry-note')?.textContent ?? null, bodyText: document.body?.innerText?.slice(0, 2000) ?? null })),
+      10000, 'failure state'); }
+    catch (error) { diagFault('failure-state', error); }
+    await readLongTasks('primary-failure');
+    try { await page.screenshot({ path: path.join(OUT, 'offline-failure.png'), timeout: 10000 }); } catch (error) { diagFault('failure-screenshot', error); }
+  }
   stage = 'first-failure'; await audit(true);
 } finally {
   // Freeze the primary result before cleanup; a stuck close cannot erase it.

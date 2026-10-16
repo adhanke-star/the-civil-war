@@ -1,5 +1,15 @@
 # Current execution — v1.1, then v2 (Aaron, 2026-10-12)
 
+0274 DIAGNOSTIC LEG (Fable, 2026-10-16; branch diag-0274). Decision 0275 moved the fault from the worker to the page's
+loader: worker answers in ≤135 ms, the renderer processes them ~30 s late. This push instruments, it does not fix.
+Player sees: nothing new except that a field that fails to load now says why (src/entry.js keeps the import error).
+In: tools/test-offline.mjs --trace-admission adds a Chromium NetLog, a CDP Tracing capture around the online battle load
+(gz, ≤96 MB), a long-task observer and a failure-state capture; ci.yml runs the smoke twice per push (OFFLINE_OUT_DIR);
+offline-manifest.js regenerated. Out: sw.js, timeouts, stage order, the 60 s controller wait (observe first, then move).
+Done when: own-SHA CI attempt 1 is read (green or red, both are samples), the trace/netlog name the component that holds
+the responses, and DECISIONS gets the cause with evidence; only then a fix contract. If two samples show no hold, say so and
+push again before changing anything.
+
 STATUS 2026-10-16: v1.1 RELEASED (tag v1.1 = 6501d5b) and v2 RELEASED (tag v2 = 0304ff0, CI 38967937836 all 9,
 Pages green). Aaron chose "tag now, play later": his live Confederate play is UNRUN. Open: Decision 0274 offline
 worker-fetch flake. Next milestone is Aaron's choice (runner-up: sandbox battle, about 5–7 days).

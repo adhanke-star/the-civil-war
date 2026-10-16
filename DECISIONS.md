@@ -1,5 +1,25 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0275 — 0274 relocated: the worker answers fast; the page's loader processes the answers ~30 s late (2026-10-16)
+
+Read from the CDP admission traces of four offline runs (7c7cf0d attempts 1 and 2, 6f6f679, 0304ff0 green). Every "stalled"
+request was complete at the worker/network layer within 15–135 ms: `loadingFinished.timestamp − requestWillBeSent.timestamp`
+(browser clock) is 0.015–0.135 s and the worker timing shows respondWithSettled at 9–115 ms, while the renderer emitted
+`responseReceived` 30.3–30.8 s after the request (`responseReceived.timestamp` is the renderer's own clock) and Node received
+both events then. 22 responses in the green run were released in one batch at +30.3 s; requests issued in the same
+millisecond (unit.js, battery.js) went through in 103 ms. Document navigations through the worker show the same shape at
+5–10 s (navigation complete at +6 ms, `Page.lifecycleEvent init` at +10 s). All stalled files are MANIFEST.base cache hits;
+prior-fetch count, size and acquire() path do not separate stalled from fine. Attempt 1 failed because the held pair
+(mixer.js, music.js) are static imports of src/entry.js, so `load` never fired inside Playwright's 30 s goto limit; the
+green run survived because its held batch was main.js's dynamic graph (240 s ready budget).
+Attempt 2's ERR_ABORTED pair (canceled=true, 54 ms in) is a side effect: `src/entry.js` `import('./main.js')` rejected at
+that instant, the `catch {}` swallowed the reason and imported ./ui/entry.js (the field-failure page), and Blink canceled
+the rest of the graph. The ready wait then ran out its 240 s.
+Not shown: what holds the renderer (candidates: a loader deferral such as code-cache or throttle, or a main-thread hold).
+Not the cause: sw.js per-fetch work, CI CPU starvation of the worker, the test server. Next sample: diag-0274 branch adds a
+NetLog, a CDP Tracing capture around the online battle load, a long-task observer, the field failure reason (console.error
+and on the failure page), and a second smoke run per push; sw.js unchanged. Only a fresh push counts (0274).
+
 ## 0274 — Open: intermittent 20–30 s stalls in worker-served module fetches (2026-10-16)
 
 v2 camera fix 7c7cf0d, CI 38963182689 attempt 1: 8/9 green; browsers (offline) RED. After the worker took control, the

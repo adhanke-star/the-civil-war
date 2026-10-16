@@ -8,7 +8,12 @@ const q = new URLSearchParams(location.search);
 if (['intro', 'practice', 'battle', 'sandbox', 'tune'].some((key) => q.has(key))) {
   document.getElementById('battle').hidden = false;
   try { await (await import('./main.js')).startField(); }
-  catch { const { showFieldFailure } = await import('./ui/entry.js'); showFieldFailure(); }
+  catch (error) {
+    // Keep the reason (info, not error: the field-admission probes require a console free of errors and warnings).
+    console.info('field: load failed', String(error?.stack ?? error));
+    const { showFieldFailure } = await import('./ui/entry.js');
+    showFieldFailure({ message: `${error?.message ?? 'The field could not be loaded.'} Your saved army is unchanged. Return to camp and try again.` });
+  }
 } else {
   mixer.arm();
   let mood;
