@@ -1718,6 +1718,7 @@ export function installFieldContextObserver({enabled=false,observeSurfaces=false
 }
 
 export function installAllocationObserver(source) {
+  const nativeApply=Reflect.apply;
   if(source.captureDefaultSurfaces===true&&(source.nativeJournal!==true||source.captureNativeFailures!==true))
     throw Error('allocation: default surface capture requires native journal and failed-call capture');
   const Ledger=(0,eval)('('+source.ledger+')'),mips=(0,eval)('('+source.mips+')'),Peak=(0,eval)('('+source.reservationPeak+')');
@@ -1833,7 +1834,7 @@ export function installAllocationObserver(source) {
     const native=proto[name];if(typeof native!=='function')return;
     const descriptor=Object.getOwnPropertyDescriptor(proto,name);
     const wrapped=function(...args){let value;
-      try{value=native.apply(this,args);}catch(error){
+      try{value=nativeApply(native,this,args);}catch(error){
         if(source.captureNativeFailures===true){
           let s;
           try{s=state(this);s.nativeFailureCount++;

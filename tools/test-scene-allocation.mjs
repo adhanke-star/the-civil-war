@@ -986,3 +986,68 @@ if(process.argv.includes('--prove-fail')){
   for(const [name,check]of checks){let error;try{await check({...api,...mutants[name]});}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&error.message.startsWith(name),`${name}: mutant must fail its own assertion`);console.log(`CAUGHT ${name}`);}
   console.log(`SCENE-ALLOCATION CONTROLS OK (${checks.length}/${checks.length})`);
 }
+
+// Exercise the actual serialized observer. No browser, native GL, or retirement claim.
+function observerDelegation(mode,throwsNative,raw,capture,install=installAllocationObserver){
+  const globals=['window','WebGLRenderingContext','WebGL2RenderingContext'],saved=globals.map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]),
+    applyDescriptor=Object.getOwnPropertyDescriptor(Function.prototype,'apply'),reflectDescriptor=Object.getOwnPropertyDescriptor(Reflect,'apply');
+  let nativeCalls=0,queries=0,receiver=null,argumentsSeen=null,foreignCalls=0,observer=null;
+  const result={native:true},buffer={},data=new Uint8Array(32);
+  class GL {
+    constructor(){this.drawingBufferWidth=8;this.drawingBufferHeight=8;}
+    getContextAttributes(){queries++;return {depth:true,stencil:false,antialias:false};}
+    getParameter(key){queries++;return key===this.ARRAY_BUFFER_BINDING?buffer:null;}
+    bufferData(...args){nativeCalls++;receiver=this;argumentsSeen=args;if(throwsNative)throw raw;return result;}
+  }
+  Object.assign(GL.prototype,{ARRAY_BUFFER:34962,ARRAY_BUFFER_BINDING:34964,STATIC_DRAW:35044});
+  const descriptors=Object.getOwnPropertyDescriptors(GL.prototype),native=GL.prototype.bufferData,ownApply=Object.getOwnPropertyDescriptor(native,'apply'),gl=new GL(),args=[gl.ARRAY_BUFFER,data,gl.STATIC_DRAW];
+  let thrown=false,error,value,afterCallQueries,report,reservation;
+  try{
+    globalThis.window={};globalThis.WebGLRenderingContext=undefined;globalThis.WebGL2RenderingContext=GL;
+    install({ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),nativeJournal:true,captureNativeFailures:capture});
+    observer=window.__allocation;
+    const foreign=function(){foreignCalls++;return result;};
+    try{
+      if(mode==='prototype')Object.defineProperty(Function.prototype,'apply',{...applyDescriptor,value:foreign});
+      if(mode==='own')Object.defineProperty(native,'apply',{value:foreign,writable:true,configurable:true});
+      if(mode==='reflect')Object.defineProperty(Reflect,'apply',{...reflectDescriptor,value:foreign});
+      try{value=gl.bufferData(...args);}catch(e){thrown=true;error=e;}
+      afterCallQueries=queries;
+    }finally{
+      Object.defineProperty(Function.prototype,'apply',applyDescriptor);Object.defineProperty(Reflect,'apply',reflectDescriptor);
+      if(ownApply)Object.defineProperty(native,'apply',ownApply);else delete native.apply;
+    }
+    reservation=observer.bufferReservation(gl,data);report=observer.peek(gl);
+    assert.equal(queries,afterCallQueries,'delegation-'+mode+': retained readers do not query GL');
+  }finally{
+    observer?.restore();
+    for(const[k,d]of saved){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k];}
+  }
+  assert.equal(nativeCalls,1,'delegation-'+mode+': actual original native called once');assert.equal(foreignCalls,0,'delegation-'+mode+': foreign apply never invoked');
+  assert.equal(receiver,gl,'delegation-'+mode+': original receiver');assert.equal(argumentsSeen.length,args.length);
+  argumentsSeen.forEach((v,i)=>assert.equal(v,args[i],'delegation-'+mode+': argument identity '+i));
+  assert.deepEqual(Object.getOwnPropertyDescriptors(GL.prototype),descriptors,'delegation-'+mode+': exact prototype restoration');
+  for(const[k,d]of saved)assert.deepEqual(Object.getOwnPropertyDescriptor(globalThis,k),d,'delegation-'+mode+': exact global restoration '+k);
+  assert.deepEqual(Object.getOwnPropertyDescriptor(Function.prototype,'apply'),applyDescriptor);
+  assert.deepEqual(Object.getOwnPropertyDescriptor(Reflect,'apply'),reflectDescriptor);
+  assert.deepEqual(Object.getOwnPropertyDescriptor(native,'apply'),ownApply);
+  assert.equal(report.observerFailureCount,0);
+  if(throwsNative){assert(thrown,'delegation-'+mode+': raw throw retained');assert.equal(error,raw);assert.equal(afterCallQueries,0,'delegation-'+mode+': no after-sampling after native throw');
+    assert.equal(report.calls.bufferData??0,0);assert.equal(report.nativeFailureCount,capture?1:0);assert.equal(report.nativeFailures.length,capture?1:0);assert.equal(reservation,null);
+  }else{assert.equal(thrown,false);assert.equal(value,result,'delegation-'+mode+': exact original return');assert(afterCallQueries>0);
+    assert.equal(report.calls.bufferData,1);assert.equal(report.nativeFailureCount,0);assert.equal(reservation.bytes,32);}
+}
+let delegationControls=0;
+for(const mode of ['prototype','own']){
+  observerDelegation(mode,false,undefined,true);delegationControls++;
+  for(const capture of [false,true])for(const raw of [undefined,null,0,false,'']){observerDelegation(mode,true,raw,capture);delegationControls++;}
+}
+observerDelegation('reflect',false,undefined,true);delegationControls++;
+observerDelegation('reflect',true,0,true);delegationControls++;
+console.log(`ALLOCATION-DELEGATION CPU OK (${delegationControls}; actual observer, raw failures and restoration; no native proof)`);
+if(process.argv.includes('--prove-fail')){
+  const source=installAllocationObserver.toString();assert.equal(source.split('nativeApply(native,this,args)').length,2,'one actual delegation seam');
+  const mutant=(0,eval)('('+source.replace('nativeApply(native,this,args)','native.apply(this,args)')+')');
+  for(const mode of ['prototype','own'])assert.throws(()=>observerDelegation(mode,false,undefined,true,mutant),e=>e.code==='ERR_ASSERTION'&&e.message.startsWith('delegation-'+mode),mode+' original unsafe source must fail semantic control');
+  console.log('ALLOCATION-DELEGATION SOURCE MUTANTS OK (2/2 actual unsafe forwarding controls)');
+}
