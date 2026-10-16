@@ -225,6 +225,6 @@
 #front #slot-difficulty-note { margin: 6px 0 0; font-size: 13px; }
 #front .entry-battles-difficulty { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0 0; }
 #front .entry-battles-difficulty label { font-weight: 700; }
-#front #entry-battles-difficulty { min-height: 44px; font: inherit; font-size: 16px; color: var(--rw-ink); background: #29232c; border: 1px solid #9b93a5; border-radius: 6px; padding: 0 10px; max-width: 100%; }
+#front #entry-battles-difficulty, #front #entry-battles-side { min-height: 44px; font: inherit; font-size: 16px; color: var(--rw-ink); background: #29232c; border: 1px solid #9b93a5; border-radius: 6px; padding: 0 10px; max-width: 100%; }
 #front #entry-battles-difficulty-note { margin: 6px 0 0; overflow-wrap: anywhere; }
 #front #camp-difficulty { color: var(--rw-dim); overflow-wrap: anywhere; }

@@ -304,7 +304,7 @@ function campRows(scenario) {
  * clock the phase ended at against the historical window's end, and the game's scale (men per figure, clock ratio).
  * `units` are phaseOutcome rows ({ side, menStart, men }); without them the live roster is read (unarrived formations
  * lose nothing). Display data only: it grants and records nothing. With anything to show it also carries `colours` (those the
- * Union took this phase) and `camp` (P5d: each camp effect that reached the battle and the Union formations it touched).
+ * player's side took this phase) and `camp` (P5d: each camp effect that reached the battle and the Union formations it touched).
  */
 export function historyComparison({ game, scenario, units = null, grade = null }) {
   if (!game || !scenario) fail('a history comparison needs the finished phase.');
@@ -315,11 +315,12 @@ export function historyComparison({ game, scenario, units = null, grade = null }
   const startMin = clockMinutes(scenario.start), endMin = clockMinutes(scenario.end);
   const finishedAt = startMin === null ? null : hhmm(startMin + (game.simTime || 0) * ratio / 60);
   const h = scenario.history || null;
-  const colours = colourRows(game, 'US').map((r) => ({ regiment: r.regiment, formation: r.formation ?? '', by: r.by, how: r.how ?? '' }));
+  const own = game.playerSide === 'CS' ? 'CS' : 'US';
+  const colours = colourRows(game, own).map((r) => ({ regiment: r.regiment, formation: r.formation ?? '', by: r.by, how: r.how ?? '' }));
   const camp = campRows(scenario), extras = { ...(colours.length ? { colours } : {}), ...(camp.length ? { camp } : {}) };
   return {
     title: scenario.title ?? '', objective: scenario.objective?.name ?? '',
-    result: { winner: game.result?.winner ?? null, grade: grade ?? GAME_GRADES[game.result?.grade] ?? null, why: game.result?.why ?? '', held: game.holder === 'US' },
+    result: { winner: game.result?.winner ?? null, grade: grade ?? GAME_GRADES[game.result?.grade] ?? null, why: game.result?.why ?? '', held: game.holder === own, side: own },
     you: { startUS: sum('US', 'menStart'), startCS: sum('CS', 'menStart'), lossesUS: sum('US', 'menStart') - sum('US', 'men'),
       lossesCS: sum('CS', 'menStart') - sum('CS', 'men'), finishedAt,
       ended: startMin !== null && endMin !== null && startMin + (game.simTime || 0) * ratio / 60 >= endMin - 0.5 },

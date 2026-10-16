@@ -679,7 +679,9 @@ export class Game {
       if (fenceField && fenceField.dist(x, z) < 14) return { value: 1.25, kind: 'fence line' };
       return { value: 1, kind: 'open' };
     };
+    // the computer's side halts for good to fire on the march; the player's line pauses and resumes (combat.js)
     this.combat = new Combat({ units: this.units, terrain, coverAt: this.coverAt, fallen: this.fallen, fx: effects, rnd: this.rnd,
+      autoHaltSides: [playerSide === 'CS' ? 'US' : 'CS'],
       onBatteryContact: state?.capture?.overrun ? (attacker, battery) => {
         if (state.capture.contacts) state.capture.contacts.push([attacker, battery]);
       } : null,

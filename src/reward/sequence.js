@@ -34,7 +34,7 @@
 //     (src/ui/replay.js). Order: a (grade, you vs history, points, badges) -> h (what really happened) -> r (replay) -> loot.
 //     Each page's primary goes on; "Open the loot" (key S) skips straight to the loot from any of them. `noLoot: true`
 //     (the Battles menu) shows the same pages without loot: the last page's "Done" unmounts and calls onDone(null).
-//   Colours and camp (P5d): when `afterAction.history` carries `colours` (regiment colours the Union took this phase) or `camp`
+//   Colours and camp (P5d): when `afterAction.history` carries `colours` (regiment colours the player's side took this phase) or `camp`
 //     (camp effects that reached the battle, each with the formations it touched), page a lists them after the badges,
 //     labelled: the colours are this game's result, the camp effects game rules.
 //
@@ -638,13 +638,13 @@ export function mountReward(root, opts = {}) {
     const cas = c.history.casualties, mpf = c.scale.menPerFigure, ratio = c.scale.clockRatio;
     const row = (label, you, past, key) => el('tr', { 'data-row': key }, el('th', { scope: 'row', text: label }), el('td', { text: you }), el('td', { text: past }));
     const youLoss = (lost, start) => `${fmtInt(lost)} of ${fmtInt(start)}`;
-    const tag = cas ? ` (${cas.provenance})` : '';
+    const tag = cas ? ` (${cas.provenance})` : '', own = c.result.side === 'CS' ? 'Confederate' : 'Union';
     return el('section', { class: 'rw-vs', 'aria-labelledby': 'rw-vs-title' },
       el('h2', { class: 'rw-points-title', id: 'rw-vs-title', text: 'You vs history' }),
       el('table', { class: 'rw-vs-table' },
         el('thead', {}, el('tr', {}, el('td', {}), el('th', { scope: 'col', text: 'You' }), el('th', { scope: 'col', text: 'History' }))),
         el('tbody', {},
-          row('Objective', c.result.why || (c.result.held ? `Union troops held ${c.objective}.` : `Union troops did not hold ${c.objective}.`), c.history.note || 'No sourced summary.', 'objective'),
+          row('Objective', c.result.why || (c.result.held ? `${own} troops held ${c.objective}.` : `${own} troops did not hold ${c.objective}.`), c.history.note || 'No sourced summary.', 'objective'),
           row('Union losses', youLoss(c.you.lossesUS, c.you.startUS), cas ? lossText(cas.US) + (cas.US === null ? '' : tag) : 'No sourced figure', 'us'),
           row('Confederate losses', youLoss(c.you.lossesCS, c.you.startCS), cas ? lossText(cas.CS) + (cas.CS === null ? '' : tag) : 'No sourced figure', 'cs'),
           row('Clock', c.you.finishedAt ? `Ended at ${c.you.finishedAt}` : 'Ended', c.history.end ? `The day's window ends at ${c.history.end}` : 'No sourced time', 'clock'))),
@@ -732,7 +732,8 @@ export function mountReward(root, opts = {}) {
       el('h2', { class: 'rw-points-title', id: 'rw-hooks-title', text: colours.length ? 'Colours taken' : 'From camp' }),
       colours.length ? el('ul', { class: 'rw-colours', 'aria-label': 'Colours taken this phase' },
         ...colours.map((r) => el('li', { 'data-regiment': r.regiment, text: `${r.regiment}${r.formation ? ` (${r.formation})` : ''}: taken by ${r.by}` }))) : null,
-      colours.length ? el('p', { class: 'rw-dim', text: 'Captured colours go to the trophy shelf in camp. They are this battle\'s result, not history.' }) : null,
+      colours.length ? el('p', { class: 'rw-dim', text: noLoot ? 'Colours taken in this battle are its result, not history; the Battles menu keeps no trophies.'
+        : 'Captured colours go to the trophy shelf in camp. They are this battle\'s result, not history.' }) : null,
       camp.length ? el('p', { class: 'rw-hint rw-camp-effects' }, el('b', { text: 'From camp (game rules): ' }),
         camp.map((x) => `${x.effect}: ${x.text} (${names(x.formations)})`).join('; ')) : null);
   }

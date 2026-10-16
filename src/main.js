@@ -38,6 +38,7 @@ import { setBattle, playMusic, resultsMood, lossShareOf, stopMusicForReload } fr
 import { setQualityHandler } from './ui/settings-panel.js';
 import { FALLEN } from './units/soldier-mesh.js';
 import { pinRuntimeClose } from './units/impostor.js';
+import { battleSide, sideScenario, fitSideCamera, sideTexts } from './sim/sides.js';
 
 export function detectFieldGPUTier(renderer,post,stats,graphicsStop,load=()=>import('detect-gpu')) {
   return load().then(({getGPUTier})=>{
@@ -166,7 +167,9 @@ export async function startField({ manifest = null, campaign = null, isCurrent =
     currentOwner();
     const routeId = manifest ? 'saved-practice' : pack ? 'pack' : mode === 'practice' && !new URLSearchParams(location.search).has('practice') ? 'first-command' : 'henry-hill';
     // A saved manifest's scenario reference is the authoritative outcome identity.
-    const scenario = manifest ? (prepareFieldScenario(manifest.scenario, routeId), manifest.scenario) : launch ? launch.scenario : pack ? pack.scenario
+    // ?side=CS (Battles menu only; DECISIONS 0273): the player commands the Confederates. Campaign, practice and saves stay Union.
+    const playerSide = pack && !launch && !manifest ? battleSide(location.search) : 'US';
+    const scenario = manifest ? (prepareFieldScenario(manifest.scenario, routeId), manifest.scenario) : launch ? launch.scenario : pack ? sideScenario(pack.scenario, playerSide)
       : prepareFieldScenario(routeId === 'first-command' ? introScenario(ground, { surrender: fictionalSurrenderRoute(location.search) }) : ground, routeId);
     document.getElementById('status').textContent = 'Loading the ground…';
     const terrain = await loadTerrainData('./assets/terrain', scenario.terrain ?? 'henry-hill');
@@ -246,7 +249,7 @@ Object.assign(stats, world.stats);
 
 // Opening view: both armies between the clock and the bottom panels; the pitch follows the zoom.
 const rts = new RtsCamera(camera, terrain, scenario.camera
-  ? { target: [...scenario.camera.target], yaw: scenario.camera.yaw, dist: scenario.camera.dist }
+  ? { target: playerSide === 'CS' ? fitSideCamera(scenario.camera, terrain.half) : [...scenario.camera.target], yaw: scenario.camera.yaw, dist: scenario.camera.dist }
   : scenario.practiceIntro
   ? { target: [-300, -610], yaw: -Math.PI / 2 - 0.12, dist: 740 }
   : { target: [-60, 200], yaw: -Math.PI / 2 - 0.12, dist: 1150 });
@@ -283,7 +286,7 @@ motion.addEventListener('change', (e) => { effects.reducedMotion = e.matches; })
   if (['rigged', 'baked'].includes(q.get('figures'))) LOOK.figureStyle = q.get('figures');
   if (['5', '10'].includes(q.get('mpf'))) LOOK.menPerFigure = Number(q.get('mpf'));
 }
-const game = new Game({ scene, terrain, scenario, world, effects, playerSide: 'US',
+const game = new Game({ scene, terrain, scenario, world, effects, playerSide,
   figureResourceLifetime:!!resources,renderer:resources?renderer:null,csRuntimeClose:resources?.csRuntimeClose??null });
 resourceOwners.game=game;
 FALLEN.clock = () => game.simTime; // gore off: the fallen fade on battle time (a pause holds them)
@@ -301,8 +304,9 @@ FALLEN.clock = () => game.simTime; // gore off: the fallen fade on battle time (
 const arrows = new ArrowLayer(scene, terrain);
 let practiceFlow = null;
 
+sideTexts(document, playerSide); // the field's first tips name the player's own flags
 const hud = new Hud({
-  camera, canvas, terrain, units: game.units, playerSide: 'US', rts, game,
+  camera, canvas, terrain, units: game.units, playerSide, rts, game,
   onSelect: (u, options) => game.select(u, options),
   onOrder: (kind) => game.orderSelected(kind),
   onPause: () => game.togglePause(),
@@ -348,7 +352,7 @@ game.on('spawn', (u) => hud.addUnit(u));
 game.on('remove', (u) => hud.removeUnit(u));
 
 const input = new Input({
-  canvas, rts, game, arrows, hud, playerSide: 'US',
+  canvas, rts, game, arrows, hud, playerSide,
   onQualityKey: () => {
     const next = QUALITY_MODES[(QUALITY_MODES.indexOf(post.mode) + 1) % QUALITY_MODES.length];
     setQuality(next);
@@ -362,7 +366,7 @@ practiceFlow = attachPracticeFlow({ game, scenario, hud, mode, manifest, campaig
 const practiceField = attachPracticeField({ game, scenario, hud, camera, terrain, rts, effects, manifest });
 document.getElementById('play-mode').textContent = launch ? launch.phase.loan
     ? "Campaign · Grant's army on loan; your brigades are unchanged" : 'Campaign · losses and loot carry to your army'
-  : pack || mode === 'historical' ? 'Historical battle · no franchise rewards'
+  : pack || mode === 'historical' ? `Historical battle · no franchise rewards${playerSide === 'CS' ? ' · you command the Confederates' : ''}`
   : mode === 'practice' ? 'Practice · rewards enabled' : 'Sandbox · no progress rewards';
 // keep the pause/speed buttons in step with keyboard changes
 const togglePause = game.togglePause.bind(game);

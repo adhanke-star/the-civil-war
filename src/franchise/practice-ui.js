@@ -230,13 +230,14 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null,
     dialog.close(); field.inert = true;
     const finish = () => { rewardActive = false; field.inert = false; sync(); openResult(); };
     try {
-      const comparison = historyComparison({ game, scenario });
+      const comparison = historyComparison({ game, scenario }), side = game.playerSide === 'CS' ? 'CS' : 'US';
+      const start = comparison.you[`start${side}`], lost = comparison.you[`losses${side}`];
       let track = null;
       try { track = game.recorder ? validateReplay(game.recorder.track(game)) : null; } catch { track = null; } // no replay page then
-      reward = mountReward(document.body, { noLoot: true, grade: REWARD_GRADES[game.result.grade] || (game.result.winner === 'US' ? 'Victory' : game.result.winner === null ? 'Draw' : 'Defeat'),
+      reward = mountReward(document.body, { noLoot: true, grade: REWARD_GRADES[game.result.grade] || (game.result.winner === side ? 'Victory' : game.result.winner === null ? 'Draw' : 'Defeat'),
         rememberReplay: false, awardId: `battles-${scenario.id}`,
-        afterAction: { title: scenario.title, why: game.result.why, surviving: comparison.you.startUS - comparison.you.lossesUS, losses: comparison.you.lossesUS,
-          guns: game.units.filter((u) => u.side === 'US').reduce((n, u) => n + (u.alive && Array.isArray(u.gunSlots) ? u.gunSlots.filter((g) => g.alive).length : 0), 0),
+        afterAction: { title: scenario.title, why: game.result.why, surviving: start - lost, losses: lost,
+          guns: game.units.filter((u) => u.side === side).reduce((n, u) => n + (u.alive && Array.isArray(u.gunSlots) ? u.gunSlots.filter((g) => g.alive).length : 0), 0),
           eyebrow: `Battles · ${scenario.title}`, note: 'Historical battles grant no loot or franchise rewards.', badges: null,
           history: comparison, replay: replayFor(track) },
         onDone: finish });

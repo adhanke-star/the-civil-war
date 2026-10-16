@@ -5,18 +5,31 @@
 ```finish-loop-checkpoint
 {
   "schema": 1,
-  "item": "0272",
-  "phase": "SHIP_V1_1",
+  "item": "0273",
+  "phase": "V2_EITHER_SIDE",
   "owner": "Claude Code (Opus 5.5) sole writer; Codex released",
   "repo": "/private/tmp/cw-v1-1-20261012",
-  "branch": "v1-1-gaps-20261012",
-  "baseSha": "6fe98290135b4f02f04017ca218c7dd3d8335977",
-  "remoteShaObserved": "6fe98290135b4f02f04017ca218c7dd3d8335977",
+  "branch": "v2-either-side",
+  "baseSha": "6501d5b700cad78beb9b6d43dd10c7cfe61cac27",
+  "remoteShaObserved": "6501d5b700cad78beb9b6d43dd10c7cfe61cac27",
   "priorSourceCi": 38892232331,
   "priorSourceCiScope": "All9 metadata verified this session; prior material acceptance remains documented historical evidence, not re-read here",
-  "nextTask": "0272 ship v1.1 under 0108 light process: docs commit on branch, green CI for that SHA, fast-forward main, Pages, screenshots, tag v1.1 + Release. Compressed atlases out of v1.1 (default-off). 0271 RAM protocol NOT v1.1 work. Then define and build one finite playable v2.",
+  "nextTask": "0273 v2 play-either-side: commit branch v2-either-side, own CI all 9 (SIDES 6/6, pack-*-cs), fast-forward main, Pages, look at pack-*-cs screenshots, Aaron plays one CS phase live, tag v2 + Release. v1.1 RELEASED tag v1.1=6501d5b.",
   "allowedPaths": [
+    "src/sim/sides.js",
+    "src/main.js",
+    "src/game.js",
+    "src/ui/entry.js",
+    "src/ui/entry.css",
+    "src/franchise/practice.js",
+    "src/franchise/practice-ui.js",
+    "src/reward/sequence.js",
+    "tools/test-sides.mjs",
+    "tools/test-packs-ui.mjs",
+    ".github/workflows/ci.yml",
+    "offline-manifest.js",
     "DECISIONS.md",
+    "DESIGN.md",
     "HANDOFF.md",
     "PLAN.md",
     "STATE.md"
@@ -47,8 +60,8 @@
   "strategy": "/private/tmp/cw-finish-loop-20261016/README.md",
   "toolingBranch": "finish-loop-recovery-20261016",
   "toolingRemoteState": "LOCAL_ONLY; not merged/pushed; no CI or product admission implied",
-  "candidateSha": "6fe98290135b4f02f04017ca218c7dd3d8335977",
-  "currentRunId": 38944167328,
+  "candidateSha": null,
+  "currentRunId": 38955478296,
   "sourceParentSha": "582a068365a9e261eff557c585cba3d65dea815c",
   "materialAdmission": "ROOT + independent Astra GO: own9/8canonical+probes finite0269 SOURCE admission; no new native-memory/retirement/250MB/adoption/release claim",
   "resourceReview": {
@@ -98,7 +111,15 @@
       "nativeGpu": false
     }
   },
-  "transportReceiptsReference": "HANDOFF.md fenced finish-loop-material-receipts; complete admitted0269 original ZIP/member/CRC/SHA/source/material records unchanged"
+  "transportReceiptsReference": "HANDOFF.md fenced finish-loop-material-receipts; complete admitted0269 original ZIP/member/CRC/SHA/source/material records unchanged",
+  "release": {
+    "v1.1": {
+      "tag": "v1.1",
+      "sha": "6501d5b700cad78beb9b6d43dd10c7cfe61cac27",
+      "ci": 38955478296,
+      "pages": 38955478238
+    }
+  }
 }
 ```
 

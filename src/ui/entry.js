@@ -50,8 +50,8 @@ const DIFFICULTY_TEXT = Object.freeze({
 });
 const DIFFICULTY_NOTE = 'Difficulty changes only how the enemy commands and when the battle pauses: casualties, fire and morale work the same at every level.';
 const difficultyName = (level) => DIFFICULTY.names[level] || DIFFICULTY.names.veteran;
-/** A Battles-list phase link at a difficulty (Veteran adds nothing to the address). */
-const battleHref = (packId, phaseId, level) => `./?battle=${encodeURIComponent(packId)}&phase=${encodeURIComponent(phaseId)}${level && level !== 'veteran' ? `&difficulty=${level}` : ''}`;
+/** A Battles-list phase link at a difficulty and side (Veteran and the Union add nothing to the address; src/sim/sides.js). */
+const battleHref = (packId, phaseId, level, side) => `./?battle=${encodeURIComponent(packId)}&phase=${encodeURIComponent(phaseId)}${level && level !== 'veteran' ? `&difficulty=${level}` : ''}${side === 'CS' ? '&side=CS' : ''}`;
 export function showFieldFailure({ href = './?camp', message = 'Your saved army is unchanged. Return to camp and try again.' } = {}) {
   document.getElementById('battle').hidden = true;
   const root = document.createElement('main'); root.id = 'front'; root.className = 'rw rw-counts';
@@ -107,7 +107,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
         <p id="entry-note"></p>
         <div class="entry-title-actions"><button id="entry-campaign-continue" class="entry-primary" type="button" aria-describedby="entry-campaign-slot" hidden>Continue</button><button id="entry-new-campaign" type="button" hidden>New campaign</button><button id="entry-battles" type="button" aria-expanded="false" aria-controls="entry-battle-list" hidden>Battles</button><button id="entry-continue" class="entry-primary" type="button">Continue</button></div>
         <p id="entry-campaign-slot" hidden></p>
-        <section id="entry-battle-list" aria-labelledby="entry-battles-heading" hidden><h2 id="entry-battles-heading" tabindex="-1">Battles</h2><p class="entry-note">Every built phase with its historical armies. No loot, and your campaign army is not changed.</p><p class="entry-battles-difficulty"><label for="entry-battles-difficulty">Difficulty</label><select id="entry-battles-difficulty"><option value="recruit">Recruit</option><option value="veteran" selected>Veteran</option><option value="general">General</option></select></p><p class="entry-note" id="entry-battles-difficulty-note"></p><p id="entry-battles-status" role="status"></p><div id="entry-battle-rows"></div></section>
+        <section id="entry-battle-list" aria-labelledby="entry-battles-heading" hidden><h2 id="entry-battles-heading" tabindex="-1">Battles</h2><p class="entry-note">Every built phase with its historical armies. No loot, and your campaign army is not changed.</p><p class="entry-battles-difficulty"><label for="entry-battles-difficulty">Difficulty</label><select id="entry-battles-difficulty"><option value="recruit">Recruit</option><option value="veteran" selected>Veteran</option><option value="general">General</option></select></p><p class="entry-battles-difficulty"><label for="entry-battles-side">Command</label><select id="entry-battles-side"><option value="US" selected>Union</option><option value="CS">Confederate</option></select></p><p class="entry-note" id="entry-battles-difficulty-note"></p><p id="entry-battles-status" role="status"></p><div id="entry-battle-rows"></div></section>
       </section>
       <section id="entry-camp" aria-labelledby="entry-camp-heading" hidden>
         <header class="entry-camp-head"><div><p class="rw-eyebrow">Between battles</p><h1 id="entry-camp-heading">Your army</h1><p id="entry-summary"></p></div>
@@ -1208,7 +1208,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
           heading.textContent = sum.title;
           for (const p of sum.phases) {
             const li = document.createElement('li'), a = document.createElement('a'), note = document.createElement('p');
-            a.href = battleHref(packId, p.id, node('entry-battles-difficulty').value); a.textContent = p.title;
+            a.href = battleHref(packId, p.id, node('entry-battles-difficulty').value, node('entry-battles-side').value); a.textContent = p.title;
             a.dataset.pack = packId; a.dataset.phase = p.id;
             a.addEventListener('click', (e) => { if (importing || pendingExchange) e.preventDefault(); });
             note.textContent = [formatDate(p.date), p.start, p.line].filter(Boolean).join(' · ');
@@ -1224,13 +1224,14 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     }
     (node('entry-battle-rows').querySelector('a') || node('entry-battles-heading')).focus();
   });
-  // The Battles list's own difficulty: every phase link carries it (?difficulty=; none for Veteran).
+  // The Battles list's own difficulty and side: every phase link carries them (?difficulty=, none for Veteran; ?side=CS).
   const battlesDifficulty = () => {
-    const level = node('entry-battles-difficulty').value;
-    node('entry-battles-difficulty-note').textContent = `${difficultyName(level)}: ${DIFFICULTY_TEXT[level]} ${DIFFICULTY_NOTE}`;
-    node('entry-battle-rows').querySelectorAll('a[data-pack]').forEach((a) => { a.href = battleHref(a.dataset.pack, a.dataset.phase, level); });
+    const level = node('entry-battles-difficulty').value, side = node('entry-battles-side').value;
+    node('entry-battles-difficulty-note').textContent = `${difficultyName(level)}: ${DIFFICULTY_TEXT[level]} ${DIFFICULTY_NOTE}${side === 'CS' ? ' You command the Confederates; the computer fights the Union.' : ''}`;
+    node('entry-battle-rows').querySelectorAll('a[data-pack]').forEach((a) => { a.href = battleHref(a.dataset.pack, a.dataset.phase, level, side); });
   };
   node('entry-battles-difficulty').addEventListener('change', battlesDifficulty);
+  node('entry-battles-side').addEventListener('change', battlesDifficulty);
   battlesDifficulty();
   node('entry-retry').addEventListener('click', async () => {
     if (importing) return;

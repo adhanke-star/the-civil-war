@@ -728,12 +728,12 @@ self.CW_OFFLINE = {
    "sha256": "1f5d4010bf4e5d42c3fae0b7008eb7e28cbdcb6a10dae5f31304080517fe2e36"
   },
   "src/franchise/practice-ui.js": {
-   "bytes": 22406,
-   "sha256": "c78fc3572d2941c1d20a9a65851bf80ed713f2d45ac094757840f0c5e523e93b"
+   "bytes": 22490,
+   "sha256": "417082f4b66f29474ff4f9c110e455950a3493ef7bb11388aea973e62bcc3013"
   },
   "src/franchise/practice.js": {
-   "bytes": 30599,
-   "sha256": "bd6c04c050c4afcbc1d2e499e6467d1157fa7bd3d8eeef6ece3e2d020d8404c8"
+   "bytes": 30670,
+   "sha256": "6c8421021fc13dcd72362d980ce4259d2736d6d5fa0d7071248bac822b0c70b9"
   },
   "src/franchise/save.js": {
    "bytes": 42846,
@@ -748,12 +748,12 @@ self.CW_OFFLINE = {
    "sha256": "70df9fff2629edaa0aa24d6f911b3ec92f856ea65f31f5413f70a38b3edddd5e"
   },
   "src/game.js": {
-   "bytes": 88365,
-   "sha256": "0a75d6581cb1053c10b8dd91fb1e91d5a054f4d34fe13a61ad5f54729f1a0e3f"
+   "bytes": 88536,
+   "sha256": "0a37c72c9dafdfb80f2b055765d3cfea0e1bf53fecc802445625f559b6b906c0"
   },
   "src/main.js": {
-   "bytes": 34166,
-   "sha256": "9acbc23dcd53e244485395043a56856814690f56903f863dbac1149bc3120a41"
+   "bytes": 34701,
+   "sha256": "3e35e86333dcb4e40ae3f91eddb01678bf1ed79a1c3dd10b1b3fcbadb471ec9a"
   },
   "src/render/post.js": {
    "bytes": 26769,
@@ -784,8 +784,8 @@ self.CW_OFFLINE = {
    "sha256": "3c141d92f426210fdeb3cf6972eb5475af8b373bd685d24845dc1b203d95f346"
   },
   "src/reward/sequence.js": {
-   "bytes": 86423,
-   "sha256": "5102f86c06af3e818f4ba399ea22ef8c09cd2c0130c9b8f200a79f9afb4ac973"
+   "bytes": 86604,
+   "sha256": "3da8b34f1756a61ffb6c468dabee502a4d097a9f441f2d70ef959191d26ed28c"
   },
   "src/reward/sfx.js": {
    "bytes": 8195,
@@ -831,6 +831,10 @@ self.CW_OFFLINE = {
    "bytes": 4103,
    "sha256": "a427c8aa9a1c0e51688b94512c288677b2f3e069d5fce3ad29f02c7d95a2b35a"
   },
+  "src/sim/sides.js": {
+   "bytes": 4482,
+   "sha256": "cd7427b85636ac1c71de47012c0fd52b2956ff485670b51d69b4e60f3519181e"
+  },
   "src/ui/arrows.js": {
    "bytes": 23753,
    "sha256": "4fc86259064e43bef508d81b83f6d54b9dce9f2a4210529b65135a12b2b2aaf1"
@@ -848,12 +852,12 @@ self.CW_OFFLINE = {
    "sha256": "26db859bfc79d232f9a4cb11985962ec7b6def8c1df0cb0bd3badca2d8b104fe"
   },
   "src/ui/entry.css": {
-   "bytes": 22051,
-   "sha256": "7bb8bbc7e6e5669262e248e8fdcd683c6f53f09b517077f224d9396c2fb5da3d"
+   "bytes": 22079,
+   "sha256": "677f528bb6e27102a4896837ed5fd8232cf40e76d87884ea51bb2d2424fe56d0"
   },
   "src/ui/entry.js": {
-   "bytes": 120848,
-   "sha256": "90154c9a5b75ed52243d001f5401918f0a5756beea331167e8663093ee137fb1"
+   "bytes": 121402,
+   "sha256": "821e9e264be9812b31e6b76570d76a30dc16430e8bbd32de7f088cca4e7c6bc9"
   },
   "src/ui/hud.css": {
    "bytes": 44196,
@@ -1242,6 +1246,7 @@ self.CW_OFFLINE = {
   "src/sim/phase.js",
   "src/sim/recorder.js",
   "src/sim/rules.js",
+  "src/sim/sides.js",
   "src/ui/arrows.js",
   "src/ui/art.js",
   "src/ui/briefing.css",
@@ -1472,5 +1477,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "4ee5087b91e828fbadc7f37228d302f3c7d73e72e67def8d4edac70e63b0fe2d"
+ "generation": "4fc342e0246abd548339ad0b8ea833c75d37c24d17a56e813b3fc42bed9d75cf"
 };

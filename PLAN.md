@@ -1,5 +1,16 @@
 # Current execution — v1.1, then v2 (Aaron, 2026-10-12)
 
+v2 CONTRACT — PLAY EITHER SIDE (Aaron, DECISIONS 0273, 2026-10-16). v1.1 RELEASED (tag v1.1 = 6501d5b).
+Player sees: Title → Battles → Command [Union|Confederate] beside Difficulty; any of the 11 phases opens with the player
+commanding the chosen side, the computer the other; result, after-action and you-vs-history read from the player's side.
+In: src/sim/sides.js (new), main.js (?side=CS on the Battles route only), game.js (computer side halts to fire),
+entry.js/css (Command select), practice.js/practice-ui.js/reward/sequence.js (player-side after-action), tests
+tools/test-sides.mjs (CI list) + tools/test-packs-ui.mjs (menu links, five CS launches, screenshots).
+Out: loot/saves/campaign/practice/Henry Hill for CS; new history or people; sandbox, officers, CS campaign; balance retune.
+Done when: own-SHA CI all 9 green incl. SIDES 6/6 and pack-*-cs checks; main fast-forwarded, Pages green; Aaron opens
+the live Battles menu, plays one phase as the Confederates and the Union attacks him; tag v2 + Release notes.
+Next after merge: look at pack-*-cs-opening/-battle screenshots from CI (test-output-3) before tagging.
+
 SHIP v1.1 NOW (Aaron, DECISIONS 0272, 2026-10-16). Light process (0108). Compressed atlases and
 extra CS looks are out of v1.1 (code stays default-off); 0271/0270 bridges below are history, not
 v1.1 gates. Steps: (1) docs commit, green CI on that SHA; (2) fast-forward main to it, Pages green,

@@ -1,5 +1,17 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0273 — v2 is "play either side" in the Battles menu (Aaron, 2026-10-16)
+
+v1.1 shipped: tag v1.1 at 6501d5b, own CI 38955478296 all 9 green, Pages 38955478238 green, Release published. The
+Pages assembly had never copied offline-manifest.js (live 404, so the new worker could not install); fixed in 6501d5b,
+with a deploy check that every manifest file is in the site. Real-browser worker install on the live site is UNVERIFIED.
+Aaron chose, from four scoped options (popup, recommended), v2 = a Command choice (Union/Confederate) on the Battles
+list: all 11 phases playable as the Confederates, no loot, no save changes. Sandbox battle, officers and a Confederate
+campaign stay later. Game rule (not history): when the computer's side is the phase attacker and the data gives none of
+its formations an AI role (the four Union-attack phases), every one attacks the objective at once; each of those phases
+opens at the hour its attack began. Campaign, practice, saved deployments and Henry Hill stay Union only. Union play is
+unchanged (same scenario object). Contract and acceptance: PLAN top.
+
 ## 0272 — Ship v1.1 now; compressed atlases leave v1.1 (Aaron, 2026-10-16)
 
 Aaron chose, in a popup with this as the recommended option, to release v1.1 from what is already

@@ -30,7 +30,7 @@ answer and later one-device-check answer were both explicitly withdrawn.
 | Enemy | Historical opening per phase, then reacts. Its army carries losses, veterancy and captured arms between battles and earns its own badges and X-Factors |
 | Difficulty | Recruit / Veteran / General: smarter, faster AI and no auto-pause; never hidden stat bonuses |
 | Flow | Title (live diorama) with one Continue; loop: Decision cards -> Fly-over briefing -> Phase -> After-action and loot -> Camp |
-| Other modes | "Battles" menu: every built phase open from the start, historical armies, no loot. Bull Run = "Practice: Henry House Hill". Sandbox battle (pick field and both armies) after the three battles exist |
+| Other modes | "Battles" menu: every built phase open from the start, historical armies, no loot; Command: play either side (v2, DECISIONS 0273). Bull Run = "Practice: Henry House Hill". Sandbox battle (pick field and both armies) after the three battles exist |
 | Teaching | Hints the first time each control is relevant; no guided tutorial |
 | Saves | Three named slots in the browser, autosave between phases and in camp, export/import file |
 | History | Fly-over briefing with captions; after-action "you vs history" with sources; codex later |
