@@ -10,12 +10,88 @@ const frames = (page, n = 2) => page.evaluate((n) => new Promise((resolve) => {
   step(n);
 }), n);
 
+// Passive, bounded observation of one native field click. Registered after Input's own listeners;
+// bubble observations therefore run after down/up, without relying on microtask ordering.
+// Dependencies can be injected for CPU controls; page.evaluate uses the browser defaults.
+export function installDelegationPointerObserver({ host = window, doc = document } = {}) {
+  const key = '__delegationPointerObservation0257';
+  if (Object.hasOwn(host, key)) throw new Error('delegation pointer observer already installed');
+  const canvas = doc.getElementById('battlefield');
+  if (!canvas || !host.__game) throw new Error('delegation pointer observer missing field');
+  const rows = [], errors = [], listeners = [];
+  let overflow = false, closed = false;
+  const failure = (kind, e) => {
+    let message = 'non-primitive observer failure';
+    if (typeof e === 'string') message = e;
+    else if (e === null || ['undefined', 'boolean', 'number', 'bigint'].includes(typeof e)) message = String(e);
+    else { try { const d = Object.getOwnPropertyDescriptor(e, 'message'); if (d && Object.hasOwn(d, 'value') && typeof d.value === 'string') message = d.value; } catch {} }
+    if (errors.length < 8) errors.push({ kind, message: message.slice(0, 500) }); else overflow = true;
+  };
+  const cleanup = () => {
+    closed = true;
+    for (const [target, type, fn, capture] of listeners) {
+      try { target.removeEventListener(type, fn, capture); } catch (e) { failure('listener-cleanup', e); }
+    }
+    try {
+      const d = Object.getOwnPropertyDescriptor(host, key);
+      if (d?.value === observer) delete host[key];
+      else failure('property-cleanup', 'delegation pointer observer replaced');
+    } catch (e) { failure('property-cleanup', e); }
+  };
+  const point = (p) => p ? { x: p.x, z: p.z } : null;
+  const state = () => {
+    const { camera, rts, input, game } = host.__game, rect = canvas.getBoundingClientRect();
+    return {
+      camera: { position: camera.position.toArray(), world: [...camera.matrixWorld.elements], projection: [...camera.projectionMatrix.elements] },
+      rts: { target: rts.target.toArray(), goal: { ...rts.goal }, groundY: rts.groundY, yaw: rts.yaw, pitch: rts.pitch, dist: rts.dist },
+      canvas: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+      viewport: { width: host.innerWidth, height: host.innerHeight, dpr: host.devicePixelRatio },
+      drag: input.drag ? { ground: point(input.drag.ground), id: input.drag.id, type: input.drag.type, moved: input.drag.moved, delegatePick: input.drag.delegatePick } : null,
+      targeting: input.targeting?.mode ?? null, chooser: !doc.getElementById('delegate-chooser').hidden,
+      delegate: game.units.find(u => u.id === 'franklin')?.delegate ? { ...game.units.find(u => u.id === 'franklin').delegate } : null,
+    };
+  };
+  const append = (kind, event, screen) => {
+    if (closed) return;
+    if (rows.length >= 8) { overflow = true; return; }
+    try {
+      const p = screen ?? { x: event.clientX, y: event.clientY };
+      rows.push({ kind, screen: { ...p }, event: event ? { type: event.type, pointerId: event.pointerId, pointerType: event.pointerType,
+        button: event.button, buttons: event.buttons, trusted: event.isTrusted, timeStamp: event.timeStamp } : null,
+      pick: point(host.__game.rts.pick(p.x, p.y, canvas)), ...state() });
+    } catch (e) { failure(kind, e); }
+  };
+  const add = (target, type, fn, capture) => { listeners.push([target, type, fn, capture]); target.addEventListener(type, fn, capture); };
+  const downCapture = e => append('down-capture', e);
+  const downBubble = e => append('down-after-input', e);
+  const upBubble = e => { if (e.target === canvas) append('up-after-input', e); };
+  const observer = {
+    mark: (kind, screen) => append(kind, null, screen),
+    read: () => structuredClone({ rows, errors, overflow, closed }),
+    close: () => {
+      if (!closed) cleanup();
+      return structuredClone({ rows, errors, overflow, closed });
+    },
+  };
+  try {
+    Object.defineProperty(host, key, { value: observer, configurable: true });
+    add(canvas, 'pointerdown', downCapture, true);
+    add(canvas, 'pointerdown', downBubble, false);
+    add(host, 'pointerup', upBubble, false);
+  } catch (e) {
+    cleanup();
+    throw e;
+  }
+  return { installed: true };
+}
+
 export async function delegationControls({ browser, url, check, shot, result, watchErrors }) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
   const page = await ctx.newPage(), errors = [];
   page.setDefaultTimeout(15000); page.setDefaultNavigationTimeout(180000);
   watchErrors(page, url, errors);
   const evidence = result.delegation = {};
+  let pointerObserver = false;
   const record = (name, ok, data) => { evidence[name] = data; check('delegation-ui-' + name, ok, JSON.stringify(data).slice(0, 1200)); };
   const read = () => page.evaluate(() => {
     const { game, input, arrows, hud } = window.__game, f = game.units.find((u) => u.id === 'franklin');
@@ -41,7 +117,9 @@ export async function delegationControls({ browser, url, check, shot, result, wa
     }
     return null;
   }, [x, z]);
-  const pickAt = (p) => page.evaluate(([x, y]) => { const { rts } = window.__game; const g = rts.pick(x, y, document.getElementById('battlefield')); return g ? { x: g.x, z: g.z } : null; }, [p.x, p.y]);
+  const pickAt = (p) => page.evaluate(([x, y]) => { const { rts } = window.__game; const g = rts.pick(x, y, document.getElementById('battlefield'));
+    window.__delegationPointerObservation0257.mark('pre-click', { x, y });
+    return g ? { x: g.x, z: g.z } : null; }, [p.x, p.y]);
   const near = (a, b, eps = 2) => !!a && !!b && Math.hypot(a.x - b.x, a.z - b.z) < eps;
   const axe = async (label, ...scopes) => {
     let builder = new AxeBuilder({ page });
@@ -68,6 +146,8 @@ export async function delegationControls({ browser, url, check, shot, result, wa
     record('mouse-begin', picking.targeting?.mode === 'delegate' && /Delegate/.test(picking.status) && picking.orders === start.orders && !picking.delegate, picking);
     const spot = await fieldPoint(start.franklin.x + 160, start.franklin.z);
     if (!spot) throw new Error('no bare field point near Franklin to click');
+    await page.evaluate(installDelegationPointerObserver);
+    pointerObserver = true;
     const ground = await pickAt(spot);
     await page.mouse.click(spot.x, spot.y);
     await frames(page);
@@ -79,6 +159,14 @@ export async function delegationControls({ browser, url, check, shot, result, wa
     await page.getByRole('button', { name: 'Attack', exact: true }).click();
     await frames(page);
     const attack = await read();
+    await page.evaluate(p => window.__delegationPointerObservation0257.mark('post-attack', p), spot);
+    evidence.pointerObservation = await page.evaluate(() => window.__delegationPointerObservation0257.close());
+    pointerObserver = false;
+    const observation = evidence.pointerObservation;
+    record('pointer-observer', observation.closed && !observation.overflow && observation.errors.length === 0
+      && observation.rows.map(r => r.kind).join(',') === 'pre-click,down-capture,down-after-input,up-after-input,post-attack'
+      && observation.rows.slice(1, 4).every(r => r.event.trusted && r.event.pointerType === 'mouse'),
+    { kinds: observation.rows.map(r => r.kind), errors: observation.errors, overflow: observation.overflow, closed: observation.closed });
     record('mouse-attack', attack.delegate?.role === 'attack' && near(attack.delegate, ground, 3) && !attack.chooser && !attack.preview
       && attack.focus === 'battlefield' && attack.orders === start.orders + 1, { delegate: attack.delegate, ground, focus: attack.focus });
     record('card-role', attack.card === 'Delegated: Attack' && attack.undo, { card: attack.card, undo: attack.undo });
@@ -176,6 +264,10 @@ export async function delegationControls({ browser, url, check, shot, result, wa
     await page.setViewportSize({ width: 1280, height: 800 });
     record('errors', errors.length === 0, errors.slice(0, 6));
   } finally {
+    if (pointerObserver) {
+      try { evidence.pointerObservation = await page.evaluate(() => window.__delegationPointerObservation0257.close()); }
+      catch (e) { evidence.pointerObserverCleanupError = String(e?.message ?? e); check('delegation-ui-pointer-observer-cleanup', false, evidence.pointerObserverCleanupError); }
+    }
     await ctx.close().catch(() => {});
   }
 }

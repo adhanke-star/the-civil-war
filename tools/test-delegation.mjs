@@ -14,6 +14,7 @@ import { LOOK } from '../src/ui/look.js';
 import * as settings from '../src/settings.js';
 import { prepareFieldScenario } from '../src/sim/phase.js';
 import { henryHillRun } from './test-packs.mjs';
+import { installDelegationPointerObserver } from './test-delegation-ui.mjs';
 
 const HH = JSON.parse(fs.readFileSync(new URL('../assets/scenarios/henry-hill.json', import.meta.url)));
 // The Henry Hill oracle is owned by tools/test-packs.mjs (observed on the pre-pack parent); read it, never restate it.
@@ -27,7 +28,7 @@ RULES.autoPause = false; RULES.battleSpeed = 1;
 settings.set('look.menPerFigure', 10); settings.set('look.formationSpacing', 1); LOOK.figureStyle = 'rigged';
 
 const FAR_CS = { x: 1500, z: 1500 };
-const API = { patch: {}, game: {}, proto: null };
+const API = { patch: {}, game: {}, proto: null, pointerObserver: installDelegationPointerObserver };
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 /** A fictional phase on the Henry Hill ground: only the listed roster ids, each with its overrides. */
@@ -54,7 +55,97 @@ const state = (u) => ({ x: +u.x.toFixed(6), z: +u.z.toFixed(6), facing: +u.facin
 
 const P = [0, 330]; // the delegated place in most checks: 330 m east of Franklin's start, facing east
 
+function pointerFixture() {
+  const target = () => {
+    const listeners = [];
+    return { listeners,
+      addEventListener(type, fn, capture) { listeners.push({ type, fn, capture }); },
+      removeEventListener(type, fn, capture) { const i = listeners.findIndex(r => r.type === type && r.fn === fn && r.capture === capture); if (i >= 0) listeners.splice(i, 1); },
+      dispatch(event) { for (const capture of [true, false]) for (const r of [...listeners]) if (r.type === event.type && !!r.capture === capture) r.fn(event); },
+    };
+  };
+  const canvas = target(), host = target(), chooser = { hidden: true }, key = '__delegationPointerObservation0257';
+  const vector = a => ({ toArray: () => [...a] });
+  canvas.getBoundingClientRect = () => ({ left: 7, top: 9, width: 1000, height: 600 });
+  const input = { drag: null, targeting: { mode: 'delegate' } }, franklin = { id: 'franklin', delegate: null };
+  const rts = { target: vector([10, 20, 30]), goal: { x: 10, z: 30, dist: 520 }, groundY: 20, yaw: 1, pitch: 0.8, dist: 520,
+    pick: (x, y) => ({ x: x + rts.groundY, z: y - rts.groundY }) };
+  host.__game = { input, rts, camera: { position: vector([1, 2, 3]), matrixWorld: { elements: Array.from({ length: 16 }, (_, i) => i) },
+    projectionMatrix: { elements: Array.from({ length: 16 }, (_, i) => i + 20) } }, game: { units: [franklin] } };
+  Object.assign(host, { innerWidth: 1280, innerHeight: 800, devicePixelRatio: 1 });
+  const doc = { getElementById: id => id === 'battlefield' ? canvas : id === 'delegate-chooser' ? chooser : null };
+  canvas.addEventListener('pointerdown', e => { input.drag = { ground: rts.pick(e.clientX, e.clientY), id: e.pointerId, type: e.pointerType, moved: false, delegatePick: true }; }, false);
+  host.addEventListener('pointerup', () => { input.drag = null; input.targeting = null; chooser.hidden = false; }, false);
+  const event = type => ({ type, target: canvas, clientX: 100.125, clientY: 200.875, pointerId: 1, pointerType: 'mouse', button: 0, buttons: type === 'pointerdown' ? 1 : 0, isTrusted: true, timeStamp: 123.5 });
+  return { canvas, host, doc, rts, input, franklin, chooser, key, event };
+}
+
 export const DELEGATION_CHECKS = [
+  ['pointer-observer', async api => {
+    const f = pointerFixture(), { host, canvas, key } = f;
+    api.pointerObserver({ host, doc: f.doc });
+    const o = host[key];
+    o.mark('pre-click', { x: 100.125, y: 200.875 });
+    f.rts.groundY = 24; // camera moves between the harness evaluation and the native event
+    canvas.dispatch(f.event('pointerdown'));
+    host.dispatch(f.event('pointerup'));
+    f.franklin.delegate = { role: 'attack', x: 124.125, z: 176.875 };
+    o.mark('post-attack', { x: 100.125, y: 200.875 });
+    const before = o.read(), closed = o.close();
+    assert.deepEqual(closed.rows.map(r => r.kind), ['pre-click', 'down-capture', 'down-after-input', 'up-after-input', 'post-attack'], 'pointer-observer: event phases retained in actual listener order');
+    assert.deepEqual(closed.rows[0].pick, { x: 120.125, z: 180.875 }, 'pointer-observer: old pre-click pick retained');
+    assert.deepEqual(closed.rows[1].pick, { x: 124.125, z: 176.875 }, 'pointer-observer: fractional event coordinates and current camera pick retained');
+    assert.equal(closed.rows[1].drag, null, 'pointer-observer: capture precedes Input.down');
+    assert.deepEqual(closed.rows[2].drag.ground, closed.rows[1].pick, 'pointer-observer: later bubble sees actual copied drag ground');
+    assert.ok(closed.rows[3].chooser && closed.rows[3].drag === null && closed.rows[3].targeting === null, 'pointer-observer: window bubble sees Input.up chooser');
+    assert.deepEqual(closed.rows[4].delegate, f.franklin.delegate, 'pointer-observer: post Attack destination retained');
+    assert.ok(closed.closed && !closed.overflow && closed.errors.length === 0 && !Object.hasOwn(host, key), 'pointer-observer: clean removal');
+    assert.equal(canvas.listeners.length + host.listeners.length, 2, 'pointer-observer: original listeners remain alone');
+    before.rows[0].camera.world[0] = -999; f.rts.goal.x = -999; f.franklin.delegate.x = -999;
+    assert.equal(closed.rows[0].camera.world[0], 0, 'pointer-observer: returned snapshots cannot mutate retained matrices');
+    assert.equal(closed.rows[0].rts.goal.x, 10, 'pointer-observer: no live camera alias');
+    assert.equal(closed.rows[4].delegate.x, 124.125, 'pointer-observer: no live delegate alias');
+    for (const mode of ['overflow', 'read-error', 'duplicate', 'registration-error']) {
+      const q = pointerFixture();
+      if (mode === 'registration-error') q.host.addEventListener = () => { throw new Error('injected registration refusal'); };
+      if (mode === 'registration-error') {
+        assert.throws(() => api.pointerObserver({ host: q.host, doc: q.doc }), /registration refusal/, 'pointer-observer: registration error surfaces');
+        assert.ok(!Object.hasOwn(q.host, q.key) && q.canvas.listeners.length === 1, 'pointer-observer: partial installation restored');
+        continue;
+      }
+      api.pointerObserver({ host: q.host, doc: q.doc });
+      if (mode === 'duplicate') assert.throws(() => api.pointerObserver({ host: q.host, doc: q.doc }), /already installed/, 'pointer-observer: duplicate refuses');
+      if (mode === 'overflow') for (let i = 0; i < 10; i++) q.host[q.key].mark('extra', { x: 1, y: 2 });
+      if (mode === 'read-error') { q.rts.pick = () => { throw new Error('injected pick refusal'); };
+        q.host[q.key].mark('first', { x: 1, y: 2 }); q.host[q.key].mark('second', { x: 1, y: 2 }); }
+      const report = q.host[q.key].close();
+      if (mode === 'overflow') assert.ok(report.overflow && report.rows.length === 8, 'pointer-observer: bounded overflow refuses clean evidence');
+      if (mode === 'read-error') assert.ok(report.errors.length === 2 && report.errors.every(e => e.message === 'injected pick refusal'), 'pointer-observer: observer errors retained');
+      assert.equal(q.canvas.listeners.length + q.host.listeners.length, 2, 'pointer-observer: refusal cleanup preserves owned input listeners');
+    }
+    const late = pointerFixture(), lateAdd = late.host.addEventListener;
+    late.host.addEventListener = function (...args) { lateAdd.apply(this, args); throw 0; };
+    let primary = 'missing'; try { api.pointerObserver({ host: late.host, doc: late.doc }); } catch (e) { primary = e; }
+    assert.equal(primary, 0, 'pointer-observer: preserve falsy primary registration error');
+    assert.equal(late.canvas.listeners.length + late.host.listeners.length, 2, 'pointer-observer: stored-then-thrown registration rolls back');
+    const hostile = pointerFixture(); api.pointerObserver({ host: hostile.host, doc: hostile.doc });
+    let foreign = 0;
+    hostile.rts.pick = () => { throw Object.defineProperty({}, 'message', { get() { foreign++; throw 0; } }); };
+    hostile.host[hostile.key].mark('hostile', { x: 1, y: 2 });
+    const hostileReport = hostile.host[hostile.key].close();
+    assert.ok(foreign === 0 && hostileReport.errors.length === 1, 'pointer-observer: foreign error getters never execute');
+    const removal = pointerFixture(); api.pointerObserver({ host: removal.host, doc: removal.doc });
+    const remove = removal.canvas.removeEventListener; let attempts = 0;
+    removal.canvas.removeEventListener = function (...args) { attempts++; remove.apply(this, args); if (attempts === 1) throw 0; };
+    const removalReport = removal.host[removal.key].close();
+    assert.ok(removalReport.closed && removalReport.errors.length === 1 && attempts === 2, 'pointer-observer: attempt all cleanup after falsy removal throw');
+    assert.equal(removal.canvas.listeners.length + removal.host.listeners.length, 2, 'pointer-observer: later canvas and window cleanup attempted');
+    const replaced = pointerFixture(); api.pointerObserver({ host: replaced.host, doc: replaced.doc });
+    const owned = replaced.host[replaced.key];
+    Object.defineProperty(replaced.host, replaced.key, { get() { foreign++; throw 0; }, configurable: true });
+    const replacementReport = owned.close();
+    assert.ok(replacementReport.errors.length === 1 && foreign === 0 && Object.hasOwn(replaced.host, replaced.key), 'pointer-observer: foreign replacement preserved without getter invocation');
+  }],
   ['attack-reaches-holds', async api => {
     const g = game(api, { franklin: {}, jackson: FAR_CS });
     const f = unit(g, 'franklin');
@@ -219,6 +310,11 @@ export const DELEGATION_CHECKS = [
 
 // One semantic mutant per check: each must fail that check's own assertion.
 const MUTANTS = {
+  'pointer-observer': { pointerObserver(args) { const add = args.doc.getElementById('battlefield').addEventListener;
+    const canvas = args.doc.getElementById('battlefield');
+    canvas.addEventListener = function (type, fn, capture) { if (capture) return; return add.call(this, type, fn, capture); };
+    try { return installDelegationPointerObserver(args); } finally { canvas.addEventListener = add; }
+  } },
   'attack-reaches-holds': { patch: { plan(u) { const m = Ai.prototype.plan.call(this, u); m.aim = [u.def.x, u.def.z]; return m; } } }, // never leaves
   'attack-line': { patch: { place(grp, v) { grp.n++; grp.pos.set(v, 0); } } }, // every brigade aims at one point
   'attack-engages': { patch: { foeNear: () => null } }, // ignores the enemy at its place
