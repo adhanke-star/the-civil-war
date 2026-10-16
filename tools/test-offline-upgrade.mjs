@@ -290,6 +290,25 @@ async function runCurrentRecordings(){
         recording.console.push({case:name,phase:readPhase(),type:message.type(),text,url,at:Date.now()});});
     };context.on('page',attach);for(const page of context.pages())attach(page);
   };
+  const initialWorker=async(page,origin)=>{
+    const startedAt=Date.now(),deadline=startedAt+60000;let closed=false,snapshot;
+    try{
+      await bounded(waitFor(async()=>{
+        if(closed||Date.now()>=deadline)return false;
+        const current=await page.evaluate(async()=>{
+          const registration=await navigator.serviceWorker.getRegistration();
+          return{url:location.href,scope:registration?.scope??null,scriptURL:registration?.active?.scriptURL??null,
+            state:registration?.active?.state??null,entryMode:window.__entry?.mode??null,
+            entryReady:!!window.__entry&&!window.__entry.importing,controlled:!!navigator.serviceWorker.controller};
+        });
+        const at=Date.now();if(closed||at>=deadline)return false;
+        if(current.url!==origin+'?sw'||current.scope!==origin||current.scriptURL!==new URL('sw.js',origin).href
+          ||current.state!=='activated'||current.entryMode!=='title'||current.entryReady!==true||current.controlled!==false)return false;
+        snapshot={...current,startedAt,observedAt:at,deadline};return true;
+      },'initial worker activation',60000),'initial worker activation',60000);
+      if(!snapshot)throw Error('recordings: initial activation receipt unavailable');return snapshot;
+    }finally{closed=true;}
+  };
   const closeContext=async context=>{
     if(!context)return;
     let failed=false,first;
@@ -388,13 +407,10 @@ async function runCurrentRecordings(){
       context=await launch(profile,name,()=>casePhase,c.origin);
       let page=context.pages()[0]??await context.newPage();await page.goto(c.origin+'?sw');
       // The shipping worker does not claim its installing document. Observe activation, then navigate normally.
-      await page.waitForFunction(async()=>{
-        const registration=await navigator.serviceWorker.getRegistration();
-        return registration?.active?.state==='activated'&&!!window.__entry&&!window.__entry.importing;
-      },null,{timeout:60000});
+      c.initialActivation=await initialWorker(page,c.origin);
       c.installBeforeGesture=await page.evaluate(()=>window.__recordingAudioContext.read());
       assert(c.installBeforeGesture.observed&&c.installBeforeGesture.calls===0);
-      await page.reload();c.initialReloaded=true;
+      c.initialReloadAt=Date.now();await page.reload();c.initialReloaded=true;
       await page.waitForFunction(()=>!!navigator.serviceWorker.controller&&!!window.__entry&&!window.__entry.importing,null,{timeout:60000});
       c.settings=await fixtureSettings(page);
       const first=await page.evaluate(()=>window.__recordingAudioContext.read());

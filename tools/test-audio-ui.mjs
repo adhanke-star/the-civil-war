@@ -345,6 +345,14 @@ export function recordingProofErrors(report, { sha, run, manifest, campaign, fie
         && typeof c.settings.before['audio.music'] === 'number' && Number.isFinite(c.settings.before['audio.music'])
         && c.settings.before['audio.music'] >= 0 && c.settings.before['audio.music'] <= 1 && c.settings.after['audio.music'] === 0
         && JSON.stringify(c.restartSettings) === JSON.stringify(c.settings.after), prefix + 'isolated-persisted-music-setting');
+      const activation=c.initialActivation;
+      need(activation?.url===c.origin+'?sw' && activation.scope===c.origin
+        && activation.scriptURL===new URL('sw.js',c.origin).href && activation.state==='activated'
+        && activation.entryMode==='title' && activation.entryReady===true && activation.controlled===false
+        && positiveInt(activation.startedAt,Number.MAX_SAFE_INTEGER) && positiveInt(activation.observedAt,Number.MAX_SAFE_INTEGER)
+        && activation.deadline===activation.startedAt+60000 && activation.observedAt>=activation.startedAt
+        && activation.observedAt<activation.deadline && positiveInt(c.initialReloadAt,Number.MAX_SAFE_INTEGER)
+        && c.initialReloadAt>=activation.observedAt, prefix+'initial-worker-before-reload');
       need(c.installBeforeGesture.observed === true && c.installBeforeGesture.calls === 0 && c.initialReloaded === true
         && c.controller === true && c.restartController === true && c.beforeGesture.observed === true
         && c.beforeGesture.requests === 0 && c.beforeGesture.audioContexts === 0, prefix + 'pre-gesture');

@@ -177,6 +177,8 @@ async function recordingProofFixture() {
       sha256: manifest.files[AUDIO_DIR + SOUNDS[id].file].sha256 } : {}) }));
     for (const id of expectedIds) report.requests.push({ id: report.requests.length + 1, case: name, phase: 'prepare', path: AUDIO_DIR + SOUNDS[id].file, method: 'GET', range: null, status: healthy ? 200 : 503, finished: true });
     report.cases.push({ name, origin, metadata: { schema: 1, scope: origin, generation: manifest.generation, members: manifest.base },
+      initialActivation:{url:origin+'?sw',scope:origin,scriptURL:new URL('sw.js',origin).href,state:'activated',
+        entryMode:'title',entryReady:true,controlled:false,startedAt:1000,observedAt:2000,deadline:61000},initialReloadAt:2001,
       installBeforeGesture: { calls: 0, observed: true }, initialReloaded: true,
       initialRaw: exportSnapshot(initial), controller: true, restartController: true,
       settings: { before: { 'audio.master': .8, 'audio.effects': 1, 'audio.voices': 1, 'audio.mute': false, 'audio.music': .5 },
@@ -255,6 +257,19 @@ const recordingProofMutations = [
   ['late-proxy-request-hidden-by-summary', r => { r.requests.push({ ...r.requests[0], id: r.requests.length + 1, phase: 'playback' }); }],
   ['forged-origin-close-count', r => { r.cases[0].requestCountAtClose++; }],
   ['uncontrolled-install-document', r => { r.cases[0].initialReloaded = false; }],
+  ['missing-initial-activation',r=>{delete r.cases[0].initialActivation;}],
+  ['initial-worker-activating',r=>{r.cases[0].initialActivation.state='activating';}],
+  ['initial-worker-scope',r=>{r.cases[0].initialActivation.scope='http://foreign.example/';}],
+  ['initial-worker-script',r=>{r.cases[0].initialActivation.scriptURL=r.cases[0].origin+'other.js';}],
+  ['initial-worker-document',r=>{r.cases[0].initialActivation.url=r.cases[0].origin+'?camp';}],
+  ['initial-entry-importing',r=>{r.cases[0].initialActivation.entryReady=false;}],
+  ['initial-worker-claimed',r=>{r.cases[0].initialActivation.controlled=true;}],
+  ['initial-worker-late',r=>{r.cases[0].initialActivation.observedAt=r.cases[0].initialActivation.deadline;}],
+  ['initial-worker-longer-budget',r=>{r.cases[0].initialActivation.deadline++;}],
+  ['initial-worker-after-reload',r=>{r.cases[0].initialReloadAt=r.cases[0].initialActivation.observedAt-1;}],
+  ['initial-worker-fractional-clock',r=>{r.cases[0].initialActivation.startedAt+=.5;r.cases[0].initialActivation.deadline+=.5;}],
+  ['initial-worker-fractional-observation',r=>{r.cases[0].initialActivation.observedAt+=.5;}],
+  ['initial-worker-fractional-reload',r=>{r.cases[0].initialReloadAt+=.5;}],
   ['install-created-audio-context', r => { r.cases[0].installBeforeGesture.calls = 1; }],
   ['wrong-held-proxy-id', r => { r.guards.ui.heldProxyRequestIds[0] = 9999; }],
   ['wrong-held-browser-id', r => { r.guards.ui.heldBrowser[0].id = 9999; }],
@@ -443,6 +458,57 @@ export const AUDIO_CHECKS = [
         && child.stdout.indexOf('timer:5000') < child.stdout.indexOf('persist-start'),
         'recordings-producer-process: terminal watchdog missing, late, or non-failing with stuck persistence');
     }
+  }],
+  ['recordings-worker-readiness',async api=>{
+    const prefix='recordings-worker-readiness: ',source=api.recordingSource();
+    const section=(start,end)=>{const a=source.indexOf(start),b=source.indexOf(end,a);assert(a>=0&&b>a,prefix+'actual helper missing');return source.slice(a,b);};
+    const helpers=section('  const bounded=','  const persist=')+section('  const initialWorker=','  const closeContext=');
+    const bundle=fs.readFileSync(path.join(ROOT,'node_modules/playwright-core/lib/coreBundle.js'),'utf8'),
+      begin=bundle.indexOf('let evaledExpression;',bundle.indexOf('async waitForFunctionExpression(')),end=bundle.indexOf('}, { expression: expression2',begin);
+    assert(begin>=0&&end>begin,prefix+'pinned poller unavailable');
+    const pollScope={flag:false},queue=[];vm.createContext(pollScope);
+    const poll=vm.runInContext('(function(injected,{expression:expression3,isFunction:isFunction3,polling,arg:arg2}){'+bundle.slice(begin,end)+'})',pollScope),
+      injected={utils:{builtins:{requestAnimationFrame:fn=>queue.push(fn),setTimeout:fn=>queue.push(fn)}}};
+    assert.equal(await poll(injected,{expression:'async p=>await p',isFunction:true,arg:Promise.resolve(false)}).result,false,prefix+'async false source behavior');
+    assert.equal(queue.length,0,prefix+'async predicate unexpectedly polled');
+    let finish;const pending=new Promise(r=>finish=r),late=poll(injected,{expression:'async p=>await p',isFunction:true,arg:pending});
+    assert.equal(queue.length,0,prefix+'deferred Promise unexpectedly polled');finish(false);assert.equal(await late.result,false,prefix+'deferred false');
+    const sync=poll(injected,{expression:'()=>globalThis.flag',isFunction:true});assert.equal(queue.length,1,prefix+'sync false must poll');
+    pollScope.flag=true;queue.shift()();assert.equal(await sync.result,true,prefix+'sync true');
+    const flush=async()=>{for(let i=0;i<16;i++)await Promise.resolve();};
+    const fixture=()=>{
+      let clock=1000,next=0,reads=0,lateReads=0;const timers=new Map(),origin='http://127.0.0.1:12345/',
+        registration={scope:origin,active:{scriptURL:origin+'sw.js',state:'activated'}},entry={mode:'title',importing:false};
+      let read=()=>Promise.resolve(registration);
+      const env={Date:{now:()=>clock},URL,Promise,window:{__entry:entry},location:{href:origin+'?sw'},
+        navigator:{serviceWorker:{getRegistration:()=>read(),controller:null}},
+        setTimeout:(fn,ms)=>{const id=++next;timers.set(id,{fn,at:clock+ms});return id;},clearTimeout:id=>timers.delete(id)};
+      const initial=vm.runInNewContext(helpers+';initialWorker',env),page={evaluate:async fn=>{
+        reads++;const value=await fn();return new Proxy(value,{get(target,key){if(clock>=61000&&key==='url')lateReads++;return Reflect.get(target,key);}});
+      }};
+      let outcome=null;const task=Promise.resolve().then(()=>initial(page,origin)).then(value=>{outcome={ok:true,value};},error=>{outcome={ok:false,error};});
+      const tick=async at=>{clock=at;for(const[id,timer]of [...timers])if(timer.at<=clock){timers.delete(id);timer.fn();}await flush();};
+      return{registration,entry,env,timers,task,tick,setRead:fn=>{read=fn;},get reads(){return reads;},get lateReads(){return lateReads;},get outcome(){return outcome;}};
+    };
+    // A deferred getRegistration cannot let reload advance; activating and importing stay unready.
+    const f=fixture();let release;f.setRead(()=>new Promise(r=>release=r));await flush();assert.equal(f.outcome,null,prefix+'deferred registration advanced');
+    release(undefined);await flush();f.setRead(()=>Promise.resolve(f.registration));f.registration.active.state='activating';await f.tick(1025);
+    assert.equal(f.outcome,null,prefix+'activating worker advanced');f.registration.active.state='activated';f.entry.importing=true;await f.tick(1050);
+    assert.equal(f.outcome,null,prefix+'importing entry advanced');f.entry.importing=false;await f.tick(1075);await f.task;
+    assert.equal(f.outcome?.ok,true,prefix+'healthy activation rejected');assert.equal(f.outcome.value.state,'activated',prefix+'activation receipt');
+    assert.equal(f.outcome.value.observedAt,1075,prefix+'observation time');assert.equal(f.timers.size,0,prefix+'successful timer cleanup');
+    for(const kind of ['scope','script','document','controlled','mode']){
+      const r=fixture();if(kind==='scope')r.registration.scope='http://foreign.example/';if(kind==='script')r.registration.active.scriptURL+='other';
+      if(kind==='document')r.env.location.href+='wrong';if(kind==='controlled')r.env.navigator.serviceWorker.controller={};if(kind==='mode')r.entry.mode='camp';
+      await flush();assert.equal(r.outcome,null,prefix+'wrong '+kind+' advanced');r.registration.scope='http://127.0.0.1:12345/';
+      r.registration.active.scriptURL=r.registration.scope+'sw.js';r.env.location.href=r.registration.scope+'?sw';r.env.navigator.serviceWorker.controller=null;r.entry.mode='title';
+      await r.tick(1025);await r.task;assert.equal(r.outcome?.ok,true,prefix+'repaired '+kind+' rejected');assert.equal(r.timers.size,0,prefix+'identity timer cleanup');
+    }
+    const timed=fixture();let lateRelease;timed.setRead(()=>new Promise(r=>lateRelease=r));await flush();await timed.tick(61000);await timed.task;
+    assert.equal(timed.outcome?.ok,false,prefix+'shared60s deadline disappeared');assert.match(String(timed.outcome.error),/recording deadline: initial worker activation/,prefix+'wrong deadline');
+    const before=timed.reads;lateRelease(timed.registration);await flush();await timed.tick(61025);
+    assert.equal(timed.outcome.ok,false,prefix+'late resolution advanced');assert.equal(timed.reads,before,prefix+'observation after close');
+    assert.equal(timed.lateReads,0,prefix+'late snapshot gate read after deadline');assert.equal(timed.timers.size,0,prefix+'timed-out timer cleanup');
   }],
   ['audio-body-observer', async api => {
     const fixture = async mode => {
@@ -903,6 +969,7 @@ export const AUDIO_CHECKS = [
 // One semantic mutant per check: each must fail that check's own assertion.
 const MUTANTS = {
   'recordings-serving-policy': { servingSource: () => fs.readFileSync(path.join(ROOT, 'tools/serve.mjs'), 'utf8').replace("? 'no-cache' : 'no-store'", "? 'no-store' : 'no-store'") },
+  'recordings-worker-readiness': { recordingSource: () => fs.readFileSync(path.join(ROOT, 'tools/test-offline-upgrade.mjs'), 'utf8').replace('if(closed||at>=deadline)return false;', 'if(false)return false;') },
   'recordings-producer-process': { recordingSource: () => fs.readFileSync(path.join(ROOT, 'tools/test-offline-upgrade.mjs'), 'utf8').replace('setTimeout(()=>process.exit(1),5000)', 'setTimeout(()=>process.exit(0),5)') },
   'audio-body-observer': { fieldAdmissionProbe: () => {} },
   'audio-transport-observer': { observeAudioTransport: (...args) => { const r = observeAudioTransport(...args); Object.defineProperty(r, 'main', { configurable: true, get: () => null, set() {} }); return r; } },
