@@ -468,3 +468,234 @@ export function createQualifiedAtlasPayload(input, page) {
   };
   return payloadFreeze(api);
 }
+
+// Constructor-only lease foundation. No payload submission, native authenticity or retirement authority.
+const RendererWeakMap=WeakMap,rendererWeakGet=WeakMap.prototype.get,rendererWeakSet=WeakMap.prototype.set,
+  RendererAggregateError=AggregateError,rendererPrototypeTest=Object.prototype.isPrototypeOf,
+  rendererInteger=Number.isSafeInteger,rendererGetConsole=PayloadTHREE.getConsoleFunction,
+  rendererConstructor=PayloadTHREE.WebGLRenderer,rendererLeases=new RendererWeakMap();
+const rendererCanvasKeys=['getContext','width','height','setAttribute','addEventListener','removeEventListener'];
+const rendererQueryKeys=['getContextAttributes','getParameter','isContextLost','getError'];
+const rendererRefuse=message=>{throw new PayloadError('qualified atlas renderer: '+message);};
+function rendererChain(object){
+  const out=[];for(let p=object;p;p=payloadGetPrototype(p)){if(out.length===32)rendererRefuse('prototype chain limit');out.push(p);}return out;
+}
+function rendererSlot(object,key){return {object,key,...payloadDescriptor(object,key)};}
+function rendererSlotStable(slot){
+  const now=payloadDescriptor(slot.object,slot.key);
+  if(now.owner!==slot.owner||!payloadSameDescriptor(now.descriptor,slot.descriptor))rendererRefuse('binding ownership changed');
+}
+function rendererRead(slot){
+  const d=slot.descriptor;if(!d)return undefined;
+  if(payloadHasOwn(d,'value'))return d.value;
+  if(typeof d.get!=='function')return undefined;
+  return payloadApply(d.get,slot.object,[]);
+}
+function rendererHook(object){
+  const keys=payloadOwnKeys(object),descriptors=[];for(let i=0;i<keys.length;i++)descriptors.push(payloadGetDescriptor(object,keys[i]));
+  return {object,prototype:payloadGetPrototype(object),keys,descriptors};
+}
+function rendererHooksStable(hooks){
+  for(let i=0;i<hooks.length;i++){
+    const h=hooks[i],keys=payloadOwnKeys(h.object);
+    if(payloadGetPrototype(h.object)!==h.prototype||keys.length!==h.keys.length)rendererRefuse('constructor hook topology changed');
+    for(let j=0;j<keys.length;j++)if(keys[j]!==h.keys[j]||!payloadSameDescriptor(payloadGetDescriptor(h.object,keys[j]),h.descriptors[j]))
+      rendererRefuse('constructor hook ownership changed');
+  }
+}
+function rendererDataGraph(roots){
+  const seen=new Set(),hooks=[],visit=object=>{
+    if(!object||typeof object!=='object'||seen.has(object))return;
+    if(seen.size===128)rendererRefuse('constructor data graph limit');
+    seen.add(object);const h=rendererHook(object);hooks.push(h);
+    for(let i=0;i<h.keys.length;i++){
+      const d=h.descriptors[i];if(!payloadHasOwn(d,'value'))rendererRefuse('constructor data accessor unsupported');
+      if(d.value&&typeof d.value==='object')visit(d.value);
+    }
+  };for(let i=0;i<roots.length;i++)visit(roots[i]);return hooks;
+}
+function rendererDevtoolsAbsent(){
+  if(payloadDescriptor(globalThis,'__THREE_DEVTOOLS__').descriptor)rendererRefuse('devtools binding unsupported');
+  // Descriptor absence cannot reveal a global lexical binding. Stable trusted bootstrap is required.
+  if(typeof __THREE_DEVTOOLS__!=='undefined')rendererRefuse('devtools lexical binding unsupported');
+}
+const rendererBootstrap=(()=>{
+  const boot={available:false};
+  try{
+    rendererDevtoolsAbsent();
+    const intrinsicNames=['Object','Array','Function','String','Number','Boolean','Symbol','Math','Reflect','Promise',
+      'Map','Set','WeakMap','WeakSet','RegExp','Error','AggregateError','ArrayBuffer','Uint8Array','Float32Array','Int32Array','Uint32Array','parseFloat'];
+    boot.bindings=[];boot.hooks=[];const objects=new Set();
+    const add=object=>{if(object&&(typeof object==='object'||typeof object==='function')&&!objects.has(object)){objects.add(object);boot.hooks.push(rendererHook(object));}};
+    // Object and Array are checked first, before any mutable collection/iterator helpers.
+    for(let i=0;i<intrinsicNames.length;i++){
+      const slot=rendererSlot(globalThis,intrinsicNames[i]);boot.bindings.push(slot);
+      const value=rendererRead(slot);add(value);
+      const prototype=value&&payloadGetDescriptor(value,'prototype');if(prototype&&payloadHasOwn(prototype,'value'))add(prototype.value);
+    }
+    const arrayIterator=payloadApply(payloadGetDescriptor(Array.prototype,Symbol.iterator).value,[],[]),iteratorChain=rendererChain(payloadGetPrototype(arrayIterator));
+    for(let i=0;i<iteratorChain.length;i++)add(iteratorChain[i]);
+    const exported=payloadOwnKeys(PayloadTHREE);boot.threeFunctions=0;
+    for(let i=0;i<exported.length;i++){
+      const d=payloadGetDescriptor(PayloadTHREE,exported[i]);if(!d||typeof d.value!=='function')continue;
+      boot.threeFunctions++;add(d.value);const p=payloadGetDescriptor(d.value,'prototype');if(p&&payloadHasOwn(p,'value'))add(p.value);
+    }
+    const up=payloadGetDescriptor(PayloadTHREE.Object3D,'DEFAULT_UP');if(!up||!payloadHasOwn(up,'value'))rendererRefuse('default up unsupported');
+    boot.data=rendererDataGraph([up.value,PayloadTHREE.ColorManagement]);
+    const canvasSlot=rendererSlot(globalThis,'HTMLCanvasElement'),glSlot=rendererSlot(globalThis,'WebGL2RenderingContext');
+    boot.bindings.push(canvasSlot,glSlot);
+    // Absent DOM at module evaluation remains unavailable; late injected providers gain no authority.
+    if(!canvasSlot.descriptor||!glSlot.descriptor)return boot;
+    boot.Canvas=rendererRead(canvasSlot);boot.GL=rendererRead(glSlot);
+    if(typeof boot.Canvas!=='function'||typeof boot.GL!=='function')return boot;
+    const cp=payloadGetDescriptor(boot.Canvas,'prototype'),gp=payloadGetDescriptor(boot.GL,'prototype');
+    if(!cp||!gp||!payloadHasOwn(cp,'value')||!payloadHasOwn(gp,'value'))return boot;
+    boot.canvasPrototype=cp.value;boot.glPrototype=gp.value;
+    add(boot.Canvas);add(boot.GL);
+    boot.canvasChain=rendererChain(boot.canvasPrototype);boot.glChain=rendererChain(boot.glPrototype);
+    for(let i=0;i<boot.canvasChain.length;i++)add(boot.canvasChain[i]);
+    for(let i=0;i<boot.glChain.length;i++)add(boot.glChain[i]);
+    boot.canvasSlots=rendererCanvasKeys.map(key=>rendererSlot(boot.canvasPrototype,key));
+    for(let i=0;i<boot.canvasSlots.length;i++){
+      const s=boot.canvasSlots[i],d=s.descriptor;
+      if(!d)rendererRefuse('canvas API missing');
+      if(s.key==='width'||s.key==='height'){if(typeof d.get!=='function')rendererRefuse('canvas dimension getter required');}
+      else if(!payloadHasOwn(d,'value')||typeof d.value!=='function')rendererRefuse('canvas data method required');
+    }
+    boot.glSlots=rendererQueryKeys.map(key=>rendererSlot(boot.glPrototype,key));
+    for(let i=0;i<boot.glSlots.length;i++)if(typeof boot.glSlots[i].descriptor?.value!=='function')rendererRefuse('context query method missing');
+    for(const key of ['navigator','OffscreenCanvas','XRWebGLBinding','self','console']){
+      const slot=rendererSlot(globalThis,key);boot.bindings.push(slot);rendererSlotStable(slot);
+      const value=rendererRead(slot);boot.values??={};boot.values[key]=value;
+      if(key==='navigator'&&value){
+        const userAgent=rendererSlot(value,'userAgent');boot.bindings.push(userAgent);rendererSlotStable(userAgent);
+        boot.userAgent=rendererRead(userAgent);
+      }
+      if((key==='OffscreenCanvas'||key==='XRWebGLBinding')&&value){
+        add(value);const p=payloadGetDescriptor(value,'prototype');if(p&&payloadHasOwn(p,'value')){
+          add(p.value);if(key==='OffscreenCanvas')boot.bindings.push(rendererSlot(p.value,'getContext'));
+        }
+      }
+      if(key==='self'&&value)for(const name of ['requestAnimationFrame','cancelAnimationFrame'])boot.bindings.push(rendererSlot(value,name));
+      if(key==='console'&&value)for(const name of ['log','warn','error'])boot.bindings.push(rendererSlot(value,name));
+    }
+    if(payloadApply(rendererGetConsole,PayloadTHREE,[])!==null)return boot;
+    boot.available=true;return boot;
+  }catch{
+    // Unsupported bootstrap has no constructed resource or lease. Preserve legacy module importability.
+    return {available:false};
+  }
+})();
+function rendererBootstrapStable(readValues=true){
+  rendererDevtoolsAbsent();
+  const b=rendererBootstrap;if(!b.available)rendererRefuse('DOM/bootstrap unavailable');
+  rendererHooksStable(b.hooks);rendererHooksStable(b.data);
+  for(let i=0;i<b.bindings.length;i++)rendererSlotStable(b.bindings[i]);
+  if(payloadApply(rendererGetConsole,PayloadTHREE,[])!==null)rendererRefuse('private console callback unsupported');
+  if(readValues){
+  for(const key of ['navigator','OffscreenCanvas','XRWebGLBinding','self','console']){
+    const slot=b.bindings.find(s=>s.object===globalThis&&s.key===key);
+    if(!payloadIs(rendererRead(slot),b.values[key]))rendererRefuse('bootstrap value changed');
+  }
+  if(b.values.navigator){
+    const slot=b.bindings.find(s=>s.object===b.values.navigator&&s.key==='userAgent');
+    if(!payloadIs(rendererRead(slot),b.userAgent))rendererRefuse('user agent changed');
+  }
+  }
+  // Reading declared trusted global accessors is followed by a complete descriptor recheck.
+  rendererHooksStable(b.hooks);rendererHooksStable(b.data);
+  for(let i=0;i<b.bindings.length;i++)rendererSlotStable(b.bindings[i]);
+  rendererDevtoolsAbsent();
+  if(payloadApply(rendererGetConsole,PayloadTHREE,[])!==null)rendererRefuse('private console callback changed during bootstrap validation');
+}
+function rendererCanvasStable(canvas){
+  const b=rendererBootstrap;
+  if(!canvas||payloadGetPrototype(canvas)!==b.canvasPrototype)rendererRefuse('canvas realm/prototype unsupported');
+  for(let i=0;i<rendererCanvasKeys.length;i++)if(payloadGetDescriptor(canvas,rendererCanvasKeys[i]))rendererRefuse('canvas own shadow unsupported');
+  const chain=rendererChain(payloadGetPrototype(canvas));
+  if(chain.length!==b.canvasChain.length||chain.some((p,i)=>p!==b.canvasChain[i]))rendererRefuse('canvas prototype chain changed');
+  for(let i=0;i<b.canvasSlots.length;i++)rendererSlotStable(b.canvasSlots[i]);
+}
+function rendererDataMethod(object,key,slots){
+  const s=rendererSlot(object,key),d=s.descriptor;
+  if(s.owner!==object||!d||!payloadHasOwn(d,'value')||typeof d.value!=='function')rendererRefuse('own data method required: '+key);
+  slots.push(s);return d.value;
+}
+function rendererOwnValue(object,key,slots){
+  const s=rendererSlot(object,key),d=s.descriptor;
+  if(s.owner!==object||!d||!payloadHasOwn(d,'value'))rendererRefuse('own data value required: '+key);
+  slots.push(s);return d.value;
+}
+function rendererContextStable(record){
+  const b=rendererBootstrap,gl=record.gl;
+  if(!gl||payloadGetPrototype(gl)!==b.glPrototype)rendererRefuse('context realm/prototype unsupported');
+  for(let i=0;i<rendererQueryKeys.length;i++){
+    const key=rendererQueryKeys[i];if(payloadGetDescriptor(gl,key))rendererRefuse('context own query shadow unsupported');
+    const now=payloadDescriptor(gl,key),expected=b.glSlots[i];
+    if(now.owner!==expected.owner||!payloadSameDescriptor(now.descriptor,expected.descriptor))rendererRefuse('context query ownership changed');
+  }
+  for(let i=0;i<record.slots.length;i++)rendererSlotStable(record.slots[i]);
+}
+function rendererValidateRecord(record){
+  rendererBootstrapStable();rendererCanvasStable(record.canvas);rendererContextStable(record);
+  if(rendererOwnValue(record.renderer,'properties',[])!==record.properties)rendererRefuse('renderer properties epoch changed');
+  if(payloadApply(record.getContext,record.renderer,[])!==record.gl)rendererRefuse('renderer context changed');
+  if(payloadApply(record.has,record.properties,[record.sentinel])!==true)rendererRefuse('renderer cache epoch missing');
+  if(payloadApply(record.get,record.properties,[record.sentinel])!==record.sentinelRecord)rendererRefuse('renderer cache epoch changed');
+  if(payloadApply(record.isContextLost,record.gl,[])!==false)rendererRefuse('renderer context lost');
+  if(payloadApply(record.getError,record.gl,[])!==0)rendererRefuse('renderer context error');
+  // Complete accessor-bearing preflight BEFORE the final native health probes.
+  rendererBootstrapStable();rendererCanvasStable(record.canvas);rendererContextStable(record);
+  if(payloadApply(record.getError,record.gl,[])!==0)rendererRefuse('renderer context error after preflight');
+  if(payloadApply(record.isContextLost,record.gl,[])!==false)rendererRefuse('renderer context lost after query');
+  // No global/userAgent accessors after health probes: only inert descriptors and pinned private cache methods.
+  rendererBootstrapStable(false);rendererCanvasStable(record.canvas);rendererContextStable(record);
+  if(rendererOwnValue(record.renderer,'properties',[])!==record.properties
+    ||payloadApply(record.getContext,record.renderer,[])!==record.gl
+    ||payloadApply(record.has,record.properties,[record.sentinel])!==true
+    ||payloadApply(record.get,record.properties,[record.sentinel])!==record.sentinelRecord)rendererRefuse('renderer epoch changed during validation');
+  return record;
+}
+function validateQualifiedAtlasRendererLease(lease,expectedRenderer){
+  rendererBootstrapStable();
+  const record=payloadApply(rendererWeakGet,rendererLeases,[lease]);
+  if(!record||record.renderer!==expectedRenderer)rendererRefuse('unknown or mismatched renderer lease');
+  return rendererValidateRecord(record);
+}
+export function createQualifiedAtlasRenderer(canvas){
+  rendererBootstrapStable();rendererCanvasStable(canvas);
+  const b=rendererBootstrap,dimension=key=>payloadApply(b.canvasSlots.find(s=>s.key===key).descriptor.get,canvas,[]);
+  const width=dimension('width'),height=dimension('height');
+  if(!rendererInteger(width)||!rendererInteger(height)||width<0||height<0)rendererRefuse('canvas dimensions unsupported');
+  rendererBootstrapStable();rendererCanvasStable(canvas);
+  let renderer,dispose,first,failed=false;
+  try{
+    renderer=new rendererConstructor({canvas,antialias:false,powerPreference:'high-performance',stencil:false});
+    const slots=[];
+    // Capture the actual returned owner's disposer before any post-construction external check.
+    dispose=rendererDataMethod(renderer,'dispose',slots);
+    rendererBootstrapStable();rendererCanvasStable(canvas);
+    if(rendererOwnValue(renderer,'domElement',slots)!==canvas)rendererRefuse('renderer canvas mismatch');
+    const getContext=rendererDataMethod(renderer,'getContext',slots),initTexture=rendererDataMethod(renderer,'initTexture',slots),
+      properties=rendererOwnValue(renderer,'properties',slots),has=rendererDataMethod(properties,'has',slots),
+      get=rendererDataMethod(properties,'get',slots),propertiesDispose=rendererDataMethod(properties,'dispose',slots),
+      gl=payloadApply(getContext,renderer,[]),record={renderer,canvas,gl,properties,getContext,initTexture,has,get,propertiesDispose,dispose,slots};
+    rendererContextStable(record);
+    record.isContextLost=b.glSlots.find(s=>s.key==='isContextLost').descriptor.value;
+    record.getError=b.glSlots.find(s=>s.key==='getError').descriptor.value;
+    record.sentinel=payloadFreeze({});
+    if(payloadApply(has,properties,[record.sentinel])!==false)rendererRefuse('new cache sentinel exists');
+    record.sentinelRecord=payloadApply(get,properties,[record.sentinel]);
+    if(!record.sentinelRecord||typeof record.sentinelRecord!=='object')rendererRefuse('cache sentinel record missing');
+    rendererValidateRecord(record);
+    const lease=payloadFreeze({});
+    payloadApply(rendererWeakSet,rendererLeases,[lease,record]);
+    return payloadFreeze({renderer,lease});
+  }catch(error){failed=true;first=error;}
+  if(failed){
+    let cleanupFailed=false,cleanup;
+    if(renderer&&dispose)try{payloadApply(dispose,renderer,[]);}catch(error){cleanupFailed=true;cleanup=error;}
+    if(cleanupFailed)throw new RendererAggregateError([first,cleanup],'qualified atlas renderer: construction failed; cleanup uncertain',{cause:first});
+    throw first;
+  }
+}

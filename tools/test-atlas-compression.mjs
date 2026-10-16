@@ -419,3 +419,520 @@ if(process.argv.includes('--prove-fail')){
     assert(failure?.includes('AssertionError')&&!failure.includes('unique source seam')&&!failure.includes('ReferenceError'),name+' submission mutant must reach semantic assertion');}
   console.log(`QUALIFIED-SUBMISSION SOURCE MUTANTS OK (${mutants.length}/${mutants.length} intended semantic failures)`);
 }
+
+// Constructor-only source controls: actual pinned Three constructor; structural CPU context only.
+function rendererConstructionFixture(config={}){
+ const calls=[],contexts=[],canvases=[],dimensions=new WeakMap(),constants=new Map([['NO_ERROR',0]]);
+ let nextConstant=1,textureId=0,framebufferId=0,disposals=0;
+ const record=(name,args=[])=>{assert(calls.length<2000,'bounded actual-constructor fixture');calls.push({name,args});};
+ class GL{
+  getParameter(key){record('getParameter',[key]);if(config.onQuery)config.onQuery(this);if(key===this.VERSION)return 'WebGL 2.0';if(key===this.VIEWPORT||key===this.SCISSOR_BOX)return [0,0,64,64];return 16;}
+  getShaderPrecisionFormat(...args){record('getShaderPrecisionFormat',args);return {precision:23,rangeMin:127,rangeMax:127};}
+  getExtension(...args){record('getExtension',args);return null;}
+  getContextAttributes(){record('getContextAttributes');return {alpha:true,depth:true,stencil:false,antialias:false,premultipliedAlpha:true,preserveDrawingBuffer:false};}
+  createTexture(){record('createTexture');return {fixtureTexture:++textureId};}
+  createFramebuffer(){record('createFramebuffer');if(config.framebufferThrow)throw config.raw;return {fixtureFramebuffer:++framebufferId};}
+  isContextLost(){record('isContextLost');return config.lost===true;}
+  getError(){record('getError');if(config.queryThrow)throw config.raw;if(config.onError)config.onError(this);return config.error??0;}
+ }
+ for(const name of ['bindTexture','texParameteri','texImage2D','texImage3D','clearColor','clearDepth','clearStencil','enable','disable','depthFunc','frontFace','cullFace','blendEquation','blendFunc','blendFuncSeparate','blendEquationSeparate','viewport','scissor','activeTexture','deleteTexture','bindVertexArray','deleteVertexArray'])Object.defineProperty(GL.prototype,name,{value:function(...args){record(name,args);},writable:true,configurable:true});
+ Object.defineProperty(GL.prototype,'deleteFramebuffer',{value:function(...args){record('deleteFramebuffer',args);disposals++;if(config.cleanupThrow)throw config.cleanupRaw;},writable:true,configurable:true});
+ class Canvas{
+  constructor(){dimensions.set(this,{width:64,height:64});this.style={};this.listeners=new Map();canvases.push(this);const target=Object.assign(new GL(),{canvas:this,drawingBufferWidth:64,drawingBufferHeight:64});this.context=new Proxy(target,{get(object,key,receiver){if(key in object)return Reflect.get(object,key,receiver);if(typeof key==='string'&&/^[A-Z][A-Z0-9_]*$/.test(key)){if(!constants.has(key))constants.set(key,nextConstant++);return constants.get(key);}throw Error('unsupported fake GL access '+String(key));}});contexts.push(this.context);}
+  get width(){const d=dimensions.get(this);if(!d)throw new TypeError('canvas brand');return d.width;}
+  set width(value){const d=dimensions.get(this);if(!d)throw new TypeError('canvas brand');d.width=value;}
+  get height(){const d=dimensions.get(this);if(!d)throw new TypeError('canvas brand');return d.height;}
+  set height(value){const d=dimensions.get(this);if(!d)throw new TypeError('canvas brand');d.height=value;}
+  setAttribute(...args){record('canvas.setAttribute',args);}
+  addEventListener(name,fn){record('canvas.addEventListener',[name,fn]);assert(!this.listeners.has(name));this.listeners.set(name,fn);}
+  removeEventListener(name,fn){record('canvas.removeEventListener',[name,fn]);assert.equal(this.listeners.get(name),fn);if(config.cleanupThrow)throw config.cleanupRaw;this.listeners.delete(name);}
+  getContext(...args){record('canvas.getContext',args);if(config.contextThrow)throw config.raw;if(config.nullContext)return null;return this.context;}
+ }
+ return {Canvas,GL,calls,contexts,canvases,config,newCanvas:()=>new Canvas(),get framebufferDeletes(){return disposals;}};
+}
+function rendererConstructionScript(body,{beforeImport='',replacements=[]}={}){
+ return `import fs from'node:fs';import assert from'node:assert/strict';import vm from'node:vm';import * as THREE from'three';
+ assert(fs.readFileSync('vendor/three/build/three.module.js','utf8').includes(THREE.WebGLRenderer.toString()),'actual pinned shipping constructor');
+ const fixture=(${rendererConstructionFixture.toString()})(),savedGlobals=['HTMLCanvasElement','WebGL2RenderingContext'].map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]);
+ globalThis.HTMLCanvasElement=fixture.Canvas;globalThis.WebGL2RenderingContext=fixture.GL;
+ ${beforeImport}
+ let source=fs.readFileSync('src/units/atlas-compression.js','utf8');
+ for(const[from,to]of ${JSON.stringify(replacements)}){assert.equal(source.split(from).length,2,'unique renderer source seam');source=source.replace(from,to);}
+ for(const[from,to]of [["from 'three';",'from '+JSON.stringify(import.meta.resolve('three'))+';'],["from '../../vendor/three/examples/jsm/libs/ktx-parse.module.js';",'from '+JSON.stringify(new URL('./vendor/three/examples/jsm/libs/ktx-parse.module.js','file://'+process.cwd()+'/').href)+';']]){assert.equal(source.split(from).length,2);source=source.replace(from,to);}
+ globalThis.__rendererDisposeAttempts=0;
+ const disposalSeam='if(renderer&&dispose)try{payloadApply(dispose,renderer,[]);}';assert.equal(source.split(disposalSeam).length,2);source=source.replace(disposalSeam,'if(renderer&&dispose)try{globalThis.__rendererDisposeAttempts++;payloadApply(dispose,renderer,[]);}');
+ source+='\\nexport {validateQualifiedAtlasRendererLease as probeValidate,rendererBootstrap as probeBootstrap};\\n';
+ const mod=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64')),create=mod.createQualifiedAtlasRenderer,validate=mod.probeValidate;
+ const refused=fn=>{let threw=false,value;try{fn();}catch(e){threw=true;value=e;}assert(threw,'factory or lease must refuse');return value;};
+ try{${body}}finally{for(const[k,d]of savedGlobals){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k];assert.deepEqual(Object.getOwnPropertyDescriptor(globalThis,k),d);}}
+ `;
+}
+function runRendererConstruction(body,options={}){
+ return execFileSync('node',['--input-type=module','-e',rendererConstructionScript(body,options)],{cwd:new URL('..',import.meta.url),encoding:'utf8',timeout:15000,maxBuffer:1000000,stdio:['ignore','pipe','pipe']});
+}
+
+const rendererConstructionCases=[
+ {
+  "name": "positive",
+  "body": "assert.equal(mod.probeBootstrap.available,true,'supported structural bootstrap');\nassert.equal(mod.probeBootstrap.threeFunctions,224);\nconst canvas=fixture.newCanvas(),pair=create(canvas);\nassert(Object.isFrozen(pair));assert(Object.isFrozen(pair.lease));assert.deepEqual(Reflect.ownKeys(pair),['renderer','lease']);assert.deepEqual(Reflect.ownKeys(pair.lease),[]);\nconst record=validate(pair.lease,pair.renderer);assert.equal(record.renderer,pair.renderer);assert.equal(record.canvas,canvas);assert.equal(record.gl,canvas.context);\nassert.equal(canvas.listeners.size,3);\nassert.deepEqual(fixture.calls.find(c=>c.name==='canvas.getContext').args,['webgl2',{alpha:true,depth:true,stencil:false,antialias:false,premultipliedAlpha:true,preserveDrawingBuffer:false,powerPreference:'high-performance',failIfMajorPerformanceCaveat:false}]);\nassert.equal(fixture.calls.filter(c=>c.name==='createTexture').length,4);assert.equal(fixture.calls.filter(c=>c.name==='createFramebuffer').length,3);\nrefused(()=>validate({},pair.renderer));refused(()=>validate(Object.freeze({...pair.lease}),pair.renderer));refused(()=>validate(pair.lease,{}));\nconst other=create(fixture.newCanvas());refused(()=>validate(pair.lease,other.renderer));refused(()=>validate(other.lease,pair.renderer));assert.equal(validate(other.lease,other.renderer).renderer,other.renderer);\npair.renderer.dispose();assert.equal(canvas.listeners.size,0);refused(()=>validate(pair.lease,pair.renderer));other.renderer.dispose();assert.equal(fixture.canvases[1].listeners.size,0);\nconsole.log('RENDERER FOUNDATION POSITIVE');"
+ },
+ {
+  "name": "cache",
+  "body": "const pair=create(fixture.newCanvas()),p=pair.renderer.properties,has=p.has,get=p.get,record=validate(pair.lease,pair.renderer);p.dispose();assert.equal(p.has,has);assert.equal(p.get,get);assert(!has(record.sentinel));const error=refused(()=>validate(pair.lease,pair.renderer));assert(error.message.includes('cache epoch missing'));assert(!has(record.sentinel),'has-FIRST refusal must not recreate cache record');pair.renderer.dispose();"
+ },
+ {
+  "name": "restore",
+  "body": "const canvas=fixture.newCanvas(),pair=create(canvas),context=pair.renderer.getContext(),init=pair.renderer.initTexture,p=pair.renderer.properties,record=validate(pair.lease,pair.renderer);canvas.listeners.get('webglcontextlost')({preventDefault(){}});canvas.listeners.get('webglcontextrestored')({});assert.equal(pair.renderer.getContext(),context);assert.equal(pair.renderer.initTexture,init);assert.notEqual(pair.renderer.properties,p);assert(p.has(record.sentinel),'old cache witness survives restoration');refused(()=>validate(pair.lease,pair.renderer));pair.renderer.dispose();assert.equal(canvas.listeners.size,0);"
+ },
+ {
+  "name": "color",
+  "body": "const d=Object.getOwnPropertyDescriptor(THREE.ColorManagement,'colorSpaceToWorking');let calls=0;try{Object.defineProperty(THREE.ColorManagement,'colorSpaceToWorking',{...d,value:function(...a){calls++;return Reflect.apply(d.value,this,a);}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{Object.defineProperty(THREE.ColorManagement,'colorSpaceToWorking',d);assert.deepEqual(Object.getOwnPropertyDescriptor(THREE.ColorManagement,'colorSpaceToWorking'),d);}"
+ },
+ {
+  "name": "up",
+  "body": "const up=THREE.Object3D.DEFAULT_UP,d=Object.getOwnPropertyDescriptor(up,'x');let calls=0;try{Object.defineProperty(up,'x',{configurable:true,enumerable:d.enumerable,get(){calls++;return d.value;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{Object.defineProperty(up,'x',d);assert.deepEqual(Object.getOwnPropertyDescriptor(up,'x'),d);}"
+ },
+ {
+  "name": "console",
+  "body": "const original=THREE.getConsoleFunction();let calls=0;try{THREE.setConsoleFunction(()=>{calls++;});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{THREE.setConsoleFunction(original);assert.equal(THREE.getConsoleFunction(),original);}"
+ },
+ {
+  "name": "lateLoss",
+  "body": "fixture.config.onError=()=>{fixture.config.lost=true;};refused(()=>create(fixture.newCanvas()));assert(fixture.calls.some(c=>c.name==='getError'));assert.equal(fixture.canvases[0].listeners.size,0);assert.equal(globalThis.__rendererDisposeAttempts,1);"
+ },
+ {
+  "name": "ownGL",
+  "body": "const canvas=fixture.newCanvas(),original=fixture.GL.prototype.getParameter;let calls=0;Object.defineProperty(canvas.context,'getParameter',{configurable:true,value:function(...args){calls++;return Reflect.apply(original,this,args);}});try{refused(()=>create(canvas));assert(calls>0,'Three may invoke own query shadows before the post-constructor refusal');assert.equal(canvas.listeners.size,0);}finally{delete canvas.context.getParameter;}"
+ },
+ {
+  "name": "dual",
+  "body": "fixture.config.queryThrow=true;fixture.config.raw=0;fixture.config.cleanupThrow=true;fixture.config.cleanupRaw='';const error=refused(()=>create(fixture.newCanvas()));assert(error instanceof AggregateError);assert.deepEqual(error.errors,[0,'']);assert.equal(error.cause,0);assert.equal(globalThis.__rendererDisposeAttempts,1);assert.equal(fixture.canvases[0].listeners.size,3,'cleanup uncertainty retains listeners');"
+ },
+ {
+  "name": "devtools",
+  "body": "const d=Object.getOwnPropertyDescriptor(globalThis,'__THREE_DEVTOOLS__');let calls=0;try{Object.defineProperty(globalThis,'__THREE_DEVTOOLS__',{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{if(d)Object.defineProperty(globalThis,'__THREE_DEVTOOLS__',d);else delete globalThis.__THREE_DEVTOOLS__;assert.deepEqual(Object.getOwnPropertyDescriptor(globalThis,'__THREE_DEVTOOLS__'),d);}"
+ },
+ {
+  "name": "canvas-own-getContext",
+  "body": "const canvas=fixture.newCanvas();let calls=0;Object.defineProperty(canvas,\"getContext\",{configurable:true,get(){calls++;return undefined;}});try{refused(()=>create(canvas));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{delete canvas[\"getContext\"];}"
+ },
+ {
+  "name": "canvas-prototype-getContext",
+  "body": "const key=\"getContext\",d=Object.getOwnPropertyDescriptor(fixture.Canvas.prototype,key);let calls=0;try{Object.defineProperty(fixture.Canvas.prototype,key,{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{Object.defineProperty(fixture.Canvas.prototype,key,d);assert.deepEqual(Object.getOwnPropertyDescriptor(fixture.Canvas.prototype,key),d);}"
+ },
+ {
+  "name": "canvas-own-width",
+  "body": "const canvas=fixture.newCanvas();let calls=0;Object.defineProperty(canvas,\"width\",{configurable:true,get(){calls++;return undefined;}});try{refused(()=>create(canvas));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{delete canvas[\"width\"];}"
+ },
+ {
+  "name": "canvas-prototype-width",
+  "body": "const key=\"width\",d=Object.getOwnPropertyDescriptor(fixture.Canvas.prototype,key);let calls=0;try{Object.defineProperty(fixture.Canvas.prototype,key,{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{Object.defineProperty(fixture.Canvas.prototype,key,d);assert.deepEqual(Object.getOwnPropertyDescriptor(fixture.Canvas.prototype,key),d);}"
+ },
+ {
+  "name": "canvas-own-height",
+  "body": "const canvas=fixture.newCanvas();let calls=0;Object.defineProperty(canvas,\"height\",{configurable:true,get(){calls++;return undefined;}});try{refused(()=>create(canvas));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{delete canvas[\"height\"];}"
+ },
+ {
+  "name": "canvas-prototype-height",
+  "body": "const key=\"height\",d=Object.getOwnPropertyDescriptor(fixture.Canvas.prototype,key);let calls=0;try{Object.defineProperty(fixture.Canvas.prototype,key,{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{Object.defineProperty(fixture.Canvas.prototype,key,d);assert.deepEqual(Object.getOwnPropertyDescriptor(fixture.Canvas.prototype,key),d);}"
+ },
+ {
+  "name": "canvas-own-setAttribute",
+  "body": "const canvas=fixture.newCanvas();let calls=0;Object.defineProperty(canvas,\"setAttribute\",{configurable:true,get(){calls++;return undefined;}});try{refused(()=>create(canvas));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{delete canvas[\"setAttribute\"];}"
+ },
+ {
+  "name": "canvas-prototype-setAttribute",
+  "body": "const key=\"setAttribute\",d=Object.getOwnPropertyDescriptor(fixture.Canvas.prototype,key);let calls=0;try{Object.defineProperty(fixture.Canvas.prototype,key,{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{Object.defineProperty(fixture.Canvas.prototype,key,d);assert.deepEqual(Object.getOwnPropertyDescriptor(fixture.Canvas.prototype,key),d);}"
+ },
+ {
+  "name": "canvas-own-addEventListener",
+  "body": "const canvas=fixture.newCanvas();let calls=0;Object.defineProperty(canvas,\"addEventListener\",{configurable:true,get(){calls++;return undefined;}});try{refused(()=>create(canvas));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{delete canvas[\"addEventListener\"];}"
+ },
+ {
+  "name": "canvas-prototype-addEventListener",
+  "body": "const key=\"addEventListener\",d=Object.getOwnPropertyDescriptor(fixture.Canvas.prototype,key);let calls=0;try{Object.defineProperty(fixture.Canvas.prototype,key,{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{Object.defineProperty(fixture.Canvas.prototype,key,d);assert.deepEqual(Object.getOwnPropertyDescriptor(fixture.Canvas.prototype,key),d);}"
+ },
+ {
+  "name": "canvas-own-removeEventListener",
+  "body": "const canvas=fixture.newCanvas();let calls=0;Object.defineProperty(canvas,\"removeEventListener\",{configurable:true,get(){calls++;return undefined;}});try{refused(()=>create(canvas));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{delete canvas[\"removeEventListener\"];}"
+ },
+ {
+  "name": "canvas-prototype-removeEventListener",
+  "body": "const key=\"removeEventListener\",d=Object.getOwnPropertyDescriptor(fixture.Canvas.prototype,key);let calls=0;try{Object.defineProperty(fixture.Canvas.prototype,key,{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{Object.defineProperty(fixture.Canvas.prototype,key,d);assert.deepEqual(Object.getOwnPropertyDescriptor(fixture.Canvas.prototype,key),d);}"
+ },
+ {
+  "name": "canvas-forged-brand",
+  "body": "const error=refused(()=>create(Object.create(fixture.Canvas.prototype)));assert(error instanceof TypeError);assert.equal(fixture.calls.length,0);"
+ },
+ {
+  "name": "canvas-subclass",
+  "body": "class Sub extends fixture.Canvas{};refused(()=>create(new Sub()));assert.equal(fixture.calls.length,0);"
+ },
+ {
+  "name": "canvas-cross-realm",
+  "body": "const Other=vm.runInNewContext('(class Canvas {})');refused(()=>create(new Other()));assert.equal(fixture.calls.length,0);"
+ },
+ {
+  "name": "bootstrap-missing-late-dom",
+  "options": {
+   "beforeImport": "delete globalThis.HTMLCanvasElement;delete globalThis.WebGL2RenderingContext;"
+  },
+  "body": "assert.equal(mod.probeBootstrap.available,false);globalThis.HTMLCanvasElement=fixture.Canvas;globalThis.WebGL2RenderingContext=fixture.GL;refused(()=>create(fixture.newCanvas()));assert.equal(fixture.calls.length,0);"
+ },
+ {
+  "name": "devtools-inherited",
+  "body": "const d=Object.getOwnPropertyDescriptor(Object.prototype,'__THREE_DEVTOOLS__');let calls=0;try{Object.defineProperty(Object.prototype,'__THREE_DEVTOOLS__',{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{if(d)Object.defineProperty(Object.prototype,'__THREE_DEVTOOLS__',d);else delete Object.prototype.__THREE_DEVTOOLS__;assert.deepEqual(Object.getOwnPropertyDescriptor(Object.prototype,'__THREE_DEVTOOLS__'),d);}"
+ },
+ {
+  "name": "devtools-lexical",
+  "body": "vm.runInThisContext('let __THREE_DEVTOOLS__ = {}');assert.equal(Object.getOwnPropertyDescriptor(globalThis,'__THREE_DEVTOOLS__'),undefined);refused(()=>create(fixture.newCanvas()));assert.equal(fixture.calls.length,0);"
+ },
+ {
+  "name": "devtools-lexical-tdz",
+  "body": "try{vm.runInThisContext('let __THREE_DEVTOOLS__ = (()=>{throw 0})()');}catch(e){assert.equal(e,0);}const error=refused(()=>create(fixture.newCanvas()));assert(error instanceof ReferenceError);assert.equal(fixture.calls.length,0);"
+ },
+ {
+  "name": "global-binding-navigator",
+  "body": "const key=\"navigator\",d=Object.getOwnPropertyDescriptor(globalThis,key);let calls=0;try{Object.defineProperty(globalThis,key,{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{if(d)Object.defineProperty(globalThis,key,d);else delete globalThis[key];assert.deepEqual(Object.getOwnPropertyDescriptor(globalThis,key),d);}"
+ },
+ {
+  "name": "global-binding-OffscreenCanvas",
+  "body": "const key=\"OffscreenCanvas\",d=Object.getOwnPropertyDescriptor(globalThis,key);let calls=0;try{Object.defineProperty(globalThis,key,{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{if(d)Object.defineProperty(globalThis,key,d);else delete globalThis[key];assert.deepEqual(Object.getOwnPropertyDescriptor(globalThis,key),d);}"
+ },
+ {
+  "name": "global-binding-XRWebGLBinding",
+  "body": "const key=\"XRWebGLBinding\",d=Object.getOwnPropertyDescriptor(globalThis,key);let calls=0;try{Object.defineProperty(globalThis,key,{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{if(d)Object.defineProperty(globalThis,key,d);else delete globalThis[key];assert.deepEqual(Object.getOwnPropertyDescriptor(globalThis,key),d);}"
+ },
+ {
+  "name": "global-binding-self",
+  "body": "const key=\"self\",d=Object.getOwnPropertyDescriptor(globalThis,key);let calls=0;try{Object.defineProperty(globalThis,key,{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{if(d)Object.defineProperty(globalThis,key,d);else delete globalThis[key];assert.deepEqual(Object.getOwnPropertyDescriptor(globalThis,key),d);}"
+ },
+ {
+  "name": "global-binding-console",
+  "body": "const key=\"console\",d=Object.getOwnPropertyDescriptor(globalThis,key);let calls=0;try{Object.defineProperty(globalThis,key,{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{if(d)Object.defineProperty(globalThis,key,d);else delete globalThis[key];assert.deepEqual(Object.getOwnPropertyDescriptor(globalThis,key),d);}"
+ },
+ {
+  "name": "global-binding-parseFloat",
+  "body": "const key=\"parseFloat\",d=Object.getOwnPropertyDescriptor(globalThis,key);let calls=0;try{Object.defineProperty(globalThis,key,{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{if(d)Object.defineProperty(globalThis,key,d);else delete globalThis[key];assert.deepEqual(Object.getOwnPropertyDescriptor(globalThis,key),d);}"
+ },
+ {
+  "name": "global-binding-HTMLCanvasElement",
+  "body": "const key=\"HTMLCanvasElement\",d=Object.getOwnPropertyDescriptor(globalThis,key);let calls=0;try{Object.defineProperty(globalThis,key,{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{if(d)Object.defineProperty(globalThis,key,d);else delete globalThis[key];assert.deepEqual(Object.getOwnPropertyDescriptor(globalThis,key),d);}"
+ },
+ {
+  "name": "global-binding-WebGL2RenderingContext",
+  "body": "const key=\"WebGL2RenderingContext\",d=Object.getOwnPropertyDescriptor(globalThis,key);let calls=0;try{Object.defineProperty(globalThis,key,{configurable:true,get(){calls++;return undefined;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{if(d)Object.defineProperty(globalThis,key,d);else delete globalThis[key];assert.deepEqual(Object.getOwnPropertyDescriptor(globalThis,key),d);}"
+ },
+ {
+  "name": "parseFloat-forwarding",
+  "body": "const d=Object.getOwnPropertyDescriptor(globalThis,'parseFloat');let calls=0;try{Object.defineProperty(globalThis,'parseFloat',{...d,value:function(...args){calls++;return Reflect.apply(d.value,this,args);}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{Object.defineProperty(globalThis,'parseFloat',d);}"
+ },
+ {
+  "name": "user-agent-shadow",
+  "body": "const nav=globalThis.navigator,d=Object.getOwnPropertyDescriptor(nav,'userAgent');let calls=0;try{Object.defineProperty(nav,'userAgent',{configurable:true,get(){calls++;return 'fixture';}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{if(d)Object.defineProperty(nav,'userAgent',d);else delete nav.userAgent;assert.deepEqual(Object.getOwnPropertyDescriptor(nav,'userAgent'),d);}"
+ },
+ {
+  "name": "color-data-primaries",
+  "body": "const target=THREE.ColorManagement.spaces[THREE.LinearSRGBColorSpace].primaries,d=Object.getOwnPropertyDescriptor(target,'0');let calls=0;try{Object.defineProperty(target,'0',{configurable:true,enumerable:true,get(){calls++;return d.value;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{Object.defineProperty(target,'0',d);assert.deepEqual(Object.getOwnPropertyDescriptor(target,'0'),d);}"
+ },
+ {
+  "name": "color-data-matrix",
+  "body": "const target=THREE.ColorManagement.spaces[THREE.LinearSRGBColorSpace].toXYZ.elements,d=Object.getOwnPropertyDescriptor(target,'0');let calls=0;try{Object.defineProperty(target,'0',{configurable:true,enumerable:true,get(){calls++;return d.value;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{Object.defineProperty(target,'0',d);assert.deepEqual(Object.getOwnPropertyDescriptor(target,'0'),d);}"
+ },
+ {
+  "name": "gl-prototype-query-shadow",
+  "body": "const d=Object.getOwnPropertyDescriptor(fixture.GL.prototype,'getParameter');let calls=0;try{Object.defineProperty(fixture.GL.prototype,'getParameter',{configurable:true,get(){calls++;return d.value;}});refused(()=>create(fixture.newCanvas()));assert.equal(calls,0);assert.equal(fixture.calls.length,0);}finally{Object.defineProperty(fixture.GL.prototype,'getParameter',d);}"
+ },
+ {
+  "name": "gl-own-query-getter",
+  "body": "const canvas=fixture.newCanvas(),original=fixture.GL.prototype.getParameter;let calls=0;try{Object.defineProperty(canvas.context,'getParameter',{configurable:true,get(){calls++;return original;}});refused(()=>create(canvas));assert(calls>0,'actual Three may read own queries before postcheck');assert.equal(canvas.listeners.size,0);}finally{delete canvas.context.getParameter;}"
+ },
+ {
+  "name": "renderer-drift-getContext",
+  "body": "const pair=create(fixture.newCanvas()),key=\"getContext\",d=Object.getOwnPropertyDescriptor(pair.renderer,key);let calls=0;try{Object.defineProperty(pair.renderer,key,{...d,value:function(){calls++;return d.value;} });refused(()=>validate(pair.lease,pair.renderer));assert.equal(calls,0);}finally{Object.defineProperty(pair.renderer,key,d);pair.renderer.dispose();}"
+ },
+ {
+  "name": "renderer-drift-initTexture",
+  "body": "const pair=create(fixture.newCanvas()),key=\"initTexture\",d=Object.getOwnPropertyDescriptor(pair.renderer,key);let calls=0;try{Object.defineProperty(pair.renderer,key,{...d,value:function(){calls++;return d.value;} });refused(()=>validate(pair.lease,pair.renderer));assert.equal(calls,0);}finally{Object.defineProperty(pair.renderer,key,d);pair.renderer.dispose();}"
+ },
+ {
+  "name": "renderer-drift-properties",
+  "body": "const pair=create(fixture.newCanvas()),key=\"properties\",d=Object.getOwnPropertyDescriptor(pair.renderer,key);let calls=0;try{Object.defineProperty(pair.renderer,key,{...d,value:{has(){calls++;return true;},get(){calls++;return {};}} });refused(()=>validate(pair.lease,pair.renderer));assert.equal(calls,0);}finally{Object.defineProperty(pair.renderer,key,d);pair.renderer.dispose();}"
+ },
+ {
+  "name": "properties-drift-has",
+  "body": "const pair=create(fixture.newCanvas()),p=pair.renderer.properties,key=\"has\",d=Object.getOwnPropertyDescriptor(p,key);let calls=0;try{Object.defineProperty(p,key,{...d,value:function(){calls++;return undefined;}});refused(()=>validate(pair.lease,pair.renderer));assert.equal(calls,0);}finally{Object.defineProperty(p,key,d);pair.renderer.dispose();}"
+ },
+ {
+  "name": "properties-drift-get",
+  "body": "const pair=create(fixture.newCanvas()),p=pair.renderer.properties,key=\"get\",d=Object.getOwnPropertyDescriptor(p,key);let calls=0;try{Object.defineProperty(p,key,{...d,value:function(){calls++;return undefined;}});refused(()=>validate(pair.lease,pair.renderer));assert.equal(calls,0);}finally{Object.defineProperty(p,key,d);pair.renderer.dispose();}"
+ },
+ {
+  "name": "properties-drift-dispose",
+  "body": "const pair=create(fixture.newCanvas()),p=pair.renderer.properties,key=\"dispose\",d=Object.getOwnPropertyDescriptor(p,key);let calls=0;try{Object.defineProperty(p,key,{...d,value:function(){calls++;return undefined;}});refused(()=>validate(pair.lease,pair.renderer));assert.equal(calls,0);}finally{Object.defineProperty(p,key,d);pair.renderer.dispose();}"
+ },
+ {
+  "name": "query-raw-undefined",
+  "body": "fixture.config.queryThrow=true;fixture.config.raw=undefined;const error=refused(()=>create(fixture.newCanvas()));assert.equal(error,undefined);assert.equal(globalThis.__rendererDisposeAttempts,1);assert.equal(fixture.canvases[0].listeners.size,0);"
+ },
+ {
+  "name": "constructor-raw-undefined",
+  "body": "fixture.config.contextThrow=true;fixture.config.raw=undefined;const error=refused(()=>create(fixture.newCanvas()));assert(error instanceof TypeError);assert.equal(globalThis.__rendererDisposeAttempts,0);assert.equal(fixture.canvases[0].listeners.size,0);"
+ },
+ {
+  "name": "query-raw-null",
+  "body": "fixture.config.queryThrow=true;fixture.config.raw=null;const error=refused(()=>create(fixture.newCanvas()));assert.equal(error,null);assert.equal(globalThis.__rendererDisposeAttempts,1);assert.equal(fixture.canvases[0].listeners.size,0);"
+ },
+ {
+  "name": "constructor-raw-null",
+  "body": "fixture.config.contextThrow=true;fixture.config.raw=null;const error=refused(()=>create(fixture.newCanvas()));assert(error instanceof TypeError);assert.equal(globalThis.__rendererDisposeAttempts,0);assert.equal(fixture.canvases[0].listeners.size,0);"
+ },
+ {
+  "name": "query-raw-0",
+  "body": "fixture.config.queryThrow=true;fixture.config.raw=0;const error=refused(()=>create(fixture.newCanvas()));assert.equal(error,0);assert.equal(globalThis.__rendererDisposeAttempts,1);assert.equal(fixture.canvases[0].listeners.size,0);"
+ },
+ {
+  "name": "constructor-raw-0",
+  "body": "fixture.config.contextThrow=true;fixture.config.raw=0;const error=refused(()=>create(fixture.newCanvas()));assert.equal(error,0);assert.equal(globalThis.__rendererDisposeAttempts,0);assert.equal(fixture.canvases[0].listeners.size,0);"
+ },
+ {
+  "name": "query-raw-false",
+  "body": "fixture.config.queryThrow=true;fixture.config.raw=false;const error=refused(()=>create(fixture.newCanvas()));assert.equal(error,false);assert.equal(globalThis.__rendererDisposeAttempts,1);assert.equal(fixture.canvases[0].listeners.size,0);"
+ },
+ {
+  "name": "constructor-raw-false",
+  "body": "fixture.config.contextThrow=true;fixture.config.raw=false;const error=refused(()=>create(fixture.newCanvas()));assert.equal(error,false);assert.equal(globalThis.__rendererDisposeAttempts,0);assert.equal(fixture.canvases[0].listeners.size,0);"
+ },
+ {
+  "name": "query-raw-''",
+  "body": "fixture.config.queryThrow=true;fixture.config.raw='';const error=refused(()=>create(fixture.newCanvas()));assert.equal(error,'');assert.equal(globalThis.__rendererDisposeAttempts,1);assert.equal(fixture.canvases[0].listeners.size,0);"
+ },
+ {
+  "name": "constructor-raw-''",
+  "body": "fixture.config.contextThrow=true;fixture.config.raw='';const error=refused(()=>create(fixture.newCanvas()));assert.equal(error,'');assert.equal(globalThis.__rendererDisposeAttempts,0);assert.equal(fixture.canvases[0].listeners.size,0);"
+ },
+ {
+  "name": "constructor-partial-framebuffer",
+  "body": "fixture.config.framebufferThrow=true;fixture.config.raw=0;assert.equal(refused(()=>create(fixture.newCanvas())),0);assert.equal(globalThis.__rendererDisposeAttempts,0);assert.equal(fixture.calls.filter(c=>c.name==='createTexture').length,4);assert.equal(fixture.calls.filter(c=>c.name==='deleteTexture').length,0);assert.equal(fixture.framebufferDeletes,0);assert.equal(fixture.canvases[0].listeners.size,0);"
+ },
+ {
+  "name": "constructor-null-context",
+  "body": "fixture.config.nullContext=true;const error=refused(()=>create(fixture.newCanvas()));assert(error instanceof Error);assert.equal(fixture.calls.filter(c=>c.name==='canvas.getContext').length,2);assert.equal(globalThis.__rendererDisposeAttempts,0);assert.equal(fixture.canvases[0].listeners.size,0);"
+ },
+ {
+  "name": "query-error",
+  "body": "fixture.config.error=1280;refused(()=>create(fixture.newCanvas()));assert.equal(globalThis.__rendererDisposeAttempts,1);assert.equal(fixture.canvases[0].listeners.size,0);"
+ },
+ {
+  "name": "query-already-lost",
+  "body": "fixture.config.lost=true;refused(()=>create(fixture.newCanvas()));assert.equal(globalThis.__rendererDisposeAttempts,1);assert.equal(fixture.canvases[0].listeners.size,0);"
+ },
+ {
+  "name": "late-accessor-console",
+  "options": {
+   "beforeImport": "const originalNavigator=Object.getOwnPropertyDescriptor(globalThis,'navigator'),originalConsole=THREE.getConsoleFunction(),late={armed:false,fired:0,foreignCalls:0,action:'none'};\nObject.defineProperty(globalThis,'navigator',{configurable:true,value:{get userAgent(){if(late.armed){late.armed=false;late.fired++;if(late.action==='console')THREE.setConsoleFunction(()=>late.foreignCalls++);if(late.action==='loss')fixture.config.lost=true;if(late.action==='error')fixture.config.error=1280;}return 'constructor fixture';}}});"
+  },
+  "body": "try{late.action=\"console\";fixture.config.onError=()=>{late.armed=true;};refused(()=>create(fixture.newCanvas()));assert(late.fired>0);assert.equal(late.foreignCalls,0);assert.equal(globalThis.__rendererDisposeAttempts,1);assert.equal(fixture.canvases[0].listeners.size,0);}finally{THREE.setConsoleFunction(originalConsole);if(originalNavigator)Object.defineProperty(globalThis,'navigator',originalNavigator);else delete globalThis.navigator;}"
+ },
+ {
+  "name": "late-accessor-loss",
+  "options": {
+   "beforeImport": "const originalNavigator=Object.getOwnPropertyDescriptor(globalThis,'navigator'),originalConsole=THREE.getConsoleFunction(),late={armed:false,fired:0,foreignCalls:0,action:'none'};\nObject.defineProperty(globalThis,'navigator',{configurable:true,value:{get userAgent(){if(late.armed){late.armed=false;late.fired++;if(late.action==='console')THREE.setConsoleFunction(()=>late.foreignCalls++);if(late.action==='loss')fixture.config.lost=true;if(late.action==='error')fixture.config.error=1280;}return 'constructor fixture';}}});"
+  },
+  "body": "try{late.action=\"loss\";fixture.config.onError=()=>{late.armed=true;};refused(()=>create(fixture.newCanvas()));assert(late.fired>0);assert.equal(late.foreignCalls,0);assert.equal(globalThis.__rendererDisposeAttempts,1);assert.equal(fixture.canvases[0].listeners.size,0);}finally{THREE.setConsoleFunction(originalConsole);if(originalNavigator)Object.defineProperty(globalThis,'navigator',originalNavigator);else delete globalThis.navigator;}"
+ },
+ {
+  "name": "late-accessor-error",
+  "options": {
+   "beforeImport": "const originalNavigator=Object.getOwnPropertyDescriptor(globalThis,'navigator'),originalConsole=THREE.getConsoleFunction(),late={armed:false,fired:0,foreignCalls:0,action:'none'};\nObject.defineProperty(globalThis,'navigator',{configurable:true,value:{get userAgent(){if(late.armed){late.armed=false;late.fired++;if(late.action==='console')THREE.setConsoleFunction(()=>late.foreignCalls++);if(late.action==='loss')fixture.config.lost=true;if(late.action==='error')fixture.config.error=1280;}return 'constructor fixture';}}});"
+  },
+  "body": "try{late.action=\"error\";fixture.config.onError=()=>{late.armed=true;};refused(()=>create(fixture.newCanvas()));assert(late.fired>0);assert.equal(late.foreignCalls,0);assert.equal(globalThis.__rendererDisposeAttempts,1);assert.equal(fixture.canvases[0].listeners.size,0);}finally{THREE.setConsoleFunction(originalConsole);if(originalNavigator)Object.defineProperty(globalThis,'navigator',originalNavigator);else delete globalThis.navigator;}"
+ },
+ {
+  "name": "no-accessors-after-final-health",
+  "options": {
+   "beforeImport": "const originalNavigator=Object.getOwnPropertyDescriptor(globalThis,'navigator'),late={armed:false,queries:0,lateEffects:0};Object.defineProperty(globalThis,'navigator',{configurable:true,value:{get userAgent(){if(late.armed){late.armed=false;if(late.queries===2){late.lateEffects++;fixture.config.lost=true;}}return 'constructor fixture';}}});"
+  },
+  "body": "try{fixture.config.onError=()=>{late.queries++;late.armed=true;};const pair=create(fixture.newCanvas());assert.equal(late.queries,2);assert.equal(late.lateEffects,0,'no accessor callback after final health probes');assert.equal(fixture.config.lost??false,false);pair.renderer.dispose();}finally{if(originalNavigator)Object.defineProperty(globalThis,'navigator',originalNavigator);else delete globalThis.navigator;}"
+ },
+ {
+  "name": "late-accessor-preconstructor-console",
+  "options": {
+   "beforeImport": "const originalNavigator=Object.getOwnPropertyDescriptor(globalThis,'navigator'),originalConsole=THREE.getConsoleFunction(),late={reads:0,foreignCalls:0};Object.defineProperty(globalThis,'navigator',{configurable:true,value:{get userAgent(){late.reads++;if(late.reads===3)THREE.setConsoleFunction(()=>late.foreignCalls++);return 'constructor fixture';}}});"
+  },
+  "body": "try{fixture.config.nullContext=true;refused(()=>create(fixture.newCanvas()));assert.equal(late.foreignCalls,0);assert.equal(fixture.calls.length,0,'private console side effect must be caught before actual constructor');}finally{THREE.setConsoleFunction(originalConsole);if(originalNavigator)Object.defineProperty(globalThis,'navigator',originalNavigator);else delete globalThis.navigator;}"
+ },
+ {
+  "name": "array-iterator-next",
+  "body": "const prototype=Object.getPrototypeOf([][Symbol.iterator]()),d=Object.getOwnPropertyDescriptor(prototype,'next');let calls=0,threw=false,caught,observed,glCalls;const canvas=fixture.newCanvas();try{Object.defineProperty(prototype,'next',{...d,value:function(...args){calls++;return Reflect.apply(d.value,this,args);}});try{create(canvas);}catch(e){threw=true;caught=e;}observed=calls;glCalls=fixture.calls.length;}finally{Object.defineProperty(prototype,'next',d);}assert.deepEqual(Object.getOwnPropertyDescriptor(prototype,'next'),d);assert(threw,'iterator drift refuses before construction');assert.equal(observed,0);assert.equal(glCalls,0);"
+ }
+];
+const rendererConstructionMutants=[
+ {
+  "name": "renderer-binding",
+  "caseName": "positive",
+  "replacements": [
+   [
+    "if(!record||record.renderer!==expectedRenderer)",
+    "if(!record)"
+   ]
+  ]
+ },
+ {
+  "name": "cache-witness",
+  "caseName": "cache",
+  "replacements": [
+   [
+    "  if(payloadApply(record.has,record.properties,[record.sentinel])!==true)rendererRefuse('renderer cache epoch missing');",
+    ""
+   ],
+   [
+    "  if(payloadApply(record.get,record.properties,[record.sentinel])!==record.sentinelRecord)rendererRefuse('renderer cache epoch changed');",
+    ""
+   ],
+   [
+    "  if(rendererOwnValue(record.renderer,'properties',[])!==record.properties\n    ||payloadApply(record.getContext,record.renderer,[])!==record.gl\n    ||payloadApply(record.has,record.properties,[record.sentinel])!==true\n    ||payloadApply(record.get,record.properties,[record.sentinel])!==record.sentinelRecord)rendererRefuse('renderer epoch changed during validation');",
+    "  if(false)rendererRefuse('renderer epoch changed during validation');"
+   ]
+  ]
+ },
+ {
+  "name": "restoration-properties",
+  "caseName": "restore",
+  "replacements": [
+   [
+    "  if(rendererOwnValue(record.renderer,'properties',[])!==record.properties)rendererRefuse('renderer properties epoch changed');",
+    ""
+   ],
+   [
+    "for(let i=0;i<record.slots.length;i++)rendererSlotStable(record.slots[i]);",
+    "for(let i=0;i<record.slots.length;i++)if(record.slots[i].key!=='properties')rendererSlotStable(record.slots[i]);"
+   ],
+   [
+    "rendererOwnValue(record.renderer,'properties',[])!==record.properties",
+    "false"
+   ]
+  ]
+ },
+ {
+  "name": "color-management",
+  "caseName": "color",
+  "replacements": [
+   [
+    "function rendererHooksStable(hooks){",
+    "function rendererHooksStable(hooks){if(hooks===rendererBootstrap.data)return;"
+   ]
+  ]
+ },
+ {
+  "name": "default-up",
+  "caseName": "up",
+  "replacements": [
+   [
+    "rendererDataGraph([up.value,PayloadTHREE.ColorManagement])",
+    "rendererDataGraph([PayloadTHREE.ColorManagement])"
+   ]
+  ]
+ },
+ {
+  "name": "private-console",
+  "caseName": "console",
+  "replacements": [
+   [
+    "rendererGetConsole=PayloadTHREE.getConsoleFunction,",
+    "rendererGetConsole=()=>null,"
+   ]
+  ]
+ },
+ {
+  "name": "last-health",
+  "caseName": "lateLoss",
+  "replacements": [
+   [
+    "if(payloadApply(record.isContextLost,record.gl,[])!==false)rendererRefuse('renderer context lost after query');",
+    "void 0;"
+   ]
+  ]
+ },
+ {
+  "name": "own-context-query",
+  "caseName": "ownGL",
+  "replacements": [
+   [
+    "    const key=rendererQueryKeys[i];if(payloadGetDescriptor(gl,key))rendererRefuse('context own query shadow unsupported');\n    const now=payloadDescriptor(gl,key),expected=b.glSlots[i];\n    if(now.owner!==expected.owner||!payloadSameDescriptor(now.descriptor,expected.descriptor))rendererRefuse('context query ownership changed');",
+    "    void rendererQueryKeys[i];"
+   ]
+  ]
+ },
+ {
+  "name": "first-cleanup-failure",
+  "caseName": "dual",
+  "replacements": [
+   [
+    "if(cleanupFailed)throw new RendererAggregateError([first,cleanup],'qualified atlas renderer: construction failed; cleanup uncertain',{cause:first});",
+    "if(cleanupFailed)throw cleanup;"
+   ]
+  ]
+ },
+ {
+  "name": "devtools-descriptor",
+  "caseName": "devtools",
+  "replacements": [
+   [
+    "if(payloadDescriptor(globalThis,'__THREE_DEVTOOLS__').descriptor)rendererRefuse('devtools binding unsupported');",
+    "void 0;"
+   ]
+  ]
+ },
+ {
+  "name": "parse-float",
+  "caseName": "parseFloat-forwarding",
+  "replacements": [
+   [
+    ",'parseFloat'];",
+    "];"
+   ]
+  ]
+ },
+ {
+  "name": "post-health-accessor",
+  "caseName": "no-accessors-after-final-health",
+  "replacements": [
+   [
+    "rendererBootstrapStable(false);rendererCanvasStable(record.canvas);rendererContextStable(record);",
+    "rendererBootstrapStable();rendererCanvasStable(record.canvas);rendererContextStable(record);"
+   ]
+  ]
+ },
+ {
+  "name": "late-private-console",
+  "caseName": "late-accessor-preconstructor-console",
+  "replacements": [
+   [
+    "if(payloadApply(rendererGetConsole,PayloadTHREE,[])!==null)rendererRefuse('private console callback changed during bootstrap validation');",
+    "void 0;"
+   ]
+  ]
+ },
+ {
+  "name": "array-iterator-hook",
+  "caseName": "array-iterator-next",
+  "replacements": [
+   [
+    "    for(let i=0;i<iteratorChain.length;i++)add(iteratorChain[i]);",
+    "    void iteratorChain;"
+   ]
+  ]
+ }
+];
+for(const c of rendererConstructionCases){try{runRendererConstruction(c.body,c.options);}catch(e){throw new Error('renderer construction '+c.name,{cause:e});}}
+console.log(`QUALIFIED-RENDERER CPU OK (${rendererConstructionCases.length}; constructor-only lease; no native/upload/retirement authority)`);
+if(process.argv.includes('--prove-fail')){
+ for(const m of rendererConstructionMutants){
+  const c=rendererConstructionCases.find(c=>c.name===m.caseName);assert(c,'named renderer control exists');
+  const tag='RENDERER_CONTROL_ASSERTION '+m.name,body='try{'+c.body+'}catch(e){if(e?.code==="ERR_ASSERTION")console.error('+JSON.stringify(tag)+');throw e;}';
+  let failure;try{runRendererConstruction(body,{...c.options,replacements:m.replacements});}catch(e){failure=e;}
+  const stderr=String(failure?.stderr??'');assert(failure&&stderr.includes('AssertionError [ERR_ASSERTION]')&&stderr.includes(tag),m.name+' renderer mutant must reach named semantic assertion');
+ }
+ console.log(`QUALIFIED-RENDERER SOURCE MUTANTS OK (${rendererConstructionMutants.length}/${rendererConstructionMutants.length} intended semantic failures)`);
+}
