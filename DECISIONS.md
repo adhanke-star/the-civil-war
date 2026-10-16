@@ -1,5 +1,17 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0274 — Open: intermittent 20–30 s stalls in worker-served module fetches (2026-10-16)
+
+v2 camera fix 7c7cf0d, CI 38963182689 attempt 1: 8/9 green; browsers (offline) RED. After the worker took control, the
+online goto to ?battle=shiloh&phase=camps-at-dawn timed out at 30 s: src/audio/mixer.js and src/audio/music.js each took
+30.8 s through the worker while every other request answered in 9–95 ms (CDP admission trace). Neither file nor sw.js nor
+the test changed. The previous green run 38959792523 had the same kind of stall below the limit (three.quarks 22.5 s).
+Stalls predate v2; cause (worker per-fetch work, CI CPU starvation, test server) UNKNOWN. Attempt 2 of the same job:
+smoke RED again, differently: rts-camera.js and soldier-view.js module fetches canceled (ERR_ABORTED) via the worker,
+so main.js never ran (240 s ready timeout). Control: rerunning 6f6f679's offline job passed its smoke 6/6, but the
+upgrade step refuses every rerun by design (exact-ci-source needs attempt 1), so reruns cannot clear that job. Score
+so far: 6f6f679 smoke 2/2 pass, 7c7cf0d 0/2. Next: one fresh push of the identical 7c7cf0d source tree (this note).
+
 ## 0273 — v2 is "play either side" in the Battles menu (Aaron, 2026-10-16)
 
 v1.1 shipped: tag v1.1 at 6501d5b, own CI 38955478296 all 9 green, Pages 38955478238 green, Release published. The
