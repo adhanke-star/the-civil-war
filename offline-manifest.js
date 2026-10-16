@@ -753,7 +753,7 @@ self.CW_OFFLINE = {
   },
   "src/main.js": {
    "bytes": 34701,
-   "sha256": "3e35e86333dcb4e40ae3f91eddb01678bf1ed79a1c3dd10b1b3fcbadb471ec9a"
+   "sha256": "e33abaad17ece8374d755a6d329d813971a2721286a7b3e84d99bb5073395871"
   },
   "src/render/post.js": {
    "bytes": 26769,
@@ -832,8 +832,8 @@ self.CW_OFFLINE = {
    "sha256": "a427c8aa9a1c0e51688b94512c288677b2f3e069d5fce3ad29f02c7d95a2b35a"
   },
   "src/sim/sides.js": {
-   "bytes": 4482,
-   "sha256": "cd7427b85636ac1c71de47012c0fd52b2956ff485670b51d69b4e60f3519181e"
+   "bytes": 4791,
+   "sha256": "4546b3627a6d6137c06d28e4e7eaecc4e4de9a9fb8d5d566529972035a1e5b91"
   },
   "src/ui/arrows.js": {
    "bytes": 23753,
@@ -1477,5 +1477,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "4fc342e0246abd548339ad0b8ea833c75d37c24d17a56e813b3fc42bed9d75cf"
+ "generation": "0804fd8bef02e8ecd0c24c6d47a3272a320710fd7100e90bc0e33e038790f711"
 };

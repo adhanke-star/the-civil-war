@@ -249,7 +249,7 @@ Object.assign(stats, world.stats);
 
 // Opening view: both armies between the clock and the bottom panels; the pitch follows the zoom.
 const rts = new RtsCamera(camera, terrain, scenario.camera
-  ? { target: playerSide === 'CS' ? fitSideCamera(scenario.camera, terrain.half) : [...scenario.camera.target], yaw: scenario.camera.yaw, dist: scenario.camera.dist }
+  ? { target: [...scenario.camera.target], yaw: playerSide === 'CS' ? fitSideCamera(scenario.camera, terrain.half) : scenario.camera.yaw, dist: scenario.camera.dist }
   : scenario.practiceIntro
   ? { target: [-300, -610], yaw: -Math.PI / 2 - 0.12, dist: 740 }
   : { target: [-60, 200], yaw: -Math.PI / 2 - 0.12, dist: 1150 });

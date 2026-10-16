@@ -51,12 +51,17 @@ export function sideCamera(scenario, playerSide) {
   return { ...cam, target: [Math.round(x), Math.round(z)], yaw: +yaw.toFixed(3) };
 }
 
-/** The Confederate opening target moved toward the enemy until the camera itself (up to `dist` behind it) stands on the map. */
+/** The Confederate opening bearing: still centred on the player's formations, turned the least (15° steps) from the
+ * opposite bearing so the camera itself (up to `dist` behind the target) stands on the map; a Confederate line deployed
+ * near the map edge would otherwise be seen from beyond it. */
 export function fitSideCamera(cam, half, margin = 60) {
-  const sx = Math.sin(cam.yaw), sz = Math.cos(cam.yaw), lim = half - margin;
-  let [x, z] = cam.target;
-  for (let i = 0; i < 400 && (Math.abs(x + sx * cam.dist) > lim || Math.abs(z + sz * cam.dist) > lim); i++) { x -= sx * 10; z -= sz * 10; }
-  return [Math.round(x), Math.round(z)];
+  const lim = half - margin, [x, z] = cam.target;
+  const inside = (yaw) => Math.abs(x + Math.sin(yaw) * cam.dist) <= lim && Math.abs(z + Math.cos(yaw) * cam.dist) <= lim;
+  for (let k = 0; k <= 12; k++) for (const s of k ? [1, -1] : [1]) {
+    const yaw = Math.atan2(Math.sin(cam.yaw + s * k * Math.PI / 12), Math.cos(cam.yaw + s * k * Math.PI / 12));
+    if (inside(yaw)) return +yaw.toFixed(3);
+  }
+  return cam.yaw;
 }
 
 const UNION_TIPS = [['#tip', 'a <b>blue flag</b>', 'a <b>Confederate flag</b>'], ['#uc-empty', 'a blue flag', 'a Confederate flag'],

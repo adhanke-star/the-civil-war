@@ -103,8 +103,8 @@ const CHECKS = [
       const turn = Math.abs(Math.atan2(Math.sin(c.yaw - p.scenario.camera.yaw), Math.cos(c.yaw - p.scenario.camera.yaw)));
       assert.ok(Math.abs(turn - Math.PI) < 0.01, `opening-view: ${p.phaseId} does not look from the Confederate side`);
       assert.equal(c.dist, p.scenario.camera.dist, `opening-view: ${p.phaseId} changed the zoom`);
-      const half = terrainOf(p.scenario.terrain).half, [tx, tz] = api.fitSideCamera(c, half);
-      const cx = tx + Math.sin(c.yaw) * c.dist, cz = tz + Math.cos(c.yaw) * c.dist;
+      const half = terrainOf(p.scenario.terrain).half, yaw = api.fitSideCamera(c, half), [tx, tz] = c.target;
+      const cx = tx + Math.sin(yaw) * c.dist, cz = tz + Math.cos(yaw) * c.dist;
       assert.ok(Math.abs(cx) <= half - 60 && Math.abs(cz) <= half - 60, `opening-view: ${p.phaseId} camera stands off the map at [${cx.toFixed(0)}, ${cz.toFixed(0)}]`);
     }
   }],
