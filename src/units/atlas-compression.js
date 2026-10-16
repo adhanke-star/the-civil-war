@@ -1,3 +1,4 @@
+import * as PayloadTHREE from 'three';
 // Narrow explicit-ASTC container adapter. The existing atlas owns loading, publication and disposal.
 import {read} from '../../vendor/three/examples/jsm/libs/ktx-parse.module.js';
 const MAGIC=[171,75,84,88,32,50,48,187,13,10,26,10];
@@ -159,4 +160,182 @@ export function createLimitedMipOwner(THREE,renderer){
       owned.clear();restored=true;if(errors.length){sticky(new AggregateError(errors,'limited atlas mips: restoration failed'));throw failure;}
     }
   };
+}
+
+// Qualified retained payload foundation. No caller, upload certificate or retirement operation.
+export const QUALIFIED_ASTC_PAYLOADS = Object.freeze(Object.fromEntries([
+  ['cs-close-base-0-astc.ktx2',1808,4938464,'b8166cadc1aeb0e7212bf81e9b105d5fb2e4e46c1912776289553028235677c5'],
+  ['cs-close-base-1-astc.ktx2',1808,4938464,'47c36c5a0b215d47b16fdb3d647ef72913aa0a4f7ff9c2e3e487d09d9ff13a2c'],
+  ['cs-close-base-2-astc.ktx2',1804,4929760,'ad30e65d87dbb9313f05f2548b85776e795e5cf58cd16ec2e9ad43f89f7491bc'],
+  ['cs-close-base-3-astc.ktx2',1968,5375328,'4d5eca2159be8fca43dc7613f4a08b5cdb5d38c6ce736c1ddb64c8d39878a0bb'],
+  ['cs-close-h2_slouch_roll_butternut-0-astc.ktx2',1808,4938464,'16eb7e53c3a74011defa0cb040a5f7fe7ca0af37334624a249067bfa0efd8647'],
+  ['cs-close-h2_slouch_roll_butternut-1-astc.ktx2',1808,4938464,'0beab1432ca741c779e17ce002db7efb562fc87530d3ad620d4ae5f25e12cdcd'],
+  ['cs-close-h2_slouch_roll_butternut-2-astc.ktx2',1800,4917472,'8f0c7ed1bbed4c1630cf9fbe4f269e88b7ae0e783edbe203c6845177be6f6193'],
+  ['cs-close-h2_slouch_roll_butternut-3-astc.ktx2',1952,5331296,'d3c434628b6c5f537e69b05d66f8f5c64b283a1c1bf8919b5118786aea816fad'],
+].map(([file,h,bytes,sha256]) => [file,Object.freeze({file,w:2048,h,bytes,mipLevels:12,
+  encoding:'astc4x4',alpha:'premultiplied-gamma-bytes',sha256})])));
+
+const payloadGetDescriptor=Object.getOwnPropertyDescriptor,payloadGetPrototype=Object.getPrototypeOf,payloadOwnKeys=Reflect.ownKeys,
+  payloadApply=Reflect.apply,payloadFreeze=Object.freeze,payloadHasOwn=Object.hasOwn,payloadIs=Object.is,
+  payloadString=String,payloadSlice=String.prototype.slice,payloadMax=Math.max,PayloadError=Error,
+  PayloadPromise=Promise,payloadResolve=Promise.resolve,payloadReject=Promise.reject,payloadThen=Promise.prototype.then;
+const payloadDescriptor = (object,key) => {
+  for(let owner=object;owner;owner=payloadGetPrototype(owner)){
+    const descriptor=payloadGetDescriptor(owner,key);if(descriptor)return {owner,descriptor};
+  }
+  return {owner:null,descriptor:null};
+};
+const payloadSameDescriptor = (a,b) => !!a===!!b && (!a || payloadIs(a.value,b.value)&&a.get===b.get&&a.set===b.set
+  &&a.writable===b.writable&&a.enumerable===b.enumerable&&a.configurable===b.configurable);
+const payloadTransfer = globalThis.structuredClone, payloadCrypto = globalThis.crypto,
+  payloadSubtle = payloadCrypto?.subtle, payloadDigest = payloadSubtle?.digest,
+  payloadLength = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype,'byteLength').get,
+  payloadResizable = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype,'resizable')?.get,
+  payloadDispose = PayloadTHREE.Texture.prototype.dispose, payloadDispatch = PayloadTHREE.Texture.prototype.dispatchEvent;
+const payloadBindings=[...['structuredClone','crypto','ArrayBuffer','Uint8Array','DataView','TextDecoder','Object','Array','Number','String','Promise','Math','Reflect'].map(k=>[globalThis,k]),[payloadCrypto,'subtle'],[payloadSubtle,'digest']]
+  .filter(([object])=>object).map(([object,key])=>({object,key,...payloadDescriptor(object,key)}));
+// The parser and Three constructors share mutable prototypes. Pin their hooks without invoking them.
+const payloadHooks=[Object.prototype,Object,Array.prototype,Array,String.prototype,String,Number.prototype,Number,Promise.prototype,Promise,Math,Reflect,
+  ArrayBuffer.prototype,Uint8Array.prototype,payloadGetPrototype(Uint8Array.prototype),DataView.prototype,TextDecoder.prototype,
+  PayloadTHREE.CompressedTexture,PayloadTHREE.CompressedTexture.prototype,PayloadTHREE.Texture,PayloadTHREE.Texture.prototype,
+  PayloadTHREE.TextureSource,PayloadTHREE.TextureSource.prototype,PayloadTHREE.EventDispatcher.prototype,
+  PayloadTHREE.Vector2.prototype,PayloadTHREE.Matrix3.prototype].map(object=>({object,prototype:payloadGetPrototype(object),
+    keys:payloadOwnKeys(object),descriptors:payloadOwnKeys(object).map(key=>payloadGetDescriptor(object,key))}));
+
+/** Transfer only a complete qualified file. Handoff exposes mips and keeps them charged forever here. */
+export function createQualifiedAtlasPayload(input, page) {
+  const refuse = message => { throw new PayloadError('qualified atlas payload: '+message); };
+  const stable = () => {
+    for(let i=0;i<payloadHooks.length;i++){
+      const h=payloadHooks[i],keys=payloadOwnKeys(h.object);
+      if(payloadGetPrototype(h.object)!==h.prototype||keys.length!==h.keys.length)refuse('construction hook ownership changed');
+      for(let j=0;j<keys.length;j++)if(keys[j]!==h.keys[j]||!payloadSameDescriptor(payloadGetDescriptor(h.object,keys[j]),h.descriptors[j]))
+        refuse('construction hook ownership changed '+i+'/'+j);
+    }
+    for(let i=0;i<payloadBindings.length;i++){
+      const b=payloadBindings[i],current=payloadDescriptor(b.object,b.key);
+      if(current.owner!==b.owner||!payloadSameDescriptor(current.descriptor,b.descriptor))refuse('intrinsic ownership changed');
+    }
+    if(typeof payloadTransfer!=='function'||typeof payloadDigest!=='function')refuse('intrinsic ownership changed');
+  };
+  stable();
+  const value = (object,key) => {
+    const d = payloadGetDescriptor(object,key);
+    if (!d || !payloadHasOwn(d,'value')) refuse('scalar data property required');
+    return d.value;
+  };
+  if (!page || payloadGetPrototype(page)!==Object.prototype) refuse('plain page required');
+  const file = value(page,'file'), spec = typeof file==='string' && payloadHasOwn(QUALIFIED_ASTC_PAYLOADS,file)
+    ? QUALIFIED_ASTC_PAYLOADS[file] : null;
+  if (!spec) refuse('qualified file required');
+  const keys = ['file','w','h','bytes','mipLevels','encoding','alpha'];
+  if (payloadOwnKeys(page).length!==keys.length || keys.some(k=>value(page,k)!==spec[k])) refuse('qualified page binding');
+  if (!input || payloadGetPrototype(input)!==ArrayBuffer.prototype || payloadOwnKeys(input).length)
+    refuse('whole ordinary ArrayBuffer required');
+  let length;
+  try { length=payloadApply(payloadLength,input,[]); if(payloadResizable&&payloadApply(payloadResizable,input,[])) refuse('fixed backing required'); new Uint8Array(input); }
+  catch { refuse('live fixed backing required'); }
+  if (length!==spec.bytes) refuse('whole file length');
+  stable();
+  let owned = payloadTransfer(input,{transfer:[input]});
+  if (payloadApply(payloadLength,input,[])!==0 || payloadApply(payloadLength,owned,[])!==length) refuse('transfer incomplete');
+  let state='owned', closed=false, failed=false, failure, cleanupFailed=false, task=null,
+    hashing=false, texture=null, disposalAttempted=false, handedOffBackingBytes=0,uncertainBackingBytes=0;
+  const describe = error => {
+    if (error===null) return 'null';
+    const type=typeof error;
+    if (type==='undefined'||type==='boolean'||type==='number'||type==='string') return payloadApply(payloadSlice,payloadString(error),[0,4096]);
+    try { const d=payloadGetDescriptor(error,'message');
+      if(d&&payloadHasOwn(d,'value')&&typeof d.value==='string')return payloadApply(payloadSlice,d.value,[0,4096]);
+    } catch {}
+    return 'unknown thrown value';
+  };
+  const sticky = error => { if(!failed){failed=true;failure=error;} if(!closed)state='failed'; };
+  const status = () => payloadFreeze({file,state,failed,error:failed?describe(failure):null,cleanupFailed,
+    ownedBackingBytes:owned?length:0,digestCopyBytes:hashing?length:0,digestOutputBytes:hashing?32:0,
+    handedOffBackingBytes,uncertainBackingBytes,
+    retainedBackingBytes:payloadMax(owned?length:0,handedOffBackingBytes,uncertainBackingBytes),retirementAvailable:false});
+  const releasePrivate = () => {
+    if (texture && !disposalAttempted) {
+      const disposing=texture;
+      disposalAttempted=true;
+      try{stable();}catch{cleanupFailed=true;uncertainBackingBytes=length;sticky(new PayloadError('qualified atlas payload: cleanup ownership changed'));}
+      const sameMethod = (key,expected) => {
+        for(let p=disposing;p;p=payloadGetPrototype(p)){
+          const d=payloadGetDescriptor(p,key);
+          if(d)return payloadHasOwn(d,'value')&&d.value===expected;
+        }
+        return false;
+      };
+      let methodsOwned=false;
+      try{methodsOwned=sameMethod('dispose',payloadDispose)&&sameMethod('dispatchEvent',payloadDispatch);}catch{}
+      if(!methodsOwned){
+        cleanupFailed=true;uncertainBackingBytes=length;sticky(new PayloadError('qualified atlas payload: cleanup ownership changed'));
+      }
+      try { payloadApply(payloadDispose,disposing,[]); }
+      catch(error){cleanupFailed=true;uncertainBackingBytes=length;sticky(error);}
+    }
+    texture=null;
+    if(!hashing)owned=null;
+  };
+  const requireState = expected => {
+    if(failed)throw failure;
+    if(closed || state!==expected)refuse('invalid state');
+    stable();
+    if(failed)throw failure;
+    if(closed || state!==expected)refuse('invalid state');
+  };
+  const api = {
+    status,
+    verify() {
+      if(task)return task;
+      if(closed || failed) { task=payloadApply(payloadReject,PayloadPromise,[failed?failure:new PayloadError('qualified atlas payload: closed')]); return task; }
+      try{stable();}catch(error){sticky(error);releasePrivate();task=payloadApply(payloadReject,PayloadPromise,[failure]);return task;}
+      state='hashing';
+      // Publish the shared promise before invoking even the captured digest implementation.
+      task=payloadApply(payloadThen,payloadApply(payloadResolve,PayloadPromise,[]),[async()=>{
+        let digest=null;
+        try {
+          if(closed)refuse('closed'); stable(); hashing=true;
+          digest=await payloadApply(payloadDigest,payloadSubtle,['SHA-256',owned]);
+          stable();
+          const hex=Array.from(new Uint8Array(digest),n=>n.toString(16).padStart(2,'0')).join('');
+          if(hex!==spec.sha256)refuse('digest mismatch');
+          if(closed)refuse('closed');
+          state='verified';
+        } catch(error){sticky(error);}
+        finally { digest=null;hashing=false;if(closed||failed)releasePrivate(); }
+        if(failed)throw failure;
+        return status();
+      }]);
+      return task;
+    },
+    construct() {
+      requireState('verified');
+      try {
+        const decoded=parseAtlasAstc(owned,spec);
+        texture=new PayloadTHREE.CompressedTexture(decoded.mipmaps,spec.w,spec.h,PayloadTHREE.RGBA_ASTC_4x4_Format,PayloadTHREE.UnsignedByteType);
+        requireState('verified');
+        Object.assign(texture,{flipY:false,premultiplyAlpha:false,colorSpace:PayloadTHREE.NoColorSpace,generateMipmaps:false,
+          minFilter:PayloadTHREE.LinearMipmapLinearFilter,magFilter:PayloadTHREE.LinearFilter,
+          wrapS:PayloadTHREE.ClampToEdgeWrapping,wrapT:PayloadTHREE.ClampToEdgeWrapping});
+        texture.userData.atlasMipBytes=decoded.bytes;texture.needsUpdate=true;
+        requireState('verified');
+        state='constructed-private';
+        return status();
+      } catch(error){sticky(error);releasePrivate();throw failure;}
+    },
+    handOff() {
+      requireState('constructed-private');
+      const result=texture;
+      handedOffBackingBytes=length;texture=null;owned=null;state='handed-off';
+      return result;
+    },
+    close() {
+      closed=true;state='closed';releasePrivate();
+      if(failed)throw failure;
+      return status();
+    },
+  };
+  return payloadFreeze(api);
 }

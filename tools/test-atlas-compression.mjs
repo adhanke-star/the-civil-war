@@ -1,4 +1,8 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+import {createQualifiedAtlasPayload,QUALIFIED_ASTC_PAYLOADS} from '../src/units/atlas-compression.js';
 import {createDefaultContainer,write} from '../vendor/three/examples/jsm/libs/ktx-parse.module.js';
 import {parseAtlasAstc,pageMipBytes,astcAvailable,createAtlasAstcTexture,createLimitedMipOwner} from '../src/units/atlas-compression.js';
 import * as THREE from '../vendor/three/build/three.module.js';
@@ -88,4 +92,186 @@ if(process.argv.includes('--prove-fail')){
  };
  for(const [name,check]of checks){const mutant=mutants[name]||{parse:()=>({mipmaps:[],bytes:0})};let error;try{check({...api,...mutant});}catch(e){error=e;}assert.equal(error?.code,'ERR_ASSERTION',`${name}: mutant must reject its own assertion`);console.log(`CAUGHT ${name}`);}
  console.log(`ATLAS-COMPRESSION CONTROLS OK (${checks.length}/${checks.length})`);
+}
+
+const payloadSource=fs.readFileSync(new URL('../src/units/atlas-compression.js',import.meta.url),'utf8');
+const oldCompression=payloadSource.split('// Qualified retained payload foundation.')[0]
+  .replace("import * as PayloadTHREE from 'three';\n",'').trimEnd()+'\n';
+assert.equal(createHash('sha256').update(oldCompression).digest('hex'),'47febc757d6bea5e2845bb3918fd2596e09f01549be48a81144abeabe36aa863','all historical compression functions byte-exact');
+const qualification=fs.readFileSync(new URL('./bake/review-current-compression.mjs',import.meta.url),'utf8');
+const trusted=JSON.parse(qualification.split('export const QUALIFIED_RUNTIME_MEMBERS = Object.freeze(')[1].split('\n});')[0]+'\n}');
+const specs=Object.values(QUALIFIED_ASTC_PAYLOADS),firstSpec=specs[0];
+function payloadFixture(spec=firstSpec,factory=createQualifiedAtlasPayload){
+  const {sha256,...page}=spec,b=fs.readFileSync(new URL('../assets/figures/confederate-infantry/'+spec.file,import.meta.url));
+  const input=b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength);
+  return {page,input,create:()=>factory(input,page)};
+}
+function scalarPayloadStatus(s){assert(Object.isFrozen(s));assert(Object.values(s).every(v=>v===null||['string','boolean','number'].includes(typeof v)));assert.equal(s.retirementAvailable,false);}
+async function payloadRejection(task){let failed=false,error;try{await task;}catch(e){failed=true;error=e;}assert(failed,'payload task must reject');return error;}
+const payloadChecks=[
+  ...specs.map(spec=>['qualified-'+spec.file,async factory=>{
+    assert(Object.isFrozen(QUALIFIED_ASTC_PAYLOADS));assert(Object.isFrozen(spec));assert.equal(spec.sha256,trusted[spec.file]);
+    const f=payloadFixture(spec,factory),alias=new Uint8Array(f.input),view=new DataView(f.input),o=f.create();
+    assert(Object.isFrozen(o));assert(Object.values(o).every(v=>typeof v==='function'));assert.equal(f.input.byteLength,0);assert.equal(alias.byteLength,0);assert.throws(()=>view.getUint8(0));
+    scalarPayloadStatus(o.status());assert.equal(o.status().ownedBackingBytes,spec.bytes);assert.equal(o.status().state,'owned');
+    const task=o.verify();assert.equal(o.verify(),task);await Promise.resolve();assert.equal(o.status().digestCopyBytes,spec.bytes);assert.equal(o.status().digestOutputBytes,32);
+    const receipt=await task;scalarPayloadStatus(receipt);assert.equal(receipt.state,'verified');assert.equal(receipt.digestCopyBytes,0);assert.equal(receipt.ownedBackingBytes,spec.bytes);
+    const constructed=o.construct();scalarPayloadStatus(constructed);assert.equal(constructed.state,'constructed-private');assert.equal(constructed.ownedBackingBytes,spec.bytes);
+    const texture=o.handOff();assert(texture.isCompressedTexture);assert.equal(texture.mipmaps.length,12);assert.equal(new Set(texture.mipmaps.map(m=>m.data.buffer)).size,1);
+    assert.equal(texture.mipmaps[0].data.buffer.byteLength,spec.bytes);assert.equal(texture.mipmaps.reduce((n,m)=>n+m.data.byteLength,0),pageMipBytes(spec.w,spec.h,true).bytes);
+    assert.equal(texture.generateMipmaps,false);assert.equal(texture.minFilter,THREE.LinearMipmapLinearFilter);assert.equal(texture.premultiplyAlpha,false);
+    const source=texture.source,mips=texture.mipmaps;let disposals=0;texture.addEventListener('dispose',()=>disposals++);
+    assert.equal(o.status().state,'handed-off');assert.equal(o.status().ownedBackingBytes,0);assert.equal(o.status().handedOffBackingBytes,spec.bytes);
+    assert.throws(()=>o.handOff(),/invalid state/);o.close();o.close();assert.equal(disposals,0);assert.equal(texture.source,source);assert.equal(texture.mipmaps,mips);
+    assert.equal(o.status().state,'closed');assert.equal(o.status().handedOffBackingBytes,spec.bytes);texture.dispose();assert.equal(disposals,1);
+  }]),
+  ['corrupt',async factory=>{
+    const f=payloadFixture(firstSpec,factory);new Uint8Array(f.input)[1024]^=1;const o=f.create(),task=o.verify();const error=await payloadRejection(task);
+    assert.match(error.message,/digest mismatch/);assert.equal(o.verify(),task);assert.equal(o.status().failed,true);assert.equal(o.status().ownedBackingBytes,0);
+    assert.throws(()=>o.construct(),e=>e===error);assert.throws(()=>o.close(),e=>e===error);
+  }],
+  ...['file','w','h','bytes','mipLevels','encoding','alpha'].map(key=>['wrong-'+key,async factory=>{
+    const f=payloadFixture(firstSpec,factory);f.page[key]=typeof f.page[key]==='number'?f.page[key]+1:'wrong';assert.throws(()=>f.create());assert.equal(f.input.byteLength,firstSpec.bytes);
+  }]),
+  ['metadata-getter',async factory=>{
+    const f=payloadFixture(firstSpec,factory);let calls=0;Object.defineProperty(f.page,'file',{get(){calls++;throw 0;},enumerable:true});assert.throws(()=>f.create());assert.equal(calls,0);assert.equal(f.input.byteLength,firstSpec.bytes);
+  }],
+  ...['typed','partial','shared','detached','resizable','short','decorated'].map(kind=>['backing-'+kind,async factory=>{
+    const f=payloadFixture(firstSpec,factory);let input;
+    if(kind==='typed')input=new Uint8Array(f.input);
+    if(kind==='partial')input=new Uint8Array(f.input,1);
+    if(kind==='shared')input=new SharedArrayBuffer(8);
+    if(kind==='detached'){input=f.input;structuredClone(input,{transfer:[input]});}
+    if(kind==='resizable')input=new ArrayBuffer(firstSpec.bytes,{maxByteLength:firstSpec.bytes*2});
+    if(kind==='short')input=new ArrayBuffer(firstSpec.bytes-1);
+    if(kind==='decorated'){input=f.input;input.extra=true;}
+    assert.throws(()=>factory(input,f.page));
+  }]),
+  ['close-owned',async factory=>{
+    const o=payloadFixture(firstSpec,factory).create();o.close();o.close();assert.equal(o.status().ownedBackingBytes,0);assert.equal(o.status().state,'closed');
+    await assert.rejects(o.verify(),/closed/);assert.throws(()=>o.construct(),/invalid state/);
+  }],
+  ['close-before-digest',async factory=>{
+    const o=payloadFixture(firstSpec,factory).create(),task=o.verify();o.close();assert.equal(o.status().digestCopyBytes,0);await assert.rejects(task,/closed/);
+    assert.equal(o.status().state,'closed');assert.equal(o.status().ownedBackingBytes,0);assert.throws(()=>o.construct(),/closed/);
+  }],
+  ['close-during-digest',async factory=>{
+    const o=payloadFixture(firstSpec,factory).create(),task=o.verify();await Promise.resolve();assert.equal(o.status().digestCopyBytes,firstSpec.bytes);o.close();
+    assert.equal(o.status().state,'closed');assert.equal(o.status().ownedBackingBytes,firstSpec.bytes);assert.equal(o.status().digestCopyBytes,firstSpec.bytes);
+    await assert.rejects(task,/closed/);assert.equal(o.status().ownedBackingBytes,0);assert.equal(o.status().digestCopyBytes,0);assert.throws(()=>o.construct(),/closed/);
+  }],
+  ['close-verified',async factory=>{
+    const o=payloadFixture(firstSpec,factory).create();await o.verify();o.close();assert.equal(o.status().ownedBackingBytes,0);assert.throws(()=>o.construct(),/invalid state/);
+  }],
+  ['close-constructed',async factory=>{
+    const o=payloadFixture(firstSpec,factory).create();await o.verify();o.construct();o.close();o.close();assert.equal(o.status().ownedBackingBytes,0);assert.equal(o.status().handedOffBackingBytes,0);assert.equal(o.status().cleanupFailed,false);assert.throws(()=>o.handOff(),/invalid state/);
+  }],
+  ['pending-alias-mutation',async factory=>{
+    const f=payloadFixture(firstSpec,factory),alias=new Uint8Array(f.input),o=f.create(),task=o.verify();await Promise.resolve();alias[0]=0;
+    assert.equal(alias.byteLength,0);assert.throws(()=>new Uint8Array(f.input));await task;o.construct();const texture=o.handOff();assert.equal(texture.mipmaps.length,12);o.close();texture.dispose();
+  }],
+  ['no-premature-construction',async factory=>{
+    const o=payloadFixture(firstSpec,factory).create();assert.throws(()=>o.construct(),/invalid state/);assert.throws(()=>o.handOff(),/invalid state/);
+    await o.verify();o.construct();const t=o.handOff();o.close();t.dispose();
+  }],
+];
+assert.equal(specs.length,8);
+for(const[name,check]of payloadChecks){try{await check(createQualifiedAtlasPayload);}catch(error){console.error('QUALIFIED-PAYLOAD FAILED',name);throw error;}}
+console.log(`QUALIFIED-PAYLOAD CPU OK (${payloadChecks.length}; eight hashes/96 mip views; no upload or retirement)`);
+
+function payloadSourceScript(replacements,body){
+  return `import fs from'node:fs';import assert from'node:assert/strict';import * as THREE from'./vendor/three/build/three.module.js';
+  let source=fs.readFileSync('src/units/atlas-compression.js','utf8');
+  for(const[from,to]of ${JSON.stringify(replacements)}){assert.equal(source.split(from).length,2,'unique source seam');source=source.replace(from,to);}
+  const base=new URL('./src/units/atlas-compression.js','file://'+process.cwd()+'/');source=source.replace(/from\\s*(['"])([^'"]+)\\1/g,(all,q,spec)=>'from '+JSON.stringify(spec.startsWith('.')?new URL(spec,base).href:import.meta.resolve(spec)));
+  const mod=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+  const {createQualifiedAtlasPayload,QUALIFIED_ASTC_PAYLOADS,pageMipBytes}=mod,firstSpec=Object.values(QUALIFIED_ASTC_PAYLOADS)[0],spec=firstSpec;
+  const trusted=${JSON.stringify(trusted)},payloadFixture=${payloadFixture.toString().replace("new URL('../assets/figures/confederate-infantry/'+spec.file,import.meta.url)","'assets/figures/confederate-infantry/'+spec.file")},scalarPayloadStatus=${scalarPayloadStatus.toString()},payloadRejection=${payloadRejection.toString()};
+  ${body}`;
+}
+function runPayloadSource(replacements,body){
+  return execFileSync('node',['--input-type=module','-e',payloadSourceScript(replacements,body)],{cwd:new URL('..',import.meta.url),encoding:'utf8',timeout:10000,maxBuffer:1000000,stdio:['ignore','pipe','pipe']});
+}
+// Exercise raw failures in the actual owner, not a replacement owner API. No source file changes.
+let payloadFaults=0;
+for(const literal of ['undefined','null','0','false',"''"]){
+  runPayloadSource([['digest=await payloadApply(payloadDigest,payloadSubtle,[\'SHA-256\',owned]);',`await payloadApply(payloadDigest,payloadSubtle,['SHA-256',owned]);throw ${literal};`]],
+    `const o=payloadFixture().create(),raw=${literal};assert.equal(await payloadRejection(o.verify()),raw);assert(o.status().failed);assert.equal(o.status().ownedBackingBytes,0);assert.throws(()=>o.close(),e=>e===raw);`);payloadFaults++;
+}
+for(const mode of ['construct','dispose','both','dispatch']){
+  const replacements=[['payloadApply(payloadDispose,disposing,[]);',"globalThis.disposeAttempts++;payloadApply(payloadDispose,disposing,[]);" ]];
+  if(mode==='construct'||mode==='both')replacements.push(['        texture.userData.atlasMipBytes=decoded.bytes;texture.needsUpdate=true;',"        texture.userData.atlasMipBytes=decoded.bytes;throw 0;"]);
+  if(mode==='dispose'||mode==='both')replacements[0][1]='globalThis.disposeAttempts++;throw false;';
+  if(mode==='dispatch')replacements.push(["        state='constructed-private';","        texture.dispatchEvent=()=>{};state='constructed-private';"]);
+  runPayloadSource(replacements,`globalThis.disposeAttempts=0;const o=payloadFixture().create();await o.verify();
+    ${mode==='construct'||mode==='both'?"assert.throws(()=>o.construct(),e=>e===0);":"o.construct();"}
+    ${mode==='dispatch'?"assert.throws(()=>o.close(),/cleanup ownership changed/);":mode==='dispose'?"assert.throws(()=>o.close(),e=>e===false);":"assert.throws(()=>o.close(),e=>e===0);"}
+    try{o.close();}catch{}assert.equal(globalThis.disposeAttempts,1);assert.equal(o.status().ownedBackingBytes,0);
+    assert.equal(o.status().cleanupFailed,${mode!=='construct'});assert.equal(o.status().failed,true);`);payloadFaults++;
+}
+console.log(`QUALIFIED-PAYLOAD RAW FAILURE CONTROLS OK (${payloadFaults}; five falsy digests/partial construction/disposal/dispatch; CPU only)`);
+let payloadDriftControls=0;
+for(const property of ['needsUpdate','image','uuid']){
+  runPayloadSource([],`const T=await import('three'),o=payloadFixture().create();await o.verify();let calls=0;
+    const proto=T.Texture.prototype,original=Object.getOwnPropertyDescriptor(proto,${JSON.stringify(property)});
+    try{Object.defineProperty(proto,${JSON.stringify(property)},{configurable:true,set(v){calls++;if(original?.set)original.set.call(this,v);}});
+      assert.throws(()=>o.construct(),/construction hook ownership changed/);assert.equal(calls,0);assert.equal(o.status().ownedBackingBytes,firstSpec.bytes);
+    }finally{if(original)Object.defineProperty(proto,${JSON.stringify(property)},original);else delete proto[${JSON.stringify(property)}];}
+    o.close();assert.equal(o.status().retainedBackingBytes,0);`);payloadDriftControls++;
+}
+runPayloadSource([],`const T=await import('three'),o=payloadFixture().create();await o.verify();let calls=0;const p=T.TextureSource.prototype,d=Object.getOwnPropertyDescriptor(p,'needsUpdate');
+  try{Object.defineProperty(p,'needsUpdate',{...d,set(v){calls++;d.set.call(this,v);}});assert.throws(()=>o.construct(),/construction hook ownership changed/);assert.equal(calls,0);}
+  finally{Object.defineProperty(p,'needsUpdate',d);}o.close();`);payloadDriftControls++;
+runPayloadSource([],`const o=payloadFixture().create();await o.verify();o.construct();let calls=0;const d=Object.getOwnPropertyDescriptor(globalThis,'crypto'),crypto=globalThis.crypto;
+  try{Object.defineProperty(globalThis,'crypto',{configurable:true,get(){calls++;o.close();return crypto;}});assert.throws(()=>o.handOff(),/intrinsic ownership changed/);assert.equal(calls,0);assert.equal(o.status().state,'constructed-private');}
+  finally{Object.defineProperty(globalThis,'crypto',d);}o.close();assert.equal(o.status().retainedBackingBytes,0);`);payloadDriftControls++;
+runPayloadSource([],`const o=payloadFixture().create();await o.verify();let calls=0;const assign=Object.assign;
+  try{Object.assign=(t,...xs)=>{if(t.isTexture)calls++;return assign(t,...xs);};assert.throws(()=>o.construct(),/construction hook ownership changed/);assert.equal(calls,0);}
+  finally{Object.assign=assign;}o.close();`);payloadDriftControls++;
+runPayloadSource([],`const o=payloadFixture().create();let calls=0;const p=Object.getPrototypeOf(crypto.subtle),d=Object.getOwnPropertyDescriptor(p,'digest');
+  try{Object.defineProperty(p,'digest',{configurable:true,get(){calls++;return d.value;}});await assert.rejects(o.verify(),/intrinsic ownership changed/);assert.equal(calls,0);assert.equal(o.status().retainedBackingBytes,0);}
+  finally{Object.defineProperty(p,'digest',d);}try{o.close();}catch{}`);payloadDriftControls++;
+runPayloadSource([],`const T=await import('three'),o=payloadFixture().create();await o.verify();o.construct();let escaped;
+  const p=T.Texture.prototype,d=Object.getOwnPropertyDescriptor(p,'dispatchEvent'),dispatch=p.dispatchEvent;
+  try{p.dispatchEvent=function(...args){escaped=this;return dispatch.apply(this,args);};assert.throws(()=>o.close(),/cleanup ownership changed/);
+    assert(escaped);assert.equal(escaped.mipmaps[0].data.buffer.byteLength,firstSpec.bytes);assert.equal(o.status().uncertainBackingBytes,firstSpec.bytes);assert.equal(o.status().retainedBackingBytes,firstSpec.bytes);assert(o.status().cleanupFailed);}
+  finally{if(d)Object.defineProperty(p,'dispatchEvent',d);else delete p.dispatchEvent;}try{o.close();}catch{}assert.equal(o.status().retainedBackingBytes,firstSpec.bytes);`);payloadDriftControls++;
+runPayloadSource([],`const T=await import('three'),o=payloadFixture().create();await o.verify();o.construct();let calls=0,errorCalls=0,caught;
+  const p=T.Texture.prototype,d=Object.getOwnPropertyDescriptor(p,'dispatchEvent'),dispatch=p.dispatchEvent,OriginalError=globalThis.Error;
+  try{p.dispatchEvent=function(...args){calls++;return dispatch.apply(this,args);};globalThis.Error=()=>{errorCalls++;throw 0;};try{o.close();}catch(e){caught=e;}}
+  finally{globalThis.Error=OriginalError;if(d)Object.defineProperty(p,'dispatchEvent',d);else delete p.dispatchEvent;}
+  assert(caught instanceof OriginalError);assert.match(caught.message,/cleanup ownership changed/);assert.equal(calls,1);assert.equal(errorCalls,0);assert(o.status().failed);assert.equal(o.status().retainedBackingBytes,firstSpec.bytes);`);payloadDriftControls++;
+runPayloadSource([],`const T=await import('three'),o=payloadFixture().create();await o.verify();o.construct();let escaped;
+  const p=T.Texture.prototype,parent=Object.getPrototypeOf(p),proxy=new Proxy(parent,{getOwnPropertyDescriptor(t,k){return Reflect.getOwnPropertyDescriptor(t,k);},get(t,k,r){if(k==='dispatchEvent')escaped=r;return Reflect.get(t,k,r);}});
+  try{Object.setPrototypeOf(p,proxy);assert.throws(()=>o.close(),/cleanup ownership changed/);assert(escaped);assert.equal(escaped.mipmaps[0].data.buffer.byteLength,firstSpec.bytes);assert.equal(o.status().retainedBackingBytes,firstSpec.bytes);}
+  finally{Object.setPrototypeOf(p,parent);}`);payloadDriftControls++;
+runPayloadSource([],`const T=await import('three'),o=payloadFixture().create();await o.verify();o.construct();let dispatches=0,caught;
+  const p=T.Texture.prototype,parent=Object.getPrototypeOf(p),proxy=new Proxy(parent,{getOwnPropertyDescriptor(t,k){if(k==='dispatchEvent')throw 0;return Reflect.getOwnPropertyDescriptor(t,k);},get(t,k,r){const value=Reflect.get(t,k,r);if(k==='dispatchEvent')return function(...args){dispatches++;return value.apply(this,args);};return value;}});
+  try{Object.setPrototypeOf(p,proxy);try{o.close();}catch(e){caught=e;}}
+  finally{Object.setPrototypeOf(p,parent);}assert.match(caught.message,/cleanup ownership changed/);assert.equal(dispatches,1);assert(o.status().cleanupFailed);assert.equal(o.status().retainedBackingBytes,firstSpec.bytes);`);payloadDriftControls++;
+runPayloadSource([],`const T=await import('three'),o=payloadFixture().create();await o.verify();o.construct();let dispatches=0,caught,reentries=0;
+  const p=T.Texture.prototype,parent=Object.getPrototypeOf(p),proxy=new Proxy(parent,{getOwnPropertyDescriptor(t,k){if(k==='dispatchEvent'){reentries++;try{o.close();}catch{}}return Reflect.getOwnPropertyDescriptor(t,k);},get(t,k,r){const value=Reflect.get(t,k,r);if(k==='dispatchEvent')return function(...args){dispatches++;return value.apply(this,args);};return value;}});
+  try{Object.setPrototypeOf(p,proxy);try{o.close();}catch(e){caught=e;}}
+  finally{Object.setPrototypeOf(p,parent);}assert.match(caught.message,/cleanup ownership changed/);assert.equal(reentries,1);assert.equal(dispatches,1);assert.equal(o.status().state,'closed');assert.equal(o.status().retainedBackingBytes,firstSpec.bytes);`);payloadDriftControls++;
+runPayloadSource([],`const o=payloadFixture().create(),includes=Array.prototype.includes;let calls=0,caught,receipt;
+  try{Array.prototype.includes=function(){calls++;throw 0;};try{await o.verify();}catch(e){caught=e;}receipt=o.status();}
+  finally{Array.prototype.includes=includes;}assert.match(caught.message,/construction hook ownership changed/);assert.equal(calls,0);scalarPayloadStatus(receipt);assert(receipt.failed);assert.equal(receipt.retainedBackingBytes,0);`);payloadDriftControls++;
+runPayloadSource([["        requireState('verified');\n        Object.assign(texture,", "        globalThis.testOwner.close();requireState('verified');\n        Object.assign(texture,"]],
+  `const o=payloadFixture().create();globalThis.testOwner=o;await o.verify();assert.throws(()=>o.construct(),/invalid state/);assert.equal(o.status().state,'closed');assert.equal(o.status().retainedBackingBytes,0);`);payloadDriftControls++;
+console.log(`QUALIFIED-PAYLOAD DRIFT CONTROLS OK (${payloadDriftControls}; actual prototype/getter/privacy/uncertainty/reentry controls)`);
+if(process.argv.includes('--prove-fail')){
+  const mutants=[
+    ['digest',"if(hex!==spec.sha256)refuse('digest mismatch');",'', 'corrupt'],
+    ['identity',"if (payloadOwnKeys(page).length!==keys.length || keys.some(k=>value(page,k)!==spec[k])) refuse('qualified page binding');",'', 'wrong-w'],
+    ['accounting','digestCopyBytes:hashing?length:0','digestCopyBytes:0','close-during-digest'],
+    ['shared-promise','if(task)return task;','if(task)return task.then(x=>x);',payloadChecks[0][0]],
+    ['pending-close','if(!hashing)owned=null;','owned=null;','close-during-digest'],
+    ['public-close',"handedOffBackingBytes=length;texture=null;owned=null;state='handed-off';","handedOffBackingBytes=length;owned=null;state='handed-off';",payloadChecks[0][0]],
+    ['premature-construction',payloadSource.slice(payloadSource.indexOf('  const requireState = expected => {'),payloadSource.indexOf('  const api = {',payloadSource.indexOf('  const requireState = expected => {'))),"  const requireState=expected=>{if(failed)throw failure;if(closed)refuse('closed');stable();};\n", 'no-premature-construction'],
+  ];
+  for(const[name,from,to,caseName]of mutants){const check=payloadChecks.find(c=>c[0]===caseName)[1];let failure;
+    try{runPayloadSource([[from,to]],`const key=${JSON.stringify(caseName.replace(/^wrong-/,''))};await (${check.toString()})(createQualifiedAtlasPayload);`);}catch(e){failure=String(e.stderr);}
+    assert(failure?.includes('AssertionError')&&!failure.includes('unique source seam')&&!failure.includes('ReferenceError'),name+' actual source mutant must reach semantic assertion');
+  }
+  console.log(`QUALIFIED-PAYLOAD SOURCE MUTANTS OK (${mutants.length}/${mutants.length} intended semantic failures)`);
 }
