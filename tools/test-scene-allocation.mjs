@@ -1051,3 +1051,72 @@ if(process.argv.includes('--prove-fail')){
   for(const mode of ['prototype','own'])assert.throws(()=>observerDelegation(mode,false,undefined,true,mutant),e=>e.code==='ERR_ASSERTION'&&e.message.startsWith('delegation-'+mode),mode+' original unsafe source must fail semantic control');
   console.log('ALLOCATION-DELEGATION SOURCE MUTANTS OK (2/2 actual unsafe forwarding controls)');
 }
+
+// Reverse buckets retain native handles, never the typed-array WeakMap key. CPU source proof only.
+{
+const src=installAllocationObserver.toString();
+let oldSource=src;
+for(const [a,b]of [
+ ['const oldBucket=s.bufferSources.get(id);oldBucket?.delete(id);','const oldSource=s.bufferSources.get(id);if(oldSource)s.bufferArrays.get(oldSource)?.delete(id);'],
+ ['s.bufferSources.set(id,ids);','s.bufferSources.set(id,data);'],
+ ['s.bufferSources.get(id)?.delete(id);','s.bufferArrays.get(s.bufferSources.get(id))?.delete(id);']
+]){assert.equal(oldSource.split(a).length,2,'one reverse bucket source seam');oldSource=oldSource.replace(a,b);}
+const compile=s=>(0,eval)('('+s+')');
+function run(install,verifyGraph=false){
+ const seam='observer={restore,';
+ assert.equal(install.toString().split(seam).length,2);
+ install=compile(install.toString().replace(seam,'observer={__bucketSizes(gl,view){const s=state(gl);return {reverse:s.bufferSources.size,forward:s.bufferArrays.get(view)?.size||0};},__bucketGraph(gl,view){const s=state(gl),bucket=s.bufferArrays.get(view);return [...s.bufferSources].map(([id,value])=>({isView:ArrayBuffer.isView(value),isBucket:value===bucket,isSet:value instanceof Set,containsNative:value instanceof Set&&value.has(id),allNative:value instanceof Set&&[...value].every(key=>s.bufferIds.has(key))}));},restore,'));
+ const names=['window','WebGLRenderingContext','WebGL2RenderingContext'],old=names.map(k=>Object.getOwnPropertyDescriptor(globalThis,k));
+ let nativeCalls=0,queries=0;
+ class GL {constructor(){this.drawingBufferWidth=2;this.drawingBufferHeight=2;this.current={};}
+ bufferData(){nativeCalls++;}deleteBuffer(){nativeCalls++;}finish(){nativeCalls++;}
+ getParameter(){queries++;return this.current;}getContextAttributes(){queries++;return {depth:true,stencil:false};}isContextLost(){return false;}}
+ Object.assign(GL.prototype,{ARRAY_BUFFER:34962,ARRAY_BUFFER_BINDING:34964});
+ const descriptors=Object.getOwnPropertyDescriptors(GL.prototype),trace=[];
+ let o;
+ try{
+ globalThis.window={};globalThis.WebGLRenderingContext=undefined;globalThis.WebGL2RenderingContext=GL;
+ install({ledger:AllocationLedger.toString(),mips:mipSizes.toString(),reservationPeak:ReservationPeak.toString(),nativeJournal:true,captureNativeFailures:true});
+ o=window.__allocation;const gl=new GL(),one=gl.current,two={},three={},a=new Float32Array(8),b=new Float32Array(a.buffer),c=new Uint8Array(12),vs=[a,b,c];
+ const capture=name=>{const rows=vs.map(v=>o.bufferReservations(gl,v)),last=vs.map(v=>o.bufferReservation(gl,v));trace.push({name,rows,last,peek:o.peek(gl),nativeCalls,queries});};
+ const put=(id,data)=>{gl.current=id;gl.bufferData(34962,data,35044);};
+ put(one,a);
+ if(verifyGraph)assert.deepEqual(o.__bucketGraph(gl,a),[{isView:false,isBucket:true,isSet:true,containsNative:true,allNative:true}],'reverse graph has only exact existing native-handle bucket');
+ put(two,a);capture('one view two keys');
+ put(one,a);capture('same-view replacement reinserts most recent');
+ o.labelBufferOwners(gl,a,['a']);capture('label two');
+ put(one,b);o.labelBufferOwners(gl,a,['stale-a']);capture('same backing distinct view replacement');
+ put(two,16);o.labelBufferOwners(gl,a,['numeric-stale']);capture('numeric invalidates');
+ put(three,c);gl.deleteBuffer(three);capture('pending remains');
+ gl.finish();capture('finish removes');
+ put(one,c);put(two,b);capture('reuse original live handles');
+ put(three,a);capture('reused fixture handle receives new deterministic id');
+ gl.deleteBuffer(one);gl.deleteBuffer(two);gl.deleteBuffer(three);capture('all pending');
+ gl.finish();capture('all finished');
+ for(let i=0;i<512;i++){
+  const id={};put(id,a);o.labelBufferOwners(gl,a,['cycle']);assert.equal(o.bufferReservations(gl,a).length,1);
+  gl.deleteBuffer(id);assert.equal(o.bufferReservations(gl,a)[0]?.pendingDelete,true);
+  gl.finish();assert.deepEqual(o.__bucketSizes(gl,a),{reverse:0,forward:0});assert.deepEqual(o.bufferReservations(gl,a),[]);
+ }
+ capture('512 allocate-label-delete-finish cycles');return trace;
+ }finally{o?.restore();assert.deepEqual(Object.getOwnPropertyDescriptors(GL.prototype),descriptors);names.forEach((k,i)=>{if(old[i])Object.defineProperty(globalThis,k,old[i]);else delete globalThis[k];assert.deepEqual(Object.getOwnPropertyDescriptor(globalThis,k),old[i]);});}
+}
+
+const old=run(compile(oldSource)),candidate=run(installAllocationObserver,true);
+assert.deepEqual(candidate,old,'reverse bucket preserves complete observer semantics');
+assert.deepEqual(candidate[1].rows[0].map(r=>r.id),[2,1]);
+console.log('ALLOCATION-BUCKET CPU OK (12 snapshots; 512 cycles; exact graph, calls, queries and restoration; no native/GC proof)');
+if(process.argv.includes('--prove-fail')){
+assert.throws(()=>run(compile(oldSource),true),e=>e.code==='ERR_ASSERTION'&&e.message.includes('reverse graph'));
+const mutants={
+ skipReplacement:src.replace('oldBucket?.delete(id);',''),
+ skipFinish:src.replace('s.bufferSources.get(id)?.delete(id);s.bufferSources.delete(id);','s.bufferSources.delete(id);'),
+ wrongBucket:src.replace('s.bufferSources.set(id,ids);','s.bufferSources.set(id,new Set());'),
+ dropPending:src.replace("s.ledger.retire(a[0]);if(kind==='texture')","s.ledger.retire(a[0]);if(kind==='buffer')s.bufferSources.get(a[0])?.delete(a[0]);if(kind==='texture')"),
+ mergeViews:src.replaceAll('s.bufferArrays.get(data)','s.bufferArrays.get(data.buffer)').replaceAll('s.bufferArrays.set(data,ids)','s.bufferArrays.set(data.buffer,ids)').replaceAll('s.bufferArrays.get(array)','s.bufferArrays.get(array.buffer)')
+};
+for(const[name,s]of Object.entries(mutants)){assert.notEqual(s,src);assert.throws(()=>assert.deepEqual(run(compile(s)),old),e=>e.code==='ERR_ASSERTION',name);}
+console.log('ALLOCATION-BUCKET SOURCE MUTANTS OK (6/6 actual graph and semantic controls)');
+
+}
+}

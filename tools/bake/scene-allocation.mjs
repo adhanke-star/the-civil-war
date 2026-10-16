@@ -1891,11 +1891,11 @@ export function installAllocationObserver(source) {
       const binding=bindings.find(([t])=>t!==undefined&&t===target)?.[1],id=binding===undefined?null:gl.getParameter(binding);
       if(!id){unknown(s,`unknown buffer target:${target}`);return;}
       const data=a[1],element=data?.BYTES_PER_ELEMENT||1,bytes=typeof data==='number'?data:a[4]?a[4]*element:(data?.byteLength||0)-(a[3]||0)*element;
-      const oldSource=s.bufferSources.get(id);if(oldSource)s.bufferArrays.get(oldSource)?.delete(id);
+      const oldBucket=s.bufferSources.get(id);oldBucket?.delete(id);
       s.bufferSources.delete(id);s.bufferOwners.delete(id);
       s.ledger.reserve(id,'buffer',0,bytes);
       if(!s.bufferIds.has(id))s.bufferIds.set(id,s.nextBufferId++);
-      if(ArrayBuffer.isView(data)){let ids=s.bufferArrays.get(data);if(!ids){ids=new Set();s.bufferArrays.set(data,ids);}ids.add(id);s.bufferSources.set(id,data);}
+      if(ArrayBuffer.isView(data)){let ids=s.bufferArrays.get(data);if(!ids){ids=new Set();s.bufferArrays.set(data,ids);}ids.add(id);s.bufferSources.set(id,ids);}
     });
     for(const multisample of [false,true])wrap(proto,multisample?'renderbufferStorageMultisample':'renderbufferStorage',(gl,a)=>{
       const s=state(gl),offset=multisample?1:0,samples=multisample?Math.max(1,a[1]):1,id=gl.getParameter(gl.RENDERBUFFER_BINDING);
@@ -1908,7 +1908,7 @@ export function installAllocationObserver(source) {
     wrap(proto,'finish',gl=>{const s=state(gl);if(gl.isContextLost?.())return;journal(s,'finish');s.ledger.sync();s.gpu.finish();
       if(s.surfaceRegistered)surfaceEvent(s,{kind:'finish'});
       for(const id of s.bufferIds.keys())if(!s.ledger.objects.has(id)){
-      s.bufferArrays.get(s.bufferSources.get(id))?.delete(id);s.bufferSources.delete(id);s.bufferOwners.delete(id);s.bufferIds.delete(id);
+      s.bufferSources.get(id)?.delete(id);s.bufferSources.delete(id);s.bufferOwners.delete(id);s.bufferIds.delete(id);
     }});
   }
   observer={restore,assertOwned(gl){
