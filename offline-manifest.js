@@ -908,8 +908,8 @@ self.CW_OFFLINE = {
    "sha256": "9372c36282ac0cd4e39b05b9ad817d41781e6c1e681b3d60f188375aa48e7540"
   },
   "src/units/atlas-compression.js": {
-   "bytes": 29695,
-   "sha256": "0965fb9277ad7e142f80077f07ec1d6a7b36cf8f87bc3098ceccdb032cd1e2f2"
+   "bytes": 40532,
+   "sha256": "b8b52e0776227bbe581b1a1e7cae04ca30540c54afb2a2a18e871b6272deab75"
   },
   "src/units/battery.js": {
    "bytes": 17488,
@@ -1472,5 +1472,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "291d93ca370c15a5158cdc5777c593c3fb78f7c0cc9f23bb461f287f82a3e4ea"
+ "generation": "7eef228ece254091bec4b5a3e87e91f9ad792f0cfa9d789fcac00e4516c6a9c5"
 };

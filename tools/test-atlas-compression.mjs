@@ -266,7 +266,7 @@ if(process.argv.includes('--prove-fail')){
     ['accounting','digestCopyBytes:hashing?length:0','digestCopyBytes:0','close-during-digest'],
     ['shared-promise','if(task)return task;','if(task)return task.then(x=>x);',payloadChecks[0][0]],
     ['pending-close','if(!hashing)owned=null;','owned=null;','close-during-digest'],
-    ['public-close',"handedOffBackingBytes=length;texture=null;owned=null;state='handed-off';","handedOffBackingBytes=length;owned=null;state='handed-off';",payloadChecks[0][0]],
+    ['public-close',"handedOffBackingBytes=length;texture=null;constructedRecord=null;owned=null;state='handed-off';","handedOffBackingBytes=length;constructedRecord=null;owned=null;state='handed-off';",payloadChecks[0][0]],
     ['premature-construction',payloadSource.slice(payloadSource.indexOf('  const requireState = expected => {'),payloadSource.indexOf('  const api = {',payloadSource.indexOf('  const requireState = expected => {'))),"  const requireState=expected=>{if(failed)throw failure;if(closed)refuse('closed');stable();};\n", 'no-premature-construction'],
   ];
   for(const[name,from,to,caseName]of mutants){const check=payloadChecks.find(c=>c[0]===caseName)[1];let failure;
@@ -274,4 +274,148 @@ if(process.argv.includes('--prove-fail')){
     assert(failure?.includes('AssertionError')&&!failure.includes('unique source seam')&&!failure.includes('ReferenceError'),name+' actual source mutant must reach semantic assertion');
   }
   console.log(`QUALIFIED-PAYLOAD SOURCE MUTANTS OK (${mutants.length}/${mutants.length} intended semantic failures)`);
+}
+
+// Actual pinned Three upload/cache/state code; GL delegates are CPU controls, never native proof.
+const {WebGLTextures}=await import('../node_modules/three/src/renderers/webgl/WebGLTextures.js');
+const {WebGLState}=await import('../node_modules/three/src/renderers/webgl/WebGLState.js');
+const {WebGLProperties}=await import('../node_modules/three/src/renderers/webgl/WebGLProperties.js');
+function submissionFixture(hooks={}){
+  const calls=[],bindings=new Map(),constants=new Map();let serial=0,active=0,lost=false;
+  const target={
+    getParameter(p){if(p===gl.VERSION)return 'WebGL 2.0';if(p===gl.VIEWPORT||p===gl.SCISSOR_BOX)return [0,0,64,64];
+      if(p===gl.TEXTURE_BINDING_2D)return bindings.get(active)??null;if(p===gl.ACTIVE_TEXTURE)return active;return 16;},
+    createTexture(){hooks.create?.();const t={cpuTexture:++serial};calls.push(['create',t]);return t;},
+    bindTexture(type,t){hooks.bind?.(type,t);if(type===gl.TEXTURE_2D)bindings.set(active,t);calls.push(['bind',type,t]);},
+    activeTexture(n){active=n;},texStorage2D(...args){hooks.storage?.(...args);calls.push(['storage',...args]);},
+    compressedTexSubImage2D(...args){hooks.mip?.(...args);calls.push(['mip',...args]);},
+    isContextLost(){return lost;},getError(){return 0;}
+  };
+  const gl=new Proxy(target,{get(t,k){if(k in t)return t[k];if(/^[A-Z0-9_]+$/.test(k)){
+    if(!constants.has(k))constants.set(k,k==='NO_ERROR'?0:1000+constants.size);return t[k]=constants.get(k);}
+    return t[k]=function(){};}});
+  for(const key of ['TEXTURE_2D','TEXTURE_BINDING_2D','TEXTURE0','ACTIVE_TEXTURE'])void gl[key];
+  for(const key of ['texImage2D','texSubImage2D','compressedTexImage2D','texStorage3D','texImage3D','texSubImage3D',
+    'compressedTexImage3D','compressedTexSubImage3D','copyTexImage2D','copyTexSubImage2D','copyTexSubImage3D','generateMipmap','deleteTexture'])void gl[key];
+  const extensions={has:()=>false,get:()=>null},properties=WebGLProperties(),state=WebGLState(gl,extensions),
+    capabilities={maxTextureSize:4096,maxTextures:16,getMaxAnisotropy:()=>1},
+    utils={convert:v=>v===THREE.RGBA_ASTC_4x4_Format?0x93b0:v===THREE.UnsignedByteType?gl.UNSIGNED_BYTE:v},
+    info={memory:{textures:0},render:{frame:0}},textures=new WebGLTextures(gl,extensions,state,properties,capabilities,utils,info);
+  const renderer={properties,getContext:()=>gl,initTexture(t){hooks.beforeInit?.(t);textures.setTexture2D(t,0);state.unbindTexture();hooks.afterInit?.(t);}};
+  calls.length=0;
+  return {renderer,gl,target,calls,properties,textures,state,setLost:v=>lost=v,wrongBinding:()=>bindings.set(active,{foreign:true})};
+}
+async function submissionOwner(factory=createQualifiedAtlasPayload){const o=payloadFixture(firstSpec,factory).create();await o.verify();o.construct();return o;}
+function submitCaught(o,f){let thrown=false,error;const logs=[],original=console.error;console.error=(...args)=>logs.push(args);
+  try{o.submit(f.renderer);}catch(e){thrown=true;error=e;}finally{console.error=original;}return {thrown,error,logs};}
+function closeCaught(o){try{return o.close();}catch{return o.status();}}
+function charged(o){assert.equal(o.status().submittedBackingBytes,firstSpec.bytes);assert.equal(o.status().retainedBackingBytes,firstSpec.bytes);}
+const submissionChecks=[
+  ['complete',async factory=>{const o=await submissionOwner(factory),f=submissionFixture(),descriptors=Object.getOwnPropertyDescriptors(f.target),r=o.submit(f.renderer);
+    assert.equal(r.storageAllocations,1);assert.equal(r.mipSubmissions,12);assert.equal(r.state,'submitted-retained');assert(Object.isFrozen(r));
+    assert.equal(r.contentAtConsumptionVerified,false);assert.equal(r.exclusiveOwnership,false);assert.equal(r.gpuCompletionVerified,false);assert.equal(r.retirementEligible,false);
+    assert.equal(f.calls.filter(c=>c[0]==='create').length,1);assert.equal(f.calls.filter(c=>c[0]==='mip').length,12);
+    for(const[k,d]of Object.entries(descriptors))assert.deepEqual(Object.getOwnPropertyDescriptor(f.target,k),d,k);charged(o);o.close();charged(o);}],
+  ['cached-no-retry',async factory=>{const o=await submissionOwner(factory),f=submissionFixture();o.submit(f.renderer);const count=f.calls.length;
+    assert.throws(()=>o.submit(f.renderer),/invalid state|already attempted/);assert.equal(f.calls.length,count);o.close();charged(o);}],
+  ['handoff-after-submit',async factory=>{const o=await submissionOwner(factory),f=submissionFixture();o.submit(f.renderer);const t=o.handOff();o.close();
+    assert.equal(t.mipmaps.length,12);assert.equal(t.mipmaps[0].data.buffer.byteLength,firstSpec.bytes);charged(o);t.dispose();}],
+  ['renderer-alias',async factory=>{let retained;const o=await submissionOwner(factory),f=submissionFixture({beforeInit:t=>retained=t});o.submit(f.renderer);o.close();
+    assert.equal(retained.mipmaps[0].data.buffer.byteLength,firstSpec.bytes);charged(o);}],
+  ['data-not-ready',async factory=>{const o=await submissionOwner(factory),f=submissionFixture({beforeInit:t=>t.source.dataReady=false});
+    assert(submitCaught(o,f).thrown);assert.equal(f.calls.filter(c=>c[0]==='mip').length,0);closeCaught(o);charged(o);}],
+  ...['storage','mip'].flatMap(key=>[0,false,undefined].map(raw=>[key+'-throw-'+String(raw),async factory=>{
+    const o=await submissionOwner(factory),f=submissionFixture({[key]:()=>{throw raw;}}),r=submitCaught(o,f);assert(r.thrown);assert.equal(r.error,raw);
+    assert(o.status().failed);assert(r.logs.length>0,'actual Three swallowed/logged native failure');closeCaught(o);charged(o);
+  }])),
+  ['wrong-binding',async factory=>{const o=await submissionOwner(factory),f=submissionFixture();
+    const original=f.target.bindTexture;f.target.bindTexture=function(...args){original.apply(this,args);f.wrongBinding();};
+    assert(submitCaught(o,f).thrown);assert.equal(f.calls.filter(c=>c[0]==='storage').length,0);closeCaught(o);charged(o);}],
+  ['wrong-view',async factory=>{const o=await submissionOwner(factory),f=submissionFixture({beforeInit:t=>t.mipmaps[0].data=t.mipmaps[0].data.slice()});
+    assert(submitCaught(o,f).thrown);assert.equal(f.calls.filter(c=>c[0]==='mip').length,0);closeCaught(o);charged(o);}],
+  ['source-drift',async factory=>{const o=await submissionOwner(factory),f=submissionFixture({beforeInit:t=>t.source.data={width:2048,height:1808}});
+    assert(submitCaught(o,f).thrown);closeCaught(o);charged(o);}],
+  ['context-probe-drift',async factory=>{const o=await submissionOwner(factory),f=submissionFixture();let exposed;
+    const has=f.properties.has;f.properties.has=t=>{if(t.isTexture)exposed=t;return has(t);};
+    f.target.getError=()=>{if(exposed)exposed.source.dataReady=false;return 0;};
+    const r=submitCaught(o,f);assert(r.thrown);assert.equal(f.calls.length,0);closeCaught(o);charged(o);}],
+  ['context-loss',async factory=>{const o=await submissionOwner(factory);let f;f=submissionFixture({mip:()=>f.setLost(true)});assert(submitCaught(o,f).thrown);closeCaught(o);charged(o);}],
+  ['recursive-close',async factory=>{const o=await submissionOwner(factory),f=submissionFixture({beforeInit:()=>o.close()});assert(submitCaught(o,f).thrown);
+    assert.equal(o.status().state,'closed');assert.equal(f.calls.filter(c=>c[0]==='mip').length,0);charged(o);}],
+  ['recursive-handoff',async factory=>{const o=await submissionOwner(factory),f=submissionFixture({beforeInit:()=>o.handOff()});assert(submitCaught(o,f).thrown);
+    assert.equal(f.calls.filter(c=>c[0]==='mip').length,0);closeCaught(o);charged(o);}],
+  ...['refuse','throw','close'].map(kind=>['properties-'+kind,async factory=>{const o=await submissionOwner(factory),f=submissionFixture();let retained;
+    f.properties.has=t=>{retained=t;if(kind==='throw')throw 0;if(kind==='close')o.close();return true;};
+    const r=submitCaught(o,f);assert(r.thrown);if(kind==='throw')assert.equal(r.error,0);assert.equal(f.calls.length,0);closeCaught(o);
+    assert.equal(retained.mipmaps[0].data.buffer.byteLength,firstSpec.bytes);charged(o);
+  }]),
+  ['malformed-before-exposure',async factory=>{const o=await submissionOwner(factory);assert.throws(()=>o.submit({}),/submission/);
+    assert.equal(o.status().submittedBackingBytes,0);closeCaught(o);assert.equal(o.status().retainedBackingBytes,0);}],
+  ['slot-preflight',async factory=>{const o=await submissionOwner(factory),f=submissionFixture(),before=Object.getOwnPropertyDescriptor(f.target,'texStorage2D');
+    Object.defineProperty(f.target,'generateMipmap',{value:f.target.generateMipmap,writable:false,configurable:false});assert(submitCaught(o,f).thrown);
+    assert.deepEqual(Object.getOwnPropertyDescriptor(f.target,'texStorage2D'),before);assert.equal(o.status().submittedBackingBytes,0);closeCaught(o);}],
+  ['preinstall-foreign-slot',async factory=>{const o=await submissionOwner(factory),f=submissionFixture(),has=f.properties.has,foreign=()=>{};
+    f.properties.has=t=>{f.target.texStorage2D=foreign;return has(t);};const r=submitCaught(o,f);assert(r.thrown);
+    assert.match(r.error.message,/uninstalled slot ownership changed/);assert.equal(f.target.texStorage2D,foreign);assert.equal(f.calls.length,0);closeCaught(o);charged(o);}],
+  ...['buffer','byteOffset','byteLength','length'].map(key=>['view-shadow-'+key,async factory=>{const o=await submissionOwner(factory),f=submissionFixture(),has=f.properties.has;let calls=0;
+    f.properties.has=t=>{if(t.isTexture){const data=t.mipmaps[0].data,original=data[key];Object.defineProperty(data,key,{get(){calls++;return original;},configurable:true});}return has(t);};
+    const r=submitCaught(o,f);assert(r.thrown);assert.match(r.error.message,/view metadata shadow/);assert.equal(calls,0);assert.equal(f.calls.length,0);closeCaught(o);charged(o);
+  }]),
+  ['missing-final-mip',async factory=>{const o=await submissionOwner(factory),f=submissionFixture(),native=f.state.compressedTexSubImage2D;let attempts=0;
+    f.state.compressedTexSubImage2D=function(...args){if(++attempts===12)return;return native.apply(this,args);};
+    f.renderer.initTexture=t=>f.textures.setTexture2D(t,0);
+    const r=submitCaught(o,f);assert(r.thrown);assert.match(r.error.message,/incomplete native calls/);assert.equal(attempts,12);
+    assert.equal(f.calls.filter(c=>c[0]==='mip').length,11);closeCaught(o);charged(o);}],
+  ...['copyTexImage2D','copyTexSubImage2D','copyTexSubImage3D'].map(key=>['alternative-'+key,async factory=>{
+    const o=await submissionOwner(factory);let f;f=submissionFixture({beforeInit:()=>f.gl[key](f.gl.TEXTURE_2D,0)});
+    const r=submitCaught(o,f);assert(r.thrown);assert.match(r.error.message,/alternative native operation/);assert.equal(f.calls.length,0);closeCaught(o);charged(o);
+  }]),
+  ['wrong-level',async factory=>{const o=await submissionOwner(factory),f=submissionFixture(),native=f.state.compressedTexSubImage2D;
+    f.state.compressedTexSubImage2D=function(...args){args[1]++;return native.apply(this,args);};const r=submitCaught(o,f);
+    assert(r.thrown);assert.match(r.error.message,/mip call/);assert.equal(f.calls.filter(c=>c[0]==='mip').length,0);closeCaught(o);charged(o);}],
+  ['inherited-slots',async factory=>{const o=await submissionOwner(factory),f=submissionFixture(),parent={};
+    for(const k of ['createTexture','bindTexture','activeTexture','texStorage2D','compressedTexSubImage2D','texImage2D','texSubImage2D','compressedTexImage2D',
+      'texStorage3D','texImage3D','texSubImage3D','compressedTexImage3D','compressedTexSubImage3D','copyTexImage2D','copyTexSubImage2D','copyTexSubImage3D','generateMipmap','deleteTexture']){
+      Object.defineProperty(parent,k,Object.getOwnPropertyDescriptor(f.target,k));delete f.target[k];}
+    Object.setPrototypeOf(f.target,parent);const before=Object.getOwnPropertyDescriptors(parent);o.submit(f.renderer);
+    for(const k of Object.keys(before))assert.equal(Object.hasOwn(f.target,k),false);assert.deepEqual(Object.getOwnPropertyDescriptors(parent),before);o.close();charged(o);}],
+  ['install-then-throw',async factory=>{const o=await submissionOwner(factory),f=submissionFixture(),before=Object.getOwnPropertyDescriptors(f.target);let once=true;
+    const proxy=new Proxy(f.gl,{defineProperty(t,k,d){Reflect.defineProperty(t,k,d);if(k==='texStorage2D'&&once){once=false;throw 0;}return true;}});
+    f.renderer.getContext=()=>proxy;const r=submitCaught(o,f);assert(r.thrown);assert.equal(r.error,0);assert.equal(f.calls.length,0);
+    for(const[k,d]of Object.entries(before))assert.deepEqual(Object.getOwnPropertyDescriptor(f.target,k),d,k);closeCaught(o);charged(o);}],
+  ['first-falsy-before-restoration-fault',async factory=>{const o=await submissionOwner(factory);let f;const foreign=()=>{};
+    f=submissionFixture({storage:()=>{f.target.texStorage2D=foreign;throw 0;}});const r=submitCaught(o,f);
+    assert(r.thrown);assert.equal(r.error,0);assert.equal(f.target.texStorage2D,foreign);assert(o.status().cleanupFailed);closeCaught(o);charged(o);}],
+  ['foreign-replacement',async factory=>{const o=await submissionOwner(factory);let f;const foreign=()=>{};f=submissionFixture({afterInit:()=>{f.target.texStorage2D=foreign;}});
+    assert(submitCaught(o,f).thrown);assert.equal(f.target.texStorage2D,foreign);assert(o.status().cleanupFailed);closeCaught(o);charged(o);}],
+  ['properties-mutates-content-limit',async factory=>{const o=await submissionOwner(factory),f=submissionFixture(),has=f.properties.has;let retained;
+    f.properties.has=t=>{if(t.isTexture){retained=t;t.mipmaps[0].data[0]^=1;}return has(t);};const r=o.submit(f.renderer);assert.equal(r.contentAtConsumptionVerified,false);
+    o.close();assert.equal(retained.mipmaps[0].data.buffer.byteLength,firstSpec.bytes);charged(o);}],
+  ['delegate-mutates-restores-content-limit',async factory=>{const o=await submissionOwner(factory);let consumed=null,original=null;
+    const f=submissionFixture({mip:(...a)=>{const data=a[7];original=data[0];data[0]^=1;consumed=data[0];data[0]=original;}}),r=o.submit(f.renderer);
+    assert.notEqual(consumed,original);assert.equal(r.contentAtConsumptionVerified,false);o.close();charged(o);}],
+];
+for(const[name,check]of submissionChecks){try{await check(createQualifiedAtlasPayload);}catch(e){throw new Error('submission '+name,{cause:e});}}
+console.log(`QUALIFIED-SUBMISSION CPU OK (${submissionChecks.length}; actual pinned Three call witness; no native/content/retirement proof)`);
+if(process.argv.includes('--prove-fail')){
+  const preamble=`const {WebGLTextures}=await import('./node_modules/three/src/renderers/webgl/WebGLTextures.js');
+    const {WebGLState}=await import('./node_modules/three/src/renderers/webgl/WebGLState.js');
+    const {WebGLProperties}=await import('./node_modules/three/src/renderers/webgl/WebGLProperties.js');
+    const submissionFixture=${submissionFixture.toString()},submissionOwner=${submissionOwner.toString()},
+      submitCaught=${submitCaught.toString()},closeCaught=${closeCaught.toString()},charged=${charged.toString()};`;
+  const restoration=payloadSource.slice(payloadSource.indexOf('        for(let i=slots.length-1;i>=0;i--)'),payloadSource.indexOf('        if(restorationFailed)'));
+  const mutants=[
+    ['complete-counts',"if(created!==1||storage!==1||submitted!==12)refuse('submission incomplete native calls');",'',
+      `await (${submissionChecks.find(c=>c[0]==='missing-final-mip')[1].toString()})(createQualifiedAtlasPayload);`],
+    ['sticky-raw-throw','}catch(e){sticky(e);throw failure;}','}catch(e){throw e;}',
+      `const o=await submissionOwner(),f=submissionFixture({storage:()=>{throw 0;}}),r=submitCaught(o,f);assert(r.thrown);assert.equal(r.error,0);`],
+    ['exposure-charge','submittedBackingBytes=length;','',
+      `await (${submissionChecks.find(c=>c[0]==='renderer-alias')[1].toString()})(createQualifiedAtlasPayload);`],
+    ['descriptor-restoration',restoration,'',`await (${submissionChecks[0][1].toString()})(createQualifiedAtlasPayload);`],
+    ['content-guarantee','contentAtConsumptionVerified:false','contentAtConsumptionVerified:true',
+      `await (${submissionChecks[0][1].toString()})(createQualifiedAtlasPayload);`],
+  ];
+  for(const[name,from,to,body]of mutants){let failure;try{runPayloadSource([[from,to]],preamble+body);}catch(e){failure=String(e.stderr);}
+    assert(failure?.includes('AssertionError')&&!failure.includes('unique source seam')&&!failure.includes('ReferenceError'),name+' submission mutant must reach semantic assertion');}
+  console.log(`QUALIFIED-SUBMISSION SOURCE MUTANTS OK (${mutants.length}/${mutants.length} intended semantic failures)`);
 }

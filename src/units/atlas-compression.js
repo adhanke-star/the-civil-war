@@ -176,6 +176,7 @@ export const QUALIFIED_ASTC_PAYLOADS = Object.freeze(Object.fromEntries([
   encoding:'astc4x4',alpha:'premultiplied-gamma-bytes',sha256})])));
 
 const payloadGetDescriptor=Object.getOwnPropertyDescriptor,payloadGetPrototype=Object.getPrototypeOf,payloadOwnKeys=Reflect.ownKeys,
+  payloadDefine=Object.defineProperty,payloadDelete=Reflect.deleteProperty,payloadExtensible=Object.isExtensible,
   payloadApply=Reflect.apply,payloadFreeze=Object.freeze,payloadHasOwn=Object.hasOwn,payloadIs=Object.is,
   payloadString=String,payloadSlice=String.prototype.slice,payloadMax=Math.max,PayloadError=Error,
   PayloadPromise=Promise,payloadResolve=Promise.resolve,payloadReject=Promise.reject,payloadThen=Promise.prototype.then;
@@ -190,6 +191,9 @@ const payloadSameDescriptor = (a,b) => !!a===!!b && (!a || payloadIs(a.value,b.v
 const payloadTransfer = globalThis.structuredClone, payloadCrypto = globalThis.crypto,
   payloadSubtle = payloadCrypto?.subtle, payloadDigest = payloadSubtle?.digest,
   payloadLength = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype,'byteLength').get,
+  payloadViewBuffer = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype),'buffer').get,
+  payloadViewOffset = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype),'byteOffset').get,
+  payloadViewLength = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Uint8Array.prototype),'byteLength').get,
   payloadResizable = Object.getOwnPropertyDescriptor(ArrayBuffer.prototype,'resizable')?.get,
   payloadDispose = PayloadTHREE.Texture.prototype.dispose, payloadDispatch = PayloadTHREE.Texture.prototype.dispatchEvent;
 const payloadBindings=[...['structuredClone','crypto','ArrayBuffer','Uint8Array','DataView','TextDecoder','Object','Array','Number','String','Promise','Math','Reflect'].map(k=>[globalThis,k]),[payloadCrypto,'subtle'],[payloadSubtle,'digest']]
@@ -240,7 +244,8 @@ export function createQualifiedAtlasPayload(input, page) {
   let owned = payloadTransfer(input,{transfer:[input]});
   if (payloadApply(payloadLength,input,[])!==0 || payloadApply(payloadLength,owned,[])!==length) refuse('transfer incomplete');
   let state='owned', closed=false, failed=false, failure, cleanupFailed=false, task=null,
-    hashing=false, texture=null, disposalAttempted=false, handedOffBackingBytes=0,uncertainBackingBytes=0;
+    hashing=false, texture=null, disposalAttempted=false, handedOffBackingBytes=0,uncertainBackingBytes=0,
+    submittedBackingBytes=0,submitting=false,submissionAttempted=false,constructedRecord=null;
   const describe = error => {
     if (error===null) return 'null';
     const type=typeof error;
@@ -253,8 +258,8 @@ export function createQualifiedAtlasPayload(input, page) {
   const sticky = error => { if(!failed){failed=true;failure=error;} if(!closed)state='failed'; };
   const status = () => payloadFreeze({file,state,failed,error:failed?describe(failure):null,cleanupFailed,
     ownedBackingBytes:owned?length:0,digestCopyBytes:hashing?length:0,digestOutputBytes:hashing?32:0,
-    handedOffBackingBytes,uncertainBackingBytes,
-    retainedBackingBytes:payloadMax(owned?length:0,handedOffBackingBytes,uncertainBackingBytes),retirementAvailable:false});
+    handedOffBackingBytes,submittedBackingBytes,uncertainBackingBytes,
+    retainedBackingBytes:payloadMax(owned?length:0,handedOffBackingBytes,submittedBackingBytes,uncertainBackingBytes),retirementAvailable:false});
   const releasePrivate = () => {
     if (texture && !disposalAttempted) {
       const disposing=texture;
@@ -275,7 +280,7 @@ export function createQualifiedAtlasPayload(input, page) {
       try { payloadApply(payloadDispose,disposing,[]); }
       catch(error){cleanupFailed=true;uncertainBackingBytes=length;sticky(error);}
     }
-    texture=null;
+    texture=null;constructedRecord=null;
     if(!hashing)owned=null;
   };
   const requireState = expected => {
@@ -321,18 +326,142 @@ export function createQualifiedAtlasPayload(input, page) {
           wrapS:PayloadTHREE.ClampToEdgeWrapping,wrapT:PayloadTHREE.ClampToEdgeWrapping});
         texture.userData.atlasMipBytes=decoded.bytes;texture.needsUpdate=true;
         requireState('verified');
+        const fields=['source','mipmaps','version','format','type','flipY','premultiplyAlpha','colorSpace','generateMipmaps',
+          'minFilter','magFilter','wrapS','wrapT','unpackAlignment','onUpdate'];
+        constructedRecord={texture,source:texture.source,image:texture.source.data,mips:texture.mipmaps,
+          fields:fields.map(key=>[key,payloadGetDescriptor(texture,key)]),version:texture.version,sourceVersion:texture.source.version,
+          levels:texture.mipmaps.map(m=>({mip:m,data:m.data,width:m.width,height:m.height,offset:m.data.byteOffset,bytes:m.data.byteLength}))};
         state='constructed-private';
         return status();
       } catch(error){sticky(error);releasePrivate();throw failure;}
     },
-    handOff() {
+    // A submission receipt is a call witness, not proof of mutable bytes at native consumption.
+    submit(renderer) {
       requireState('constructed-private');
+      if(submitting||submissionAttempted)refuse('submission already attempted');
+      submissionAttempted=true;submitting=true;
+      const r=constructedRecord,submittingTexture=texture,slots=[],bindings=[];
+      let gl=null,properties=null,nativeTexture=null,created=0,storage=0,submitted=0,restorationFailed=false;
+      const checkOpen=()=>{if(failed)throw failure;if(closed)refuse('closed during submission');stable();if(closed)refuse('closed during submission');};
+      const capture=(object,key)=>{
+        if(!object)refuse('submission API required');
+        const found=payloadDescriptor(object,key),d=found.descriptor;
+        if(!d||!payloadHasOwn(d,'value'))refuse('submission data property required');
+        const entry={object,key,owner:found.owner,descriptor:d};bindings.push(entry);return d.value;
+      };
+      const method=(object,key)=>{const fn=capture(object,key);if(typeof fn!=='function')refuse('submission method required');return fn;};
+      const apiStable=()=>{
+        checkOpen();
+        for(const b of bindings){const current=payloadDescriptor(b.object,b.key);
+          if(current.owner!==b.owner||!payloadSameDescriptor(current.descriptor,b.descriptor))refuse('submission API ownership changed');}
+        for(const s of slots){
+          const own=payloadGetDescriptor(gl,s.key);
+          if(s.installed){if(!payloadSameDescriptor(own,s.installed))refuse('submission interception ownership changed');}
+          else {const found=payloadDescriptor(gl,s.key);if(!payloadSameDescriptor(own,s.own)||found.owner!==s.owner
+            ||!payloadSameDescriptor(found.descriptor,s.original))refuse('submission uninstalled slot ownership changed');}
+        }
+      };
+      const valid=()=>{
+        checkOpen();
+        if(texture!==submittingTexture||!r||r.texture!==submittingTexture)refuse('submission texture ownership changed');
+        for(const [key,d]of r.fields)if(!payloadSameDescriptor(payloadGetDescriptor(submittingTexture,key),d))refuse('submission texture fields changed');
+        if(value(r.source,'data')!==r.image||value(r.source,'dataReady')!==true||value(r.source,'version')!==r.sourceVersion
+          ||value(r.image,'width')!==spec.w||value(r.image,'height')!==spec.h||value(r.mips,'length')!==12)refuse('submission source changed');
+        for(let i=0;i<12;i++){const m=r.levels[i];if(value(r.mips,''+i)!==m.mip||value(m.mip,'data')!==m.data
+          ||value(m.mip,'width')!==m.width||value(m.mip,'height')!==m.height)refuse('submission mip identity changed');
+          for(const key of ['buffer','byteOffset','byteLength','length'])if(payloadGetDescriptor(m.data,key))refuse('submission view metadata shadow');
+          if(payloadApply(payloadViewBuffer,m.data,[])!==owned||payloadApply(payloadViewOffset,m.data,[])!==m.offset
+            ||payloadApply(payloadViewLength,m.data,[])!==m.bytes)refuse('submission mip identity changed');}
+      };
+      try {
+        valid();
+        const init=method(renderer,'initTexture'),context=method(renderer,'getContext');properties=capture(renderer,'properties');
+        const has=method(properties,'has'),get=method(properties,'get');
+        gl=payloadApply(context,renderer,[]);checkOpen();
+        const lost=method(gl,'isContextLost'),error=method(gl,'getError'),parameter=method(gl,'getParameter');
+        const target=capture(gl,'TEXTURE_2D'),binding=capture(gl,'TEXTURE_BINDING_2D'),unit=capture(gl,'TEXTURE0'),active=capture(gl,'ACTIVE_TEXTURE');
+        if(!Number.isInteger(target)||!Number.isInteger(binding)||!Number.isInteger(unit)||!Number.isInteger(active))refuse('submission GL constants required');
+        const healthy=()=>{
+          apiStable();valid();if(payloadApply(context,renderer,[])!==gl)refuse('submission context changed');checkOpen();
+          if(payloadApply(lost,gl,[])||payloadApply(error,gl,[])!==0)refuse('submission native error/context lost');checkOpen();
+          apiStable();valid();
+        };
+        healthy();
+        // Preflight every slot before installing even one. GL wrappers are operation-local only.
+        const names=['createTexture','bindTexture','activeTexture','texStorage2D','compressedTexSubImage2D',
+          'texImage2D','texSubImage2D','compressedTexImage2D','texStorage3D','texImage3D','texSubImage3D','compressedTexImage3D',
+          'compressedTexSubImage3D','copyTexImage2D','copyTexSubImage2D','copyTexSubImage3D','generateMipmap','deleteTexture'];
+        for(const key of names){const found=payloadDescriptor(gl,key),d=found.descriptor,own=payloadGetDescriptor(gl,key);
+          if(!d||!payloadHasOwn(d,'value')||typeof d.value!=='function'||(own&&!own.configurable&&!own.writable)||(!own&&!payloadExtensible(gl)))refuse('submission slot not interceptable');
+          slots.push({key,native:d.value,owner:found.owner,original:d,own,installed:null});}
+        // Even properties.has/get can retain the identity or recursively close this owner.
+        submittedBackingBytes=length;
+        if(payloadApply(has,properties,[submittingTexture]))refuse('submission texture cache already exists');healthy();
+        if(payloadApply(has,properties,[r.source]))refuse('submission source cache already exists');healthy();
+        for(const s of slots){
+          apiStable();
+          const wrapped=function(...args){
+            try {
+              if(this!==gl)refuse('submission GL receiver');healthy();
+              if(s.key==='createTexture'){if(created!==0||args.length)refuse('submission duplicate texture');}
+              else if(s.key==='activeTexture'){if(args.length!==1||args[0]!==unit)refuse('submission texture unit');}
+              else if(s.key==='bindTexture'){
+                if(args.length!==2||args[0]!==target||(!nativeTexture||args[1]!==nativeTexture)&&!(submitted===12&&args[1]===null))refuse('submission texture binding');
+              }else if(s.key==='texStorage2D'){
+                if(created!==1||storage||submitted||args.length!==5||args[0]!==target||args[1]!==12||args[2]!==0x93b0||args[3]!==spec.w||args[4]!==spec.h)refuse('submission storage shape');
+              }else if(s.key==='compressedTexSubImage2D'){
+                const m=r.levels[submitted];if(storage!==1||!m||args.length!==8||args[0]!==target||args[1]!==submitted||args[2]!==0||args[3]!==0
+                  ||args[4]!==m.width||args[5]!==m.height||args[6]!==0x93b0||args[7]!==m.data)refuse('submission mip call');
+              }else refuse('submission alternative native operation');
+              if(s.key==='texStorage2D'||s.key==='compressedTexSubImage2D'){
+                if(payloadApply(parameter,gl,[binding])!==nativeTexture||payloadApply(parameter,gl,[active])!==unit)refuse('submission actual binding');healthy();
+              }
+              const result=payloadApply(s.native,gl,args);
+              // A falsy native throw is latched by catch BEFORE Three can swallow it.
+              if(s.key==='createTexture'){if(!result)refuse('submission native texture absent');nativeTexture=result;created++;}
+              if(s.key==='texStorage2D')storage++;
+              if(s.key==='compressedTexSubImage2D')submitted++;
+              healthy();return result;
+            }catch(e){sticky(e);throw failure;}
+          };
+          s.installed=s.own?{...s.own,value:wrapped}:{value:wrapped,writable:true,configurable:true,enumerable:false};
+          payloadDefine(gl,s.key,s.installed);apiStable();
+        }
+        healthy();payloadApply(init,renderer,[submittingTexture]);healthy();
+        if(created!==1||storage!==1||submitted!==12)refuse('submission incomplete native calls');
+        const t=payloadApply(get,properties,[submittingTexture]);healthy();const source=payloadApply(get,properties,[r.source]);healthy();
+        if(value(t,'__webglTexture')!==nativeTexture||value(t,'__version')!==r.version||value(source,'__version')!==r.sourceVersion)refuse('submission native cache mismatch');
+        healthy();
+      }catch(e){sticky(e);}
+      finally {
+        for(let i=slots.length-1;i>=0;i--){const s=slots[i];if(!s.installed)continue;
+          try{const current=payloadGetDescriptor(gl,s.key);
+            if(payloadSameDescriptor(current,s.installed)){
+              if(s.own)payloadDefine(gl,s.key,s.own);else if(!payloadDelete(gl,s.key))refuse('submission restoration refused');
+            }else if(!payloadSameDescriptor(current,s.own))refuse('submission restoration ownership changed');
+            if(!payloadSameDescriptor(payloadGetDescriptor(gl,s.key),s.own))refuse('submission restoration mismatch');
+            const original=payloadDescriptor(gl,s.key);if(original.owner!==s.owner||!payloadSameDescriptor(original.descriptor,s.original))refuse('submission inherited restoration changed');
+          }catch(e){restorationFailed=true;sticky(e);}
+        }
+        if(restorationFailed){cleanupFailed=true;uncertainBackingBytes=length;}
+        submitting=false;
+        if(closed)releasePrivate();
+      }
+      if(failed)throw failure;
+      if(closed)refuse('closed during submission');
+      state='submitted-retained';
+      return payloadFreeze({file,state,storageAllocations:storage,mipSubmissions:submitted,submittedBackingBytes,
+        verifiedBeforeExposure:true,contentAtConsumptionVerified:false,exclusiveOwnership:false,gpuCompletionVerified:false,retirementEligible:false});
+    },
+    handOff() {
+      if(submitting)refuse('handoff during submission');
+      requireState(state==='submitted-retained'?'submitted-retained':'constructed-private');
       const result=texture;
-      handedOffBackingBytes=length;texture=null;owned=null;state='handed-off';
+      handedOffBackingBytes=length;texture=null;constructedRecord=null;owned=null;state='handed-off';
       return result;
     },
     close() {
-      closed=true;state='closed';releasePrivate();
+      closed=true;state='closed';if(!submitting)releasePrivate();
       if(failed)throw failure;
       return status();
     },
