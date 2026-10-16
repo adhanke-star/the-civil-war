@@ -1,19 +1,11 @@
 # STATE
-0268/582a068 source-admitted; 0269 local102+13/fullCPU+UNIT+syntax+manifest+YAML55+inverses PASS; Astra conditional GO; own-SHA CI admission PENDING.
-Root owns /private/tmp/cw-v1-1-20261012 branchv1-1-gaps-20261012; COORD absent; one read-only Astra; no simultaneous provider/file edits; capacityunknown.
-Next:0235native38811427465 completedMISS releaseexpired/noawards;0238accounting own38816942416 ROOT+AstraCLEAR; 0257passivepointer06dc3ca/own38848393291all9/full8ROOT+AstraSOURCEclear/nocauseclaim;0258terminalterrain ROOT+AstraSOURCEclear/local87+87+UNIT+requiredCPU PASS; be0e59e/own38853460472 ALL9/full8ROOT+AstraSOURCEclear;0259reviewed22Bspritefoundation next/no shipping caller/nativeclaim; resource-nativeHALT untilsufficientCPU/ownerdesign, no mip/filter/budgetwaiver;0236own38820444300RED2/3;0241f684670/own38822969235RED2/3;0242own38826022053RED2/3/fullEOF29aborts;0240+0244 42f306c/own38828363370 all9/full8 ROOT+AstraSOURCEclear; optional38831515515RED initialasyncwaitdefect;0247da0dd5a/own38833040204 ROOT+AstraSOURCEclear; changedoptional38835630802RED invalidguardfixture;0252 30737bb/own38836442464 ROOT+AstraSOURCEclear; optional38839560964RED release-receipt overwrite;0253d56bd75/own38840382739ROOT+AstraSOURCEclear; optional38843643691ROOT+AstraACCEPTED;0255b26dbe4foundationSOURCEclear/own38845977419shard3REDdelegationtarget/originalretained/sourceBLOCKED;0248–0251source-only/resourceinsufficient.
-0230 manifest/syntax/requiredCPU/UNIT/YAML51+27 CLEAR; aa probes134PASS/fresh6PASS; wholeREDuncachedroute withreachableupstream.
-Camera settlement passive eight exact RAFsnapshots/reset/cap4096/measurement30s, no appclock/render/readiness/pixel changes; naturallyuploaded fieldpages retained.
-Ordinarypilot38789128604 two fresh actualentry/store/Lookout contexts, pausedbriefing/explicitthreeUSclose hydration workload; no automaticclose/zoom proof.
-0231 all11×2 CPUapplied capacity preflight CLEAR; full16ordinarypilot/110native/CPUtransients/default/driver/decode/device/250MB/adoption UNRUN.
-Prior fullFloat32 diagnostic38477052623/exact07ca110contexts168wholePNG admitted; cannot replace ordinary proof. Historical firstRED470232876B retained; budget250000000B unchanged.
-Aaron seen six actual numbered artfiles and visual02/05 APPROVED; stop/reload APPROVED; no recurring hands-on requests.
-Badge genuine Gibson Bronze1033→Silver2238→Gold3688/absentLookout save-reload-import root+Astra accepted; Defeat notwinningbalance; all20amounts unchanged.
-0223 independent14of20coverage confirmed; sixbadge gaps; real Stanley replay requires T0/actualterrain/revisedpolicy on Actions, no midbattlecheckpoint.
-0232 uncachedrecordedbanks/orders/ambient gap; synthesizedgunfirefallback EXISTS; nativeplaybackUNRUN. PriorNO-fallbackclaimcorrected.
-Campaign201 actualend/loot/camp/end/reload/import/export/defeat/replay accepted; no demonstrated missing corefeature.
-Historical WebKit38506692812/Chromium38618622919 REDs retained/unexplained; equivalent currentacceptance doesnot claimcause/repair/flake.
-Originmain9e720798 acceptedCI/Pages; protectedMAIN13a7b1368tracked+3untracked untouched/11hashes exact. No integration throughMAIN.
-.out299193157B/364files fixed under300M, including6approvalPNGs; no localnative/browser/heavy/logs/ZIPs.
-Mission: finish existingv1.1 proof/adoption/release, independentAstra finiteplayablev2 scope, implement/release; continue dependency-ready work at greens.
-Historical exactSTATE snapshot and complete evidence/contracts in HANDOFF; no release/performance/device claim from CPU/source/parentgreen.
+2026-10-16 · Claude Code (Opus) sole writer; Codex released. Worktree /private/tmp/cw-v1-1-20261012, branch v1-1-gaps-20261012.
+Decision 0272 (Aaron): ship v1.1 now under the 0108 light process; compressed atlases and extra CS looks leave v1.1 (code stays default-off).
+Live: v1 released 2026-10-12; origin/main 9e72079 on Pages. Branch is 74 commits ahead, 0 behind; 6fe9829 own CI 38944167328 all 9 green.
+In v1.1 (done): MIT + CC-BY licence; Stones River southern ground; four sourced higher commanders; balance/campaign 201 fights accepted;
+branch fixes: RTS camera at terrain height, recorded battle sounds prepared before leaving camp, offline upgrade admission, terminal graphics stop/reload (Aaron approved).
+Next: docs commit → CI green → fast-forward main → Pages → screenshots → tag v1.1 + Release → define one finite playable v2 in PLAN.
+Open, not v1.1 gates: compressed atlases (0270/0271 history in HANDOFF/PLAN); six natural badge-award gaps (14/20 covered); native FPS/sound/device UNRUN.
+Protected MAIN /Users/aaronhanke/Developer/the-civil-war (13a7b13 + 11 WIP files) is never edited or integrated through.
+.out 364 files / 299,193,157 B (cap 300 MB): add nothing locally; screenshots go to the scratchpad.
+Old build ~/Desktop/Video Game is read-only. History: two sources for Verified; never invent people or units.

@@ -1,5 +1,38 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0272 — Ship v1.1 now; compressed atlases leave v1.1 (Aaron, 2026-10-16)
+
+Aaron chose, in a popup with this as the recommended option, to release v1.1 from what is already
+done and playable, under the Decision 0108 light process. Compressed (ASTC/KTX) soldier atlases and
+the extra Confederate looks they were meant to carry leave v1.1. Their code stays in the tree,
+default-off; the 0271 RAM-only terminal-texture protocol and the nine 0270 "bridges" are not v1.1
+work. Why: that one item held the release for days across 74 mostly invisible commits, with no end in
+sight, while players would not see the difference. The relay prompt's proof regime (byte inverses,
+RAM witnesses, material ZIP readback) is not reinstated; 0108 governs. History rules, the 250 MB
+budget as a design target, and Aaron's approved art 02/05 and stop/reload stay as they were.
+Release path: docs commit on v1-1-gaps-20261012, green CI for that SHA, fast-forward main, Pages,
+look at screenshots, tag v1.1 and publish the Release. Then plan one finite playable v2.
+
+0271 relay boundary (2026-10-16): Aaron requests Claude Fable/Opus autonomous continuation.
+Stop before production implementation. Actual pinned CPU destination-copy counterexample shows
+source/image/mip guards alone insufficient; complete sampler/copy/cache/epoch/authorized-cleanup
+RAM protocol remains next. No passing protocol, retirement or native budget claim. Four docs WIP
+preserved for next source boundary, no docs-only producer push. Codex releases writer ownership.
+
+0270 resource feasibility (2026-10-16): current retained-F path cannot close conditional fallback
+290185945B under unchanged250000000B. ROOT+Astra recommend0271 RAM-only complete terminal
+texture protocol witness; deterministic zero-length transfer detaches aliases, but actual pinned
+Three reuploads12empty mip views after needsUpdate. Old counters stay permanent. Guard/cache/
+epoch/disposal and one-renderer unsupported route, static retirement, font/allphase admission,
+natural-Post staging and equivalent bounded observer remain explicit dependencies. No new
+production mechanisms/native retry/adoption until a complete plausible plan and finite contract.
+
+0269 final admission (2026-10-16): ROOT+independent Astra admit retained-backing upload foundation
+at6fe98290135b4f02f04017ca218c7dd3d8335977/own38944167328, all9 and all8 canonical material
+scopes+probes clear. Permanent F charge, stable-baseline limit and historical failures remain.
+Next0270 reviews complete resource feasibility before more mechanisms; 121767B conditional
+margin is not native-memory, retirement, 250MB, adoption or release proof.
+
 0269 capture completion (2026-10-16): pin has/get/remove/dispose method-function hooks and all
 48 explicit upload/table constants. Astra demonstrated an accepted wrong CLAMP_TO_EDGE upload
 and three accepted function-property changes; the bounded fixes now reject both classes. Actual

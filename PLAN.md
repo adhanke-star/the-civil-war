@@ -1,5 +1,75 @@
 # Current execution — v1.1, then v2 (Aaron, 2026-10-12)
 
+SHIP v1.1 NOW (Aaron, DECISIONS 0272, 2026-10-16). Light process (0108). Compressed atlases and
+extra CS looks are out of v1.1 (code stays default-off); 0271/0270 bridges below are history, not
+v1.1 gates. Steps: (1) docs commit, green CI on that SHA; (2) fast-forward main to it, Pages green,
+live page loads; (3) look at CI screenshots; (4) tag v1.1 + Release notes of player-visible changes;
+(5) write ONE finite playable v2 milestone here before any v2 code, then build and release it.
+
+PROVIDER RELAY: Aaron requests Claude Code Fable/Opus autonomous completion loop. Codex stops
+at0269 SOURCE admission/0270 complete review/0271 RAM-only findings. Four docs WIP preserved,
+source/test/manifest unchanged6fe9829/indexempty. Read HANDOFF top0271 adversarial supplement:
+source/image/mips guards alone STILL allow terminal DESTINATION copy (one16B native-boundary
+write in actual pinned CPU fixture). No complete terminal protocol or production repair exists.
+Claude becomes sole writer only after reconciling provider/process ownership; no simultaneous edits.
+
+0270 whole-path resource review COMPLETE, ROOT+independent Astra (2026-10-16).
+Decision: retain the fixed250000000B/fullmips/art/capacity/camera/acceptance requirements;
+proceed only to0271 RAM-only terminal texture protocol witness before production mechanisms.
+The existing retained-payload path cannot close the fallback budget. Rehashed actual8KTX files
+40307712B/96mips40303744B,496B overhead each/max5375328B. Conditional fallback endpoint
+249098867+F=289406579; peak249878233+F=290185945. Capable226928045+F=267235757 IF that
+whole set is additional; never double-count modeled copies. Remaining original margin121767B
+is Lookout-specific/source-only, not universal eleven-phase/font or physical memory proof.
+
+| Existing foundation | Required closure before native resource acceptance |
+| --- | --- |
+| Qualified hashes, full pinned upload, permanent F charges | Private terminal alias detachment plus immutable upload state/cache/context epochs; old generic/trusted/handoff counters remain unchanged. |
+| SerialClose staging | Retire completed private payloads; unwind failed candidates before PNG fallback; both-side close starts only after first existing healthy natural Post.render return. |
+| Packed terrain and22B sprites | Actual shader/wholeRGBA equality; static CPU aliases retire only after complete upload caller return; dynamic streams stay resident. Current terrain guards require full backing bytes. |
+| Fatal label bounds | Wire actual World caller; actual fonts/all11phase admission without omitting labels. Current allowance is Lookout-specific. |
+| Source-closed renderer factories | One renderer/context across capable and unsupported routes. Current upload factory refuses/disposes on missing ASTC; main still constructs ordinary renderer. Do not retry a second context or retrofit public renderer authority. |
+| Allocation observer and RAM codec | Actual bounded606536B PBO+65532B chunk, full-stream equality/PACK restore/pending reservations; explicit observer-buffer role while every application buffer retains CPU binding. Current capture still allocates fullRGBA. |
+| Partial default-off primitives | Wire Game/main/World serial and terminal selection only after finite source/native contracts. Actual construction, lifetime, resize/failure/all11/full110/adoption/release remain separate gates. |
+
+Alternatives: (A) retain F: smallest and reversible diagnostic path, arithmetically insufficient;
+(B) private terminal upload/detachment: recommended smallest plausible path, terminal reload on
+loss and fail-closed ownership errors, no new module/framework; (C) change representation/art/
+capacity/architecture: larger reversal cost, not justified before B's finite witness. All preserve
+same-realm stable-bootstrap boundary; no arbitrary hostile baseline/native authenticity claim.
+Digest-copy scheduling can substitute F for current G (+496B) only after digest settles and before
+GPU allocation/no-next-fetch; prior GPU, pending deletion and scratch stay charged. Private
+JS/font/image/decode/driver memory remains unmeasured. This review does not admit250MB.
+
+0270 independent CPU witnesses: transferToFixedLength(0) and transfer(0) detach real4938464B
+qualified backing/all12mip aliases/whole view; DataView refuses; destination0. Actual byte-bound
+pinned full renderer's subsequent cached initTexture calls allocate/upload0, dimensions/versions/
+handle unchanged. needsUpdate=true causes12zero-view upload calls: terminal guard is REQUIRED.
+Existing status retains F/retirementAvailable:false through handoff/disposal/close, correctly.
+
+0271 READ-ONLY RAM scope: reuse existing complete pinned renderer fixture. Prototype terminal
+transition after successful trusted submission and BEFORE production-public handoff; proof-only
+test probes may see private texture but confer no production authority. Bind whole buffer/allmips,
+source/dimensions/versions/cache handle/epoch and once-only disposal. Positive cached binding;
+refuse version/source/mip/branch mutation, cache deletion/reset, context loss/restoration, clone/
+reupload and reentry BEFORE byte-consuming calls. Charge independent copies, all uncertainty,
+old permanent F and pending native deletion. No source/module/manifest/workflow edits, new CI,
+native dispatch, actual retirementAvailable or lowering old counters. First raw falsy failures
+preserved. ROOT+Astra challenge the complete protocol; then define a separate finite source slice
+only if plausible. If guard/ownership premise fails without bounded fix, preserve and halt that
+protocol; select independent authorized work. No more unrelated hardening selected by default.
+
+0269 FINAL SOURCE ADMISSION (2026-10-16): exact6fe98290135b4f02f04017ca218c7dd3d8335977,
+own38944167328/attempt1/push/namedbranch all9SUCCESS. ROOT+independent Astra cleared all8
+canonical original/material scopes and probes; detailed ZIP/member/CRC/SHA/source readbacks in
+HANDOFF checkpoint. Counts251/365/266/166/campaign201/FF6/WK6/offline6+upgrade26. Preserve
+offline8missing module terminals/hashfalse, known wide12pixel32channel difference, tool warnings,
+stable-baseline mutation limit and historical REDs. Admission is retained-backing upload SOURCE
+foundation only; native retirement/physical memory/250MB/adoption/release remain UNRUN.
+Next0270: whole-path feasibility review, existing docs/source only; no mechanisms before a
+plausible complete fixed250000000B ownership/overlap/capture plan. Root sole writer/one read-only
+Astra; no docs-only producer rerun; source/test frozen until separately bounded next slice.
+
 0269 local admission boundary: complete serial CPU/UNIT/syntax/manifest/YAML3/bash55/inverse/
 preservation gates PASS; upload102+13, old69+14 unchanged. Independent Astra conditional GO on
 source abaa33f2/test b5c28e03. Next: exact seven-path index review, one commit/push, then freeze

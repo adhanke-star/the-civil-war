@@ -2,6 +2,183 @@
 
 ## Current recovery checkpoint — 2026-10-16
 
+```finish-loop-checkpoint
+{
+  "schema": 1,
+  "item": "0272",
+  "phase": "SHIP_V1_1",
+  "owner": "Claude Code (Opus 5.5) sole writer; Codex released",
+  "repo": "/private/tmp/cw-v1-1-20261012",
+  "branch": "v1-1-gaps-20261012",
+  "baseSha": "6fe98290135b4f02f04017ca218c7dd3d8335977",
+  "remoteShaObserved": "6fe98290135b4f02f04017ca218c7dd3d8335977",
+  "priorSourceCi": 38892232331,
+  "priorSourceCiScope": "All9 metadata verified this session; prior material acceptance remains documented historical evidence, not re-read here",
+  "nextTask": "0272 ship v1.1 under 0108 light process: docs commit on branch, green CI for that SHA, fast-forward main, Pages, screenshots, tag v1.1 + Release. Compressed atlases out of v1.1 (default-off). 0271 RAM protocol NOT v1.1 work. Then define and build one finite playable v2.",
+  "allowedPaths": [
+    "DECISIONS.md",
+    "HANDOFF.md",
+    "PLAN.md",
+    "STATE.md"
+  ],
+  "sourceHashes": {
+    "src/units/atlas-compression.js": "abaa33f212e84bb07dfdbe7619958f20f45e5048ee36c2d87216472ca34aa1a3",
+    "tools/test-atlas-compression.mjs": "b5c28e035bade2f34f9a51c92a21429236c90d7b0fec08c2546b55f9a277cec5"
+  },
+  "protectedMain": {
+    "root": "/Users/aaronhanke/Developer/the-civil-war",
+    "head": "13a7b136f0ed97b92c682f64f3f7db660b84a4a0",
+    "hashes": {
+      "index.html": "5410175d10dd2db6a4b818b6ab6db0535f05129b643c8a83ddde5c0fe6b437fa",
+      "src/main.js": "b74dfc22e07aa2b9f4a7440ea4a9a9559881156115a5918e0ce21248e8696193",
+      "src/ui/hud.css": "6fc16b51e6dc7199cb8cce195a8b8ebd915f2404ec94d3e3f3d021605438c5a0",
+      "src/ui/hud.js": "8d4a42f918350e5e07deacc2110a3987730303dc1b88cef98f748f0b81a14d9a",
+      "src/ui/input.js": "af216be39da57ddfd1dd3f69ee7b19bd81ec0730e92c0c8a0afb0ffa62152068",
+      "tools/test-soldier-view-ui.mjs": "ef2a524a00f61888514e0079e4d70c77481826611f65ae4278b84b371dc7c508",
+      "tools/test-view-ui.mjs": "e7b061acefb3fab4b99c9942350215686e4a21de1edb26187d22ce6316a2a6db",
+      "tools/test.mjs": "4cb9b1eced08887e162c058f82c6939af3c7da2dad04cd5f35c6e2d65fdb8fc3",
+      "NEW-civil-war-video-game.code-workspace": "2380ef586dca4039d2b589bc49165edfb4627e03fe942bbcb5b89a852be2e186",
+      "docs/shiloh-preflight.md": "d3ea69756e562657fa02780dca2ebad1d13303dcd7bfe2542146bcfabc73b918",
+      "tools/test-feedback-ui.mjs": "e0017c3fee486f6730be256fc0026ff79ff4ddddbc9a4d1292ee1281539c3082"
+    }
+  },
+  "pendingExternalAction": null,
+  "recoveryTool": "/private/tmp/cw-finish-loop-20261016/tools/finish-status.mjs",
+  "strategy": "/private/tmp/cw-finish-loop-20261016/README.md",
+  "toolingBranch": "finish-loop-recovery-20261016",
+  "toolingRemoteState": "LOCAL_ONLY; not merged/pushed; no CI or product admission implied",
+  "candidateSha": "6fe98290135b4f02f04017ca218c7dd3d8335977",
+  "currentRunId": 38944167328,
+  "sourceParentSha": "582a068365a9e261eff557c585cba3d65dea815c",
+  "materialAdmission": "ROOT + independent Astra GO: own9/8canonical+probes finite0269 SOURCE admission; no new native-memory/retirement/250MB/adoption/release claim",
+  "resourceReview": {
+    "id": "0270",
+    "review": "ROOT + independent Astra complete; conditional terminal path plausible, current retained-F path infeasible",
+    "cap": 250000000,
+    "conditionalOldPeak": 249878233,
+    "oldMargin": 121767,
+    "qualifiedFileBytes": 40307712,
+    "qualifiedGpuMipBytes": 40303744,
+    "perFileOverhead": 496,
+    "retainedFallbackEndpoint": 289406579,
+    "retainedFallbackPeak": 290185945,
+    "retainedCapablePeakIfAdditional": 267235757,
+    "byteBoundCpuWitness": {
+      "fileBytes": 4938464,
+      "mipViews": 12,
+      "detachedViews": 12,
+      "zeroLengthDestination": 0,
+      "dataViewRefuses": true,
+      "cachedReuploads": 0,
+      "needsUpdateEmptyReuploads": 12,
+      "oldCharge": 4938464,
+      "retirementAvailable": false
+    },
+    "missing": [
+      "terminal texture/cache/context/once-disposal protocol",
+      "single source-closed renderer/context capable + unsupported route",
+      "static backing caller-return/alias retirement",
+      "World labels actual font/all11 admission",
+      "Game/main terminal+serial selection after first natural healthy Post return",
+      "bounded observer PBO/chunk equivalent full pixels + explicit observer-buffer role",
+      "native/physical/private memory/all11/full110/adoption/release"
+    ],
+    "protocolStatus": "UNIMPLEMENTED; detach/cached-binding and needsUpdate/destination-copy rejecting findings only; full guard protocol UNRUN",
+    "destinationCopyCounterexample": {
+      "reviewer": "independent Astra",
+      "renderer": "actual pinned full renderer CPU fixture",
+      "guards": [
+        "source",
+        "image",
+        "mipmaps"
+      ],
+      "guardReads": 0,
+      "compressedSubImageCalls": 1,
+      "sourceBytes": 16,
+      "nativeGpu": false
+    }
+  },
+  "transportReceiptsReference": "HANDOFF.md fenced finish-loop-material-receipts; complete admitted0269 original ZIP/member/CRC/SHA/source/material records unchanged"
+}
+```
+
+0272 (Aaron, 2026-10-16): ship v1.1 now under DECISIONS 0108. Compressed atlases and extra CS looks leave v1.1; their
+code stays default-off. The 0271 protocol and 0270 bridges below are history, not release gates. The relay
+prompt's proof regime is not reinstated. Release path is in PLAN top and STATE.
+
+
+Recovery-reader closeout fix: its first16384B checkpoint envelope initially returned exit2 after
+the accumulated material receipts grew. Compact5206B checkpoint moved first; complete16862B
+transport/material JSON moved to the separate finish-loop-material-receipts fence IN THIS SAME
+HANDOFF, data-equal to all admitted receipts. No tool/source/new file/evidence catalog change.
+Final recovery command exit0/RECONCILE_WIP/Issues[]; HEAD=origin6fe9829; all9 own jobs SUCCESS;
+protected11/source-test-manifest/.out364files299193157B/STATE19/indexempty/diffcheck PASS.
+
+PROVIDER RELAY requested by Aaron: stop Codex here; target Claude Code Fable/Opus main loop,
+high/xhigh for renderer judgment, sole implementation/integration writer. Codex has released
+ownership; no further agents/prototypes/edits after final preservation checks. COORD absent;
+read it immediately if it appears. Four docs are intentional uncommitted receipt/review WIP;
+source/test/manifest remain admitted6fe9829, indexempty, HEAD=origin namedbranch, no external
+action pending. Next0271 RAM-only protocol completion, then autonomous bounded dependency loop
+through v1.1 acceptance/release and one separately finite playable v2. Capacity unmeasured.
+
+0271 ADVERSARIAL FINDINGS, NOT COMPLETE PROTOCOL/NO PRODUCTION CHANGE. Independent actual
+pinned full renderer CPU witness: after trusted submission+zero detach, making source/image/
+mipmaps getters throw STILL permits copyTextureToTexture(otherCompressed,terminal) to issue ONE
+16B compressedTexSubImage2D destination write with ZERO guarded getter reads. Restore exact
+descriptors before cleanup. Destination format/type are read before binding; a proposed deny
+there needs actual ordinary sampler-path compatibility proof. No accepted repair/prototype yet.
+Required ordering coverage: ordinary setValueT1 uses PRIVATE textures.setTexture2D, bypasses
+public initTexture; properties.get precedes video/renderTarget/external flags and version;
+direct initTexture reads cube/3D/array flags first. Copy FROM terminal reads mipmaps/image before
+version; framebuffer copy reads image dimensions. Borrowed Texture.prototype.copy also reads
+source/mipmaps; instance clone/copy overrides alone are insufficient. Native Texture.dispose
+uses dispatchEvent/public _listeners; borrowed prototype disposal/dispatch must not bypass
+authorization. Real onTextureDispose removes listener before reading source twice for deletion;
+cleanup must allow ONLY required reads, reject reentered render/copy and prevent second deletion.
+Cache remove(texture)/remove(source), altered records, whole properties.dispose and restored GL
+epoch must fail closed; renderer.resetState only resets bindings, NOT cache, and requires separate
+positive/refusal treatment. Guard must precede byte allocation/upload/copy, not fail later by an
+incidental TypeError. First raw falsy error/cleanup uncertainty stays sticky. Root independently
+reproduced needsUpdate12empty uploads; independent destination bypass is retained as a claim
+with exact source ordering, not a new native/physical/retirement proof. RAM code is NOT durable;
+reconstruct against byte-bound fixture and do not invent a passing terminal protocol.
+
+0270 COMPLETE ROOT+independent Astra: whole-path closure map/alternatives/0271 RAM contract at
+top of PLAN. Current permanent-F path fails conditional fallback: eight actual rehashed files
+40307712B/96mips40303744B (496B overhead each), endpoint289406579/peak290185945B. Capable
+267235757B only if fullF additional/no duplicate copies; original margin121767B Lookout-only.
+ROOT+independent actual full pinned Three CPU witness: zero-length transfer detaches4938464B
+and12mips, cached initTexture0uploads, needsUpdate then12empty-view uploads. Old permanent F
+and retirementAvailable:false unchanged. Node capability/detachment is not physical/native proof.
+ROOT first READER attempt used cross-realm module/U8 in Node REPL and failed byte-input brand;
+ordinary Node CPU replay passed all8actual file hashes/parser totals; no product/gate changed.
+Missing whole-path bridges: terminal texture/cache/epoch protocol, one-renderer supported AND
+unsupported creation (old upload factory missing-ASTC refuses/disposes), static backing retirement,
+World fatal labels+actual font/allphase bounds, Game/main terminal/serial selection+first natural
+healthy Post gate, equivalent bounded PBO/chunk observer and explicit observer-buffer ownership.
+Next0271 only RAM protocol prototype/source-backed positive+rejecting witnesses+independent
+review, existing fixture, no production edits/native dispatch/old counter reduction. Source/test
+remain6fe9829; four docs dirty receipt/review WIP, indexempty, no docs-only producer push.
+
+0269 FINAL SOURCE ADMISSION CLEAR ROOT+independent Astra. Exact6fe98290135b4f02f04017ca218c7dd3d8335977,
+own38944167328/attempt1/push/namedbranch all9SUCCESS; all8 canonical originals/material and
+probes cleared. Full durable scalar receipts are referenced by the first finish-loop-checkpoint. Counts
+251/365/266/166/campaign201/FF6/WK6/offline6+upgrade26; new upload102+13 and old69+14 retained.
+No native-memory/retirement/250MB/adoption/release claim. Known wide12pixel32channel difference,
+offline8missing module terminals/hashfalse, tool warnings and stable-baseline mutation limit stay
+explicit. The pending statements below record earlier boundaries and are superseded by this admission.
+Next0270 read-only whole-path resource-feasibility/closure review in existing docs/source; no new
+mechanisms before complete fixed250000000B plan. Source/test frozen; four checkpoint docs may
+carry receipt/review WIP; no docs-only push/unchanged producer. Root sole writer/one read-only Astra.
+
+0269 COMMITTED/PUSHED ONCE: 6fe98290135b4f02f04017ca218c7dd3d8335977; exact staged tree
+f98f98947d2ba75204a45080d61b6b82b7e6d31c independently cleared. Remote SHA verified equal.
+Own automatic CI38944167328 is in_progress; source/test frozen. Only HANDOFF receipt updates
+are dirty; index empty. No dispatch, integration, source adoption or release. Reattach existing run;
+metadata green alone never accepts the candidate. Current RAM artifact reader adaptation retains
+ZIP/member/selected expanded limits <99000000 bytes (existing .out/read-artifact-r2.mjs authority).
+
 0269 LOCAL GATES COMPLETE; source admission PENDING. Root serial gate run exited 0 for every
 command below against source 70015B/abaa33f212e84bb07dfdbe7619958f20f45e5048ee36c2d87216472ca34aa1a3
 and test 138294B/b5c28e035bade2f34f9a51c92a21429236c90d7b0fec08c2546b55f9a277cec5.
@@ -69,70 +246,491 @@ recovery after stalls/crashes. That review and a read-only recovery companion ar
 source was changed by this recovery session. The 0269 source work below is preserved and unfinished.
 This block is the current recovery entry; all prior text and receipts remain below unchanged.
 
-```finish-loop-checkpoint
+### Admitted 0269 material receipts
+
+```finish-loop-material-receipts
 {
-  "schema": 1,
-  "item": "0269",
-  "phase": "LOCAL_GATES_CLEAR_INDEX_REVIEW_PENDING",
-  "owner": "Sole ChatGPT/Codex root writer; one bounded read-only Astra reviewer; no simultaneous provider edits",
-  "repo": "/private/tmp/cw-v1-1-20261012",
-  "branch": "v1-1-gaps-20261012",
-  "baseSha": "582a068365a9e261eff557c585cba3d65dea815c",
-  "remoteShaObserved": "582a068365a9e261eff557c585cba3d65dea815c",
-  "priorSourceCi": 38892232331,
-  "priorSourceCiScope": "All9 metadata verified this session; prior material acceptance remains documented historical evidence, not re-read here",
-  "nextTask": "Inspect exact seven-path index independently; commit and push once; freeze actual candidate for own-SHA CI/material admission",
-  "allowedPaths": [
-    "src/units/atlas-compression.js",
-    "tools/test-atlas-compression.mjs",
-    "offline-manifest.js",
-    "DECISIONS.md",
-    "HANDOFF.md",
-    "PLAN.md",
-    "STATE.md"
-  ],
-  "sourceHashes": {
-    "src/units/atlas-compression.js": "abaa33f212e84bb07dfdbe7619958f20f45e5048ee36c2d87216472ca34aa1a3",
-    "tools/test-atlas-compression.mjs": "b5c28e035bade2f34f9a51c92a21429236c90d7b0fec08c2546b55f9a277cec5"
-  },
-  "protectedMain": {
-    "root": "/Users/aaronhanke/Developer/the-civil-war",
-    "head": "13a7b136f0ed97b92c682f64f3f7db660b84a4a0",
-    "hashes": {
-      "index.html": "5410175d10dd2db6a4b818b6ab6db0535f05129b643c8a83ddde5c0fe6b437fa",
-      "src/main.js": "b74dfc22e07aa2b9f4a7440ea4a9a9559881156115a5918e0ce21248e8696193",
-      "src/ui/hud.css": "6fc16b51e6dc7199cb8cce195a8b8ebd915f2404ec94d3e3f3d021605438c5a0",
-      "src/ui/hud.js": "8d4a42f918350e5e07deacc2110a3987730303dc1b88cef98f748f0b81a14d9a",
-      "src/ui/input.js": "af216be39da57ddfd1dd3f69ee7b19bd81ec0730e92c0c8a0afb0ffa62152068",
-      "tools/test-soldier-view-ui.mjs": "ef2a524a00f61888514e0079e4d70c77481826611f65ae4278b84b371dc7c508",
-      "tools/test-view-ui.mjs": "e7b061acefb3fab4b99c9942350215686e4a21de1edb26187d22ce6316a2a6db",
-      "tools/test.mjs": "4cb9b1eced08887e162c058f82c6939af3c7da2dad04cd5f35c6e2d65fdb8fc3",
-      "NEW-civil-war-video-game.code-workspace": "2380ef586dca4039d2b589bc49165edfb4627e03fe942bbcb5b89a852be2e186",
-      "docs/shiloh-preflight.md": "d3ea69756e562657fa02780dca2ebad1d13303dcd7bfe2542146bcfabc73b918",
-      "tools/test-feedback-ui.mjs": "e0017c3fee486f6730be256fc0026ff79ff4ddddbc9a4d1292ee1281539c3082"
+  "firefox": {
+    "id": 12064013645,
+    "job": 117118958789,
+    "zipBytes": 7071624,
+    "zipSHA": "c0305bf9a1536db9ec770b71c044a9b697133c76122a3cd6b131c121edd0e81a",
+    "members": [
+      {
+        "member": "browsers-firefox/result.json",
+        "bytes": 1106,
+        "crc": 515182471,
+        "sha256": "80fbb2e70e930aedb6ccfb01c0f2db550c8b95a8a97cb4540816a996b72563b3"
+      }
+    ],
+    "material": {
+      "checks": 6,
+      "root": true,
+      "independent": true,
+      "rawBytes": 25213,
+      "rawSHA": "be76738fedfae1eb9c4f478b2f3a736f470dc6a584aa16620b824f17d115981d"
     }
   },
-  "pendingExternalAction": {
-    "action": "COMMIT_THEN_PUSH_ONCE",
-    "baseSha": "582a068365a9e261eff557c585cba3d65dea815c",
-    "candidateSha": null,
-    "allowlist": [
-      "src/units/atlas-compression.js",
-      "tools/test-atlas-compression.mjs",
-      "offline-manifest.js",
-      "DECISIONS.md",
-      "HANDOFF.md",
-      "PLAN.md",
-      "STATE.md"
+  "webkit": {
+    "id": 12064232627,
+    "job": 117118958748,
+    "zipBytes": 6287470,
+    "zipSHA": "a7708a235e35c63530d6b75ad440d701297c2fcc697dc4db8c98728a50ab3c5d",
+    "members": [
+      {
+        "member": "browsers-webkit/navigation.json",
+        "bytes": 181913,
+        "crc": 3243181924,
+        "sha256": "e0730aa0773c4bd05676c8156399ec7fcce521f6ab3df3eedd6636ca61777cde"
+      },
+      {
+        "member": "browsers-webkit/result.json",
+        "bytes": 1105,
+        "crc": 1866096758,
+        "sha256": "c3e350d1eab4e13756764a44c06323cb989730451058c9517c7307499cbbc815"
+      }
     ],
-    "commitCommand": "git commit -m \"Complete qualified ASTC upload controls and captures\"",
-    "pushCommand": "git push origin HEAD:refs/heads/v1-1-gaps-20261012",
-    "expected": "One materially changed automatic CI producer; no integration/release"
+    "material": {
+      "checks": 6,
+      "events": 424,
+      "requests": 131,
+      "status0": 1,
+      "status200": 130,
+      "manifestOverlap": true,
+      "root": true,
+      "independent": true,
+      "rawBytes": 25099,
+      "rawSHA": "cb0170cf3c360b3a871239918c5f62c66d2c1fc7d06cc42059fc2be38981019d"
+    }
   },
-  "recoveryTool": "/private/tmp/cw-finish-loop-20261016/tools/finish-status.mjs",
-  "strategy": "/private/tmp/cw-finish-loop-20261016/README.md",
-  "toolingBranch": "finish-loop-recovery-20261016",
-  "toolingRemoteState": "LOCAL_ONLY; not merged/pushed; no CI or product admission implied"
+  "offline": {
+    "id": 12065045918,
+    "job": 117118958910,
+    "zipBytes": 1231669,
+    "zipSHA": "ea0d0b6e45eeb83cc80efbcdcbdd8d256b325c08035c14176762284331950688",
+    "members": [
+      {
+        "member": "offline/admission-trace.json",
+        "bytes": 1539023,
+        "crc": 3517213293,
+        "sha256": "a18824442178b6097d56b21e3cda7aea4f5f2b16caa0089c6074e9d1156330a9"
+      },
+      {
+        "member": "offline/result.json",
+        "bytes": 500329,
+        "crc": 2966147292,
+        "sha256": "b4112ba554dfcf996652a53906e9fdf692fddba0792cbbbf35e551c22a4b0308"
+      },
+      {
+        "member": "offline/upgrade.json",
+        "bytes": 109036,
+        "crc": 2803788306,
+        "sha256": "14a51eac16a0748fdfac6697013f9bed38752a4f89798f547a8edcc0dd681722"
+      }
+    ],
+    "material": {
+      "fresh": 6,
+      "upgrade": 26,
+      "events": 1428,
+      "cacheInventories": 2,
+      "cachedEach": 117,
+      "cachedHashes": false,
+      "traceEvents": 1303,
+      "requests": 365,
+      "terminals": 357,
+      "missingTerminals": 8,
+      "postFreezeEvents": 2,
+      "saveBytes": 5632,
+      "saves": 6,
+      "oldRows": 232,
+      "oldFiles": 86,
+      "statusOnly": 90,
+      "upgradeConsoleErrors": 19,
+      "upgradeConsoleWarnings": 19,
+      "pageErrors": 0,
+      "root": true,
+      "independent": true,
+      "rawBytes": 28225,
+      "rawSHA": "5bbdde293c2a695372f6df25704f2b84f549edf5acb577de43fa70af714904f8"
+    }
+  },
+  "native": {
+    "id": 12065891052,
+    "job": 117118958612,
+    "zipBytes": 41998487,
+    "zipSHA": "8574c19c3cc540b05f4a9ac9b755e65b7355414c752112ed85ef29000b2c2088",
+    "members": [
+      {
+        "member": "last-result.json",
+        "bytes": 81509790,
+        "crc": 4112340701,
+        "sha256": "8091e694de4168290b6971ea5e3dac18df09c2a9918815f5309f8a31fbd34d16"
+      }
+    ],
+    "material": {
+      "checks": 266,
+      "actualSourceCPUChecks": 108,
+      "paintedSourceChecks": 7,
+      "histories": 8,
+      "historyStates": 194,
+      "historyEvents": 1288,
+      "rawAllocationObjectsIncludingProjections": 422,
+      "wholeRGBA": 186,
+      "rgbaBytes": 38308352,
+      "nonuniformFlags": 169,
+      "decodedNonuniform": 186,
+      "wholeComparisons": 114,
+      "equal": 90,
+      "distinct": 24,
+      "rootPixelRejects": 40,
+      "independentAdditionalRejects": 95,
+      "screenshotEvents": 110,
+      "screenshotPairs": 40,
+      "rawBytes": 7262484,
+      "rawSHA": "53328c5d10f64fb9baac804a9fdbc5d2cc50645a74cd6e9b27e0bdae92c66920",
+      "testOKms": 607518,
+      "root": true,
+      "independent": true
+    }
+  },
+  "probes": {
+    "id": 12064319011,
+    "job": 117118958663,
+    "zipBytes": 1135243,
+    "zipSHA": "47631931034cc63570507a2d93abeeb718504695d06d4a02a67d56d0fc39e16c",
+    "members": [
+      {
+        "member": "surrender-ui-controls-1792173779037-result-narrow.png",
+        "bytes": 43179,
+        "crc": 3961757894,
+        "sha256": "6525b6c232148d4f171e1572ad6916a45c449966c6c6d52528b89d437554696c"
+      },
+      {
+        "member": "surrender-ui-controls-1792173779037-reward-narrow.png",
+        "bytes": 156142,
+        "crc": 1570232133,
+        "sha256": "5c14e53a0f29f4189e6376fbb091fe3255c3edcd5c42a059c1de254b1af49126"
+      },
+      {
+        "member": "surrender-ui-controls-1792173779037-result-wide.png",
+        "bytes": 40139,
+        "crc": 481091274,
+        "sha256": "6c90abad57188dfd75d53544ec5a37123a51300f13d20929bb8edbd7f27752d2"
+      },
+      {
+        "member": "surrender-ui-controls-1792173779037-reward-wide.png",
+        "bytes": 330351,
+        "crc": 560698807,
+        "sha256": "ffc4466f6dddbd37cac7249c200515df6f84437b77b4d889434e17a62eb9f8ff"
+      },
+      {
+        "member": "surrender-ui-normal-1792173766425-result-narrow.png",
+        "bytes": 43179,
+        "crc": 3961757894,
+        "sha256": "6525b6c232148d4f171e1572ad6916a45c449966c6c6d52528b89d437554696c"
+      },
+      {
+        "member": "surrender-ui-normal-1792173766425-result-wide.png",
+        "bytes": 40162,
+        "crc": 2430099446,
+        "sha256": "82a6cdbced276560c3a75d23d27339f258c7ee1f474d1f518f8a1101c423f62d"
+      },
+      {
+        "member": "surrender-ui-normal-1792173766425-reward-narrow.png",
+        "bytes": 156142,
+        "crc": 1570232133,
+        "sha256": "5c14e53a0f29f4189e6376fbb091fe3255c3edcd5c42a059c1de254b1af49126"
+      },
+      {
+        "member": "surrender-ui-normal-1792173766425-reward-wide.png",
+        "bytes": 330351,
+        "crc": 560698807,
+        "sha256": "ffc4466f6dddbd37cac7249c200515df6f84437b77b4d889434e17a62eb9f8ff"
+      }
+    ],
+    "material": {
+      "groups": 134,
+      "suites": 67,
+      "rendererCases": 69,
+      "rendererMutants": 14,
+      "uploadCases": 102,
+      "uploadMutants": 13,
+      "actualUI": 24,
+      "rejects": 24,
+      "restorations": 38,
+      "emptyAudits": 8,
+      "rgbaBytes": 10602496,
+      "pairs": [
+        {
+          "role": "result-narrow",
+          "width": 286,
+          "height": 604,
+          "pixels": 0,
+          "channels": 0,
+          "bounds": null
+        },
+        {
+          "role": "result-wide",
+          "width": 574,
+          "height": 332,
+          "pixels": 12,
+          "channels": 32,
+          "bounds": {
+            "minX": 217,
+            "maxX": 356,
+            "minY": 261,
+            "maxY": 268
+          }
+        },
+        {
+          "role": "reward-narrow",
+          "width": 300,
+          "height": 740,
+          "pixels": 0,
+          "channels": 0,
+          "bounds": null
+        },
+        {
+          "role": "reward-wide",
+          "width": 1000,
+          "height": 740,
+          "pixels": 0,
+          "channels": 0,
+          "bounds": null
+        }
+      ],
+      "rawBytes": 5762823,
+      "rawSHA": "c1f369b3ac27dc029a38d61b4ad2e80a1fe536fc71c3ee2dd08176e5f3eaf778",
+      "root": true,
+      "independent": true
+    }
+  },
+  "campaign": {
+    "id": 12066316696,
+    "job": 117118958237,
+    "zipBytes": 48449133,
+    "zipSHA": "276a10c75d129a84de97b7085c0f01005f4d86e78ca9aefdd80eec7c82309644",
+    "members": [
+      {
+        "member": "export-slot1.json",
+        "bytes": 11242,
+        "crc": 2693877929,
+        "sha256": "96ebd770262f55cab17ae95f4f8752efadcde0478a66c113c0e09b15d48b81d1"
+      },
+      {
+        "member": "final-save.json",
+        "bytes": 74225,
+        "crc": 80529586,
+        "sha256": "9e4cf28ee409ba26bb4ed1f698ccc92e3ac9fee91b9bebb54c5faa23929d4610"
+      },
+      {
+        "member": "result.json",
+        "bytes": 77787,
+        "crc": 3857892255,
+        "sha256": "b92f214d62f70ae701bb18453a860495594abfaef9db71fcaadd9d39bbef88d0"
+      }
+    ],
+    "material": {
+      "results": 201,
+      "phases": 12,
+      "uniquePhases": 11,
+      "replays": 1,
+      "phasePoints": 420,
+      "decisionPoints": 140,
+      "rp": 560,
+      "reputation": 560,
+      "level": 8,
+      "army": 55,
+      "ledgerRows": 29,
+      "rawBytes": 61050,
+      "rawSHA": "37aae384a37121c7dce2276f40e9113100730b666afe56182e4711acaac79991",
+      "root": true,
+      "independent": true
+    }
+  },
+  "test1": {
+    "id": 12066396723,
+    "job": 117118958587,
+    "zipBytes": 40163419,
+    "zipSHA": "da0825223e39532c8dc659b8e7053264608df201ef4e00d674d80a9723efaa4a",
+    "members": [
+      {
+        "member": "last-result.json",
+        "bytes": 764432,
+        "crc": 2328707944,
+        "sha256": "f80ee919a3b6b5f3abe91f37ee27d21d003b7ec8c4a408475b2f0170b35fb1b0"
+      }
+    ],
+    "material": {
+      "checks": 251,
+      "poses": 42,
+      "distinctPoses": 7,
+      "epochs": [
+        {
+          "epoch": 1,
+          "frames": 520,
+          "restored": true
+        },
+        {
+          "epoch": 2,
+          "frames": 300,
+          "restored": true
+        },
+        {
+          "epoch": 1,
+          "frames": 382,
+          "restored": true
+        },
+        {
+          "epoch": 1,
+          "frames": 177,
+          "restored": true
+        }
+      ],
+      "readinessPairs": 5,
+      "semanticControls": 14,
+      "readerRejects": 4,
+      "activation": 2,
+      "activationRejects": 2,
+      "raw": {
+        "job": 117118958587,
+        "bytes": 145512,
+        "sha256": "c6d61ef37cec86154222a710b273b65f94ebb69adebc9fce82d4272c8581ba72",
+        "testOK": [
+          "2026-10-16T18:21:21.3587425Z TEST OK (1137439 ms)"
+        ],
+        "warnings": [
+          "2026-10-16T18:02:20.5211577Z (node:147) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+          "2026-10-16T18:02:21.0435966Z (node:147) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilitie",
+          "2026-10-16T18:21:21.6006783Z (node:1015) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+          "2026-10-16T18:21:22.1085699Z (node:1015) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabiliti",
+          "2026-10-16T18:21:23.6199235Z (node:1040) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+          "2026-10-16T18:21:24.1923482Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4, actions/upload-artifact@v4. For more information see: htt"
+        ]
+      },
+      "root": true,
+      "independent": true,
+      "emptyAuditLocations": 15
+    }
+  },
+  "test4": {
+    "id": 12066297030,
+    "job": 117118958777,
+    "zipBytes": 38683201,
+    "zipSHA": "cbdb1c854b5e1689e614a9dfaf4a9f034ec3351d5505b91e4f0ebeacb4ca89f4",
+    "members": [
+      {
+        "member": "last-result.json",
+        "bytes": 384365,
+        "crc": 2178272359,
+        "sha256": "c7c863926449d10aba40fe62a16cfb64d1d794501935cfb839abd2227a6ab10c"
+      }
+    ],
+    "material": {
+      "checks": 166,
+      "packs": 11,
+      "difficultyRows": 9,
+      "foragerCaptures": 4,
+      "badgePrerequisitePredicates": 6,
+      "badgeRejects": 5,
+      "naturalBadgeAwardClaim": false,
+      "raw": {
+        "job": 117118958777,
+        "bytes": 75570,
+        "sha256": "8c9e08a9810e75113f6f75e1c24ce3ca76d165fb4077d009e5081ba86681910e",
+        "testOK": [
+          "2026-10-16T18:20:17.3062890Z TEST OK (1081943 ms)"
+        ],
+        "warnings": [
+          "2026-10-16T18:02:11.5016146Z (node:147) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+          "2026-10-16T18:02:12.1595344Z (node:147) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilitie",
+          "2026-10-16T18:20:17.6095823Z (node:972) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+          "2026-10-16T18:20:18.1925878Z (node:972) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilitie",
+          "2026-10-16T18:20:19.9275500Z (node:997) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+          "2026-10-16T18:20:20.5676076Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4, actions/upload-artifact@v4. For more information see: htt"
+        ]
+      },
+      "root": true,
+      "independent": true,
+      "emptyAuditLocations": 12
+    }
+  },
+  "test2": {
+    "id": 12066770009,
+    "job": 117118958477,
+    "zipBytes": 21084063,
+    "zipSHA": "a027ebe5c7ffa64eb87686df96495fc80e23fbe59fc2519df9a3932bf947c592",
+    "members": [
+      {
+        "member": "last-result.json",
+        "bytes": 30429001,
+        "crc": 3878832061,
+        "sha256": "5d690b6c13823781c32d9a094efb9f27c6da94c0c1f8df8ab24d6c94c66f2bf3"
+      },
+      {
+        "member": "p1-export-2026-10-16T18-02-16-547Z.json",
+        "bytes": 2256,
+        "crc": 447032090,
+        "sha256": "fa0a1180ce21bda3c11ed9ab16abf3511f3a0d1e16c41024828574f94323825f"
+      },
+      {
+        "member": "p1-unsaved-export-2026-10-16T18-02-16-547Z.json",
+        "bytes": 2645,
+        "crc": 3393214788,
+        "sha256": "2b137f3f0700120373717ddf56ce3e4e592a17f0cb5b5bcf3aa2792d5587e9b4"
+      }
+    ],
+    "material": {
+      "checks": 365,
+      "focus": 12,
+      "focusRejects": 12,
+      "ordinaryFocus": true,
+      "originalPointerWitness": true,
+      "activation": 5,
+      "activationRejects": 5,
+      "rw": {
+        "heldRW": true,
+        "request": "success",
+        "transaction": "complete",
+        "nativeEscape": true,
+        "zeroWritesGPU": true,
+        "restored": true,
+        "actualEquippedBytes": 573865,
+        "actualEquippedSHA": "fd296034dc4093987532d362031fbe9506484d0006b970009b71ed2dc523e8fb",
+        "rejects": 6
+      },
+      "exports": [
+        {
+          "name": "p1-export-2026-10-16T18-02-16-547Z.json",
+          "bytes": 2256
+        },
+        {
+          "name": "p1-unsaved-export-2026-10-16T18-02-16-547Z.json",
+          "bytes": 2645
+        }
+      ],
+      "raw": {
+        "job": 117118958477,
+        "bytes": 93330,
+        "sha256": "7dc273dfe1e911f32f767eecc4583c46180324049b16de4ef13ca6cc2cf5346e",
+        "testOK": [
+          "2026-10-16T18:17:02.7038681Z TEST OK (885934 ms)"
+        ],
+        "warnings": [
+          "2026-10-16T18:02:12.4766331Z (node:147) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+          "2026-10-16T18:02:13.1091680Z (node:147) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilitie",
+          "2026-10-16T18:17:03.0110096Z (node:1236) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+          "2026-10-16T18:17:03.7952909Z (node:1236) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabiliti",
+          "2026-10-16T18:17:05.1865712Z (node:1261) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.",
+          "2026-10-16T18:17:05.8291885Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4, actions/upload-artifact@v4. For more information see: htt"
+        ]
+      },
+      "root": true,
+      "independent": true,
+      "emptyAuditLocations": 42,
+      "distinctAuditObservations": 40
+    }
+  }
 }
 ```
 
