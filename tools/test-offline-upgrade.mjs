@@ -14,6 +14,7 @@ import {bankIds,SOUNDS,AUDIO_DIR} from '../src/audio/bank.js';
 import {newCampaign} from '../src/franchise/campaign.js';
 import {completedSnapshot,exportSnapshot} from '../src/franchise/save.js';
 import {SAMPLE_ARMY} from '../src/reward/data.js';
+import {savedDeployment} from '../src/franchise/practice.js';
 import {validateDeck} from '../src/franchise/decisions.js';
 import {observeFallbackCall,recordingProofErrors} from './test-audio-ui.mjs';
 import {observeAudioTransport} from './test-field-admission-ui.mjs';
@@ -375,8 +376,13 @@ async function runCurrentRecordings(){
     const scenario=JSON.parse(await fs.readFile(path.join(ROOT,'assets/packs/shiloh.json'),'utf8')).phases[0].scenario;
     const deck=validateDeck(JSON.parse(await fs.readFile(path.join(ROOT,'assets/decisions.json'),'utf8')));
     const initial=newCampaign({campaign,slot:1,seed:1861,at:'2026-10-15T00:00:00Z',difficulty:'veteran'});
-    const guardRaw=exportSnapshot(completedSnapshot({awardId:'recording-guard-fixture',army:structuredClone(SAMPLE_ARMY),depot:[],issued:[],seed:1861,grade:'Victory'}));
-    expected={sha:recording.sha,run:recording.run,manifest,campaign,deck,initial,guardRaw,
+    const guardRaw=exportSnapshot(completedSnapshot({awardId:'recording-guard-fixture',army:structuredClone(SAMPLE_ARMY.filter(b=>b.id==='b1')),depot:[],issued:[],seed:1861,grade:'Victory'}));
+    assert.equal(JSON.parse(guardRaw).army.length,1);assert.equal(JSON.parse(guardRaw).army[0].id,'b1');
+    const guardGround=JSON.parse(await fs.readFile(path.join(ROOT,'assets/scenarios/henry-hill.json'),'utf8'));
+    const guardInput={baseline:JSON.parse(guardRaw),awardId:'recording-guard-admission',seed:1861,surrender:true};
+    const guardPreliminary=savedDeployment({...guardInput,ground:{}}),guardComplete=savedDeployment({...guardInput,ground:guardGround});
+    assert.deepEqual(guardPreliminary.allocation,guardComplete.allocation);
+    expected={sha:recording.sha,run:recording.run,manifest,campaign,deck,initial,guardRaw,guardAllocation:guardComplete.allocation,
       fielded:[...scenario.units,...(scenario.reinforcements??[])].filter(u=>u.side==='US').map(u=>u.id),
       expectedIds:[...bankIds('battle'),...bankIds('ambient',{season:scenario.season})]};
     const sourceScripts=[];await probeProgress({addInitScript:async(fn)=>sourceScripts.push(fn.toString())},
@@ -505,6 +511,7 @@ async function runCurrentRecordings(){
     assert(browser,'native guards require the actual healthy browser');
     let context,proxy,page,cleanupTask,guardPhase='startup';const hold={enabled:false,rows:[]};
     const g={origin:null,fixtureSource:null,ui:{},cancel:null,healthy:null,probesRestored:false,contextClosed:false};
+    recording.guards=g; // Preserve partial native diagnostics when a later guard fails.
     const previousCleanup=activeCleanup;
     const releaseBodies=()=>{hold.enabled=false;for(const{row,res,bytes}of hold.rows){row.releasedAt=Date.now();if(!res.destroyed&&!res.writableEnded)res.end(bytes);}};
     const cleanup=()=>cleanupTask??=(async()=>{
@@ -547,6 +554,16 @@ async function runCurrentRecordings(){
       await page.goto(g.origin+'?camp&nosw');await page.waitForFunction(()=>window.__entry?.mode==='camp'&&!window.__entry.importing);
       await page.locator('#camp-deploy').click();await page.waitForFunction(()=>document.getElementById('deploy-review')?.getAttribute('aria-busy')==='false');
       g.ui.rawBefore=await progressRaw(page);assert.equal(g.ui.rawBefore,expected.guardRaw);
+      g.ui.review=await page.evaluate(async()=>{
+        const{exportSnapshot}=await import('./src/franchise/save.js'),t=window.__entry.deployment;
+        return{busy:t?.busy,cancelled:t?.cancelled,admitted:t?.admitted,
+          open:document.getElementById('deploy-review').open,enabled:!document.getElementById('deploy-launch').disabled,
+          baselineRaw:t?.manifest?exportSnapshot(t.manifest.baseline):null,allocation:t?.manifest?.allocation??null,
+          note:document.getElementById('deploy-note').textContent};
+      });
+      assert(g.ui.review.open&&g.ui.review.enabled&&g.ui.review.busy===false&&g.ui.review.cancelled===false
+        &&g.ui.review.admitted===false&&g.ui.review.baselineRaw===expected.guardRaw,'recordings: actual guard review was not admitted');
+      assert.deepEqual(g.ui.review.allocation,expected.guardAllocation);
       await page.evaluate(()=>{
         window.__recordingTask=window.__entry.deployment;window.__recordingStart=null;window.__recordingCancel=null;
         const save=(name,event)=>{window[name]={trusted:event.isTrusted,at:performance.timeOrigin+performance.now(),timebase:'browser-performance-UTC'};};

@@ -199,10 +199,12 @@ async function recordingProofFixture() {
   }
   const { completedSnapshot } = await import('../src/franchise/save.js');
   const { SAMPLE_ARMY } = await import('../src/reward/data.js');
-  const guardRaw = exportSnapshot(completedSnapshot({ awardId: 'recording-guard-fixture', army: structuredClone(SAMPLE_ARMY), depot: [], issued: [], seed: 1861, grade: 'Victory' }));
+  const guardRaw = exportSnapshot(completedSnapshot({ awardId: 'recording-guard-fixture', army: structuredClone(SAMPLE_ARMY.filter(b=>b.id==='b1')), depot: [], issued: [], seed: 1861, grade: 'Victory' }));
   report.guards = { cancel: { queued: true, currentCalls: 1, puts: 0, before: guardRaw, after: guardRaw, rejected: true, error: 'Progress: the reviewed exchange was cancelled.' },
     healthy: { queued: true, currentCalls: 1, puts: 1, before: guardRaw, after: guardRaw, rejected: false, error: null },
-    ui: { preparing: true, cancelled: true, rawBefore: guardRaw, rawAfter: guardRaw, gpu: 0, departures: 0, closed: true } };
+    ui: { preparing: true, cancelled: true, rawBefore: guardRaw, rawAfter: guardRaw, gpu: 0, departures: 0, closed: true,
+      review:{open:true,enabled:true,busy:false,cancelled:false,admitted:false,baselineRaw:guardRaw,
+        allocation:(await import('../src/franchise/practice.js')).savedDeployment({baseline:JSON.parse(guardRaw),ground:{},awardId:'recording-guard-admission',seed:1861,surrender:true}).allocation,note:'Source-admitted guard fixture'} } };
   const scripts = [];
   const { probeProgress } = await import('./test-progress-browser.mjs');
   await probeProgress({ addInitScript: async fn => scripts.push(fn.toString()) }, { prefix: '__recording', readFlag: '__recordingReadBlocked', quotaFlag: '__recordingQuota' });
@@ -248,6 +250,15 @@ async function recordingProofFixture() {
   return structuredClone(recordingReaderFixture);
 }
 const recordingProofMutations = [
+  ['guard-review-disabled',r=>{r.guards.ui.review.enabled=false;}],
+  ['guard-review-closed',r=>{r.guards.ui.review.open=false;}],
+  ['guard-review-busy',r=>{r.guards.ui.review.busy=true;}],
+  ['guard-review-cancelled',r=>{r.guards.ui.review.cancelled=true;}],
+  ['guard-review-admitted',r=>{r.guards.ui.review.admitted=true;}],
+  ['guard-review-baseline',r=>{r.guards.ui.review.baselineRaw+=' ';}],
+  ['guard-review-allocation',r=>{r.guards.ui.review.allocation.figures++;}],
+  ['guard-review-note',r=>{r.guards.ui.review.note='';}],
+  ['guard-review-missing',r=>{delete r.guards.ui.review;}],
   ['unrelated-cancel-error', r => { r.guards.cancel.error = 'Progress: something else cancelled'; }],
   ['healthy-exchange-rejected', r => { r.guards.healthy.rejected = true; }],
   ['healthy-exchange-error', r => { r.guards.healthy.error = 'unexplained'; }],
@@ -459,6 +470,26 @@ export const AUDIO_CHECKS = [
         'recordings-producer-process: terminal watchdog missing, late, or non-failing with stuck persistence');
     }
   }],
+  ['recordings-guard-fixture',async api=>{
+    const prefix='recordings-guard-fixture: ',source=api.recordingSource();
+    const {completedSnapshot,exportSnapshot}=await import('../src/franchise/save.js'),{SAMPLE_ARMY}=await import('../src/reward/data.js'),
+      {savedDeployment}=await import('../src/franchise/practice.js'),{bankIds}=await import('../src/audio/bank.js'),vm=await import('node:vm');
+    const start=source.indexOf('const guardRaw='),end=source.indexOf('const sourceScripts=[];',start);
+    assert.ok(start>0&&end>start,prefix+'actual producer preflight unavailable');
+    const recording={sha:'a'.repeat(40),run:'123'},scenario=JSON.parse(fs.readFileSync(path.join(ROOT,'assets/packs/shiloh.json'),'utf8')).phases[0].scenario;
+    let result,failure;try{result=await vm.runInNewContext('(async()=>{let expected;'+source.slice(start,end)+';return {guardRaw,guardPreliminary,guardComplete,expected};})()',
+      {SAMPLE_ARMY,completedSnapshot,exportSnapshot,savedDeployment,structuredClone,fs:fs.promises,path,ROOT,recording,scenario,manifest:{},campaign:{},deck:{},initial:{},bankIds,assert});}catch(error){failure=error;}
+    assert.equal(failure,undefined,prefix+'actual producer fixture fails admission: '+failure?.message);
+    assert.deepEqual(JSON.parse(JSON.stringify(result.guardComplete.allocation)),{formations:1,men:1840,guns:0,figures:374},prefix+'source-admitted complete allocation');
+    assert.equal(exportSnapshot(result.guardComplete.baseline),result.guardRaw,prefix+'baseline changed');
+    assert.equal(result.guardComplete.scenario.id,'saved-practice',prefix+'wrong ground-backed manifest');
+    const f=await recordingProofFixture();assert.equal(f.expected.guardRaw,result.guardRaw,prefix+'reader fixture diverges');
+    for(const army of [structuredClone(SAMPLE_ARMY),[{...structuredClone(SAMPLE_ARMY[0]),men:7241}]]){
+      const baseline=completedSnapshot({awardId:'recording-guard-fixture',army,depot:[],issued:[],seed:1861,grade:'Victory'});
+      for(const ground of [{},HH])assert.throws(()=>savedDeployment({baseline,ground,awardId:'recording-guard-admission',seed:1861,surrender:true}),/whole active army exceeds/,prefix+'oversized fixture admitted');
+    }
+  }],
+
   ['recordings-worker-readiness',async api=>{
     const prefix='recordings-worker-readiness: ',source=api.recordingSource();
     const section=(start,end)=>{const a=source.indexOf(start),b=source.indexOf(end,a);assert(a>=0&&b>a,prefix+'actual helper missing');return source.slice(a,b);};
@@ -968,6 +999,7 @@ export const AUDIO_CHECKS = [
 
 // One semantic mutant per check: each must fail that check's own assertion.
 const MUTANTS = {
+  'recordings-guard-fixture': { recordingSource:()=>fs.readFileSync(path.join(ROOT,'tools/test-offline-upgrade.mjs'),'utf8').replace("SAMPLE_ARMY.filter(b=>b.id==='b1')",'SAMPLE_ARMY') },
   'recordings-serving-policy': { servingSource: () => fs.readFileSync(path.join(ROOT, 'tools/serve.mjs'), 'utf8').replace("? 'no-cache' : 'no-store'", "? 'no-store' : 'no-store'") },
   'recordings-worker-readiness': { recordingSource: () => fs.readFileSync(path.join(ROOT, 'tools/test-offline-upgrade.mjs'), 'utf8').replace('if(closed||at>=deadline)return false;', 'if(false)return false;') },
   'recordings-producer-process': { recordingSource: () => fs.readFileSync(path.join(ROOT, 'tools/test-offline-upgrade.mjs'), 'utf8').replace('setTimeout(()=>process.exit(1),5000)', 'setTimeout(()=>process.exit(0),5)') },

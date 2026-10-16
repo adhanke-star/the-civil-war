@@ -17,6 +17,7 @@ import { breakCamp } from '../src/franchise/camp-orders.js';
 import { reconcileLevelRewards } from '../src/franchise/level-rewards.js';
 import { campaignPhase } from '../src/franchise/campaign.js';
 import { cardsFor, chooseDecision, optionOpen } from '../src/franchise/decisions.js';
+import { savedDeployment } from '../src/franchise/practice.js';
 
 const settle = (page) => page.evaluate(() => new Promise((r) => { let n = 0; const f = () => (++n >= 3 ? r() : requestAnimationFrame(f)); requestAnimationFrame(f); }));
 
@@ -223,6 +224,9 @@ export function recordingProofErrors(report, { sha, run, manifest, campaign, fie
     const positive = (n, max) => typeof n === 'number' && Number.isFinite(n) && n > 0 && n <= max;
     need(typeof run === 'string' && report.run === run && expectedIds.length === 18 && new Set(expectedIds).size === 18, 'exact-run/source-ids');
     need(exportSnapshot(parseSnapshot(guardRaw)) === guardRaw && parseSnapshot(guardRaw).kind === 'completed-reward', 'source-guard-baseline');
+    const guardBaseline=parseSnapshot(guardRaw);
+    const guardAllocation=savedDeployment({baseline:guardBaseline,ground:{},awardId:'recording-guard-admission',seed:1861,surrender:true}).allocation;
+    need(guardBaseline.army.length===1&&guardBaseline.army[0].id==='b1','source-admissible-guard-fixture');
     need(!initial.ready && initial.campaign.index === 0 && initial.campaign.history.length === 0, 'source-fresh-prefix');
     const sourceDecisions = [], phase = campaignPhase(initial, campaign);
     let decisionPrefix = initial;
@@ -256,6 +260,10 @@ export function recordingProofErrors(report, { sha, run, manifest, campaign, fie
           && f.admitted === false && f.ownerReleased === true && f.closed === true && time(f.at)
           && f.at >= u.cancelEvent.at && (i === 0 || f.at > u.frames[i - 1].at))
         && report.requests.filter(r => r.case === 'guards' && r.path === 'src/main.js').length === 0;
+      const review=u.review;
+      boundGuard=boundGuard&&review?.open===true&&review.enabled===true&&review.busy===false
+        &&review.cancelled===false&&review.admitted===false&&review.baselineRaw===guardRaw
+        &&JSON.stringify(review.allocation)===JSON.stringify(guardAllocation)&&typeof review.note==='string'&&review.note.length>0;
       const paths = new Set();
       for (const id of u.heldProxyRequestIds) {
         const p = report.requests.find(r => r.id === id);
