@@ -13,6 +13,7 @@ import http from 'node:http';
 import { promises as fs, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { SOUNDS, AUDIO_DIR } from '../src/audio/bank.js';
 
 export const ROOT = realpathSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'));
 export const DEFAULT_PORT = 8770;
@@ -39,6 +40,13 @@ const MIME = {
   '.txt': 'text/plain; charset=utf-8',
   '.md': 'text/plain; charset=utf-8',
 };
+
+// These public recordings may be stored, but every reuse requires validation. The server always reads
+// current full bytes (no validators/304 path). Keep private/dev documents, music and Range behavior separate.
+const PUBLIC_RECORDINGS = new Set(Object.values(SOUNDS).filter(s => s.bank === 'battle' || s.bank === 'ambient').map(s => AUDIO_DIR + s.file));
+export function recordingCacheControl(relative, type, range) {
+  return PUBLIC_RECORDINGS.has(relative) && type === 'audio/mpeg' && range === undefined ? 'no-cache' : 'no-store';
+}
 
 function inside(child, parent) {
   if (child === parent) return true;
@@ -94,7 +102,7 @@ async function handle(req, res, root) {
   res.writeHead(200, {
     'Content-Type': type,
     'Content-Length': st.size,
-    'Cache-Control': 'no-store',
+    'Cache-Control': recordingCacheControl(path.relative(root, real).split(path.sep).join('/'), type, req.headers.range),
     'X-Content-Type-Options': 'nosniff',
   });
   res.end(body);

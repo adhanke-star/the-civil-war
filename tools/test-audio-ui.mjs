@@ -216,7 +216,7 @@ export function observeFallbackCall(sound) {
 
 
 /** Separate replay of recorded/synthetic execution; source inputs come from committed files, never the report. */
-export function recordingProofErrors(report, { sha, run, manifest, campaign, fielded, expectedIds, initial, deck, guardRaw }) {
+export function recordingProofErrors(report, { sha, run, manifest, campaign, fielded, expectedIds, initial, deck, guardRaw, guardFixtureSource }) {
   const errors = [], need = (ok, name) => { if (!ok) errors.push(name); };
   try {
     const positiveInt = (n, max = 100000000) => typeof n === 'number' && Number.isSafeInteger(n) && n > 0 && n <= max;
@@ -233,26 +233,129 @@ export function recordingProofErrors(report, { sha, run, manifest, campaign, fie
     }
     need(sourceDecisions.length === 2 && !decisionPrefix.ready, 'source-decision-prefix');
     need(Array.isArray(report.console) && report.console.length <= 256 && Array.isArray(report.requests) && report.requests.length <= 4096, 'raw-diagnostic-containers');
+    need(positiveInt(guardFixtureSource?.bytes, 100000) && /^[a-f0-9]{64}$/.test(guardFixtureSource?.sha256), 'actual-guard-probe-source');
+    const g = report.guards, time = n => positive(n, Number.MAX_SAFE_INTEGER);
+    const guardProxyIds = new Set(), guardBrowserKeys = new Set();
+    let boundGuard = false;
+    try {
+      const u = g.ui, ordered = [u.startedAt, u.heldAt, u.cancelCommandAt, u.settledAt, u.terminalsAt, u.observedAt];
+      boundGuard = g.origin !== report.cases[0].origin && g.origin !== report.cases[1].origin
+        && new URL(g.origin).hostname === '127.0.0.1' && new URL(g.origin).origin + '/' === g.origin
+        && JSON.stringify(g.fixtureSource) === JSON.stringify(guardFixtureSource)
+        && g.probesRestored === true && g.contextClosed === true && u.holdsReleased === true
+        && ['audio.master', 'audio.effects', 'audio.voices'].every(key => positive(u.settings.before[key], 1) && u.settings.after[key] === u.settings.before[key])
+        && u.settings.after['audio.mute'] === false && u.settings.before['audio.mute'] === false && u.settings.after['audio.music'] === 0
+        && ordered.every(time) && ordered.every((n, i) => i === 0 || n >= ordered[i - 1])
+        && u.startEvent.trusted === true && u.cancelEvent.trusted === true
+        && [u.startEvent, u.cancelEvent].every(e => e.timebase === 'browser-performance-UTC' && time(e.at))
+        && u.cancelEvent.at >= u.startEvent.at && u.cancelEvent.at - u.startEvent.at < 6000
+        && u.heldProxyRequestIds.length === 3 && new Set(u.heldProxyRequestIds).size === 3
+        && u.proxyAbortIds.length === 3 && JSON.stringify(u.proxyAbortIds.slice().sort((a,b)=>a-b)) === JSON.stringify(u.heldProxyRequestIds.slice().sort((a,b)=>a-b))
+        && u.heldBrowser.length === 3 && u.browserAbort.length === 3
+        && u.frames.length === 2 && u.frames.every((f, i) => f.gpu === 0 && f.gamePresent === false && f.cancelled === true
+          && f.admitted === false && f.ownerReleased === true && f.closed === true && time(f.at)
+          && f.at >= u.cancelEvent.at && (i === 0 || f.at > u.frames[i - 1].at))
+        && report.requests.filter(r => r.case === 'guards' && r.path === 'src/main.js').length === 0;
+      const paths = new Set();
+      for (const id of u.heldProxyRequestIds) {
+        const p = report.requests.find(r => r.id === id);
+        if (!p || p.case !== 'guards' || p.origin !== g.origin || p.phase !== 'cancel' || p.method !== 'GET' || p.range !== null
+          || p.status !== 200 || p.held !== true || p.finished !== false || p.failed !== 'client-aborted'
+          || !expectedIds.some(id => p.path === AUDIO_DIR + SOUNDS[id].file)
+          || ![p.at, p.failedAt, p.releasedAt].every(time) || p.at > u.heldAt || p.failedAt < u.cancelCommandAt
+          || p.failedAt > u.terminalsAt || p.releasedAt < u.terminalsAt || p.releasedAt > u.observedAt || paths.has(p.path)) boundGuard = false;
+        if (p) { paths.add(p.path); guardProxyIds.add(id); }
+      }
+      for (const h of u.heldBrowser) {
+        const t = report.browserAudio.find(t => t.id === h.traceId), r = t?.trace.requests.find(r => r.id === h.id);
+        const key = h.traceId + ':' + h.id;
+        const p = report.requests.find(p => guardProxyIds.has(p.id) && g.origin + p.path === h.url && p.method === h.method);
+        const aborted = u.browserAbort.filter(a => a.traceId === h.traceId && a.id === h.id);
+        if (!t || t.case !== 'guards' || t.origin !== g.origin || !r || !p || h.method !== 'GET' || h.url !== r.url
+          || r.start.phase !== 'cancel' || h.response.status !== 200 || h.response.phase !== 'cancel'
+          || !time(h.response.at) || h.response.at > u.heldAt || JSON.stringify(h.response) !== JSON.stringify(r.response)
+          || aborted.length !== 1 || aborted[0].url !== h.url || aborted[0].method !== h.method
+          || JSON.stringify(aborted[0].terminal) !== JSON.stringify(r.terminal) || r.terminal?.type !== 'failed'
+          || r.terminal.failure !== 'net::ERR_ABORTED' || r.terminal.phase !== 'cancel'
+          || !time(r.terminal.at) || r.terminal.at < u.cancelCommandAt || r.terminal.at > u.terminalsAt
+          || r.response.sequence >= r.terminal.sequence || guardBrowserKeys.has(key)) boundGuard = false;
+        guardBrowserKeys.add(key);
+      }
+    } catch { boundGuard = false; }
+    need(boundGuard, 'bound-native-cancel-identities/order/restore');
+    if (!boundGuard) { guardProxyIds.clear(); guardBrowserKeys.clear(); }
+    need(Array.isArray(report.browserAudio) && report.browserAudio.length > 0 && report.browserAudio.length <= 16, 'browser-transport-container');
+    for (const [i, t] of report.browserAudio.entries()) {
+      const origin = t.case === 'guards' ? g.origin : report.cases.find(c => c.name === t.case)?.origin;
+      const trace = t.trace;
+      need(t.id === i + 1 && t.origin === origin && trace.schema === 'audio-transport-node-v1'
+        && trace.overflow === false && trace.observerFailure === false && trace.requests.length <= 64 && trace.events.length <= 256,
+        'browser-transport-identity/bounds');
+      need(trace.events.every((e, i) => e.sequence === i + 1 && time(e.at) && (i === 0 || e.at >= trace.events[i - 1].at)
+        && ['request', 'response', 'finished', 'failed', 'main-request'].includes(e.type)
+        && (e.type === 'main-request' ? e.id === null && JSON.stringify(e) === JSON.stringify(trace.main)
+          : trace.requests.some(r => r.id === e.id && [r.start, r.response, r.terminal].some(v => v && JSON.stringify(v) === JSON.stringify(e))))), 'browser-transport-events');
+      need(trace.events.filter(e => e.type === 'main-request').length === (trace.main ? 1 : 0)
+        && (t.case !== 'guards' || trace.main === null), 'actual-main-markers');
+      for (const [j, r] of trace.requests.entries()) {
+        const target = new URL(r.url), event = e => e && JSON.stringify(trace.events[e.sequence - 1]) === JSON.stringify(e);
+        const path = target.pathname.slice(1), expectedPath = expectedIds.some(id => path === AUDIO_DIR + SOUNDS[id].file);
+        need(r.id === j + 1 && r.method === 'GET' && target.origin + '/' === origin && expectedPath
+          && (t.case === 'guards' ? r.start.phase === 'cancel' : ['prepare', 'playback'].includes(r.start.phase)) && event(r.start)
+          && r.start.id === r.id && r.start.type === 'request' && event(r.terminal) && r.terminal.id === r.id
+          && r.start.sequence < r.terminal.sequence && r.start.at <= r.terminal.at
+          && (!r.response || (event(r.response) && r.response.id === r.id && r.response.type === 'response'
+            && r.start.sequence < r.response.sequence && r.response.sequence < r.terminal.sequence)), 'browser-transport-occurrence');
+        const guarded = guardBrowserKeys.has(t.id + ':' + r.id);
+        const declaredUnavailable = t.case === 'unavailable' && ['prepare', 'playback'].includes(r.start.phase)
+          && expectedPath && r.terminal.type === 'failed' && r.terminal.failure === 'net::ERR_FAILED'
+          && (!r.response || r.response.status === 503);
+        need(guarded || declaredUnavailable || (r.terminal.type === 'finished' && r.response?.status === 200), 'unexplained-browser-transport');
+      }
+    }
     need(report.requests.every((r, i) => r.id === i + 1 && ['healthy', 'unavailable', 'guards'].includes(r.case)
+      && r.origin === (r.case === 'guards' ? g.origin : report.cases.find(c => c.name === r.case)?.origin)
+      && time(r.at) && (r.finished !== true || (time(r.finishedAt) && r.finishedAt >= r.at))
       && typeof r.path === 'string' && r.path.length < 2048 && ['GET', 'HEAD'].includes(r.method)
       && (r.status === null || (positiveInt(r.status, 599) && r.status >= 100))), 'raw-request-shapes');
-    need(report.requests.every(r => !r.failed && (r.status === 200 || (r.case === 'unavailable' && r.phase === 'prepare'
-      && r.status === 503 && expectedIds.some(id => r.path === AUDIO_DIR + SOUNDS[id].file)))), 'unexplained-request-failure');
+    need(report.requests.every(r => guardProxyIds.has(r.id) || (!r.failed && r.finished === true && (r.status === 200 || (r.case === 'unavailable' && r.phase === 'prepare'
+      && r.status === 503 && expectedIds.some(id => r.path === AUDIO_DIR + SOUNDS[id].file))))), 'unexplained-request-failure');
     need(report.schema === 'battle-recordings-v1' && report.complete === true && report.sha === sha
       && /^[1-9][0-9]*$/.test(report.run) && report.attempt === '1' && report.failure === null, 'identity/completion');
     need(report.generation === manifest.generation && report.errors.length === 0 && report.overflow === false, 'source/errors/overflow');
     need(report.cases.length === 2 && report.cases[0].name === 'healthy' && report.cases[1].name === 'unavailable', 'two-distinct-cases');
+    need(report.cases[0].origin !== report.cases[1].origin, 'distinct-owned-origins');
     for (const c of report.cases) {
       const healthy = c.name === 'healthy', prefix = c.name + ':';
       need(new URL(c.origin).origin === c.origin.slice(0, -1) && new URL(c.origin).hostname === '127.0.0.1', prefix + 'origin');
       need(c.metadata.schema === 1 && c.metadata.scope === c.origin && c.metadata.generation === manifest.generation
         && manifest.base.every(p => c.metadata.members.includes(p)), prefix + 'admission');
-      need(c.controller === true && c.beforeGesture.requests === 0 && c.beforeGesture.audioContexts === 0, prefix + 'pre-gesture');
+      const traces = report.browserAudio.filter(t => t.case === c.name);
+      need(traces.filter(t => t.trace.main?.phase === 'prepare').length === 1
+        && traces.filter(t => t.trace.main?.phase === 'restart').length === 1, prefix + 'one-actual-departure/full-restart');
+      for (const phase of ['prepare', 'playback']) {
+        const observed = traces.flatMap(t => t.trace.requests).filter(r => r.start.phase === phase);
+        need(observed.length === 18 && expectedIds.every(id => observed.filter(r => r.url === c.origin + AUDIO_DIR + SOUNDS[id].file).length === 1),
+          prefix + 'all-browser-recording-occurrences:' + phase);
+      }
+      need(c.initialRaw === exportSnapshot(initial), prefix + 'actual-fresh-initial-save');
+      const levels = ['audio.master', 'audio.effects', 'audio.voices'];
+      need(levels.every(key => positive(c.settings.before[key], 1) && c.settings.after[key] === c.settings.before[key])
+        && c.settings.before['audio.mute'] === false && c.settings.after['audio.mute'] === false
+        && typeof c.settings.before['audio.music'] === 'number' && Number.isFinite(c.settings.before['audio.music'])
+        && c.settings.before['audio.music'] >= 0 && c.settings.before['audio.music'] <= 1 && c.settings.after['audio.music'] === 0
+        && JSON.stringify(c.restartSettings) === JSON.stringify(c.settings.after), prefix + 'isolated-persisted-music-setting');
+      need(c.installBeforeGesture.observed === true && c.installBeforeGesture.calls === 0 && c.initialReloaded === true
+        && c.controller === true && c.restartController === true && c.beforeGesture.observed === true
+        && c.beforeGesture.requests === 0 && c.beforeGesture.audioContexts === 0, prefix + 'pre-gesture');
       need(c.beforeBegin.simTime === 0 && c.beforeBegin.paused === true && c.beforeBegin.briefing === true
         && c.beforeBegin.decoded === 0 && c.restartBeforeBegin.simTime === 0 && c.restartBeforeBegin.paused === true
         && c.restartBeforeBegin.briefing === true && c.restartBeforeBegin.decoded === 0, prefix + 'unbegun/restarted');
+      need(positiveInt(c.requestCountAtClose, 4096) && c.requestCountAtClose === report.requests.filter(r => r.case === c.name).length
+        && report.requests.filter(r => r.case === c.name).every(r => ['title', 'camp', 'prepare', 'briefing'].includes(r.phase)), prefix + 'raw-origin-closed-count');
       need(c.online.reachable === true && c.online.status === 200 && c.closed.reachable === false
-        && c.closed.error === 'ECONNREFUSED' && c.listenerClosed === true && c.browserRestarted === true, prefix + 'actual-offline');
+        && c.closed.error === 'ECONNREFUSED' && c.listenerClosed === true && c.browserRestarted === true && c.noRequestsAfterClose === true
+        && typeof c.resumedForPlayback === 'boolean', prefix + 'actual-offline');
       need(c.saves.before === exportSnapshot(decisionPrefix) && JSON.stringify(c.decisionSaves) === JSON.stringify(sourceDecisions), prefix + 'source-decision-saves');
       const before = parseSnapshot(c.saves.before), expected = exportSnapshot(reconcileLevelRewards(
         breakCamp(before, { campaign, fielded }), MAX_SAVE_BYTES));
@@ -277,13 +380,14 @@ export function recordingProofErrors(report, { sha, run, manifest, campaign, fie
         need(c.playback.decoded.length === 18 && new Set(c.playback.decoded.map(r => r.id)).size === 18
           && expectedIds.every(id => c.playback.decoded.some(r => r.id === id && r.native === true && positiveInt(r.length) && positiveInt(r.channels, 8) && positiveInt(r.sampleRate, 384000))), prefix + 'decoded');
         need(c.playback.volley.some(r => expectedIds.includes(r.id) && ['volley', 'shot'].includes(SOUNDS[r.id]?.role) && r.ok === true && r.bus === 'effects'), prefix + 'recorded-volley');
-        need(c.playback.order.some(r => r.id === 'call-recall' && r.ok === true), prefix + 'keyboard-call');
-        need(c.playback.ambient.id === expectedIds[17] && c.playback.ambient.loop === true
+        need(c.playback.order.some(r => r.id === 'call-recall' && r.ok === true && r.bus === 'effects'), prefix + 'keyboard-call');
+        need(c.playback.ambient.id === expectedIds[17] && c.playback.ambient.bus === 'ambient' && c.playback.ambient.loop === true
           && c.playback.ambient.live === true && c.playback.ambient.stopped === false, prefix + 'ambient-loop');
       } else {
         need(c.rejectedPaths.length === 18 && new Set(c.rejectedPaths).size === 18
           && expectedIds.every(id => c.rejectedPaths.includes(AUDIO_DIR + SOUNDS[id].file)), prefix + 'declared-503');
-        need(c.playback.decoded.length === 0 && c.notice.visible === true && c.notice.status === true, prefix + 'limited-notice');
+        need(c.playback.decoded.length === 0 && c.notice.visible === true && c.notice.status === true
+          && c.notice.role === 'status' && c.notice.toastRole === 'status', prefix + 'limited-notice');
         const f = c.playback.fallback;
         need(f.owned === true && f.restored === true && f.failed === false && f.rows.length > 0 && f.rows.length <= 8
           && f.rows.every(r => r.delegated === true && r.threw === false && r.nativeSource === true && r.nativeBuffer === true
@@ -291,10 +395,9 @@ export function recordingProofErrors(report, { sha, run, manifest, campaign, fie
       }
       need(c.cleanup.length === 3 && c.cleanup.every(r => r.ok === true), prefix + 'cleanup');
     }
-    const g = report.guards;
     need(g.cancel.queued === true && g.cancel.currentCalls === 1 && g.cancel.puts === 0 && g.cancel.before === guardRaw && g.cancel.after === guardRaw
-      && g.cancel.rejected === true && typeof g.cancel.error === 'string' && g.cancel.error.startsWith('Progress:') && g.cancel.error.includes('cancelled'), 'native-queued-cancel');
-    need(g.healthy.queued === true && g.healthy.currentCalls === 1 && g.healthy.puts === 1 && g.healthy.before === guardRaw && g.healthy.after === guardRaw, 'native-queued-healthy');
+      && g.cancel.rejected === true && g.cancel.error === 'Progress: the reviewed exchange was cancelled.', 'native-queued-cancel');
+    need(g.healthy.queued === true && g.healthy.currentCalls === 1 && g.healthy.puts === 1 && g.healthy.before === guardRaw && g.healthy.after === guardRaw && g.healthy.rejected === false && g.healthy.error === null, 'native-queued-healthy');
     need(g.ui.preparing === true && g.ui.cancelled === true && g.ui.rawBefore === guardRaw && g.ui.rawAfter === guardRaw
       && g.ui.gpu === 0 && g.ui.departures === 0 && g.ui.closed === true, 'native-ui-cancel');
     for (const row of report.console) {

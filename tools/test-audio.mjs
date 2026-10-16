@@ -17,6 +17,10 @@
 // fail that check, with the check's own name in the failure text. No browser, no GPU, writes nothing.
 import assert from 'node:assert/strict';
 import vm from 'node:vm';
+import { createHash } from 'node:crypto';
+import { spawnSync } from 'node:child_process';
+import http from 'node:http';
+import { startServer } from './serve.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -167,22 +171,27 @@ async function recordingProofFixture() {
   const sha = 'a'.repeat(40), report = { schema: 'battle-recordings-v1', complete: true, sha, run: '123', attempt: '1',
     generation: manifest.generation, failure: null, errors: [], console: [], requests: [], overflow: false, cases: [], cleanup: [{ ok: true }] };
   for (const name of ['healthy', 'unavailable']) {
-    const healthy = name === 'healthy', origin = 'http://127.0.0.1:12345/';
+    const healthy = name === 'healthy', origin = healthy ? 'http://127.0.0.1:12345/' : 'http://127.0.0.1:12346/';
     const cache = expectedIds.map(id => ({ id, present: healthy, ...(healthy ? { status: 200, type: 'basic', contentRange: null,
       bytes: manifest.files[AUDIO_DIR + SOUNDS[id].file].bytes, contentLength: String(manifest.files[AUDIO_DIR + SOUNDS[id].file].bytes),
       sha256: manifest.files[AUDIO_DIR + SOUNDS[id].file].sha256 } : {}) }));
     for (const id of expectedIds) report.requests.push({ id: report.requests.length + 1, case: name, phase: 'prepare', path: AUDIO_DIR + SOUNDS[id].file, method: 'GET', range: null, status: healthy ? 200 : 503, finished: true });
     report.cases.push({ name, origin, metadata: { schema: 1, scope: origin, generation: manifest.generation, members: manifest.base },
-      controller: true, beforeGesture: { requests: 0, audioContexts: 0 },
+      installBeforeGesture: { calls: 0, observed: true }, initialReloaded: true,
+      initialRaw: exportSnapshot(initial), controller: true, restartController: true,
+      settings: { before: { 'audio.master': .8, 'audio.effects': 1, 'audio.voices': 1, 'audio.mute': false, 'audio.music': .5 },
+        after: { 'audio.master': .8, 'audio.effects': 1, 'audio.voices': 1, 'audio.mute': false, 'audio.music': 0 } },
+      restartSettings: { 'audio.master': .8, 'audio.effects': 1, 'audio.voices': 1, 'audio.mute': false, 'audio.music': 0 },
+      noRequestsAfterClose: true, resumedForPlayback: false, beforeGesture: { requests: 0, audioContexts: 0, observed: true },
       beforeBegin: { simTime: 0, paused: true, briefing: true, decoded: 0 }, restartBeforeBegin: { simTime: 0, paused: true, briefing: true, decoded: 0 },
       online: { reachable: true, status: 200 }, closed: { reachable: false, error: 'ECONNREFUSED' }, listenerClosed: true, browserRestarted: true,
       saves: { before, departed, restart: departed, played: departed }, decisionSaves, departures: 1,
       coldCache: expectedIds.map(id => ({ id, present: false })), cache, restartCache: structuredClone(cache),
-      rejectedPaths: healthy ? [] : expectedIds.map(id => AUDIO_DIR + SOUNDS[id].file), notice: { visible: !healthy, status: !healthy },
+      rejectedPaths: healthy ? [] : expectedIds.map(id => AUDIO_DIR + SOUNDS[id].file), notice: { visible: !healthy, status: !healthy, role: 'status', toastRole: 'status' },
       playback: { running: true, simTime: 0, selectedUS: true,
         decoded: healthy ? expectedIds.map(id => ({ id, native: true, length: 100, channels: 1, sampleRate: 44100 })) : [],
-        volley: healthy ? [{ id: 'volley-1', ok: true, bus: 'effects' }] : [], order: healthy ? [{ id: 'call-recall', ok: true }] : [],
-        ambient: { id: expectedIds[17], loop: true, live: true, stopped: false }, fallback: healthy ? null
+        volley: healthy ? [{ id: 'volley-1', ok: true, bus: 'effects' }] : [], order: healthy ? [{ id: 'call-recall', ok: true, bus: 'effects' }] : [],
+        ambient: { id: expectedIds[17], bus: 'ambient', loop: true, live: true, stopped: false }, fallback: healthy ? null
           : { owned: true, restored: true, failed: false, rows: [{ delegated: true, threw: false, nativeSource: true,
             nativeBuffer: true, length: 100, duration: 1, channels: 1, contextRunning: true }] } }, cleanup: [{ ok: true }, { ok: true }, { ok: true }] });
   }
@@ -190,12 +199,99 @@ async function recordingProofFixture() {
   const { SAMPLE_ARMY } = await import('../src/reward/data.js');
   const guardRaw = exportSnapshot(completedSnapshot({ awardId: 'recording-guard-fixture', army: structuredClone(SAMPLE_ARMY), depot: [], issued: [], seed: 1861, grade: 'Victory' }));
   report.guards = { cancel: { queued: true, currentCalls: 1, puts: 0, before: guardRaw, after: guardRaw, rejected: true, error: 'Progress: the reviewed exchange was cancelled.' },
-    healthy: { queued: true, currentCalls: 1, puts: 1, before: guardRaw, after: guardRaw },
+    healthy: { queued: true, currentCalls: 1, puts: 1, before: guardRaw, after: guardRaw, rejected: false, error: null },
     ui: { preparing: true, cancelled: true, rawBefore: guardRaw, rawAfter: guardRaw, gpu: 0, departures: 0, closed: true } };
-  recordingReaderFixture = { report, expected: { sha, run: '123', manifest, campaign, fielded, expectedIds, initial, deck, guardRaw } };
+  const scripts = [];
+  const { probeProgress } = await import('./test-progress-browser.mjs');
+  await probeProgress({ addInitScript: async fn => scripts.push(fn.toString()) }, { prefix: '__recording', readFlag: '__recordingReadBlocked', quotaFlag: '__recordingQuota' });
+  assert.equal(scripts.length, 1);
+  const guardFixtureSource = { bytes: Buffer.byteLength(scripts[0]), sha256: createHash('sha256').update(scripts[0]).digest('hex') };
+  report.browserAudio = [];
+  const makeTrace = (name, origin, phase, ids, base, guard = false) => {
+    const trace = { schema: 'audio-transport-node-v1', requests: [], events: [], main: null, overflow: false, observerFailure: false };
+    const event = (type, id, at, extra = {}) => { const e = { sequence: trace.events.length + 1, type, id, at, phase, ...extra }; trace.events.push(e); return e; };
+    if (phase === 'playback') trace.main = event('main-request', null, base - 1, { phase: 'restart' });
+    for (const [i, sound] of ids.entries()) {
+      const id = i + 1, row = { id, url: origin + AUDIO_DIR + SOUNDS[sound].file, method: 'GET', start: event('request', id, base + i * 3) };
+      const unavailable = name === 'unavailable';
+      if (!unavailable) row.response = event('response', id, base + i * 3 + 1, { status: 200 });
+      if (!guard) row.terminal = event(unavailable ? 'failed' : 'finished', id, base + i * 3 + 2,
+        unavailable ? { failure: 'net::ERR_FAILED' } : {});
+      trace.requests.push(row);
+    }
+    if (guard) for (const [i, row] of trace.requests.entries()) row.terminal = event('failed', row.id, 1250 + i, { failure: 'net::ERR_ABORTED' });
+    if (phase === 'prepare') trace.main = event('main-request', null, base + ids.length * 3);
+    const result = { id: report.browserAudio.length + 1, case: name, origin, trace }; report.browserAudio.push(result); return result;
+  };
+  for (const c of report.cases) {
+    for (const row of report.requests.filter(r => r.case === c.name)) Object.assign(row, { origin: c.origin, at: 1000 + row.id * 3, finishedAt: 1002 + row.id * 3 });
+    c.requestCountAtClose = report.requests.filter(r => r.case === c.name).length;
+    makeTrace(c.name, c.origin, 'prepare', expectedIds, 2000);
+    makeTrace(c.name, c.origin, 'playback', expectedIds, 3000);
+  }
+  const origin = 'http://127.0.0.1:12347/', sounds = expectedIds.slice(0, 3), t = makeTrace('guards', origin, 'cancel', sounds, 1010, true);
+  const held = sounds.map((id, i) => {
+    const row = { id: report.requests.length + 1, case: 'guards', origin, phase: 'cancel', path: AUDIO_DIR + SOUNDS[id].file,
+      method: 'GET', range: null, status: 200, held: true, finished: false, failed: 'client-aborted', at: 1005 + i, failedAt: 1250 + i, releasedAt: 1400 };
+    report.requests.push(row); return row;
+  });
+  Object.assign(report.guards, { origin, fixtureSource: { ...guardFixtureSource }, probesRestored: true, contextClosed: true });
+  Object.assign(report.guards.ui, { settings: structuredClone(report.cases[0].settings), startedAt: 1000, heldAt: 1100, cancelCommandAt: 1200, settledAt: 1300, terminalsAt: 1350, observedAt: 1600,
+    startEvent: { trusted: true, at: 10000, timebase: 'browser-performance-UTC' }, cancelEvent: { trusted: true, at: 10020, timebase: 'browser-performance-UTC' },
+    heldProxyRequestIds: held.map(r => r.id), proxyAbortIds: held.map(r => r.id), holdsReleased: true,
+    heldBrowser: t.trace.requests.map(r => ({ traceId: t.id, id: r.id, url: r.url, method: r.method, response: r.response })),
+    browserAbort: t.trace.requests.map(r => ({ traceId: t.id, id: r.id, url: r.url, method: r.method, terminal: r.terminal })),
+    frames: [10040, 10060].map(at => ({ at, gpu: 0, gamePresent: false, cancelled: true, admitted: false, ownerReleased: true, closed: true })) });
+  recordingReaderFixture = { report, expected: { sha, run: '123', manifest, campaign, fielded, expectedIds, initial, deck, guardRaw, guardFixtureSource } };
   return structuredClone(recordingReaderFixture);
 }
 const recordingProofMutations = [
+  ['unrelated-cancel-error', r => { r.guards.cancel.error = 'Progress: something else cancelled'; }],
+  ['healthy-exchange-rejected', r => { r.guards.healthy.rejected = true; }],
+  ['healthy-exchange-error', r => { r.guards.healthy.error = 'unexplained'; }],
+  ['hidden-pre-gesture-browser-trace', r => { const trace = structuredClone(r.browserAudio[0]); trace.id = r.browserAudio.length + 1;
+    for (const row of trace.trace.requests) row.start.phase = 'title';
+    for (const e of trace.trace.events) if (e.type === 'request') e.phase = 'title'; r.browserAudio.push(trace); }],
+  ['late-proxy-request-hidden-by-summary', r => { r.requests.push({ ...r.requests[0], id: r.requests.length + 1, phase: 'playback' }); }],
+  ['forged-origin-close-count', r => { r.cases[0].requestCountAtClose++; }],
+  ['uncontrolled-install-document', r => { r.cases[0].initialReloaded = false; }],
+  ['install-created-audio-context', r => { r.cases[0].installBeforeGesture.calls = 1; }],
+  ['wrong-held-proxy-id', r => { r.guards.ui.heldProxyRequestIds[0] = 9999; }],
+  ['wrong-held-browser-id', r => { r.guards.ui.heldBrowser[0].id = 9999; }],
+  ['wrong-abort-browser-id', r => { r.guards.ui.browserAbort[0].id = 9999; }],
+  ['wrong-cancel-phase', r => { r.guards.ui.heldBrowser[0].response.phase = 'startup'; }],
+  ['wrong-cancel-origin', r => { r.guards.origin = r.cases[0].origin; }],
+  ['cancel-before-headers', r => { r.guards.ui.cancelCommandAt = r.guards.ui.heldAt - 1; }],
+  ['release-before-abort', r => { r.requests.find(x => x.case === 'guards').releasedAt = 1100; }],
+  ['absent-held-response', r => { r.guards.ui.heldBrowser.pop(); }],
+  ['unrelated-proxy-abort', r => { r.requests[0].failed = 'client-aborted'; }],
+  ['declared503-transport-failed', r => { r.requests.find(x => x.case === 'unavailable').failed = 'net::ERR_FAILED'; }],
+  ['unreleased-held-bodies', r => { r.guards.ui.holdsReleased = false; }],
+  ['unrestored-native-probes', r => { r.guards.probesRestored = false; }],
+  ['guard-context-open', r => { r.guards.contextClosed = false; }],
+  ['wrong-guard-probe-source', r => { r.guards.fixtureSource.sha256 = '0'.repeat(64); }],
+  ['late-game-after-cancel', r => { r.guards.ui.frames[1].gamePresent = true; }],
+  ['missing-second-frame', r => { r.guards.ui.frames.pop(); }],
+  ['untrusted-cancel', r => { r.guards.ui.cancelEvent.trusted = false; }],
+  ['cancel-after-deadline', r => { r.guards.ui.cancelEvent.at = r.guards.ui.startEvent.at + 6000; }],
+  ['browser-trace-overflow', r => { r.browserAudio[0].trace.overflow = true; }],
+  ['browser-observer-failure', r => { r.browserAudio[0].trace.observerFailure = true; }],
+  ['orphan-browser-event', r => { const t = r.browserAudio[0].trace; t.events.push({ sequence: t.events.length + 1, at: 10000, type: 'failed', id: 999, phase: 'prepare', failure: 'net::ERR_FAILED' }); }],
+  ['healthy-browser-abort', r => { r.browserAudio[0].trace.requests[0].terminal.type = 'failed'; r.browserAudio[0].trace.requests[0].terminal.failure = 'net::ERR_ABORTED'; }],
+  ['missing-browser-recording', r => { r.browserAudio[0].trace.requests.pop(); }],
+  ['duplicate-departure-marker', r => { r.browserAudio.push({ ...r.browserAudio[0], id: r.browserAudio.length + 1 }); }],
+  ['wrong-playback-pause-type', r => { r.cases[0].resumedForPlayback = 'false'; }],
+
+  ['wrong-order-bus', r => { r.cases[0].playback.order[0].bus = 'music'; }],
+  ['wrong-ambient-bus', r => { r.cases[0].playback.ambient.bus = 'effects'; }],
+  ['changed-effects-level', r => { r.cases[0].settings.after['audio.effects'] = 0; }],
+  ['settings-not-persisted', r => { r.cases[0].restartSettings['audio.music'] = .5; }],
+  ['wrong-notice-role', r => { r.cases[1].notice.role = null; }],
+  ['unobserved-AC', r => { r.cases[0].beforeGesture.observed = false; }],
+  ['fresh-save-absent', r => { delete r.cases[0].initialRaw; }],
+  ['restart-controller-absent', r => { r.cases[0].restartController = false; }],
+  ['late-origin-request', r => { r.cases[0].noRequestsAfterClose = false; }],
+  ['same-case-origin', r => { r.cases[1].origin = r.cases[0].origin; }],
   ['failed-healthy-request', r => { r.requests[0].failed = 'net::ERR_ABORTED'; }],
   ['unknown-healthy500', r => { r.requests.push({ id: r.requests.length + 1, case: 'healthy', phase: 'prepare', path: 'unknown.json', method: 'GET', range: null, status: 500, finished: true }); }],
   ['unshipped-volley', r => { r.cases[0].playback.volley[0].id = 'volley-9'; }],
@@ -232,10 +328,122 @@ const recordingProofMutations = [
 ];
 
 const API = { observeAudioTransport, observeFallbackCall, recordingProofErrors, prepareBattleRecordings, SOUNDS, AUDIO_BUDGET, ALLOWED_LICENCES, ORDER_CALLS, busLevel, busGain, Director, FallenPool, fadeOf, Mixer,
-  fieldAdmissionProbe, defineAudio: defineAudioSettings, resultsMood: music.resultsMood, lossShareOf: music.lossShareOf, audioFiles, attributionText, goreHook: () => {} };
+  servingSource: () => fs.readFileSync(path.join(ROOT, 'tools/serve.mjs'), 'utf8'), recordingSource: () => fs.readFileSync(path.join(ROOT, 'tools/test-offline-upgrade.mjs'), 'utf8'), fieldAdmissionProbe, defineAudio: defineAudioSettings, resultsMood: music.resultsMood, lossShareOf: music.lossShareOf, audioFiles, attributionText, goreHook: () => {} };
 
 export const AUDIO_CHECKS = [
 
+  ['recordings-serving-policy', async api => {
+    const source = api.servingSource(), digest = b => createHash('sha256').update(b).digest('hex');
+    const request = async (url, options = {}) => {
+      try { const response = await fetch(url, { ...options, signal: AbortSignal.timeout(1000) });
+        return { status: response.status, headers: Object.fromEntries(response.headers), bytes: Buffer.from(await response.arrayBuffer()) }; }
+      catch (error) { throw new Error('recordings-serving-policy: HTTP/body failure: ' + error.message); }
+    };
+    const verify = (row, bytes, policy = 'no-cache', head = false) => {
+      assert.equal(row.status, 200, 'recordings-serving-policy: full200 required');
+      assert.equal(row.headers['cache-control'], policy, 'recordings-serving-policy: exact public/private policy');
+      assert.equal(row.headers['content-length'], String(bytes.length), 'recordings-serving-policy: declared current length');
+      assert.equal(row.headers['content-range'], undefined, 'recordings-serving-policy: unchanged non-range response');
+      assert.equal(row.headers.etag, undefined, 'recordings-serving-policy: no validator shortcut');
+      assert.equal(row.headers['last-modified'], undefined, 'recordings-serving-policy: no date validator shortcut');
+      assert.equal(row.headers['x-content-type-options'], 'nosniff', 'recordings-serving-policy: content protection changed');
+      assert.equal(row.bytes.length, head ? 0 : bytes.length, 'recordings-serving-policy: actual body length');
+      if (!head) assert.equal(digest(row.bytes), digest(bytes), 'recordings-serving-policy: exact current source bytes');
+    };
+    const close = async server => { server.closeAllConnections(); await new Promise((resolve, reject) => server.close(e => e ? reject(e) : resolve())); };
+    const ram = async text => {
+      const root = '/recordings-serving-ram', recording = root + '/assets/audio/sfx/volley-1.mp3';
+      const files = new Map([[recording, Buffer.from('AAAA')], [root + '/assets/audio/music/title.mp3', Buffer.from('CCCC')],
+        [root + '/other.mp3', Buffer.from('DDDD')], [root + '/index.html', Buffer.from('EEEE')]]), memo = new Map();
+      const mockFS = { realpath: async p => { if (p === root || files.has(p)) return p; throw new Error('ENOENT'); },
+        stat: async p => ({ size: files.get(p)?.length || 0, isDirectory: () => p === root, isFile: () => files.has(p) }),
+        readFile: async p => Buffer.from(files.get(p)) };
+      const declarations = text.slice(text.indexOf('const MIME ='), text.indexOf('const isMain =')).replace(/export /g, '');
+      const factory = vm.runInNewContext(declarations + '; startServer', { http, path, URL, Buffer, fs: mockFS, SOUNDS, AUDIO_DIR, ROOT: root, DEFAULT_PORT: 0,
+        memoizedReadFile: async p => { if (!memo.has(p)) memo.set(p, await mockFS.readFile(p)); return memo.get(p); } });
+      const { server, url } = await factory({ port: 0 });
+      try {
+        verify(await request(url + 'assets/audio/sfx/volley-1.mp3'), Buffer.from('AAAA'));
+        files.set(recording, Buffer.from('BBBB'));
+        verify(await request(url + 'assets/audio/sfx/volley-1.mp3', { headers: { 'If-None-Match': 'invented', 'If-Modified-Since': 'Wed, 01 Jan 2099 00:00:00 GMT' } }), Buffer.from('BBBB'));
+        verify(await request(url + 'assets/audio/sfx/volley-1.mp3', { method: 'HEAD' }), Buffer.from('BBBB'), 'no-cache', true);
+        verify(await request(url + 'assets/audio/sfx/volley-1.mp3', { headers: { Range: 'bytes=0-1' } }), Buffer.from('BBBB'), 'no-store');
+        for (const [file, value] of [['assets/audio/music/title.mp3', 'CCCC'], ['other.mp3', 'DDDD'], ['index.html', 'EEEE']])
+          verify(await request(url + file), Buffer.from(value), 'no-store');
+        const missing = await request(url + 'missing.mp3');
+        assert.ok(missing.status === 404 && missing.headers['cache-control'] === 'no-store', 'recordings-serving-policy: error policy changed');
+      } finally { await close(server); }
+    };
+    await ram(source);
+    const mutations = [
+      ['broad', s => s.replace('PUBLIC_RECORDINGS.has(relative)', 'true')],
+      ['max-age', s => s.replace("? 'no-cache' : 'no-store'", "? 'public, max-age=600' : 'no-store'")],
+      ['304', s => s.replace('res.writeHead(200, {', "res.writeHead(req.headers['if-none-match'] ? 304 : 200, {")],
+      ['stale', s => s.replace('await fs.readFile(real)', 'await memoizedReadFile(real)')],
+      ['body', s => s.replace('await fs.readFile(real)', 'Buffer.alloc(st.size)')],
+      ['length', s => s.replace("'Content-Length': st.size", "'Content-Length': st.size + 1")],
+    ];
+    for (const [name, mutate] of mutations) {
+      const broken = mutate(source); assert.notEqual(broken, source, 'recordings-serving-policy: inert mutant ' + name);
+      await assert.rejects(() => ram(broken), /recordings-serving-policy:/, 'recordings-serving-policy: accepted ' + name);
+    }
+    const { server, url } = await startServer({ port: 0 });
+    try {
+      const sounds = Object.values(SOUNDS).filter(s => s.bank === 'battle' || s.bank === 'ambient');
+      assert.equal(sounds.length, 20, 'recordings-serving-policy: all seasons and battle recordings');
+      for (const sound of sounds) {
+        const file = AUDIO_DIR + sound.file, bytes = fs.readFileSync(path.join(ROOT, file));
+        for (const options of [{}, { method: 'HEAD' }, { headers: { 'If-None-Match': 'invented', 'If-Modified-Since': 'Wed, 01 Jan 2099 00:00:00 GMT' } }]) {
+          const row = await request(url + file, options); verify(row, bytes, 'no-cache', options.method === 'HEAD');
+          assert.equal(row.headers['content-type'], 'audio/mpeg', 'recordings-serving-policy: audio MIME changed');
+        }
+      }
+      for (const file of ['index.html', 'offline-manifest.js', 'assets/audio/music/title.mp3']) verify(await request(url + file), fs.readFileSync(path.join(ROOT, file)), 'no-store');
+      const file = 'assets/audio/sfx/volley-1.mp3'; verify(await request(url + file, { headers: { Range: 'bytes=0-1' } }), fs.readFileSync(path.join(ROOT, file)), 'no-store');
+    } finally { await close(server); }
+  }],
+  ['recordings-producer-process', async api => {
+    const source = api.recordingSource();
+    const begin = source.indexOf('const report='), endText = 'process.exit(report.complete?0:1);';
+    const old = source.slice(begin, source.indexOf(endText, begin) + endText.length);
+    assert.ok(Buffer.byteLength(old) === 18405 && createHash('sha256').update(old).digest('hex') === '820020ae1d6bcc64895940aa0b9d753dcf0df5aabf16f26406aba05c3c535405',
+      'recordings-producer-process: old26 source body changed');
+    const closeStart = source.indexOf('  const closeContext=async context=>{');
+    const closeEnd = source.indexOf('  const fixtureSettings=', closeStart);
+    const closeExpression = source.slice(closeStart, closeEnd).trim().replace(/^const closeContext=/, '').replace(/;$/, '');
+    for (const mode of ['healthy', 'restore-false', 'restore-falsy', 'restore-hang', 'close-falsy', 'both-falsy', 'close-hang']) {
+      const recording = { cleanup: [] }, calls = [], first = null, second = false, deadline = new Error('controlled cleanup deadline');
+      const context = { pages: () => [{ isClosed: () => false, evaluate: async () => {
+        calls.push('restore'); if (mode === 'restore-falsy' || mode === 'both-falsy') throw first;
+        if (mode === 'restore-hang') return new Promise(() => {});
+        return mode !== 'restore-false'; } }], close: () => {
+        calls.push('close'); if (mode === 'close-falsy' || mode === 'both-falsy') throw second;
+        return mode === 'close-hang' ? new Promise(() => {}) : Promise.resolve(); } };
+      const close = vm.runInNewContext('(' + closeExpression + ')', { recording, assert,
+        bounded: (pending, label, ms) => { assert.equal(ms, 30000); return (mode === 'restore-hang' && label === 'AudioContext observer restoration')
+          || (mode === 'close-hang' && label === 'actual browser/context close') ? Promise.reject(deadline) : pending; } });
+      let caught = false, error;
+      try { await close(context); } catch (e) { caught = true; error = e; }
+      assert.deepEqual(calls, ['restore', 'close'], 'recordings-producer-process: restoration failure skipped actual close');
+      assert.equal(caught, mode !== 'healthy', 'recordings-producer-process: cleanup failure disappeared');
+      if (mode === 'restore-falsy' || mode === 'both-falsy') assert.equal(error, first, 'recordings-producer-process: first falsy failure replaced');
+      if (mode === 'close-falsy') assert.equal(error, second, 'recordings-producer-process: close falsy failure replaced');
+      if (mode === 'close-hang' || mode === 'restore-hang') assert.equal(error, deadline, 'recordings-producer-process: hanging close did not propagate bound');
+      if (['close-falsy', 'both-falsy', 'close-hang'].includes(mode)) assert.ok(recording.cleanup.length === 1 && recording.cleanup[0].ok === false,
+        'recordings-producer-process: close failure lacked separate receipt');
+    }
+    const hardstop = source.match(/  hardstop=setTimeout\((\(\)=>\{[\s\S]*?\}),480000\);/)?.[1];
+    assert.ok(hardstop, 'recordings-producer-process: actual terminal callback unavailable');
+    for (const persistence of ['new Promise(()=>{})', 'Promise.reject(new Error("controlled persistence failure"))']) {
+      const child = spawnSync(process.execPath, ['--input-type=module', '-e',
+        'let recording={complete:true};const fail=()=>{};const nativeTimer=setTimeout;globalThis.setTimeout=(fn,ms)=>{console.log("timer:"+ms);return nativeTimer(fn,ms);};' +
+        'const persist=()=>{console.log("persist-start");return ' + persistence + ';};(' + hardstop + ')();'],
+        { encoding: 'utf8', timeout: 7000, maxBuffer: 16384 });
+      assert.ok(child.status === 1 && child.signal === null && child.stdout.indexOf('timer:5000') >= 0
+        && child.stdout.indexOf('timer:5000') < child.stdout.indexOf('persist-start'),
+        'recordings-producer-process: terminal watchdog missing, late, or non-failing with stuck persistence');
+    }
+  }],
   ['audio-body-observer', async api => {
     const fixture = async mode => {
       const sandbox = { URL, Headers, AbortController, performance, mode };
@@ -694,6 +902,8 @@ export const AUDIO_CHECKS = [
 
 // One semantic mutant per check: each must fail that check's own assertion.
 const MUTANTS = {
+  'recordings-serving-policy': { servingSource: () => fs.readFileSync(path.join(ROOT, 'tools/serve.mjs'), 'utf8').replace("? 'no-cache' : 'no-store'", "? 'no-store' : 'no-store'") },
+  'recordings-producer-process': { recordingSource: () => fs.readFileSync(path.join(ROOT, 'tools/test-offline-upgrade.mjs'), 'utf8').replace('setTimeout(()=>process.exit(1),5000)', 'setTimeout(()=>process.exit(0),5)') },
   'audio-body-observer': { fieldAdmissionProbe: () => {} },
   'audio-transport-observer': { observeAudioTransport: (...args) => { const r = observeAudioTransport(...args); Object.defineProperty(r, 'main', { configurable: true, get: () => null, set() {} }); return r; } },
   'fallback-observer-metadata': { observeFallbackCall: sound => { const o = observeFallbackCall(sound); return { close: () => ({ ...o.close(), failed: false }) }; } },
