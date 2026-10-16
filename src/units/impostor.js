@@ -479,6 +479,7 @@ function closeMetadata(original, manifest, sourceManifest) {
 export class BakedAtlas {
   #runtimeClose = null;
   #runtimeRenderer = null;
+  #serialClose = false;
   #disposeStarted = false;
   #pendingLoads = 0;
   get loadsSettled(){return this.#pendingLoads===0;}
@@ -487,6 +488,10 @@ export class BakedAtlas {
   get cleanupFailure(){return Object.freeze({failed:this.#disposeFailed,error:this.#disposeError});}
   #cleanupFailure(error){if(!this.#disposeFailed){this.#disposeFailed=true;this.#disposeError=error;}}
   constructor(manifest, base = BAKED_BASE, options = {}) {
+    const serialClose = options.serialClose === undefined ? false : options.serialClose;
+    if (typeof serialClose !== 'boolean' || serialClose && !options.runtimeClose && !options.diagnosticClose)
+      throw new Error('baked close: explicit configured serial boolean required');
+    this.#serialClose = serialClose;
     if (options.runtimeClose != null) {
       if (!runtimeCloseDescriptors.has(options.runtimeClose) || options.diagnosticClose != null
         || base !== options.runtimeClose.base || typeof options.renderer?.getContext !== 'function'
@@ -583,6 +588,7 @@ export class BakedAtlas {
   }
 
   async #loadClose(configuration, renderer, runtime) {
+    if (this.#serialClose) return this.#loadSerialClose(configuration, renderer, runtime);
     const baseline = runtime ? new AtlasLayout(configuration.baseline).tiers.close : this.layout.tiers.close;
     const completionBeforeFallback = runtime || (configuration.completionBeforeFallback ?? false);
     const captureRuntimeFailures = () => {
@@ -730,6 +736,205 @@ export class BakedAtlas {
     return attempt(baseline, runtime ? configuration.base : this.base, false);
   }
 
+  // Scheduling only. Completed mip views keep their whole input backing; nothing is retired here.
+  async #loadSerialClose(configuration, renderer, runtime) {
+    // Publish load()'s shared promise before an I/O provider can synchronously reenter it.
+    await Promise.resolve();
+    const layout = this.layout, textures = this.textures, field = layout.tiers.field,
+      fieldTextures = textures.field, close = layout.tiers.close;
+    const sourceLayout = runtime ? new AtlasLayout(configuration.baseline) : null;
+    const baseline = sourceLayout ? sourceLayout.tiers.close : close;
+    const runtimeMetadata = runtime ? JSON.stringify([configuration.baseline, sourceLayout.tiers.field, baseline]) : null;
+    const metadata = JSON.stringify([layout.manifest, field, close, configuration]);
+    const getContext = renderer?.getContext, initTexture = renderer?.initTexture;
+    const properties = renderer?.properties, getProperties = properties?.get;
+    const io = this.io, fetchProvider = io.fetch, pngProvider = io.loadPNG, fetchPage = fetchProvider || fetch;
+    const observer = io.observeClose, pools = this.pools, fields = new Map(), acquired = [], borrowed = new Set(), seen = new Set();
+    let fatal = false, observerFailed = false, observerFailure, context;
+    const describe = error => {
+      if (error === null) return 'null';
+      if (typeof error === 'bigint') return 'bigint thrown value';
+      if (['undefined','boolean','number','string'].includes(typeof error)) return String(error).slice(0, 4096);
+      try { const d = Object.getOwnPropertyDescriptor(error, 'message');
+        if (d && Object.hasOwn(d, 'value') && typeof d.value === 'string') return d.value.slice(0, 4096);
+      } catch {}
+      return 'unknown thrown value';
+    };
+    const refuse = message => { fatal = true; throw new Error('baked close serial: ' + message); };
+    const data = (object, key) => {
+      const d = Object.getOwnPropertyDescriptor(object, key);
+      if (!d || !Object.hasOwn(d, 'value')) refuse('data property required');
+      return d;
+    };
+    const entries = array => {
+      if (array === undefined) return null;
+      if (!Array.isArray(array)) refuse('dense field array required');
+      const length = data(array, 'length').value;
+      if (!Number.isSafeInteger(length) || length < 0 || length > field.pages.length) refuse('field entry count changed');
+      return Array.from({length}, (_, i) => data(array, String(i)).value);
+    };
+    const sameEntries = (array, values) => values === null ? array === undefined
+      : Array.isArray(array) && data(array, 'length').value === values.length && values.every((v, i) => data(array, String(i)).value === v);
+    const fieldEntries = entries(fieldTextures);
+    if (fieldEntries && fieldEntries.length !== field.pages.length || textures.close !== undefined) refuse('complete unpublished field ownership required');
+    for (const texture of fieldEntries || []) borrowed.add(texture);
+    const method = (object, key) => {
+      for (let owner = object; owner; owner = Object.getPrototypeOf(owner)) {
+        const descriptor = Object.getOwnPropertyDescriptor(owner, key);
+        if (descriptor) {
+          if (!Object.hasOwn(descriptor, 'value') || typeof descriptor.value !== 'function') refuse('owned method required');
+          return {owner, descriptor};
+        }
+      }
+      refuse('owned method missing');
+    };
+    const sameDescriptor = (a, b) => ['value','get','set','writable','enumerable','configurable'].every(k => a?.[k] === b?.[k]);
+    const textureStable = record => {
+      const disposal = method(record.texture, 'dispose'), dispatch = method(record.texture, 'dispatchEvent');
+      if (!sameDescriptor(Object.getOwnPropertyDescriptor(record.texture, 'uuid'), record.uuidDescriptor)
+        || disposal.owner !== record.disposal.owner || !sameDescriptor(disposal.descriptor, record.disposal.descriptor)
+        || dispatch.owner !== record.dispatch.owner || !sameDescriptor(dispatch.descriptor, record.dispatch.descriptor))
+        refuse('texture ownership changed');
+    };
+    if (typeof getContext !== 'function' || typeof initTexture !== 'function') refuse('renderer required');
+    if (observer !== undefined && typeof observer !== 'function') refuse('synchronous observer required');
+    try { context = getContext.call(renderer); } catch (error) { fatal = true; throw error; }
+    const finish = context?.finish;
+    const completion = runtime || (configuration.completionBeforeFallback ?? false);
+    if (typeof completion !== 'boolean') refuse('explicit completion boolean required');
+    const healthy = () => {
+      try {
+        if (observerFailed) { fatal = true; throw observerFailure; }
+        for (const pool of pools) if (pool.cleanupFailure?.failed) this.#cleanupFailure(pool.cleanupFailure.error);
+        if (this.#disposeFailed) { fatal = true; throw this.#disposeError; }
+        if (this.disposed) refuse('disposed or cleanup incomplete');
+        if (renderer.getContext !== getContext || renderer.initTexture !== initTexture || getContext.call(renderer) !== context
+          || renderer.properties !== properties || properties && properties.get !== getProperties
+          || !context || context.isContextLost() || context.getError() !== context.NO_ERROR) refuse('context or renderer changed');
+        if (this.io !== io || io.fetch !== fetchProvider || io.loadPNG !== pngProvider || io.observeClose !== observer
+          || !fetchProvider && fetch !== fetchPage || this.pools !== pools) refuse('I/O or pool ownership changed');
+        if (!sameEntries(fieldTextures, fieldEntries)) refuse('field texture entries changed');
+        for (const [pool, record] of fields) if (!pools.includes(pool) || pool.batches !== record.batches
+          || pool.batches.field !== record.array || !sameEntries(record.array, record.entries)) refuse('field ownership changed');
+        for (const pool of pools) {
+          if (pool.atlas !== this || pool.layout !== layout) refuse('foreign pool');
+          if (!fields.has(pool)) fields.set(pool, {batches:pool.batches, array:pool.batches.field, entries:entries(pool.batches.field)});
+        }
+        for (const record of acquired) textureStable(record);
+        if (runtime && JSON.stringify([layout.manifest, layout.tiers.field, layout.tiers.close]) !== runtimeMetadata)
+          refuse('runtime source metadata drift');
+        if (this.layout !== layout || this.textures !== textures || layout.tiers.field !== field || textures.field !== fieldTextures
+          || layout.tiers.close !== close || JSON.stringify([layout.manifest, field, close, configuration]) !== metadata)
+          refuse('metadata or publication ownership changed');
+      } catch (error) { fatal = true; throw error; }
+    };
+    const observe = event => {
+      if (!observer) return;
+      try {
+        const value = observer(Object.freeze(event));
+        if (value && ['object','function'].includes(typeof value)) {
+          // Refuse asynchronous/thenable observation without invoking foreign getters.
+          try { Promise.prototype.then.call(value, undefined, () => {}); } catch {}
+          throw new Error('synchronous primitive observation required');
+        }
+      } catch (error) { if (!observerFailed) { observerFailed = true; observerFailure = error; } fatal = true; }
+    };
+    const attempt = async (T, base, compressed) => {
+      const owned = [], settled = [], name = compressed ? 'candidate' : 'baseline';
+      const event = (operation, record, extra = {}) => observe({operation, attempt:name,
+        page:record?.file ?? null, index:record?.index ?? null, encoding:record?.encoding || 'png', textureUUID:record?.uuid ?? null, ...extra});
+      try {
+        for (const [index, page] of T.pages.entries()) {
+          healthy();
+          let texture;
+          const record = {file:page.file, index, encoding:page.encoding || 'png', texture:null, uuid:null,
+            dispose:THREE.Texture.prototype.dispose, disposal:null, dispatch:null, uuidDescriptor:null};
+          const own = value => {
+            if (!value || borrowed.has(value) || seen.has(value)) refuse('borrowed or duplicate texture');
+            texture = value; record.texture = value; seen.add(value); owned.push(record);
+            record.disposal = method(texture, 'dispose'); record.dispose = record.disposal.descriptor.value;
+            record.dispatch = method(texture, 'dispatchEvent'); record.uuidDescriptor = data(texture, 'uuid');
+            if (typeof record.uuidDescriptor.value !== 'string' || record.uuidDescriptor.value.length > 128) refuse('texture UUID required');
+            record.uuid = record.uuidDescriptor.value; acquired.push(record);
+            event('created', record); healthy();
+          };
+          try {
+            if (compressed && page.encoding === 'astc4x4') {
+              const response = await fetchPage(base + page.file); healthy();
+              if (!response.ok) throw new Error(`baked close: HTTP ${response.status}`);
+              const bytes = await response.arrayBuffer(); healthy();
+              own(createAtlasAstcTexture(THREE, new Uint8Array(bytes), page));
+            } else {
+              own(await (pngProvider ? pngProvider.call(io, base + page.file) : new THREE.TextureLoader().loadAsync(base + page.file)));
+              Object.assign(texture, {flipY:false, premultiplyAlpha:true, colorSpace:THREE.NoColorSpace,
+                generateMipmaps:true, minFilter:THREE.LinearMipmapLinearFilter, magFilter:THREE.LinearFilter,
+                wrapS:THREE.ClampToEdgeWrapping, wrapT:THREE.ClampToEdgeWrapping});
+              texture.needsUpdate = true;
+              if (texture.image?.width !== page.w || texture.image?.height !== page.h) throw new Error('baked close: PNG dimensions');
+            }
+            healthy();
+            const returned = initTexture.call(renderer, texture);
+            if (returned !== undefined) {
+              try { Promise.prototype.then.call(returned, undefined, () => {}); } catch {}
+              refuse('synchronous native upload required');
+            }
+            healthy();
+            if (properties) {
+              const native = getProperties.call(properties, texture);
+              if (!context.isTexture(native.__webglTexture) || native.__version !== texture.version)
+                throw new Error('baked close: native texture not uploaded');
+            }
+            event('uploaded', record); healthy();
+            settled.push({status:'fulfilled', value:texture});
+            event('settled', record, {outcome:'fulfilled', error:null});
+          } catch (error) {
+            event('settled', record, {outcome:'rejected', error:describe(error)}); throw error;
+          }
+        }
+        healthy();
+        event('all-settled', null, {fulfilled:settled.length, rejected:0}); healthy();
+        event('publish-start', null); healthy();
+        const result = settled.map(row => row.value);
+        this.publishTier('close', T, result, healthy);
+        return result;
+      } catch (primary) {
+        let cleanupFailed = false;
+        for (const record of owned) {
+          event('dispose-start', record);
+          let failed = false, failure;
+          try { if (record.disposal && record.dispatch) textureStable(record); }
+          catch (error) { failed = true; failure = error; }
+          // A captured dispose method can still call a replaced dispatchEvent. Attempt it,
+          // but ownership drift prevents a successful cleanup receipt even if it returns.
+          try { Reflect.apply(record.dispose, record.texture, []); }
+          catch (error) { if (!failed) { failed = true; failure = error; } }
+          if (failed) { cleanupFailed = true; this.#cleanupFailure(failure); }
+          event('dispose-result', record, {ok:!failed, error:failed ? describe(failure) : null});
+        }
+        if (cleanupFailed || observerFailed) fatal = true;
+        try { healthy(); } catch { fatal = true; }
+        if (!fatal && compressed && completion && owned.length) {
+          event('completion-start', null, {method:'finish'});
+          try {
+            healthy(); if (context.finish !== finish || typeof finish !== 'function') refuse('completion ownership changed');
+            const began = performance.now(); finish.call(context); healthy();
+            event('completion-result', null, {method:'finish', ok:true, elapsedMs:performance.now()-began, error:null}); healthy();
+          } catch (error) { fatal = true;
+            event('completion-result', null, {method:'finish', ok:false, error:describe(error)}); }
+        }
+        throw primary;
+      }
+    };
+    healthy();
+    try {
+      const T = closeMetadata(layout.manifest, configuration.manifest, configuration.sourceManifest);
+      if (astcAvailable(context, T.pages)) return await attempt(T, configuration.base, true);
+    } catch (error) { if (fatal) throw error; this.closeDiagnosticFailure = describe(error); }
+    healthy();
+    if (baseline.looks.length !== 1) refuse('baseline must be single-base PNG');
+    return attempt(baseline, runtime ? configuration.base : this.base, false);
+  }
+
   async close(){
     try{this.dispose();}catch{}
     await Promise.allSettled(Object.values(this.state));
@@ -752,11 +957,12 @@ export class BakedAtlas {
 }
 
 /** Fetch the manifest and the field pages; resolves once sprites can draw. */
-export async function loadBakedAtlas(base = BAKED_BASE, { onCreated = null, runtimeClose = null, renderer = null } = {}) {
+export async function loadBakedAtlas(base = BAKED_BASE, { onCreated = null, runtimeClose = null, renderer = null, serialClose = false } = {}) {
   if(onCreated!==null&&typeof onCreated!=='function')throw Error('baked atlas: creation observer required');
+  if(typeof serialClose!=='boolean'||serialClose&&!runtimeClose)throw Error('baked close: explicit configured serial boolean required');
   const res = await fetch(`${base}soldier.json`);
   if (!res.ok) throw new Error(`baked figures: HTTP ${res.status} for ${base}soldier.json`);
-  const atlas = new BakedAtlas(await res.json(), base, { runtimeClose, renderer });
+  const atlas = new BakedAtlas(await res.json(), base, { runtimeClose, renderer, serialClose });
   try{if(onCreated)onCreated(atlas);await atlas.load('field');return atlas;}catch(error){try{atlas.dispose();}catch{}throw error;}
 }
 

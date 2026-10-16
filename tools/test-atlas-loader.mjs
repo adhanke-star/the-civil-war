@@ -1,5 +1,44 @@
 import assert from 'node:assert/strict';
 import { loaderFixture } from './atlas-loader-fixture.mjs';
+import {BakedAtlas,loadBakedAtlas} from '../src/units/impostor.js';
+import fs from 'node:fs';
+import {createHash} from 'node:crypto';
+import {execFileSync} from 'node:child_process';
+
+const serialTurn=async()=>{for(let i=0;i<96;i++)await Promise.resolve();};
+async function serialFailure(task){let rejected=false,error;try{await task;}catch(value){rejected=true;error=value;}assert(rejected,'serial promise must reject');return error;}
+async function serialOrder(f){
+  const fetch=f.io.fetch,png=f.io.loadPNG,upload=f.renderer.initTexture,starts=[],backs=new Map(),indices=new Map();let complete=0,a,reentered;
+  const start=url=>{assert.equal(starts.length,complete,'next provider waits for preceding native upload return');starts.push(url);};
+  f.io.fetch=async function(url){assert.equal(this,undefined,'fetch keeps original unbound receiver');start(url);reentered=f.atlas.load('close');
+    const response=await fetch(url);return{...response,arrayBuffer:async()=>{const b=await response.arrayBuffer();backs.set(url,b);return b;}};};
+  f.io.loadPNG=async function(url){assert.equal(this,f.io,'PNG keeps original receiver');start(url);return png.call(this,url);};
+  f.io.observeClose=e=>{if(e.operation==='created')indices.set(e.textureUUID,e.index);if(e.operation==='settled'&&e.outcome==='fulfilled')complete++;
+    if(['created','uploaded'].includes(e.operation)){assert.equal(f.atlas.loaded('close'),false);assert.equal(f.atlas.textures.field,f.before.fieldTextures);}};
+  f.renderer.initTexture=function(t){assert.equal(starts.length,indices.get(t.uuid)+1);const out=upload.call(this,t);assert.equal(complete,starts.length-1);return out;};
+  a=f.atlas.load('close');assert.equal(a,f.atlas.load('close'));f.atlas.serialClose=false;const ts=await a;assert.equal(reentered,a);
+  const expected=['base','extra'].flatMap(look=>Array.from({length:5},(_,i)=>`candidate/${look}-${i}.${i===4?'png':'ktx2'}`));
+  assert.deepEqual(starts,expected);assert.equal(complete,10);assert.equal(ts.length,10);assert.equal(ts.filter(t=>t.isCompressedTexture).length,8);
+  for(const [i,t]of ts.entries())if(t.isCompressedTexture){assert.equal(t.mipmaps.length,4,'serial scheduling never clears payloads');assert(t.mipmaps.every(m=>m.data.buffer===backs.get(expected[i])),'every mip retains its whole input backing');}
+  assert.equal(new Set([...backs.values()]).size,8);assert.equal(f.events.filter(e=>e==='finish').length,0);
+  assert(f.pools.every(p=>p.batches.close.length===10));
+}
+async function serialContext(f){
+  const fetch=f.io.fetch,initial=f.renderer.getContext();let context=initial,release,starts=0;const held=new Promise(r=>{release=r;});
+  f.renderer.getContext=()=>context;f.io.fetch=async url=>{starts++;await held;return fetch(url);};
+  const oldRelease=f.releaseLate;f.releaseLate=()=>{oldRelease();release();};
+  const task=f.atlas.load('close');await serialTurn();assert.equal(starts,1);context={...initial};release();
+  await serialFailure(task);assert.equal(starts,1,'context identity drift must stop scheduling');assert.equal(f.atlas.loaded('close'),false);
+  assert(!f.events.some(e=>e.startsWith('png:baseline/')));
+}
+async function serialRawFailure(f){
+  f.io.loadPNG=async()=>{throw 0;};const error=await serialFailure(f.atlas.load('close'));assert.equal(error,0,'first raw falsy failure is preserved');
+}
+async function serialBorrowed(f){
+  const png=f.io.loadPNG;f.io.loadPNG=async url=>url==='candidate/base-4.png'?f.before.fieldTextures[0]:png.call(f.io,url);
+  await serialFailure(f.atlas.load('close'));assert.equal(f.disposed.size,4);assert.equal(f.atlas.textures.field,f.before.fieldTextures);
+  assert(!f.events.some(e=>e.startsWith('png:baseline/')));assert.equal(f.atlas.loaded('close'),false);
+}
 
 const checks = [
   ['completion-before-fallback', {httpFailure:true}, async f=>{
@@ -156,12 +195,171 @@ const checks = [
       assert.equal(typeof e.textureUUID,'string');assert.equal(e.textureUUID,created.textureUUID);assert.equal(e.textureUUID,disposed.textureUUID);assert.equal(disposed.ok,true);}
   },f=>{const load=f.atlas.loadDiagnosticClose;f.atlas.loadDiagnosticClose=function(){const observe=f.io.observeClose;f.io.observeClose=e=>observe(e.operation==='settled'&&e.outcome==='rejected'?{...e,textureUUID:null}:e);return load.call(this);};}],
 ];
+const serialChecks=[
+  ['serial-order',{},serialOrder],
+  ['serial-context',{},serialContext],
+  ['serial-falsy-baseline',{unsupported:true},serialRawFailure],
+  ['serial-borrowed',{},serialBorrowed],
+  ['serial-boolean',{},async f=>{
+    for(const serialClose of [null,0,1,'true',{},()=>true])assert.throws(()=>new BakedAtlas(f.atlas.layout.manifest,'baseline/',{serialClose,diagnosticClose:f.atlas.diagnosticClose,renderer:f.renderer,io:f.io}),/boolean/);
+    assert.throws(()=>new BakedAtlas(f.atlas.layout.manifest,'baseline/',{serialClose:true}),/configured/);
+    await assert.rejects(loadBakedAtlas('unused/',{serialClose:true}),/configured/);assert.equal(f.events.length,0);
+  }],
+  ...['fetch','body','png'].map(phase=>['serial-deferred-'+phase,{},async f=>{
+    const fetch=f.io.fetch,png=f.io.loadPNG,starts=[];let release;const held=new Promise(r=>{release=r;});
+    const oldRelease=f.releaseLate;f.releaseLate=()=>{oldRelease();release();};
+    f.io.fetch=async url=>{starts.push(url);if(phase==='fetch'&&starts.length===1)await held;const response=await fetch(url);
+      return{...response,arrayBuffer:async()=>{if(phase==='body'&&starts.length===1)await held;return response.arrayBuffer();}};};
+    f.io.loadPNG=async url=>{starts.push(url);if(phase==='png'&&starts.length===5)await held;return png.call(f.io,url);};
+    const task=f.atlas.load('close');await serialTurn();assert.equal(starts.length,phase==='png'?5:1);assert.equal(f.atlas.loaded('close'),false);
+    assert(f.pools.every(p=>!p.batches.close.length));release();assert.equal((await task).length,10);
+  }]),
+  ...Array.from({length:10},(_,index)=>['serial-failure-'+index,{},async f=>{
+    const fetch=f.io.fetch,png=f.io.loadPNG,requests=[];let candidate=0;
+    f.atlas.diagnosticClose.completionBeforeFallback=true;
+    const begin=url=>{requests.push(url);if(url.startsWith('candidate/')&&candidate++===index)throw Error('serial-page-'+index);
+      if(url.startsWith('baseline/'))assert.equal(f.events.filter(e=>e==='finish').length,index?1:0);};
+    f.io.fetch=async url=>{begin(url);return fetch(url);};f.io.loadPNG=async url=>{begin(url);return png.call(f.io,url);};
+    const ts=await f.atlas.load('close');assert.equal(ts.length,5);assert.equal(candidate,index+1);
+    assert.equal(requests.filter(u=>u.startsWith('candidate/')).length,index+1);assert.equal(requests.filter(u=>u.startsWith('baseline/')).length,5);
+    assert.equal(f.disposed.size,index);assert.equal(f.atlas.textures.field,f.before.fieldTextures);assert.equal(f.atlas.layout.tiers.close,f.before.close);
+    if(index){const done=f.events.indexOf('finish');assert(done>f.events.lastIndexOf('dispose'));assert(done<f.events.findIndex(e=>e.startsWith('png:baseline/')));}
+  }]),
+  ...['undefined','null','zero','false','empty','symbol','hostile'].flatMap(kind=>['candidate','baseline'].map(attempt=>['serial-thrown-'+attempt+'-'+kind,{unsupported:attempt==='baseline'},async f=>{
+    let getterCalls=0;const hostile=Object.create(null);Object.defineProperty(hostile,'message',{get(){getterCalls++;throw Error('foreign message');}});
+    Object.defineProperty(hostile,Symbol.toPrimitive,{value(){getterCalls++;throw Error('foreign coercion');}});
+    const value={undefined:undefined,null:null,zero:0,false:false,empty:'',symbol:Symbol('raw'),hostile}[kind],fetch=f.io.fetch;
+    if(attempt==='candidate'){f.io.fetch=async url=>{if(url==='candidate/base-0.ktx2')throw value;return fetch(url);};assert.equal((await f.atlas.load('close')).length,5);assert.equal(typeof f.atlas.closeDiagnosticFailure,'string');}
+    else{f.io.loadPNG=async()=>{throw value;};assert.equal(await serialFailure(f.atlas.load('close')),value);}
+    assert.equal(getterCalls,0);
+  }])),
+  ['serial-upload-cleanup-falsy',{},async f=>{
+    const upload=f.renderer.initTexture,cleanup=Error('later cleanup');f.renderer.initTexture=function(t){upload.call(this,t);t.addEventListener('dispose',()=>{throw cleanup;});throw 0;};
+    assert.equal(await serialFailure(f.atlas.load('close')),0);assert.equal(f.disposed.size,1);assert.equal(f.atlas.cleanupFailure.error,cleanup);
+    assert(!f.events.some(e=>e.startsWith('png:baseline/')));
+  }],
+  ...['undefined','null','zero','false','empty'].map(kind=>['serial-all-owned-cleanup-'+kind,{},async f=>{
+    const value={undefined:undefined,null:null,zero:0,false:false,empty:''}[kind],primary={primary:true},fetch=f.io.fetch,upload=f.renderer.initTexture;let first=true;
+    f.io.fetch=async url=>{if(url==='candidate/extra-0.ktx2')throw primary;return fetch(url);};
+    f.renderer.initTexture=function(t){upload.call(this,t);if(first){first=false;t.addEventListener('dispose',()=>{throw value;});}};
+    assert.equal(await serialFailure(f.atlas.load('close')),primary);assert.equal(f.disposed.size,5,'all five owned cleanup operations attempted');
+    assert.equal(f.atlas.cleanupFailure.failed,true);assert.equal(f.atlas.cleanupFailure.error,value);assert(!f.events.some(e=>e.startsWith('png:baseline/')));
+  }]),
+  ['serial-dispose-observer',{},async f=>{
+    const primary=Error('original provider'),fetch=f.io.fetch;f.io.fetch=async url=>{if(url==='candidate/base-1.ktx2')throw primary;return fetch(url);};
+    f.io.observeClose=e=>{if(e.operation==='dispose-result')throw 0;};assert.equal(await serialFailure(f.atlas.load('close')),primary);
+    assert.equal(f.disposed.size,1);assert(!f.events.some(e=>e.startsWith('png:baseline/')));
+  }],
+  ['serial-baseline-order',{unsupported:true},async f=>{
+    const png=f.io.loadPNG,upload=f.renderer.initTexture;let started=0,uploaded=0;
+    f.io.loadPNG=async function(url){assert.equal(this,f.io);assert.equal(started,uploaded);assert(url.startsWith('baseline/'));started++;return png.call(this,url);};
+    f.renderer.initTexture=function(t){const out=upload.call(this,t);uploaded++;return out;};
+    const ts=await f.atlas.load('close');assert.equal(started,5);assert.equal(uploaded,5);assert.equal(ts.length,5);
+    assert(ts.every(t=>t.generateMipmaps&&t.image?.width===8&&t.image?.height===8));
+  }],
+  ['serial-explicit-false',{serialClose:false,httpFailure:true,delay:true},async f=>{
+    const task=f.atlas.load('close');await serialTurn();assert(f.events.includes('late-wait'));
+    assert.equal(f.events.filter(e=>e.startsWith('fetch:candidate/')||e.startsWith('png:candidate/')).length,10);
+    assert.equal(f.atlas.loaded('close'),false);assert.equal(f.disposed.size,0);f.releaseLate();assert.equal((await task).length,5);assert.equal(f.disposed.size,9);
+  }],
+  ['serial-pending-close',{},async f=>{
+    const png=f.io.loadPNG;let release;const held=new Promise(r=>{release=r;}),oldRelease=f.releaseLate;f.releaseLate=()=>{oldRelease();release();};
+    f.io.loadPNG=async url=>{const t=await png.call(f.io,url);if(url==='candidate/base-4.png')await held;return t;};
+    const task=f.atlas.load('close');await serialTurn();assert.equal(f.textures.length,5);let closed=false;const closing=f.atlas.close().then(()=>{closed=true;});
+    await serialTurn();assert.equal(closed,false);release();await serialFailure(task);await closing;assert.equal(f.disposed.size,5);assert.equal(f.atlas.loadsSettled,true);assert.equal(f.atlas.loaded('close'),false);
+    assert(!f.events.some(e=>e.startsWith('png:baseline/')));
+  }],
+  ...['created','uploaded','publish-start'].map(operation=>['serial-observer-'+operation,{},async f=>{
+    const records=[];f.io.observeClose=e=>{records.push(e);if(e.operation===operation)throw 0;};assert.equal(await serialFailure(f.atlas.load('close')),0);
+    assert.equal(f.disposed.size,operation==='created'?0:operation==='publish-start'?10:1);
+    assert.equal(records.filter(e=>e.operation==='dispose-result'&&e.ok).length,operation==='publish-start'?10:1);
+    assert(!f.events.some(e=>e.startsWith('png:baseline/')));
+  }]),
+  ...['dispose','context','replacement'].map(which=>['serial-upload-stop-'+which,{},async f=>{
+    const upload=f.renderer.initTexture,gl=f.renderer.getContext();let uploads=0;
+    f.renderer.initTexture=function(t){upload.call(this,t);uploads++;if(which==='dispose')f.atlas.dispose();else if(which==='context')gl.isContextLost=()=>true;else f.renderer.getContext=()=>({...gl});};
+    await serialFailure(f.atlas.load('close'));assert.equal(uploads,1);assert.equal(f.disposed.size,1);assert.equal(f.atlas.loaded('close'),false);
+    assert.equal(f.events.filter(e=>e.startsWith('fetch:candidate/')).length,1);assert(!f.events.some(e=>e.startsWith('png:baseline/')));
+  }]),
+  ['serial-pending-context-loss',{},async f=>{
+    const png=f.io.loadPNG,gl=f.renderer.getContext();let release;const held=new Promise(r=>{release=r;}),oldRelease=f.releaseLate;f.releaseLate=()=>{oldRelease();release();};
+    f.io.loadPNG=async url=>{const t=await png.call(f.io,url);if(url==='candidate/base-4.png')await held;return t;};
+    const task=f.atlas.load('close');await serialTurn();assert.equal(f.textures.length,5);gl.isContextLost=()=>true;release();
+    await serialFailure(task);assert.equal(f.disposed.size,5);assert.equal(f.atlas.loaded('close'),false);assert(!f.events.some(e=>e.startsWith('png:baseline/')));
+  }],
+  ['serial-async-upload',{},async f=>{
+    const upload=f.renderer.initTexture;f.renderer.initTexture=function(t){upload.call(this,t);return Promise.resolve();};
+    await assert.rejects(f.atlas.load('close'),/synchronous native upload/);assert.equal(f.disposed.size,1);assert(!f.events.some(e=>e.startsWith('png:baseline/')));
+  }],
+  ['serial-async-observer',{},async f=>{
+    const records=[];f.io.observeClose=e=>{records.push(e);return Promise.reject(Error('controlled observer promise'));};await assert.rejects(f.atlas.load('close'),/synchronous primitive observation/);
+    assert.equal(f.disposed.size,0);assert.equal(records.filter(e=>e.operation==='dispose-result'&&e.ok).length,1);assert(!f.events.some(e=>e.startsWith('png:baseline/')));
+  }],
+  ...['textures','batches','provider'].map(which=>['serial-owned-drift-'+which,{},async f=>{
+    const fetch=f.io.fetch,field=f.atlas.textures.field[0],batch=f.pools[0].batches.field[0];let once=true;
+    f.io.fetch=async url=>{if(once){once=false;if(which==='textures')f.atlas.textures.field[0]={};if(which==='batches')f.pools[0].batches.field[0]={};if(which==='provider')f.io.fetch=()=>{throw Error('foreign provider must not run');};}return fetch(url);};
+    try{await serialFailure(f.atlas.load('close'));assert.equal(f.textures.length,0);assert(!f.events.some(e=>e.startsWith('png:baseline/')));}
+    finally{f.atlas.textures.field[0]=field;f.pools[0].batches.field[0]=batch;}
+  }]),
+  ...['uuid','dispose'].map(which=>['serial-texture-drift-'+which,{},async f=>{
+    const upload=f.renderer.initTexture;let getterCalls=0;
+    f.renderer.initTexture=function(t){upload.call(this,t);if(which==='uuid')Object.defineProperty(t,'uuid',{configurable:true,get(){getterCalls++;throw 0;}});else t.dispose=()=>{};throw 0;};
+    assert.equal(await serialFailure(f.atlas.load('close')),0);assert.equal(getterCalls,0);assert.equal(f.disposed.size,1);
+    assert(!f.events.some(e=>e.startsWith('png:baseline/')));
+  }]),
+  ['serial-dispatch-drift',{},async f=>{
+    const upload=f.renderer.initTexture,fetch=f.io.fetch,records=[];let first,listenerCalls=0;
+    f.io.observeClose=e=>records.push(e.operation==='dispose-result'?e:null);
+    f.renderer.initTexture=function(t){upload.call(this,t);if(!first){first=t;t.addEventListener('dispose',()=>{listenerCalls++;});}};
+    f.io.fetch=async url=>{if(url==='candidate/extra-0.ktx2'){first.dispatchEvent=()=>{};throw 0;}return fetch(url);};
+    assert.equal(await serialFailure(f.atlas.load('close')),0);assert.equal(listenerCalls,0,'foreign dispatch suppresses original native-owner witness');
+    assert.equal(f.disposed.size,4,'later owned resources still attempted');assert.equal(f.atlas.cleanupFailure.failed,true);
+    assert.match(f.atlas.cleanupFailure.error.message,/texture ownership changed/);
+    const results=records.filter(Boolean);assert.equal(results.length,5);assert.equal(results[0].ok,false);assert(results.slice(1).every(e=>e.ok));
+    assert(!f.events.some(e=>e.startsWith('png:baseline/')));
+    await assert.rejects(f.atlas.close(),/texture ownership changed/);
+  }],
+  ['serial-duplicate',{},async f=>{
+    const png=f.io.loadPNG;let first;f.io.loadPNG=async url=>{if(url==='candidate/extra-4.png')return first;const t=await png.call(f.io,url);if(url==='candidate/base-4.png')first=t;return t;};
+    await serialFailure(f.atlas.load('close'));assert.equal(f.disposed.size,9);assert(!f.events.some(e=>e.startsWith('png:baseline/')));
+  }],
+  ...['prepare','mount','late'].map(mode=>['serial-publication-'+mode,{},async f=>{
+    let once=true;if(mode==='prepare'){const p=f.pools[1],prepare=p.prepareTier;p.prepareTier=function(...args){if(once){once=false;throw Error('controlled prepare');}return prepare.apply(this,args);};}
+    else f.pools[0].group.addEventListener('childadded',()=>{if(once){once=false;if(mode==='late')f.addPool();else throw Error('controlled mount');}});
+    const ts=await f.atlas.load('close');assert.equal(ts.length,mode==='late'?10:5);assert.equal(f.pools.length,mode==='late'?3:2);
+    assert(f.pools.every(p=>p.batches.close.length===ts.length));assert.equal(f.atlas.textures.field,f.before.fieldTextures);
+    assert.equal(f.disposed.size,mode==='late'?0:10);
+  }]),
+];
+const source=fs.readFileSync(new URL('../src/units/impostor.js',import.meta.url),'utf8'),legacyBody=source.slice(source.indexOf('  async #loadClose('),source.indexOf('  // Scheduling only.')).replace('    if (this.#serialClose) return this.#loadSerialClose(configuration, renderer, runtime);\n','').trimEnd();
+assert.equal(createHash('sha256').update(legacyBody).digest('hex'),'112e2de293f3636bfefe73fac0ca37d923146d32d18255e8dc5154beddbdd490','historical concurrent body is byte-exact');
 for (const [name, options, check] of checks) { const f = loaderFixture(options); try { await check(f); } catch (e) { e.message = `${name}: ${e.message}`; throw e; } finally { f.cleanup(); } }
 console.log(`ATLAS-LOADER OK (${checks.length}/${checks.length})`);
+for(const[name,options,check]of serialChecks){const f=loaderFixture({serialClose:true,...options});try{await check(f);}catch(e){console.error('SERIAL-LOADER FAILED',name);throw e;}finally{f.releaseLate();await f.atlas.state.close?.catch(()=>{});f.cleanup();}}
+console.log(`SERIAL-LOADER CPU OK (${serialChecks.length}; default body exact; completed backings retained)`);
 if (process.argv.includes('--prove-fail')) {
   for (const [name, options, check, mutate] of checks) { const f = loaderFixture(options, mutate); let error;
     try { await check(f); } catch (e) { error = e; } finally { f.releaseLate(); await f.atlas.state.close?.catch(() => {}); f.cleanup(); }
     assert.equal(error?.code, 'ERR_ASSERTION', `${name}: own implementation fault must reject its assertion`); console.log(`CAUGHT ${name}: ${error.message.split('\n')[0]}`);
   }
   console.log(`ATLAS-LOADER CONTROLS OK (${checks.length}/${checks.length})`);
+  const mutants=[
+    ['scheduling','this.#serialClose = serialClose;','this.#serialClose = false;','serial-order'],
+    ['context','getContext.call(renderer) !== context','false','serial-context'],
+    ['raw-primary','throw primary;',"throw new Error('replaced primary');",'serial-falsy-baseline'],
+    ['payload',"this.publishTier('close', T, result, healthy);\n        return result;","this.publishTier('close', T, result, healthy);\n        for(const t of result)if(t.isCompressedTexture)t.mipmaps=[];\n        return result;",'serial-order'],
+    ['borrowed','!value || borrowed.has(value) || seen.has(value)','!value || seen.has(value)','serial-borrowed'],
+    ['cleanup-receipt','catch (error) { failed = true; failure = error; }','catch (error) { fatal = true; }','serial-dispatch-drift'],
+  ];
+  for(const[name,from,to,caseName]of mutants){const[,options,check]=serialChecks.find(c=>c[0]===caseName);
+    const script=`import fs from'node:fs';import assert from'node:assert/strict';import{loaderFixture}from'./tools/atlas-loader-fixture.mjs';
+      const[from,to]=JSON.parse(process.argv[1]);let text=fs.readFileSync('src/units/impostor.js','utf8');assert.equal(text.split(from).length,2);text=text.replace(from,to);
+      const base=new URL('./src/units/impostor.js','file://'+process.cwd()+'/');text=text.replace(/from '([^']+)'/g,(all,spec)=>'from '+JSON.stringify(spec.startsWith('.')?new URL(spec,base).href:import.meta.resolve(spec)));
+      const{BakedAtlas}=await import('data:text/javascript;base64,'+Buffer.from(text).toString('base64'));
+      const serialTurn=${serialTurn.toString()},serialFailure=${serialFailure.toString()},check=${check.toString()},f=loaderFixture(${JSON.stringify({serialClose:true,...options})},()=>{},BakedAtlas);
+      try{await check(f);}finally{f.releaseLate();await f.atlas.state.close?.catch(()=>{});f.cleanup();}`;
+    let failure;try{execFileSync('node',['--input-type=module','-e',script,JSON.stringify([from,to])],{cwd:new URL('..',import.meta.url),encoding:'utf8',maxBuffer:1000000,timeout:10000,stdio:['ignore','pipe','pipe']});}catch(e){failure=String(e.stderr);}
+    assert(failure?.includes('AssertionError'),name+' actual serial source mutant must reach semantic assertion');
+  }
+  console.log(`SERIAL-LOADER SOURCE MUTANTS OK (${mutants.length}/${mutants.length} intended semantic failures)`);
 }

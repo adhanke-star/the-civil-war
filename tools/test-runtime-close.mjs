@@ -27,7 +27,7 @@ function fixture(options={}, pin=pinRuntimeClose) {
     return match?`candidate/${match[1]==='base'?'base':'extra'}-${match[2]}.${match[3]==='astc.ktx2'?'ktx2':'png'}`:`baseline/${name}`;
   };
   const io={fetch:url=>original.io.fetch(translate(url)),loadPNG:url=>original.io.loadPNG(translate(url))};
-  const atlas=new BakedAtlas(baseline,BAKED_BASES.CS,{runtimeClose:descriptor,renderer:original.renderer,io});
+  const atlas=new BakedAtlas(baseline,BAKED_BASES.CS,{runtimeClose:descriptor,renderer:original.renderer,io,serialClose:options.serialClose});
   const pools=[new ImpostorPool(2),new ImpostorPool(2)];for(const p of pools)p.attach(atlas);
   return {...original,input,descriptor,atlas,pools,requests,io,async cleanup(){original.releaseLate();try{await atlas.close();}catch{}original.cleanup();}};
 }
@@ -145,8 +145,48 @@ const checks=[
     assert.equal(f.atlas.loadsSettled,true);assert.equal(Object.keys(f.atlas.textures).length,0);
     assert.ok(!f.events.some(e=>e.startsWith('png:baseline/')));},{delay:true})],
 ];
+const serialChecks=[
+  ['serial-runtime-success',()=>withFixture(async f=>{
+    f.atlas.diagnosticClose={};f.atlas.renderer=null;f.atlas.serialClose=false;
+    const a=f.atlas.load('close');assert.equal(a,f.atlas.load('close'));const ts=await a;
+    assert.equal(ts.length,10);assert.equal(ts.filter(t=>t.isCompressedTexture).length,8);
+    assert(ts.filter(t=>t.isCompressedTexture).every(t=>t.mipmaps.length===4&&new Set(t.mipmaps.map(m=>m.data.buffer)).size===1));
+    assert.equal(f.requests.length,10);assert(f.requests.every(u=>u.includes('cs-close-')));assert(f.pools.every(p=>p.batches.close.length===10));
+  },{serialClose:true})],
+  ['serial-runtime-fallback',()=>withFixture(async f=>{
+    const ts=await f.atlas.load('close');assert.equal(ts.length,5);assert.equal(f.requests.length,6);
+    assert.equal(f.requests.filter(u=>u.includes('cs-close-')).length,1);assert.equal(f.events.filter(e=>e==='finish').length,0);
+    assert.equal(f.disposed.size,0);
+  },{serialClose:true,httpFailure:true})],
+  ...['before','during'].map(when=>['serial-runtime-metadata-'+when,()=>withFixture(async f=>{
+    const field=f.atlas.layout.tiers.field,prior=field.pxPerMetre,fetch=f.io.fetch;
+    if(when==='before')field.pxPerMetre=12345;
+    else f.io.fetch=async url=>{field.pxPerMetre=12345;return fetch(url);};
+    try{await assert.rejects(f.atlas.load('close'),/metadata/);assert.equal(f.requests.length,when==='before'?0:1);
+      assert.equal(f.atlas.loaded('close'),false);assert(!f.requests.some(u=>!u.includes('cs-close-')));}
+    finally{field.pxPerMetre=prior;}
+  },{serialClose:true})]),
+  ['serial-runtime-historical-falsy',()=>withFixture(async f=>{
+    const p=f.pools[0],texture=new Texture(),batches=p.prepareTier('close',f.atlas.layout,[texture]);
+    batches[0].body.material.addEventListener('dispose',()=>{throw 0;});let thrown=false;
+    try{p.disposeTier(batches);}catch(error){thrown=true;assert.equal(error,0);}assert(thrown);texture.dispose();
+    let rejected=false,reason;try{await f.atlas.load('close');}catch(error){rejected=true;reason=error;}
+    assert(rejected);assert.equal(reason,0);assert.equal(f.requests.length,0);
+  },{serialClose:true})],
+  ['serial-public-loader',()=>withFixture(async f=>{
+    const fetch=globalThis.fetch,load=TextureLoader.prototype.loadAsync;let atlas,registered=false;
+    try{
+      globalThis.fetch=async url=>String(url).endsWith('soldier.json')?{ok:true,json:async()=>structuredClone(f.input.baseline)}:f.io.fetch(url);
+      TextureLoader.prototype.loadAsync=function(url){assert(registered);return f.io.loadPNG(url);};
+      atlas=await loadBakedAtlas(BAKED_BASES.CS,{runtimeClose:f.descriptor,renderer:f.renderer,serialClose:true,onCreated(a){registered=true;assert.equal(a.loaded('field'),false);}});
+      const ts=await atlas.load('close');assert.equal(ts.length,10);assert.equal(f.requests.filter(u=>u.includes('cs-close-')).length,10);
+    }finally{try{await atlas?.close();}finally{globalThis.fetch=fetch;TextureLoader.prototype.loadAsync=load;}}
+  },{serialClose:true})],
+];
 for(const [name,check]of checks)try{await check({pin:pinRuntimeClose});}catch(error){console.error('RUNTIME-CLOSE FAILED',name);throw error;}
 console.log(`RUNTIME-CLOSE OK (${checks.length}/${checks.length})`);
+for(const[name,check]of serialChecks)try{await check();}catch(error){console.error('SERIAL-RUNTIME-CLOSE FAILED',name);throw error;}
+console.log(`SERIAL-RUNTIME-CLOSE CPU OK (${serialChecks.length}; no native admission)`);
 if(process.argv.includes('--prove-fail')){
   for(const [name,pin]of [['immutable',x=>x],['descriptor-refusals',x=>x]]){
     let failed=false;try{await checks.find(c=>c[0]===name)[1]({pin});}catch(error){assert.equal(error.code,'ERR_ASSERTION','control must reach its own assertion');failed=true;}

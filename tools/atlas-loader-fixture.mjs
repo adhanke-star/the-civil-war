@@ -4,7 +4,7 @@ import { createDefaultContainer, write } from '../vendor/three/examples/jsm/libs
 import { BakedAtlas, ImpostorPool } from '../src/units/impostor.js';
 import { pageMipBytes } from '../src/units/atlas-compression.js';
 
-export function loaderFixture(options = {}, mutate = () => {}) {
+export function loaderFixture(options = {}, mutate = () => {}, Atlas = BakedAtlas) {
   const frame = { page: 0, x: 0, y: 0, w: 4, h: 4, ox: 0, oy: 0, ax: 2, ay: 4, ppm: 4 };
   const tier = name => ({ frameSize: 8, pxPerMetre: 4, anchor: [2, 4],
     pages: Array.from({ length: name === 'close' ? 5 : 1 }, (_, i) => ({ file: `${name}-${i}.png`, w: 8, h: 8 })),
@@ -45,7 +45,7 @@ export function loaderFixture(options = {}, mutate = () => {}) {
       if (options.delay && url === 'candidate/extra-4.png') { events.push('late-wait'); await late; events.push('late-done'); }
       return track(new THREE.DataTexture(new Uint8Array(8 * 8 * 4), 8, 8)); }
   };
-  const atlas = new BakedAtlas(manifest, 'baseline/', { diagnosticClose: { manifest: hybrid, sourceManifest, base: 'candidate/' }, renderer, io });
+  const atlas = new Atlas(manifest, 'baseline/', { diagnosticClose: { manifest: hybrid, sourceManifest, base: 'candidate/' }, renderer, io, serialClose:options.serialClose });
   atlas.textures.field = atlas.layout.tiers.field.pages.map(() => new THREE.DataTexture(new Uint8Array(256), 8, 8));
   for (let i = 0; i < 2; i++) { const pool = new ImpostorPool(2, { side: 'CS' }); pool.attach(atlas); pools.push(pool); }
   const before = { layout: atlas.layout, field: atlas.layout.tiers.field, close: atlas.layout.tiers.close,
