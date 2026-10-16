@@ -1,5 +1,9 @@
 # Current execution — v1.1, then v2 (Aaron, 2026-10-12)
 
+STATUS 2026-10-16: v1.1 RELEASED (tag v1.1 = 6501d5b) and v2 RELEASED (tag v2 = 0304ff0, CI 38967937836 all 9,
+Pages green). Aaron chose "tag now, play later": his live Confederate play is UNRUN. Open: Decision 0274 offline
+worker-fetch flake. Next milestone is Aaron's choice (runner-up: sandbox battle, about 5–7 days).
+
 v2 CONTRACT — PLAY EITHER SIDE (Aaron, DECISIONS 0273, 2026-10-16). v1.1 RELEASED (tag v1.1 = 6501d5b).
 Player sees: Title → Battles → Command [Union|Confederate] beside Difficulty; any of the 11 phases opens with the player
 commanding the chosen side, the computer the other; result, after-action and you-vs-history read from the player's side.
