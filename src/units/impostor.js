@@ -83,6 +83,147 @@ export function prepareTerminalSpriteTable(rects) {
   return { data, width, height, entries };
 }
 
+// Opt-in batch storage only. No Game/main caller selects this representation.
+// A publishTier transaction wraps the layout, but preserves exact tier identity.
+const terminalSpriteTables = new WeakMap(), terminalSpriteLeases = new WeakMap();
+const terminalSpriteRefuse = () => { throw new Error('terminal sprite: frame table or batch owner changed'); };
+const terminalArrayLength = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(Float32Array.prototype), 'length').get;
+function terminalSpriteArray(array, Type, length = null) {
+  if (!(array instanceof Type)) terminalSpriteRefuse();
+  for (const key of ['length', 'byteLength', 'byteOffset', 'buffer', 'BYTES_PER_ELEMENT'])
+    if (Object.hasOwn(array, key)) terminalSpriteRefuse();
+  const n = terminalArrayLength.call(array);
+  if (length !== null && n !== length) terminalSpriteRefuse();
+  return n;
+}
+
+function clearTerminalSpriteTable(row) {
+  let failed = false, failure;
+  try { row.texture?.dispose(); } catch (e) { failed = true; failure = e; }
+  try {
+    if (row.image) {
+      const d = Object.getOwnPropertyDescriptor(row.image, 'data');
+      if (!d || !Object.hasOwn(d, 'value') || d.value !== row.data || !d.configurable) terminalSpriteRefuse();
+      Object.defineProperty(row.image, 'data', { ...d, value: null });
+    }
+  } catch (e) { if (!failed) { failed = true; failure = e; } }
+  finally {
+    if (row.registry.get(row.tier) === row) row.registry.delete(row.tier);
+    row.state = 'closed'; row.data = row.rects = row.image = row.source = row.texture = row.tier = row.registry = null;
+  }
+  if (failed) throw failure;
+}
+
+function acquireTerminalSpriteTable(atlas, tier) {
+  if (!atlas || atlas.disposed) terminalSpriteRefuse();
+  const descriptor = Object.getOwnPropertyDescriptor(tier, 'rects'), rects = descriptor?.value;
+  if (!descriptor || !Object.hasOwn(descriptor, 'value') || !(rects instanceof Float32Array)) terminalSpriteRefuse();
+  const rectCount = terminalSpriteArray(rects, Float32Array);
+  let registry = terminalSpriteTables.get(atlas);
+  if (!registry) { registry = new Map(); terminalSpriteTables.set(atlas, registry); }
+  let row = registry.get(tier);
+  if (row) {
+    if (row.state !== 'live' || row.rects !== rects
+      || terminalSpriteArray(row.data, Float32Array) < rectCount) terminalSpriteRefuse();
+    for (let i = 0; i < rectCount; i++) if (!Object.is(rects[i], row.data[i])) terminalSpriteRefuse();
+  } else {
+    row = { state: 'preparing', registry, tier, rects, refs: 0, texture: null, image: null, data: null };
+    registry.set(tier, row); // Refuse constructor/callback reentry before allocations.
+    try {
+      const p = prepareTerminalSpriteTable(rects);
+      row.data = p.data; row.entries = p.entries;
+      const texture = new THREE.DataTexture(p.data, p.width, p.height, THREE.RGBAFormat, THREE.FloatType);
+      row.texture = texture; row.image = texture.image;
+      texture.internalFormat = 'RGBA32F'; texture.minFilter = texture.magFilter = THREE.NearestFilter;
+      texture.generateMipmaps = false; texture.flipY = false; texture.unpackAlignment = 1;
+      texture.colorSpace = THREE.NoColorSpace; texture.needsUpdate = true;
+      row.source = texture.source; row.width = p.width; row.height = p.height;
+      if (atlas.disposed) terminalSpriteRefuse();
+      row.state = 'live';
+    } catch (error) {
+      try { clearTerminalSpriteTable(row); }
+      catch (cleanup) { throw new AggregateError([error, cleanup], 'terminal sprite: table construction and cleanup failed'); }
+      throw error;
+    }
+  }
+  row.refs++;
+  return { row, disposed: false, disposing: false, failed: false, failure: undefined };
+}
+
+function releaseTerminalSpriteTable(lease) {
+  if (lease.released) return;
+  lease.released = true;
+  const row = lease.row;
+  if (row.state !== 'live' || row.refs < 1) terminalSpriteRefuse();
+  row.refs--;
+  if (!row.refs) { row.state = 'closing'; clearTerminalSpriteTable(row); }
+}
+
+function terminalSpriteValue(object, key) {
+  const d = Object.getOwnPropertyDescriptor(object, key);
+  if (!d || !Object.hasOwn(d, 'value')) terminalSpriteRefuse();
+  return d.value;
+}
+function terminalSpriteFields(object, fields) {
+  for (const [key, expected] of Object.entries(fields)) if (!Object.is(terminalSpriteValue(object, key), expected)) terminalSpriteRefuse();
+}
+function validateTerminalBatches(pool, batches, tier = null) {
+  const lease = terminalSpriteLeases.get(batches), row = lease?.row;
+  if (!lease || lease.pool !== pool || lease.batches !== batches || lease.disposed || lease.released
+    || tier !== null && lease.tier !== tier || row.state !== 'live'
+    || batches.length !== lease.owned.length) terminalSpriteRefuse();
+  terminalSpriteFields(pool, { atlas: lease.atlas, capacity: lease.capacity });
+  if (lease.atlas.disposed) terminalSpriteRefuse();
+  terminalSpriteFields(row.tier, { rects: row.rects });
+  terminalSpriteArray(row.rects, Float32Array, row.entries * REC);
+  terminalSpriteArray(row.data, Float32Array, row.width * row.height * 4);
+  terminalSpriteFields(row.texture, { source: row.source, format: THREE.RGBAFormat, type: THREE.FloatType,
+    internalFormat: 'RGBA32F', minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter,
+    generateMipmaps: false, flipY: false, unpackAlignment: 1, colorSpace: THREE.NoColorSpace });
+  terminalSpriteFields(row.source, { data: row.image });
+  terminalSpriteFields(row.image, { data: row.data, width: row.width, height: row.height });
+  for (let i = 0; i < batches.length; i++) {
+    const b = terminalSpriteValue(batches, String(i)), own = lease.owned[i];
+    if (b !== own.batch) terminalSpriteRefuse();
+    terminalSpriteFields(b, { tier: lease.tier, page: i, data: own.data, buf: own.buf,
+      words: own.words, geo: own.geo, body: own.body, soft: own.soft });
+    terminalSpriteArray(own.data, Float32Array, lease.capacity * 5);
+    terminalSpriteArray(own.wordsArray, Uint16Array, lease.capacity);
+    terminalSpriteFields(own.buf, { array: own.data, stride: 5, meshPerAttribute: 1, usage: THREE.DynamicDrawUsage });
+    terminalSpriteFields(own.words, { array: own.wordsArray, itemSize: 1, normalized: false,
+      meshPerAttribute: 1, usage: THREE.DynamicDrawUsage, gpuType: THREE.FloatType });
+    terminalSpriteFields(own.geo, { attributes: own.attributes });
+    terminalSpriteFields(own.attributes, { iPos: own.iPos, iVariation: own.iVariation, iWord: own.words });
+    terminalSpriteFields(own.iPos, { data: own.buf, itemSize: 4, offset: 0 });
+    terminalSpriteFields(own.iVariation, { data: own.buf, itemSize: 1, offset: 4 });
+    terminalSpriteFields(own.body, { geometry: own.geo, material: own.bodyMaterial });
+    terminalSpriteFields(own.soft, { geometry: own.geo, material: own.softMaterial });
+    terminalSpriteFields(own.bodyMaterial, { uniforms: own.uniforms });
+    terminalSpriteFields(own.softMaterial, { uniforms: own.uniforms });
+    terminalSpriteFields(own.uniforms, { uFrameTable: own.frameUniform });
+    terminalSpriteFields(own.frameUniform, { value: row.texture });
+    const n = terminalSpriteValue(b, 'n');
+    if (!Number.isSafeInteger(n) || n < 0 || n > lease.capacity) terminalSpriteRefuse();
+  }
+  return lease;
+}
+
+function terminalSpriteRow(pool, batches, tier, batch, offset, x, y, z, scale, pose, variation, compare, look) {
+  const lease = validateTerminalBatches(pool, batches), d = Object.getOwnPropertyDescriptor(tier, 'rects');
+  if (!lease || lease.disposed || lease.row.state !== 'live' || lease.row.tier !== tier
+    || !d || !Object.hasOwn(d, 'value') || d.value !== lease.row.rects) terminalSpriteRefuse();
+  const row = lease.row, rects = row.rects;
+  // The selected CPU frame and its GPU copy must agree at every push boundary.
+  // Draw-time content protection/native retirement remains a separate owner gate.
+  for (let i = 0; i < REC; i++) if (!Object.is(rects[offset + i], row.data[offset + i])) terminalSpriteRefuse();
+  const word = terminalSpriteWord(offset / REC, compare, row.entries), n = batch.n, i = n * 5, a = batch.data;
+  a[i] = x; a[i + 1] = y; a[i + 2] = z; a[i + 3] = scale / rects[offset + 7]; a[i + 4] = variation;
+  batch.words.array[n] = word; batch.n++;
+  if (pose !== BAKE_CLIP.FALLEN) pool.standing++;
+  pool.poses[pose & 7]++; pool.looks[look & 7]++;
+  return true;
+}
+
 /**
  * Baked direction for a man facing `yaw` (forward = (sin yaw, cos yaw)) at (x, z), seen from a camera at
  * (cx, cz), when all n directions exist. The bake's rule: direction d faces d * 360/n degrees counter-
@@ -660,6 +801,20 @@ const VERT = /* glsl */ `
   }
 `;
 
+function terminalSpriteVertex() {
+  const rect = 'attribute vec4 iRect;', off = 'attribute vec4 iOff;', main = 'void main() {';
+  if ([rect, off, main].some(seam => VERT.split(seam).length !== 2)) terminalSpriteRefuse();
+  return VERT.replace(rect, 'attribute float iWord;\n  attribute float iVariation;\n  uniform sampler2D uFrameTable;')
+    .replace(off, '')
+    .replace(main, main + `
+    int word = int(iWord), at = (word / 4) * 2, next = at + 1;
+    vec4 firstRecord = texelFetch(uFrameTable, ivec2(at % 256, at / 256), 0);
+    vec4 secondRecord = texelFetch(uFrameTable, ivec2(next % 256, next / 256), 0);
+    vec4 iRect = vec4(firstRecord.yzw, secondRecord.x);
+    vec4 iOff = vec4(secondRecord.yz, iVariation, float(word % 4 - 1));
+`);
+}
+
 const FRAG = /* glsl */ `
   uniform sampler2D uMap;
   uniform vec2 uPage;
@@ -718,11 +873,35 @@ function quad() {
  * re-pushes the casualties: their baked direction follows the camera). Draws nothing until attach(atlas).
  */
 export class ImpostorPool {
+  #terminalSprites;
+  #terminalCapacity;
+  #terminalOwned = new Set();
+  #busy = false;
+  #operation(run) {
+    if (!this.#terminalSprites) return run();
+    if (this.#busy) terminalSpriteRefuse();
+    this.#busy = true;
+    let result, failed = false, failure;
+    try { result = run(); } catch (error) { failed = true; failure = error; }
+    // Atlas closure may run inside an allocation/mount callback. Its public
+    // disposal is refused while busy; this owner still unwinds every own lease.
+    try {
+      for (const batches of this.#terminalOwned) if (terminalSpriteLeases.get(batches).atlas.disposed) {
+        try { this.#disposeTier(batches); }
+        catch (error) { if (!failed) { failed = true; failure = error; } }
+      }
+    } finally { this.#busy = false; }
+    if (failed) throw failure;
+    return result;
+  }
   #cleanupFailed=false;
   #cleanupError;
   get cleanupFailure(){return Object.freeze({failed:this.#cleanupFailed,error:this.#cleanupError});}
   #cleanupFailure(error){if(!this.#cleanupFailed){this.#cleanupFailed=true;this.#cleanupError=error;}}
-  constructor(capacity, { side = 'US' } = {}) {
+  constructor(capacity, { side = 'US', terminalSprites = false } = {}) {
+    if (typeof terminalSprites !== 'boolean' || terminalSprites && (!Number.isSafeInteger(capacity) || capacity < 1)) terminalSpriteRefuse();
+    this.#terminalSprites = terminalSprites;
+    this.#terminalCapacity = capacity;
     this.capacity = capacity;
     this.side = side;
     this.group = new THREE.Group();
@@ -747,7 +926,26 @@ export class ImpostorPool {
   get mesh() { return this.group; }
   get ready() { return !!(this.layout && this.batches.field.length); }
 
-  attach(atlas) {
+  attach(atlas) { return this.#terminalSprites ? this.#operation(() => this.#attach(atlas)) : this.#attach(atlas); }
+
+  #attach(atlas) {
+    if (this.#terminalSprites) {
+      if (atlas.disposed || this.atlas !== null) terminalSpriteRefuse();
+      this.atlas = atlas; this.layout = atlas.layout; atlas.pools.push(this);
+      try { for (const tier of Object.keys(atlas.textures)) this.#addTier(tier); }
+      catch (error) {
+        const failures = [];
+        for (const tier of ['field', 'close']) {
+          const batches = this.batches[tier];
+          if (batches.length) try { this.#disposeTier(batches); } catch (e) { failures.push(e); }
+        }
+        const at = atlas.pools.indexOf(this); if (at >= 0) atlas.pools.splice(at, 1);
+        this.atlas = this.layout = null;
+        if (failures.length) throw new AggregateError([error, ...failures], 'terminal sprite: attachment and cleanup failed');
+        throw error;
+      }
+      return;
+    }
     this.atlas = atlas;
     this.layout = atlas.layout;
     atlas.pools.push(this);
@@ -755,24 +953,59 @@ export class ImpostorPool {
   }
 
   /** Build the instanced batches (one per page, two passes each) for a loaded tier. */
-  addTier(tier) {
+  addTier(tier) { return this.#terminalSprites ? this.#operation(() => this.#addTier(tier)) : this.#addTier(tier); }
+
+  #addTier(tier) {
     if (this.batches[tier].length || !this.atlas.textures[tier]) return;
+    if (this.#terminalSprites) {
+      const batches = this.#prepareTier(tier, this.layout, this.atlas.textures[tier]);
+      try { this.#commitTier(tier, batches); }
+      catch (error) {
+        try { this.#disposeTier(batches); }
+        catch (cleanup) { throw new AggregateError([error, cleanup], 'terminal sprite: publication and cleanup failed'); }
+        throw error;
+      }
+      return;
+    }
     this.commitTier(tier, this.prepareTier(tier, this.layout, this.atlas.textures[tier]));
   }
 
-  prepareTier(tier, layout, textures) {
+  prepareTier(tier, layout, textures) { return this.#terminalSprites ? this.#operation(() => this.#prepareTier(tier, layout, textures)) : this.#prepareTier(tier, layout, textures); }
+
+  #prepareTier(tier, layout, textures) {
+    if (this.#terminalSprites && terminalSpriteValue(this, 'capacity') !== this.#terminalCapacity) terminalSpriteRefuse();
     const T = layout.tiers[tier], batches = [], geometries = [], materials = [];
-    try { textures.forEach((tex, page) => {
-      const data = new Float32Array(this.capacity * STRIDE);
-      const buf = new THREE.InstancedInterleavedBuffer(data, STRIDE, 1);
+    const pageCount = T.pages.length;
+    let lease;
+    try {
+      if (this.#terminalSprites) {
+        if (!Array.isArray(textures) || textures.length !== T.pages.length || !textures.length) terminalSpriteRefuse();
+        for (let i = 0; i < textures.length; i++) {
+          const texture = terminalSpriteValue(textures, String(i));
+          if (!texture || texture.isTexture !== true) terminalSpriteRefuse();
+        }
+        lease = acquireTerminalSpriteTable(this.atlas, T);
+      }
+      const vertexShader = this.#terminalSprites ? terminalSpriteVertex() : VERT;
+      textures.forEach((tex, page) => {
+      const stride = this.#terminalSprites ? 5 : STRIDE, data = new Float32Array(this.capacity * stride);
+      const buf = new THREE.InstancedInterleavedBuffer(data, stride, 1);
       buf.setUsage(THREE.DynamicDrawUsage);
       const geo = new THREE.InstancedBufferGeometry();
       geometries.push(geo);
       geo.index = quad().index;
       geo.setAttribute('position', quad().attributes.position);
       geo.setAttribute('iPos', new THREE.InterleavedBufferAttribute(buf, 4, 0));
-      geo.setAttribute('iRect', new THREE.InterleavedBufferAttribute(buf, 4, 4));
-      geo.setAttribute('iOff', new THREE.InterleavedBufferAttribute(buf, 4, 8));
+      let words;
+      if (this.#terminalSprites) {
+        words = new THREE.InstancedBufferAttribute(new Uint16Array(this.capacity), 1, false);
+        words.setUsage(THREE.DynamicDrawUsage);
+        geo.setAttribute('iWord', words);
+        geo.setAttribute('iVariation', new THREE.InterleavedBufferAttribute(buf, 1, 4));
+      } else {
+        geo.setAttribute('iRect', new THREE.InterleavedBufferAttribute(buf, 4, 4));
+        geo.setAttribute('iOff', new THREE.InterleavedBufferAttribute(buf, 4, 8));
+      }
       geo.instanceCount = 0;
       const uniforms = {
         ...THREE.UniformsUtils.clone(THREE.UniformsLib.fog),
@@ -783,9 +1016,10 @@ export class ImpostorPool {
         uCosBake: { value: Math.cos(layout.elevation) },
         uSoftFar: { value: this.softFar },
         uSplit: { value: 0 },
+        ...(lease ? { uFrameTable: { value: lease.row.texture } } : {}),
       };
       const mat = (soft) => { const material = new THREE.ShaderMaterial({
-        uniforms, vertexShader: VERT, fragmentShader: FRAG, fog: true, defines: { SOFT: soft ? 1 : 0 },
+        uniforms, vertexShader, fragmentShader: FRAG, fog: true, defines: { SOFT: soft ? 1 : 0 },
         side: THREE.DoubleSide,
         transparent: soft, depthWrite: !soft,
         ...(soft ? { blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.OneFactor, blendDstAlpha: THREE.OneMinusSrcAlphaFactor } : {}),
@@ -803,39 +1037,97 @@ export class ImpostorPool {
         m.onBeforeRender = hook;
         m.name = `baked-${this.side}-${tier}${page}-${kind}`;
       }
-      batches.push({ tier, page, look: T.pages[page].look, data, buf, geo, body, soft, n: 0 });
-    }); } catch (error) {
+      batches.push({ tier, page, look: T.pages[page].look, data, buf, geo, body, soft, n: 0, ...(words ? { words } : {}) });
+    });
+      if (lease) {
+        if (this.atlas.disposed || lease.row.state !== 'live' || batches.length !== pageCount) terminalSpriteRefuse();
+        Object.assign(lease, { pool: this, atlas: this.atlas, tier, capacity: this.#terminalCapacity,
+          batches, owned: batches.map(b => ({ ...b, batch: b, wordsArray: b.words.array,
+            uniforms: b.body.material.uniforms, frameUniform: b.body.material.uniforms.uFrameTable,
+            bodyMaterial: b.body.material, softMaterial: b.soft.material,
+            attributes: b.geo.attributes, iPos: b.geo.attributes.iPos, iVariation: b.geo.attributes.iVariation })) });
+        terminalSpriteLeases.set(batches, lease);
+        this.#terminalOwned.add(batches);
+      }
+    } catch (error) {
       for(const m of materials)try{m.dispose();}catch(cleanupError){this.#cleanupFailure(cleanupError);}
       for(const g of geometries)try{g.index=null;g.deleteAttribute('position');g.dispose();}catch(cleanupError){this.#cleanupFailure(cleanupError);}
+      if (lease) try { releaseTerminalSpriteTable(lease); } catch (cleanupError) { this.#cleanupFailure(cleanupError); }
       throw error;
     }
     return batches;
   }
 
-  commitTier(tier, batches) {
-    this.mountTier(batches);
+  commitTier(tier, batches) { return this.#terminalSprites ? this.#operation(() => this.#commitTier(tier, batches)) : this.#commitTier(tier, batches); }
+
+  #commitTier(tier, batches) {
+    if (this.#terminalSprites) validateTerminalBatches(this, batches, tier);
+    if (this.#terminalSprites) this.#mountTier(batches);
+    else this.mountTier(batches);
     this.batches[tier] = batches;
   }
 
-  mountTier(batches) {
+  mountTier(batches) { return this.#terminalSprites ? this.#operation(() => this.#mountTier(batches)) : this.#mountTier(batches); }
+
+  #mountTier(batches) {
+    if (this.#terminalSprites) validateTerminalBatches(this, batches);
     for (const b of batches) this.group.add(b.body, b.soft);
+    if (this.#terminalSprites) validateTerminalBatches(this, batches);
   }
 
-  disposeTier(batches) {
+  disposeTier(batches) { return this.#terminalSprites ? this.#operation(() => this.#disposeTier(batches)) : this.#disposeTier(batches); }
+
+  #disposeTier(batches) {
+    const lease = this.#terminalSprites ? terminalSpriteLeases.get(batches) : null;
+    if (this.#terminalSprites) {
+      if (!lease && batches.length === 0) return;
+      if (!lease || lease.pool !== this || lease.batches !== batches) terminalSpriteRefuse();
+      if (lease.disposing) terminalSpriteRefuse();
+      if (lease.disposed) { if (lease.failed) throw lease.failure; return; }
+      lease.disposed = lease.disposing = true;
+      this.#terminalOwned.delete(batches);
+      for (const tier of ['field', 'close']) if (this.batches[tier] === batches) this.batches[tier] = [];
+    }
     let failed=false,failure;
     const clean = fn => { try { fn(); } catch (error) { if(!failed){failed=true;failure=error;}this.#cleanupFailure(error); } };
-    for (const b of batches) {
+    for (const b of lease ? lease.owned : batches) {
       clean(() => this.group.remove(b.body)); clean(() => this.group.remove(b.soft));
-      clean(() => b.body.material.dispose()); clean(() => b.soft.material.dispose());
+      clean(() => (lease ? b.bodyMaterial : b.body.material).dispose()); clean(() => (lease ? b.softMaterial : b.soft.material).dispose());
       // Shared quad attributes belong to the common geometry, not this candidate.
-      b.geo.index = null; b.geo.deleteAttribute('position'); clean(() => b.geo.dispose());
+      if (lease) {
+        clean(() => { b.geo.index = null; }); clean(() => b.geo.deleteAttribute('position'));
+        clean(() => {
+          if (b.geo.index !== null || Object.hasOwn(b.geo.attributes, 'position')) terminalSpriteRefuse();
+          b.geo.dispose();
+        });
+      } else { b.geo.index = null; b.geo.deleteAttribute('position'); clean(() => b.geo.dispose()); }
+    }
+    if (lease) {
+      clean(() => releaseTerminalSpriteTable(lease));
+      lease.disposing = false; lease.failed = failed; lease.failure = failure;
     }
     if (failed) throw failure;
   }
 
+  #validatePublished() {
+    const atlas = terminalSpriteValue(this, 'atlas'), layout = terminalSpriteValue(this, 'layout'),
+      all = terminalSpriteValue(this, 'batches');
+    if (atlas?.disposed) terminalSpriteRefuse();
+    for (const tier of ['field', 'close']) {
+      const batches = terminalSpriteValue(all, tier);
+      if (!Array.isArray(batches)) terminalSpriteRefuse();
+      if (!batches.length) continue;
+      const lease = validateTerminalBatches(this, batches, tier);
+      if (layout?.tiers[tier] !== lease.row.tier) terminalSpriteRefuse();
+    }
+  }
+
   setView(camera) { this.cam.copy(camera.position); }
 
-  begin() {
+  begin() { return this.#terminalSprites ? this.#operation(() => this.#begin()) : this.#begin(); }
+
+  #begin() {
+    if (this.#terminalSprites) this.#validatePublished();
     for (const tier of ['field', 'close']) for (const b of this.batches[tier]) b.n = 0;
     this.standing = 0;
     this.poses.fill(0);
@@ -846,7 +1138,10 @@ export class ImpostorPool {
    * One man as a sprite: feet position, yaw, world scale per life metre, pose (BAKE_CLIP), phase (WALK: cycles
    * walked; LOAD: 0..1 of his loading), variation 0..1, compare clip, man number (picks his look).
    */
-  push(x, y, z, yaw, s, clip, phase, variation, side, man = 0) {
+  push(x, y, z, yaw, s, clip, phase, variation, side, man = 0) { return this.#terminalSprites ? this.#operation(() => this.#push(x, y, z, yaw, s, clip, phase, variation, side, man)) : this.#push(x, y, z, yaw, s, clip, phase, variation, side, man); }
+
+  #push(x, y, z, yaw, s, clip, phase, variation, side, man = 0) {
+    if (this.#terminalSprites) this.#validatePublished();
     if (!this.ready) return false;
     const L = this.layout;
     const cx = this.cam.x, cy = this.cam.y, cz = this.cam.z;
@@ -860,10 +1155,16 @@ export class ImpostorPool {
     const slot = L.slotFor(clip, phase);
     const look = L.lookFor(tier, man);
     const o = L.entry(slot, L.direction(tier, slot, yaw, x, z, cx, cz), look);
-    const R = T.rects;
+    const R = this.#terminalSprites ? terminalSpriteLeases.get(this.batches[tier]).row.rects : T.rects;
+    if (this.#terminalSprites) {
+      terminalSpriteWord(o / REC, side, R.length / REC);
+      const copy = terminalSpriteLeases.get(this.batches[tier]).row.data;
+      for (let i = 0; i < REC; i++) if (!Object.is(R[o + i], copy[o + i])) terminalSpriteRefuse();
+    }
     if (!(R[o + 3] > 0)) return false;
     const b = this.batches[tier][R[o]];
     if (!b || b.n >= this.capacity) return false;
+    if (this.#terminalSprites) return terminalSpriteRow(this, this.batches[tier], T, b, o, x, y, z, s, clip, variation, side, look);
     const a = b.data;
     const i = b.n++ * STRIDE;
     a[i] = x; a[i + 1] = y; a[i + 2] = z; a[i + 3] = s / R[o + 7];
@@ -882,7 +1183,10 @@ export class ImpostorPool {
     f[o] = x; f[o + 1] = y; f[o + 2] = z; f[o + 3] = yaw; f[o + 4] = s; f[o + 5] = variation; f[o + 6] = man; f[o + 7] = FALLEN.clock();
   }
 
-  flush() {
+  flush() { return this.#terminalSprites ? this.#operation(() => this.#flush()) : this.#flush(); }
+
+  #flush() {
+    if (this.#terminalSprites) this.#validatePublished();
     const visible = this.group.visible = FIGURE_VIEW.baked && this.ready;
     if (visible) {
       const f = this.fallen, clip = FIGURE_VIEW.clipBaked, gore = FALLEN.gore, now = gore ? 0 : FALLEN.clock();
@@ -890,7 +1194,7 @@ export class ImpostorPool {
       for (let j = gore ? 0 : this.goneTo; j < this.nFallen; j++) {
         const o = j * FALLEN_REC, k = gore ? 0 : fadeOf(now - f[o + 7], false);
         // gore off: sink into the ground and shrink, then stop drawing (laid down in order: the rest are younger)
-        this.push(f[o], f[o + 1] - k * SINK * f[o + 4], f[o + 2], f[o + 3], f[o + 4] * (1 - 0.5 * k), BAKE_CLIP.FALLEN, 0, f[o + 5], clip, f[o + 6]);
+        (this.#terminalSprites ? this.#push : this.push).call(this, f[o], f[o + 1] - k * SINK * f[o + 4], f[o + 2], f[o + 3], f[o + 4] * (1 - 0.5 * k), BAKE_CLIP.FALLEN, 0, f[o + 5], clip, f[o + 6]);
       }
     }
     let drawn = 0;
@@ -903,8 +1207,11 @@ export class ImpostorPool {
         drawn += n;
         if (!n) continue;
         b.buf.clearUpdateRanges();
-        b.buf.addUpdateRange(0, n * STRIDE);
+        b.buf.addUpdateRange(0, n * (this.#terminalSprites ? 5 : STRIDE));
         b.buf.needsUpdate = true;
+        if (this.#terminalSprites) {
+          b.words.clearUpdateRanges(); b.words.addUpdateRange(0, n); b.words.needsUpdate = true;
+        }
       }
     }
     this.drawn = drawn;
@@ -918,7 +1225,12 @@ export class ImpostorPool {
         const p = this.layout.tiers[tier].pages[b.page];
         for (let i = 0; i < b.n; i++) {
           const k = i * STRIDE;
-          const [x, y, w, h] = [b.data[k + 4], b.data[k + 5], b.data[k + 6], b.data[k + 7]];
+          const record = this.#terminalSprites ? terminalSpriteLeases.get(this.batches[tier])?.row : null;
+          if (this.#terminalSprites && (!record || record.state !== 'live')) terminalSpriteRefuse();
+          const at = this.#terminalSprites ? Math.floor(b.words.array[i] / 4) * REC : 0;
+          const [x, y, w, h] = this.#terminalSprites
+            ? [record.data[at + 1], record.data[at + 2], record.data[at + 3], record.data[at + 4]]
+            : [b.data[k + 4], b.data[k + 5], b.data[k + 6], b.data[k + 7]];
           if (!(w > 0 && h > 0 && x >= 0 && y >= 0 && x + w <= p.w && y + h <= p.h)) out.push(`${tier}${b.page}#${i} (${x},${y},${w},${h}) on ${p.w}x${p.h}`);
         }
       }

@@ -313,6 +313,8 @@ async function checkTerminalSprites(field,route,mutant=null){
       table=prepareTerminalSpriteTable(T.rects),batches=Object.values(pool.batches).flat(),
       saved=batches.map(b=>({b,n:b.n,first:b.data.slice(0,12)})),cam=pool.cam.clone(),standing=pool.standing,
       poses=pool.poses.slice(),looks=pool.looks.slice();
+    const actualPool=mutant?null:new source.ImpostorPool(pool.capacity,{side,terminalSprites:true});
+    if(actualPool){actualPool.allowClose=pool.allowClose;actualPool.attach(pool.atlas);actualPool.setView({position:new THREE.Vector3(0,tier==='field'?5000:100,0)});}
     const decode=(scalars,word,lookup=table.data)=>{
       const entry=Math.floor(word/4),r=lookup.subarray(entry*8,entry*8+8);
       return new Float32Array([...scalars.subarray(0,4),r[1],r[2],r[3],r[4],r[5],r[6],scalars[4],word%4-1]);
@@ -336,7 +338,16 @@ async function checkTerminalSprites(field,route,mutant=null){
         const used=pool.batches[tier].filter(b=>b.n);assert.equal(used.length,1);const original=used[0].data.slice(0,12),slot=L.slotFor(clip,phase),
           entry=L.entry(slot,L.direction(tier,slot,yaw,0,0,0,0),L.lookFor(tier,man))/8,
           scalars=new Float32Array([original[0],original[1],original[2],original[3],original[10]]),word=terminalSpriteWord(entry,original[11],table.entries);
-        assert.deepEqual(bits(decode(scalars,word)),bits(original));rows++;
+        assert.deepEqual(bits(decode(scalars,word)),bits(original));
+        if(actualPool){
+          actualPool.begin();assert(actualPool.push(0,0,0,yaw,4.4,clip,phase,variation,compare,man));
+          const compact=actualPool.batches[tier].filter(b=>b.n);assert.equal(compact.length,1);const b=compact[0];
+          assert.equal(b.page,used[0].page);assert.equal(b.data.length,pool.capacity*5);assert.equal(b.words.array.length,pool.capacity);
+          assert.equal(b.words.normalized,false);assert.equal(b.body.geometry,b.soft.geometry);
+          assert.deepEqual(bits(decode(b.data,b.words.array[0],b.body.material.uniforms.uFrameTable.value.image.data)),bits(original));
+          assert.equal(actualPool.standing,pool.standing);assert.deepEqual(actualPool.poses,pool.poses);assert.deepEqual(actualPool.looks,pool.looks);
+        }
+        rows++;
       }
       pool.begin();assert(pool.push(0,0,0,0,4.4,0,0,.5,1,0));
       const original=pool.batches[tier].find(b=>b.n).data.slice(0,12),slot=L.slotFor(0,0),
@@ -352,6 +363,7 @@ async function checkTerminalSprites(field,route,mutant=null){
       assert.equal(rows,28224);assert.equal(rejects,14);
       console.log(JSON.stringify({terminalSprite:true,route,side,tier,rows,rejects,entries:table.entries,tableBytes:table.data.byteLength}));
     }finally{
+      if(actualPool){for(const bs of Object.values(actualPool.batches))actualPool.disposeTier(bs);const at=pool.atlas.pools.indexOf(actualPool);assert(at>=0);pool.atlas.pools.splice(at,1);}
       for(const {b,n,first}of saved){b.n=n;b.data.set(first);}pool.cam.copy(cam);pool.standing=standing;pool.poses.set(poses);pool.looks.set(looks);
     }
   }
@@ -359,6 +371,162 @@ async function checkTerminalSprites(field,route,mutant=null){
     assert.throws(()=>prepareTerminalSpriteTable(bad),/^Error: terminal sprite:/);
   assert.equal(terminalSpriteWord(16383,2,16384),65535,'Uint16 attribute maximum remains legal');
 }
+// Actual compact owners: isolated CPU fixtures never enter shipping selection or create a GL context.
+const THREE=await import('three'),{BakedAtlas,ImpostorPool}=await import('../src/units/impostor.js'),
+  {FIGURE_VIEW,FALLEN}=await import('../src/units/soldier-mesh.js');
+const compactManifest=JSON.parse(fs.readFileSync(new URL('../assets/figures/union-infantry/soldier.json',import.meta.url)));
+let compactChecks=0;
+function compactFixture(capacity=2){
+  const atlas=new BakedAtlas(structuredClone(compactManifest),'./unused/');
+  atlas.textures.field=atlas.layout.tiers.field.pages.map(()=>new THREE.Texture());
+  const pool=new ImpostorPool(capacity,{terminalSprites:true});pool.allowClose=false;pool.attach(atlas);
+  pool.cam.set(0,5000,0);return{atlas,pool};
+}
+const pushCompact=(p,variation=-0,compare=1)=>p.push(0,0,0,0,4.4,0,0,variation,compare,0);
+const compactFail=fn=>{assert.throws(fn,/terminal sprite:/);compactChecks++;};
+const previousCompactView={baked:FIGURE_VIEW.baked,clipBaked:FIGURE_VIEW.clipBaked},previousCompactGore=FALLEN.gore;
+try{
+  FIGURE_VIEW.baked=true;FIGURE_VIEW.clipBaked=1;FALLEN.gore=true;
+  {
+    const{atlas,pool:p}=compactFixture(),q=new ImpostorPool(2,{terminalSprites:true});q.allowClose=false;q.attach(atlas);
+    const a=p.batches.field,b=q.batches.field,t=a[0].body.material.uniforms.uFrameTable.value;
+    let metadataReads=0;Object.defineProperty(t.image.data,'length',{get(){metadataReads++;throw 0;},configurable:true});
+    const r=new ImpostorPool(2,{terminalSprites:true});compactFail(()=>r.attach(atlas));assert.equal(metadataReads,0);assert.equal(atlas.pools.includes(r),false);delete t.image.data.length;
+    assert(a.every(b=>b.body.material.uniforms.uFrameTable.value===t&&b.soft.material.uniforms.uFrameTable.value===t));
+    assert.equal(b[0].body.material.uniforms.uFrameTable.value,t);let disposed=0;t.addEventListener('dispose',()=>disposed++);
+    for(const call of[()=>q.disposeTier(a),()=>q.mountTier(a),()=>q.commitTier('field',a),()=>p.commitTier('close',a)])compactFail(call);
+    assert.equal(p.ready,true);assert.equal(disposed,0);p.disposeTier(a);p.disposeTier(a);assert.equal(disposed,0);
+    q.begin();assert(pushCompact(q));q.flush();assert.deepEqual(q.rectProblems(),[]);q.disposeTier(b);assert.equal(disposed,1);assert.equal(t.image.data,null);
+    q.disposeTier(b);assert.equal(disposed,1);compactFail(()=>q.mountTier(b));atlas.dispose();compactChecks+=9;
+  }
+  {
+    const{atlas,pool:p}=compactFixture(),b=p.batches.field[0];p.begin();assert(pushCompact(p));assert(Object.is(b.data[4],-0));
+    p.addFallen(0,0,0,0,4.4,.25,0);p.flush();assert.equal(p.standing,1);assert.equal(p.drawn,2);assert.equal(b.n,2);
+    assert.equal(pushCompact(p),false);assert.equal(b.n,2);
+    assert.deepEqual(b.buf.updateRanges,[{start:0,count:10}]);assert.deepEqual(b.words.updateRanges,[{start:0,count:2}]);
+    const versions=[b.buf.version,b.words.version];p.begin();p.flush();assert.equal(b.n,1); // casualty retains its original page competition
+    p.nFallen=0;p.begin();p.flush();const empty=[b.buf.version,b.words.version];p.flush();assert.deepEqual([b.buf.version,b.words.version],empty);
+    FIGURE_VIEW.baked=false;p.begin();assert(pushCompact(p));p.flush();assert.equal(p.drawn,0);assert.deepEqual([b.buf.version,b.words.version],empty);FIGURE_VIEW.baked=true;
+    assert(versions.every(v=>v>0));atlas.dispose();compactChecks+=12;
+  }
+  for(const mutate of[
+    p=>{p.capacity=100;return()=>p.capacity=2;},
+    ...['length','byteLength','byteOffset','buffer','BYTES_PER_ELEMENT'].flatMap(key=>['data','words','source','lookup'].map(kind=>p=>{
+      const b=p.batches.field[0],array=kind==='data'?b.data:kind==='words'?b.words.array:kind==='source'?p.layout.tiers.field.rects:b.body.material.uniforms.uFrameTable.value.image.data;
+      Object.defineProperty(array,key,{get(){throw Error('typed getter must not run');},configurable:true});return()=>{delete array[key];};
+    })),
+    p=>{const v=p.atlas;p.atlas=new BakedAtlas(structuredClone(compactManifest),'./unused/');return()=>p.atlas=v;},
+    p=>{const u=p.batches.field[0].body.material.uniforms.uFrameTable,d=Object.getOwnPropertyDescriptor(u,'value');Object.defineProperty(u,'value',{get(){throw Error('getter must not run');},configurable:true});return()=>Object.defineProperty(u,'value',d);},
+    p=>{const b=p.batches.field[0],v=b.body.material.uniforms.uFrameTable.value;b.body.material.uniforms.uFrameTable.value=new THREE.Texture();return()=>b.body.material.uniforms.uFrameTable.value=v;},
+    p=>{const t=p.batches.field[0].body.material.uniforms.uFrameTable.value,v=t.image.data;t.image.data=v.slice();return()=>t.image.data=v;},
+    p=>{const b=p.batches.field[0],v=b.words.array;b.words.array=v.slice();return()=>b.words.array=v;},
+    p=>{const b=p.batches.field[0],v=b.data;b.data=v.slice();return()=>b.data=v;},
+    p=>{const t=p.layout.tiers.field,v=t.rects;t.rects=v.slice();return()=>t.rects=v;},
+    p=>{const t=p.batches.field[0].body.material.uniforms.uFrameTable.value,v=t.minFilter;t.minFilter=THREE.LinearFilter;return()=>t.minFilter=v;},
+  ]){
+    const{atlas,pool:p}=compactFixture(),b=p.batches.field[0];p.begin();const undo=mutate(p),n=b.n;
+    try{compactFail(()=>pushCompact(p));compactFail(()=>p.flush());assert.equal(b.n,n);assert.equal(p.standing,0);}finally{undo();atlas.dispose();}
+  }
+  {
+    const{atlas,pool:p}=compactFixture(),b=p.batches.field[0],R=p.layout.tiers.field.rects;
+    for(const compare of[-0,-2,3,.5,NaN,Infinity]){p.begin();compactFail(()=>pushCompact(p,.5,compare));assert.equal(b.n,0);assert.equal(p.standing,0);}
+    const o=p.layout.entry(p.layout.slotFor(0,0),p.layout.direction('field',p.layout.slotFor(0,0),0,0,0,0,0),p.layout.lookFor('field',0)),old=R[o+1];
+    R[o+1]=old+1;compactFail(()=>pushCompact(p));assert.equal(b.n,0);R[o+1]=old;
+    for(const [at,value]of[[o,99],[o+3,0]]){const before=R[at];R[at]=value;compactFail(()=>pushCompact(p));assert.equal(b.n,0);R[at]=before;}
+    atlas.dispose();
+  }
+  {
+    const{atlas,pool:p}=compactFixture(),bs=p.batches.field;let rejected=0,cleaned=0;
+    for(const b of bs){b.body.material.addEventListener('dispose',()=>{for(const call of[()=>p.addTier('field'),()=>p.begin(),()=>pushCompact(p),()=>p.flush(),()=>p.attach(atlas)]){compactFail(call);rejected++;}cleaned++;});b.soft.material.addEventListener('dispose',()=>cleaned++);b.geo.addEventListener('dispose',()=>cleaned++);}
+    p.disposeTier(bs);assert.equal(rejected,bs.length*5);assert.equal(cleaned,bs.length*3);assert.equal(p.group.children.length,0);assert.equal(p.ready,false);atlas.dispose();compactChecks+=4;
+  }
+  {
+    const{atlas,pool:p}=compactFixture(),bs=p.batches.field,t=bs[0].body.material.uniforms.uFrameTable.value;let cleaned=0;
+    for(const b of bs){b.body.material.addEventListener('dispose',()=>{cleaned++;throw null;});b.soft.material.addEventListener('dispose',()=>cleaned++);b.geo.addEventListener('dispose',()=>cleaned++);}
+    let failed=false;try{p.disposeTier(bs);}catch(e){failed=true;assert.equal(e,null);}assert(failed);assert.equal(cleaned,bs.length*3);assert.equal(t.image.data,null);
+    failed=false;try{p.disposeTier(bs);}catch(e){failed=true;assert.equal(e,null);}assert(failed);assert.equal(p.cleanupFailure.failed,true);failed=false;try{atlas.dispose();}catch(e){failed=true;assert.equal(e,null);}assert(failed);compactChecks+=6;
+  }
+
+  {
+    const{atlas,pool:p}=compactFixture(),T=atlas.layout.tiers.field,sparse=new Array(T.pages.length);sparse[0]=new THREE.Texture();
+    if(sparse.length>1)compactFail(()=>p.prepareTier('field',atlas.layout,sparse));
+    const incomplete=atlas.textures.field.slice();incomplete.forEach=fn=>fn(incomplete[0],0);
+    if(incomplete.length>1)compactFail(()=>p.prepareTier('field',atlas.layout,incomplete));
+    const Tbig={...T,rects:new Float32Array(16384*8),pages:[T.pages[0]]};Tbig.rects.set([0,1,2,3,4,5,6,7],16383*8);
+    const layout={...atlas.layout,tiers:{field:Tbig},slotFor:()=>0,lookFor:()=>0,entry:()=>16383*8,direction:()=>0};
+    const old=p.batches.field,candidate=p.prepareTier('field',layout,[atlas.textures.field[0]]);p.disposeTier(old);p.layout=layout;p.commitTier('field',candidate);
+    p.begin();assert(pushCompact(p,.5,2));assert.equal(candidate[0].words.array[0],65535);assert.equal(candidate[0].data[3],Math.fround(4.4/7));atlas.dispose();compactChecks+=3;
+  }
+  for(const mode of ['prepare-failure','mount-failure','same-pool-reentry','different-pool-attach','atlas-close']){
+    const{atlas,pool:p}=compactFixture(),old=p.batches.field,oldTable=old[0].body.material.uniforms.uFrameTable.value,
+      T=atlas.layout.tiers.close,pages=T.pages.map(()=>new THREE.Texture());let q=null,seen=0,table=null,retired=0;
+    const nativeDispose=THREE.Texture.prototype.dispose;
+    THREE.Texture.prototype.dispose=function(...args){if(this.internalFormat==='RGBA32F'&&this!==oldTable){table=this;retired++;}return nativeDispose.apply(this,args);};
+    const listener=()=>{if(seen++)return;if(mode==='mount-failure')throw 0;
+      if(mode==='atlas-close'){try{atlas.dispose();}catch{}return;}
+      if(mode==='same-pool-reentry'){compactFail(()=>p.addTier('close'));compactFail(()=>p.attach(atlas));}
+      if(mode==='different-pool-attach'){q=new ImpostorPool(2,{terminalSprites:true});q.allowClose=false;q.attach(atlas);}
+    };
+    p.group.addEventListener('childadded',listener);
+    try{
+      if(mode==='prepare-failure'){
+        pages.forEach=fn=>{fn(pages[0],0);throw 0;};let failed=false;try{p.prepareTier('close',atlas.layout,pages);}catch(e){failed=true;assert.equal(e,0);}assert(failed);
+      }else if(mode==='mount-failure'||mode==='atlas-close'){
+        let failed=false;try{atlas.publishTier('close',T,pages);}catch(e){failed=true;if(mode==='mount-failure')assert.equal(e,0);else assert.match(String(e),/terminal sprite:/);}assert(failed);
+      }else{
+        atlas.publishTier('close',T,pages);assert(p.batches.close.length);if(q){assert(q.batches.close.length);assert.equal(q.batches.close[0].body.material.uniforms.uFrameTable.value,p.batches.close[0].body.material.uniforms.uFrameTable.value);}
+      }
+      if(mode==='atlas-close'){
+        assert.equal(oldTable.image.data,null);assert.equal(p.group.children.length,0);assert.equal(p.ready,false);assert.equal(retired,1);compactChecks+=4;continue;
+      }
+      assert.equal(p.batches.field,old);assert.equal(oldTable.image.data!==null,true);assert.equal(p.ready,true);
+      if(mode.endsWith('failure')){assert.equal(retired,1);assert.equal(table.image.data,null);assert.equal(p.group.children.length,old.length*2);assert.equal(p.batches.close.length,0);}
+      compactChecks+=7;
+    }finally{p.group.removeEventListener('childadded',listener);THREE.Texture.prototype.dispose=nativeDispose;if(!atlas.disposed)atlas.dispose();}
+  }
+  {
+    const{atlas,pool:p}=compactFixture(),b=p.batches.field[0],calls=[];let bound,id=0;
+    const gl={ARRAY_BUFFER:34962,FLOAT:5126,UNSIGNED_SHORT:5123,createBuffer:()=>({id:++id}),bindBuffer:(target,v)=>{bound=v;},
+      bufferData:(target,array,usage)=>calls.push({kind:'create',key:bound,array,usage}),
+      bufferSubData:(target,offset,array,start,count)=>calls.push({kind:'update',key:bound,offset,array,start,count}),deleteBuffer:()=>{}};
+    const{WebGLAttributes}=await import('three/src/renderers/webgl/WebGLAttributes.js'),
+      {WebGLGeometries}=await import('three/src/renderers/webgl/WebGLGeometries.js'),{WebGLObjects}=await import('three/src/renderers/webgl/WebGLObjects.js'),
+      attrs=WebGLAttributes(gl),info={render:{frame:1},memory:{geometries:0}},bindings={releaseStatesOfGeometry(){},releaseStatesOfObject(){}},
+      geos=WebGLGeometries(gl,attrs,info,bindings),objects=WebGLObjects(gl,geos,attrs,bindings,info);
+    try{
+      p.begin();assert(pushCompact(p));p.flush();objects.update(b.body);objects.update(b.soft);
+      const dynamic=calls.filter(c=>c.usage===THREE.DynamicDrawUsage);assert.equal(dynamic.length,2);assert.notEqual(dynamic[0].key,dynamic[1].key);
+      assert(dynamic.some(c=>c.array===b.data));assert(dynamic.some(c=>c.array===b.words.array));assert.equal(info.memory.geometries,1);
+      calls.length=0;info.render.frame++;p.begin();assert(pushCompact(p));p.flush();objects.update(b.body);objects.update(b.soft);
+      const updates=calls.filter(c=>c.kind==='update');assert.equal(updates.length,2);
+      assert.deepEqual(updates.map(c=>[c.offset,c.start,c.count,c.array.BYTES_PER_ELEMENT]).sort((a,b)=>b[2]-a[2]),[[0,0,5,4],[0,0,1,2]]);
+      calls.length=0;info.render.frame++;p.begin();p.flush();objects.update(b.body);objects.update(b.soft);assert.equal(calls.length,0);compactChecks+=9;
+    }finally{atlas.dispose();objects.dispose();}
+  }
+}finally{Object.assign(FIGURE_VIEW,previousCompactView);FALLEN.gore=previousCompactGore;}
+console.log('ACTUAL-COMPACT CPU controls '+compactChecks+'; no native compilation/retirement claim');
+let actualCompactMutants=0;
+for(const [name,from,to]of[
+  ['word','batch.words.array[n] = word;','batch.words.array[n] = word ^ 1;'],
+  ['scale','scale / rects[offset + 7]','scale'],
+  ['variation','a[i + 4] = variation;','a[i + 4] = Math.abs(variation);'],
+  ['shader','vec4(firstRecord.yzw, secondRecord.x)','vec4(firstRecord.xyz, secondRecord.x)'],
+]){
+  const script=`import fs from'node:fs';import assert from'node:assert/strict';import * as THREE from'three';
+    let text=fs.readFileSync('src/units/impostor.js','utf8');const[from,to]=JSON.parse(process.argv[1]);assert.equal(text.split(from).length,2);text=text.replace(from,to);
+    const base=new URL('./src/units/impostor.js','file://'+process.cwd()+'/');
+    text=text.replace(/from '([^']+)'/g,(all,spec)=>'from '+JSON.stringify(spec.startsWith('.')?new URL(spec,base).href:import.meta.resolve(spec)));
+    const{BakedAtlas,ImpostorPool}=await import('data:text/javascript;base64,'+Buffer.from(text).toString('base64')),
+      manifest=JSON.parse(fs.readFileSync('assets/figures/union-infantry/soldier.json')),atlas=new BakedAtlas(manifest,'./unused/');
+    atlas.textures.field=atlas.layout.tiers.field.pages.map(()=>new THREE.Texture());const p=new ImpostorPool(2,{terminalSprites:true});p.allowClose=false;p.attach(atlas);p.cam.set(0,5000,0);
+    try{p.begin();assert(p.push(0,0,0,0,4.4,0,0,-0,1,0));const b=p.batches.field.find(b=>b.n),slot=p.layout.slotFor(0,0),entry=p.layout.entry(slot,p.layout.direction('field',slot,0,0,0,0,0),p.layout.lookFor('field',0))/8;
+      assert.equal(b.words.array[0],entry*4+2);assert.equal(b.data[3],Math.fround(4.4/p.layout.tiers.field.rects[entry*8+7]));assert(Object.is(b.data[4],-0));
+      assert(b.body.material.vertexShader.includes('vec4(firstRecord.yzw, secondRecord.x)'));
+    }finally{atlas.dispose();}`;
+  let failure;try{execFileSync('node',['--input-type=module','-e',script,JSON.stringify([from,to])],{cwd:new URL('..',import.meta.url),encoding:'utf8',maxBuffer:1000000,timeout:10000,stdio:['ignore','pipe','pipe']});}catch(e){failure=String(e.stderr);}
+  assert(failure?.includes('AssertionError'),name+' actual source mutant must reach semantic assertion');actualCompactMutants++;
+}
+assert.equal(actualCompactMutants,4);console.log('ACTUAL-COMPACT SOURCE MUTANTS 4/4 intended semantic failures');
 let terminalRows=0,terminalRejects=0,terminalCases=0;
 for(const route of ['capable','unsupported']){
   const script='const owners='+checkConstructedOwners.toString()+',sprites='+checkTerminalSprites.toString()+';('+constructOrdinaryOwnerShapes.toString()+')(async(field,shapes)=>{await owners(field,shapes);await sprites(field,process.argv[1]);const assert=(await import("node:assert/strict")).default;for(const mode of ["word","table"]){let error;try{await sprites(field,process.argv[1],mode);}catch(e){error=e;}assert.equal(error?.code,"ERR_ASSERTION","terminal sprite "+mode+" mutant must reach its own assertion");}console.log(JSON.stringify({terminalSpriteControl:true,checkpoint:field.phase,count:2}));}).catch(error=>{console.error(error);process.exitCode=1;})';
@@ -373,5 +541,5 @@ for(const route of ['capable','unsupported']){
   console.log('SOURCE-OWNERS '+route+' '+output.trim());
 }
 assert.equal(terminalCases,6);assert.equal(terminalRows,169344);assert.equal(terminalRejects,84);
-console.log('TERMINAL-SPRITE CPU OK (6 cases / 169344 rows / 84 rejects / 8 intended source mutants); no runtime shader/upload/retirement claim');
+console.log('TERMINAL-SPRITE CPU OK (6 cases / 169344 legacy and actual compact rows / 84 rejects / 8 intended source mutants); no runtime shader/upload/retirement claim');
 console.log(`ORDINARY-PILOT CPU OK (source ${sourceChecks}, mask ${maskChecks}, frame ${frameChecks}, stability ${stabilityChecks}, progress ${progressChecks}, reader ${readerChecks}); native entry/budget UNRUN`);

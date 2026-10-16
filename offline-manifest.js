@@ -924,8 +924,8 @@ self.CW_OFFLINE = {
    "sha256": "6bbc1d33dee34ebbfd9933ef94528f0a3a1610a3e31fe7ab97b0b63c8d69028c"
   },
   "src/units/impostor.js": {
-   "bytes": 49308,
-   "sha256": "9406612cea4eef3416202357ccffe5524fb3c0eb47b01d286534141ef2da70cc"
+   "bytes": 67264,
+   "sha256": "4e68f2fdf0f90a46db190fa7625dc5b32105cbd000413f5f206eb357be118b4e"
   },
   "src/units/mounts.js": {
    "bytes": 7786,
@@ -1472,5 +1472,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "0fa78f046d8001a9b2feefdf1fa285ccfe7c2c7f01ac9c762b2a3098ee26de21"
+ "generation": "d52710c24a95443fb082b2cfa3605c316917b53399e1e8b2acfcaad01ae674c8"
 };
