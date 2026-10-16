@@ -869,7 +869,7 @@ const rendererConstructionMutants=[
   "caseName": "dual",
   "replacements": [
    [
-    "if(cleanupFailed)throw new RendererAggregateError([first,cleanup],'qualified atlas renderer: construction failed; cleanup uncertain',{cause:first});",
+    "if(cleanupFailed)throw rendererAggregateFailure(first,cleanup,'qualified atlas renderer: construction failed; cleanup uncertain');",
     "if(cleanupFailed)throw cleanup;"
    ]
   ]
@@ -935,4 +935,292 @@ if(process.argv.includes('--prove-fail')){
   const stderr=String(failure?.stderr??'');assert(failure&&stderr.includes('AssertionError [ERR_ASSERTION]')&&stderr.includes(tag),m.name+' renderer mutant must reach named semantic assertion');
  }
  console.log(`QUALIFIED-RENDERER SOURCE MUTANTS OK (${rendererConstructionMutants.length}/${rendererConstructionMutants.length} intended semantic failures)`);
+}
+
+// Upload authority controls execute the complete pinned renderer, including its real initTexture.
+// Only the canvas/GL boundary is structural CPU code. These are not native-content proofs.
+function rendererUploadFixture(base){
+ const f=base(),{GL,config,calls}=f,bindings=new Map();let active=0;
+ const log=(name,args=[])=>{if(calls.length>=2000)throw Error('bounded upload fixture');calls.push({name,args});};
+ const remove=f.Canvas.prototype.removeEventListener;f.cleanupAttempts=0;
+ f.Canvas.prototype.removeEventListener=function(name,fn){if(config.cleanupThrow){f.cleanupAttempts++;throw config.cleanupRaw;}return Reflect.apply(remove,this,[name,fn]);};
+ const constantNames=['TEXTURE_2D','TEXTURE_3D','TEXTURE_2D_ARRAY','TEXTURE0','ACTIVE_TEXTURE','TEXTURE_BINDING_2D',
+  'UNPACK_FLIP_Y_WEBGL','UNPACK_PREMULTIPLY_ALPHA_WEBGL','UNPACK_COLORSPACE_CONVERSION_WEBGL','UNPACK_ALIGNMENT',
+  'NONE','BROWSER_DEFAULT_WEBGL','UNSIGNED_BYTE','RED','RED_INTEGER','RG','RG_INTEGER','RGB_INTEGER','RGBA_INTEGER','RGB','RGBA',
+  'R16F','R32F','RG16F','RG32F','RGBA16F','RGBA32F','TEXTURE_WRAP_S','TEXTURE_WRAP_T','TEXTURE_MAG_FILTER','TEXTURE_MIN_FILTER',
+  'REPEAT','CLAMP_TO_EDGE','MIRRORED_REPEAT','NEAREST','NEAREST_MIPMAP_NEAREST','NEAREST_MIPMAP_LINEAR',
+  'LINEAR','LINEAR_MIPMAP_NEAREST','LINEAR_MIPMAP_LINEAR','NEVER','ALWAYS','LESS','LEQUAL','EQUAL','GEQUAL','GREATER','NOTEQUAL'];
+ for(let i=0;i<constantNames.length;i++)Object.defineProperty(GL.prototype,constantNames[i],{value:10000+i,writable:true,configurable:true});
+ f.astc={COMPRESSED_RGBA_ASTC_4x4_KHR:0x93b0};
+ const oldParameter=GL.prototype.getParameter,oldExtension=GL.prototype.getExtension;
+ GL.prototype.getParameter=function(key){
+  if(key===this.ACTIVE_TEXTURE){log('getParameter',[key]);return active;}
+  if(key===this.TEXTURE_BINDING_2D){log('getParameter',[key]);return bindings.get(active)??null;}
+  if(key===this.MAX_TEXTURE_SIZE){log('getParameter',[key]);return 4096;}
+  return oldParameter.call(this,key);
+ };
+ GL.prototype.getExtension=function(name){if(config.onExtension)config.onExtension(name,this);
+  if(name==='WEBGL_compressed_texture_astc'){log('getExtension',[name]);return config.noAstc?null:f.astc;}
+  return oldExtension.call(this,name);
+ };
+ GL.prototype.activeTexture=function(unit){log('activeTexture',[unit]);active=unit;};
+ GL.prototype.bindTexture=function(target,texture){log('bindTexture',[target,texture]);if(target===this.TEXTURE_2D)bindings.set(active,texture);};
+ for(const name of ['pixelStorei','texStorage2D','compressedTexSubImage2D','texSubImage2D','compressedTexImage2D',
+  'texStorage3D','texSubImage3D','compressedTexImage3D','compressedTexSubImage3D','copyTexImage2D',
+  'copyTexSubImage2D','copyTexSubImage3D','generateMipmap'])Object.defineProperty(GL.prototype,name,{value:function(...args){
+   log(name,args);if(config.onGL)config.onGL(name,args,this);
+   if(config.throwAt===name)throw config.raw;
+  },writable:true,configurable:true});
+ return f;
+}
+function rendererUploadScript(body,{beforeImport='',replacements=[]}={}){
+ return `import fs from'node:fs';import assert from'node:assert/strict';import {createHash} from'node:crypto';import * as THREE from'three';
+ const hash=b=>createHash('sha256').update(b).digest('hex');
+ for(const[name,bytes,sha]of [['three.module.js',662772,'9052042d676cb0fdc1ddfefe193053f34b7ac0513a616fdac4535d49987812ea'],['three.core.js',1458113,'9edde002b066a9a05676a6127f67735b62baf399bdea529f2f7e31657da769e6']]){
+  const vendor=fs.readFileSync('vendor/three/build/'+name),actual=fs.readFileSync('node_modules/three/build/'+name);
+  assert.equal(vendor.length,bytes);assert.equal(hash(vendor),sha);assert.deepEqual(actual,vendor);
+ }
+ assert(fs.readFileSync('vendor/three/build/three.module.js','utf8').includes(THREE.WebGLRenderer.toString()));
+ const fixture=(${rendererUploadFixture.toString()})(${rendererConstructionFixture.toString()}),savedGlobals=['HTMLCanvasElement','WebGL2RenderingContext','ImageBitmap','HTMLImageElement','VideoFrame','navigator'].map(k=>[k,Object.getOwnPropertyDescriptor(globalThis,k)]);
+ globalThis.HTMLCanvasElement=fixture.Canvas;globalThis.WebGL2RenderingContext=fixture.GL;
+ ${beforeImport}
+ let source=fs.readFileSync('src/units/atlas-compression.js','utf8');
+ for(const[from,to]of ${JSON.stringify(replacements)}){assert.equal(source.split(from).length,2,'unique upload source seam');source=source.replace(from,to);}
+ for(const[from,to]of [["from 'three';",'from '+JSON.stringify(import.meta.resolve('three'))+';'],["from '../../vendor/three/examples/jsm/libs/ktx-parse.module.js';",'from '+JSON.stringify(new URL('./vendor/three/examples/jsm/libs/ktx-parse.module.js','file://'+process.cwd()+'/').href)+';']])source=source.replace(from,to);
+ source='let probePrivate;\\n'+source.replace("state='constructed-private';","probePrivate=texture;state='constructed-private';");
+ source+='\\nexport {probePrivate,validateQualifiedAtlasUploadLease as probeUpload,validateQualifiedAtlasRendererLease as probeBase,rendererBootstrap as probeBootstrap,rendererUploadBootstrap as probeUploadBootstrap};\\n';
+ const mod=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64')),create=mod.createQualifiedAtlasUploadRenderer,validate=mod.probeUpload;
+ const caught=fn=>{let threw=false,error;try{fn();}catch(e){threw=true;error=e;}return {threw,error};};
+ const refused=fn=>{const r=caught(fn);assert(r.threw,'upload authority must refuse');return r.error;};
+ const spec=Object.values(mod.QUALIFIED_ASTC_PAYLOADS)[0],page=Object.fromEntries(['file','w','h','bytes','mipLevels','encoding','alpha'].map(k=>[k,spec[k]]));
+ const owner=async()=>{const b=fs.readFileSync('assets/figures/confederate-infantry/'+spec.file),input=b.buffer.slice(b.byteOffset,b.byteOffset+b.byteLength),o=mod.createQualifiedAtlasPayload(input,page);await o.verify();o.construct();return o;};
+ const close=o=>caught(()=>o.close()),charged=o=>{assert.equal(o.status().retainedBackingBytes,spec.bytes);assert.equal(o.status().retirementAvailable,false);};
+ const changed=[],change=(object,key,descriptor)=>{changed.push([object,key,Object.getOwnPropertyDescriptor(object,key)]);Object.defineProperty(object,key,descriptor);};
+ const restore=()=>{for(let i=changed.length-1;i>=0;i--){const [object,key,d]=changed[i];if(d)Object.defineProperty(object,key,d);else delete object[key];}changed.length=0;};
+ try{${body}}finally{restore();for(const[k,d]of savedGlobals){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k];assert.deepEqual(Object.getOwnPropertyDescriptor(globalThis,k),d);}}
+ `;
+}
+function runRendererUpload(body,options={}){
+ return execFileSync('node',['--input-type=module','-e',rendererUploadScript(body,options)],{cwd:new URL('..',import.meta.url),encoding:'utf8',timeout:15000,maxBuffer:1000000,stdio:['ignore','pipe','pipe']});
+}
+const rendererUploadCases=[
+ {name:'complete',body:`
+ assert.equal(mod.probeUploadBootstrap.available,true);const canvas=fixture.newCanvas(),pair=create(canvas),o=await owner();
+ assert(Object.isFrozen(pair));assert(Object.isFrozen(pair.lease));assert.deepEqual(Reflect.ownKeys(pair),['renderer','lease']);assert.deepEqual(Reflect.ownKeys(pair.lease),[]);
+ const before=Object.getOwnPropertyDescriptors(canvas.context),start=fixture.calls.length,r=o.submitTrusted(pair.lease),calls=fixture.calls.slice(start);
+ assert.equal(r.sourceClosedSubmissionVerified,true);assert.equal(r.rendererLeaseVerified,true);assert.equal(r.storageAllocations,1);assert.equal(r.mipSubmissions,12);assert.equal(r.trustedSubmittedBackingBytes,spec.bytes);
+ assert.equal(r.contentAtConsumptionVerified,false);assert.equal(r.exclusiveOwnership,false);assert.equal(r.gpuCompletionVerified,false);assert.equal(r.retirementEligible,false);
+ assert.equal(calls.filter(c=>c.name==='createTexture').length,1);assert.equal(calls.filter(c=>c.name==='texStorage2D').length,1);
+ const mips=calls.filter(c=>c.name==='compressedTexSubImage2D');assert.equal(mips.length,12);for(let i=0;i<12;i++){assert.equal(mips[i].args[1],i);assert.equal(mips[i].args[6],0x93b0);}
+ assert.deepEqual(Object.getOwnPropertyDescriptors(canvas.context),before);assert.equal(pair.renderer.info.memory.textures,1);assert.equal(validate(pair.lease).renderer,pair.renderer);
+ const texture=o.handOff();assert.equal(pair.renderer.properties.get(texture).__version,texture.version);assert.equal(pair.renderer.properties.get(texture.source).__version,texture.source.version);
+ charged(o);o.close();charged(o);texture.dispose();charged(o);assert.equal(pair.renderer.info.memory.textures,0);pair.renderer.dispose();
+ `},
+ {name:'multiple-fresh-and-counter',body:`
+ const pair=create(fixture.newCanvas()),a=await owner(),b=await owner();
+ const ordinary=new THREE.DataTexture(new Uint8Array(4),1,1);ordinary.needsUpdate=true;pair.renderer.initTexture(ordinary);assert.equal(pair.renderer.info.memory.textures,1);ordinary.dispose();assert.equal(pair.renderer.info.memory.textures,0);
+ a.submitTrusted(pair.lease);b.submitTrusted(pair.lease);assert.equal(pair.renderer.info.memory.textures,2);charged(a);charged(b);a.close();b.close();charged(a);charged(b);assert.equal(pair.renderer.info.memory.textures,0);
+ const other=create(fixture.newCanvas()),c=await owner();c.submitTrusted(other.lease);c.close();charged(c);pair.renderer.dispose();other.renderer.dispose();
+ `},
+ ...['forged','copied','base','cross-module'].map(kind=>({name:'lease-'+kind,body:`
+ const pair=create(fixture.newCanvas()),o=await owner();let lease;
+ if(${JSON.stringify(kind)}==='forged')lease={};else if(${JSON.stringify(kind)}==='copied')lease=Object.freeze({...pair.lease});
+ else if(${JSON.stringify(kind)}==='base')lease=mod.createQualifiedAtlasRenderer(fixture.newCanvas()).lease;
+ else{const other=await import('data:text/javascript;base64,'+Buffer.from(source+'\\n// distinct module').toString('base64'));lease=other.createQualifiedAtlasUploadRenderer(fixture.newCanvas()).lease;}
+ const error=refused(()=>o.submitTrusted(lease));assert.equal(o.status().trustedSubmittedBackingBytes,0);assert.equal(o.status().failed,true);assert.equal(refused(()=>o.submitTrusted(pair.lease)),error);refused(()=>o.handOff());close(o);pair.renderer.dispose();
+ `})),
+ ...['cache-dispose','context-restore','renderer-context','state','extensions','capabilities','info','memory','counter-getter',
+  'extension-get','extension-has','state-mip','state-mip-hook','properties-has-hook','properties-get-hook','properties-dispose-hook','properties-remove','maximum','astc-getter','astc-value',
+  'gl-own-mip','gl-prototype-mip','gl-function-hook','gl-constant-own','gl-constant-prototype','lost','error'].map(kind=>({name:'refuse-'+kind,body:`
+ const pair=create(fixture.newCanvas()),o=await owner(),r=pair.renderer,gl=r.getContext();let foreign=0;
+ switch(${JSON.stringify(kind)}){
+ case 'cache-dispose':r.properties.dispose();break;
+ case 'context-restore':{const old=r.properties,sentinel=validate(pair.lease).sentinel;fixture.canvases[0].listeners.get('webglcontextlost')({preventDefault(){}});fixture.canvases[0].listeners.get('webglcontextrestored')();assert.equal(old.has(sentinel),true);assert.notEqual(r.properties,old);break;}
+ case 'renderer-context':r.getContext=()=>({});break;
+ case 'state':case 'extensions':case 'capabilities':case 'info':r[${JSON.stringify(kind)}]={...r[${JSON.stringify(kind)}]};break;
+ case 'memory':r.info.memory={textures:0};break;
+ case 'counter-getter':change(r.info.memory,'textures',{get(){foreign++;return 0;},configurable:true});break;
+ case 'extension-get':r.extensions.get=()=>{foreign++;return fixture.astc;};break;
+ case 'extension-has':r.extensions.has=()=>{foreign++;return false;};break;
+ case 'state-mip':r.state.compressedTexSubImage2D=(...args)=>{foreign++;};break;
+ case 'state-mip-hook':change(r.state.compressedTexSubImage2D,'extra',{value:true,configurable:true});break;
+ case 'properties-has-hook':case 'properties-get-hook':case 'properties-dispose-hook':change(r.properties[${JSON.stringify(kind)}.slice(11,-5)],'extra',{value:true,configurable:true});break;
+ case 'properties-remove':r.properties.remove=()=>{foreign++;};break;
+ case 'maximum':r.capabilities.maxTextureSize=1024;break;
+ case 'astc-getter':change(fixture.astc,'COMPRESSED_RGBA_ASTC_4x4_KHR',{get(){foreign++;return 0x93b0;},configurable:true});break;
+ case 'astc-value':fixture.astc.COMPRESSED_RGBA_ASTC_4x4_KHR=0x93b1;break;
+ case 'gl-own-mip':change(gl,'compressedTexSubImage2D',{value:()=>{foreign++;},writable:true,configurable:true});break;
+ case 'gl-prototype-mip':change(fixture.GL.prototype,'compressedTexSubImage2D',{value:()=>{foreign++;},writable:true,configurable:true});break;
+ case 'gl-function-hook':change(fixture.GL.prototype.compressedTexSubImage2D,'extra',{value:true,configurable:true});break;
+ case 'gl-constant-own':change(gl,'RGBA',{get(){foreign++;return 0;},configurable:true});break;
+ case 'gl-constant-prototype':change(fixture.GL.prototype,'R16F',{get(){foreign++;return 0;},configurable:true});break;
+ case 'lost':fixture.config.lost=true;break;
+ case 'error':fixture.config.error=1;break;
+ }
+ const result=caught(()=>o.submitTrusted(pair.lease));restore();fixture.config.lost=false;fixture.config.error=0;
+ assert(result.threw,'changed upload capture refuses');assert.equal(foreign,0,'no changed delegate executes');assert.equal(o.status().trustedSubmittedBackingBytes,0,'no private exposure before capture refusal');assert.equal(o.status().failed,true);close(o);r.dispose();
+ `})),
+ ...['ImageBitmap','HTMLImageElement','VideoFrame'].flatMap(name=>['late','hasInstance'].map(kind=>({name:'global-'+name+'-'+kind,
+  options:{beforeImport:kind==='hasInstance'?`globalThis.${name}=class ${name} {};`:''},body:`
+ const pair=create(fixture.newCanvas()),o=await owner();let foreign=0;
+ ${kind==='late'?`change(globalThis,'${name}',{get(){foreign++;return class {};},configurable:true});`:
+ `change(globalThis.${name},Symbol.hasInstance,{value:()=>{foreign++;return false;},configurable:true});`}
+ const result=caught(()=>o.submitTrusted(pair.lease));restore();assert(result.threw);assert.equal(foreign,0);assert.equal(o.status().trustedSubmittedBackingBytes,0);close(o);pair.renderer.dispose();
+ `}))),
+ ...['isCubeTexture','isData3DTexture','isDataArrayTexture','isCompressedArrayTexture','isVideoTexture','isExternalTexture',
+  'isDepthTexture','isDataTexture','isTexture','isCompressedTexture','isRenderTargetTexture','wrapR','compareFunction','internalFormat','normalized','anisotropy','onUpdate','_listeners','complete','dataReady','mip-data','mip-count'].map(key=>({name:'private-'+key,body:`
+ const pair=create(fixture.newCanvas()),o=await owner(),t=mod.probePrivate;let foreign=0;
+ const key=${JSON.stringify(key)};
+ if(key==='complete')change(t.image,'complete',{get(){foreign++;return true;},configurable:true});
+ else if(key==='dataReady')t.source.dataReady=false;
+ else if(key==='mip-data')t.mipmaps[0].data=t.mipmaps[0].data.slice();
+ else if(key==='mip-count')t.mipmaps.pop();
+ else change(t,key,{value:key==='onUpdate'?()=>foreign++:key==='_listeners'?{}:key==='internalFormat'?'bad':key==='anisotropy'?2:key==='isTexture'||key==='isCompressedTexture'?false:true,writable:true,configurable:true});
+ const result=caught(()=>o.submitTrusted(pair.lease));restore();assert(result.threw);assert.equal(foreign,0);assert.equal(fixture.calls.filter(c=>c.name==='compressedTexSubImage2D').length,0);close(o);pair.renderer.dispose();
+ `})),
+ ...[undefined,null,0,false,''].flatMap(raw=>['texStorage2D','compressedTexSubImage2D'].map(at=>({name:'raw-'+at+'-'+String(raw),body:`
+ const pair=create(fixture.newCanvas()),o=await owner(),gl=pair.renderer.getContext(),before=Object.getOwnPropertyDescriptors(gl);
+ fixture.config.throwAt=${JSON.stringify(at)};fixture.config.raw=${raw===undefined?'undefined':JSON.stringify(raw)};
+ const result=caught(()=>o.submitTrusted(pair.lease));assert(result.threw);assert.equal(result.error,fixture.config.raw,'actual first raw failure survives Three swallow');
+ assert.deepEqual(Object.getOwnPropertyDescriptors(gl),before);assert.equal(o.status().trustedSubmittedBackingBytes,spec.bytes);charged(o);const closed=close(o);assert(closed.threw);assert.equal(closed.error,result.error);charged(o);pair.renderer.dispose();
+ `}))),
+ ...['generic','duplicate','closed'].map(kind=>({name:'attempt-'+kind,body:`
+ const pair=create(fixture.newCanvas()),o=await owner();
+ if(${JSON.stringify(kind)}==='generic')o.submit(pair.renderer);else if(${JSON.stringify(kind)}==='duplicate')o.submitTrusted(pair.lease);else o.close();
+ const count=fixture.calls.length;refused(()=>o.submitTrusted(pair.lease));assert.equal(fixture.calls.length,count);close(o);if(${JSON.stringify(kind)}!=='closed')charged(o);pair.renderer.dispose();
+ `})),
+ {name:'all-constant-own-shadows',body:`
+ const constants=Object.getOwnPropertyNames(fixture.GL.prototype).filter(k=>typeof Object.getOwnPropertyDescriptor(fixture.GL.prototype,k).value==='number');assert.equal(constants.length,48);
+ for(const key of constants){fixture.calls.length=0;const canvas=fixture.newCanvas();change(canvas.context,key,{value:57005,writable:true,configurable:true});const result=caught(()=>create(canvas));restore();assert(result.threw,'constant own shadow refuses '+key);assert.equal(canvas.listeners.size,0);}
+ `},
+ {name:'filter-parameters',body:`
+ const pair=create(fixture.newCanvas()),o=await owner(),start=fixture.calls.length;o.submitTrusted(pair.lease);
+ const gl=pair.renderer.getContext(),calls=fixture.calls.slice(start).filter(c=>c.name==='texParameteri');assert.deepEqual(calls.map(c=>c.args),[[gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE],[gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE],[gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR],[gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR_MIPMAP_LINEAR]]);o.close();pair.renderer.dispose();
+ `},
+ ...['image','navigator','width'].map(kind=>({name:'lookup-'+kind,options:{beforeImport:`
+ let armed=false,foreign=0;const findDescriptor=Object.getOwnPropertyDescriptor(Array.prototype,'find');
+ const poisonFind=()=>{Object.defineProperty(Array.prototype,'find',{...findDescriptor,value:function(...args){foreign++;return Reflect.apply(findDescriptor.value,this,args);}});};
+ ${kind==='image'?`Object.defineProperty(globalThis,'ImageBitmap',{get(){if(armed)poisonFind();return undefined;},configurable:true});`:
+ kind==='navigator'?`const nav={userAgent:''};Object.defineProperty(globalThis,'navigator',{get(){if(armed)poisonFind();return nav;},configurable:true});`:
+ `const widthDescriptor=Object.getOwnPropertyDescriptor(fixture.Canvas.prototype,'width');Object.defineProperty(fixture.Canvas.prototype,'width',{...widthDescriptor,get(){const value=Reflect.apply(widthDescriptor.get,this,[]);if(armed)poisonFind();return value;}});`}
+ `},body:`
+ armed=true;const result=caught(()=>create(fixture.newCanvas()));Object.defineProperty(Array.prototype,'find',findDescriptor);armed=false;
+ assert(result.threw);assert.equal(foreign,0,'no mutable lookup after baseline accessor');assert.equal(fixture.calls.length,0,'no construction after bootstrap drift');
+ `})),
+ {name:'extension-capture-private-slots',body:`
+ let slots=0;const pushDescriptor=Object.getOwnPropertyDescriptor(Array.prototype,'push');fixture.config.onExtension=name=>{if(name==='WEBGL_compressed_texture_astc')Object.defineProperty(Array.prototype,'push',{...pushDescriptor,value:function(...args){for(let i=0;i<args.length;i++)if(args[i]?.key==='COMPRESSED_RGBA_ASTC_4x4_KHR')slots++;return Reflect.apply(pushDescriptor.value,this,args);}});};
+ const result=caught(()=>create(fixture.newCanvas()));Object.defineProperty(Array.prototype,'push',pushDescriptor);fixture.config.onExtension=null;
+ assert(result.threw);assert.equal(slots,0,'no private slot accepted after changed bootstrap');assert.equal(fixture.canvases[0].listeners.size,0);
+ `},
+ ...['base','upload'].map(kind=>({name:'aggregate-iterator-'+kind,options:{beforeImport:`
+ let armed=false;const first=Error('actual baseline failure'),iteratorDescriptor=Object.getOwnPropertyDescriptor(Array.prototype,Symbol.iterator);
+ ${kind==='base'?`const nav={};Object.defineProperty(nav,'userAgent',{get(){if(armed&&fixture.calls.some(c=>c.name==='getError')){fixture.config.cleanupThrow=true;fixture.config.cleanupRaw=false;Object.defineProperty(Array.prototype,Symbol.iterator,{...iteratorDescriptor,value(){throw 0;}});throw first;}return '';}});Object.defineProperty(globalThis,'navigator',{value:nav,configurable:true});`:''}
+ `},body:`
+ ${kind==='upload'?`fixture.config.onExtension=name=>{if(name==='WEBGL_compressed_texture_astc'){fixture.config.cleanupThrow=true;fixture.config.cleanupRaw=false;Object.defineProperty(Array.prototype,Symbol.iterator,{...iteratorDescriptor,value(){throw 0;}});throw first;}};`:''}
+ armed=true;const result=caught(()=>${kind==='base'?'mod.createQualifiedAtlasRenderer':'create'}(fixture.newCanvas()));Object.defineProperty(Array.prototype,Symbol.iterator,iteratorDescriptor);armed=false;fixture.config.onExtension=null;fixture.config.cleanupThrow=false;
+ assert(result.threw);assert(result.error instanceof AggregateError,'both actual failures retained');assert.equal(result.error.errors.length,2);assert.equal(result.error.errors[0],first);assert.equal(result.error.cause,first);assert.equal(result.error.errors[1],false);assert.equal(fixture.cleanupAttempts,1,'returned disposer attempted once');
+ `})),
+ ...['trusted','generic','handoff','close','generic-falsy'].map(kind=>({name:'reentry-'+kind,options:{beforeImport:`
+ let action=null,inner=null;Object.defineProperty(globalThis,'ImageBitmap',{get(){if(action){const fn=action;action=null;inner=fn();}return undefined;},configurable:true});
+ `},body:`
+ const pair=create(fixture.newCanvas()),o=await owner();
+ action=()=>caught(()=>${kind==='trusted'?'o.submitTrusted(pair.lease)':kind==='generic'||kind==='generic-falsy'?'o.submit(pair.renderer)':kind==='handoff'?'o.handOff()':'o.close()'});
+ ${kind==='generic-falsy'?`fixture.config.throwAt='texStorage2D';fixture.config.raw=0;`:''}
+ const result=caught(()=>o.submitTrusted(pair.lease));
+ ${kind==='trusted'?`assert(inner.threw);assert.equal(result.threw,false);charged(o);`:
+ `assert(result.threw,'reentry cannot upgrade owner');${kind==='generic-falsy'?`assert.equal(result.error,0,'generic first failure outranks trusted refusal');`:''}`}
+ close(o);if(${kind==='generic'||kind==='trusted'||kind==='handoff'||kind==='generic-falsy'})charged(o);pair.renderer.dispose();
+ `})),
+ {name:'inflight-baseline-limit',options:{beforeImport:`
+ let pair,foreign=0,fired=0;const Image=class ImageBitmap{};Object.defineProperty(globalThis,'ImageBitmap',{get(){
+ if(pair&&Object.hasOwn(pair.renderer.getContext(),'texStorage2D')){fired++;const state=pair.renderer.state,original=state.compressedTexSubImage2D;
+ if(fired===1)state.compressedTexSubImage2D=function(...args){foreign++;return Reflect.apply(original,this,args);};}return Image;},configurable:true});
+ `},body:`
+ pair=create(fixture.newCanvas());const o=await owner(),result=caught(()=>o.submitTrusted(pair.lease));assert(result.threw);assert(fired>0);assert.equal(foreign,12,'unsupported in-flight baseline can observe before final refusal');charged(o);close(o);charged(o);pair.renderer.dispose();
+ `},
+ {name:'counter-transition',body:`
+ const pair=create(fixture.newCanvas()),o=await owner();fixture.config.onGL=(name,args)=>{if(name==='compressedTexSubImage2D'&&args[1]===11)pair.renderer.info.memory.textures++;};
+ const result=caught(()=>o.submitTrusted(pair.lease));assert(result.threw,'exact numeric +1 required');charged(o);close(o);charged(o);pair.renderer.dispose();
+ `},
+ {name:'late-function-drift',body:`
+ const pair=create(fixture.newCanvas()),o=await owner();fixture.config.onGL=(name,args)=>{if(name==='compressedTexSubImage2D'&&args[1]===11)change(pair.renderer.state.compressedTexSubImage2D,'extra',{value:true,configurable:true});};
+ const result=caught(()=>o.submitTrusted(pair.lease));restore();assert(result.threw,'post-upload capture drift refuses receipt');charged(o);close(o);pair.renderer.dispose();
+ `},
+ {name:'missing-astc',body:`
+ fixture.config.noAstc=true;refused(()=>create(fixture.newCanvas()));assert.equal(fixture.canvases[0].listeners.size,0);assert.equal(fixture.calls.filter(c=>c.name==='compressedTexSubImage2D').length,0);
+ `},
+ ...[undefined,null,0,false,''].flatMap(raw=>[false,true].map(dual=>({name:'factory-raw-'+String(raw)+'-'+dual,body:`
+ const raw=${raw===undefined?'undefined':JSON.stringify(raw)};fixture.config.onExtension=name=>{if(name==='WEBGL_compressed_texture_astc'){fixture.config.cleanupThrow=${dual};fixture.config.cleanupRaw=false;throw raw;}};
+ const result=caught(()=>create(fixture.newCanvas()));fixture.config.onExtension=null;fixture.config.cleanupThrow=false;assert(result.threw);
+ ${dual?`assert(result.error instanceof AggregateError);assert.deepEqual(result.error.errors,[raw,false]);assert.equal(result.error.cause,raw);assert.equal(fixture.cleanupAttempts,1);`:`assert.equal(result.error,raw);assert.equal(fixture.canvases[0].listeners.size,0);`}
+ `}))),
+ {name:'upload-final-health-order',options:{beforeImport:`
+ let armed=false,health=0,late=0;Object.defineProperty(globalThis,'ImageBitmap',{get(){if(armed&&health>=2){late++;fixture.config.lost=true;}return undefined;},configurable:true});
+ `},body:`
+ const pair=create(fixture.newCanvas());fixture.config.onError=()=>health++;armed=true;const result=caught(()=>validate(pair.lease));armed=false;fixture.config.lost=false;fixture.config.onError=null;
+ assert.equal(result.threw,false);assert.equal(late,0,'no upload constructor accessors after final health');assert.equal(health,2);pair.renderer.dispose();
+ `},
+];
+for(const c of rendererUploadCases){try{runRendererUpload(c.body,c.options);}catch(e){throw new Error('renderer upload '+c.name,{cause:e});}}
+console.log(`QUALIFIED-UPLOAD CPU OK (${rendererUploadCases.length}; actual pinned renderer; retained backing only)`);
+if(process.argv.includes('--prove-fail')){
+ const mutants=[
+  ['retained-trusted-charge','complete','trustedSubmittedBackingBytes=length;','void 0;'],
+  ['trusted-attempt-before-accessors','reentry-trusted','trustedAttempted=true;','void 0;'],
+  ['properties-function-hooks','refuse-properties-has-hook',"for(const key of ['has','get','remove','dispose'])method(record.properties,key);","method(record.properties,'remove');"],
+  ['cached-filter-constant','all-constant-own-shadows',"'REPEAT','CLAMP_TO_EDGE','MIRRORED_REPEAT'","'REPEAT','MIRRORED_REPEAT'"],
+  ['counter-transition','counter-transition',"if(rendererUploadCounter(record)!==count+1)refuse('trusted texture allocation count changed');",'void 0;'],
+  ['post-upload-captures','late-function-drift',"requireState('submitted-retained');\n        validateQualifiedAtlasUploadLease(lease);","requireState('submitted-retained');"],
+  ['indexed-new-bootstrap','lookup-image','const s=b.valueBindings[i];',"const s=b.bindings.find(s=>s.object===globalThis&&s.key===b.names[i]);"],
+  ['indexed-shared-bootstrap','lookup-navigator','const slot=b.valueBindings[i];',"const slot=b.bindings.find(s=>s.object===globalThis&&s.key===b.valueBindings[i].key);"],
+  ['indexed-dimensions','lookup-width',"b.canvasSlots[key==='width'?1:2].descriptor.get","b.canvasSlots.find(s=>s.key===key).descriptor.get"],
+  ['capture-extension-boundary','extension-capture-private-slots',"const astc=payloadApply(extensionGet,extensions,['WEBGL_compressed_texture_astc']);\n    capturedStable();","const astc=payloadApply(extensionGet,extensions,['WEBGL_compressed_texture_astc']);"],
+  ['aggregate-base','aggregate-iterator-base',"throw rendererAggregateFailure(first,cleanup,'qualified atlas renderer: construction failed; cleanup uncertain');","throw new RendererAggregateError([first,cleanup],'qualified atlas renderer: construction failed; cleanup uncertain',{cause:first});"],
+  ['aggregate-upload','aggregate-iterator-upload',"throw rendererAggregateFailure(first,cleanup,'qualified atlas upload renderer: failed; cleanup uncertain');","throw new RendererAggregateError([first,cleanup],'qualified atlas upload renderer: failed; cleanup uncertain',{cause:first});"],
+  ['upload-final-accessors','upload-final-health-order',"rendererValidateRecord(record);\n  rendererUploadBootstrapStable(false);rendererUploadDescriptorsStable(record);","rendererValidateRecord(record);\n  rendererUploadBootstrapStable();rendererUploadDescriptorsStable(record);"],
+ ];
+ for(const[name,caseName,from,to]of mutants){
+  const c=rendererUploadCases.find(c=>c.name===caseName),tag='UPLOAD_CONTROL_ASSERTION '+name;
+  const body='try{'+c.body+'}catch(e){if(e?.code==="ERR_ASSERTION")console.error('+JSON.stringify(tag)+');throw e;}';
+  let failure;try{runRendererUpload(body,{...c.options,replacements:[[from,to]]});}catch(e){failure=e;}
+  const stderr=String(failure?.stderr??'');assert(failure&&stderr.includes('AssertionError [ERR_ASSERTION]')&&stderr.includes(tag),name+' upload mutant must reach named semantic assertion');
+ }
+ console.log(`QUALIFIED-UPLOAD SOURCE MUTANTS OK (${mutants.length}/${mutants.length} intended semantic failures)`);
+}
+
+// Finite inverse: the generic submit and old validator remain byte-exact. No git history is needed in CI.
+{
+ const actual=fs.readFileSync(new URL('../src/units/atlas-compression.js',import.meta.url),'utf8');
+ let inverse=actual.slice(0,actual.indexOf('\nfunction rendererAggregateFailure('));
+ const one=(from,to)=>{assert.equal(inverse.split(from).length,2,'unique finite source inverse');inverse=inverse.replace(from,to);};
+ inverse=inverse.slice(0,inverse.indexOf('    // A new source-closed factory lease'))+inverse.slice(inverse.indexOf('    // A submission receipt is a call witness'));
+ one('submittedBackingBytes=0,trustedSubmittedBackingBytes=0,trustedAttempted=false,','submittedBackingBytes=0,');
+ one('handedOffBackingBytes,submittedBackingBytes,trustedSubmittedBackingBytes,uncertainBackingBytes,','handedOffBackingBytes,submittedBackingBytes,uncertainBackingBytes,');
+ one('handedOffBackingBytes,submittedBackingBytes,trustedSubmittedBackingBytes,uncertainBackingBytes)','handedOffBackingBytes,submittedBackingBytes,uncertainBackingBytes)');
+ one('RendererAggregateError=AggregateError,rendererIteratorSymbol=Symbol.iterator,','RendererAggregateError=AggregateError,');
+ one('    boot.valueBindings=[];\n','');
+ one('boot.bindings.push(slot);boot.valueBindings.push(slot);rendererSlotStable(slot);','boot.bindings.push(slot);rendererSlotStable(slot);');
+ one('boot.bindings.push(userAgent);boot.userAgentBinding=userAgent;rendererSlotStable(userAgent);','boot.bindings.push(userAgent);rendererSlotStable(userAgent);');
+ one(`  for(let i=0;i<b.valueBindings.length;i++){
+    const slot=b.valueBindings[i];
+    if(!payloadIs(rendererRead(slot),b.values[slot.key]))rendererRefuse('bootstrap value changed');
+  }
+  if(b.values.navigator&&!payloadIs(rendererRead(b.userAgentBinding),b.userAgent))rendererRefuse('user agent changed');`,
+ `  for(const key of ['navigator','OffscreenCanvas','XRWebGLBinding','self','console']){
+    const slot=b.bindings.find(s=>s.object===globalThis&&s.key===key);
+    if(!payloadIs(rendererRead(slot),b.values[key]))rendererRefuse('bootstrap value changed');
+  }
+  if(b.values.navigator){
+    const slot=b.bindings.find(s=>s.object===b.values.navigator&&s.key==='userAgent');
+    if(!payloadIs(rendererRead(slot),b.userAgent))rendererRefuse('user agent changed');
+  }`);
+ one("b.canvasSlots[key==='width'?1:2].descriptor.get","b.canvasSlots.find(s=>s.key===key).descriptor.get");
+ one('record.isContextLost=b.glSlots[2].descriptor.value;',"record.isContextLost=b.glSlots.find(s=>s.key==='isContextLost').descriptor.value;");
+ one('record.getError=b.glSlots[3].descriptor.value;',"record.getError=b.glSlots.find(s=>s.key==='getError').descriptor.value;");
+ one("throw rendererAggregateFailure(first,cleanup,'qualified atlas renderer: construction failed; cleanup uncertain');","throw new RendererAggregateError([first,cleanup],'qualified atlas renderer: construction failed; cleanup uncertain',{cause:first});");
+ assert.equal(Buffer.byteLength(inverse),56303);assert.equal(createHash('sha256').update(inverse).digest('hex'),'cd9e66977c0657bfe3d4553d7184a10e2f62b38cdefa22288391e27c297b68f6');
+ const test=fs.readFileSync(new URL(import.meta.url),'utf8'),prefix=test.slice(0,test.indexOf('\n// Upload authority controls execute'));
+ const old=prefix.replace("if(cleanupFailed)throw rendererAggregateFailure(first,cleanup,'qualified atlas renderer: construction failed; cleanup uncertain');","if(cleanupFailed)throw new RendererAggregateError([first,cleanup],'qualified atlas renderer: construction failed; cleanup uncertain',{cause:first});");
+ assert.equal(createHash('sha256').update(old).digest('hex'),'6992956a475a9df80a9f078855dff52cc63cae62549d5825d591d9a2762ad4aa');
+ console.log('QUALIFIED-UPLOAD EXACT INVERSES OK (parent source/test; generic submit/private validator unchanged)');
 }

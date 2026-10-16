@@ -245,7 +245,7 @@ export function createQualifiedAtlasPayload(input, page) {
   if (payloadApply(payloadLength,input,[])!==0 || payloadApply(payloadLength,owned,[])!==length) refuse('transfer incomplete');
   let state='owned', closed=false, failed=false, failure, cleanupFailed=false, task=null,
     hashing=false, texture=null, disposalAttempted=false, handedOffBackingBytes=0,uncertainBackingBytes=0,
-    submittedBackingBytes=0,submitting=false,submissionAttempted=false,constructedRecord=null;
+    submittedBackingBytes=0,trustedSubmittedBackingBytes=0,trustedAttempted=false,submitting=false,submissionAttempted=false,constructedRecord=null;
   const describe = error => {
     if (error===null) return 'null';
     const type=typeof error;
@@ -258,8 +258,8 @@ export function createQualifiedAtlasPayload(input, page) {
   const sticky = error => { if(!failed){failed=true;failure=error;} if(!closed)state='failed'; };
   const status = () => payloadFreeze({file,state,failed,error:failed?describe(failure):null,cleanupFailed,
     ownedBackingBytes:owned?length:0,digestCopyBytes:hashing?length:0,digestOutputBytes:hashing?32:0,
-    handedOffBackingBytes,submittedBackingBytes,uncertainBackingBytes,
-    retainedBackingBytes:payloadMax(owned?length:0,handedOffBackingBytes,submittedBackingBytes,uncertainBackingBytes),retirementAvailable:false});
+    handedOffBackingBytes,submittedBackingBytes,trustedSubmittedBackingBytes,uncertainBackingBytes,
+    retainedBackingBytes:payloadMax(owned?length:0,handedOffBackingBytes,submittedBackingBytes,trustedSubmittedBackingBytes,uncertainBackingBytes),retirementAvailable:false});
   const releasePrivate = () => {
     if (texture && !disposalAttempted) {
       const disposing=texture;
@@ -334,6 +334,56 @@ export function createQualifiedAtlasPayload(input, page) {
         state='constructed-private';
         return status();
       } catch(error){sticky(error);releasePrivate();throw failure;}
+    },
+    // A new source-closed factory lease qualifies only this retained submission path.
+    submitTrusted(lease) {
+      requireState('constructed-private');
+      if(submitting||submissionAttempted||trustedAttempted)refuse('trusted submission already attempted');
+      trustedAttempted=true;
+      try{
+        const record=validateQualifiedAtlasUploadLease(lease);
+        // Baseline accessors may reenter another public owner operation; they cannot upgrade its result.
+        requireState('constructed-private');
+        if(submitting||submissionAttempted)refuse('owner changed during trusted validation');
+        const r=constructedRecord,t=texture;
+        const privateShape=after=>{
+          if(!r||r.texture!==t||texture!==t)refuse('trusted texture ownership changed');
+          const expected={isTexture:true,isCompressedTexture:true,isRenderTargetTexture:false,internalFormat:null,normalized:false,
+            anisotropy:1,format:PayloadTHREE.RGBA_ASTC_4x4_Format,type:PayloadTHREE.UnsignedByteType,generateMipmaps:false,
+            flipY:false,premultiplyAlpha:false,colorSpace:PayloadTHREE.NoColorSpace,unpackAlignment:4,onUpdate:null,
+            wrapS:PayloadTHREE.ClampToEdgeWrapping,wrapT:PayloadTHREE.ClampToEdgeWrapping,
+            minFilter:PayloadTHREE.LinearMipmapLinearFilter,magFilter:PayloadTHREE.LinearFilter};
+          const keys=payloadOwnKeys(expected);
+          for(let i=0;i<keys.length;i++){
+            const d=payloadGetDescriptor(t,keys[i]);
+            if(!d||!payloadHasOwn(d,'value')||!payloadIs(d.value,expected[keys[i]]))refuse('trusted texture default changed');
+          }
+          const absent=['wrapR','compareFunction','isExternalTexture','isCubeTexture','isData3DTexture','isDataArrayTexture',
+            'isCompressedArrayTexture','isVideoTexture','isDepthTexture','isDataTexture'];
+          for(let i=0;i<absent.length;i++)if(payloadDescriptor(t,absent[i]).descriptor)refuse('trusted texture branch changed');
+          if(payloadDescriptor(r.image,'complete').descriptor||value(r.source,'dataReady')!==true)refuse('trusted image branch changed');
+          const listeners=payloadGetDescriptor(t,'_listeners');
+          if(!after){if(listeners)refuse('trusted texture already has listeners');}
+          else{
+            if(!listeners||!payloadHasOwn(listeners,'value')||payloadGetPrototype(listeners.value)!==Object.prototype)refuse('trusted listener cache changed');
+            const names=payloadOwnKeys(listeners.value),dispose=payloadGetDescriptor(listeners.value,'dispose');
+            if(names.length!==1||names[0]!=='dispose'||!dispose||!payloadHasOwn(dispose,'value')
+              ||payloadGetPrototype(dispose.value)!==Array.prototype||value(dispose.value,'length')!==1
+              ||typeof value(dispose.value,'0')!=='function')refuse('trusted dispose listener changed');
+          }
+        };
+        privateShape(false);
+        const count=rendererUploadCounter(record);
+        if(count===9007199254740991)refuse('trusted texture counter overflow');
+        // Even captured genuine properties.has/get receive private identity: charge BEFORE that exposure.
+        trustedSubmittedBackingBytes=length;
+        const result=payloadApply(api.submit,api,[record.renderer]);
+        requireState('submitted-retained');
+        validateQualifiedAtlasUploadLease(lease);
+        privateShape(true);
+        if(rendererUploadCounter(record)!==count+1)refuse('trusted texture allocation count changed');
+        return payloadFreeze({...result,trustedSubmittedBackingBytes,rendererLeaseVerified:true,sourceClosedSubmissionVerified:true});
+      }catch(error){sticky(error);throw failure;}
     },
     // A submission receipt is a call witness, not proof of mutable bytes at native consumption.
     submit(renderer) {
@@ -471,7 +521,7 @@ export function createQualifiedAtlasPayload(input, page) {
 
 // Constructor-only lease foundation. No payload submission, native authenticity or retirement authority.
 const RendererWeakMap=WeakMap,rendererWeakGet=WeakMap.prototype.get,rendererWeakSet=WeakMap.prototype.set,
-  RendererAggregateError=AggregateError,rendererPrototypeTest=Object.prototype.isPrototypeOf,
+  RendererAggregateError=AggregateError,rendererIteratorSymbol=Symbol.iterator,rendererPrototypeTest=Object.prototype.isPrototypeOf,
   rendererInteger=Number.isSafeInteger,rendererGetConsole=PayloadTHREE.getConsoleFunction,
   rendererConstructor=PayloadTHREE.WebGLRenderer,rendererLeases=new RendererWeakMap();
 const rendererCanvasKeys=['getContext','width','height','setAttribute','addEventListener','removeEventListener'];
@@ -564,11 +614,12 @@ const rendererBootstrap=(()=>{
     }
     boot.glSlots=rendererQueryKeys.map(key=>rendererSlot(boot.glPrototype,key));
     for(let i=0;i<boot.glSlots.length;i++)if(typeof boot.glSlots[i].descriptor?.value!=='function')rendererRefuse('context query method missing');
+    boot.valueBindings=[];
     for(const key of ['navigator','OffscreenCanvas','XRWebGLBinding','self','console']){
-      const slot=rendererSlot(globalThis,key);boot.bindings.push(slot);rendererSlotStable(slot);
+      const slot=rendererSlot(globalThis,key);boot.bindings.push(slot);boot.valueBindings.push(slot);rendererSlotStable(slot);
       const value=rendererRead(slot);boot.values??={};boot.values[key]=value;
       if(key==='navigator'&&value){
-        const userAgent=rendererSlot(value,'userAgent');boot.bindings.push(userAgent);rendererSlotStable(userAgent);
+        const userAgent=rendererSlot(value,'userAgent');boot.bindings.push(userAgent);boot.userAgentBinding=userAgent;rendererSlotStable(userAgent);
         boot.userAgent=rendererRead(userAgent);
       }
       if((key==='OffscreenCanvas'||key==='XRWebGLBinding')&&value){
@@ -593,14 +644,11 @@ function rendererBootstrapStable(readValues=true){
   for(let i=0;i<b.bindings.length;i++)rendererSlotStable(b.bindings[i]);
   if(payloadApply(rendererGetConsole,PayloadTHREE,[])!==null)rendererRefuse('private console callback unsupported');
   if(readValues){
-  for(const key of ['navigator','OffscreenCanvas','XRWebGLBinding','self','console']){
-    const slot=b.bindings.find(s=>s.object===globalThis&&s.key===key);
-    if(!payloadIs(rendererRead(slot),b.values[key]))rendererRefuse('bootstrap value changed');
+  for(let i=0;i<b.valueBindings.length;i++){
+    const slot=b.valueBindings[i];
+    if(!payloadIs(rendererRead(slot),b.values[slot.key]))rendererRefuse('bootstrap value changed');
   }
-  if(b.values.navigator){
-    const slot=b.bindings.find(s=>s.object===b.values.navigator&&s.key==='userAgent');
-    if(!payloadIs(rendererRead(slot),b.userAgent))rendererRefuse('user agent changed');
-  }
+  if(b.values.navigator&&!payloadIs(rendererRead(b.userAgentBinding),b.userAgent))rendererRefuse('user agent changed');
   }
   // Reading declared trusted global accessors is followed by a complete descriptor recheck.
   rendererHooksStable(b.hooks);rendererHooksStable(b.data);
@@ -664,7 +712,7 @@ function validateQualifiedAtlasRendererLease(lease,expectedRenderer){
 }
 export function createQualifiedAtlasRenderer(canvas){
   rendererBootstrapStable();rendererCanvasStable(canvas);
-  const b=rendererBootstrap,dimension=key=>payloadApply(b.canvasSlots.find(s=>s.key===key).descriptor.get,canvas,[]);
+  const b=rendererBootstrap,dimension=key=>payloadApply(b.canvasSlots[key==='width'?1:2].descriptor.get,canvas,[]);
   const width=dimension('width'),height=dimension('height');
   if(!rendererInteger(width)||!rendererInteger(height)||width<0||height<0)rendererRefuse('canvas dimensions unsupported');
   rendererBootstrapStable();rendererCanvasStable(canvas);
@@ -681,8 +729,8 @@ export function createQualifiedAtlasRenderer(canvas){
       get=rendererDataMethod(properties,'get',slots),propertiesDispose=rendererDataMethod(properties,'dispose',slots),
       gl=payloadApply(getContext,renderer,[]),record={renderer,canvas,gl,properties,getContext,initTexture,has,get,propertiesDispose,dispose,slots};
     rendererContextStable(record);
-    record.isContextLost=b.glSlots.find(s=>s.key==='isContextLost').descriptor.value;
-    record.getError=b.glSlots.find(s=>s.key==='getError').descriptor.value;
+    record.isContextLost=b.glSlots[2].descriptor.value;
+    record.getError=b.glSlots[3].descriptor.value;
     record.sentinel=payloadFreeze({});
     if(payloadApply(has,properties,[record.sentinel])!==false)rendererRefuse('new cache sentinel exists');
     record.sentinelRecord=payloadApply(get,properties,[record.sentinel]);
@@ -695,7 +743,167 @@ export function createQualifiedAtlasRenderer(canvas){
   if(failed){
     let cleanupFailed=false,cleanup;
     if(renderer&&dispose)try{payloadApply(dispose,renderer,[]);}catch(error){cleanupFailed=true;cleanup=error;}
-    if(cleanupFailed)throw new RendererAggregateError([first,cleanup],'qualified atlas renderer: construction failed; cleanup uncertain',{cause:first});
+    if(cleanupFailed)throw rendererAggregateFailure(first,cleanup,'qualified atlas renderer: construction failed; cleanup uncertain');
+    throw first;
+  }
+}
+
+function rendererAggregateFailure(first,cleanup,message){
+  const errors={
+    [rendererIteratorSymbol](){let index=0;return {next(){index++;
+      if(index===1)return {value:first,done:false};
+      if(index===2)return {value:cleanup,done:false};
+      return {done:true};
+    }};}
+  };
+  return new RendererAggregateError(errors,message,{cause:first});
+}
+
+// Retained-only source-closed upload lease. No native-content, alias-retirement or budget authority.
+const rendererUploadMethodNames=['createTexture','deleteTexture','activeTexture','bindTexture','pixelStorei','texParameteri',
+  'texStorage2D','compressedTexSubImage2D','getExtension','getParameter','getError','isContextLost','getContextAttributes',
+  'texImage2D','texSubImage2D','compressedTexImage2D','texStorage3D','texImage3D','texSubImage3D',
+  'compressedTexImage3D','compressedTexSubImage3D','copyTexImage2D','copyTexSubImage2D','copyTexSubImage3D','generateMipmap'];
+const rendererUploadConstantNames=['TEXTURE_2D','TEXTURE_3D','TEXTURE_2D_ARRAY','TEXTURE0','ACTIVE_TEXTURE','TEXTURE_BINDING_2D',
+  'UNPACK_FLIP_Y_WEBGL','UNPACK_PREMULTIPLY_ALPHA_WEBGL','UNPACK_COLORSPACE_CONVERSION_WEBGL','UNPACK_ALIGNMENT',
+  'NONE','BROWSER_DEFAULT_WEBGL','UNSIGNED_BYTE','RED','RED_INTEGER','RG','RG_INTEGER','RGB_INTEGER','RGBA_INTEGER','RGB','RGBA',
+  'R16F','R32F','RG16F','RG32F','RGBA16F','RGBA32F','TEXTURE_WRAP_S','TEXTURE_WRAP_T','TEXTURE_MAG_FILTER','TEXTURE_MIN_FILTER',
+  'REPEAT','CLAMP_TO_EDGE','MIRRORED_REPEAT','NEAREST','NEAREST_MIPMAP_NEAREST','NEAREST_MIPMAP_LINEAR',
+  'LINEAR','LINEAR_MIPMAP_NEAREST','LINEAR_MIPMAP_LINEAR','NEVER','ALWAYS','LESS','LEQUAL','EQUAL','GEQUAL','GREATER','NOTEQUAL'];
+const rendererUploadStateNames=['activeTexture','bindTexture','unbindTexture','pixelStorei','texStorage2D','compressedTexSubImage2D'];
+function rendererUploadFunctionHooks(fn,hooks){
+  hooks.push(rendererHook(fn));
+  const p=payloadGetDescriptor(fn,'prototype');
+  if(p&&payloadHasOwn(p,'value')&&p.value)hooks.push(rendererHook(p.value));
+}
+const rendererUploadBootstrap=(()=>{
+  try{
+    if(!rendererBootstrap.available)return {available:false};
+    const hooks=[],bindings=[],valueBindings=[],methods=[],constants=[];
+    for(let i=0;i<rendererUploadMethodNames.length;i++){
+      const s=rendererSlot(rendererBootstrap.glPrototype,rendererUploadMethodNames[i]);
+      if(!s.descriptor||!payloadHasOwn(s.descriptor,'value')||typeof s.descriptor.value!=='function')return {available:false};
+      methods.push(s);rendererUploadFunctionHooks(s.descriptor.value,hooks);
+    }
+    for(let i=0;i<rendererUploadConstantNames.length;i++){
+      const s=rendererSlot(rendererBootstrap.glPrototype,rendererUploadConstantNames[i]);
+      if(!s.descriptor||!payloadHasOwn(s.descriptor,'value')||!rendererInteger(s.descriptor.value))return {available:false};
+      constants.push(s);
+    }
+    const names=['ImageBitmap','HTMLImageElement','VideoFrame'];
+    for(let i=0;i<names.length;i++){
+      const s=rendererSlot(globalThis,names[i]);bindings.push(s);valueBindings.push(s);
+      const value=rendererRead(s);s.bootstrapValue=value;
+      if(value!==undefined){
+        if(typeof value!=='function')return {available:false};
+        const chain=rendererChain(value);
+        for(let j=0;j<chain.length;j++)hooks.push(rendererHook(chain[j]));
+        const p=payloadGetDescriptor(value,'prototype');
+        if(p&&payloadHasOwn(p,'value')&&p.value)hooks.push(rendererHook(p.value));
+        const h=rendererSlot(value,Symbol.hasInstance);bindings.push(h);
+        if(!h.descriptor||!payloadHasOwn(h.descriptor,'value')||typeof h.descriptor.value!=='function')return {available:false};
+        rendererUploadFunctionHooks(h.descriptor.value,hooks);
+      }
+    }
+    return {available:true,hooks,bindings,valueBindings,methods,constants,names};
+  }catch{return {available:false};}
+})();
+function rendererUploadBootstrapStable(readValues=true){
+  rendererBootstrapStable(readValues);
+  const b=rendererUploadBootstrap;if(!b.available)rendererRefuse('upload bootstrap unavailable');
+  rendererHooksStable(b.hooks);
+  for(let i=0;i<b.bindings.length;i++)rendererSlotStable(b.bindings[i]);
+  for(let i=0;i<b.methods.length;i++)rendererSlotStable(b.methods[i]);
+  for(let i=0;i<b.constants.length;i++)rendererSlotStable(b.constants[i]);
+  if(readValues)for(let i=0;i<b.names.length;i++){
+    const s=b.valueBindings[i];
+    if(!payloadIs(rendererRead(s),s.bootstrapValue))rendererRefuse('upload constructor binding changed');
+  }
+  // A trusted baseline accessor can change another hook; check again without invoking it.
+  rendererBootstrapStable(false);rendererHooksStable(b.hooks);
+  for(let i=0;i<b.bindings.length;i++)rendererSlotStable(b.bindings[i]);
+}
+function rendererUploadContextStable(gl){
+  const b=rendererUploadBootstrap;
+  for(let i=0;i<b.methods.length+b.constants.length;i++){
+    const expected=i<b.methods.length?b.methods[i]:b.constants[i-b.methods.length];
+    if(payloadGetDescriptor(gl,expected.key))rendererRefuse('upload context own shadow unsupported');
+    const now=payloadDescriptor(gl,expected.key);
+    if(now.owner!==expected.owner||!payloadSameDescriptor(now.descriptor,expected.descriptor))rendererRefuse('upload context binding changed');
+  }
+}
+function rendererUploadCounter(record){
+  const u=record.upload,s=rendererSlot(u.memory,'textures'),d=s.descriptor,b=u.counter;
+  if(s.owner!==u.memory||!d||!payloadHasOwn(d,'value')||!rendererInteger(d.value)||d.value<0
+    ||!payloadSameDescriptor({...d,value:b.descriptor.value},b.descriptor))rendererRefuse('upload texture counter changed');
+  return d.value;
+}
+function rendererUploadDescriptorsStable(record){
+  const u=record.upload;
+  rendererContextStable(record);rendererUploadContextStable(record.gl);
+  for(let i=0;i<u.slots.length;i++)rendererSlotStable(u.slots[i]);
+  rendererHooksStable(u.hooks);rendererUploadCounter(record);
+}
+function validateQualifiedAtlasUploadLease(lease){
+  rendererUploadBootstrapStable();
+  const record=payloadApply(rendererWeakGet,rendererLeases,[lease]);
+  if(!record||record.upload?.version!==1)rendererRefuse('unknown upload lease');
+  rendererUploadDescriptorsStable(record);
+  const u=record.upload;
+  const astc=payloadApply(u.extensionGet,u.extensions,['WEBGL_compressed_texture_astc']);
+  rendererUploadBootstrapStable(false);rendererUploadDescriptorsStable(record);
+  if(astc!==u.astc)rendererRefuse('upload extension cache changed');
+  const anisotropic=payloadApply(u.extensionHas,u.extensions,['EXT_texture_filter_anisotropic']);
+  rendererUploadBootstrapStable(false);rendererUploadDescriptorsStable(record);
+  if(anisotropic!==u.anisotropic)rendererRefuse('upload extension capability changed');
+  // Finish every accessor-bearing preflight before the existing validator's final health probes.
+  rendererValidateRecord(record);
+  rendererUploadBootstrapStable(false);rendererUploadDescriptorsStable(record);
+  return record;
+}
+export function createQualifiedAtlasUploadRenderer(canvas){
+  rendererUploadBootstrapStable();
+  let pair,record,first,failed=false;
+  try{
+    pair=createQualifiedAtlasRenderer(canvas);
+    record=payloadApply(rendererWeakGet,rendererLeases,[pair.lease]);
+    const slots=[],hooks=[],own=(object,key)=>rendererOwnValue(object,key,slots),
+      method=(object,key)=>{const fn=rendererDataMethod(object,key,slots);rendererUploadFunctionHooks(fn,hooks);return fn;};
+    rendererUploadContextStable(record.gl);
+    const state=own(record.renderer,'state'),extensions=own(record.renderer,'extensions'),
+      capabilities=own(record.renderer,'capabilities'),info=own(record.renderer,'info'),memory=own(info,'memory');
+    const maximum=own(capabilities,'maxTextureSize');
+    if(!rendererInteger(maximum)||maximum<2048)rendererRefuse('upload texture size unsupported');
+    for(let i=0;i<rendererUploadStateNames.length;i++)method(state,rendererUploadStateNames[i]);
+    const extensionGet=method(extensions,'get'),extensionHas=method(extensions,'has');
+    for(const key of ['has','get','remove','dispose'])method(record.properties,key);
+    const capturedStable=()=>{
+      rendererUploadBootstrapStable(false);rendererContextStable(record);rendererUploadContextStable(record.gl);
+      for(let i=0;i<slots.length;i++)rendererSlotStable(slots[i]);rendererHooksStable(hooks);
+    };
+    capturedStable();
+    const astc=payloadApply(extensionGet,extensions,['WEBGL_compressed_texture_astc']);
+    capturedStable();
+    if(!astc||(typeof astc!=='object'&&typeof astc!=='function'))rendererRefuse('ASTC extension unavailable');
+    const astcEnum=rendererSlot(astc,'COMPRESSED_RGBA_ASTC_4x4_KHR');slots.push(astcEnum);
+    if(!astcEnum.descriptor||!payloadHasOwn(astcEnum.descriptor,'value')||astcEnum.descriptor.value!==0x93b0)
+      rendererRefuse('ASTC extension enum unsupported');
+    const astcChain=rendererChain(astc);for(let i=0;i<astcChain.length;i++)hooks.push(rendererHook(astcChain[i]));
+    const anisotropic=payloadApply(extensionHas,extensions,['EXT_texture_filter_anisotropic']);
+    capturedStable();
+    if(typeof anisotropic!=='boolean')rendererRefuse('anisotropic capability unsupported');
+    const counter=rendererSlot(memory,'textures');
+    record.upload={version:1,slots,hooks,state,extensions,capabilities,info,memory,counter,extensionGet,extensionHas,astc,anisotropic};
+    rendererUploadCounter(record);
+    // The intermediate constructor-only lease stays operation-local; only the new key receives upload authority.
+    const lease=payloadFreeze({});payloadApply(rendererWeakSet,rendererLeases,[lease,record]);
+    validateQualifiedAtlasUploadLease(lease);
+    return payloadFreeze({renderer:record.renderer,lease});
+  }catch(error){failed=true;first=error;}
+  if(failed){
+    let cleanupFailed=false,cleanup;
+    if(record)try{payloadApply(record.dispose,record.renderer,[]);}catch(error){cleanupFailed=true;cleanup=error;}
+    if(cleanupFailed)throw rendererAggregateFailure(first,cleanup,'qualified atlas upload renderer: failed; cleanup uncertain');
     throw first;
   }
 }
