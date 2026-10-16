@@ -301,11 +301,77 @@ async function checkConstructedOwners(field,expectedShapes){
   console.log(JSON.stringify({checkpoint:field.phase,sourceOwners:expectedShapes.length,views:inventory.views.length,bytes:inventory.retainedBackingBytes,geometry:sampled.geometryArrayIds.length,controls:rejectControls}));
 }
 
+async function checkTerminalSprites(field,route,mutant=null){
+  const assert=(await import('node:assert/strict')).default,THREE=await import('three'),
+    source=await import('./src/units/impostor.js');
+  const terminalSpriteWord=mutant==='word'?()=>0:source.terminalSpriteWord,
+    prepareTerminalSpriteTable=mutant==='table'?rects=>{const p=source.prepareTerminalSpriteTable(rects);new Uint32Array(p.data.buffer)[0]^=1;return p;}:source.prepareTerminalSpriteTable;
+  const bits=array=>Buffer.from(array.buffer,array.byteOffset,array.byteLength);
+  for(const side of ['US','CS']){
+    if(route==='capable'&&side==='US')continue;
+    const pool=field.game.impostors[side],tier=field.phase==='field'?'field':'close',L=pool.layout,T=L.tiers[tier],
+      table=prepareTerminalSpriteTable(T.rects),batches=Object.values(pool.batches).flat(),
+      saved=batches.map(b=>({b,n:b.n,first:b.data.slice(0,12)})),cam=pool.cam.clone(),standing=pool.standing,
+      poses=pool.poses.slice(),looks=pool.looks.slice();
+    const decode=(scalars,word,lookup=table.data)=>{
+      const entry=Math.floor(word/4),r=lookup.subarray(entry*8,entry*8+8);
+      return new Float32Array([...scalars.subarray(0,4),r[1],r[2],r[3],r[4],r[5],r[6],scalars[4],word%4-1]);
+    };
+    let rows=0,rejects=0;
+    try{
+      assert.equal(table.entries,T.rects.length/8);assert.equal(table.width,256);
+      assert.deepEqual(bits(table.data.subarray(0,T.rects.length)),bits(T.rects));
+      assert(table.data.subarray(T.rects.length).every(value=>Object.is(value,0)));
+      for(let entry=0;entry<table.entries;entry++)for(const clip of [-1,0,1,2]){
+        const packed=new THREE.InstancedBufferAttribute(new Uint16Array([terminalSpriteWord(entry,clip,table.entries)]),1,false);
+        assert.equal(packed.normalized,false);assert.equal(packed.array.BYTES_PER_ELEMENT,2);
+        assert.equal(Math.floor(packed.array[0]/4),entry);assert.equal(packed.array[0]%4-1,clip);
+      }
+      for(const clip of [-0,-2,3,.5,NaN,Infinity]){assert.throws(()=>terminalSpriteWord(0,clip,table.entries),/^Error: terminal sprite:/);rejects++;}
+      for(const entry of [-1,table.entries,.5,NaN]){assert.throws(()=>terminalSpriteWord(entry,0,table.entries),/^Error: terminal sprite:/);rejects++;}
+      pool.setView({position:new THREE.Vector3(0,tier==='field'?5000:100,0)});
+      for(const clip of [0,1,2,3,4,5,6])for(const phase of [0,.01,.125,.5,.875,1.25,2.25])for(let direction=0;direction<64;direction++)for(let man=0;man<9;man++){
+        const yaw=direction*Math.PI*2/64,compare=[-1,0,1,2][rows%4],variation=[0,-0,.25,.75,1][rows%5];
+        pool.begin();assert(pool.push(0,0,0,yaw,4.4,clip,phase,variation,compare,man));
+        const used=pool.batches[tier].filter(b=>b.n);assert.equal(used.length,1);const original=used[0].data.slice(0,12),slot=L.slotFor(clip,phase),
+          entry=L.entry(slot,L.direction(tier,slot,yaw,0,0,0,0),L.lookFor(tier,man))/8,
+          scalars=new Float32Array([original[0],original[1],original[2],original[3],original[10]]),word=terminalSpriteWord(entry,original[11],table.entries);
+        assert.deepEqual(bits(decode(scalars,word)),bits(original));rows++;
+      }
+      pool.begin();assert(pool.push(0,0,0,0,4.4,0,0,.5,1,0));
+      const original=pool.batches[tier].find(b=>b.n).data.slice(0,12),slot=L.slotFor(0,0),
+        entry=L.entry(slot,L.direction(tier,slot,0,0,0,0,0),L.lookFor(tier,0))/8,
+        scalars=new Float32Array([original[0],original[1],original[2],original[3],original[10]]),word=terminalSpriteWord(entry,1,table.entries),
+        wrongEntry=Array.from({length:table.entries},(_,i)=>i).find(i=>!bits(T.rects.subarray(i*8+1,i*8+7)).equals(bits(T.rects.subarray(entry*8+1,entry*8+7))));
+      assert.notEqual(wrongEntry,undefined);
+      const wrongTable=table.data.slice(),wrongScalars=scalars.slice();
+      new Uint32Array(wrongTable.buffer)[entry*8+1]^=1;new Uint32Array(wrongScalars.buffer)[3]^=1;
+      for(const changed of [decode(scalars,terminalSpriteWord(wrongEntry,1,table.entries)),decode(scalars,word^1),decode(scalars,word,wrongTable),decode(wrongScalars,word)]){
+        assert.notDeepEqual(bits(changed),bits(original));rejects++;
+      }
+      assert.equal(rows,28224);assert.equal(rejects,14);
+      console.log(JSON.stringify({terminalSprite:true,route,side,tier,rows,rejects,entries:table.entries,tableBytes:table.data.byteLength}));
+    }finally{
+      for(const {b,n,first}of saved){b.n=n;b.data.set(first);}pool.cam.copy(cam);pool.standing=standing;pool.poses.set(poses);pool.looks.set(looks);
+    }
+  }
+  for(const bad of [new Float64Array(8),new Float32Array(),new Float32Array(7),new Float32Array(8*16384+8),new Float32Array([NaN,0,0,0,0,0,0,0])])
+    assert.throws(()=>prepareTerminalSpriteTable(bad),/^Error: terminal sprite:/);
+  assert.equal(terminalSpriteWord(16383,2,16384),65535,'Uint16 attribute maximum remains legal');
+}
+let terminalRows=0,terminalRejects=0,terminalCases=0;
 for(const route of ['capable','unsupported']){
-  const output=execFileSync('node',['--input-type=module','-e','('+constructOrdinaryOwnerShapes.toString()+')('+checkConstructedOwners.toString()+').catch(error=>{console.error(error);process.exitCode=1;})'],
+  const script='const owners='+checkConstructedOwners.toString()+',sprites='+checkTerminalSprites.toString()+';('+constructOrdinaryOwnerShapes.toString()+')(async(field,shapes)=>{await owners(field,shapes);await sprites(field,process.argv[1]);const assert=(await import("node:assert/strict")).default;for(const mode of ["word","table"]){let error;try{await sprites(field,process.argv[1],mode);}catch(e){error=e;}assert.equal(error?.code,"ERR_ASSERTION","terminal sprite "+mode+" mutant must reach its own assertion");}console.log(JSON.stringify({terminalSpriteControl:true,checkpoint:field.phase,count:2}));}).catch(error=>{console.error(error);process.exitCode=1;})';
+  const output=execFileSync('node',['--input-type=module','-e',script,route],
     {cwd:new URL('..',import.meta.url),input:JSON.stringify({scenario:JSON.parse(actual.inputs.applied),route}),encoding:'utf8',maxBuffer:1000000,timeout:60000});
-  const rows=output.trim().split('\n').map(line=>JSON.parse(line));assert.deepEqual(rows.map(r=>r.checkpoint),['field','close']);
+  const all=output.trim().split('\n').map(line=>JSON.parse(line)),rows=all.filter(r=>r.checkpoint&&!r.terminalSpriteControl),packed=all.filter(r=>r.terminalSprite),controls=all.filter(r=>r.terminalSpriteControl);
+  assert.deepEqual(rows.map(r=>r.checkpoint),['field','close']);
   assert(rows.every(row=>row.sourceOwners===actual.retainedOwners[route][row.checkpoint].length&&row.controls===16));
+  assert.equal(packed.length,route==='capable'?2:4);
+  assert.deepEqual(controls.map(r=>r.checkpoint),['field','close']);assert(controls.every(r=>r.count===2));
+  for(const row of packed){terminalCases++;terminalRows+=row.rows;terminalRejects+=row.rejects;}
   console.log('SOURCE-OWNERS '+route+' '+output.trim());
 }
+assert.equal(terminalCases,6);assert.equal(terminalRows,169344);assert.equal(terminalRejects,84);
+console.log('TERMINAL-SPRITE CPU OK (6 cases / 169344 rows / 84 rejects / 8 intended source mutants); no runtime shader/upload/retirement claim');
 console.log(`ORDINARY-PILOT CPU OK (source ${sourceChecks}, mask ${maskChecks}, frame ${frameChecks}, stability ${stabilityChecks}, progress ${progressChecks}, reader ${readerChecks}); native entry/budget UNRUN`);

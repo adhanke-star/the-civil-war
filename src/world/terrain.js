@@ -28,6 +28,87 @@ export function partitionTerrain({position,uv,index},limit=65535) {
   return {chunks,triangles:index.length/3,sourceBytes:position.byteLength+uv.byteLength+index.byteLength,bytes};
 }
 
+/** Exact storage prerequisite for the terminal profile; never selects a renderer
+ * or retires an original. Axis/height texels retain the original Float32 bits;
+ * UV division is exact because the admitted grid span is a power of two.
+ */
+export function prepareTerminalTerrain(data, vertices, triangles, limit = 65535) {
+  const refuse = () => { throw new Error('terminal terrain: invalid or nonexact input'); };
+  const grid = data?.grid, cell = data?.cell, half = data?.half, heights = data?.heights;
+  const authoredStep = data?.meta?.heights?.stepM;
+  const step = typeof authoredStep === 'number' ? authoredStep * EXAGGERATION : NaN;
+  if (!Number.isSafeInteger(grid) || grid < 3 || grid > 1025 || !Number.isInteger(Math.log2(grid - 1))
+    || !Number.isFinite(cell) || cell <= 0 || !Number.isFinite(half) || half <= 0 || cell * (grid - 1) !== half * 2
+    || !Number.isFinite(step) || step <= 0 || !(heights instanceof Float32Array) || heights.length !== grid * grid
+    || !(vertices instanceof Uint16Array || vertices instanceof Uint32Array) || !vertices.length || vertices.length % 2
+    || vertices.some(value => value >= grid)
+    || !(triangles instanceof Uint16Array || triangles instanceof Uint32Array) || !triangles.length || triangles.length % 3
+    || triangles.some(value => value >= vertices.length / 2)
+    || !Number.isSafeInteger(limit) || limit < 3 || limit > 65535) refuse();
+  // Whole DEM storage also serves future heightAt consumers. This function does
+  // not change TerrainData or claim that its original backing has been retired.
+  const heightCodes = new Uint16Array(heights.length);
+  let maximum = 0;
+  for (let i = 0; i < heights.length; i++) {
+    const code = Math.round(heights[i] / step);
+    if (!Number.isSafeInteger(code) || Object.is(code, -0) || code < 0 || code > 65535
+      || !Object.is(Math.fround(code * step), heights[i])) refuse();
+    heightCodes[i] = code; maximum = Math.max(maximum, code);
+  }
+  const width = 256, height = Math.ceil((grid + maximum + 1) / width), lookup = new Float32Array(width * height);
+  for (let g = 0; g < grid; g++) {
+    lookup[g] = g * cell - half;
+    if (!Number.isFinite(lookup[g])) refuse();
+  }
+  for (let code = 0; code <= maximum; code++) lookup[grid + code] = code * step;
+  const point = id => {
+    const x = vertices[id * 2], z = vertices[id * 2 + 1];
+    return [lookup[x], lookup[grid + heightCodes[z * grid + x]], lookup[z]];
+  };
+  const bounds = ids => {
+    const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+    for (const id of ids) {
+      const p = point(id);
+      for (let k = 0; k < 3; k++) { min[k] = Math.min(min[k], p[k]); max[k] = Math.max(max[k], p[k]); }
+    }
+    const center = min.map((value, k) => (value + max[k]) / 2);
+    let radius2 = 0;
+    for (const id of ids) {
+      const p = point(id);
+      radius2 = Math.max(radius2, p.reduce((sum, value, k) => sum + (value - center[k]) ** 2, 0));
+    }
+    const radius = Math.sqrt(radius2);
+    if (![...min, ...max, ...center, radius].every(Number.isFinite)) refuse();
+    return { min, max, center, radius };
+  };
+  const rootBounds = bounds({ *[Symbol.iterator]() { for (let i = 0; i < vertices.length / 2; i++) yield i; } });
+  const chunks = [];
+  let ids = [], local = new Map(), index = [];
+  const flush = () => {
+    if (!index.length) return;
+    const packed = new Uint16Array(ids.length * 3);
+    ids.forEach((id, i) => {
+      const x = vertices[id * 2], z = vertices[id * 2 + 1];
+      packed.set([x, z, heightCodes[z * grid + x]], i * 3);
+    });
+    chunks.push({ packed, index: new Uint16Array(index), bounds: bounds(ids) });
+    ids = []; local = new Map(); index = [];
+  };
+  for (let i = 0; i < triangles.length; i += 3) {
+    const face = [triangles[i], triangles[i + 1], triangles[i + 2]], fresh = new Set(face.filter(id => !local.has(id)));
+    if (local.size + fresh.size > limit) flush();
+    for (const id of face) {
+      if (!local.has(id)) { local.set(id, ids.length); ids.push(id); }
+      index.push(local.get(id));
+    }
+  }
+  flush();
+  return { grid, cell, half, step, width, height, lookup, heightCodes, chunks, bounds: rootBounds,
+    triangles: triangles.length / 3,
+    geometryBytes: chunks.reduce((n, chunk) => n + chunk.packed.byteLength + chunk.index.byteLength, 0),
+    bytes: heightCodes.byteLength + lookup.byteLength + chunks.reduce((n, chunk) => n + chunk.packed.byteLength + chunk.index.byteLength, 0) };
+}
+
 /** Opt-in preparation only. No production caller selects this geometry lifetime yet.
  * CPU construction precedes publication, so its receipt survives a failed install.
  * Shared material/texture lifetime remains with the world (including repaint).

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
-import {Scene,Vector2,TextureLoader,DataTexture} from 'three';
+import {Scene,Vector2,TextureLoader,DataTexture,Shape,Path,ExtrudeGeometry,BufferGeometry,BufferAttribute} from 'three';
 import {fieldResourceProfile,prepareFieldResources,createFieldGraphicsStop,detectFieldGPUTier} from '../src/main.js';
 import {Post} from '../src/render/post.js';
 import {Input} from '../src/ui/input.js';
@@ -20,6 +20,7 @@ import {parseAtlasAstc,pageMipBytes} from '../src/units/atlas-compression.js';
 import {ordinaryLookoutFixture,ordinaryCapacityContract} from './resource-profile-fixture.mjs';
 import {applyCampaign} from '../src/franchise/campaign.js';
 import {validateSnapshot} from '../src/franchise/save.js';
+import {buildLabels,createTerminalLabelAdmission} from '../src/world/labels.js';
 import {installFieldContextObserver,installAllocationObserver,AllocationLedger,mipSizes,ReservationPeak,defaultSurfaceHistoryErrors,fieldEpochObservationErrors,sampleSceneAllocations} from './bake/scene-allocation.mjs';
 
 const base='assets/figures/confederate-infantry/';
@@ -165,7 +166,8 @@ reject(error);await Promise.resolve();await Promise.resolve();
 assert.equal(warnings.length,process.argv[2]==='terminal'?0:1);console.log('PENDING-MUSIC-CLEAR');
 `;
 
-const api={profile:fieldResourceProfile,prepare:prepareFieldResources,ordering,Mixer,Effects,Post,Input,detect:detectFieldGPUTier};
+const api={profile:fieldResourceProfile,prepare:prepareFieldResources,ordering,Mixer,Effects,Post,Input,detect:detectFieldGPUTier,
+  buildLabels,labelAdmission:createTerminalLabelAdmission};
 async function ordinaryInputControls() {
   const campaign=JSON.parse(fs.readFileSync('assets/campaign.json')),
     pack=JSON.parse(fs.readFileSync('assets/packs/chattanooga.json')),
@@ -657,7 +659,68 @@ async function defaultSurfaceControls(){
   console.log(`FIELD-EPOCH CPU OK (${epochChecks} assertions); modeled capture dispatch only; native propagation/trust/restoration behavior UNRUN`);
 }
 await defaultSurfaceControls();
+
+// Synthetic pixels exercise the actual tracing/build path; no system-font claim.
+function labelBitmapFixture(glyphWidth=50) {
+  const stats={imageReads:0,warnings:0};
+  return {stats,document:{createElement(tag){
+    assert.equal(tag,'canvas');const canvas={width:0,height:0};
+    canvas.getContext=()=>({measureText:text=>({width:text.length*glyphWidth}),fillText(){},
+      getImageData(x,y,w,h){
+        stats.imageReads++;const data=new Uint8ClampedArray(w*h*4);
+        for(let yy=30;yy<h-30;yy++)for(let xx=20;xx<w-20;xx++)data[(yy*w+xx)*4+3]=255;
+        return {data};
+      }});
+    return canvas;
+  }}};
+}
+const terminalLabelError=error=>error?.terminalLabelAdmission===true;
 const checks=[
+  ['terminal-label-output',async a=>{
+    const fixture=labelBitmapFixture(),terrain={heightAt:()=>0},labels=[{text:'ABCD',x:10,z:20,height:40,angle:.3}];
+    await globals({document:fixture.document},()=>{
+      const original=a.buildLabels(terrain,labels),admission=a.labelAdmission(),bounded=a.buildLabels(terrain,labels,admission);
+      const reference=original.children[0].geometry,actual=bounded.children[0].geometry;
+      for(const key of ['position','normal','color'])assert.deepEqual(
+        Buffer.from(actual.attributes[key].array.buffer),Buffer.from(reference.attributes[key].array.buffer));
+      const resident=['position','normal','color'].reduce((n,key)=>n+actual.attributes[key].array.buffer.byteLength,0);
+      assert.equal(admission.read().resident,resident);
+      assert.equal(admission.read().pixels,48060);
+      for(const group of [original,bounded])for(const mesh of group.children){mesh.geometry.dispose();mesh.material.dispose();}
+    });
+    const ring=(n,cx,cy,r)=>Array.from({length:n},(_,i)=>new Vector2(cx+Math.cos(i/n*2*Math.PI)*r,cy+Math.sin(i/n*2*Math.PI)*r));
+    for(const holes of [0,1,2,3])for(const points of [4,8,16,32]){
+      const shape=new Shape(ring(points,0,0,100));
+      for(let h=0;h<holes;h++)shape.holes.push(new Path(ring(points,-50+h*40,0,10).reverse()));
+      const admission=a.labelAdmission(),prediction=admission.geometry([shape]),
+        geometry=new ExtrudeGeometry([shape],{depth:2,bevelEnabled:false,curveSegments:3});
+      admission.verify(geometry,prediction);assert.equal(geometry.attributes.position.count,prediction.vertices);
+      const wrong={vertices:prediction.vertices+3};
+      assert.throws(()=>admission.verify(geometry,wrong),terminalLabelError);geometry.dispose();
+    }
+    // This valid shape was independently found to pass the broad construction
+    // bound while exceeding the resident allowance by 558,144 bytes.
+    const large=new Shape(ring(4000,0,0,1));
+    assert.throws(()=>a.labelAdmission().geometry([large]),terminalLabelError);
+    const oversized=new BufferGeometry();
+    for(const key of ['position','normal','color'])oversized.setAttribute(key,new BufferAttribute(new Float32Array(143964),3));
+    assert.throws(()=>a.labelAdmission().verifyMerged(oversized),terminalLabelError);oversized.dispose();
+  }],
+  ['terminal-label-fatal',async a=>{
+    for(const [width,text]of [[1000,'A'],[50,'A'.repeat(400)]]){
+      const fixture=labelBitmapFixture(width);
+      await globals({document:fixture.document,console:{...console,warn(){fixture.stats.warnings++;}}},()=>{
+        assert.throws(()=>a.buildLabels({heightAt:()=>0},[{text,x:0,z:0}],a.labelAdmission()),terminalLabelError);
+        assert.equal(fixture.stats.warnings,0,'terminal refusal must bypass warn-and-omit');
+        if(width===1000)assert.equal(fixture.stats.imageReads,0,'reject before getImageData');
+      });
+    }
+    for(const [w,h]of [[0,1],[1,0],[NaN,1],[1.5,1],[257,256]])
+      assert.throws(()=>a.labelAdmission().bitmap(w,h),terminalLabelError);
+    const mismatch=new BufferGeometry();
+    for(const key of ['position','normal','color'])mismatch.setAttribute(key,new BufferAttribute(new Float32Array(3),3));
+    assert.throws(()=>a.labelAdmission().verifyMerged(mismatch),terminalLabelError);mismatch.dispose();
+  }],
   ['pending-gpu-import',async a=>{
     let release,calls=0;const stats={},stop={stopped:false,check(){return !this.stopped;}},renderer={getContext(){calls++;return {};}};
     const post={startFromTier(){calls++;}},loading=new Promise(r=>{release=r;});
@@ -754,7 +817,10 @@ const checks=[
 for(const [name,check]of checks)try{await check(api);}catch(error){console.error('RESOURCE-PROFILE FAILED',name);throw error;}
 console.log(`RESOURCE-PROFILE OK (${checks.length}/${checks.length})`);
 if(process.argv.includes('--prove-fail')){
-  const controls=[['pending-gpu-import',{...api,detect:(renderer,post,stats,stop,load)=>load().then(m=>m.getGPUTier({glContext:renderer.getContext()}))}],
+  const controls=[
+    ['terminal-label-output',{...api,labelAdmission:()=>({...createTerminalLabelAdmission(),geometry:()=>({vertices:0}),verify(){},verifyMerged(){}})}],
+    ['terminal-label-fatal',{...api,buildLabels:(terrain,labels)=>buildLabels(terrain,labels)}],
+    ['pending-gpu-import',{...api,detect:(renderer,post,stats,stop,load)=>load().then(m=>m.getGPUTier({glContext:renderer.getContext()}))}],
     ['profile-shape',{...api,profile:()=>null}],['metadata-only',{...api,prepare:async()=>null}],
     ['post-stop',{...api,Post:class extends Post{stopForReload(){}}}],
     ['input-stop',{...api,Input:class extends Input{stopForReload(){}}}],

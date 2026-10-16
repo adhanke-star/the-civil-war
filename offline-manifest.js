@@ -924,8 +924,8 @@ self.CW_OFFLINE = {
    "sha256": "6bbc1d33dee34ebbfd9933ef94528f0a3a1610a3e31fe7ab97b0b63c8d69028c"
   },
   "src/units/impostor.js": {
-   "bytes": 48064,
-   "sha256": "ebe311f7ec8407f18afabc6f9736a6337bc75d14f053b2a30e44f311c3990062"
+   "bytes": 49308,
+   "sha256": "9406612cea4eef3416202357ccffe5524fb3c0eb47b01d286534141ef2da70cc"
   },
   "src/units/mounts.js": {
    "bytes": 7786,
@@ -944,8 +944,8 @@ self.CW_OFFLINE = {
    "sha256": "3a3c16b2492ce45cad8ee52cff6666d55fc8e56b6dcf1baa9d18540ac11f85bf"
   },
   "src/world/labels.js": {
-   "bytes": 10185,
-   "sha256": "02ebe257ce4fe53fd193adf533cd58793d77f4a3f06b99d5cdb1439985f37668"
+   "bytes": 12799,
+   "sha256": "72e132c299adf5fb711fce3bc1f63d7070e9d4e7d453ce8e8ef710ba90d5acb4"
   },
   "src/world/landscape.js": {
    "bytes": 22506,
@@ -956,8 +956,8 @@ self.CW_OFFLINE = {
    "sha256": "694308e5ac838df6bd4e3d59e77aab72ae2d94e08c6a38ca09f02daf6b48898e"
   },
   "src/world/terrain.js": {
-   "bytes": 30234,
-   "sha256": "ff8ce9922bcea6a7ed7f0e4f67ef70b0c9b213ff4b8734b8696793ab5b354953"
+   "bytes": 34694,
+   "sha256": "74b4394ae4945b7c684b4752e9bd4bf4e12371fc953d7997a7a85fbdc6e45b4c"
   },
   "src/world/world.js": {
    "bytes": 5717,
@@ -1472,5 +1472,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "55e33e318fbb83f0b674bf9a137dc97f112f4d2e8d88820f8d754e0670ca6e90"
+ "generation": "c30c6eed0d4ca1884fba91bd7cd55ecd822eef07982628aff8ba09862286e23c"
 };

@@ -58,6 +58,31 @@ export const REC = 8; // floats per frame record: page u v w h dx dy ppm
 const DIR_RES = 8; // direction lookup bins per baked direction step (nearest available direction per clip)
 const FALLEN_REC = 8; // x y z yaw s variation man born (FALLEN.clock() when he fell; gore off fades him out)
 
+/** Private terminal-profile representation prerequisite. The public push path
+ * stays Float32 until the profile's separate owner/shader gates select it.
+ * Two clip bits share one unnormalized Uint16 with the frame-entry index.
+ */
+export function terminalSpriteWord(entry, clip, entries) {
+  if (!Number.isInteger(entries) || entries < 1 || entries > 16384
+    || !Number.isInteger(entry) || entry < 0 || entry >= entries
+    || !Number.isInteger(clip) || Object.is(clip, -0) || clip < -1 || clip > 2)
+    throw new Error('terminal sprite: invalid entry/clip');
+  return entry * 4 + clip + 1;
+}
+
+/** The original eight Float32 values, padded to two RGBA32F texels per entry.
+ * Caller owns the returned backing; this does not upload or retire any data.
+ */
+export function prepareTerminalSpriteTable(rects) {
+  if (!(rects instanceof Float32Array) || !rects.length || rects.length % REC
+    || rects.length / REC > 16384 || rects.some(value => !Number.isFinite(value)))
+    throw new Error('terminal sprite: invalid frame table');
+  const entries = rects.length / REC, width = 256, height = Math.ceil(entries * 2 / width);
+  const data = new Float32Array(width * height * 4);
+  data.set(rects);
+  return { data, width, height, entries };
+}
+
 /**
  * Baked direction for a man facing `yaw` (forward = (sin yaw, cos yaw)) at (x, z), seen from a camera at
  * (cx, cz), when all n directions exist. The bake's rule: direction d faces d * 360/n degrees counter-

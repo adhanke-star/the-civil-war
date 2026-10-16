@@ -13,13 +13,63 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 const FONT = '"Georgia", "Times New Roman", "DejaVu Serif", serif';
 const PX = 96; // canvas font size; letters are traced at this resolution
 
+/** Fixed, opt-in terminal-profile limits. Refusal must never omit a place name.
+ * The resident allowance is the reviewed Lookout bound, not a font-independent
+ * claim about every phase. Native/profile admission remains a separate gate.
+ */
+export function createTerminalLabelAdmission() {
+  let pixels = 0, points = 0, bytes = 0, resident = 0;
+  const refuse = message => {
+    const error = new Error(`label admission: ${message}`);
+    error.terminalLabelAdmission = true;
+    throw error;
+  };
+  return Object.freeze({
+    bitmap(w, h) {
+      if (!Number.isSafeInteger(w) || !Number.isSafeInteger(h) || w < 1 || h < 1
+        || w * h > 65536 || pixels + w * h > 4194304) refuse('bitmap bound');
+      pixels += w * h;
+    },
+    geometry(shapes) {
+      let count = 0, vertices = 0;
+      for (const shape of shapes) {
+        const p = shape.extractPoints(3);
+        const faces = THREE.ShapeUtils.triangulateShape(p.shape, p.holes);
+        const edges = p.shape.length + p.holes.reduce((n, hole) => n + hole.length, 0);
+        count += edges;
+        // Pinned ExtrudeGeometry: no bevel, one step, cap faces plus side quads.
+        vertices += 6 * (faces.length + edges);
+      }
+      // Input position/normal/uv/color plus merged position/normal/color = 80 B.
+      if (!Number.isSafeInteger(vertices) || points + count > 20000
+        || bytes + vertices * 80 > 38400000 || resident + vertices * 36 > 1169424)
+        refuse('tessellation or resident bound');
+      points += count; bytes += vertices * 80; resident += vertices * 36;
+      return Object.freeze({ vertices });
+    },
+    verify(geometry, prediction) {
+      if (!['position', 'normal', 'uv'].every(key => geometry.attributes[key]?.count === prediction.vertices))
+        refuse('extrusion count');
+    },
+    verifyMerged(geometry) {
+      const arrays = ['position', 'normal', 'color'].map(key => geometry.attributes[key]?.array);
+      if (arrays.some(array => !(array instanceof Float32Array))) refuse('merged attributes');
+      const buffers = new Set(arrays.map(array => array.buffer));
+      const actual = [...buffers].reduce((n, buffer) => n + buffer.byteLength, 0);
+      if (actual !== resident || actual > 1169424) refuse('merged resident bound');
+    },
+    read() { return Object.freeze({ pixels, points, bytes, resident }); },
+  });
+}
+
 /** Render text white on transparent; return the alpha bitmap. */
-function textBitmap(text, italic) {
+function textBitmap(text, italic, admission) {
   const font = `${italic ? 'italic ' : ''}bold ${PX}px ${FONT}`;
   const probe = document.createElement('canvas').getContext('2d');
   probe.font = font;
   const w = Math.ceil(probe.measureText(text).width + PX * 0.4);
   const h = Math.ceil(PX * 1.4);
+  admission?.bitmap(w, h);
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
@@ -132,7 +182,7 @@ const inside = (x, y, poly) => {
 /** Shapes (with holes) for a word, in canvas pixels centred on the word, y up. Each glyph is traced alone
  * (so touching letters such as "ry" in bold serif never merge into one self-touching polygon) and placed
  * at its measured advance. */
-function textShapes(text, italic) {
+function textShapes(text, italic, admission) {
   const font = `${italic ? 'italic ' : ''}bold ${PX}px ${FONT}`;
   const probe = document.createElement('canvas').getContext('2d');
   probe.font = font;
@@ -142,7 +192,7 @@ function textShapes(text, italic) {
     const ch = text[i];
     if (ch === ' ') continue;
     const advance = probe.measureText(text.slice(0, i)).width;
-    const bm = textBitmap(ch, italic);
+    const bm = textBitmap(ch, italic, admission);
     const loops = traceLoops(bm).map((l) => simplify(l, 1.1)).filter((l) => l.length >= 3);
     const outers = [], holes = [];
     for (const l of loops) {
@@ -174,19 +224,25 @@ function textShapes(text, italic) {
  * labels: [{ text, x, z, height (m of letter box), angle (radians, 0 = reads west to east), italic }]
  * angle is measured like Math.atan2(dz, dx) in the ground plane.
  */
-export function buildLabels(terrain, labels) {
+export function buildLabels(terrain, labels, admission = null) {
   const group = new THREE.Group();
   group.name = 'labels';
   const geos = [];
   const face = new THREE.Color('#cfc08c'), faceHi = new THREE.Color('#e9dcae'), side = new THREE.Color('#4a3618');
   for (const L of labels) {
     let shapes;
-    try { shapes = textShapes(L.text, !!L.italic); } catch (err) { console.warn(`label trace failed for "${L.text}":`, err.message); shapes = []; }
+    try { shapes = textShapes(L.text, !!L.italic, admission); }
+    catch (err) {
+      if (err?.terminalLabelAdmission) throw err;
+      console.warn(`label trace failed for "${L.text}":`, err.message); shapes = [];
+    }
     if (!shapes.length) continue;
     const hgt = L.height || 40;
     const scale = (hgt * 0.72) / PX; // metres per canvas pixel: cap height about 0.72 of the box
     const depth = Math.max(1.5, hgt * 0.07);
+    const prediction = admission?.geometry(shapes);
     const geo = new THREE.ExtrudeGeometry(shapes, { depth: depth / scale, bevelEnabled: false, curveSegments: 3 });
+    admission?.verify(geo, prediction);
     geo.scale(scale, scale, scale);
     // lay flat: shape x -> east (along the label), shape y -> north (-z), extrusion -> up
     geo.rotateX(-Math.PI / 2);
@@ -217,6 +273,7 @@ export function buildLabels(terrain, labels) {
   }
   if (!geos.length) return group;
   const merged = mergeGeometries(geos, false);
+  admission?.verifyMerged(merged);
   merged.computeVertexNormals();
   merged.computeBoundingSphere();
   const mesh = new THREE.Mesh(merged, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));

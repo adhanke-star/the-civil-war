@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';import * as THREE from 'three';
 import fs from 'node:fs';import {gunzipSync} from 'node:zlib';import Martini from '../vendor/@mapbox/martini/index.js';
 import {captureFloat32TerrainOriginal,partitionTerrain,installTerrainPartition,registerTerrainPartition,prepareCanonicalTerrain,createCanonicalTerrainMesh,installCanonicalTerrain} from './bake/partition-terrain.mjs';
-import {TerrainData,buildTerrainMesh} from '../src/world/terrain.js';
+import {TerrainData,buildTerrainMesh,prepareTerminalTerrain} from '../src/world/terrain.js';
 const size=257,position=new Float32Array(size*size*3),uv=new Float32Array(size*size*2),indices=[];
 for(let z=0;z<size;z++)for(let x=0;x<size;x++){const i=z*size+x;position.set([x,x===0&&z===0?-0:Math.sin(x+z),z],i*3);uv.set([x/(size-1),z/(size-1)],i*2);if(x<size-1&&z<size-1)indices.push(i,i+size,i+1,i+1,i+size,i+size+1);}
 const source={position,uv,index:new Uint32Array(indices)},api={partition:partitionTerrain,install:installTerrainPartition,register:registerTerrainPartition,canonical:prepareCanonicalTerrain,canonicalMesh:createCanonicalTerrainMesh};
 api.build=buildTerrainMesh;
 api.replaceCanonical=installCanonicalTerrain;
 api.originalProof=captureFloat32TerrainOriginal;
+api.terminal=prepareTerminalTerrain;
 function retainedFixture(a){
  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(new Float32Array([0,0,0,1,0,0,0,0,1]),3));geo.setAttribute('uv',new THREE.BufferAttribute(new Float32Array([0,0,1,0,0,1]),2));geo.setIndex(new THREE.BufferAttribute(new Uint16Array([0,1,2]),1));geo.computeBoundingBox();geo.computeBoundingSphere();
  const root=new THREE.Mesh(geo,new THREE.MeshBasicMaterial()),receipt=a.install({terrainMesh:root},THREE,partitionTerrain,{reversible:true});return {geo,root,receipt};
@@ -195,5 +196,72 @@ for(const [name,mutate]of [
 }
 checks.push(['float32-original-release',a=>{const f=originalProofFixture(),proof=a.originalProof(f.world),partition=installTerrainPartition(f.world,THREE,partitionTerrain,{reversible:true});assert.equal(proof.retainedArrays.reduce((n,r)=>n+r.array.byteLength,0),66,'float32-original-release: byte oracle declared');partition.restore();const r=proof.receipt();assert.ok(r.sourceBytesExact&&r.uniformValuesExact&&r.sourceBoundsExact&&r.drawStateExact&&r.materialId===f.mat.id&&!r.children.length,'float32-original-release: exact original receipt');proof.release();assert.ok(proof.released&&!proof.retainedArrays.length,'float32-original-release: successful oracle release');let error;try{proof.verify();}catch(e){error=e;}assert.ok(error,'float32-original-release: stale proof refused');}]);
 mutants['float32-original-release']={originalProof:()=>({retainedArrays:[],verify:()=>true,receipt:()=>({}),release(){}})};
+function terminalFixture(){
+ const meta={grid:5,cellSize:.3,halfSize:.6,heights:{stepM:.05}},heights=Float32Array.from({length:25},(_,i)=>i*.1);
+ return {data:new TerrainData(meta,heights),vertices:new Uint16Array([0,0,4,0,4,4,0,4,2,2]),triangles:new Uint32Array([0,1,4,1,2,4,2,3,4,3,0,4])};
+}
+function originalBounds(position){
+ const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.BufferAttribute(position,3));
+ geometry.computeBoundingBox();geometry.computeBoundingSphere();
+ const result={min:geometry.boundingBox.min.toArray(),max:geometry.boundingBox.max.toArray(),center:geometry.boundingSphere.center.toArray(),radius:geometry.boundingSphere.radius};
+ geometry.dispose();return result;
+}
+checks.push(['terminal-six-byte',a=>{
+ const name='terminal-six-byte';
+ const verify=(data,vertices,triangles,limit)=>{
+  const p=a.terminal(data,vertices,triangles,limit);let corner=0;
+  assert.ok(p.chunks.length>0&&p.lookup instanceof Float32Array&&p.heightCodes instanceof Uint16Array,name+': explicit packed owners');
+  const rootPositions=new Float32Array(vertices.length/2*3);
+  for(let i=0;i<vertices.length/2;i++){const x=vertices[i*2],z=vertices[i*2+1];rootPositions.set([x*data.cell-data.half,data.heights[z*data.grid+x],z*data.cell-data.half],i*3);}
+  assert.deepEqual(p.bounds,originalBounds(rootPositions),name+': actual Three root bounds');
+  for(const chunk of p.chunks){
+   assert.ok(chunk.packed instanceof Uint16Array&&chunk.packed.length%3===0&&chunk.packed.length/3<=limit,name+': six-byte vertices');
+   assert.ok(chunk.index instanceof Uint16Array&&chunk.index.every(i=>i<chunk.packed.length/3&&i!==65535),name+': bounded indices');
+   const originalPositions=new Float32Array(chunk.packed.length);
+   for(let i=0;i<chunk.packed.length/3;i++){
+    const x=chunk.packed[i*3],z=chunk.packed[i*3+1];
+    originalPositions.set([x*data.cell-data.half,data.heights[z*data.grid+x],z*data.cell-data.half],i*3);
+   }
+   assert.deepEqual(chunk.bounds,originalBounds(originalPositions),name+': actual Three chunk bounds');
+   for(const local of chunk.index){
+    const original=triangles[corner++],gx=vertices[original*2],gz=vertices[original*2+1],offset=local*3;
+    const x=chunk.packed[offset],z=chunk.packed[offset+1],code=chunk.packed[offset+2];
+    assert.ok(x===gx&&z===gz,name+': exact ordered triangles');
+    const actual=[p.lookup[x],p.lookup[data.grid+code],p.lookup[z],Math.fround(x/(data.grid-1)),Math.fround(z/(data.grid-1))],
+     expected=[Math.fround(gx*data.cell-data.half),data.heights[gz*data.grid+gx],Math.fround(gz*data.cell-data.half),Math.fround(gx/(data.grid-1)),Math.fround(gz/(data.grid-1))];
+    assert.ok(actual.every((value,k)=>Object.is(value,expected[k])),name+': all five original Float32 values');
+   }
+  }
+  assert.equal(corner,triangles.length,name+': complete original triangle stream');
+  assert.equal(p.bytes,p.heightCodes.byteLength+p.lookup.byteLength+p.chunks.reduce((n,c)=>n+c.packed.byteLength+c.index.byteLength,0),name+': all output backings counted');
+  return p;
+ };
+ const f=terminalFixture();verify(f.data,f.vertices,f.triangles,3);
+ for(const terrain of ['henry-hill','shiloh','stones-river','chattanooga','lookout-mountain']){
+  const meta=JSON.parse(fs.readFileSync('assets/terrain/'+terrain+'.json','utf8')),
+   raw=gunzipSync(fs.readFileSync('assets/terrain/'+terrain+'.bin'),{maxOutputLength:meta.grid*meta.grid*2}),heights=new Float32Array(meta.grid*meta.grid);
+  for(let z=0;z<meta.grid;z++){let value=0;for(let x=0;x<meta.grid;x++){value+=raw.readInt16LE((z*meta.grid+x)*2);heights[z*meta.grid+x]=value*(meta.heights.stepM*2);}}
+  const data=new TerrainData(meta,heights),mesh=new Martini(meta.grid).createTile(heights).getMesh(.5),p=verify(data,mesh.vertices,mesh.triangles,65535);
+  if(terrain==='lookout-mountain')assert.equal(p.lookup.byteLength,41984,name+': reviewed Lookout lookup bound');
+ }
+}]);
+checks.push(['terminal-bounds',a=>{
+ const name='terminal-bounds',f=terminalFixture(),p=a.terminal(f.data,f.vertices,f.triangles,3),position=new Float32Array(f.vertices.length/2*3);
+ for(let i=0;i<f.vertices.length/2;i++){const x=f.vertices[i*2],z=f.vertices[i*2+1];position.set([x*f.data.cell-f.data.half,f.data.heights[z*f.data.grid+x],z*f.data.cell-f.data.half],i*3);}
+ assert.deepEqual(p.bounds,originalBounds(position),name+': exact original root bounds');
+}]);
+checks.push(['terminal-input-refusal',a=>{
+ const name='terminal-input-refusal';
+ const bad=[f=>{f.data.heights[0]=-0;},f=>{f.data.heights[0]=NaN;},f=>{f.data.heights[0]=.15;},f=>{f.data.heights[0]=7000;},
+  f=>{f.data.grid=4;},f=>{f.data.cell=1;},f=>{f.data.meta.heights.stepM=0;},f=>{f.vertices[0]=5;},f=>{f.triangles[0]=5;},
+  f=>{f.vertices=new Float32Array(f.vertices);},f=>{f.triangles=new Float32Array(f.triangles);},f=>{f.limit=65536;},
+  f=>{f.data.cell=1e40;f.data.half=2e40;},f=>{f.data.meta.heights.stepM='0.05';},
+  f=>{f.data.meta.heights.stepM={valueOf(){assert.fail(name+': must not coerce authored step');}};}];
+ for(const change of bad){const f=terminalFixture();f.limit=65535;change(f);let error;try{a.terminal(f.data,f.vertices,f.triangles,f.limit);}catch(e){error=e;}
+  assert.ok(error?.message==='terminal terrain: invalid or nonexact input',name+': unsafe/nonexact domain rejected');}
+}]);
+mutants['terminal-six-byte']={terminal:(...args)=>{const p=prepareTerminalTerrain(...args);new Uint32Array(p.lookup.buffer)[0]^=1;return p;}};
+mutants['terminal-input-refusal']={terminal:()=>({})};
+mutants['terminal-bounds']={terminal:(...args)=>{const p=prepareTerminalTerrain(...args);p.bounds.radius=0;return p;}};
 for(const [,check]of checks)await check(api);console.log(`TERRAIN-PARTITION OK (${checks.length}/${checks.length})`);
 if(process.argv.includes('--prove-fail')){for(const [name,check]of checks){let error;try{await check({...api,...mutants[name]});}catch(e){error=e;}assert.ok(error?.code==='ERR_ASSERTION'&&error.message.startsWith(name),`${name}: mutant must fail its own assertion`);console.log(`CAUGHT ${name}`);}console.log(`TERRAIN-PARTITION CONTROLS OK (${checks.length}/${checks.length})`);}
