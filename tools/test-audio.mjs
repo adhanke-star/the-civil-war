@@ -289,6 +289,7 @@ const recordingProofMutations = [
   ['wrong-cancel-origin', r => { r.guards.origin = r.cases[0].origin; }],
   ['cancel-before-headers', r => { r.guards.ui.cancelCommandAt = r.guards.ui.heldAt - 1; }],
   ['release-before-abort', r => { r.requests.find(x => x.case === 'guards').releasedAt = 1100; }],
+  ['cleanup-overwrites-release', r => { r.requests.find(x => x.case === 'guards').releasedAt = r.guards.ui.observedAt + 1; }],
   ['absent-held-response', r => { r.guards.ui.heldBrowser.pop(); }],
   ['unrelated-proxy-abort', r => { r.requests[0].failed = 'client-aborted'; }],
   ['declared503-transport-failed', r => { r.requests.find(x => x.case === 'unavailable').failed = 'net::ERR_FAILED'; }],
@@ -470,6 +471,81 @@ export const AUDIO_CHECKS = [
         'recordings-producer-process: terminal watchdog missing, late, or non-failing with stuck persistence');
     }
   }],
+  ['recordings-held-release',async api=>{
+    const prefix='recordings-held-release: ',source=api.recordingSource(),start=source.indexOf('const releaseBodies='),end=source.indexOf('\n    const cleanup=',start);
+    assert.ok(start>0&&end>start,prefix+'actual producer release unavailable');
+    const expression=source.slice(start+'const releaseBodies='.length,end).replace(/;$/,'');
+    let clock=100;
+    const instantiate=hold=>vm.runInNewContext('('+expression+')',{hold,Date:{now:()=>clock}});
+    for(const mode of ['live','destroyed','ended','throw']){
+      const row={},bytes=Buffer.from('original held body'),failure=Error('original end failure');let calls=0,observed;
+      const res={destroyed:mode==='destroyed',writableEnded:mode==='ended',end(value){calls++;observed=value;if(mode==='throw')throw failure;}};
+      const hold={enabled:true,rows:[{row,res,bytes}]},release=instantiate(hold);clock=100;
+      if(mode==='throw')assert.throws(release,e=>e===failure,prefix+'original end error lost');else release();
+      assert.equal(hold.enabled,false,prefix+'new holds stayed enabled');assert.equal(row.releasedAt,100,prefix+'first release missing');
+      clock=200;release();assert.equal(row.releasedAt,100,prefix+'cleanup overwrote original release');
+      assert.equal(calls,mode==='destroyed'||mode==='ended'?0:1,prefix+'body submitted more than once');
+      if(calls)assert.equal(observed,bytes,prefix+'body identity changed');
+    }
+    for(const failure of [undefined,null,0,Error('primary end failure')]){
+      let calls=0,tailCalls=0,thirdCalls=0,caught=false,value;const first={},tail={},third={},late={},hold={enabled:true,rows:[
+        {row:first,res:{destroyed:false,writableEnded:false,end(){calls++;throw failure;}},bytes:Buffer.from('first')},
+        {row:tail,res:{destroyed:false,writableEnded:false,end(){tailCalls++;throw Error('secondary release failure');}},bytes:Buffer.from('tail')},
+        {row:third,res:{destroyed:false,writableEnded:false,end(){thirdCalls++;}},bytes:Buffer.from('third')}]},release=instantiate(hold);
+      clock=100;try{release();}catch(error){caught=true;value=error;}
+      assert.ok(caught&&value===failure,prefix+'first falsy/ordinary failure not propagated');
+      assert.equal(first.releasedAt,100,prefix+'throwing release missing');assert.equal(tail.releasedAt,100,prefix+'throwing tail not attempted');assert.equal(third.releasedAt,100,prefix+'healthy tail not attempted');
+      // Cleanup preserves all original attempts. A newly held row is handled once too.
+      hold.rows.push({row:late,res:{destroyed:true,writableEnded:false},bytes:Buffer.from('late')});
+      clock=200;release();clock=300;release();
+      assert.deepEqual([first.releasedAt,tail.releasedAt,third.releasedAt,late.releasedAt,calls,tailCalls,thirdCalls],[100,100,100,200,1,1,1],prefix+'cleanup-only/tail/late release changed');
+    }
+    const fixture=await recordingProofFixture(),guardRows=fixture.report.requests.filter(r=>r.case==='guards'),
+      guardHold={enabled:true,rows:guardRows.map(row=>({row:{...row},res:{destroyed:true,writableEnded:false},bytes:Buffer.from('aborted')}))};
+    for(const held of guardHold.rows)delete held.row.releasedAt;
+    const guardRelease=instantiate(guardHold);clock=1400;guardRelease();clock=2000;guardRelease();
+    for(const held of guardHold.rows)Object.assign(fixture.report.requests.find(r=>r.id===held.row.id),held.row);
+    assert.deepEqual(api.recordingProofErrors(fixture.report,fixture.expected),[],prefix+'actual reader rejects first-only release');
+    // Execute the actual guard cleanup too: failed release must not skip descriptor/context/proxy closure.
+    const cleanupStart=source.indexOf('const cleanup=()=>cleanupTask',start),cleanupEnd=source.indexOf(';activeCleanup=',cleanupStart),
+      cleanStart=source.indexOf('const clean=async('),cleanEnd=source.indexOf('  const beforeBegin=',cleanStart);
+    assert.ok(cleanupStart>end&&cleanupEnd>cleanupStart&&cleanStart>0&&cleanEnd>cleanStart,prefix+'actual cleanup source unavailable');
+    for(const failure of [undefined,null,0,Error('cleanup end failure')]){
+      const calls=[],recording={cleanup:[]},g={probesRestored:false,contextClosed:false},failures=[],
+        hold={enabled:true,rows:[{row:{},res:{destroyed:false,writableEnded:false,end(){calls.push('release');throw failure;}},bytes:Buffer.from('remaining')}]};
+      const scope={hold,Date:{now:()=>500},recording,g,assert,bounded:async task=>task,fail:error=>failures.push(error),
+        page:{isClosed:()=>false,evaluate:async()=>{calls.push('restore');return true;}},context:{},proxy:{server:{}},
+        closeContext:async()=>{calls.push('context');},closeOwned:async()=>{calls.push('proxy');}};
+      const cleanup=vm.runInNewContext('let cleanupTask;'+source.slice(cleanStart,cleanEnd)+'const releaseBodies='+expression+';'+source.slice(cleanupStart,cleanupEnd)+';cleanup',scope);
+      await cleanup();await cleanup();
+      assert.deepEqual(calls,['release','restore','context','proxy'],prefix+'release failure skipped or repeated owner cleanup');
+      assert.ok(g.probesRestored&&g.contextClosed,prefix+'actual owners not restored/closed');
+      assert.equal(failures.length,1,prefix+'release failure disappeared or repeated');assert.equal(failures[0],failure,prefix+'release failure identity changed');
+      assert.equal(recording.cleanup.length,4,prefix+'missing separate release cleanup receipt');
+      assert.equal(recording.cleanup[0].ok,false,prefix+'failed release cleanup falsely passed');
+      assert.ok(recording.cleanup.slice(1).every(r=>r.ok),prefix+'later owner cleanup failed');
+    }
+    // Real owned HTTP responses exercise both full release and client-aborted held bodies.
+    for(const aborted of [false,true]){
+      const bytes=Buffer.from('exact original remainder\u0000\u00ff'),row={},hold={enabled:true,rows:[]};let response,request,ends=0;
+      const server=http.createServer((req,res)=>{response=res;const original=res.end;res.end=function(...args){ends++;return Reflect.apply(original,this,args);};
+        hold.rows.push({row,res,bytes});res.writeHead(200,{'Content-Length':String(bytes.length)});res.flushHeaders();});
+      const bounded=async task=>{let timer;try{return await Promise.race([task,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error(prefix+'HTTP observation deadline')),3000);})]);}finally{clearTimeout(timer);}};
+      try{
+        await bounded(new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);}));
+        const incoming=await bounded(new Promise((resolve,reject)=>{request=http.get({host:'127.0.0.1',port:server.address().port},resolve);request.once('error',reject);}));
+        const chunks=[],received=new Promise((resolve,reject)=>{incoming.on('data',b=>chunks.push(b));incoming.once('end',()=>resolve(Buffer.concat(chunks)));incoming.once('error',reject);});
+        // The abort path has no complete body; retain its error without an unhandled rejection.
+        received.catch(()=>{});
+        if(aborted){const closed=new Promise(resolve=>response.once('close',resolve));incoming.destroy();await bounded(closed);assert.equal(response.destroyed,true,prefix+'real client abort not observed');}
+        const release=instantiate(hold);clock=300;release();
+        if(!aborted)assert.deepEqual(await bounded(received),bytes,prefix+'actual HTTP body differs');
+        clock=400;release();assert.equal(row.releasedAt,300,prefix+'real HTTP cleanup changed release');
+        assert.equal(ends,aborted?0:1,prefix+'real response ended more than once');assert.equal(hold.enabled,false,prefix+'HTTP holds enabled');
+      }finally{request?.destroy();server.closeAllConnections();await new Promise(resolve=>server.close(resolve));}
+    }
+  }],
+
   ['recordings-guard-fixture',async api=>{
     const prefix='recordings-guard-fixture: ',source=api.recordingSource();
     const {completedSnapshot,exportSnapshot}=await import('../src/franchise/save.js'),{SAMPLE_ARMY}=await import('../src/reward/data.js'),
@@ -999,6 +1075,7 @@ export const AUDIO_CHECKS = [
 
 // One semantic mutant per check: each must fail that check's own assertion.
 const MUTANTS = {
+  'recordings-held-release': { recordingSource:()=>fs.readFileSync(path.join(ROOT,'tools/test-offline-upgrade.mjs'),'utf8').replace("if(Object.hasOwn(row,'releasedAt'))continue;",'') },
   'recordings-guard-fixture': { recordingSource:()=>fs.readFileSync(path.join(ROOT,'tools/test-offline-upgrade.mjs'),'utf8').replace("SAMPLE_ARMY.filter(b=>b.id==='b1')",'SAMPLE_ARMY') },
   'recordings-serving-policy': { servingSource: () => fs.readFileSync(path.join(ROOT, 'tools/serve.mjs'), 'utf8').replace("? 'no-cache' : 'no-store'", "? 'no-store' : 'no-store'") },
   'recordings-worker-readiness': { recordingSource: () => fs.readFileSync(path.join(ROOT, 'tools/test-offline-upgrade.mjs'), 'utf8').replace('if(closed||at>=deadline)return false;', 'if(false)return false;') },

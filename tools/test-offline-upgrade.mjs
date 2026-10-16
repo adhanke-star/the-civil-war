@@ -513,9 +513,12 @@ async function runCurrentRecordings(){
     const g={origin:null,fixtureSource:null,ui:{},cancel:null,healthy:null,probesRestored:false,contextClosed:false};
     recording.guards=g; // Preserve partial native diagnostics when a later guard fails.
     const previousCleanup=activeCleanup;
-    const releaseBodies=()=>{hold.enabled=false;for(const{row,res,bytes}of hold.rows){row.releasedAt=Date.now();if(!res.destroyed&&!res.writableEnded)res.end(bytes);}};
+    const releaseBodies=()=>{hold.enabled=false;let failed=false,failure;
+      for(const{row,res,bytes}of hold.rows){if(Object.hasOwn(row,'releasedAt'))continue;row.releasedAt=Date.now();
+        try{if(!res.destroyed&&!res.writableEnded)res.end(bytes);}catch(error){if(!failed){failed=true;failure=error;}}}
+      if(failed)throw failure;};
     const cleanup=()=>cleanupTask??=(async()=>{
-      releaseBodies();await clean(recording.cleanup,'guard native descriptors',async()=>{
+      await clean(recording.cleanup,'guard held bodies',releaseBodies);await clean(recording.cleanup,'guard native descriptors',async()=>{
         if(page&&!page.isClosed())g.probesRestored=await page.evaluate(()=>window.__recordingNativeRestore?.()??false);
         assert(g.probesRestored||!page,'guard native descriptors restored');
       });
