@@ -16,6 +16,14 @@ const mutations={
     to:"const members=new Set(MANIFEST.base.filter(p=>p!=='src/new.js')),visited=new Set();",message:'added code dependency admitted'},
   'stale-activation':{from:'await prepare(cache,previous);',to:'/* omitted late key reconciliation */',message:'late terrain represented in admitted generation'},
   'corrupt-cache':{from:'if(await valid(hit,p))return hit;',to:'if(hit)return hit;',message:'corrupt admitted cache must reject'},
+  'trace-drop-failure':{target:'producer',from:'const listener = raw => recorder.record(name, raw, stage());',
+    to:"const listener = raw => {const copy={...raw};delete copy.canceled;recorder.record(name,copy,stage());};",message:'all native failure fields retained'},
+  'trace-leak-listener':{target:'producer',from:'Reflect.apply(methods.removeListener, session, [name, listener]); cleanup.removed++;',
+    to:'cleanup.removed++;',message:'trace removes only its exact listeners'},
+  'trace-ignore-bound':{target:'producer',from:'if (events.length >= 8192 || bytes + size > 4194304)',
+    to:'if (false)',message:'malformed or excessive CDP metadata is sticky invalid'},
+  'trace-block-cleanup':{target:'producer',from:"admissionPrimaryWrite = admissionPersist('primary');",
+    to:"await admissionPersist('primary');",message:'hanging trace preserves original owner cleanup'},
 };
 const args=process.argv.slice(2),mutation=args.length===1&&args[0].startsWith('--mutation=')?args[0].slice(11):null;
 if(args.length&&args[0]!=='--prove-fail'&&!mutations[mutation])throw Error('unknown offline worker test mode');
@@ -27,10 +35,10 @@ if(args.includes('--prove-fail')){
     assert.match(r.stderr,/AssertionError/,id+' must reach its own assertion');
     assert(r.stderr.includes(m.message),id+' must fail its intended control: '+r.stderr.slice(0,300));
   }
-  console.log('OFFLINE WORKER own rejecting controls OK (4 distinct source mutants)');
+  console.log('OFFLINE WORKER own rejecting controls OK (8 distinct source mutants)');
   process.exit(0);
 }
-if(mutation){const m=mutations[mutation];assert.equal(source.split(m.from).length,2,'unique source mutation anchor');source=source.replace(m.from,m.to);}
+if(mutation&&mutations[mutation].target!=='producer'){const m=mutations[mutation];assert.equal(source.split(m.from).length,2,'unique source mutation anchor');source=source.replace(m.from,m.to);}
 const hash=b=>createHash('sha256').update(b).digest('hex');
 const scope='https://game.example/the-civil-war/';
 const url=p=>new URL(p,scope).href;
@@ -172,7 +180,8 @@ for(const [relative,tier,which]of [
   }
 }
 {
-  const producer=fs.readFileSync(new URL('./test-offline.mjs',import.meta.url),'utf8');
+  let producer=fs.readFileSync(new URL('./test-offline.mjs',import.meta.url),'utf8');
+  if(mutation&&mutations[mutation].target==='producer'){const m=mutations[mutation];assert.equal(producer.split(m.from).length,2,'unique trace source mutation anchor');producer=producer.replace(m.from,m.to);}
   const functions=producer.slice(producer.indexOf('export function offlineRecorder()'),producer.indexOf('\nconst OUT =')).replaceAll('export ','');
   const bodies={'src/main.js':'MAIN','src/ui/entry.js':'ENTRY','assets/terrain/shiloh.bin':'HEIGHTS'};
   const expected=Object.fromEntries(Object.entries(bodies).map(([p,b])=>[p,{bytes:Buffer.byteLength(b),sha256:hash(b)}]));
@@ -240,7 +249,7 @@ for(const [relative,tier,which]of [
   for(const mode of ['normal','first-write','both-writes','browser','server','stuck-write']){
     const primary={results:[{id:'harness',ok:false,detail:'ORIGINAL FAILURE'}]},cleanupErrors=[],calls=[];
     let timer,cleared=0,writes=0;
-    const run=vm.runInNewContext('(async()=>{'+finish+'})',{cleanupErrors,
+    const run=vm.runInNewContext('(async()=>{'+finish+'})',{cleanupErrors,admission:null,
       persist:async()=>{calls.push('persist');writes++;if(mode==='stuck-write')return new Promise(()=>{});
         if(mode==='both-writes'||mode==='first-write'&&writes===1)throw null;},
       browser:{close:async()=>{calls.push('browser');if(mode==='browser')throw null;}},
@@ -254,6 +263,102 @@ for(const [relative,tier,which]of [
     check(primary.results[0].detail==='ORIGINAL FAILURE','cleanup never mutates original failure');
     check(cleared===1&&cleanupErrors.length===(mode==='normal'?0:mode==='both-writes'?2:1),'cleanup errors and timer exact');
   }
+  const traceAPI=vm.runInNewContext(functions+';({make:offlineAdmissionRecorder,session:offlineAdmissionSession,setup:offlineAdmissionSetup,error:offlineAdmissionError,read:readOfflineAdmissionTrace,write:writeOfflineAdmissionReport})',{TextEncoder,performance});
+  function cdpFixture(mode='normal',failure=null){
+    const listeners=new Map(),calls=[],foreign=()=>{},recorder=traceAPI.make();
+    listeners.set('Network.loadingFailed',new Set([foreign]));
+    const session={on(name,fn){if(!listeners.has(name))listeners.set(name,new Set());listeners.get(name).add(fn);calls.push('on:'+name);if(mode==='listener'&&calls.length===4)throw 0;},
+      removeListener(name,fn){listeners.get(name)?.delete(fn);calls.push('remove:'+name);if(mode==='hostile')throw failure;},
+      async send(name,parameters){calls.push(name);assert(!/Fetch|Cache|Debugger|Target/.test(name));if(mode==='setup'&&name==='Page.enable')throw null;},
+      async detach(){calls.push('detach');if(mode==='detach')throw false;}};
+    const owner=traceAPI.session(session,recorder,()=> 'existing-flow');
+    return{listeners,calls,foreign,recorder,owner,session,emit(name,raw){for(const fn of listeners.get(name)||[])fn(raw);}};
+  }
+  const request=(id,loader='document-1',extra={})=>({requestId:id,loaderId:loader,frameId:'frame-1',timestamp:3,
+    documentURL:scope,request:{url:scope+'same.js',method:'GET'},type:'Script',initiator:{type:'script'},...extra});
+  let admissionChecks=0;
+  {
+    const f=cdpFixture();await f.owner.start();
+    f.recorder.record('boundary',{operation:'first-title-goto:start'});
+    f.emit('Network.requestWillBeSentExtraInfo',{requestId:'reused',headers:{}});
+    f.emit('Network.requestWillBeSent',request('reused'));
+    f.emit('Network.requestWillBeSent',request('reused','document-1',{redirectResponse:{status:302,url:scope+'same.js'}}));
+    f.emit('Network.loadingFinished',{requestId:'reused',timestamp:4,encodedDataLength:12});
+    f.emit('Network.requestWillBeSent',request('reused','document-2'));
+    f.emit('Network.loadingFailed',{requestId:'reused',timestamp:5,type:'Script',errorText:'net::ERR_ABORTED',canceled:true,blockedReason:'other',corsErrorStatus:{corsError:'DisallowedByMode'}});
+    f.emit('Network.requestWillBeSent',request('unfinished','document-3'));
+    f.emit('ServiceWorker.workerVersionUpdated',{versions:[{versionId:'v1',status:'activated',runningStatus:'running'}]});
+    const primary={setupComplete:f.owner.setupComplete,primaryFailure:null,trace:f.recorder.freeze()},cleanup=await f.owner.close(),
+      report={schema:'offline-admission-v1',primary,cleanup};
+    const read=traceAPI.read(report);assert.deepEqual(JSON.parse(JSON.stringify(read)),{requests:4,redirects:1,terminals:2,orphans:0,missingTerminals:1});admissionChecks++;
+    check(f.listeners.get('Network.loadingFailed').size===1&&f.listeners.get('Network.loadingFailed').has(f.foreign),'trace removes only its exact listeners');
+    assert.equal((await f.owner.close()),cleanup);assert.equal(f.calls.filter(c=>c==='detach').length,1);admissionChecks+=2;
+    const failure=primary.trace.events.find(e=>e.event==='Network.loadingFailed').raw;
+    check(failure.canceled===true&&failure.blockedReason==='other'&&failure.corsErrorStatus.corsError==='DisallowedByMode','all native failure fields retained');
+    for(const change of[r=>r.primary.setupComplete=false,r=>r.primary.trace.overflow=true,r=>r.primary.trace.events[0].sequence=8,
+      r=>r.primary.trace.clocks.cdpTimestamp='same clock',r=>r.primary.trace.events.find(e=>e.event==='setup-return').raw.command='wrong-domain',
+      r=>r.cleanup.detached=false,r=>r.primary.trace.events.find(e=>e.event==='Network.requestWillBeSent').raw.loaderId=3,
+      r=>{const e=r.primary.trace.events.find(e=>e.event==='Network.loadingFailed');e.raw.canceled='yes';},
+      r=>{const i=r.primary.trace.events.findIndex(e=>e.event==='Network.loadingFinished'),e=structuredClone(r.primary.trace.events[i]);r.primary.trace.events.splice(i+1,0,e);r.primary.trace.events.forEach((e,i)=>e.sequence=i);}]){
+      const bad=structuredClone(report);change(bad);bad.primary.trace.bytes=bad.primary.trace.events.reduce((n,e)=>n+Buffer.byteLength(JSON.stringify(e)),0);assert.throws(()=>traceAPI.read(bad));admissionChecks++;
+    }
+    const writes=[],logs=[],receipt=await traceAPI.write({report:{...report,run:'42',sha:'a'.repeat(40)},phase:'final',
+      write:async b=>writes.push(Buffer.from(b)),hash,log:m=>logs.push(m)});
+    assert.equal(receipt.bytes,writes[0].length);assert.equal(receipt.sha256,hash(writes[0]));assert.equal(JSON.parse(logs[0].split('OFFLINE_ADMISSION_TRACE_PERSISTED ')[1]).sha256,hash(writes[0]));admissionChecks+=3;
+    await assert.rejects(traceAPI.write({report,phase:'primary',write:async()=>{throw 0;},hash,log:()=>assert.fail('failed write cannot print receipt')}),e=>e===0);admissionChecks++;
+  }
+  for(const mode of['listener','setup','detach']){
+    const f=cdpFixture(mode);let failed=false,error;try{await f.owner.start();}catch(e){failed=true;error=e;}
+    assert.equal(failed,mode!=='detach');if(failed)assert.equal(error,mode==='listener'?0:null);
+    const cleanup=await f.owner.close();check(cleanup.attempted&&f.calls.includes('detach'),'partial trace setup still attempts complete owned cleanup');
+    assert.equal(f.listeners.get('Network.loadingFailed').size,1);assert.equal(cleanup.errors.length,mode==='detach'?1:0);admissionChecks+=4;
+  }
+  for(const kind of['overflow','unicode','nesting','nonfinite','accessor']){
+    const r=traceAPI.make();let reads=0;
+    if(kind==='overflow')for(let n=0;n<8200;n++)r.record('boundary',{});
+    if(kind==='unicode')r.record('boundary',{text:'\u{1f600}'.repeat(100000)});
+    if(kind==='nesting'){const root={};let x=root;for(let n=0;n<40;n++)x=x.next={};r.record('boundary',root);}
+    if(kind==='nonfinite')r.record('boundary',{timestamp:Infinity});
+    if(kind==='accessor'){const raw={};Object.defineProperty(raw,'bad',{get(){reads++;throw 0;},enumerable:true});r.record('boundary',raw);}
+    const result=r.read();check(result.overflow||result.errors.length,'malformed or excessive CDP metadata is sticky invalid');assert.equal(reads,0);admissionChecks++;
+  }
+  for(const mode of['normal','primary-trace-write','stuck-trace-write','detach','freeze']){
+    const calls=[],cleanupErrors=[],admission={recorder:traceAPI.make(),owner:{setupComplete:true,close:async()=>{calls.push('detach');return{attempted:true,removed:14,detached:mode!=='detach',errors:mode==='detach'?['controlled']:[]};}},
+      primary:null,primaryFailure:{type:'number',message:'0'},persistenceErrors:[],cleanup:null};
+    if(mode==='freeze')admission.recorder.freeze=()=>{throw null;};
+    let timer,cleared=0;
+    const run=vm.runInNewContext('(async()=>{'+finish+'})',{cleanupErrors,admission,results:[{id:'harness',ok:false,detail:'0'}],offlineAdmissionError:traceAPI.error,
+      admissionMark:()=>{},admissionPersist:async phase=>{calls.push('trace:'+phase);if(phase==='primary'&&mode==='stuck-trace-write')return new Promise(()=>{});if(phase==='primary'&&mode==='primary-trace-write')admission.persistenceErrors.push({phase});},
+      persist:async()=>calls.push('persist'),browser:{close:async()=>calls.push('browser')},server:{close:()=>calls.push('server')},
+      setTimeout:(fn,ms)=>{assert.equal(ms,20000);timer=fn;return 2;},clearTimeout:()=>cleared++,process:{exit:n=>{assert.equal(n,1);calls.push('terminal');}}});
+    const pending=run();for(let n=0;n<12;n++)await Promise.resolve();
+    if(mode==='stuck-trace-write'){assert(calls.includes('browser')&&calls.includes('server'),'hanging trace preserves original owner cleanup');assert.equal(calls.filter(c=>c==='persist').length,2);timer();assert(calls.includes('terminal'));admissionChecks+=4;continue;}
+    await pending;assert(calls.includes('browser')&&calls.includes('server'));assert.equal(calls.filter(c=>c==='persist').length,2);assert.equal(cleared,1);assert.equal(admission.primaryFailure.message,'0');admissionChecks+=4;
+  }
+  {
+    let reads=0;const hostile={[Symbol.toPrimitive](){reads++;throw 0;}};
+    Object.defineProperty(hostile,'message',{get(){reads++;throw 0;}});
+    const f=cdpFixture('hostile',hostile);f.recorder.fault('controlled',hostile);assert.equal(reads,0);assert.equal(f.recorder.read().errors.length,1);
+    await f.owner.start();const cleanup=await f.owner.close();assert.equal(cleanup.errors.length,14);assert.equal(cleanup.detached,true);
+    assert.equal(f.calls.filter(c=>c.startsWith('remove:')).length,14);assert.equal(reads,0);admissionChecks+=6;
+    const raw=request('original');Object.defineProperty(raw,'toJSON',{get(){reads++;return()=>({requestId:'forged'});}});
+    const r=traceAPI.make();r.record('Network.requestWillBeSent',raw);assert.equal(reads,0);assert.equal(r.read().events.length,0);assert.equal(r.read().errors.length,1);admissionChecks+=3;
+    const trapped=new Proxy({},{getOwnPropertyDescriptor(){throw 0;}});assert.equal(traceAPI.error(trapped).descriptorFailure,true);admissionChecks++;
+  }
+  for(const mode of['pending-create','pending-send']){
+    const f=cdpFixture();let timer,cleared=0,release,navigations=0,outcome;
+    const held=new Promise(resolve=>release=resolve);
+    if(mode==='pending-send')f.session.send=async name=>{f.calls.push(name);if(name==='Network.enable')await held;};
+    const owner=traceAPI.setup(()=>mode==='pending-create'?held:Promise.resolve(f.session),f.recorder,()=> 'setup',{
+      set:(fn,ms)=>{assert.equal(ms,20000);timer=fn;return 7;},clear:id=>{assert.equal(id,7);cleared++;}});
+    const pending=owner.start().then(()=>navigations++,error=>{outcome=error;});
+    for(let n=0;n<8;n++)await Promise.resolve();timer();await pending;
+    assert.match(outcome.message,/setup deadline/);assert.equal(navigations,0);assert.equal(cleared,1);
+    release(mode==='pending-create'?f.session:undefined);for(let n=0;n<16;n++)await Promise.resolve();
+    const cleanup=await owner.close();assert.equal(cleanup.detached,true);assert(!f.calls.includes('Page.enable'));assert.equal(navigations,0);
+    assert.equal(f.calls.filter(c=>c==='detach').length,1);assert.equal(f.listeners.get('Network.loadingFailed').size,1);admissionChecks+=8;
+  }
+  console.log('OFFLINE ADMISSION TRACE CPU OK ('+admissionChecks+' checks; no native execution)');
 }
 {
   const producer=fs.readFileSync(new URL('./test-offline-upgrade.mjs',import.meta.url),'utf8');

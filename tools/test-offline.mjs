@@ -13,6 +13,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { startServer, ROOT } from './serve.mjs';
 import vm from 'node:vm';
+import { createHash } from 'node:crypto';
 
 // Diagnostic only: never routes a request, changes a worker or retries a failed operation.
 export function offlineRecorder() {
@@ -27,6 +28,185 @@ export function offlineRecorder() {
     } catch { if (observerErrors.length < 16) observerErrors.push('event serialization'); }
   };
   return { record, read: () => JSON.parse(JSON.stringify({ events, bytes, overflow, observerErrors })) };
+}
+
+// Passive, separately bounded diagnostic. CDP timestamps stay in their original
+// clock domain; nodeMs is receipt time, and sequence is collector order only.
+export function offlineAdmissionError(value) {
+  const type = value === null ? 'null' : typeof value;
+  const primitive = v => v === null ? 'null' : ['string', 'number', 'boolean', 'undefined', 'bigint', 'symbol'].includes(typeof v) ? String(v) : null;
+  let message = primitive(value), descriptorFailure = false;
+  if (message === null) {
+    try {
+      const d = Object.getOwnPropertyDescriptor(value, 'message');
+      message = d && Object.hasOwn(d, 'value') ? primitive(d.value) : null;
+    } catch { descriptorFailure = true; }
+    if (message === null) message = 'non-primitive thrown value without an own data message';
+  }
+  return { type, message: message.slice(0, 4096), messageTruncated: message.length > 4096, descriptorFailure };
+}
+export function offlineAdmissionRecorder() {
+  const events = [], errors = []; let bytes = 0, overflow = false, frozen = false, late = 0;
+  const fault = (stage, value) => { if (errors.length < 32) errors.push({ stage, ...offlineAdmissionError(value) }); };
+  const clone = input => {
+    let nodes = 0;
+    const walk = (value, depth) => {
+      if (++nodes > 65536 || depth > 32) throw Error('metadata nesting/node bound');
+      if (value === null || typeof value === 'boolean') return value;
+      if (typeof value === 'number') { if (!Number.isFinite(value)) throw Error('nonfinite metadata'); return value; }
+      if (typeof value === 'string') { if (new TextEncoder().encode(value).length > 262144) throw Error('metadata string bound'); return value; }
+      if (typeof value !== 'object') throw Error('non-JSON metadata');
+      const prototype = Object.getPrototypeOf(value);
+      if (!Array.isArray(value) && prototype !== null && Object.getPrototypeOf(prototype) !== null) throw Error('non-JSON metadata');
+      const array = Array.isArray(value), keys = Reflect.ownKeys(value), copy = array ? [] : Object.create(null);
+      if (array) Object.setPrototypeOf(copy, null);
+      if (keys.length > (array ? 8193 : 256)) throw Error('metadata key bound');
+      for (const key of keys) {
+        if (typeof key !== 'string' || new TextEncoder().encode(key).length > 4096) throw Error('metadata key type/size');
+        const d = Object.getOwnPropertyDescriptor(value, key);
+        if (!d || !Object.hasOwn(d, 'value')) throw Error('metadata accessor');
+        if (array && key === 'length') { if (!Number.isSafeInteger(d.value) || d.value > 8192 || keys.length !== d.value + 1) throw Error('sparse/oversized metadata array'); continue; }
+        if (!d.enumerable || array && !/^(0|[1-9][0-9]*)$/.test(key)) throw Error('non-JSON property');
+        Object.defineProperty(copy, key, { value: walk(d.value, depth + 1), enumerable: true, configurable: true, writable: true });
+      }
+      return copy;
+    };
+    return walk(input, 0);
+  };
+  const record = (event, raw = {}, stage = 'registration') => {
+    if (frozen) { late++; return; }
+    try {
+      const row = { sequence: events.length, nodeMs: performance.now(), session: 'page-1', stage, event, raw: clone(raw) },
+        size = new TextEncoder().encode(JSON.stringify(row)).length;
+      if (events.length >= 8192 || bytes + size > 4194304) { overflow = true; return; }
+      events.push(row); bytes += size;
+    } catch (error) { fault('record', error); }
+  };
+  const read = () => JSON.parse(JSON.stringify({ clocks: { nodeMs: 'Node performance.now receipt milliseconds',
+    cdpTimestamp: 'raw CDP monotonic seconds; not synchronized to nodeMs' }, events, bytes, overflow, errors, late }));
+  return { record, fault, read, freeze() { frozen = true; return read(); } };
+}
+
+export function offlineAdmissionSession(session, recorder, stage) {
+  const methods = Object.fromEntries(['on', 'removeListener', 'send', 'detach'].map(k => [k, session[k]])), listeners = [];
+  let started = false, closed = false, setupComplete = false;
+  const cleanup = { attempted: false, removed: 0, detached: false, errors: [] };
+  const failure = (where, error) => { cleanup.errors.push({ stage: where, ...offlineAdmissionError(error) }); };
+  return {
+    async start() {
+      if (started) throw Error('offline admission: duplicate setup'); started = true;
+      try {
+        const open = () => { if (closed) throw Error('offline admission: closed setup'); };
+        open();
+        for (const name of ['Network.requestWillBeSent', 'Network.requestWillBeSentExtraInfo', 'Network.responseReceived',
+          'Network.responseReceivedExtraInfo', 'Network.loadingFinished', 'Network.loadingFailed', 'Network.requestServedFromCache',
+          'Page.frameNavigated', 'Page.frameStartedLoading', 'Page.frameStoppedLoading', 'Page.lifecycleEvent',
+          'ServiceWorker.workerRegistrationUpdated', 'ServiceWorker.workerVersionUpdated', 'ServiceWorker.workerErrorReported']) {
+          open();
+          const listener = raw => recorder.record(name, raw, stage());
+          listeners.push([name, listener]); Reflect.apply(methods.on, session, [name, listener]);
+          open();
+        }
+        for (const [command, parameters] of [['Network.enable', {}], ['Page.enable', {}],
+          ['Page.setLifecycleEventsEnabled', { enabled: true }], ['ServiceWorker.enable', {}]]) {
+          open();
+          recorder.record('setup-command', { command }, stage());
+          await Reflect.apply(methods.send, session, [command, parameters]);
+          open();
+          recorder.record('setup-return', { command }, stage());
+        }
+        setupComplete = true; recorder.record('setup-complete', {}, stage());
+      } catch (error) { recorder.fault('setup', error); throw error; }
+    },
+    get setupComplete() { return setupComplete; },
+    async close() {
+      if (closed) return cleanup; closed = true; cleanup.attempted = true;
+      for (const [name, listener] of listeners) {
+        try { Reflect.apply(methods.removeListener, session, [name, listener]); cleanup.removed++; }
+        catch (error) { failure('remove:' + name, error); }
+      }
+      try { await Reflect.apply(methods.detach, session, []); cleanup.detached = true; }
+      catch (error) { failure('detach', error); }
+      return cleanup;
+    },
+  };
+}
+
+export function offlineAdmissionSetup(create, recorder, stage, timers = { set: setTimeout, clear: clearTimeout }) {
+  let owner = null, closed = false, started = false;
+  const empty = { attempted: false, removed: 0, detached: false, errors: [] };
+  return {
+    get setupComplete() { return !closed && owner?.setupComplete === true; },
+    async start() {
+      if (started || closed) throw Error('offline admission: duplicate/closed setup'); started = true;
+      let timer;
+      const deadline = new Promise((resolve, reject) => { timer = timers.set(() => {
+        closed = true; recorder.fault('setup-deadline', 'diagnostic setup exceeded 20000ms');
+        if (owner) owner.close().catch(error => recorder.fault('deadline-cleanup', error));
+        reject(Error('offline admission: diagnostic setup deadline'));
+      }, 20000); });
+      const pending = (async () => {
+        const session = await create();
+        owner = offlineAdmissionSession(session, recorder, stage);
+        if (closed) { await owner.close(); throw Error('offline admission: late session'); }
+        await owner.start();
+        if (closed) throw Error('offline admission: late setup');
+      })();
+      try { await Promise.race([pending, deadline]); }
+      finally { timers.clear(timer); }
+    },
+    async close() { closed = true; return owner ? owner.close() : empty; },
+  };
+}
+
+export function readOfflineAdmissionTrace(report) {
+  const refuse = () => { throw Error('offline admission: invalid diagnostic'); }, p = report?.primary;
+  if (report?.schema !== 'offline-admission-v1' || !p || p.setupComplete !== true || !Array.isArray(p.trace?.events)
+    || p.trace.overflow !== false || !Array.isArray(p.trace.errors) || p.trace.errors.length || !Array.isArray(report.cleanup?.errors) || report.cleanup.errors.length
+    || report.persistenceErrors !== undefined && (!Array.isArray(report.persistenceErrors) || report.persistenceErrors.length)
+    || report.cleanup?.attempted !== true || report.cleanup.detached !== true || report.cleanup.removed !== 14) refuse();
+  if (p.trace.clocks?.nodeMs !== 'Node performance.now receipt milliseconds'
+    || p.trace.clocks.cdpTimestamp !== 'raw CDP monotonic seconds; not synchronized to nodeMs') refuse();
+  const setup = p.trace.events.filter(e => e.event.startsWith('setup-')).map(e => [e.event, e.raw.command ?? null]);
+  const expectedSetup = [];
+  for (const name of ['Network.enable', 'Page.enable', 'Page.setLifecycleEventsEnabled', 'ServiceWorker.enable'])
+    expectedSetup.push(['setup-command', name], ['setup-return', name]);
+  expectedSetup.push(['setup-complete', null]);
+  if (JSON.stringify(setup) !== JSON.stringify(expectedSetup)) refuse();
+  const navigation = p.trace.events.filter(e => e.event === 'boundary' && e.raw.operation === 'first-title-goto:start');
+  if (navigation.length !== 1 || navigation[0].sequence <= p.trace.events.find(e => e.event === 'setup-complete').sequence) refuse();
+  const active = new Map(); let bytes = 0, requests = 0, redirects = 0, terminals = 0, orphans = 0;
+  for (const [i, row] of p.trace.events.entries()) {
+    if (row.sequence !== i || row.session !== 'page-1' || !Number.isFinite(row.nodeMs) || typeof row.stage !== 'string') refuse();
+    bytes += new TextEncoder().encode(JSON.stringify(row)).length;
+    const r = row.raw;
+    if (row.event.startsWith('Network.')) {
+      if (!r || typeof r.requestId !== 'string' || !r.requestId) refuse();
+      const key = row.session + ':' + r.requestId;
+      if (row.event === 'Network.requestWillBeSent') {
+        if (typeof r.loaderId !== 'string' || typeof r.request?.url !== 'string' || typeof r.request.method !== 'string'
+          || !Number.isFinite(r.timestamp) || r.frameId !== undefined && typeof r.frameId !== 'string') refuse();
+        const old = active.get(key);
+        if (old && !old.terminal) { if (!r.redirectResponse) refuse(); redirects++; }
+        active.set(key, { terminal: false }); requests++;
+      } else if (['Network.loadingFinished', 'Network.loadingFailed'].includes(row.event)) {
+        if (!Number.isFinite(r.timestamp)) refuse();
+        if (row.event === 'Network.loadingFailed' && (typeof r.errorText !== 'string'
+          || r.canceled !== undefined && typeof r.canceled !== 'boolean')) refuse();
+        const old = active.get(key); if (old?.terminal) refuse();
+        if (old) old.terminal = true; else { active.set(key, { terminal: true }); orphans++; } terminals++;
+      }
+    }
+  }
+  if (p.trace.events.length > 8192 || bytes !== p.trace.bytes || bytes > 4194304) refuse();
+  return { requests, redirects, terminals, orphans, missingTerminals: [...active.values()].filter(r => !r.terminal).length };
+}
+
+export async function writeOfflineAdmissionReport({ report, phase, write, hash, log }) {
+  const bytes = new TextEncoder().encode(JSON.stringify(report, null, 1));
+  await write(bytes);
+  const receipt = { phase, run: report.run, sha: report.sha, bytes: bytes.byteLength, sha256: hash(bytes) };
+  log('OFFLINE_ADMISSION_TRACE_PERSISTED ' + JSON.stringify(receipt)); return receipt;
 }
 
 // Runs in the page. Named CacheStorage reads do not create a missing cache.
@@ -96,6 +276,8 @@ export async function inspectOfflineCaches({ scope, expected, hashes }) {
 }
 
 const OUT = path.join(ROOT, '.out', 'offline');
+const cli = process.argv.slice(2), traceAdmission = cli.length === 1 && cli[0] === '--trace-admission';
+if (cli.length && !traceAdmission) { console.error('offline: unknown diagnostic option'); process.exit(1); }
 await fs.mkdir(OUT, { recursive: true });
 const results = [];
 const diagnostic = offlineRecorder(), audits = [], auditErrors = [], cleanupErrors = [];
@@ -112,6 +294,19 @@ const browser = await chromium.launch({ headless: true, args: ['--use-angle=swif
 const ctx = await browser.newContext({ viewport: { width: 1280, height: 720 } });
 const page = await ctx.newPage(), errors = [];
 let stage = 'registration', nextRequest = 0;
+const admission = traceAdmission ? { recorder: offlineAdmissionRecorder(), owner: null, primary: null,
+  cleanup: { attempted: false, removed: 0, detached: false, errors: [] }, persistenceErrors: [], primaryFailure: null } : null;
+const admissionMark = (operation, detail = {}) => admission?.recorder.record('boundary', { operation, ...detail }, stage);
+const admissionPersist = async phase => {
+  if (!admission) return;
+  try {
+    await writeOfflineAdmissionReport({ report: { schema: 'offline-admission-v1', run: process.env.GITHUB_RUN_ID ?? null,
+      sha: process.env.GITHUB_SHA ?? null, primary: admission.primary, cleanup: admission.cleanup,
+      persistenceErrors: admission.persistenceErrors }, phase,
+      write: bytes => fs.writeFile(path.join(OUT, 'admission-trace.json'), bytes),
+      hash: bytes => createHash('sha256').update(bytes).digest('hex'), log: message => console.log(message) });
+  } catch (error) { admission.persistenceErrors.push({ phase, ...offlineAdmissionError(error) }); }
+};
 const requestIds = new WeakMap();
 const requestId = req => { if (!requestIds.has(req)) requestIds.set(req, ++nextRequest); return requestIds.get(req); };
 const describe = req => ({ stage, request: requestId(req), url: req.url(), method: req.method(), type: req.resourceType(),
@@ -146,26 +341,43 @@ page.on('pageerror', (e) => errors.push(`pageerror: ${e.message}`));
 page.on('console', (m) => { if (m.type() === 'error' && !/Failed to load resource|net::ERR_INTERNET_DISCONNECTED/.test(m.text())) errors.push(`console.error: ${m.text()}`); });
 const battleReady = () => page.waitForFunction(() => window.__ready === true, null, { timeout: 240_000, polling: 500 });
 try {
+  if (admission) {
+    admission.owner = offlineAdmissionSetup(() => ctx.newCDPSession(page), admission.recorder, () => stage);
+    await admission.owner.start();
+  }
   // 1. registration and control
+  admissionMark('first-title-goto:start');
   await page.goto(`${url}?sw`);
+  admissionMark('first-title-goto:return');
+  admissionMark('controller-wait:start');
   await page.waitForFunction(() => navigator.serviceWorker?.controller || null, null, { timeout: 60_000 }).catch(() => {});
-  if (!(await page.evaluate(() => !!navigator.serviceWorker?.controller))) { await page.reload(); await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 60_000 }); }
+  admissionMark('controller-wait:return');
+  if (!(await page.evaluate(() => !!navigator.serviceWorker?.controller))) { admissionMark('control-reload:start'); await page.reload(); admissionMark('control-reload:return'); await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 60_000 }); }
   const sw = await page.evaluate(async () => ({ controlled: !!navigator.serviceWorker.controller, scope: (await navigator.serviceWorker.getRegistration())?.scope }));
   check('sw-controls', sw.controlled, JSON.stringify(sw));
   // 2. visit the title and one battle online, through the worker
+  admissionMark('controlled-title-reload:start');
   await page.reload(); await page.waitForFunction(() => window.__entry && !window.__entry.importing, null, { timeout: 60_000 });
+  admissionMark('controlled-title-ready');
+  admissionMark('online-battle-goto:start', { url: url + BATTLE });
   await page.goto(url + BATTLE); await battleReady(); await page.waitForTimeout(3000);
+  admissionMark('online-battle-ready');
   const cached = await page.evaluate(async () => { let n = 0; for (const k of await caches.keys()) n += (await (await caches.open(k)).keys()).length; return n; });
   check('cache-filled', cached > 50, `${cached} cached responses after the title and one battle`);
   stage = 'before-offline'; await audit(false);
   // 3. offline
+  admissionMark('offline-transition:start');
   await ctx.setOffline(true);
+  admissionMark('offline-title-goto:start');
   await page.goto(`${url}?sw`); await page.waitForFunction(() => window.__entry && !window.__entry.importing, null, { timeout: 60_000 });
+  admissionMark('offline-title-ready');
   await page.screenshot({ path: path.join(OUT, 'offline-title.png') });
   check('offline-title', await page.evaluate(() => window.__entry.mode === 'title'), 'the title opens with no network');
   stage = 'after-offline-title'; await audit(false);
   stage = 'offline-battle';
+  admissionMark('offline-battle-goto:start');
   await page.goto(url + BATTLE); await battleReady();
+  admissionMark('offline-battle-ready');
   const run = await page.evaluate(() => {
     const { game, pack, terrain } = window.__game, t0 = game.simTime;
     if (game.paused) game.togglePause();
@@ -175,26 +387,48 @@ try {
   await page.screenshot({ path: path.join(OUT, 'offline-battle.png') });
   check('offline-battle', run.pack === 'camps-at-dawn' && run.units > 0 && run.advanced >= 9, JSON.stringify(run));
   // 4. back online
+  admissionMark('online-transition:start');
   await ctx.setOffline(false);
   stage = 'online-again';
   await page.goto(`${url}?sw`); await page.waitForFunction(() => window.__entry && !window.__entry.importing, null, { timeout: 60_000 });
+  admissionMark('online-again-title-ready');
   check('online-again', await page.evaluate(() => !!navigator.serviceWorker.controller), 'the worker still controls the page online');
   check('no-errors', errors.length === 0, errors.length ? errors.slice(0, 5).join(' | ') : 'no page or console errors');
 } catch (e) {
-  check('harness', false, `${e.message.split('\n')[0]} | ${errors.slice(0, 3).join(' | ')}`);
+  if (admission) { admission.primaryFailure = offlineAdmissionError(e); admissionMark('primary-failure', admission.primaryFailure); }
+  check('harness', false, `${offlineAdmissionError(e).message.split('\n')[0]} | ${errors.slice(0, 3).join(' | ')}`);
   stage = 'first-failure'; await audit(true);
 } finally {
   // Freeze the primary result before cleanup; a stuck close cannot erase it.
   const terminal = setTimeout(() => process.exit(1), 20000);
   try {
+    let admissionPrimaryWrite, admissionClose;
+    if (admission) {
+      try {
+        admissionMark('primary-freeze-before-cleanup');
+        admission.primary = { setupComplete: admission.owner?.setupComplete ?? false, primaryFailure: admission.primaryFailure,
+          results: JSON.parse(JSON.stringify(results)), trace: admission.recorder.freeze() };
+        admissionPrimaryWrite = admissionPersist('primary');
+      } catch (error) { admission.persistenceErrors.push({ phase: 'freeze', ...offlineAdmissionError(error) }); }
+      if (admission.owner) admissionClose = admission.owner.close();
+    }
     try { await persist(); } catch { cleanupErrors.push('primary persistence'); }
     try { await browser.close(); } catch { cleanupErrors.push('browser close'); }
     try { server.close(); } catch { cleanupErrors.push('server close'); }
     try { await persist(); } catch { cleanupErrors.push('final persistence'); }
+    if (admission) {
+      if (admissionClose) admission.cleanup = await admissionClose;
+      admission.cleanup.postFreezeEvents = admission.recorder.read().late;
+      await admissionPrimaryWrite;
+      await admissionPersist('final');
+    }
   } finally { clearTimeout(terminal); }
 }
 const failed = results.filter((r) => !r.ok);
 const receipt = diagnostic.read(), invalid = receipt.overflow || receipt.observerErrors.length || receipt.events.some(r => r.event === 'observer-error')
   || auditErrors.length || audits.some(r => r.observerErrors.length) || cleanupErrors.length;
-console.log(failed.length || invalid ? `OFFLINE FAILED (${results.length - failed.length}/${results.length}; diagnostic invalid=${!!invalid})` : `OFFLINE OK (${results.length}/${results.length})`);
-process.exit(failed.length || invalid ? 1 : 0);
+let admissionInvalid = false;
+if (admission) { try { readOfflineAdmissionTrace({ schema: 'offline-admission-v1', primary: admission.primary, cleanup: admission.cleanup });
+  if (admission.persistenceErrors.length) throw Error('trace persistence'); } catch { admissionInvalid = true; } }
+console.log(failed.length || invalid || admissionInvalid ? `OFFLINE FAILED (${results.length - failed.length}/${results.length}; diagnostic invalid=${!!invalid}${admission ? '; admission invalid=' + admissionInvalid : ''})` : `OFFLINE OK (${results.length}/${results.length})`);
+process.exit(failed.length || invalid || admissionInvalid ? 1 : 0);

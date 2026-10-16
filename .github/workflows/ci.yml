@@ -143,7 +143,7 @@ jobs:
         run: |
           if [ "${{ matrix.browser }}" = offline ]; then
             # the service worker: a battle visited once plays with the network off
-            node tools/test-offline.mjs
+            node tools/test-offline.mjs --trace-admission
             node tools/test-offline-upgrade.mjs
           elif [ "${{ matrix.browser }}" = firefox ]; then
             # headless Firefox has no GL driver in this container: Mesa's software GL under xvfb instead
