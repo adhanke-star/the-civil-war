@@ -331,11 +331,12 @@ const expected = Object.fromEntries(auditPaths.map(p => [p, manifest.files[p]]))
 const check = (id, ok, detail) => { results.push({ id, ok: !!ok, detail }); console.log(`${ok ? 'ok  ' : 'FAIL'} ${id}: ${detail}`); };
 const BATTLE = '?battle=shiloh&phase=camps-at-dawn&quality=low&sw';
 
-// --trace-admission extras (Decision 0274): netlog, a browser trace of the online battle load, long tasks and the
-// failure page. Best-effort: each fault lands in diagnosticErrors and never changes the OFFLINE OK/FAILED verdict.
-const diagnosticErrors = [], longTasks = {}, deepTrace = traceAdmission ? { started: false, ended: false, file: null,
-  bytes: 0, truncated: false, dataLossOccurred: null, detached: false } : null;
-let failureState = null, traceSession = null;
+// --trace-admission extras (Decision 0274): netlog, browser traces of the online and offline battle loads, long tasks
+// and the failure page. Best-effort: each fault lands in diagnosticErrors and never changes the OFFLINE OK/FAILED verdict.
+const traceWindow = () => ({ started: false, ended: false, file: null, bytes: 0, truncated: false, dataLossOccurred: null, detached: false });
+const diagnosticErrors = [], longTasks = {}, deepTrace = traceAdmission ? { online: traceWindow(), offline: traceWindow() } : null;
+const traceSessions = { online: null, offline: null };
+let failureState = null;
 const diagFault = (where, error) => { if (diagnosticErrors.length < 64) diagnosticErrors.push({ stage: where, ...offlineAdmissionError(error) }); };
 const within = (promise, ms, label) => { let timer; return Promise.race([promise, new Promise((_, reject) => {
   timer = setTimeout(() => reject(Error(label + ' exceeded ' + ms + 'ms')), ms); })]).finally(() => clearTimeout(timer)); };
@@ -347,49 +348,52 @@ if (traceAdmission) {
   catch (error) { diagFault('netlog-args', error); }
 }
 const TRACE_LIMIT = 96 * 1024 * 1024;
-const traceStart = async () => {
+const traceStart = async label => {
   if (!traceAdmission) return;
+  const rec = deepTrace[label];
   try {
-    traceSession = await browser.newBrowserCDPSession();
-    await traceSession.send('Tracing.start', { traceConfig: { recordMode: 'recordContinuously', includedCategories: ['blink', 'blink.net',
+    const session = traceSessions[label] = await browser.newBrowserCDPSession();
+    await session.send('Tracing.start', { traceConfig: { recordMode: 'recordContinuously', includedCategories: ['blink', 'blink.net',
       'blink.resource', 'blink.user_timing', 'loading', 'navigation', 'ServiceWorker', 'devtools.timeline',
       'disabled-by-default-devtools.timeline', 'v8', 'v8.execute', 'toplevel', 'ipc', 'mojom', 'net', 'safe_browsing', 'benchmark'],
       excludedCategories: ['*'] }, transferMode: 'ReturnAsStream', streamFormat: 'json', streamCompression: 'gzip' });
-    deepTrace.started = true;
-  } catch (error) { diagFault('trace-start', error); }
+    rec.started = true;
+  } catch (error) { diagFault('trace-start:' + label, error); }
 };
-const traceEnd = async () => {
-  if (!traceSession || deepTrace.ended) return;
-  deepTrace.ended = true;
-  const session = traceSession; let listener;
+const traceEnd = async label => {
+  if (!traceAdmission) return;
+  const rec = deepTrace[label], session = traceSessions[label];
+  if (!session || rec.ended) return;
+  rec.ended = true;
+  let listener;
   try {
-    if (!deepTrace.started) throw Error('tracing never started');
+    if (!rec.started) throw Error('tracing never started');
     const complete = within(new Promise(resolve => { listener = resolve; session.on('Tracing.tracingComplete', listener); }), 60000, 'Tracing.tracingComplete');
     complete.catch(() => {});
     await session.send('Tracing.end');
     const { stream, dataLossOccurred } = await complete;
-    deepTrace.dataLossOccurred = dataLossOccurred ?? null;
+    rec.dataLossOccurred = dataLossOccurred ?? null;
     if (!stream) throw Error('tracingComplete carried no stream');
-    const file = path.join(OUT, 'trace-online-battle.json.gz'), handle = await fs.open(file, 'w');
-    deepTrace.file = path.relative(ROOT, file);
+    const file = path.join(OUT, 'trace-' + label + '-battle.json.gz'), handle = await fs.open(file, 'w');
+    rec.file = path.relative(ROOT, file);
     try {
       while (true) {
         const { data, eof, base64Encoded } = await within(session.send('IO.read', { handle: stream, size: 1048576 }), 30000, 'IO.read');
         const chunk = Buffer.from(data ?? '', base64Encoded ? 'base64' : 'utf8');
-        if (deepTrace.bytes + chunk.length > TRACE_LIMIT) {
-          const room = TRACE_LIMIT - deepTrace.bytes;
-          if (room > 0) { await handle.write(chunk.subarray(0, room)); deepTrace.bytes += room; }
-          deepTrace.truncated = true; break;
+        if (rec.bytes + chunk.length > TRACE_LIMIT) {
+          const room = TRACE_LIMIT - rec.bytes;
+          if (room > 0) { await handle.write(chunk.subarray(0, room)); rec.bytes += room; }
+          rec.truncated = true; break;
         }
-        if (chunk.length) { await handle.write(chunk); deepTrace.bytes += chunk.length; }
+        if (chunk.length) { await handle.write(chunk); rec.bytes += chunk.length; }
         if (eof) break;
       }
     } finally { await handle.close(); }
-    try { await within(session.send('IO.close', { handle: stream }), 10000, 'IO.close'); } catch (error) { diagFault('trace-io-close', error); }
-  } catch (error) { diagFault('trace-end', error); }
+    try { await within(session.send('IO.close', { handle: stream }), 10000, 'IO.close'); } catch (error) { diagFault('trace-io-close:' + label, error); }
+  } catch (error) { diagFault('trace-end:' + label, error); }
   finally {
-    try { if (listener) session.removeListener('Tracing.tracingComplete', listener); } catch (error) { diagFault('trace-listener', error); }
-    try { await within(session.detach(), 10000, 'trace detach'); deepTrace.detached = true; } catch (error) { diagFault('trace-detach', error); }
+    try { if (listener) session.removeListener('Tracing.tracingComplete', listener); } catch (error) { diagFault('trace-listener:' + label, error); }
+    try { await within(session.detach(), 10000, 'trace detach'); rec.detached = true; } catch (error) { diagFault('trace-detach:' + label, error); }
   }
 };
 const readLongTasks = async label => {
@@ -486,11 +490,11 @@ try {
   admissionMark('controlled-title-reload:start');
   await page.reload(); await page.waitForFunction(() => window.__entry && !window.__entry.importing, null, { timeout: 60_000 });
   admissionMark('controlled-title-ready');
-  await traceStart();
+  await traceStart('online');
   admissionMark('online-battle-goto:start', { url: url + BATTLE });
   await page.goto(url + BATTLE); await battleReady(); await page.waitForTimeout(3000);
   admissionMark('online-battle-ready');
-  await traceEnd(); await readLongTasks('online-battle-ready');
+  await traceEnd('online'); await readLongTasks('online-battle-ready');
   const cached = await page.evaluate(async () => { let n = 0; for (const k of await caches.keys()) n += (await (await caches.open(k)).keys()).length; return n; });
   check('cache-filled', cached > 50, `${cached} cached responses after the title and one battle`);
   stage = 'before-offline'; await audit(false);
@@ -504,9 +508,11 @@ try {
   check('offline-title', await page.evaluate(() => window.__entry.mode === 'title'), 'the title opens with no network');
   stage = 'after-offline-title'; await audit(false);
   stage = 'offline-battle';
+  await traceStart('offline');
   admissionMark('offline-battle-goto:start');
   await page.goto(url + BATTLE); await battleReady();
   admissionMark('offline-battle-ready');
+  await traceEnd('offline');
   await readLongTasks('offline-battle-ready');
   const run = await page.evaluate(() => {
     const { game, pack, terrain } = window.__game, t0 = game.simTime;
@@ -528,7 +534,7 @@ try {
   if (admission) { admission.primaryFailure = offlineAdmissionError(e); admissionMark('primary-failure', admission.primaryFailure); }
   check('harness', false, `${offlineAdmissionError(e).message.split('\n')[0]} | ${errors.slice(0, 3).join(' | ')}`);
   if (traceAdmission) {
-    await traceEnd();
+    await traceEnd('online'); await traceEnd('offline');
     try { failureState = await within(page.evaluate(() => ({ href: location.href, entryMode: window.__entry?.mode ?? null,
       ready: window.__ready ?? null, failureHeading: document.getElementById('field-failure-heading')?.textContent ?? null,
       failureNote: document.getElementById('entry-note')?.textContent ?? null, bodyText: document.body?.innerText?.slice(0, 2000) ?? null })),

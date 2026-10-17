@@ -1,5 +1,21 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0278 — Open: one worker-served module fetch is canceled (net::ERR_ABORTED) ~35–55 ms in, and the field import fails (2026-10-17)
+
+Seen twice today, both on pages controlled by the service worker, never in the 14 browser tests that load fields
+without it: 7c7cf0d attempt 2 (online battle load: rts-camera.js and soldier-view.js canceled 54 ms after request, no
+response) and v3 852f6c2 CI 38998598887 smoke sample 2 (offline battle load: BufferGeometryUtils.js canceled 35 ms in,
+requested by labels.js; every other request of the burst answered 200 from cache-storage). In both the module graph
+kept fetching other modules afterwards, so Blink canceled that one request, not the graph; `import('./main.js')` then
+rejected with "Failed to fetch dynamically imported module" (now visible on the failure page since ef85e41) and the
+player would see "The battlefield could not be loaded". No worker console output, no worker status change, no error
+reported, no update found; the worker stayed running throughout (DevTools attached, so no idle termination). Rate
+today: 2 of about 14 worker-controlled field loads. Not caused by 0276 (one case predates it). Instrument: the Chrome
+trace now also covers the offline battle load, three smoke samples per push. Candidate mechanisms, none shown:
+Chromium's ServiceWorkerSubresourceLoader aborting on a controller connection change; a Blink module-map/MemoryCache
+race when a second importer resolves the same URL while the first fetch is in flight. A one-shot automatic reload on a
+failed field import is a mitigation for Aaron to choose, not a fix.
+
 ## 0276 — 0274 cause: headless GPU compositor teardown blocks the page's main thread for ~30 s (2026-10-16)
 
 Evidence (diag-0274 ef85e41, CI 38975595565, both smoke samples, Chrome traces trace-online-battle.json.gz):

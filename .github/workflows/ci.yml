@@ -143,12 +143,13 @@ jobs:
         run: |
           if [ "${{ matrix.browser }}" = offline ]; then
             # the service worker: a battle visited once plays with the network off
-            # two smoke samples per push (Decision 0274 diagnosis), then the upgrade test; the step fails if any failed
+            # three smoke samples per push (Decisions 0276, 0278), then the upgrade test; the step fails if any failed
             set +e
             node tools/test-offline.mjs --trace-admission; a=$?
             OFFLINE_OUT_DIR=offline-2 node tools/test-offline.mjs --trace-admission; b=$?
+            OFFLINE_OUT_DIR=offline-3 node tools/test-offline.mjs --trace-admission; d=$?
             node tools/test-offline-upgrade.mjs; c=$?
-            exit $(( a | b | c ))
+            exit $(( a | b | c | d ))
           elif [ "${{ matrix.browser }}" = firefox ]; then
             # headless Firefox has no GL driver in this container: Mesa's software GL under xvfb instead
             apt-get update -qq && apt-get install -y -qq libgl1-mesa-dri libegl1 libegl-mesa0 xvfb >/dev/null
