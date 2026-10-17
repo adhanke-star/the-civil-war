@@ -21,6 +21,7 @@
 //   rankChanges(rows)                    -> [{ from, to, packId, phaseId, packTitle, title }] where the sourced rank differs
 //   officerLines(save, { packs, ladder, titleOf })   -> the camp's "Officers" lines (Merit changes, sourced rank changes)
 //   officerView(input)                   -> the officer card's plain view model (src/reward/sequence.js draws it)
+//   officerPortrait(portrait, note)      -> { src, note } | null: the scenario's own commander portrait (card and camp row)
 //
 // GAME RULES (named so in code and on the card; Merit is a game value, never history):
 // - Merit is kept per commander name per franchise save, 0-3. +1 when his brigade ends a battle's last phase at Victory or
@@ -281,6 +282,14 @@ const EVENT_WORDS = { wounded: 'Wounded at', killed: 'Killed at', 'took-command'
 /** A data portrait path the card may load: a relative file under ./assets/ (the scenario's commander.portrait), else ''. */
 const portraitPath = (v) => (typeof v === 'string' && /^\.\/assets\/[\w./-]+\.(?:jpe?g|png|webp)$/i.test(v) && !v.includes('..') ? v : '');
 /**
+ * The scenario's own portrait for a commander as the card and the camp's commander row show it: { src, note } from
+ * commander.portrait and commander.portraitNote, or null when the data gives none (then the period-portrait mapping, then
+ * the generic silhouette). One rule for both places, so the camp row and the card never disagree.
+ */
+export const officerPortrait = (portrait, note = '') => (portraitPath(portrait) ? { src: portraitPath(portrait), note: text(note) ? note.trim() : '' } : null);
+/** A display string: the value when it is non-empty text, else '' (never "null" or "undefined" on the card). */
+const shown = (v) => (text(v) ? v : '');
+/**
  * The officer card's view model. input: { name, rank (as sourced for the current battle), formation, kind (the formation's:
  * 'infantry', 'cavalry', 'battery' or 'artillery'; the effect line depends on it), parent, regiments, sources, sourcesFrom
  * (where the sources come from), record (officerRecord or a definition's `officer`), campaign (false in Battles and the
@@ -290,21 +299,21 @@ const portraitPath = (v) => (typeof v === 'string' && /^\.\/assets\/[\w./-]+\.(?
 export function officerView({ name, rank = '', formation = '', kind = null, parent = '', regiments = [], sources = [], sourcesFrom = '', record = null, campaign = true,
   ranks = [], titleOf = null, portrait = '', portraitNote = '' } = {}) {
   if (!text(name)) fail('an officer card needs the sourced name.');
-  const title = (p, ph) => (typeof titleOf === 'function' && titleOf(p, ph)) || `${p} · ${ph}`;
+  const title = (p, ph) => { const t = typeof titleOf === 'function' ? titleOf(p, ph) : null; return text(t) ? t : `${p} · ${ph}`; };
   const rows = campaign && record && Array.isArray(record.record) ? record.record : [];
   const merit = campaign && record ? clampMerit(record.merit | 0) : 0;
   const fell = rows.find((r) => r.event === 'killed');
   const distinct = [...new Set(ranks.map((r) => r.rank))];
   return frozen({
     name, rank: text(rank) ? rank : '', heading: text(rank) ? `${rank} ${name}` : name,
-    command: { formation, parent, regiments: Array.isArray(regiments) ? regiments.filter(text) : [] },
+    command: { formation: shown(formation), parent: shown(parent), regiments: Array.isArray(regiments) ? regiments.filter(text) : [] },
     record: rows.map((r) => ({ text: `${title(r.pack, r.phase)}: ${r.grade}, ${Number(r.lost).toLocaleString('en-US')} men lost${has(r, 'merit') ? ` · Merit now ${r.merit}` : ''}`,
       event: r.event ? `${EVENT_WORDS[r.event]} ${title(r.pack, r.phase)}` : '' })),
     campaign: campaign === true, merit, meritNote: MERIT_NOTE,
     meritLabel: campaign ? `Merit ${merit} of ${MERIT.max}` : 'Merit: not used outside the campaign',
     effect: meritEffectText(merit, { campaign, killed: fell ? title(fell.pack, fell.phase) : null, kind }),
-    portrait: portraitPath(portrait) ? { src: portraitPath(portrait), note: text(portraitNote) ? portraitNote.trim() : '' } : null,
+    portrait: officerPortrait(portrait, portraitNote),
     ranks: distinct.length > 1 ? distinct.map((rk) => ({ rank: rk, phases: ranks.filter((r) => r.rank === rk).map((r) => `${r.packTitle}: ${r.title}`) })) : [],
-    sources: (Array.isArray(sources) ? sources : []).filter(text).slice(0, 16), sourcesFrom,
+    sources: (Array.isArray(sources) ? sources : []).filter(text).slice(0, 16), sourcesFrom: shown(sourcesFrom),
   });
 }

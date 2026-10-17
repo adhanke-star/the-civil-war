@@ -9,7 +9,9 @@
 // Escape closes it and focus returns; the camp's Officers line; in battle the unit card's existing name line is the one opener
 // (#uc-officer wraps #uc-name in the .ucname row: no second commander line, aria-label "Officer card: Col. <name>", a 44 px
 // target) and opens the same card read-only, leaving the pause as it was; Escape closes it; axe on both; screenshots
-// officer-card-camp and officer-card-battle.
+// officer-card-camp and officer-card-battle. Repairs bound here (CI screenshot findings): the camp row shows the scenario's own
+// portrait as the card does (camp-row-portrait); no text node of the card reads "null" or "undefined" (no-null-text); the
+// card fits the viewport with Back on screen, inside the dialog and hit-testable at 1024x768 and 360x640 (fit-WxH).
 import fs from 'node:fs';
 import { AxeBuilder } from '@axe-core/playwright';
 import { probeProgress, seedProgress } from './test-progress-browser.mjs';
@@ -49,6 +51,21 @@ export async function officersControls({ browser, url, check, shot, result, watc
     const bad = a.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical');
     record(key, bad.length === 0, bad.length ? bad.map((v) => `${v.impact} ${v.id}`) : `0 serious/critical (${a.violations.length} minor)`);
   };
+  /** The card's fit: Back inside the viewport and inside the dialog's box, the topmost element at its centre; no text node
+   *  reading "null" or "undefined"; the dialog no taller than 90 % of the viewport. */
+  const fit = () => page.evaluate(() => {
+    const d = document.getElementById('officer-card'), b = document.getElementById('officer-card-back');
+    if (!d || !b) return null;
+    const r = b.getBoundingClientRect(), dr = d.getBoundingClientRect(), x = r.x + r.width / 2, y = r.y + r.height / 2;
+    const w = document.createTreeWalker(d, NodeFilter.SHOW_TEXT), bad = [];
+    for (let n = w.nextNode(); n; n = w.nextNode()) if (/^(?:null|undefined)$/.test(n.nodeValue.trim())) bad.push(n.parentElement?.className || n.parentElement?.tagName);
+    const px = (v) => Math.round(v);
+    return { viewport: [innerWidth, innerHeight], back: [px(r.left), px(r.top), px(r.right), px(r.bottom)], dialog: [px(dr.left), px(dr.top), px(dr.right), px(dr.bottom)],
+      inViewport: r.width > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight,
+      inDialog: r.left >= dr.left - 0.5 && r.top >= dr.top - 0.5 && r.right <= dr.right + 0.5 && r.bottom <= dr.bottom + 0.5,
+      hit: document.elementFromPoint(x, y) === b, tall: dr.height <= innerHeight * 0.9 + 1, scrolls: d.scrollHeight > d.clientHeight, nullText: bad };
+  });
+  const fits = (key, f) => record(key, !!f && f.inViewport && f.inDialog && f.hit && f.tall, f);
   const card = () => page.evaluate(() => {
     const d = document.getElementById('officer-card');
     return d ? { open: d.open, heading: d.querySelector('#officer-card-title')?.textContent, focus: document.activeElement?.id,
@@ -66,6 +83,11 @@ export async function officersControls({ browser, url, check, shot, result, watc
     // ---- camp: the commander row is a button; the card; Escape closes and focus returns ----
     const row = page.locator('#camp-army [data-brigade-id="sherman"] button.rw-bwho');
     await row.waitFor({ timeout: 30000 });
+    // the camp row's portrait, picked as the card picks it: the scenario's own commander.portrait first, the card's alt text
+    const rowArt = await page.evaluate(() => { const r = document.querySelector('#camp-army [data-brigade-id="sherman"] button.rw-bwho');
+      return { portrait: r?.dataset.portrait ?? null, alt: r?.querySelector('.rw-bportrait img')?.getAttribute('alt') ?? null, src: r?.querySelector('.rw-bportrait img')?.getAttribute('src') ?? null,
+        note: r?.querySelector('.rw-bwho-note')?.textContent ?? null }; });
+    record('camp-row-portrait', rowArt.portrait === 'scenario' && rowArt.alt === ALT && rowArt.src === OWN.portrait && !/No sourced portrait/.test(rowArt.note), rowArt);
     const line = await page.evaluate(() => { const n = document.getElementById('camp-officers'); return n && !n.hidden ? n.textContent : ''; });
     record('camp-line', line.includes(`${NAME}: Merit 0 → 1 (game value)`), { line });
     await row.click();
@@ -75,7 +97,15 @@ export async function officersControls({ browser, url, check, shot, result, watc
       && camp.tag === 'Game value' && /^Game rule/.test(camp.effect) && camp.effect.includes(STEADY) && camp.record.length === 1 && camp.record[0].includes('Victory') && camp.sources > 0 && camp.back
       && camp.portrait === 'scenario' && camp.alt === ALT, camp);
     await axe('camp-axe');
+    const campFit = await fit();
+    record('no-null-text', !!campFit && campFit.nullText.length === 0, campFit && { nullText: campFit.nullText });
+    fits('fit-1024x768', campFit);
     await shot(page, 'officer-card-camp');
+    await page.setViewportSize({ width: 360, height: 640 });
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    fits('fit-360x640', await fit());
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
     await page.keyboard.press('Escape');
     const closed = await page.evaluate(() => ({ open: document.getElementById('officer-card').open, back: document.activeElement?.classList.contains('rw-bwho') }));
     record('camp-escape', !closed.open && closed.back, closed);
@@ -108,6 +138,8 @@ export async function officersControls({ browser, url, check, shot, result, watc
       && battle.formation === HH.units.find((u) => u.id === 'sherman').name && battle.sources > 0 && text.includes(`Col. ${NAME}`) && paused === before
       && battle.effect.includes(STEADY) && battle.portrait === 'scenario' && battle.alt === ALT, { ...battle, text, paused, before });
     await axe('battle-axe');
+    const battleFit = await fit();
+    record('battle-fit', !!battleFit && battleFit.nullText.length === 0 && battleFit.inViewport && battleFit.inDialog && battleFit.hit && battleFit.tall, battleFit);
     await shot(page, 'officer-card-battle');
     await page.keyboard.press('Escape');
     const after = await page.evaluate(() => ({ open: document.getElementById('officer-card').open, focus: document.activeElement?.id, selected: window.__game.game.selected?.id ?? null }));

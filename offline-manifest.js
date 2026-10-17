@@ -728,8 +728,8 @@ self.CW_OFFLINE = {
    "sha256": "1f5d4010bf4e5d42c3fae0b7008eb7e28cbdcb6a10dae5f31304080517fe2e36"
   },
   "src/franchise/officers.js": {
-   "bytes": 24376,
-   "sha256": "a12f7c15f780d36fa67e83bc11b27b49b82d8484311f86f8d5158596720817df"
+   "bytes": 25175,
+   "sha256": "6a5dc1f4da7ca17a1bea48176a6a052da8724b6c42580132468cb1ef3a748f88"
   },
   "src/franchise/practice-ui.js": {
    "bytes": 23305,
@@ -784,12 +784,12 @@ self.CW_OFFLINE = {
    "sha256": "c173eda4308e08fd7515d71a6cfda532916ec719cf854a5413bf52f4c84c1667"
   },
   "src/reward/reward.css": {
-   "bytes": 62864,
-   "sha256": "3780ed39437470d10efe6a1726d952e69e56294d2e0cd7053f09f541e4507980"
+   "bytes": 63482,
+   "sha256": "c27d91a5fd77832154e3eba8b802eb8e3b755835a686fd974e68e69f8caf2ea3"
   },
   "src/reward/sequence.js": {
-   "bytes": 95921,
-   "sha256": "846ae146a9e0810b2bd9a94a8104e447407cca37dd58b8f0bc08079d77e665d5"
+   "bytes": 96932,
+   "sha256": "788bd2442e753a10b4d7f52abfb2fb1a06bbbfb84a6a5a0832926e857cbf8f2b"
   },
   "src/reward/sfx.js": {
    "bytes": 8195,
@@ -864,8 +864,8 @@ self.CW_OFFLINE = {
    "sha256": "43b1c4fe2b87054c2d3e8969a8591e7a6d969105e1d3f6e3d647472feadc9086"
   },
   "src/ui/entry.js": {
-   "bytes": 127552,
-   "sha256": "810a119394ae7ab4dfa0f1d59b5e3be4be2f0e604e7105b7ec60d031afea52f2"
+   "bytes": 127844,
+   "sha256": "e9d174385fb177316ca2a79c3916aa1ec2a5e781513541fa10c39d56b775c596"
   },
   "src/ui/hud.css": {
    "bytes": 45339,
@@ -1487,5 +1487,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "af88682ccbf22fa31c3a702f3ec65b8c1846a1ed2cd50d53d9bab456d89ffc9e"
+ "generation": "45539e980438f183f8c8c7c95d852defa7b66cc2bddc7e0492fefa7dfff4299b"
 };

@@ -36,7 +36,7 @@ import { ORDERS, orderName, orderText, setOrder, breakCamp, campReport, supplyNe
 import { cardsFor, recorded, optionOpen, chooseDecision, historyOf, effectText as decisionEffect, DECISIONS_NOTE } from '../franchise/decisions.js';
 import { get } from '../settings.js';
 import { brigCard, staticCard, itemLabel, defineRewardSettings, levelUpMoment, badgeChip, openOfficerCard } from '../reward/sequence.js';
-import { officerRecord, officerView, rankHistory, officerLines } from '../franchise/officers.js';
+import { officerRecord, officerView, rankHistory, officerLines, officerPortrait } from '../franchise/officers.js';
 import { shopStock, buyLot, turnInCard, markShopSeen, levelUps, turnInPoints, nextLevelAt, shopTierFor, pendingLevelRewards, pendingLevelRewardReason, ECONOMY, RULES_NOTE, CAMP,
   storesOf, upgradesOf, depotCapacity, buyStores, buyUpgrade, buyTraining, buySlot, trainingOffer, rerollPreview, rerollAffix } from '../franchise/economy.js';
 import { TIER_BY_ID, STORE_ITEMS, STORE_BY_ID, VETERANCY, itemDef, conditionEffect } from '../reward/data.js';
@@ -853,14 +853,18 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
   // The art loads a moment after the screen renders (src/ui/art.js whenArt): the title and camp are usable at once.
   setTimeout(() => { if (!disposed) loadArt(); }, ART_DELAY_MS);
   /** The brigade's commander for the camp card: from the next phase on that names him (the loaded packs), else the latest
-   *  phase before it; null when no loaded phase names one (the card shows the generic silhouette). */
+   *  phase before it; null when no loaded phase names one (the card shows the generic silhouette). `portrait` is that phase's
+   *  own commander portrait (officerPortrait, as his officer card shows it first), null when the data gives none. */
   function commanderOf(b) {
     if (!b.unitId || !ladder || saved?.version !== 2 || ladder.def.id !== saved.campaign.id) return undefined;
     const all = ladder.def.phases, at = Math.min(saved.campaign.index, all.length - 1);
     const order = [...all.slice(at), ...all.slice(0, at).reverse()];
     for (const p of order) {
-      const who = titles.get(p.packId)?.phases.find((x) => x.id === p.phaseId)?.commanders?.[b.unitId];
-      if (who) return { name: who.name, rank: rankShort(who.rank) };
+      const ph = titles.get(p.packId)?.phases.find((x) => x.id === p.phaseId), who = ph?.commanders?.[b.unitId];
+      if (who) {
+        const own = ph.officers?.[b.unitId];
+        return { name: who.name, rank: rankShort(who.rank), portrait: officerPortrait(own?.portrait, own?.portraitNote) };
+      }
     }
     return null;
   }

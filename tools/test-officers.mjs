@@ -10,7 +10,9 @@
 // merit-line-after-trim), one Merit change per name per phase (one-merit-per-name), 128 names (save-bounds), and the card's
 // effect line saying exactly what the field does with Merit for HIS formation (effect-text: an infantry brigade, rallied by its
 // own commander, gains steadiness only; the wider rally radius reaches a battery, which has no commander figure; the
-// numbers are read back from src/game.js, so the old "+10 % rally radius for his brigade" promise fails it).
+// numbers are read back from src/game.js, so the old "+10 % rally radius for his brigade" promise fails it), and the card's
+// view model never yielding "null" or "undefined" as text for any commander the shipped packs or the fixture name, fed as both
+// callers feed it and with every optional field null (view-no-null; the CI card showed a stray "null").
 // `node tools/test-officers.mjs` prints OFFICERS OK (n/n); `--prove-fail` also runs one mutant per check and requires each to
 // fail that check, with the check's own name in the failure text. No browser, no GPU, writes nothing.
 import assert from 'node:assert/strict';
@@ -334,6 +336,35 @@ export const OFFICER_CHECKS = [
     const view = api.officerView({ name: SHERMAN, rank: 'Colonel', record: api.officerRecord(s, SHERMAN) });
     assert.ok(view.heading === `Colonel ${SHERMAN}` && view.merit === 3, 'no-rank-from-events: the card does not show the pack\'s rank with Merit 3');
   }],
+  ['view-no-null', (api) => {
+    const leaks = [];
+    const walk = (v, path, who) => {
+      if (typeof v === 'string') { if (/\b(?:null|undefined)\b/.test(v)) leaks.push(`${who} ${path}: "${v.slice(0, 60)}"`); }
+      else if (v === undefined || (v === null && path !== '.portrait')) leaks.push(`${who} ${path}: ${v}`);
+      else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) walk(x, `${path}.${k}`, who);
+    };
+    const s = withMerits(api, play(api, LOAN, play(api, LOAN, start(api, LOAN)).after).after, { [SHERMAN]: 2 });
+    const titles = [() => null, () => undefined, (p, ph) => `${p}: ${ph}`];
+    const inputs = [];
+    for (const [scope, scn] of [['henry-hill', HH], ...Object.entries(PACKS).flatMap(([p, phs]) => Object.entries(phs).map(([id, x]) => [`fixture ${p}/${id}`, x])),
+      ...REAL.flatMap((pack) => pack.phases.map((ph) => [`${pack.id}/${ph.id}`, preparePhase(pack, ph.id).scenario]))]) {
+      for (const d of [...scn.units, ...(scn.reinforcements || [])]) {
+        if (!d?.commander?.name) continue;
+        const c = d.commander, who = `${scope} ${d.id}`;
+        // the battle's unit card (src/ui/hud.js: raw definition fields) and the camp (src/ui/entry.js: pack-summary words)
+        inputs.push([who, { name: c.name, rank: c.rank, formation: d.name, kind: d.type, parent: d.parent, regiments: d.regiments, portrait: c.portrait, portraitNote: c.portraitNote,
+          sources: d.sources, record: d.side === 'US' ? api.officerRecord(s, c.name) : null, campaign: d.side === 'US', ranks: api.rankHistory(c.name, REAL, SHIPPED), titleOf: titles[inputs.length % 3] }]);
+        inputs.push([`${who} (camp)`, { name: c.name, rank: c.rank || '', formation: d.name || '', kind: d.type, parent: d.parent || '', regiments: d.regiments || [], portrait: c.portrait || '',
+          portraitNote: c.portraitNote || '', sources: d.sources || [], sourcesFrom: `The battle pack's sources for this formation in ${scope}.`, record: api.officerRecord(s, c.name), campaign: true }]);
+      }
+    }
+    // every optional field null, as a definition without them hands it on
+    inputs.push(['fixture all-null', { name: SHERMAN, rank: null, formation: null, kind: null, parent: null, regiments: [null, 'Test regiment (fictional)'], sources: [null], sourcesFrom: null,
+      record: api.officerRecord(s, SHERMAN), campaign: true, ranks: [], titleOf: () => null, portrait: null, portraitNote: null }]);
+    assert.ok(inputs.length > 100, `view-no-null: only ${inputs.length} commanders read from the packs and the fixture`);
+    for (const [who, input] of inputs) walk(api.officerView(input), '', who);
+    assert.deepEqual(leaks.slice(0, 6), [], `view-no-null: the officer card's view model yields null or undefined text (${leaks.length}): ${leaks.slice(0, 3).join('; ')}`);
+  }],
   ['officer-lines', (api) => {
     const p2 = play(api, LOAN, play(api, LOAN, start(api, LOAN)).after);
     assert.ok(api.officerLines(p2.after, { packs: [], ladder: api.validateCampaign(LOAN) }).includes(`${SHERMAN}: Merit 0 → 1 (game value)`), 'officer-lines: the camp does not name the Merit change');
@@ -421,6 +452,8 @@ const MUTANTS = {
   'no-rank-from-events': { applyMerit: (scn, s, o) => { const out = officers.applyMerit(scn, s, o); return { ...out, units: out.units.map((d) => (d.officer?.merit === 3 ? { ...d, commander: { ...d.commander, rank: 'Brigadier General' } } : d)) }; } },
   // the camp says nothing
   'officer-lines': { officerLines: () => [] },
+  // a missing parent line passed through as text, as the card's stray "null"
+  'view-no-null': { officerView: (i) => { const v = officers.officerView(i); return { ...v, command: { ...v.command, parent: `${i.parent}` } }; } },
 };
 
 // Unexpected (non-assertion) errors count as that check's failure, named.

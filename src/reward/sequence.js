@@ -239,8 +239,10 @@ function artPanel(itemId, { small = false } = {}) {
   return panel;
 }
 /**
- * The commander row of a brigade card: the period portrait for exactly this name, else the generic silhouette. With
- * onWho(who, trigger) and a sourced name the row is a button that opens his officer card (the camp; v4).
+ * The commander row of a brigade card, its portrait picked as the officer card picks it (openOfficerCard): the scenario's own
+ * commander portrait (who.portrait, { src, note } from src/franchise/officers.js officerPortrait) first, then the period
+ * portrait for exactly this name, else the generic silhouette; the alt text is the card's. With onWho(who, trigger) and a
+ * sourced name the row is a button that opens his officer card (the camp; v4).
  */
 function whoRow(who, onWho = null) {
   const name = who && typeof who.name === 'string' ? who.name : '';
@@ -252,6 +254,14 @@ function whoRow(who, onWho = null) {
     ...(button ? { type: 'button', 'aria-haspopup': 'dialog', title: `Officer card: ${label.textContent}` } : {}) },
   fig, el('span', { class: 'rw-bwho-text' }, label, note, button ? el('span', { class: 'rw-bwho-open', 'aria-hidden': 'true', text: 'Officer card ›' }) : null));
   if (button) row.addEventListener('click', (e) => { e.stopPropagation(); onWho(who, row); });
+  const own = name && who.portrait && typeof who.portrait.src === 'string' && who.portrait.src ? who.portrait : null;
+  if (own) {
+    fig.classList.remove('is-generic');
+    row.dataset.portrait = 'scenario';
+    fig.replaceChildren(el('img', { src: own.src, alt: portraitAlt(name, own.note), decoding: 'async', draggable: 'false' }));
+    fig.title = note.textContent = `${own.note ? `${own.note} · ` : ''}Portrait from this battle's data`;
+    return row;
+  }
   whenArt((m) => {
     const p = (name && portraitArt(name, m)) || genericPortrait(m);
     if (!p) return;
@@ -385,6 +395,8 @@ function badgeRow(b, onBadge) {
 }
 
 // ---- the officer card (v4; src/franchise/officers.js officerView builds the model) ----------------------------------------
+/** The alt text of a scenario's own commander portrait (the officer card and the camp's commander row). */
+function portraitAlt(name, note) { return `Portrait of ${name}${note ? `, ${note}` : ''}`; }
 /**
  * Open the officer card: a modal dialog (the page behind is inert; Escape or Back closes it and focus returns to `trigger`).
  * Read-only in camp and in battle. Name and rank are the pack's; Merit is labelled a game value; sources are the pack's.
@@ -414,7 +426,7 @@ export function openOfficerCard(view, { trigger = document.activeElement, onClos
     d.portraitToken = (d.portraitToken || 0) + 1; // a pending manifest answer for an earlier card no longer applies
     fig.classList.remove('is-generic');
     d.dataset.portrait = 'scenario';
-    fig.replaceChildren(el('img', { src: own.src, alt: `Portrait of ${view.name}${own.note ? `, ${own.note}` : ''}`, decoding: 'async', draggable: 'false' }));
+    fig.replaceChildren(el('img', { src: own.src, alt: portraitAlt(view.name, own.note), decoding: 'async', draggable: 'false' }));
     credit.textContent = `${view.name}${own.note ? ` (${own.note})` : ''}: the portrait this battle's data gives him.`;
   } else {
     delete d.dataset.portrait;
@@ -434,7 +446,8 @@ export function openOfficerCard(view, { trigger = document.activeElement, onClos
   const c = view.command;
   const back = el('button', { type: 'button', class: 'rw-officer-back', id: 'officer-card-back', text: 'Back' });
   back.addEventListener('click', () => d.close());
-  d.replaceChildren(
+  // replaceChildren, unlike el(), turns a null argument into the text "null": the optional sections are filtered out first
+  d.replaceChildren(...[
     el('div', { class: 'rw-officer-head' }, fig,
       el('div', { class: 'rw-officer-who' },
         el('p', { class: 'rw-officer-eyebrow', text: 'Officer card' }),
@@ -460,7 +473,7 @@ export function openOfficerCard(view, { trigger = document.activeElement, onClos
         const url = (String(s).match(/https?:\/\/\S+/) || [])[0];
         return el('li', {}, url ? el('a', { href: url, target: '_blank', rel: 'noopener noreferrer', text: s }) : s);
       })) : el('p', { class: 'rw-dim', text: 'The pack lists no sources for this formation.' })),
-    el('div', { class: 'rw-officer-actions' }, back));
+    el('div', { class: 'rw-officer-actions' }, back)].filter(Boolean));
   d.trigger = trigger; d.onDone = onClose;
   if (!d.open) d.showModal();
   d.querySelector('#officer-card-title').focus({ preventScroll: true });

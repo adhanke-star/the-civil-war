@@ -692,8 +692,11 @@ button.rw-bwho.is-button:focus-visible { outline: 2px solid var(--focus, #ffd75e
 .rw-bwho-open { font-size: 11.5px; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 
 /* ---- the officer card (v4; src/reward/sequence.js openOfficerCard): one modal dialog for the camp and the battle ------ */
-#officer-card { --rw-rule: #8b8170; --rw-dim: #d6cdbb; box-sizing: border-box; width: min(560px, calc(100vw - 24px)); max-width: none;
-  max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow: auto; padding: 20px 22px; color: #f2ead8; background: #1f1c18;
+/* Fits the viewport (90 % of its height at most, 320 px wide and up): the dialog scrolls inside itself and Back stays pinned at
+   its bottom (the Settings dialog's sticky-bar precedent, src/ui/settings-panel.css); the header is the top of the scroll. */
+#officer-card { --rw-rule: #8b8170; --rw-dim: #d6cdbb; --oc-pad-y: 20px; --oc-pad-x: 22px; box-sizing: border-box; width: min(560px, calc(100vw - 24px)); max-width: none;
+  max-height: min(90vh, calc(100vh - 24px)); max-height: min(90dvh, calc(100dvh - 24px)); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain;
+  padding: var(--oc-pad-y) var(--oc-pad-x); color: #f2ead8; background: #1f1c18;
   border: 1px solid #8b8170; border-radius: 12px; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
 #officer-card::backdrop { background: rgba(0,0,0,0.7); }
 #officer-card h2 { margin: 2px 0 4px; font-size: 21px; line-height: 1.2; overflow-wrap: anywhere; }
@@ -719,9 +722,10 @@ button.rw-bwho.is-button:focus-visible { outline: 2px solid var(--focus, #ffd75e
 .rw-officer-stars .is-on { color: #f0c24b; }
 .rw-officer-stars .is-off { color: #a39a88; }
 .rw-officer-meritlabel { font-weight: 700; }
-.rw-officer-actions { margin-top: 16px; display: flex; justify-content: flex-end; }
+.rw-officer-actions { position: sticky; bottom: calc(-1 * var(--oc-pad-y)); z-index: 1; display: flex; justify-content: flex-end;
+  margin: 16px calc(-1 * var(--oc-pad-x)) calc(-1 * var(--oc-pad-y)); padding: 10px var(--oc-pad-x) 12px; background: #1f1c18; border-top: 1px solid #4a443a; }
 .rw-officer-back { min-width: 120px; min-height: 44px; font: inherit; font-weight: 700; color: #1f1c18; background: #f2ead8; border: 1px solid #f2ead8; border-radius: 8px; cursor: pointer; }
 .rw-officer-back:focus-visible { outline: 2px solid #ffd75e; outline-offset: 2px; }
-@media (max-width: 420px) { .rw-officer-head { flex-direction: column; } #officer-card { padding: 16px; } }
+@media (max-width: 420px) { .rw-officer-head { flex-direction: column; } #officer-card { --oc-pad-y: 16px; --oc-pad-x: 16px; } }
 /* the after-action's Officers line (campaign phases) */
 .rw-officers { margin-top: 14px; }
