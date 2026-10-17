@@ -5,6 +5,7 @@ import { ratings, canCarry, equip } from '../reward/model.js';
 import { BADGE_BY_ID, TIERS, slotsFor, BARS } from './badges.js';
 import { CAMP, DIFFICULTY } from './tuning.js';
 import { reconcileLevelRewards } from './level-rewards.js';
+import { MERIT, OFFICER_LIMITS, OFFICER_EVENTS } from './officers.js';
 
 export const SAVE_KEY = 'cw.progress';
 export const PROGRESS_DB = 'cw.progress';
@@ -369,6 +370,44 @@ function trophiesRecord(v, awards) {
   });
   return { colours };
 }
+/**
+ * v2 officers (v4; src/franchise/officers.js recordOfficers writes it). `officers` maps a commander's name (as the pack gives it)
+ * to { merit, record, killed? }: Merit 0-3 (a game value), `killed: true` once he fell in play (kept apart from the rows, so
+ * trimming the oldest rows never revives his Merit), and his newest records, each { pack, phase, unit, grade, lost, from?,
+ * merit?, event? } (the pack phase, the franchise formation he led, its grade and men lost, his Merit before and after it when
+ * it changed (always together, one step apart), and wounded, killed or took-command, the last only for a successor the pack
+ * names). The contract's row { pack, phase, grade, lost, event? } plus unit/from/merit: DECISIONS.md D-v4 officers. At most
+ * 128 names and 24 records each; every row belongs to a recorded phase. Saves written before officers have no field and load
+ * with an empty map (officers.js reads a missing name as Merit 0, no record).
+ */
+export const OFFICER_FIELDS = Object.freeze(['officers']);
+function officersRecord(v, history) {
+  const keys = Object.keys(plain(v, 'officers'));
+  if (!keys.length || keys.length > OFFICER_LIMITS.names) bad('incomplete or oversized officers.');
+  const fought = new Set(history.map((r) => `${r.packId}|${r.phaseId}`)), out = {};
+  for (const name of keys.sort()) {
+    const e = v[name];
+    word(name, 'officer name', OFFICER_LIMITS.name);
+    shape(plain(e, 'officer'), ['merit', 'record'], ['killed']);
+    if (has(e, 'killed') && e.killed !== true) bad('officer killed must be true when present.');
+    const record = list(e.record, 'officer record', 1, OFFICER_LIMITS.records).map((r) => {
+      shape(plain(r, 'officer record row'), ['pack', 'phase', 'unit', 'grade', 'lost'], ['from', 'merit', 'event']);
+      const row = { pack: id(r.pack, 'pack identity'), phase: id(r.phase, 'phase identity'), unit: id(r.unit, 'officer formation identity') };
+      if (!GRADES.includes(r.grade)) bad('unknown grade in an officer record.');
+      if (!fought.has(`${row.pack}|${row.phase}`)) bad('an officer record must belong to a recorded phase.');
+      Object.assign(row, { grade: r.grade, lost: number(r.lost, 'officer men lost', 0, 100000) });
+      if (has(r, 'from') !== has(r, 'merit')) bad('an officer merit change needs both from and merit.');
+      if (has(r, 'merit')) {
+        row.from = number(r.from, 'officer merit', 0, MERIT.max); row.merit = number(r.merit, 'officer merit', 0, MERIT.max);
+        if (Math.abs(row.merit - row.from) !== 1) bad('an officer merit change must be one step.');
+      }
+      if (has(r, 'event')) { if (!OFFICER_EVENTS.includes(r.event)) bad('unknown officer event.'); row.event = r.event; }
+      return row;
+    });
+    out[name] = { merit: number(e.merit, 'officer merit', 0, MERIT.max), record, ...(e.killed === true ? { killed: true } : {}) };
+  }
+  return out;
+}
 /** A brigade's camp fields (v2), in canonical order; {} when it has none. */
 function brigadeCamp(b) {
   const out = {};
@@ -386,7 +425,7 @@ function brigadeCamp(b) {
 export function validateSnapshot(v) {
   // Version 2 is only the campaign kind; any other version-2 record is an unsupported version.
   const v2 = !!v && typeof v === 'object' && v.version === 2 && v.kind === 'campaign';
-  if (v2) shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade', 'slot', 'campaign'], ['updated', 'enemy', ...ECONOMY_FIELDS, ...CAMP_FIELDS, ...HOOK_FIELDS]);
+  if (v2) shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade', 'slot', 'campaign'], ['updated', 'enemy', ...ECONOMY_FIELDS, ...CAMP_FIELDS, ...HOOK_FIELDS, ...OFFICER_FIELDS]);
   else shape(v, ['format', 'version', 'kind', 'awardId', 'army', 'depot', 'issued', 'seed', 'grade']);
   if (v.format !== 'the-civil-war' || (!v2 && (v.version !== 1 || v.kind !== 'completed-reward'))) bad('unsupported save format or version.');
   const awardId = id(v.awardId, 'completed award identity');
@@ -463,6 +502,7 @@ export function validateSnapshot(v) {
     if (v.difficulty !== 'veteran') out.difficulty = v.difficulty;
   }
   if (v2 && has(v, 'trophies')) out.trophies = trophiesRecord(v.trophies, new Set(campaign.history.map((r) => r.awardId)));
+  if (v2 && has(v, 'officers')) out.officers = officersRecord(v.officers, campaign.history);
   if (v2 && has(v, 'updated')) {
     if (typeof v.updated !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z$/.test(v.updated)) bad('invalid update time.');
     out.updated = v.updated;

@@ -39,6 +39,10 @@
 //   Colours and camp (P5d): when `afterAction.history` carries `colours` (regiment colours the player's side took this phase) or `camp`
 //     (camp effects that reached the battle, each with the formations it touched), page a lists them after the badges,
 //     labelled: the colours are this game's result, the camp effects game rules.
+//   Officers (v4, src/franchise/officers.js): a campaign award recorded on this page (officerAward) adds an "Officers" line to page
+//     a (Merit changes such as "William B. Hazen: Merit 2 → 3", wounded, killed, took command), labelled a game value.
+//     openOfficerCard(view, { trigger, onClose }) is the officer card (a modal dialog, Escape or Back closes it) shared by the
+//     camp (brigCard's `onWho` makes a campaign card's commander row its button) and the battle's unit card (src/ui/hud.js).
 //
 // State lives in one plain object (S). Settings come from src/settings.js (defineRewardSettings below);
 // the 'screens.cardStyle' choice can be split-screened through src/sandbox/compare.js.
@@ -52,6 +56,7 @@ import { validateSnapshot, completedSnapshot } from '../franchise/save.js';
 import { assertSavedReward } from '../franchise/practice.js';
 import { BADGE_BY_ID, TIER_NAMES, featText, effectText, badgeAward, BADGE_RULES_NOTE } from '../franchise/badges.js';
 import { mountReplay } from '../ui/replay.js';
+import { officerAward, MERIT_NOTE } from '../franchise/officers.js';
 import { armArt, armIdOf, whenArt, loadArt, portraitArt, genericPortrait, portraitLine } from '../ui/art.js';
 
 const STYLE_SLUG = { 'clean modern': 'modern', 'period desk': 'desk', hybrid: 'hybrid' };
@@ -233,13 +238,20 @@ function artPanel(itemId, { small = false } = {}) {
   });
   return panel;
 }
-/** The commander row of a brigade card: the period portrait for exactly this name, else the generic silhouette. */
-function whoRow(who) {
+/**
+ * The commander row of a brigade card: the period portrait for exactly this name, else the generic silhouette. With
+ * onWho(who, trigger) and a sourced name the row is a button that opens his officer card (the camp; v4).
+ */
+function whoRow(who, onWho = null) {
   const name = who && typeof who.name === 'string' ? who.name : '';
   const fig = el('span', { class: 'rw-bportrait is-generic' });
   const label = el('span', { class: 'rw-bwho-name', text: name ? `${who.rank ? `${who.rank} ` : ''}${name}` : 'Commander not recorded' });
   const note = el('span', { class: 'rw-bwho-note' });
-  const row = el('span', { class: 'rw-bwho', 'data-commander': name || null }, fig, el('span', { class: 'rw-bwho-text' }, label, note));
+  const button = !!(onWho && name);
+  const row = el(button ? 'button' : 'span', { class: `rw-bwho${button ? ' is-button' : ''}`, 'data-commander': name || null,
+    ...(button ? { type: 'button', 'aria-haspopup': 'dialog', title: `Officer card: ${label.textContent}` } : {}) },
+  fig, el('span', { class: 'rw-bwho-text' }, label, note, button ? el('span', { class: 'rw-bwho-open', 'aria-hidden': 'true', text: 'Officer card ›' }) : null));
+  if (button) row.addEventListener('click', (e) => { e.stopPropagation(); onWho(who, row); });
   whenArt((m) => {
     const p = (name && portraitArt(name, m)) || genericPortrait(m);
     if (!p) return;
@@ -303,7 +315,7 @@ export function staticCard(inst) {
 }
 
 /** A brigade card (rating-first front). interactive: a role=button target in the issue step. */
-export function brigCard(b, i, { interactive = true, show = ratings(b), onBadge = null, who = undefined } = {}) {
+export function brigCard(b, i, { interactive = true, show = ratings(b), onBadge = null, who = undefined, onWho = null } = {}) {
   const def = itemDef(b.weapon.itemId);
   const cond = CONDITION_BY_ID[b.weapon.conditionId];
   const r = ratings(b);
@@ -333,7 +345,7 @@ export function brigCard(b, i, { interactive = true, show = ratings(b), onBadge 
     el('span', { class: 'rw-preview', 'aria-hidden': 'true' }),
     el('span', { class: 'rw-star', hidden: true }, el('span', { 'aria-hidden': 'true', text: '★ ' }), 'Best fit'),
     el('span', { class: 'rw-delta', 'aria-hidden': 'true' })),
-  who !== undefined ? whoRow(who) : null,
+  who !== undefined ? whoRow(who, interactive ? null : onWho) : null, // never a button inside a button card
   weap, bars,
   el('span', { class: 'rw-blocked', hidden: true }),
   badgeRow(b, onBadge));
@@ -370,6 +382,90 @@ function badgeRow(b, onBadge) {
   }
   if (b.offer?.length) row.append(el('span', { class: 'rw-bbadges-new', text: `${b.offer.length} new badge${b.offer.length === 1 ? '' : 's'} to place` }));
   return row;
+}
+
+// ---- the officer card (v4; src/franchise/officers.js officerView builds the model) ----------------------------------------
+/**
+ * Open the officer card: a modal dialog (the page behind is inert; Escape or Back closes it and focus returns to `trigger`).
+ * Read-only in camp and in battle. Name and rank are the pack's; Merit is labelled a game value; sources are the pack's.
+ */
+export function openOfficerCard(view, { trigger = document.activeElement, onClose = null } = {}) {
+  if (!document.querySelector('link[data-reward-css]')) {
+    document.head.append(el('link', { rel: 'stylesheet', href: new URL('./reward.css', import.meta.url).href, 'data-reward-css': true }));
+  }
+  let d = document.getElementById('officer-card');
+  if (!d) {
+    d = el('dialog', { id: 'officer-card', class: 'rw-officer', 'aria-labelledby': 'officer-card-title' });
+    d.addEventListener('close', () => {
+      const back = d.trigger, done = d.onDone;
+      d.trigger = null; d.onDone = null;
+      if (typeof done === 'function') done();
+      if (back && back.isConnected) back.focus({ preventScroll: true });
+    });
+    document.body.append(d);
+  }
+  // The portrait, as the unit card picks it (src/ui/hud.js fillPortrait): the scenario's own commander.portrait first (with its
+  // portraitNote), then the period portrait mapped to exactly his name (assets/art/manifest.json), then the generic silhouette.
+  // Alt text and the note come from that data (his name as the pack gives it, the data's own note), never written here.
+  const fig = el('span', { class: 'rw-officer-portrait is-generic' });
+  const credit = el('p', { class: 'rw-officer-credit' });
+  const own = view.portrait && view.portrait.src ? view.portrait : null;
+  if (own) {
+    d.portraitToken = (d.portraitToken || 0) + 1; // a pending manifest answer for an earlier card no longer applies
+    fig.classList.remove('is-generic');
+    d.dataset.portrait = 'scenario';
+    fig.replaceChildren(el('img', { src: own.src, alt: `Portrait of ${view.name}${own.note ? `, ${own.note}` : ''}`, decoding: 'async', draggable: 'false' }));
+    credit.textContent = `${view.name}${own.note ? ` (${own.note})` : ''}: the portrait this battle's data gives him.`;
+  } else {
+    delete d.dataset.portrait;
+    const token = d.portraitToken = (d.portraitToken || 0) + 1; // whenArt may answer now (manifest loaded) or later
+    whenArt((m) => {
+      const p = portraitArt(view.name, m) || genericPortrait(m);
+      if (!p || d.portraitToken !== token) return; // a later card replaced this one before the manifest arrived
+      fig.classList.toggle('is-generic', p.generic);
+      d.dataset.portrait = p.generic ? 'generic' : 'sourced';
+      fig.replaceChildren(el('img', { src: p.src, alt: p.generic ? '' : `Portrait of ${view.name}`, decoding: 'async', draggable: 'false' }));
+      credit.textContent = p.generic ? `${p.caption || 'Generic officer silhouette'}: no sourced portrait of ${view.name}.` : portraitLine(p);
+    });
+  }
+  const h3 = (id, text, tag) => el('h3', { id, class: 'rw-officer-h' }, text, tag ? el('span', { class: 'rw-rule-tag', text: tag }) : null);
+  const stars = el('p', { class: 'rw-officer-stars', role: 'img', 'aria-label': view.meritLabel, 'data-merit': String(view.merit) },
+    ...[1, 2, 3].map((n) => el('span', { class: n <= view.merit ? 'is-on' : 'is-off', 'aria-hidden': 'true', text: n <= view.merit ? '★' : '☆' })));
+  const c = view.command;
+  const back = el('button', { type: 'button', class: 'rw-officer-back', id: 'officer-card-back', text: 'Back' });
+  back.addEventListener('click', () => d.close());
+  d.replaceChildren(
+    el('div', { class: 'rw-officer-head' }, fig,
+      el('div', { class: 'rw-officer-who' },
+        el('p', { class: 'rw-officer-eyebrow', text: 'Officer card' }),
+        el('h2', { id: 'officer-card-title', tabindex: '-1', text: view.heading }),
+        el('p', { class: 'rw-officer-rank-note', text: view.rank ? 'Rank and name as the battle pack gives them.' : 'Name as the battle pack gives it; no rank is given.' }),
+        credit)),
+    el('section', { class: 'rw-officer-sec', 'aria-labelledby': 'officer-card-command' }, h3('officer-card-command', 'Command'),
+      el('p', { class: 'rw-officer-formation', text: c.formation || 'Formation not recorded' }),
+      c.parent ? el('p', { class: 'rw-dim', text: c.parent }) : null,
+      c.regiments.length ? el('ul', { class: 'rw-officer-regs', 'aria-label': 'Regiments' }, ...c.regiments.map((r) => el('li', { text: r }))) : null),
+    view.ranks.length ? el('section', { class: 'rw-officer-sec', 'aria-labelledby': 'officer-card-ranks' }, h3('officer-card-ranks', 'Ranks as sourced'),
+      el('ul', { class: 'rw-officer-ranks' }, ...view.ranks.map((r) => el('li', { 'data-rank': r.rank }, el('b', { text: r.rank }), ` · ${r.phases.join('; ')}`)))) : null,
+    el('section', { class: 'rw-officer-sec', 'aria-labelledby': 'officer-card-record' }, h3('officer-card-record', 'Campaign record'),
+      view.record.length ? el('ol', { class: 'rw-officer-record' }, ...view.record.map((r) => el('li', {}, r.text, r.event ? el('span', { class: 'rw-officer-event', text: ` · ${r.event}` }) : null)))
+        : el('p', { class: 'rw-dim', text: view.campaign ? 'No phase commanded with your army yet.' : 'Campaign records belong to your campaign army.' })),
+    el('section', { class: 'rw-officer-sec rw-officer-merit', 'aria-labelledby': 'officer-card-merit' }, h3('officer-card-merit', 'Merit', 'Game value'),
+      el('div', { class: 'rw-officer-meritrow' }, stars, el('span', { class: 'rw-officer-meritlabel', text: view.meritLabel })),
+      el('p', { class: 'rw-officer-meritnote', text: `${view.meritNote}.` }),
+      el('p', { class: 'rw-officer-effect', text: view.effect })),
+    el('section', { class: 'rw-officer-sec', 'aria-labelledby': 'officer-card-sources' }, h3('officer-card-sources', 'Sources'),
+      view.sourcesFrom ? el('p', { class: 'rw-dim', text: view.sourcesFrom }) : null,
+      view.sources.length ? el('ul', { class: 'rw-officer-sources' }, ...view.sources.map((s) => {
+        const url = (String(s).match(/https?:\/\/\S+/) || [])[0];
+        return el('li', {}, url ? el('a', { href: url, target: '_blank', rel: 'noopener noreferrer', text: s }) : s);
+      })) : el('p', { class: 'rw-dim', text: 'The pack lists no sources for this formation.' })),
+    el('div', { class: 'rw-officer-actions' }, back));
+  d.trigger = trigger; d.onDone = onClose;
+  if (!d.open) d.showModal();
+  d.querySelector('#officer-card-title').focus({ preventScroll: true });
+  d.scrollTop = 0;
+  return d;
 }
 
 let xfactorSting = () => sfx.play('sting', { level: 'full' });
@@ -621,6 +717,7 @@ export function mountReward(root, opts = {}) {
       story ? vsBlock(vsHistory) : null,
       pointsBlock(opts.afterAction?.points),
       badgesBlock(award),
+      opts.afterAction && S.awardId ? officersBlock(officerAward(S.awardId)) : null,
       hooksBlock(vsHistory),
       noLoot ? null : el('div', { class: 'rw-aar-stats' },
         el('p', { class: 'rw-aar-stat' }, el('b', { text: String(S.captures.length) }), el('span', { text: 'Captures' })),
@@ -689,6 +786,17 @@ export function mountReward(root, opts = {}) {
     } catch (err) { box.append(el('p', { class: 'rw-dim', text: `The replay could not be drawn (${err.message}).` })); }
     sec.querySelector('#rw-replay-title').focus({ preventScroll: true });
     announce('Map replay of the phase.');
+  }
+
+  // ---- officers (campaign phases, v4): Merit changes and field events this phase; Merit is a game value ----
+  function officersBlock(o) {
+    if (!o) return null;
+    const words = { wounded: 'wounded', killed: 'killed', 'took-command': 'took command as the successor the battle pack names' };
+    const lines = [...o.changes.map((c) => `${c.name}: Merit ${c.from} → ${c.to}`), ...o.events.map((e) => `${e.name}: ${words[e.event] || e.event}`)];
+    return el('section', { class: 'rw-officers', 'aria-labelledby': 'rw-officers-title' },
+      el('h2', { class: 'rw-points-title', id: 'rw-officers-title' }, 'Officers', el('span', { class: 'rw-rule-tag', text: 'Game value' })),
+      el('p', { class: 'rw-hint rw-officers-line', text: `${lines.join(' · ')}.` }),
+      el('p', { class: 'rw-dim', text: `${MERIT_NOTE}; ranks change only where a later battle pack gives a new one. Open a commander on his brigade card in camp.` }));
   }
 
   // ---- badges earned this phase (campaign phases; feats and effects are game rules) ----

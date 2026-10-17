@@ -38,7 +38,14 @@
 // when a save first reaches that phase (a new campaign reaching its first phase, or recordPhase advancing to it; never
 // a replay). Appending is idempotent by unitId, so a formation already in the army (alive or destroyed) is never added
 // twice. unitIds are unique across the franchise and every phase's joins; a loan phase cannot carry joins.
+//
+// Officers (v4; src/franchise/officers.js, game rules there): a result may carry `officers` (phaseResult: who led each Union
+// formation, as the pack names him, and whether it ended broken or surrendered and he was wounded or killed); recordPhase
+// keeps each franchise commander's record and Merit (0-3, a game value; the veterancy tier-up gate for +1) and notes the
+// changes for the after-action (officerAward). applyCampaign gives each fielded franchise brigade its commander's Merit
+// (applyMerit: a wider rally radius and steadier morale, campaign play only). Rank text is never changed by either.
 import { validateSnapshot, colourKey, TROPHY_LIMITS } from './save.js';
+import { applyMerit, recordOfficers, noteOfficers, officerRows, validateOfficerRows } from './officers.js';
 import { phaseOutcome, vetBase } from './practice.js';
 import { ARMS, UNIQUES, VETERANCY, GRADES, itemDef } from '../reward/data.js';
 import { awardPhase, upgradesOf } from './economy.js';
@@ -250,7 +257,7 @@ export function applyCampaign(scenario, save, phase) {
   if (Array.isArray(out.commandChain)) out.commandChain = out.commandChain
     .map(c => ({ ...c, units: c.units.filter(id => present.has(id)) })).filter(c => c.units.length);
   out.difficulty = campaignDifficulty(s); // the campaign's level, so the page's ?difficulty= never overrides it (src/game.js)
-  return out;
+  return applyMerit(out, s, { loan }); // officers' Merit (game rule): franchise brigades off loan only
 }
 
 /**
@@ -259,7 +266,7 @@ export function applyCampaign(scenario, save, phase) {
  */
 export function recordPhase(save, campaign, result) {
   const c = validateCampaign(campaign), s = campaignSave(save, c);
-  shape(result, ['packId', 'phaseId', 'winner', 'grade', 'units', 'loot'], ['awardId', 'at', 'held', 'feats', 'colours'], 'phase result');
+  shape(result, ['packId', 'phaseId', 'winner', 'grade', 'units', 'loot'], ['awardId', 'at', 'held', 'feats', 'colours', 'officers'], 'phase result');
   if (has(result, 'held') && typeof result.held !== 'boolean') fail('held must be true or false when present.');
   const history = s.campaign.history, last = history[history.length - 1];
   if (has(result, 'awardId') && last && result.awardId === s.awardId && last.awardId === s.awardId && same(last, result.packId, result.phaseId)) return s;
@@ -288,6 +295,9 @@ export function recordPhase(save, campaign, result) {
   let feats = {};
   try { if (has(result, 'feats')) feats = validateFeats(result.feats, units); }
   catch (err) { fail(String(err.message).replace(/^Badges: /, '')); }
+  let officers = [];
+  try { if (has(result, 'officers')) officers = validateOfficerRows(result.officers, ids); }
+  catch (err) { fail(String(err.message).replace(/^Officers: /, '')); }
   if (!Array.isArray(result.loot) || result.loot.some((it) => !it || typeof it.uid !== 'string' || !it.uid.startsWith(`${awardId}.`))) fail('loot does not belong to this award.');
   // Captured colours (P5d): each names a formation of this result; kept once per formation, regiment and pack phase.
   const colours = has(result, 'colours') ? result.colours : [];
@@ -339,8 +349,11 @@ export function recordPhase(save, campaign, result) {
   }
   // Badges for this award (every brigade re-fitted to its slots too); then the whole save is validated.
   const badges = awardBadges(draft, { awardId, feats, loan });
-  const next = validateSnapshot(badges.save);
+  // Officers' records and Merit for this award (game rules in officers.js; nothing on a loan phase).
+  const led = recordOfficers(badges.save, { awardId, packId: entry.packId, phaseId: entry.phaseId, grade: result.grade, units, officers, loan, battleEnd, replay });
+  const next = validateSnapshot(led.save);
   noteAward(badges.summary);
+  noteOfficers(led.summary);
   // Requisition points for this award (paid once; a loan phase pays half; a replay pays only its improvement).
   return awardPhase(next, { awardId, grade: result.grade, held: result.held === true, lossesUS: losses.US, lossesCS: losses.CS, loan });
 }
@@ -349,10 +362,12 @@ export function recordPhase(save, campaign, result) {
 export function phaseResult({ phase, game, scenario }) {
   if (!phase || typeof phase.awardId !== 'string') fail('a phase result needs the launched phase.');
   const outcome = phaseOutcome({ game, scenario, awardId: phase.awardId, seed: phase.seed });
+  const officers = phase.loan ? [] : officerRows({ game, scenario }); // who led each Union formation, from the pack's names
   return { outcome, record: { packId: phase.packId, phaseId: phase.phaseId, awardId: phase.awardId, winner: outcome.winner,
     grade: outcome.grade, held: outcome.held === true, units: outcome.units.map((u) => ({ ...u })), loot: outcome.cards.map((c) => ({ ...c })),
     ...(outcome.feats ? { feats: Object.fromEntries(Object.entries(outcome.feats).map(([id, f]) => [id, { ...f }])) } : {}),
-    ...(outcome.colours?.length ? { colours: outcome.colours.map((r) => ({ unitId: r.unitId, regiment: r.regiment, side: r.side, by: r.by })) } : {}) } };
+    ...(outcome.colours?.length ? { colours: outcome.colours.map((r) => ({ unitId: r.unitId, regiment: r.regiment, side: r.side, by: r.by })) } : {}),
+    ...(officers.length ? { officers } : {}) } };
 }
 
 /**

@@ -685,3 +685,43 @@ button.cw-badge:focus-visible { outline: 3px solid var(--rw-focus, #ffd27a); out
 .rw-bwho-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .rw-bwho-name { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
 .rw-bwho-note { font-size: 11.5px; line-height: 1.3; color: var(--rw-card-dim); overflow-wrap: anywhere; }
+/* the commander row as the officer card's button (camp, v4): the same row, with a visible affordance and focus ring */
+button.rw-bwho.is-button { font: inherit; color: inherit; text-align: left; background: none; border: 1px solid transparent; border-radius: 6px; padding: 3px 4px; margin: -4px -5px; cursor: pointer; min-height: 44px; }
+button.rw-bwho.is-button:hover { border-color: var(--rw-card-dim, #9a917f); }
+button.rw-bwho.is-button:focus-visible { outline: 2px solid var(--focus, #ffd75e); outline-offset: 2px; }
+.rw-bwho-open { font-size: 11.5px; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+
+/* ---- the officer card (v4; src/reward/sequence.js openOfficerCard): one modal dialog for the camp and the battle ------ */
+#officer-card { --rw-rule: #8b8170; --rw-dim: #d6cdbb; box-sizing: border-box; width: min(560px, calc(100vw - 24px)); max-width: none;
+  max-height: calc(100vh - 24px); max-height: calc(100dvh - 24px); overflow: auto; padding: 20px 22px; color: #f2ead8; background: #1f1c18;
+  border: 1px solid #8b8170; border-radius: 12px; font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
+#officer-card::backdrop { background: rgba(0,0,0,0.7); }
+#officer-card h2 { margin: 2px 0 4px; font-size: 21px; line-height: 1.2; overflow-wrap: anywhere; }
+#officer-card h2:focus { outline: none; }
+#officer-card h2:focus-visible { outline: 2px solid #ffd75e; outline-offset: 2px; }
+#officer-card p { margin: 4px 0; overflow-wrap: anywhere; }
+#officer-card .rw-dim { color: #d6cdbb; font-size: 13px; }
+#officer-card a { color: #f2ead8; overflow-wrap: anywhere; }
+.rw-officer-head { display: flex; gap: 14px; align-items: flex-start; }
+.rw-officer-portrait { flex: none; width: 88px; height: 110px; overflow: hidden; border-radius: 6px; background: #2a2218; box-shadow: 0 0 0 1px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.4); }
+.rw-officer-portrait img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.rw-officer-who { min-width: 0; }
+.rw-officer-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #d6cdbb; }
+.rw-officer-rank-note, .rw-officer-credit { font-size: 12.5px; color: #d6cdbb; }
+.rw-officer-sec { margin-top: 14px; border-top: 1px solid #4a443a; padding-top: 8px; }
+.rw-officer-h { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 6px; font-size: 15px; }
+.rw-officer-formation { font-weight: 700; }
+.rw-officer-regs, .rw-officer-ranks, .rw-officer-record, .rw-officer-sources { margin: 4px 0 0; padding-left: 20px; }
+.rw-officer-sources li { font-size: 13px; margin: 3px 0; }
+.rw-officer-event { font-weight: 700; }
+.rw-officer-meritrow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.rw-officer-stars { margin: 0; font-size: 24px; line-height: 1; letter-spacing: 2px; }
+.rw-officer-stars .is-on { color: #f0c24b; }
+.rw-officer-stars .is-off { color: #a39a88; }
+.rw-officer-meritlabel { font-weight: 700; }
+.rw-officer-actions { margin-top: 16px; display: flex; justify-content: flex-end; }
+.rw-officer-back { min-width: 120px; min-height: 44px; font: inherit; font-weight: 700; color: #1f1c18; background: #f2ead8; border: 1px solid #f2ead8; border-radius: 8px; cursor: pointer; }
+.rw-officer-back:focus-visible { outline: 2px solid #ffd75e; outline-offset: 2px; }
+@media (max-width: 420px) { .rw-officer-head { flex-direction: column; } #officer-card { padding: 16px; } }
+/* the after-action's Officers line (campaign phases) */
+.rw-officers { margin-top: 14px; }

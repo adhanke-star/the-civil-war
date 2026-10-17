@@ -1,5 +1,23 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0281 — v4 officers: no inferred "took command"; save row shape; 128 names; wounded ends Merit in battle (2026-10-17)
+
+A verifier refuted the first v4 diff. (1) Law: "Took command at <phase>" was inferred whenever a later phase put a new name
+on the same brigade (13 names in the shipped ladder, e.g. Grose at the Round Forest, who very likely led it earlier). A pack
+says who led a brigade then, not when he took over, so that event is gone; "took command" now comes only from a successor
+the pack itself names (`commander.successor`, none shipped yet). (2) Save shape beyond the contract's row
+{ pack, phase, grade, lost, event? }: rows also carry `unit` (the franchise formation) and `from`/`merit` (his Merit before
+and after, only where it changed, so the camp's "Merit a → b" survives trimming); the entry carries `killed: true` once he
+falls, so trimming to the newest 24 rows never revives a fallen commander's Merit. (3) The name bound is 128, not 64: the
+shipped ladder already names 63; names dropped past it are counted in the record summary. (4) One Merit change per name per
+phase (-1 if any of his formations broke or surrendered, else +1 if any met the gate). (5) In battle, Merit stops applying
+when the brigade's own commander is wounded as well as killed (he is carried off; contract named only death); only killed
+ends it for later battles. Fable accepted these and three more after a second read: (6) the battle unit card's existing commander line IS the opener (one line, no
+second row; the opener is absent once he has fallen, so a fallen man's card opens only in camp); (7) the officer card uses the
+scenario's own sourced portrait first, then the name mapping, then the silhouette; (8) the card says exactly what Merit does for
+that kind of formation: steadiness +2 % per Merit for a brigade with its own commander; the wider general's rally (+10 % per Merit)
+reaches only batteries, which have no commander figure. Tests: tools/test-officers.mjs (19 checks, each with a mutant).
+
 ## 0279 — v3 released; 0278 gets a one-shot reload; v4 is Officers (Aaron, 2026-10-17)
 
 v3 = tag v3 at 2ef47e9 (CI 39001389623 all 9 green, Pages 39003033964 green, Release "v3 — Sandbox battle" is Latest).

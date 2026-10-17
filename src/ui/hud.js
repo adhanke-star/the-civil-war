@@ -21,6 +21,11 @@
 // (src/ui/input.js) open the panel (quality, volumes, gore, X-Factor effects); the help sheet lists the key.
 // Portraits (P6b, src/ui/art.js): the unit card shows the commander's period portrait when one is sourced for exactly his
 // name (assets/art/manifest.json), the generic silhouette otherwise; a scenario's own commander.portrait still comes first.
+// Officers (v4): for the player's formation with a commander the pack names (and while he is up), the card's existing name
+// line is itself the opener: #uc-name sits inside one button (#uc-officer, "Officer card: <Rank Name>", a 44 px target
+// without a taller row) that opens his officer card read-only (src/reward/sequence.js openOfficerCard; the battle runs on,
+// Escape or Back closes it): his campaign record and Merit (a game value) when the campaign put them on the definition, the
+// pack's ranks and sources. Any other selection shows the same line as plain text; no second commander line exists.
 // Feedback readability (DECISIONS 0109): the event feed and toasts sit on the field without a box (a translucent backing
 // behind each row's text only, a text shadow); the feed shows its 3 newest rows and scrolls to the newest (older ones
 // scroll up out of view, still reachable by keyboard, wheel and touch); toasts keep at most 3, below the objective line.
@@ -37,7 +42,9 @@ import { Minimap } from './minimap.js';
 import { BADGE_BY_ID, TIER_NAMES, campEffectLines } from '../franchise/badges.js';
 import { openSettings } from './settings-panel.js';
 import { loadArt, portraitArt, genericPortrait, portraitLine } from './art.js';
-import { loadTraits, formationTraits, formationTraitEntries, traitRuleLine, traitDetails, commanderTitle } from './briefing.js';
+import { loadTraits, formationTraits, formationTraitEntries, traitRuleLine, traitDetails, commanderTitle, loadCampaign, loadPackSummary } from './briefing.js';
+import { openOfficerCard } from '../reward/sequence.js';
+import { officerView, rankHistory } from '../franchise/officers.js';
 
 const $ = (id) => document.getElementById(id);
 const _v = new THREE.Vector3();
@@ -193,7 +200,7 @@ function commandText(u, game) {
   const d = u.commandDown;
   if (d) return `Commander down: ${titled(d.rank, d.name)} ${d.kind}.`;
   const g = game && game.generalsOver ? game.generalsOver(u) : [];
-  if (g.length) return `Rallied by ${rankShort(g[0].rank)} ${g[0].name} (within 300 m): faster rally, steadier morale.`;
+  if (g.length) return `Rallied by ${rankShort(g[0].rank)} ${g[0].name} (within ${Math.round(game.rallyRadius ? game.rallyRadius(u) : 300)} m): faster rally, steadier morale.`;
   return '';
 }
 const STATE_WORD = { steady: 'Steady', shaken: 'Shaken', wavering: 'Wavering', routing: 'Routing' };
@@ -419,6 +426,65 @@ export class Hud {
     return d;
   }
 
+  /**
+   * The card's name line as the officer card's opener (v4): for the player's formation with a commander the pack names, while
+   * he is up, #uc-name is wrapped in the one button #uc-officer; otherwise #uc-name stands in the line as plain text. The line's
+   * text is never duplicated (updateCard keeps writing #uc-name). Called on selection and on every card refresh.
+   */
+  fillOfficer(u) {
+    const ob = this.officerButton, name = $('uc-name');
+    if (!ob || !name) return;
+    const c = u && u.commander, show = !!(c && c.name && u.side === this.playerSide && !u.commandDown);
+    if (!show) {
+      if (ob.isConnected) {
+        const had = ob.contains(document.activeElement);
+        ob.replaceWith(name);
+        if (had) $('unitcard')?.focus({ preventScroll: true }); // the opener went away under focus: stay on the card
+      }
+      return;
+    }
+    if (name.parentElement !== ob) { name.replaceWith(ob); ob.append(name); }
+    const label = `Officer card: ${commanderLine(u)}`;
+    if (ob.getAttribute('aria-label') !== label) ob.setAttribute('aria-label', label);
+  }
+
+  /** Pack summaries in ladder order for the officer card's phase titles and sourced ranks (loaded once; empty on failure). */
+  officerPacks() {
+    if (!this.officerPacksP) this.officerPacksP = loadCampaign().then(async (l) => {
+      if (!l) return { ladder: null, packs: [] };
+      const ids = [...new Set(l.def.phases.map((p) => p.packId))];
+      return { ladder: l.def, packs: (await Promise.all(ids.map((id) => loadPackSummary(id).catch(() => null)))).filter(Boolean) };
+    }).catch(() => ({ ladder: null, packs: [] }));
+    return this.officerPacksP;
+  }
+
+  /**
+   * The selected formation's officer card, read-only: name and rank from its definition (the pack's), its campaign record
+   * and Merit when the campaign put them on the definition (src/franchise/officers.js applyMerit), the pack's sources. The
+   * battle runs on (no pause); Escape or Back closes the card and focus returns to the commander line.
+   */
+  async openOfficer(trigger = document.activeElement) {
+    const u = this.selected, c = u && u.commander;
+    if (!u || !c || !c.name || u.side !== this.playerSide) return null;
+    const { ladder, packs } = await this.officerPacks();
+    if (this.selected !== u) return null; // the selection moved while the titles loaded
+    const titleOf = (packId, phaseId) => {
+      const p = packs.find((x) => x.packId === packId), ph = p?.phases.find((x) => x.id === phaseId);
+      return ph ? `${p.title}: ${ph.title}` : null;
+    };
+    const s = this.game?.scenario, officer = u.def && u.def.officer ? u.def.officer : null;
+    const view = officerView({ name: c.name, rank: c.rank || '', formation: u.name, kind: u.type, parent: u.parent, regiments: u.regiments,
+      portrait: c.portrait || '', portraitNote: c.portraitNote || '',
+      sources: Array.isArray(u.def?.sources) ? u.def.sources : [], record: officer, campaign: !!officer, ranks: rankHistory(c.name, packs, ladder), titleOf,
+      sourcesFrom: `The battle pack's sources for this formation${s && s.title ? ` in ${s.title}` : ''}.` });
+    this.closeDelegate(null, false);
+    this.rts?.keys.clear();
+    if (this.rts) this.rts.inertia = null;
+    return openOfficerCard(view, { trigger, onClose: () => {
+      if (!(trigger && trigger.isConnected && trigger.getClientRects().length)) this.canvas?.focus({ preventScroll: true });
+    } });
+  }
+
   /** The enemy flag tooltip's words for its commanders' traits ('' without). */
   traitTip(u) {
     const t = this.unitTraits(u);
@@ -469,6 +535,12 @@ export class Hud {
       regs.setAttribute('aria-label', 'Regiments of this brigade (they move with it; order the brigade)');
       const before = body.querySelector('.ucdelegate');
       body.insertBefore(line, before); body.insertBefore(regs, before);
+      // The name line's opener (v4): one button that wraps #uc-name while it applies (fillOfficer); kept detached otherwise.
+      const ob = document.createElement('button');
+      ob.type = 'button'; ob.id = 'uc-officer'; ob.setAttribute('aria-haspopup', 'dialog');
+      ob.title = 'His officer card: rank and name as the pack gives them, his campaign record and Merit (a game value), sources (Esc or Back closes it)';
+      ob.addEventListener('click', (e) => { this.openOfficer(e.currentTarget); });
+      this.officerButton = ob;
     }
     const tip = document.createElement('div');
     tip.id = 'regiment-tip'; tip.setAttribute('role', 'tooltip'); tip.hidden = true;
@@ -745,6 +817,7 @@ export class Hud {
     this.fillRegiments(u);
     this.fillBadges(u);
     this.fillTraits(u);
+    this.fillOfficer(u);
     this.hideRegimentTip('card');
     if (!u) {
       this.updateOrders();
@@ -821,6 +894,7 @@ export class Hud {
     $('uc-cas').textContent = String(Math.round(u.casualties));
     const name = `${cardWho(u)} — ${u.parent || u.name}${this.cardMore || ''}`;
     if ($('uc-name').textContent !== name) $('uc-name').textContent = name;
+    this.fillOfficer(u); // the opener goes when his commander falls (the line then names the next in command)
     $('uc-portrait').classList.toggle('down', !!u.commandDown);
     const line = $('uc-command');
     if (line) {

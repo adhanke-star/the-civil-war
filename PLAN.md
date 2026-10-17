@@ -25,8 +25,9 @@ Game rules (named as such in code and on the card)
 - Merit: per commander name, per franchise save, 0–3. +1 when his brigade ends a battle's last phase at Victory or better with at
   least half its men (same gate as the veterancy tier-up rule in src/franchise/campaign.js:15); −1 when it ends the phase broken
   or surrendered; never below 0 or above 3. The loaned Shiloh day-1 army earns nothing (as for veterancy).
-- Effects: rally radius +10 % per Merit (src/game.js command radius 300 m) and steadiness +2 % per Merit (the morale factor
-  commandFactor uses), applied only to franchise brigades in campaign play, never in Battles, sandbox or practice.
+- Effects: steadiness +2 % per Merit (the morale factor commandFactor uses) for a brigade with its own commander; the general's
+  rally radius +10 % per Merit reaches only batteries (no commander figure); campaign play only, never Battles, sandbox or
+  practice (amended 2026-10-17, Decision 0281 (8)).
 - A commander who dies in play (field event killed) keeps his record; his Merit stays with the name and no longer applies.
 - No rank ever changes from game events. Sourced rank changes are read from pack data only.
 

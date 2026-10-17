@@ -21,6 +21,9 @@
 // and starts the campaign at the chosen level; the camp names the campaign's level; the Battles list has its own choice,
 // carried on each phase link as ?difficulty= (none for Veteran). The trophy shelf also lists the regiment colours the army
 // took (save `trophies.colours`), and the camp's notes say where camp orders, training, shortages and pioneers reach the battle.
+// Officers (v4, src/franchise/officers.js): a campaign brigade card's commander row is a button that opens his officer card
+// (src/reward/sequence.js openOfficerCard: rank and name as the pack gives them, record, Merit as a game value, sources); the
+// campaign strip's "Officers" line names the last phase's Merit changes and any sourced rank change the next phase brings.
 // Sandbox battle (src/sim/sandbox-battle.js): below the battle sections, a field, a Union and a Confederate roster (from the pack
 // summaries) and the attacker; the Battles list's Command and Difficulty apply; the Fight link's address follows every change.
 import { createProgressStore, parseSnapshot, exportSnapshot, exchangeDepot, listSlots, MAX_SAVE_BYTES } from '../franchise/save.js';
@@ -32,7 +35,8 @@ import { loadArt, backdropArt, whenArt } from './art.js';
 import { ORDERS, orderName, orderText, setOrder, breakCamp, campReport, supplyNeed, CAMP_RULES_NOTE, BATTLE_NOTE, shortText } from '../franchise/camp-orders.js';
 import { cardsFor, recorded, optionOpen, chooseDecision, historyOf, effectText as decisionEffect, DECISIONS_NOTE } from '../franchise/decisions.js';
 import { get } from '../settings.js';
-import { brigCard, staticCard, itemLabel, defineRewardSettings, levelUpMoment, badgeChip } from '../reward/sequence.js';
+import { brigCard, staticCard, itemLabel, defineRewardSettings, levelUpMoment, badgeChip, openOfficerCard } from '../reward/sequence.js';
+import { officerRecord, officerView, rankHistory, officerLines } from '../franchise/officers.js';
 import { shopStock, buyLot, turnInCard, markShopSeen, levelUps, turnInPoints, nextLevelAt, shopTierFor, pendingLevelRewards, pendingLevelRewardReason, ECONOMY, RULES_NOTE, CAMP,
   storesOf, upgradesOf, depotCapacity, buyStores, buyUpgrade, buyTraining, buySlot, trainingOffer, rerollPreview, rerollAffix } from '../franchise/economy.js';
 import { TIER_BY_ID, STORE_ITEMS, STORE_BY_ID, VETERANCY, itemDef, conditionEffect } from '../reward/data.js';
@@ -123,6 +127,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
           <div class="entry-field-actions"><a id="camp-next" class="entry-primary" href="./">Next</a><a id="camp-replay" class="entry-secondary" href="./" hidden>Replay</a></div>
           <p id="camp-march-status" role="status" tabindex="-1"></p>
           <div id="camp-decisions" hidden><h3 id="camp-decisions-heading">Decisions for the next phase</h3><ul id="camp-decisions-list" aria-labelledby="camp-decisions-heading"></ul></div>
+          <p id="camp-officers" hidden></p>
           <h3 id="camp-record-heading">Record so far</h3><p id="camp-record-empty">No phase fought yet.</p><ol id="camp-record" aria-labelledby="camp-record-heading"></ol>
         </section>
         <section id="camp-orders" aria-labelledby="camp-orders-heading" hidden>
@@ -281,6 +286,10 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     node('camp-difficulty').textContent = `Difficulty: ${difficultyName(level)}. ${DIFFICULTY_TEXT[level]} ${DIFFICULTY_NOTE}`;
     node('camp-difficulty').dataset.difficulty = level;
     renderDecisionStrip(known && !complete ? ladder.def.phases[c.index] : null);
+    // Officers (v4): the last phase's Merit changes and any sourced rank change the next phase's pack gives (officers.js).
+    const officers = known ? officerLines(saved, { packs: ladderPacks(), ladder: ladder.def }) : [];
+    node('camp-officers').hidden = !officers.length;
+    node('camp-officers').textContent = officers.length ? `Officers: ${officers.join(' · ')}.` : '';
     node('camp-record-empty').hidden = c.history.length > 0; node('camp-record').hidden = !c.history.length;
     node('camp-record').replaceChildren(...c.history.map((r) => {
       const li = document.createElement('li'); li.dataset.grade = r.grade; if (r.replay) li.dataset.replay = 'true';
@@ -855,6 +864,31 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
     }
     return null;
   }
+  // ---- officers (v4; src/franchise/officers.js): the officer card from a campaign brigade card's commander row ----
+  /** The loaded pack summaries of the ladder, in ladder order (the camp loads them for titles). */
+  const ladderPacks = () => (ladder ? [...new Set(ladder.def.phases.map((p) => p.packId))].map((id) => titles.get(id)).filter(Boolean) : []);
+  /** The pack's commander entry for a brigade, as commanderOf picks the phase (next phase that names him, else the latest). */
+  function commanderEntry(b) {
+    if (!b.unitId || !ladder || saved?.version !== 2 || ladder.def.id !== saved.campaign.id) return null;
+    const all = ladder.def.phases, at = Math.min(saved.campaign.index, all.length - 1);
+    for (const p of [...all.slice(at), ...all.slice(0, at).reverse()]) {
+      const ph = titles.get(p.packId)?.phases.find((x) => x.id === p.phaseId), who = ph?.commanders?.[b.unitId];
+      if (who) return { ...who, ...(ph.officers?.[b.unitId] || {}), packId: p.packId, phaseId: p.phaseId };
+    }
+    return null;
+  }
+  function openOfficer(b, trigger) {
+    const who = commanderEntry(b);
+    if (!who) return;
+    const view = officerView({ name: who.name, rank: who.rank, formation: who.formation || b.label, kind: b.kind, parent: who.parent || '', regiments: who.regiments || [],
+      portrait: who.portrait || '', portraitNote: who.portraitNote || '',
+      sources: who.sources || [], sourcesFrom: `The battle pack's sources for this formation in ${titleOf(who.packId, who.phaseId)}.`,
+      record: officerRecord(saved, who.name), campaign: true, ranks: rankHistory(who.name, ladderPacks(), ladder.def), titleOf: (p, ph) => {
+        const sum = titles.get(p), x = sum?.phases.find((y) => y.id === ph);
+        return x ? `${sum.title}: ${x.title}` : null;
+      } });
+    openOfficerCard(view, { trigger });
+  }
   const SHELF_CAP = 12;
   const ICONS = {
     gun: '<svg viewBox="0 0 32 20" class="camp-trophy-icon"><circle cx="11" cy="13" r="6" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 9 L30 4 L31 7 L10 12 Z M2 18 L11 13" fill="currentColor" stroke="currentColor" stroke-width="2"/></svg>',
@@ -923,7 +957,8 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
       paged(saved.army, node('camp-army'), node('army-pages'), (b, i) => {
         const v2 = saved.version === 2;
         const who = v2 ? commanderOf(b) : undefined;
-        const card = brigCard(b, i, { interactive: false, onBadge: v2 ? (x, br, chip) => openBadge(x, br, chip) : null, ...(who !== undefined ? { who } : {}) }); card.dataset.brigadeId = b.id;
+        const card = brigCard(b, i, { interactive: false, onBadge: v2 ? (x, br, chip) => openBadge(x, br, chip) : null, ...(who !== undefined ? { who } : {}),
+          onWho: v2 ? (w, trigger) => openOfficer(b, trigger) : null }); card.dataset.brigadeId = b.id;
         if (v2 && b.offer?.length) {
           const choose = document.createElement('button'); choose.type = 'button'; choose.className = 'camp-choose-button';
           choose.textContent = 'Choose badges to keep'; choose.setAttribute('aria-label', `Choose which badges ${b.label} keeps`);

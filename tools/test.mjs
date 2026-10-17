@@ -46,6 +46,8 @@
 // (tools/test-campaign-ui.mjs, also in shard 2).
 // `node tools/test.mjs --economy` runs the requisition points count-up, the level-up moment and the camp Requisition drawer
 // only (tools/test-economy-ui.mjs, also in shard 2): buy and turn-in with confirm, each level shown once, axe and 320 px.
+// `node tools/test.mjs --officers` runs the officer card only (tools/test-officers-ui.mjs, also in shard 2): from a camp brigade
+// card and from a battle unit card, "Rank Name" as the pack gives it, Merit labelled a game value, Escape closes it, axe.
 // `node tools/test.mjs --badges` runs the badges and X-Factor screens only (tools/test-badges-ui.mjs, also in shard 2): the badge
 // stamped in the after-action, the X-Factor moment once, the camp card emblem and its real example with sources, the keep
 // choice by keyboard, axe and 320 px.
@@ -1874,6 +1876,7 @@ async function browserChecks(server, url) {
     if (process.argv.includes('--entry')) { result.mode = 'title and camp only'; await entryProgress({ browser, url, check, shot, result, watchErrors }); return; }
     // Imported on demand: its CPU half imports game modules that define settings, which would skew settingsUnit.
     if (process.argv.includes('--campaign')) { result.mode = 'campaign screens and flow'; const { campaignControls } = await import('./test-campaign-ui.mjs'); await campaignControls({ browser, url, check, shot, result, watchErrors }); return; }
+    if (process.argv.includes('--officers')) { result.mode = 'officer card'; const { officersControls } = await import('./test-officers-ui.mjs'); await officersControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--badges')) { result.mode = 'badges and X-Factor'; const { badgesControls } = await import('./test-badges-ui.mjs'); await badgesControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--traits')) { result.mode = 'commander traits'; const { traitsControls } = await import('./test-traits-ui.mjs'); await traitsControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--command-chain')) { result.mode = 'corps command influence'; const { commandChainControls } = await import('./test-command-chain-ui.mjs'); await commandChainControls({ browser, url, check, shot, result, watchErrors }); return; }
@@ -1937,6 +1940,8 @@ async function browserChecks(server, url) {
       await levelRewardsControls({browser,url,check,shot,result,watchErrors});
       const { badgesControls } = await import('./test-badges-ui.mjs');
       await badgesControls({ browser, url, check, shot, result, watchErrors });
+      const { officersControls } = await import('./test-officers-ui.mjs');
+      await officersControls({ browser, url, check, shot, result, watchErrors });
       const { artControls } = await import('./test-art-ui.mjs');
       await artControls({ browser, url, check, shot, result, watchErrors });
     }

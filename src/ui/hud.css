@@ -522,3 +522,14 @@ body:has(.sb-toggle.sb-closed:not(.sb-left)) #soldier-view-hint { right: calc(va
 .traits-cite { color: var(--dim); }
 .traits-quote { display: block; margin: 2px 0 0; font-style: italic; color: var(--text); }
 #traits-close { min-width: 120px; }
+/* The unit card's name line as the officer card's opener (v4): #uc-officer wraps #uc-name in the same row (no second line).
+   Drawn 28 px tall; its ::before widens the target to 44 px, 8 px into the card's top padding and 8 px below (the row's
+   margin plus the button's own 2 px), so it never covers the portrait or the tiles. #uc-name is positioned so its text,
+   not the pseudo-element, is what a point on the name hits (tools/test-dock-ui.mjs card-identity-hit). */
+#uc-officer { position: relative; flex: 0 1 auto; min-width: 0; max-width: 100%; min-height: 28px; margin: 0 0 2px; padding: 4px 8px; box-sizing: border-box;
+  font: inherit; color: var(--text); text-align: left; cursor: pointer; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.18); border-radius: 4px; }
+#uc-officer::before { content: ''; position: absolute; left: -1px; right: -1px; top: -9px; bottom: -9px; }
+#uc-officer #uc-name { position: relative; display: block; }
+#uc-officer:hover { background: rgba(255, 255, 255, 0.14); }
+#uc-officer:focus-visible { outline-offset: -3px; }
+.ucname:has(> #uc-officer) { align-items: center; }

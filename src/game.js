@@ -390,15 +390,40 @@ function makeCommander(def, k) {
 /** "Brigadier General Benjamin M. Prentiss" (rank omitted when the data has none). */
 const titled = (rank, name) => (rank ? `${rank} ${name}` : name);
 
+// Officers' Merit (game rule, src/franchise/officers.js applyMerit; campaign franchise brigades only): the definition's
+// meritRadius widens the rally radius a general reaches the formation at and meritSteady divides its rallied morale loss.
+// The radius acts only on a formation without a commander figure (unit.officer is infantry and cavalry only, so in practice a
+// battery): a brigade with its own commander is rallied by him while he is up (commandFactor's first branch) and its Merit ends
+// when he falls, so for it Merit is steadiness alone. The officer card says so (officers.js meritEffectText).
+// Absent everywhere else (Battles, sandbox, practice), so both read 1. Bounded to Merit 3 (+30 %, +6 %) whatever the input;
+// they end when the brigade's own commander falls, killed OR wounded (commandDown, any kind): a wounded commander is carried off,
+// so his Merit has no one to act through for the rest of this battle. Only "killed" ends it for later battles (officers.js;
+// DECISIONS.md, v4 officers).
+const MERIT_CAP = Object.freeze({ radius: 1.3, steady: 1.06 });
+const meritOf = (u, key) => {
+  const v = u.commandDown ? 1 : u.def?.[key === 'radius' ? 'meritRadius' : 'meritSteady'];
+  return Number.isFinite(v) ? Math.max(1, Math.min(MERIT_CAP[key], v)) : 1;
+};
+const steadied = new Map(); // one frozen factor per Merit steadiness (at most four), no per-tick allocation
+function ralliedFor(u) {
+  const k = meritOf(u, 'steady');
+  if (k === 1) return RALLIED;
+  if (!steadied.has(k)) steadied.set(k, Object.freeze({ loss: COMMAND.loss / k, rally: COMMAND.rally }));
+  return steadied.get(k);
+}
+/** The rally radius a living general reaches u at (m): COMMAND.radius, wider with its commander's Merit. */
+export const rallyRadius = (u) => COMMAND.radius * meritOf(u, 'radius');
+
 /** The morale factor of a unit (combat.js): rallied inside a living general's radius or by its own commander. */
 function commandFactor(game, u) {
   const st = commandState.get(game);
   if (!st || !u.alive) return null;
-  if (u.officer && !u.commandDown) return RALLIED;
+  if (u.officer && !u.commandDown) return ralliedFor(u);
+  const r = rallyRadius(u);
   for (const c of st.commanders) {
     if (c.down || c.side !== u.side) continue;
     const dx = c.x - u.x, dz = c.z - u.z;
-    if (dx * dx + dz * dz <= COMMAND.radius * COMMAND.radius) return RALLIED;
+    if (dx * dx + dz * dz <= r * r) return ralliedFor(u);
   }
   return null;
 }
@@ -1380,6 +1405,10 @@ export class Game {
       : 'Your brigades lost the practice ground. Survivors and any stores still held return for the issue.';
     if (result) {
       this.over = true;
+      // The brigade commanders who fell (commanderHit's field events), for the officers' records (src/franchise/officers.js);
+      // absent when none fell, so a result without such events keeps its shape.
+      const fell = this.units.filter((u) => u.commandDown).map((u) => ({ unitId: u.id, name: u.commandDown.name, rank: u.commandDown.rank, kind: u.commandDown.kind }));
+      if (fell.length) result.officers = fell;
       this.result = result;
       this.event(result.why, null, 'result', o);
     }
@@ -1545,8 +1574,14 @@ export class Game {
 
   /** The living generals whose rally radius covers u now. */
   generalsOver(u) {
-    return this.commanders.filter((c) => !c.down && c.side === u.side && Math.hypot(c.x - u.x, c.z - u.z) <= COMMAND.radius);
+    return this.commanders.filter((c) => !c.down && c.side === u.side && Math.hypot(c.x - u.x, c.z - u.z) <= rallyRadius(u));
   }
+
+  /** The rally radius (m) a living general reaches u at: 300, wider with its commander's Merit in campaign play. */
+  rallyRadius(u) { return rallyRadius(u); }
+
+  /** u's morale factor now ({ loss, rally } or null; combat.js reads the same): the officers' check reads steadiness here. */
+  commandFactor(u) { return commandFactor(this, u); }
 
   /** Does u rally faster and lose morale slower now (a general's radius or its own commander)? */
   rallied(u) { return commandFactor(this, u) !== null; }

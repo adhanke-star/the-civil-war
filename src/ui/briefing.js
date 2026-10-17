@@ -93,7 +93,14 @@ export function loadPackSummary(packId, { fetcher } = {}) {
           .filter((u) => u && u.side === 'US' && typeof u.id === 'string').map((u) => u.id)),
         commanders: Object.freeze(Object.fromEntries([...p.scenario.units, ...(Array.isArray(p.scenario.reinforcements) ? p.scenario.reinforcements : [])]
           .filter((u) => u && typeof u.id === 'string' && words(u.commander?.name))
-          .map((u) => [u.id, Object.freeze({ name: words(u.commander.name), rank: words(u.commander.rank) })]))) }))) });
+          .map((u) => [u.id, Object.freeze({ name: words(u.commander.name), rank: words(u.commander.rank) })]))),
+        // the formation's own lines and sources for the camp's officer card (v4, src/franchise/officers.js officerView), and the
+        // scenario's own commander portrait with its note where the pack gives one (the card shows it before the name mapping)
+        officers: Object.freeze(Object.fromEntries([...p.scenario.units, ...(Array.isArray(p.scenario.reinforcements) ? p.scenario.reinforcements : [])]
+          .filter((u) => u && typeof u.id === 'string' && words(u.commander?.name))
+          .map((u) => [u.id, Object.freeze({ formation: words(u.name), parent: words(u.parent), regiments: Object.freeze((Array.isArray(u.regiments) ? u.regiments : []).filter(words)),
+            sources: Object.freeze((Array.isArray(u.sources) ? u.sources : []).filter(words).slice(0, 16)),
+            portrait: words(u.commander.portrait), portraitNote: words(u.commander.portraitNote) })]))) }))) });
     });
     pending.catch(() => summaries.delete(packId));
     summaries.set(packId, pending);
