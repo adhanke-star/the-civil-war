@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import { loadTerrainData, prepareTerrainPartition } from './world/terrain.js';
 import { buildWorld } from './world/world.js';
 import { Post, QUALITY_MODES, pinPostResourceDiagnostic } from './render/post.js';
-import { RtsCamera } from './render/rts-camera.js';
+import { RtsCamera, pitchForDist } from './render/rts-camera.js';
 import { SoldierView } from './render/soldier-view.js';
 import { Game } from './game.js';
 import { Effects } from './fx/effects.js';
@@ -119,6 +119,22 @@ export function createFieldGraphicsStop(owners) {
   });
 }
 
+// The battle camera's vertical field of view (degrees); the sandbox opening view fits its frame with it.
+const FIELD_FOV = 32;
+/**
+ * What the sandbox opening view (src/sim/sandbox-battle.js OPENING_VIEW) fits against: the field camera's opening pitch
+ * (rts-camera.js: pitchForDist plus the Look > Camera elevation, clamped as its constructor clamps it), the lens, and the
+ * page's frame (its height and the HUD's top strip and bottom dock in px, from hud.css's sizes; left to the 720 px default
+ * if they cannot be read).
+ */
+function sandboxView() {
+  const elevation = Number.isFinite(LOOK.cameraElevation) ? LOOK.cameraElevation * Math.PI / 180 : 0;
+  const pitchFor = (d) => Math.min(1.35, Math.max(0.3, pitchForDist(d) + elevation));
+  const css = getComputedStyle(document.documentElement), px = (name) => parseFloat(css.getPropertyValue(name));
+  const frame = { height: window.innerHeight, top: px('--edge') + px('--top-h'), bottom: px('--edge') + px('--dock-card-h') };
+  const ok = Object.values(frame).every((v) => Number.isFinite(v) && v >= 0) && frame.height > frame.top + frame.bottom;
+  return { pitchFor, fov: FIELD_FOV, ...(ok ? { frame } : {}) };
+}
 let fieldClaimed = false;
 // Importing this module has no field side effects. The owner commits navigation only after recheck.
 // A campaign launch ({ campaign: { slot, replay } }, from ?campaign=<slot>[&replay]) loads that slot's next phase.
@@ -153,7 +169,7 @@ export async function startField({ manifest = null, campaign = null, isCurrent =
     const currentOwner = () => { if (!isCurrent()) throw new Error('Practice: deployment review was cancelled.'); };
     // ?sandbox-battle&field=…&us=…&cs=…&attacker=…: two built rosters on a built field (no loot, no save, no record).
     const sandbox = manifest || campaign || !new URLSearchParams(location.search).has('sandbox-battle') ? null
-      : await loadSandboxBattle(location.search, { isCurrent });
+      : await loadSandboxBattle(location.search, { isCurrent, view: sandboxView() });
     const mode = sandbox ? 'sandbox-battle' : playMode(location.search);
     // ?battle=<packId>[&phase=<phaseId>]: any battle pack but Henry Hill, which keeps its own route.
     const query = new URLSearchParams(location.search), packId = manifest || campaign ? null : query.get('battle');
@@ -177,7 +193,8 @@ export async function startField({ manifest = null, campaign = null, isCurrent =
     const ground = manifest || pack ? null : await loadFieldScenario({ isCurrent });
     currentOwner();
     const routeId = manifest ? 'saved-practice' : pack ? 'pack' : mode === 'practice' && !new URLSearchParams(location.search).has('practice') ? 'first-command' : 'henry-hill';
-    // A saved manifest's scenario reference is the authoritative outcome identity.
+    // A saved manifest's scenario reference is the authoritative outcome identity. A sandbox battle sets `pack` and no
+    // `launch`, so it passes through sideScenario as every Battles-menu phase does (its camera.bySide gives each side its view).
     // ?side=CS (Battles menu only; DECISIONS 0273): the player commands the Confederates. Campaign, practice and saves stay Union.
     const playerSide = sandbox ? sandbox.params.side : pack && !launch && !manifest ? battleSide(location.search) : 'US';
     const scenario = manifest ? (prepareFieldScenario(manifest.scenario, routeId), manifest.scenario) : launch ? launch.scenario : pack ? sideScenario(pack.scenario, playerSide)
@@ -246,7 +263,7 @@ if(graphicsStop && !graphicsStop.check())return;
 const gpuTier = detectFieldGPUTier(renderer,post,stats,graphicsStop);
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(32, window.innerWidth / window.innerHeight, 2, 6000);
+const camera = new THREE.PerspectiveCamera(FIELD_FOV, window.innerWidth / window.innerHeight, 2, 6000);
 
 const world = buildWorld(scene, terrain, scenario, { terrainMeshFactory: diagnosticTerrainFactory });
 let terrainOwner=null;
@@ -258,9 +275,10 @@ if(resources){
 }
 Object.assign(stats, world.stats);
 
-// Opening view: both armies between the clock and the bottom panels; the pitch follows the zoom.
+// Opening view: both armies between the clock and the bottom panels; the pitch follows the zoom. A sandbox battle's view
+// is already the player's side's and must face the enemy (src/sim/sandbox-battle.js openingView), so it is never turned.
 const rts = new RtsCamera(camera, terrain, scenario.camera
-  ? { target: [...scenario.camera.target], yaw: playerSide === 'CS' ? fitSideCamera(scenario.camera, terrain.half) : scenario.camera.yaw, dist: scenario.camera.dist }
+  ? { target: [...scenario.camera.target], yaw: playerSide === 'CS' && !sandbox ? fitSideCamera(scenario.camera, terrain.half) : scenario.camera.yaw, dist: scenario.camera.dist }
   : scenario.practiceIntro
   ? { target: [-300, -610], yaw: -Math.PI / 2 - 0.12, dist: 740 }
   : { target: [-60, 200], yaw: -Math.PI / 2 - 0.12, dist: 1150 });

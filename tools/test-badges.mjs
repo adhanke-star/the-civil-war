@@ -5,6 +5,11 @@
 // ground and a fictional campaign are built here; nothing ships for them and nothing is written to disk.
 // `node tools/test-badges.mjs` prints BADGES OK (n/n); `--prove-fail` also runs one mutant per check and requires each to
 // fail that check, with the check's own name in the failure text. No browser, no GPU.
+// Measured play (v5): DECISIONS.md:782 listed First Volley, Fire Discipline, Stormers, Shock, Relentless and Rear Guard as
+// having no native measured US award. The scene-* checks now earn each one at Bronze from orders alone (Hold Fire released
+// inside 60 m; 15 s of fire after it; a charge on a brigade in woods; a charge on a larger brigade; a second charge after a
+// recalled one; Fallback under fire), award it through awardBadges and print the measured value (MEASURED lines). Each
+// scene also runs without its key action and must award nothing; its mutant drops the key action and must fail.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { Scene } from 'three';
@@ -148,6 +153,84 @@ function firstVolley(api, shooterBadges, { friendBadges = null, gap = 150 } = {}
   for (let k = 0; k < 400 && !u.shots; k++) g.tick(0.05);
   return t.casualties;
 }
+
+// ---- measured play scenes: six feats earned by orders alone (v5 LEG C) -------------------------------------------------
+// The player (US) acts only through the HUD's own path (select + orderSelected: holdfire, charge, fallback, hold); the
+// computer's brigade marches by its unit order as the AI would. No feat counter is called or set. Each scene runs with and
+// without its key action (`key`); a mutant API (`keyAction: false`) drops the key action from the keyed run too.
+const playerOrder = (g, u, kind) => { g.select(u); return g.orderSelected(kind); };
+const ticksUntil = (g, done, s) => { for (let k = 0; k < Math.round(s / 0.05) && !done(); k++) g.tick(0.05); };
+/** A US `line` meets a CS line that runs in to 50 m; with the key it holds its fire and releases once the foe halts inside
+ *  60 m. A first volley of Bronze size (10) takes a large line: a volley is about 1.5 men per 1,500 muskets per second of reload. */
+function closeVolley(key, afterS, line) {
+  const g = field([def('us', 'US', 0, -300, line), def('cs', 'CS', 0, 0), far('csr', 'CS')]);
+  const us = unit(g, 'us'), cs = unit(g, 'cs');
+  if (key) playerOrder(g, us, 'holdfire');
+  cs.orderMove([[0, 0], [0, -250]], { endFacing: Math.PI }); cs.run = true; // at the double: it neither halts to fire nor fires
+  const gap = () => Math.hypot(us.x - cs.x, us.z - cs.z);
+  ticksUntil(g, () => !cs.follow.active && gap() < 60, 120);
+  const at = Math.round(gap());
+  if (key) playerOrder(g, us, 'holdfire'); // release
+  run(g, afterS);
+  return { stats: g.featReport().us, note: `${key ? "released" : "firing at will"} with the foe halted at ${at} m, read ${afterS} s later` };
+}
+const SCENES = {
+  firstVolley: { action: 'Hold Fire, released inside 60 m', without: 'firing at will', play: (key) => closeVolley(key, 3, { men: 2500, xp: 3 }) },
+  fireDiscipline: { action: 'Hold Fire, released inside 60 m, then 15 s of fire', without: 'firing at will', play: (key) => closeVolley(key, 16, { men: 2000 }) },
+  stormers: { action: 'Charge on a brigade in woods', without: 'no charge, only fire', play: (key) => {
+    const g = field([def('us', 'US', 0, -150), def('cs', 'CS', 0, 0, { men: 800, xp: 1 }), far('csr', 'CS')], { woods: [WOOD(-300, -30, 300, 120)] });
+    const us = unit(g, 'us'), cs = unit(g, 'cs');
+    run(g, 1); const cover = cs.cover;
+    if (key) playerOrder(g, us, 'charge');
+    run(g, 45);
+    return { stats: g.featReport().us, note: `foe cover x${cover}, foe ${cs.state}` };
+  } },
+  shock: { action: 'Charge on a larger brigade after 120 s of cross-fire', without: 'the cross-fire, no charge', play: (key) => {
+    // a supporting brigade on the foe's flank and the charger's own fire wear it down first (both ordinary fire)
+    const g = field([def('us', 'US', 0, -120, { men: 1000, xp: 3 }), def('usb', 'US', -160, 0, { facing: Math.PI / 2 }),
+      def('cs', 'CS', 0, 0, { men: 1500, xp: 1 }), far('csr', 'CS')]);
+    const us = unit(g, 'us'), cs = unit(g, 'cs');
+    run(g, 120);
+    const men = `${Math.round(us.men)} on ${Math.round(cs.men)}`;
+    if (key) playerOrder(g, us, 'charge');
+    run(g, 40);
+    return { stats: g.featReport().us, note: `charge of ${men} men, foe ${cs.state}` };
+  } },
+  relentless: { action: 'a second Charge after a charge recalled unbroken', without: 'the first charge only', play: (key) => {
+    const g = field([def('us', 'US', 0, -120), def('cs', 'CS', 0, 0, { xp: 3 }), far('csr', 'CS')]);
+    const us = unit(g, 'us'), cs = unit(g, 'cs');
+    run(g, 1); playerOrder(g, us, 'charge');
+    ticksUntil(g, () => us.melee, 30); run(g, 4);
+    playerOrder(g, us, 'fallback'); run(g, 8); // the first charge is over: out of contact, its foe unbroken
+    const first = g.featReport().us.chargeBreaks;
+    if (key) playerOrder(g, us, 'charge');
+    ticksUntil(g, () => us.melee, 30); run(g, 2);
+    return { stats: g.featReport().us, note: `first charge broke ${first}, foe ${cs.state}` };
+  } },
+  rearGuard: { action: 'Fallback twice under fire', without: 'Hold instead of Fallback', play: (key) => {
+    const g = field([def('us', 'US', 0, -150), def('cs', 'CS', 0, 0)]);
+    const us = unit(g, 'us');
+    run(g, 1);
+    for (let i = 0; i < 2; i++) { playerOrder(g, us, key ? 'fallback' : 'hold'); run(g, 25); }
+    return { stats: g.featReport().us, note: `ended ${Math.round(-150 - us.z)} m back` };
+  } },
+};
+const MEASURED = [];
+/** Play a scene, then award its US formation's feats to a franchise brigade through awardBadges (an off-loan phase). */
+function sceneAward(api, id, key) {
+  const { stats, note } = SCENES[id].play(key && api.keyAction !== false);
+  const s = play(api, fresh(api), {}), p = api.campaignPhase(s, CAMPAIGN);
+  const { summary } = api.awardBadges(s, { awardId: p.awardId, feats: { alpha: stats }, loan: false });
+  const earned = summary.brigades.find((b) => b.id === 'alpha')?.earned.find((e) => e.id === id) ?? null;
+  return { value: api.measure(api.BADGE_BY_ID[id], stats), earned, note };
+}
+const SCENE_CHECKS = Object.keys(SCENES).map((id) => [`scene-${id}`, (api) => {
+  const name = `scene-${id}`, b = api.BADGE_BY_ID[id], with_ = sceneAward(api, id, true), without = sceneAward(api, id, false);
+  assert.ok(with_.earned && api.TIERS.indexOf(with_.earned.tier) >= api.TIERS.indexOf('bronze') && with_.earned.feat === with_.value,
+    `${name}: ${SCENES[id].action} must earn ${b.name} at Bronze (${b.stat} ${with_.value}, Bronze ${b.bronze}; ${with_.note})`);
+  assert.ok(!without.earned && without.value < b.bronze, `${name}: the scene without its key action must not award ${b.name} (${b.stat} ${without.value})`);
+  MEASURED.push(`MEASURED ${b.name}: ${b.stat} ${with_.value} -> ${with_.earned.tier} (Bronze ${b.bronze}; ${with_.note}); ${SCENES[id].without}: ${without.value}, no award`);
+}]);
 
 export const BADGE_CHECKS = [
   ['catalogue', (api) => {
@@ -334,6 +417,7 @@ export const BADGE_CHECKS = [
     refuses('phase-bridge', () => api.recordPhase(s0, CAMPAIGN, { packId: p.packId, phaseId: p.phaseId, awardId: p.awardId, winner: 'US', grade: 'Victory', units, loot: [],
       feats: { ...feats, ghost: feats.alpha } }), /not in the result/);
   }],
+  ...SCENE_CHECKS,
 ];
 
 const MUTANTS = {
@@ -353,6 +437,8 @@ const MUTANTS = {
   'field-badges': { applyCampaign: (sc, s, p) => { const out = campaign.applyCampaign(sc, s, p); out.units = out.units.map((d) => ({ ...d, badges: [{ id: 'sharpshooters', tier: 'bronze' }] })); return out; } },
   'save-round-trip': { parseSnapshot: (t) => { const v = save.parseSnapshot(t); delete v.enemy; return v; } },
   'phase-bridge': { phaseOutcome: (o) => ({ ...phaseOutcome(o), feats: {} }) },
+  // each play scene without its key action (no Hold Fire, no charge, no second charge, no fallback)
+  ...Object.fromEntries(Object.keys(SCENES).map((id) => [`scene-${id}`, { keyAction: false }])),
 };
 
 // Unexpected (non-assertion) errors count as that check's failure, named.
@@ -376,6 +462,7 @@ if (process.argv[1] && import.meta.url === new URL(`file://${fs.realpathSync(pro
   }
   const n = BADGE_CHECKS.length;
   if (failed) { console.log(`BADGES FAILED (${n - failed}/${n})`); process.exit(1); }
+  for (const line of MEASURED) console.log(line);
   console.log(`BADGES OK (${n}/${n})`);
   if (process.argv.includes('--prove-fail')) {
     let caught = 0;

@@ -1,5 +1,17 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0283 — v5 polish scope after the inventory (Aaron, 2026-10-17)
+
+The inventory corrected two premises: all 20 badges are awardable in code (the "six gaps" of DECISIONS.md:782 are feats with no
+native measured US award: firstVolley, fireDiscipline, stormers, shock, relentless, rearGuard), and no pack names a Union army
+commander (src/sim/ai.js armyCommander returns null for US in all 11 phases), so Union AI traits would be new sourced history,
+not polish; deferred to the Confederate-franchise research. The Henry Hill sandbox figures (defenders lost 962, attackers 35) are
+the rules working: a rifled line (effective 219 m) halts at its range and fires on a smoothbore line that reaches 89 m; nothing
+returns fire because nothing is in range. The player cannot read that today. Aaron chose (popup, recommended): LEG A the sandbox
+opening view frames the player's line and the objective, mirrored for the Confederate player; LEG B an "Outranged" status word
+and a one-time hint (read-only on the simulation); LEG C measured CI proof for the six feats; LEG D a sides balance report
+across the 11 phases, measurement only, no tuning. Contract at PLAN top.
+
 ## 0282 — v4 released; v5 is a polish round (Aaron, 2026-10-17)
 
 v4 = tag v4 at 483b2ca (CI 39027953486 all 9 green, Pages 39029443642 green, Release "v4 — Officers" is Latest). The first

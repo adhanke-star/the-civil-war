@@ -8,7 +8,8 @@
 //     Union formation an `ai` role, so a computer Union would only stand. When the AI's side is the phase's attacker and
 //     the data gives none of its formations a role, every one of them (reinforcements on arrival) takes the attack role
 //     at once on the objective: the phase opens at the hour its attack began. A game rule, not a history claim.
-//   - The opening view: centred on the Confederate formations, looking across from the opposite bearing.
+//   - The opening view: centred on the Confederate formations, looking across from the opposite bearing; a scenario that
+//     authors a view per side (camera.bySide: the sandbox battle, src/sim/sandbox-battle.js openingView) gets its own.
 // A Union player gets the scenario back unchanged (the same object), so every existing battle runs exactly as before.
 
 import { prepareFieldScenario } from './phase.js';
@@ -40,9 +41,11 @@ export function sideScenario(scenario, playerSide) {
   return prepareFieldScenario(out, 'pack');
 }
 
-/** The opening view for `playerSide`: the scenario's own for the Union; for the Confederates, their formations' centre seen from the opposite bearing. */
+/** The opening view for `playerSide`: the scenario's own for the Union; for the Confederates, the scenario's own
+ * Confederate view (camera.bySide.CS) when it authors one, else their formations' centre seen from the opposite bearing. */
 export function sideCamera(scenario, playerSide) {
   const cam = scenario.camera;
+  if (playerSide === 'CS' && cam?.bySide?.CS) return { ...cam.bySide.CS };
   if (playerSide !== 'CS' || !cam) return cam ?? null;
   const own = (scenario.units || []).filter((d) => d.side === playerSide && Number.isFinite(d.x) && Number.isFinite(d.z));
   if (!own.length) return cam;

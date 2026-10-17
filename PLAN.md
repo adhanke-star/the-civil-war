@@ -4,6 +4,58 @@ STATUS 2026-10-17 (later): v4 RELEASED (tag v4 = 483b2ca, CI 39027953486 all 9, 
 0274 CLOSED (0276); 0278 open with the one-shot reload live (0279). v5 = polish round (0282): contract below once written.
 Aaron's hands-on play of sandbox, Confederate phase and officer cards UNRUN.
 
+v5 CONTRACT — POLISH ROUND: readability, camera, proof (Aaron chose this scope by popup, 2026-10-17; Fable wrote it)
+
+Worktree /private/tmp/cw-v3-20261016, branch v5-polish (from f838414 = origin/main). Four legs, each finite; every leg keeps the
+history law (no new people, units or ranks) and the codebase's terse style with comments that say why.
+
+LEG A — Sandbox opening view (src/sim/sandbox-battle.js, src/main.js, src/sim/sides.js only if needed)
+Player sees: the first frame of a sandbox battle shows the player's own front line AND the objective marker ("the centre ground")
+together, whichever side he commands and whichever side attacks. Rule: camera target = the midpoint between the player's front line
+x and the objective x (0), z = 0; dist = the smaller value that keeps both the player's front and the objective's far edge
+(r = 600) inside the view at pitchForDist (use the same fit helper the pack cameras rely on, src/render/rts-camera.js), never
+less than 900 m; yaw faces the enemy. The Confederate player gets the mirrored view (sides.js sideCamera semantics) — verify
+whether the sandbox path applies sideScenario (the reader found src/main.js:183 using launch.scenario; make it consistent with the
+pack path or document why not). Tests: tools/test-sandbox-battle.mjs gains `opening-view`: for all 4 (side × attacker) combos on
+shiloh and henry-hill, the camera target lies between the player's front and 0, both points project inside the frustum at the chosen
+dist (compute with the same maths as rts-camera), and yaw points at the enemy; mutant: old camera. UI: tools/test-sandbox-battle-ui.mjs
+asserts the objective marker and at least one own flag are on screen in the opening screenshot (bounding boxes inside the viewport).
+
+LEG B — "Outranged" readability (src/sim/combat.js counters, src/units/unit.js status, src/ui/hud.js marker + hint, hints registry)
+Rule (game rule, comment it): a formation is Outranged when it has taken fire for the last 10 s of battle time and in that window
+never had an enemy inside its own effective range (combat.js effRange) with line of sight. Player sees: the marker status word
+"Outranged" (where "Halted"/"Steady" show) while it holds; the first time one of the player's formations becomes Outranged in a
+session, the existing first-time hint system shows: "<Short> is outranged: its muskets cannot reach the line firing on it. Charge (C),
+fall back (F) or hold." Never shown for the computer's side. Tests: tools/test-orders.mjs or a new tools/test-outranged.mjs (Node;
+--prove-fail): a rifled line halted 219 m from a smoothbore line → the smoothbore line is Outranged within 12 s and the rifled one
+never; a line with a target in range is never Outranged; the hint fires once per session; mutant: window 0 s. UI test in the suite
+that already drives a fight (tools/test-command-ui.mjs or test-hooks-ui.mjs): the status word appears on a marker.
+
+LEG C — Measured proof for six badge feats (tools/observe-badges.mjs, tools/test-badges.mjs, no src change)
+DECISIONS.md:782 says firstVolley, fireDiscipline, stormers, shock, relentless and rearGuard have no native measured US award.
+Add six scripted headless scenes to tools/observe-badges.mjs (or test-badges.mjs, whichever already holds the measured awards)
+that produce each feat through play rules only (Hold Fire then release at < 60 m; 15 s discipline; a charge breaking a unit in
+cover; a charge breaking a larger unit; a second charge after a failed one; casualties while falling back), assert awardBadges
+grants the badge at Bronze, and print the measured feat values. Mutants: the scene without its key action must not award. CI: the
+Node loop already runs badges/observe-badges (confirm in ci.yml:96; add if missing). Update the DECISIONS line only via a note in
+the test header (Fable writes DECISIONS).
+
+LEG D — Sides balance report (NEW tools/balance-sides.mjs, ci.yml artifact; no tuning)
+A Node diagnostic that runs every pack phase headless twice: player side US and player side CS, with the player's side on a simple
+scripted doctrine (hold the objective if defending; march every formation at the objective if attacking) against the computer
+(Veteran), to the phase end, and prints a table: phase, side, result grade, own losses %, enemy losses %, objective holder, minutes
+to first contact. It must finish under 10 minutes on CI (fast-forward; cap per phase). Wire it into tools/test.mjs shard 4 behind
+`--balance-sides`, write `.out/balance-sides.json` and a Markdown table `.out/balance-sides.md`, never fail the run on outcomes
+(only on exceptions). Report the table in your return so Fable can record it.
+
+Out: tuning constants, Union traits, new history, art, the Confederate franchise.
+Commands (all must pass; report tails): node --check on changed files; node tools/test-sandbox-battle.mjs and --prove-fail;
+node tools/test-outranged.mjs (or the file you used) and --prove-fail; node tools/test-badges.mjs and --prove-fail and
+node tools/observe-badges.mjs (both modes if it has them); node tools/balance-sides.mjs; node tools/test-sides.mjs; node tools/test.mjs --unit;
+node tools/build-offline-manifest.mjs --write && node tools/build-offline-manifest.mjs --check. No browser on this Mac. Do not commit.
+Done when: own-SHA CI all 9 green, main fast-forwarded, Pages green, CI screenshots (sandbox opening, a marker reading Outranged)
+sent to Aaron, balance table recorded in DECISIONS, tag v5 + Release.
+
 v4 CONTRACT — OFFICERS: cards and a Merit track, sourced ranks only (Aaron chose this scope by popup, 2026-10-17; Fable wrote it)
 
 Law first: never invent a person, unit, rank or presence. A commander's name and rank come from the pack phase being played; the

@@ -5,7 +5,10 @@
 // show; his rally ring shows with Franklin selected and with the general selected, and hides otherwise; hovering a
 // regiment block on the field and focusing the card's regiment list name the regiment; a forced kill of Franklin's
 // commander (a fictional test event, Game.commanderDown) shows "Commander down" on the card and marker; axe and
-// screenshots. Writes screenshots only (through `shot`).
+// screenshots. Outranged (v5 LEG B, src/sim/combat.js OUTRANGED): Hampton's rifled line is set 219 m from Willcox's
+// smoothbore line (a fictional test placement, not the battle); after 13 s of fire Willcox's marker reads "Outranged" and
+// exactly one hint toast names a Union formation that is Outranged (Willcox, or another line the Confederate guns outrange);
+// no Confederate (computer) marker reads Outranged. Writes screenshots only (through `shot`).
 import { AxeBuilder } from '@axe-core/playwright';
 
 const frames = (page, n = 2) => page.evaluate((n) => new Promise((resolve) => {
@@ -132,6 +135,39 @@ export async function commandControls({ browser, url, check, shot, result, watch
     await shot(page, 'command-down');
     await axe('card-down', '#unitcard');
     await axe('general-marker', '.gmarker');
+
+    // ---- Outranged: a rifled line 219 m from a smoothbore line (fictional placement) -------------------------------
+    const setup = await page.evaluate(() => {
+      const { game, rts } = window.__game, c = game.combat;
+      const w = game.units.find((u) => u.id === 'willcox'), h = game.units.find((u) => u.id === 'hampton');
+      for (const u of [w, h]) { u.manual = true; u.stop(); u.order = { type: 'hold' }; u.holdFire = false; }
+      const east = Math.atan2(h.x - w.x, h.z - w.z);
+      for (const k of [0, 1, -1, 2, -2, 3, -3, 4, -4, 6, -6]) { // the first bearing with sight, starting toward Hampton's own side
+        const a = east + (k * Math.PI) / 18, x = w.x + Math.sin(a) * 219, z = w.z + Math.cos(a) * 219;
+        h.vehicle.position.x = x; h.vehicle.position.z = z;
+        if (!c.los(h, w)) continue;
+        h.facing = h.goalFacing = Math.atan2(w.x - x, w.z - z);
+        w.facing = w.goalFacing = a;
+        for (const u of [w, h]) { u.layout(); u.snapFigures(); }
+        game.fastForward(13);
+        rts.flyTo((w.x + h.x) / 2, (w.z + h.z) / 2, 650); rts.snap();
+        return { bearing: k * 10, dist: Math.round(Math.hypot(h.x - w.x, h.z - w.z)), outranged: w.outranged, hampton: h.outranged, reach: c.effRange(w) };
+      }
+      return null;
+    });
+    await page.waitForFunction(() => [...document.querySelectorAll('.marker')].find((m) => m.querySelector('.nm')?.textContent === 'Willcox')?.querySelector('.act')?.textContent === 'Outranged', null, { timeout: 5000 }).catch(() => {});
+    const word = await page.evaluate(() => {
+      const m = [...document.querySelectorAll('.marker')].find((x) => x.querySelector('.nm')?.textContent === 'Willcox'), r = m?.getBoundingClientRect();
+      const toast = document.querySelector('#toasts p[data-hint="outranged"]');
+      return { act: m?.querySelector('.act')?.textContent ?? null, shown: !!r && !m.classList.contains('hidden') && r.width > 0 && r.right > 0 && r.bottom > 0 && r.left < innerWidth && r.top < innerHeight,
+        hint: toast?.textContent ?? null, hints: document.querySelectorAll('#toasts p[data-hint]').length,
+        out: window.__game.game.units.filter((u) => u.side === 'US' && u.outranged).map((u) => u.short),
+        enemyWords: [...document.querySelectorAll('.marker.cs .act')].filter((a) => a.textContent === 'Outranged').length };
+    });
+    record('outranged-word', !!setup && setup.outranged === true && setup.hampton === false && word.act === 'Outranged' && word.shown && word.enemyWords === 0, { setup, word });
+    const named = /^(.+) is outranged: its (muskets|guns) cannot reach the line firing on it\. (Charge \(C\), fall back \(F\) or hold|Fall back \(F\) or hold)\.$/.exec(word.hint || '');
+    record('outranged-hint', !!named && word.out.includes(named[1]) && word.hints === 1, { hint: word.hint, hints: word.hints, out: word.out });
+    await shot(page, 'command-outranged');
     record('errors', errors.length === 0, errors.slice(0, 6));
   } finally {
     await ctx.close().catch(() => {});

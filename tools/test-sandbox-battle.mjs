@@ -5,13 +5,19 @@
 // history and the rosters' own sources; the attack role on every attacker
 // formation (also through sideScenario for a Confederate player); two headless battles in which the computer's attacker
 // closes on the centre ground, and the same two in which, by 07:00 (60 battle minutes), the lines have met (closest
-// attacker-defender pair under 300 m) and both sides have lost men; and bad addresses refused with the parameter named.
+// attacker-defender pair under 300 m) and both sides have lost men; bad addresses refused with the parameter named; and the
+// opening view (v5 LEG A): on Shiloh and Henry Hill, for each side the player commands and each attacker, the camera target
+// lies between the player's front and the objective, the front, the objective's centre and its far edge all project inside
+// the frame of a real RtsCamera (1280 x 720) at the chosen distance (the smallest from 900 m that does, see OPENING_VIEW),
+// and the camera looks at the enemy (opening-view); and the front and the objective's centre project between the top strip
+// and the bottom dock (hud.css sizes; opening-hud), which the first v5 fit (halfway, 95% of the full frame) did not.
 // `node tools/test-sandbox-battle.mjs` prints SANDBOX BATTLE OK (n/n); `--prove-fail` also runs one mutant per check and
 // requires each to fail with that check's own name. No browser, no GPU, writes nothing.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import zlib from 'node:zlib';
-import { Scene } from 'three';
+import { Scene, PerspectiveCamera, Vector3 } from 'three';
+import { RtsCamera, pitchForDist } from '../src/render/rts-camera.js';
 import { Game } from '../src/game.js';
 import { setPlan } from '../src/world/landscape.js';
 import { TerrainData, EXAGGERATION } from '../src/world/terrain.js';
@@ -31,7 +37,7 @@ const readJson = (p) => JSON.parse(fs.readFileSync(new URL(p, ROOT), 'utf8'));
 const PACKS = S.SANDBOX_PACKS.map((id) => readJson(`assets/packs/${id}.json`));
 const HENRY = readJson('assets/scenarios/henry-hill.json');
 const META = Object.fromEntries(S.FIELDS.map((f) => [f.id, readJson(`assets/terrain/${f.id}.json`)]));
-const SOURCES = { packs: PACKS, henryHill: HENRY };
+const SOURCES = { packs: PACKS, henryHill: HENRY, view: { pitchFor: pitchForDist, fov: 32 } }; // src/main.js FIELD_FOV
 const ROSTERS = S.rosterList(PACKS);
 const ids = (side) => ROSTERS.filter((r) => r.side === side).map((r) => r.id);
 const COMBOS = S.FIELDS.flatMap((f) => ids('US').flatMap((us) => ids('CS').flatMap((cs) => ['US', 'CS'].map((attacker) => ({ field: f.id, us, cs, attacker })))));
@@ -58,6 +64,29 @@ function makeGame(scenario, playerSide) {
   const game = new Game({ scene: new Scene(), terrain: terrainOf(scenario.terrain), scenario, world: { fenceField: null }, effects: { volley() {}, boom() {} }, playerSide });
   game.initializeReinforcements();
   return game;
+}
+// A real RtsCamera (flat ground, the page's 32 degree lens at 1280 x 720) at the goal it opens on: frame coordinates of x points on z = 0.
+const frames = new Map();
+function frameOf(cam, dist, half, xs) {
+  const k = `${cam.target}|${cam.yaw}|${dist}|${half}`;
+  if (!frames.has(k)) {
+    const r = new RtsCamera(new PerspectiveCamera(32, 1280 / 720, 2, 6000), { half, heightAt: () => 0, inBounds: () => true }, { target: [...cam.target], yaw: cam.yaw, dist });
+    frames.set(k, r.goalCamera().clone());
+  }
+  const c3 = frames.get(k);
+  return xs.map((x) => new Vector3(x, 0, 0).project(c3));
+}
+/** Every opening view on Shiloh and Henry Hill: each roster pair, attacker and player side, with its front and the objective. */
+function openingCases(api) {
+  const out = [];
+  for (const c of COMBOS.filter((x) => x.field === 'shiloh' || x.field === 'henry-hill')) for (const side of ['US', 'CS']) {
+    const s = sideScenario(api.scenarioFor(c), side), o = s.objective, dir = side === c.attacker ? 1 : -1;
+    const own = s.units.filter((d) => d.side === side), enemy = s.units.filter((d) => d.side !== side);
+    out.push({ k: `${key(c)} ${side} player`, kind: `${c.field}|${side}|${c.attacker}`, cam: s.camera, half: META[c.field].halfSize, dir,
+      front: dir > 0 ? Math.max(...own.map((d) => d.x)) : Math.min(...own.map((d) => d.x)), obj: o.x, edge: o.x + dir * o.r,
+      enemyX: enemy.reduce((n, d) => n + d.x, 0) / enemy.length });
+  }
+  return out;
 }
 const throwsNaming = (fn, param, label) => {
   let message = null;
@@ -227,6 +256,38 @@ const CHECKS = [
     throwsNaming(() => S.sandboxBattleScenario({ ...base, cs: 'stones-river.nope' }, { ...SOURCES, terrainMeta: META.shiloh }), 'cs', 'refusals: scenario cs');
     throwsNaming(() => S.sandboxBattleScenario({ ...base, attacker: 'both' }, { ...SOURCES, terrainMeta: META.shiloh }), 'attacker', 'refusals: scenario attacker');
   }],
+  // v5 LEG A: the first frame shows the player's own front and the centre ground, whichever side he commands and whichever attacks.
+  ['opening-view', (api) => {
+    const seen = new Set(), V = S.OPENING_VIEW, [lo, hi] = S.clearBand(V.frame, V.margin);
+    for (const o of openingCases(api)) {
+      const { k, cam, front, dir, enemyX, obj, edge } = o, [tx, tz] = cam.target;
+      assert.ok(tz === 0 && tx >= Math.min(front, obj) && tx <= Math.max(front, obj),
+        `opening-view: ${k} camera target ${tx},${tz} is not between the front (x ${front}) and the objective (x ${obj})`);
+      const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw);
+      assert.ok(Math.sign(enemyX - front) === dir && fx * dir > 0.999 && Math.abs(fz) < 1e-3,
+        `opening-view: ${k} camera looks along ${fx.toFixed(3)},${fz.toFixed(3)}, not at the enemy (x ${enemyX.toFixed(0)} from the front at ${front})`);
+      assert.ok(cam.dist >= V.minDist && cam.dist <= V.maxDist, `opening-view: ${k} camera distance ${cam.dist} is outside ${V.minDist}-${V.maxDist} m`);
+      const at = (dist) => frameOf(cam, dist, o.half, [front, obj, edge]);
+      const p = at(cam.dist);
+      assert.ok(p.every((q) => Math.abs(q.x) <= 1 && Math.abs(q.y) <= 1 && q.z > -1 && q.z < 1),
+        `opening-view: ${k} at ${cam.dist} m the front (x ${front}), the objective (x ${obj}) or its far edge (x ${edge}) projects outside the frame (${p.map((q) => q.y.toFixed(2)).join(', ')})`);
+      const rule = ([f, c, e]) => f.y >= lo && f.y <= hi && c.y >= lo && c.y <= hi && Math.abs(e.y) <= 1;
+      assert.ok(cam.dist === V.minDist || !rule(at(cam.dist - V.step)), `opening-view: ${k} ${cam.dist} m is not the smallest distance that frames them (${cam.dist - V.step} m does)`);
+      seen.add(o.kind);
+    }
+    assert.equal(seen.size, 8, `opening-view: ${seen.size} of the 8 (field, side, attacker) cases were checked`);
+  }],
+  ['opening-hud', (api) => {
+    // The HUD's own edges at 1280 x 720 (no margin): the top strip ends at frame.top px, the dock starts frame.bottom px up.
+    const F = S.OPENING_VIEW.frame, row = (q) => ((1 - q.y) / 2) * F.height, worst = { front: 0, obj: F.height };
+    for (const o of openingCases(api)) {
+      const [f, c] = frameOf(o.cam, o.cam.dist, o.half, [o.front, o.obj]).map(row);
+      assert.ok(f >= F.top && f <= F.height - F.bottom, `opening-hud: ${o.k} the player's front (x ${o.front}) projects at y ${f.toFixed(0)} px, outside the band between the top strip (${F.top} px) and the dock (${F.height - F.bottom} px)`);
+      assert.ok(c >= F.top && c <= F.height - F.bottom, `opening-hud: ${o.k} the objective (x ${o.obj}) projects at y ${c.toFixed(0)} px, outside the band between the top strip (${F.top} px) and the dock (${F.height - F.bottom} px)`);
+      worst.front = Math.max(worst.front, f); worst.obj = Math.min(worst.obj, c);
+    }
+    assert.ok(worst.front > 0, 'opening-hud: no case was checked');
+  }],
   ['href', (api) => {
     const p = { field: 'henry-hill', us: 'shiloh.hornets-nest', cs: 'shiloh.buell-attacks', attacker: 'US' };
     assert.equal(api.sandboxBattleHref({ ...p, side: 'US', difficulty: 'veteran' }), './?sandbox-battle&field=henry-hill&us=shiloh.hornets-nest&cs=shiloh.buell-attacks&attacker=US', 'href: Veteran and the Union add to the address');
@@ -244,6 +305,22 @@ const redeploy = (c, rules) => {
   return prepareFieldScenario(strip(s, (u) => ({ ...u, x: at.get(u.id).x, z: at.get(u.id).z, facing: at.get(u.id).facing })), 'pack');
 };
 const strip = (s, fn) => ({ ...s, units: s.units.map((u) => fn({ ...u })) });
+// The opening-view mutant: the camera before v5 (1,200 m behind the Union front, pulled in so it stood on the map; a
+// Confederate player got sides.js's centroid view).
+const oldCamera = (s, c) => {
+  const dist = 1200, dirUS = c.attacker === 'US' ? 1 : -1, usX = s.units.filter((d) => d.side === 'US').map((d) => d.x);
+  const front = dirUS > 0 ? Math.max(...usX) : Math.min(...usX), reach = META[c.field].halfSize - 100 - dist;
+  return { target: [Math.round(dirUS > 0 ? Math.max(front, -reach) : Math.min(front, reach)), 0], yaw: dirUS > 0 ? -Math.PI / 2 : Math.PI / 2, dist };
+};
+// The opening-hud mutant: the first v5 fit (target halfway; from 900 m out until the front and the far edge lie inside 95%
+// of the full frame's height), which put an attacker's front under the dock.
+const firstFit = (s, c, side) => {
+  const dir = side === c.attacker ? 1 : -1, xs = s.units.filter((d) => d.side === side).map((d) => d.x), front = dir > 0 ? Math.max(...xs) : Math.min(...xs);
+  const tx = front / 2, near = (front - tx) * dir, far = (dir * s.objective.r - tx) * dir;
+  let dist = 900;
+  while (dist < 2000 && !(Math.abs(S.viewHeight(near, dist, pitchForDist(dist), 32)) <= 0.95 && Math.abs(S.viewHeight(far, dist, pitchForDist(dist), 32)) <= 0.95)) dist += 10;
+  return { target: [Math.round(tx), 0], yaw: dir > 0 ? -Math.PI / 2 : Math.PI / 2, dist };
+};
 const MUTANTS = {
   rosters: { rosterList: (packs) => S.rosterList(packs.map((p) => ({ ...p, phases: p.phases.map((ph) => ({ ...ph, scenario: { ...ph.scenario, reinforcements: [] } })) }))) },
   fields: { fieldDressing: (field, scenarios) => structuredClone(Object.fromEntries(['ground', 'woods', 'sites', 'labels'].map((k) => [k, scenarios.find((s) => (s.terrain ?? 'henry-hill') === field)[k]]).filter(([, v]) => v !== undefined))) },
@@ -259,6 +336,8 @@ const MUTANTS = {
   contact: { scenarioFor: (c) => redeploy(c, { ...S.DEPLOYMENT, defenderFront: 400 }) },
   refusals: { sandboxBattleSearch: (search, rosters) => { try { return S.sandboxBattleSearch(search, rosters); } catch { return Object.freeze({}); } } },
   href: { sandboxBattleHref: (p) => S.sandboxBattleHref({ ...p, side: 'US' }) },
+  'opening-view': { scenarioFor: (c) => ({ ...build(c), camera: oldCamera(build(c), c) }) },
+  'opening-hud': { scenarioFor: (c) => { const s = build(c); return { ...s, camera: { ...firstFit(s, c, 'US'), bySide: { US: firstFit(s, c, 'US'), CS: firstFit(s, c, 'CS') } } }; } },
 };
 
 async function run(api, only = null) {
@@ -277,8 +356,9 @@ const n = await run(API);
 if (process.argv.includes('--prove-fail')) {
   for (const [name] of CHECKS) {
     assert.ok(MUTANTS[name], `no mutant for ${name}`);
-    await assert.rejects(() => run({ ...API, ...MUTANTS[name] }, name), (e) => e.code === 'ERR_ASSERTION' && e.message.startsWith(`${name}:`), `${name}: its mutant was not caught`);
-    console.log(`fail ${name} (mutant caught)`);
+    let said = '';
+    await assert.rejects(() => run({ ...API, ...MUTANTS[name] }, name), (e) => { said = String(e.message).split('\n')[0]; return e.code === 'ERR_ASSERTION' && e.message.startsWith(`${name}:`); }, `${name}: its mutant was not caught`);
+    console.log(`fail ${name} (mutant caught): ${said.slice(0, 220)}`);
   }
 }
 console.log(`SANDBOX BATTLE OK (${n}/${CHECKS.length})`);

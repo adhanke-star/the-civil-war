@@ -756,8 +756,8 @@ self.CW_OFFLINE = {
    "sha256": "655551c4e531a06167ae70ece63451b3067cce7fb338dad7e5fc01a2414ea38d"
   },
   "src/main.js": {
-   "bytes": 36132,
-   "sha256": "2f98909a63d03a33ea509aa105281c32d64ea267c9d4944f671c34741b5fe346"
+   "bytes": 37671,
+   "sha256": "016a1ad0d2c26a18b4de8ed695d09712402703fd9595e3b7d641ecb4178d6f87"
   },
   "src/render/post.js": {
    "bytes": 26769,
@@ -816,8 +816,8 @@ self.CW_OFFLINE = {
    "sha256": "00d6043eb5fa02bcab1aeb5d698b6afbc5f8a608a124a4b928b967e1911b9f29"
   },
   "src/sim/combat.js": {
-   "bytes": 42548,
-   "sha256": "9e2ba814da3efb74a08c29de269ceb2a3b0c7af937fedd11fe4f0905c69b1a6e"
+   "bytes": 45799,
+   "sha256": "5fad36841619db3e65fa7c9d9abc6aee8c09af2b1673fae15192f3ebc5a605ed"
   },
   "src/sim/equipment.js": {
    "bytes": 4298,
@@ -836,12 +836,12 @@ self.CW_OFFLINE = {
    "sha256": "a427c8aa9a1c0e51688b94512c288677b2f3e069d5fce3ad29f02c7d95a2b35a"
   },
   "src/sim/sandbox-battle.js": {
-   "bytes": 19349,
-   "sha256": "edfe5eb3b3fdd5426e511c5f1dd7e6c21e2c7f302ffbd3f3e8111bc471e75f44"
+   "bytes": 24633,
+   "sha256": "8cf11fcbf1915ac4868b79230afc575330813e2040bb1206590646c3baf81a6b"
   },
   "src/sim/sides.js": {
-   "bytes": 4791,
-   "sha256": "4546b3627a6d6137c06d28e4e7eaecc4e4de9a9fb8d5d566529972035a1e5b91"
+   "bytes": 5086,
+   "sha256": "9388774f55b976705ddeb880a6aa9fe21c1b98be03c0a5ff075c9913f132205d"
   },
   "src/ui/arrows.js": {
    "bytes": 23753,
@@ -872,8 +872,8 @@ self.CW_OFFLINE = {
    "sha256": "7c7dfee6cccfecd5700d01fca33f25cc0ae12277ab48eeebe6cc10cbc5ac06f1"
   },
   "src/ui/hud.js": {
-   "bytes": 66069,
-   "sha256": "8519142c75ac603582dde6f8aeb0fbd2d3282608b645b0e1c6a4dd23a5fb4532"
+   "bytes": 70207,
+   "sha256": "60513b295540dfc91df9e33e7ffd3425a700eec459ea50da8c16546dafd428b0"
   },
   "src/ui/input.js": {
    "bytes": 36705,
@@ -948,8 +948,8 @@ self.CW_OFFLINE = {
    "sha256": "1517846da294c87f71a9a4b0bce389a618bcf7d5f2042f48e9c484685f2bd883"
   },
   "src/units/unit.js": {
-   "bytes": 57181,
-   "sha256": "87309d0080294f84d1d40af6429e21533afa9ae9ca723b04cf462f42646164f4"
+   "bytes": 57371,
+   "sha256": "0840aaba3623155bb4d8c3cad015988a7943f34968d6abf4104b4fc18e68cf37"
   },
   "src/world/ground-paint.js": {
    "bytes": 8594,
@@ -1487,5 +1487,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "45539e980438f183f8c8c7c95d852defa7b66cc2bddc7e0492fefa7dfff4299b"
+ "generation": "0ebeb0042f1cc1168eea1b855aad919d590706e92d87291db64d2dccefa6bebd"
 };

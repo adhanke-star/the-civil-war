@@ -56,7 +56,7 @@ import { framePos } from './figure.js';
 import { BAKE_CLIP } from './impostor.js';
 import { mulberry32 } from '../world/landscape.js';
 import { RULES } from '../sim/rules.js';
-import { CAVALRY, SCREENED, defaultWeapon, featsOf, setCampEffects, campFx } from '../sim/combat.js';
+import { CAVALRY, SCREENED, defaultWeapon, featsOf, setCampEffects, campFx, outranged } from '../sim/combat.js';
 import { LOOK } from '../ui/look.js';
 import { equipmentProfile } from '../sim/equipment.js';
 import { define, on as onSetting } from '../settings.js';
@@ -326,6 +326,8 @@ export class Unit {
   get spacing() { return this.type === 'infantry' ? LOOK.formationSpacing : 1; }
   /** On foot or getting there: a dismounted regiment, or one dismounting or remounting (cavalry only). */
   get afoot() { return this.type === 'cavalry' && (!this.mounted || !!this.switching); }
+  /** Under fire with no enemy inside its own effective range for the last 10 s (src/sim/combat.js OUTRANGED; the marker's word). */
+  get outranged() { return outranged(this); }
 
   /** Assign line slots (two dense ranks plus the skirmish screen) to living figures, keeping neighbours. */
   layout() {

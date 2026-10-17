@@ -17,6 +17,8 @@
 //               the attack role on it (the computer's march at once, as DECISIONS 0273 gives a computer attacker), the
 //               defender's hold. Result and grade are the battle-pack rule (src/game.js packResult: objective at the
 //               end, a broken side, and the casualty ratio for Decisive).
+//   View        openingView() below: the first frame shows the player's own front line and the centre ground together,
+//               whichever side he commands and whichever attacks (one view per side; src/sim/sides.js sideCamera picks it).
 //   Scale       the coarser of the two phases' men per figure, coarsened further until the whole field fits the
 //               battle-pack figure budget (src/sim/phase.js PACK_FIELD_LIMITS).
 // Date: src/sim/phase.js scenario() requires an ISO `date`, and the field draws the Confederate national colour of that
@@ -151,15 +153,83 @@ function rosterSource(packs, id, side, key) {
   return { pack, phase, row: rosterList([{ ...pack, phases: [phase] }]).find((r) => r.side === side) };
 }
 
+// Opening view game rule (metres; v5 LEG A). The camera stands behind the player's front looking at the enemy, its target
+// on the line between that front and the objective's centre. Must: the front and the objective's centre both project into
+// the band of the frame the HUD leaves clear (below the top strip, above the bottom dock: OPENING_VIEW.frame, less
+// `margin` px each side for uneven ground, which moves a point about 11 px). Should: the objective's far edge (r) inside
+// the frame. It is unmarked on the field (the minimap rings it), and an attacker's front stands about 900 m out, so at the
+// field camera's own limit of 2,000 m (src/render/rts-camera.js maxDist) the 1,500 m from front to far edge cannot also
+// clear the top strip. The search takes the smallest distance from 900 m (10 m steps) and, at it, the target nearest the
+// halfway point (10 m steps toward either end) that keeps both rules; failing that, the Must alone; failing that (no
+// built roster does), halfway at 2,000 m. The pitch is the field camera's zoom-dependent one (view.pitchFor: src/main.js
+// passes rts-camera.js pitchForDist plus the player's Look > Camera elevation, so the menu never loads three.js), the lens
+// the page's (view.fov, src/main.js FIELD_FOV), and the frame the page's (view.frame: its height and the HUD's top and
+// bottom px; the default is a 720 px page with hud.css's sizes). An attacker's camera on a small field (Henry Hill,
+// half 1,300 m) stands up to about 600 m beyond the map's edge to see this much; the dark apron (src/world/terrain.js
+// buildApron) fills what the top corners see past the edge. Flat ground is assumed; hills move points by the margin.
+export const OPENING_VIEW = Object.freeze({ minDist: 900, maxDist: 2000, step: 10, margin: 12,
+  frame: Object.freeze({ height: 720, top: 60, bottom: 158 }) }); // hud.css --edge + --top-h; --edge + --dock-card-h
+/**
+ * Height in the frame (-1 bottom, 1 top) of a ground point s metres beyond the target along the view axis, for a camera
+ * dist metres from the target at pitch radians and a vertical field of view of fov degrees: flat ground, the camera
+ * placed as rts-camera.js update() places it (target + horizontal cos(pitch) dist behind, sin(pitch) dist up). A point
+ * level with or behind the camera is -Infinity (never in the frame).
+ */
+export function viewHeight(s, dist, pitch, fov) {
+  const h = Math.cos(pitch) * dist, up = Math.sin(pitch) * dist;
+  if (h + s <= 0) return -Infinity;
+  return Math.tan(pitch - Math.atan2(up, h + s)) / Math.tan((fov * Math.PI) / 360);
+}
+/** The HUD-clear band of the frame ([bottom, top] in -1..1) for `frame` ({ height, top, bottom } px) less `margin` px. */
+export function clearBand(frame, margin) {
+  return [-1 + (2 * (frame.bottom + margin)) / frame.height, 1 - (2 * (frame.top + margin)) / frame.height];
+}
+/**
+ * The opening view (see OPENING_VIEW) of a player whose front line stands at x = front facing dir (+1 east, -1 west):
+ * { target, yaw, dist }. `objective` is { x, r } on the line z = 0; `view` is { pitchFor, fov, frame? }.
+ */
+export function openingView(front, dir, objective, view, V = OPENING_VIEW) {
+  const [lo, hi] = clearBand({ ...V.frame, ...view.frame }, V.margin), edge = objective.x + dir * objective.r;
+  const mid = Math.round((front + objective.x) / 2), min = Math.min(front, objective.x), max = Math.max(front, objective.x);
+  // rts-camera.js puts the camera at target + (sin yaw, cos yaw) * h: yaw -pi/2 stands it west, looking east (+x).
+  const yaw = dir > 0 ? -Math.PI / 2 : Math.PI / 2;
+  const fits = (tx, dist, withEdge) => {
+    const p = view.pitchFor(dist), y = (x) => viewHeight((x - tx) * dir, dist, p, view.fov), clear = (v) => v >= lo && v <= hi;
+    return clear(y(front)) && clear(y(objective.x)) && (!withEdge || Math.abs(y(edge)) <= 1);
+  };
+  for (const withEdge of [true, false]) {
+    for (let dist = V.minDist; dist <= V.maxDist; dist += V.step) {
+      for (let k = 0; mid - k * V.step >= min || mid + k * V.step <= max; k++) {
+        for (const tx of k ? [mid - k * V.step, mid + k * V.step] : [mid]) {
+          if (tx >= min && tx <= max && fits(tx, dist, withEdge)) return { target: [tx, 0], yaw, dist };
+        }
+      }
+    }
+  }
+  return { target: [mid, 0], yaw, dist: V.maxDist };
+}
+/** The opening view of each side (the side's front: its formation nearest the enemy, as deploy() faces it). */
+function sideViews(units, attacker, view) {
+  const out = {};
+  for (const side of SIDES) {
+    const dir = side === attacker ? 1 : -1, xs = units.filter((d) => d.side === side).map((d) => d.x);
+    out[side] = openingView(dir > 0 ? Math.max(...xs) : Math.min(...xs), dir, OBJECTIVE, view);
+  }
+  return out;
+}
+
 /**
  * The prepared ('pack' route) scenario of one sandbox battle. `packs` are the raw battle packs, `henryHill` the raw
- * assets/scenarios/henry-hill.json and `terrainMeta` the field's assets/terrain/<field>.json (its halfSize and name).
+ * assets/scenarios/henry-hill.json and `terrainMeta` the field's assets/terrain/<field>.json (its halfSize and name); `view` is the field camera's { pitchFor, fov, frame? } (see OPENING_VIEW).
  */
-export function sandboxBattleScenario({ field, us, cs, attacker }, { packs, henryHill, terrainMeta }) {
+export function sandboxBattleScenario({ field, us, cs, attacker }, { packs, henryHill, terrainMeta, view }) {
   if (!FIELD_IDS.includes(field)) throw new Error('Sandbox battle: the "field" parameter names no built field.');
   if (!SIDES.includes(attacker)) throw new Error('Sandbox battle: the "attacker" parameter must be US or CS.');
   const half = terrainMeta?.halfSize;
   if (!Number.isFinite(half) || typeof terrainMeta.name !== 'string') throw new Error('Sandbox battle: the field terrain description is invalid.');
+  if (typeof view?.pitchFor !== 'function' || !Number.isFinite(view.fov)) throw new Error('Sandbox battle: the opening view needs the field camera\'s pitch rule and field of view.');
+  const fr = view.frame;
+  if (fr !== undefined && !(['height', 'top', 'bottom'].every((k) => Number.isFinite(fr?.[k]) && fr[k] >= 0) && fr.height > fr.top + fr.bottom)) throw new Error('Sandbox battle: the opening view\'s frame is invalid.');
   const U = rosterSource(packs, us, 'US', 'us'), C = rosterSource(packs, cs, 'CS', 'cs');
   const scenarios = [henryHill, ...packs.flatMap((p) => p.phases.map((ph) => ph.scenario))];
   const source = dressingSource(field, scenarios), defender = attacker === 'US' ? 'CS' : 'US';
@@ -168,11 +238,9 @@ export function sandboxBattleScenario({ field, us, cs, attacker }, { packs, henr
   // Game rule: the attacker's formations march on the objective at once (ignored for the player's own); the defender's hold.
   const units = deploy(formations, attacker, half).map((d) => (d.side === attacker ? { ...d, ai: { role: 'attack' } } : d));
   const base = Math.max(phaseMenPerFigure(U.phase.scenario), phaseMenPerFigure(C.phase.scenario));
-  // Opening view (game rule): from behind the Union front, looking at the enemy, pulled toward the centre so the camera
-  // itself stands on the map (src/sim/sides.js turns it for a Confederate player).
-  const dist = 1200, dirUS = attacker === 'US' ? 1 : -1, usX = units.filter((d) => d.side === 'US').map((d) => d.x);
-  const front = dirUS > 0 ? Math.max(...usX) : Math.min(...usX), reach = half - 100 - dist;
-  const target = [Math.round(dirUS > 0 ? Math.max(front, -reach) : Math.min(front, reach)), 0];
+  // Opening view (game rule, see OPENING_VIEW): one per side. `camera` is the Union player's; sideScenario hands a
+  // Confederate player bySide.CS (src/sim/sides.js sideCamera), as it does every Battles-menu phase.
+  const views = sideViews(units, attacker, view);
   const A = sideName(attacker), Dn = sideName(defender), fieldName = terrainMeta.name;
   const out = {
     id: 'sandbox-battle', title: `Sandbox battle · ${fieldName}`, battle: 'Sandbox battle',
@@ -182,7 +250,7 @@ export function sandboxBattleScenario({ field, us, cs, attacker }, { packs, henr
     ...(source.season ? { season: source.season } : {}), ...(Number.isSafeInteger(source.seed) ? { seed: source.seed } : {}),
     clockRatio: 15, menPerFigure: figureScale(units, base), attacker, objective: { ...OBJECTIVE },
     retreat: { [attacker]: [-(half - DEPLOYMENT.edge), 0], [defender]: [half - DEPLOYMENT.edge, 0] },
-    camera: { target, yaw: dirUS > 0 ? -Math.PI / 2 : Math.PI / 2, dist },
+    camera: { ...views.US, bySide: views },
     victory: {
       attackerHolds: `${A} troops hold the centre ground at 08:00 (sandbox rule: the objective decides).`,
       defenderHolds: `${Dn} troops still hold the centre ground at 08:00 (sandbox rule: the objective decides).`,
@@ -241,8 +309,9 @@ async function readJson(url, fetcher, current) {
   return JSON.parse(text);
 }
 
-/** Read the address, fetch the three packs (each validated whole), Henry Hill and the field's terrain description, and build the scenario. */
-export async function loadSandboxBattle(search, { fetcher = globalThis.fetch, isCurrent = () => true } = {}) {
+/** Read the address, fetch the three packs (each validated whole), Henry Hill and the field's terrain description, and build
+ * the scenario; `view` is the field camera's { pitchFor, fov, frame? } (see OPENING_VIEW). */
+export async function loadSandboxBattle(search, { fetcher = globalThis.fetch, isCurrent = () => true, view } = {}) {
   const current = () => { if (!isCurrent()) throw new Error('Field: the field launch was cancelled.'); };
   const asked = sandboxBattleSearch(search);
   const [packs, henryHill, terrainMeta] = await Promise.all([
@@ -254,5 +323,5 @@ export async function loadSandboxBattle(search, { fetcher = globalThis.fetch, is
     if (pack.id !== SANDBOX_PACKS[i]) throw new Error('Sandbox battle: a battle pack identity does not match its file.');
   });
   const params = sandboxBattleSearch(search, rosterList(packs));
-  return Object.freeze({ params, scenario: sandboxBattleScenario(params, { packs, henryHill, terrainMeta }) });
+  return Object.freeze({ params, scenario: sandboxBattleScenario(params, { packs, henryHill, terrainMeta, view }) });
 }

@@ -50,6 +50,9 @@ jobs:
         run: |
           if [ "${{ matrix.shard }}" = "3" ]; then
             node tools/test.mjs --shard=3 --trace-screenshots
+          elif [ "${{ matrix.shard }}" = "4" ]; then
+            # the sides balance report (tools/balance-sides.mjs) runs first; it fails only on an exception, never on an outcome
+            node tools/test.mjs --shard=4 --balance-sides
           else
             node tools/test.mjs --shard=${{ matrix.shard }}
           fi
@@ -61,6 +64,23 @@ jobs:
           name: test-output-${{ matrix.shard }}
           path: .out/
           include-hidden-files: true
+          retention-days: 7
+          if-no-files-found: warn
+
+      # v5 LEG D: the balance table on its own (artifact and job summary), so it is read without unpacking the shard's output
+      - name: Sides balance report
+        if: always() && matrix.shard == 4
+        run: |
+          if [ -f .out/balance-sides.md ]; then cat .out/balance-sides.md >> "$GITHUB_STEP_SUMMARY"; else echo "no .out/balance-sides.md"; fi
+
+      - name: Upload sides balance report
+        if: always() && matrix.shard == 4
+        uses: actions/upload-artifact@v4
+        with:
+          name: balance-sides
+          path: |
+            .out/balance-sides.json
+            .out/balance-sides.md
           retention-days: 7
           if-no-files-found: warn
 
@@ -92,7 +112,7 @@ jobs:
           for name in deployment phase field-admission reinforcements reinforcement-runtime capture-accounting \
             surrender-runtime surrender-result surrender-result-ui equipment reward save practice captures intro \
             sandbox-rules look view spacing residency moments keyboard soldier-view surrender-activation \
-            captured-guns battery-overrun captured-loadouts packs large ai masking campaign campaign-ui ground delegation shiloh command stones-river \
+            captured-guns battery-overrun captured-loadouts packs large ai masking outranged campaign campaign-ui ground delegation shiloh command stones-river \
             cavalry chattanooga economy badges observe-badges orders history audio art hooks traits command-chain current-compression scene-allocation foragers progression difficulty-matrix inactive-figures terrain-partition terrain-owner pool-resource game-figure-resource runtime-close resource-profile level-rewards atlas-compression atlas-loader ordinary-field-pilot offline-worker sides sandbox-battle officers; do
             for mode in "" --prove-fail; do
               echo "::group::node tools/test-$name.mjs $mode"

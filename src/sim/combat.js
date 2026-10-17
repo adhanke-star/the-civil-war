@@ -55,6 +55,11 @@
 //     (`limber` s) must stand UNLIMBER_S + limber sim seconds after it halts before it fires (unit.js also holds it that long
 //     before it moves off); pioneers (`pioneers`) pass woods faster (unit.js). Starting fatigue and rounds are the
 //     definition's `fatigue` and `ammo` (unit.js). A definition without them takes exactly the old arithmetic.
+//   - Outranged (v5 LEG B, a game rule for readability; DECISIONS 0283): a formation is Outranged while it has been under
+//     fire for the last OUTRANGED.window s of battle time (hit at the start of that window and again since, no gap between
+//     hits over OUTRANGED.gap) and in that window never had a living enemy inside its own effective range (effRange) with
+//     line of sight. Routing and captured units are never Outranged. The record lives in a module WeakMap (outranged(u);
+//     unit.js reads it as u.outranged), is refreshed with the targets and draws no random number: nothing the battle reads.
 // FIRE_BASE and the drains are tuned for a few minutes of fighting per brigade, not sourced (as in the old
 // model, where FIRE_BASE was "tuned so the loop runs ~90 s"). The sandbox multipliers rules.fireEffect and
 // rules.moraleLoss scale them at the point of use; the constants here stay as they are.
@@ -113,6 +118,15 @@ const LIVE_FX = new WeakMap(); // unit -> own fractions plus any X-Factor aura, 
 const HELD_RANGE = 60, DISCIPLINE_S = 15, BREAK_S = 30, RALLY_QUICK_S = 30, REPULSE_RANGE = 150, PRESSED_RANGE = 300;
 const FAR = 200, LONG = 150, RECENT_FIRE_S = 8;
 const WORKS = new Set(['fence line', 'farm buildings']);
+// ---- Outranged (see the header; read-only on the battle) ---------------------------------------------------------------
+/**
+ * Game values, not sourced. window: seconds under fire with no enemy in reach before the word shows. gap: the longest pause
+ * between hits that still counts as one spell of fire; it is longer than the slowest reload (a tired battery, 7.5 s x 1.5).
+ */
+export const OUTRANGED = Object.freeze({ window: 10, gap: 12 });
+const OUT = new WeakMap(); // unit -> { fireFrom: spell start | null, hitT: last hit, reachT: last time an enemy was in reach, on }
+/** Is this formation Outranged now (the rule in the header)? */
+export const outranged = (u) => OUT.get(u)?.on === true;
 /** The unit's feat record for this battle (made on first use). */
 export function featsOf(u) {
   let r = FEATS.get(u);
@@ -313,6 +327,7 @@ export class Combat {
       }
       this.screenStep();
       this.badgeStep();
+      this.outrangedStep(this.#now);
     }
     for (const u of this.units) {
       if (!u.alive) continue;
@@ -404,6 +419,43 @@ export class Combat {
   holdingFeat(t, men, time) {
     if (!(men > 0) || t.follow.active || t.state === 'routing' || t.order.type === 'fallback' || t.order.type === 'charge') return;
     if (t.firing || time - t.fireT < RECENT_FIRE_S) featsOf(t).holdingLoss += men;
+  }
+
+  /** A volley landed on `t` at `time`: it opens a new spell of fire after a pause longer than OUTRANGED.gap. */
+  tookFire(t, time) {
+    let r = OUT.get(t);
+    if (!r) OUT.set(t, (r = { fireFrom: null, hitT: -Infinity, reachT: -Infinity, on: false }));
+    if (r.fireFrom === null || time - r.hitT > OUTRANGED.gap) { r.fireFrom = time; r.reachT = -Infinity; }
+    r.hitT = time;
+  }
+
+  /** Has `u` a living enemy inside its own effective range (centre distance less 0.4 of the enemy's half-front, as for targets) with line of sight? */
+  inReach(u) {
+    const reach = this.effRange(u), t = u.target;
+    if (t && Math.hypot(t.x - u.x, t.z - u.z) - t.halfFront * 0.4 <= reach) return true; // the pick already saw it
+    for (const e of this.units) {
+      if (e.side === u.side || !e.alive || e.state === 'captured') continue;
+      if (Math.hypot(e.x - u.x, e.z - u.z) - e.halfFront * 0.4 > reach) continue;
+      if (this.los(u, e)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * The Outranged rule (header), refreshed with the targets: under fire for `window` s (hit at its start and again since,
+   * last hit within OUTRANGED.gap) and no enemy in reach for longer than `window` s. Reach is sampled only during a spell of fire.
+   */
+  outrangedStep(time, window = OUTRANGED.window) {
+    for (const u of this.units) {
+      const r = OUT.get(u);
+      if (!r) continue;
+      if (!u.alive || u.state === 'routing' || u.state === 'captured' || (r.fireFrom !== null && time - r.hitT > OUTRANGED.gap)) {
+        r.fireFrom = null; r.on = false; continue; // the spell is over (or the line is not holding)
+      }
+      if (r.fireFrom === null) { r.on = false; continue; }
+      if (this.inReach(u)) r.reachT = time;
+      r.on = time - r.fireFrom >= window && r.hitT > r.fireFrom && time - r.reachT > window;
+    }
   }
 
   /** Sim seconds per round for u at full fatigue factor 1 (cavalry on foot: breech-loading carbines, faster). */
@@ -508,6 +560,7 @@ export class Combat {
     const tMen = t.men;
     const cas = Math.min(t.men, (boost ? rate * (1 + boost) : rate) * period * (0.78 + this.rnd() * 0.44));
     t.takeLosses(cas, this.fallen[t.side], time);
+    this.tookFire(t, Number.isFinite(time) ? time : this.#now);
     // feat statistics (counting only)
     const r = featsOf(u);
     if (d > FAR) r.farKills += cas;

@@ -39,6 +39,9 @@
 //   device-*: device.html prints a GPU tier line and finishes the ratio-1 benchmark without console errors
 // `node tools/test.mjs --shard=N` (N = 1-4) runs one CI slice of the full run; CI runs all four in parallel.
 // `node tools/test.mjs --unit` runs only the Node checks (settings, baked-maths; no browser, writes nothing).
+// `node tools/test.mjs --balance-sides` runs only the sides balance report (tools/balance-sides.mjs, no browser): every pack
+// phase from each side, table in .out/balance-sides.md and .json; it fails only on an exception, never on an outcome.
+// With --shard=4 (CI) it runs before shard 4's browser checks.
 // `node tools/test.mjs --s1` runs the settings, sandbox and device checks only (skips the battle page).
 // `node tools/test.mjs --field` runs the settings and battle-page checks only (skips the sandbox and device pages).
 // `node tools/test.mjs --reward` runs Node foundations and completed reward persistence UI only.
@@ -115,6 +118,7 @@ catch(error){console.error(error.message);process.exit(1);}
 // `--shard=N` (1-4) runs one CI slice of the full browser run; the Node unit checks run in shard 3. No flag = everything.
 const SHARD = Number((process.argv.find((a) => a.startsWith("--shard=")) || "=0").split("=")[1]) || 0;
 const runs = (n) => SHARD === 0 || SHARD === n;
+const BALANCE = process.argv.includes('--balance-sides');
 const READY_TIMEOUT_MS = 180_000;
 const VIEWPORT = { width: 1280, height: 720 };
 const MIN_FIGURES = 1000;
@@ -1583,6 +1587,18 @@ async function cpuModelUnit(file, marker, key, name, detail) {
 }
 const capturedGunsModelUnit = () => cpuModelUnit('tools/test-captured-guns.mjs', 'CAPTURED GUNS', 'capturedGuns', 'captured-guns-model', 'captured-gun CPU categories with their own controls');
 const batteryOverrunModelUnit = () => cpuModelUnit('tools/test-battery-overrun.mjs', 'BATTERY OVERRUN', 'batteryOverrun', 'battery-overrun-model', 'battery overrun CPU categories with their own controls');
+/** The sides balance report (tools/balance-sides.mjs) in its own process: a diagnostic, so the check is that it ran
+ * (exit 0 and "BALANCE SIDES OK"); the grades it prints are for reading, never for passing or failing. */
+async function balanceSidesUnit() {
+  try {
+    const { execFileSync } = await import('node:child_process');
+    const text = execFileSync(process.execPath, [path.join(ROOT, 'tools/balance-sides.mjs')], { encoding: 'utf8', maxBuffer: 16 * 1024 * 1024, timeout: 10 * 60_000 });
+    const ok = text.match(/^BALANCE SIDES OK \((\d+)\/(\d+)\)$/m);
+    if (!ok || ok[1] !== ok[2]) throw new Error('balance-sides.mjs did not finish every run.');
+    console.log(text.slice(text.indexOf('# Sides balance')).trimEnd());
+    check('balance-sides', true, `${ok[1]} phase runs; table in .out/balance-sides.md`);
+  } catch (error) { check('balance-sides', false, String(error.message).split('\n').slice(0, 3).join(' ')); }
+}
 const capturedLoadoutsModelUnit = () => cpuModelUnit('tools/test-captured-loadouts.mjs', 'CAPTURED LOADOUTS', 'capturedLoadouts', 'captured-loadouts-model', 'captured loadout CPU categories with their own controls');
 
 /** The original battle-page checks: ready, canvas, figures, orders, combat, axe and console. */
@@ -1808,6 +1824,7 @@ async function battlePage(browser, url) {
 
 async function main() {
   if (!BADGE_SELECTION && runs(3)) await nodeUnits();
+  if (BALANCE && SHARD === 4) await balanceSidesUnit();
   await fs.mkdir(OUT_DIR, { recursive: true });
   const { server, url } = await startServer({ port: 0 });
   return browserChecks(server, url);
@@ -1991,6 +2008,13 @@ async function browserChecks(server, url) {
     if (browser) await browser.close().catch(() => {});
     await new Promise((resolve) => server.close(resolve));
   }
+}
+
+if (BALANCE && !SHARD) {
+  await balanceSidesUnit();
+  const ok = checks.every((c) => c.ok);
+  console.log(ok ? 'BALANCE OK' : 'BALANCE FAILED');
+  process.exit(ok ? 0 : 1);
 }
 
 if (process.argv.includes('--unit')) {

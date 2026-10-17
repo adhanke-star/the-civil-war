@@ -6,6 +6,13 @@
 //    no page errors while the computer's attacker closes on the centre ground; screenshots sandbox-battle-<n>-opening and
 //    -battle. Run to the clock's end, the result offers the after-action: one page (Done; no replay) with the grade, the
 //    losses and the no-history line on its own (announced too, never "Historical battles"), and no loot. Registered in tools/test.mjs (CI shard 3, --sandbox-battle).
+// 3. The opening view (v5 LEG A; src/sim/sandbox-battle.js openingView): on the opening screenshot the objective (the centre
+//    ground has no flag of its own: its centre point projected through the page camera, as a 1 px box) and at least one of
+//    the player's own brigade flags (their marker boxes) lie wholly inside the 1280 x 720 viewport, and the objective's
+//    centre and the player's front formation (its own centre, projected the same way) lie between the top strip's bottom
+//    and the dock's top, so the HUD hides neither: for a Union defender (launch 1), a Confederate defender facing a Union
+//    attack (launch 2) and a Union attacker on Henry Hill (launch 3: the opening only, screenshot sandbox-battle-3-opening;
+//    its camera stands beyond the small field's edge and the top corners show the apron).
 
 import fs from 'node:fs';
 import { AxeBuilder } from '@axe-core/playwright';
@@ -14,6 +21,7 @@ import { rosterList, SANDBOX_PACKS, NO_HISTORY_NOTE } from '../src/sim/sandbox-b
 const LAUNCHES = [
   { field: 'shiloh', us: 'shiloh.buell-attacks', cs: 'shiloh.camps-at-dawn', attacker: 'CS', side: 'US' },
   { field: 'henry-hill', us: 'shiloh.hornets-nest', cs: 'shiloh.buell-attacks', attacker: 'US', side: 'CS' },
+  { field: 'henry-hill', us: 'shiloh.hornets-nest', cs: 'shiloh.buell-attacks', attacker: 'US', side: 'US', openingOnly: true },
 ];
 
 export async function sandboxBattleUIControls({ browser, url, check, shot, result, watchErrors }) {
@@ -86,7 +94,26 @@ async function sandboxLaunch({ browser, url, check, shot, rows, watchErrors, ros
       return { params: sandboxBattle, terrain: terrain.meta.name, player: game.playerSide, ai: game.ai.side,
         US: game.units.filter((u) => u.side === 'US').length, CS: game.units.filter((u) => u.side === 'CS').length, figures: game.figureCount(),
         mode: document.getElementById('play-mode').textContent, clock: document.getElementById('clock-date').textContent,
-        title: document.getElementById('menu-title').textContent, objective: document.getElementById('objective').textContent };
+        title: document.getElementById('menu-title').textContent, objective: document.getElementById('objective').textContent, view: view() };
+      function view() {
+        const { camera, hud } = window.__game, W = window.innerWidth, H = window.innerHeight, o = game.objective;
+        const inside = (r) => r.width > 0 && r.height > 0 && r.left >= 0 && r.top >= 0 && r.right <= W && r.bottom <= H;
+        camera.updateMatrixWorld(true);
+        const p = camera.position.clone().set(o.x, terrain.heightAt(o.x, o.z), o.z).project(camera);
+        const ox = (p.x + 1) / 2 * W, oy = (1 - p.y) / 2 * H, objectiveBox = { left: ox, top: oy, right: ox + 1, bottom: oy + 1, width: 1, height: 1 };
+        const own = game.units.filter((u) => u.side === game.playerSide && hud.markers.has(u.id)).map((u) => hud.markers.get(u.id).el)
+          .filter((el) => el.isConnected && !el.hidden && getComputedStyle(el).display !== 'none' && getComputedStyle(el).visibility !== 'hidden');
+        const flags = own.filter((el) => inside(el.getBoundingClientRect())).length;
+        // the band the HUD leaves clear, and the player's front formation (the one nearest the enemy along the field's axis)
+        const band = [document.getElementById('topbar').getBoundingClientRect().bottom, document.getElementById('dock').getBoundingClientRect().top];
+        const mine = game.units.filter((u) => u.side === game.playerSide), dir = game.playerSide === game.attacker ? 1 : -1;
+        const lead = mine.reduce((a, u) => (u.x * dir > a.x * dir ? u : a), mine[0]);
+        const q = camera.position.clone().set(lead.x, terrain.heightAt(lead.x, lead.z), lead.z).project(camera);
+        const fx = (q.x + 1) / 2 * W, fy = (1 - q.y) / 2 * H, clear = (x, y) => x >= 0 && x <= W && y >= band[0] && y <= band[1];
+        return { objective: inside(objectiveBox) && p.z > -1 && p.z < 1, objectiveAt: [Math.round(ox), Math.round(oy)], flags, ownMarkers: own.length,
+          band: band.map(Math.round), frontAt: [Math.round(fx), Math.round(fy)], clear: clear(ox, oy) && clear(fx, fy) && q.z > -1 && q.z < 1,
+          camera: { x: Math.round(window.__game.rts.target.x), z: Math.round(window.__game.rts.target.z), yaw: +window.__game.rts.yaw.toFixed(3), dist: Math.round(window.__game.rts.dist) } };
+      }
     });
     await shot(page, `${name}-opening`);
     const run = await page.evaluate((attacker) => {
@@ -105,6 +132,8 @@ async function sandboxLaunch({ browser, url, check, shot, rows, watchErrors, ros
       && opening.ai === (launch.side === 'CS' ? 'US' : 'CS') && opening.params?.field === launch.field && opening.title.startsWith('Sandbox battle · ')
       && opening.mode.startsWith('Sandbox battle · no progress rewards') && opening.clock === 'Sandbox battle' && /centre ground/.test(opening.objective),
     JSON.stringify({ want, opening }));
+    check(`${name}-opening-view`, opening.view.objective && opening.view.flags >= 1 && opening.view.clear, JSON.stringify(opening.view));
+    if (launch.openingOnly) { rows.push({ ...launch, opening, errors: errors.slice() }); check(`${name}-errors`, errors.length === 0, JSON.stringify(errors.slice(0, 5))); return; }
     check(`${name}-runs`, (run.advanced >= 39 || run.over) && run.closed > 10 && errors.length === 0, JSON.stringify({ run, errors: errors.slice(0, 5) }));
     // The clock's end (06:00-08:00 at 15x is 480 s of battle): the frame loop then opens the result.
     const end = await page.evaluate(() => {

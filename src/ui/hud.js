@@ -34,6 +34,9 @@
 // they drive and each man's provenance, with a record note where one is part of his record (Chalmers at Fort Pillow);
 // "Records and sources" opens a dialog (keyboard: Esc or Close returns focus; the battle pauses while it is open) with each
 // trait's claim and its opened sources as links. The enemy flag's tooltip names the traits too.
+// Outranged (v5 LEG B; src/sim/combat.js OUTRANGED, a game rule): a halted formation under fire that cannot reach the line
+// firing on it reads "Outranged" on its marker; the first time one of the player's own formations does in a browser session,
+// a one-time hint (createHints below) says what to do. Never for the computer's side; it changes nothing in the battle.
 
 import * as THREE from 'three';
 import { LOOK } from './look.js';
@@ -117,11 +120,16 @@ export function compass(f) {
   return COMPASS[((Math.round(b / (Math.PI / 4)) % 8) + 8) % 8];
 }
 
-/** What a unit is doing, in one or two words, and a tone for its colour. */
-export function activity(u) {
+/**
+ * What a unit is doing, in one or two words, and a tone for its colour. `playerSide` is the side the reader commands:
+ * Outranged is advice to him, so only his own formations ever read it (a computer formation says what it is doing).
+ */
+export function activity(u, playerSide) {
   if (u.state === 'routing') return ['Routing', 'bad'];
   if (u.melee) return ['Hand to hand', 'bad'];
   if (u.switching) return [u.switching.to === 'mounted' ? 'Remounting' : 'Dismounting', 'warn'];
+  // under fire it cannot return (combat.js OUTRANGED); a line on the move says where it is going instead
+  if (u.side === playerSide && u.outranged && !u.follow.active) return ['Outranged', 'warn'];
   const o = u.order.type;
   if (u.engaged) return [u.firing ? 'Halted, firing' : 'Halted to fight', 'hot'];
   if (u.follow.active) {
@@ -146,9 +154,55 @@ const pathLength = (p) => {
   return len;
 };
 
-/** A sentence for the flag's tooltip: who, how many, what now and what next. */
-export function intention(u) {
-  const [now] = activity(u);
+// ---- first-time hints (v5 LEG B) ------------------------------------------------------------------------------------
+// A hint teaches a rule the moment it first matters (shown as a toast), at most once per browser session: the shown ids live
+// in sessionStorage, so the next battle in the same tab stays quiet and a new tab starts over. Without storage (private
+// mode, Node) a set in memory stands in for this page only. Kept in this module so the offline manifest needs no new file.
+const HINTS_KEY = 'cw-hints-seen';
+function sessionHints() {
+  try { if (typeof sessionStorage !== 'undefined') { sessionStorage.getItem(HINTS_KEY); return sessionStorage; } } catch { /* private mode */ }
+  return null;
+}
+/** A hint registry over `store` (getItem/setItem; null: memory only): once(id) is true the first time this session, false after. */
+export function createHints(store = sessionHints()) {
+  const mem = new Set();
+  const read = () => {
+    if (!store) return mem;
+    try { const v = JSON.parse(store.getItem(HINTS_KEY) || '[]'); return new Set([...mem, ...(Array.isArray(v) ? v.filter((x) => typeof x === 'string') : [])]); } catch { return mem; }
+  };
+  return {
+    seen: (id) => read().has(id),
+    once(id) {
+      const seen = read();
+      if (seen.has(id)) return false;
+      seen.add(id); mem.add(id);
+      if (store) try { store.setItem(HINTS_KEY, JSON.stringify([...seen])); } catch { /* full or private: memory keeps it for this page */ }
+      return true;
+    },
+  };
+}
+/** The page's hint registry (the HUD's). */
+export const HINTS = createHints();
+
+/** The one-time hint's words for an Outranged formation: the contract's sentence for infantry (v5 LEG B); a battery's names
+ * its guns and leaves Charge out (guns cannot charge), a cavalry line's its carbines or revolvers. */
+export function outrangedText(u) {
+  const arms = u.type === 'artillery' ? 'guns' : u.type === 'cavalry' ? (u.weapon === 'pistol' ? 'revolvers' : 'carbines') : 'muskets';
+  return `${u.short} is outranged: its ${arms} cannot reach the line firing on it. ${u.type === 'artillery' ? 'Fall back (F) or hold.' : 'Charge (C), fall back (F) or hold.'}`;
+}
+
+/**
+ * The Outranged hint, once per session (hints: createHints above): the text for the first of the player's own
+ * formations whose marker reads Outranged, or null. The computer's formations never take the hint.
+ */
+export function outrangedHint(units, playerSide, hints = HINTS) {
+  const u = units.find((v) => v.alive && v.side === playerSide && activity(v, playerSide)[0] === 'Outranged');
+  return u && hints.once('outranged') ? outrangedText(u) : null;
+}
+
+/** A sentence for the flag's tooltip: who, how many, what now and what next (`playerSide`: see activity). */
+export function intention(u, playerSide) {
+  const [now] = activity(u, playerSide);
   let next = '';
   const o = u.order;
   if (o.type === 'attack' && o.target) {
@@ -213,6 +267,9 @@ const ROLE_TIP = {
 };
 
 export class Hud {
+  /** The side the player commands (the game's once it is attached): the reader of activity() and intention(). */
+  get ownSide() { return this.game ? this.game.playerSide : this.playerSide; }
+
   constructor({ camera, canvas, terrain, units, playerSide, rts, game, onSelect, onOrder, onPause, onSpeed, onQuality, onSound }) {
     Object.assign(this, { camera, canvas, terrain, units, playerSide, rts, game, onSelect, onOrder });
     this.selected = null;
@@ -913,7 +970,7 @@ export class Hud {
       if (camp.textContent !== text) camp.textContent = text;
       camp.hidden = !text;
     }
-    $('uc-state').textContent = `${intention(u).replace(/^[^:]*: /, '')}${u.coverKind && u.coverKind !== 'open' ? ` In ${u.coverKind}.` : ''}`;
+    $('uc-state').textContent = `${intention(u, this.ownSide).replace(/^[^:]*: /, '')}${u.coverKind && u.coverKind !== 'open' ? ` In ${u.coverKind}.` : ''}`;
     if (this.traitData) this.fillTraits(u); // his own traits leave the card once he is down
   }
 
@@ -1016,10 +1073,15 @@ export class Hud {
     if (this.cardTimer > 0) return;
     this.cardTimer = 0.25;
     for (const { u, m } of shown) this.refreshMarker(u, m);
+    this.outrangedHinted ??= HINTS.seen('outranged'); // an earlier battle in this tab already showed it
+    if (!this.outrangedHinted) { // checked 4 times a second until the session's hint has been shown
+      const hint = outrangedHint(this.units, this.ownSide);
+      if (hint) { this.toast(hint, 'outranged'); this.outrangedHinted = true; }
+    }
     for (const u of this.units) {
       const m = this.markers.get(u.id);
       if (!m || !u.alive) continue;
-      const tip = intention(u) + (u.commandDown ? ' Commander down.' : '') + (this.traitData ? this.traitTip(u) : '');
+      const tip = intention(u, this.ownSide) + (u.commandDown ? ' Commander down.' : '') + (this.traitData ? this.traitTip(u) : '');
       if (tip !== m.lastTip) {
         m.el.title = tip;
         m.el.setAttribute('aria-label', `${tip}${u.selected ? ' Selected.' : ''}`);
@@ -1086,7 +1148,7 @@ export class Hud {
     }
     if (u.holdFire !== m.lastHf) { m.el.classList.toggle('holdfire', !!u.holdFire); m.lastHf = u.holdFire; }
     if (LOOK.statusWords) {
-      const [act, tone] = activity(u);
+      const [act, tone] = activity(u, this.ownSide);
       const actKey = act + tone;
       if (actKey !== m.lastAct) { m.act.textContent = act; m.act.className = `act ${tone}`; m.lastAct = actKey; }
     }
@@ -1137,7 +1199,7 @@ export class Hud {
     }
     for (const u of mine) {
       const r = this.armyRows.get(u.id);
-      const [act] = activity(u);
+      const [act] = activity(u, this.ownSide);
       const key = `${Math.round(u.men)}|${u.state}|${act}|${u.selected}`;
       if (key === r.last) continue;
       r.last = key;
@@ -1178,9 +1240,10 @@ export class Hud {
     $('clock-bar').style.width = `${(frac * 100).toFixed(1)}%`;
   }
 
-  toast(text) {
+  toast(text, hint = '') {
     const p = document.createElement('p');
     p.textContent = text;
+    if (hint) { p.className = 'hint'; p.dataset.hint = hint; } // a first-time hint (createHints)
     $('toasts').appendChild(p);
     setTimeout(() => p.remove(), 5200);
     while ($('toasts').children.length > 3) $('toasts').firstChild.remove();
