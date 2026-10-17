@@ -9,7 +9,10 @@
 //   Field       one of the 5 terrains; its dressing (ground, woods, sites, labels) is that of the built scenario on the same
 //               terrain with the largest JSON of those four keys (Henry Hill: assets/scenarios/henry-hill.json); its season
 //               and seed come from that scenario too, so the ground looks as it does in its own battle.
-//   Deployment  deploy() below: facing lines, the attacker west facing +x, the defender east facing -x.
+//   Deployment  deploy() below: facing lines, the attacker west facing +x (front x = -900), the defender east facing -x
+//               with its front line on the objective (x = +100, inside its radius), so the attack meets it there. The
+//               computer attacker marches about 1,000 m per clock hour, so the 1,000 m gap brings the lines into musket
+//               range about 40 clock minutes in (under three real minutes at 1x) and leaves most of 06:00-08:00 to fight.
 //   Battle      06:00-08:00 at 15x; the objective is "the centre ground" (0, 0), r 600 m; the attacker's formations take
 //               the attack role on it (the computer's march at once, as DECISIONS 0273 gives a computer attacker), the
 //               defender's hold. Result and grade are the battle-pack rule (src/game.js packResult: objective at the
@@ -82,19 +85,22 @@ export function fieldDressing(field, scenarios) {
 }
 
 // Deployment game rule (metres). See deploy().
-export const DEPLOYMENT = Object.freeze({ attackerFront: -1500, defenderFront: 400, edge: 300, bound: 250, spacing: 260,
+export const DEPLOYMENT = Object.freeze({ attackerFront: -900, defenderFront: 100, edge: 300, bound: 250, spacing: 260,
   lineGap: 320, battery: 160, batteryStep: 130, cavalry: 350, minGap: 120 });
 /**
- * Pure and deterministic: `formations` (both sides' defs) as new defs with x, z and facing, in input order. Game rule: the
- * attacker on the west facing +x, the defender on the east facing -x; front lines at x = -1500 and +400, clamped to
- * +-(half - 300). Infantry 260 m apart along z, centred on z = 0; a line longer than 2(half - 300) (less 350 m a side when
- * the side has cavalry, so the horse stays on the field) overflows into further lines 320 m behind. Batteries 160 m behind
- * the front line, spread evenly across it (at least 130 m apart); cavalry 350 m outboard of the front line's flanks,
- * alternating right and left, later pairs 320 m further back. When the rearmost rank would stand beyond half - 250, the
- * whole side steps toward the centre. Throws when the two sides would not stay apart.
+ * Pure and deterministic: `formations` (both sides' defs) as new defs with x, z and facing, in input order. Game rule:
+ * the attacker on the west facing +x, the defender on the east facing -x; front lines at x = -900 and +100 (the
+ * defender's stands on the objective, inside its radius, so the attack meets it there; the computer attacker marches
+ * about 1,000 m per clock hour, so the 1,000 m gap closes to musket range about 40 clock minutes in, under three real
+ * minutes at 1x, leaving most of 06:00-08:00 for the fight), clamped to +-(half - 300).
+ * Infantry 260 m apart along z, centred on z = 0; a line longer than 2(half - 300) (less 350 m a side when the side has
+ * cavalry, so the horse stays on the field) overflows into further lines 320 m behind. Batteries 160 m behind the front
+ * line, spread evenly across it (at least 130 m apart); cavalry 350 m outboard of the front line's flanks, alternating
+ * right and left, later pairs 320 m further back. When the rearmost rank would stand beyond half - 250, the whole side
+ * steps toward the centre. Throws when the two sides would not stay apart. `D` is DEPLOYMENT unless a test passes
+ * another rule set (tools/test-sandbox-battle.mjs: the old +400 defender front as its mutant).
  */
-export function deploy(formations, attackerSide, half) {
-  const D = DEPLOYMENT;
+export function deploy(formations, attackerSide, half, D = DEPLOYMENT) {
   if (!SIDES.includes(attackerSide) || !Number.isFinite(half) || half <= D.edge + D.cavalry) throw new Error('Sandbox battle: deployment needs an attacker and a field half-size.');
   if (!Array.isArray(formations) || formations.some((f) => !SIDES.includes(f?.side))) throw new Error('Sandbox battle: every formation needs a side.');
   const lim = half - D.edge, bound = half - D.bound, placed = new Map(), extent = {};

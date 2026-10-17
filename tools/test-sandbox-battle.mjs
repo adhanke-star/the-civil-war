@@ -4,7 +4,8 @@
 // facing the enemy; the Confederate roster's own date (it picks their national colour); a valid 'pack' scenario with no
 // history and the rosters' own sources; the attack role on every attacker
 // formation (also through sideScenario for a Confederate player); two headless battles in which the computer's attacker
-// closes on the centre ground; and bad addresses refused with the parameter named.
+// closes on the centre ground, and the same two in which, by 07:00 (60 battle minutes), the lines have met (closest
+// attacker-defender pair under 300 m) and both sides have lost men; and bad addresses refused with the parameter named.
 // `node tools/test-sandbox-battle.mjs` prints SANDBOX BATTLE OK (n/n); `--prove-fail` also runs one mutant per check and
 // requires each to fail with that check's own name. No browser, no GPU, writes nothing.
 import assert from 'node:assert/strict';
@@ -196,6 +197,21 @@ const CHECKS = [
       assert.ok(closed > 10, `advance: ${key(c)} the computer's attacker closed ${closed.toFixed(1)} m on the centre ground in 40 s`);
     }
   }],
+  // The lines must meet (CI 38998598887: a defender front at x = +400 left a Shiloh sandbox a 0-lost Draw at 08:00). Battle
+  // clock minutes are simulation seconds x clockRatio / 60, so 07:00 is 240 sim s at 15x.
+  ['contact', (api) => {
+    for (const [c, player] of CONTACT_RUNS) {
+      const g = makeGame(sideScenario(api.scenarioFor(c), player), player), until = (60 * 60) / g.clockRatio, k = key(c);
+      for (let guard = 0; guard < 200 && g.simTime < until - 1e-6 && !g.over; guard++) { if (g.paused) g.togglePause(); g.fastForward(Math.min(5, until - g.simTime)); }
+      const def = c.attacker === 'US' ? 'CS' : 'US', alive = (side) => g.units.filter((u) => u.side === side && u.alive);
+      const lost = (side) => g.units.filter((u) => u.side === side).reduce((n, u) => n + Math.max(0, (u.menMax || 0) - (u.men || 0)), 0);
+      let closest = Infinity;
+      for (const a of alive(c.attacker)) for (const d of alive(def)) closest = Math.min(closest, Math.hypot(a.x - d.x, a.z - d.z));
+      assert.ok(closest < 300, `contact: ${k} the closest attacker and defender stand ${closest.toFixed(0)} m apart at 07:00 (must be under 300 m)`);
+      const la = Math.round(lost(c.attacker)), ld = Math.round(lost(def));
+      assert.ok(la > 0 && ld > 0, `contact: ${k} by 07:00 the attacker (${c.attacker}) lost ${la} and the defender (${def}) ${ld} men (both must be above 0)`);
+    }
+  }],
   ['refusals', (api) => {
     const good = 'field=shiloh&us=shiloh.buell-attacks&cs=shiloh.camps-at-dawn&attacker=CS';
     const p = api.sandboxBattleSearch('?sandbox-battle&' + good, ROSTERS);
@@ -220,6 +236,13 @@ const CHECKS = [
   }],
 ];
 
+const CONTACT_RUNS = [[{ field: 'shiloh', us: 'shiloh.buell-attacks', cs: 'shiloh.camps-at-dawn', attacker: 'CS' }, 'US'],
+  [{ field: 'henry-hill', us: 'shiloh.hornets-nest', cs: 'shiloh.buell-attacks', attacker: 'US' }, 'CS']];
+// The built scenario re-placed by deploy() under another rule set (the contact mutant: the old +400 defender front).
+const redeploy = (c, rules) => {
+  const s = build(c), at = new Map(S.deploy(s.units, c.attacker, META[c.field].halfSize, rules).map((d) => [d.id, d]));
+  return prepareFieldScenario(strip(s, (u) => ({ ...u, x: at.get(u.id).x, z: at.get(u.id).z, facing: at.get(u.id).facing })), 'pack');
+};
 const strip = (s, fn) => ({ ...s, units: s.units.map((u) => fn({ ...u })) });
 const MUTANTS = {
   rosters: { rosterList: (packs) => S.rosterList(packs.map((p) => ({ ...p, phases: p.phases.map((ph) => ({ ...ph, scenario: { ...ph.scenario, reinforcements: [] } })) }))) },
@@ -233,6 +256,7 @@ const MUTANTS = {
   scenario: { scenarioFor: (c) => ({ ...build(c), history: PACKS[0].phases[0].scenario.history }) },
   'attack-roles': { scenarioFor: (c) => prepareFieldScenario(strip(build(c), ({ ai, ...u }) => u), 'pack') },
   advance: { scenarioFor: (c) => prepareFieldScenario(strip(build(c), ({ ai, ...u }) => u), 'pack') },
+  contact: { scenarioFor: (c) => redeploy(c, { ...S.DEPLOYMENT, defenderFront: 400 }) },
   refusals: { sandboxBattleSearch: (search, rosters) => { try { return S.sandboxBattleSearch(search, rosters); } catch { return Object.freeze({}); } } },
   href: { sandboxBattleHref: (p) => S.sandboxBattleHref({ ...p, side: 'US' }) },
 };

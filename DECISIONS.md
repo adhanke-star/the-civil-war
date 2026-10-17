@@ -26,7 +26,10 @@ Fable accepted four amendments the implementation forced: (1) the scenario's req
 phase date, because the renderer picks the Confederate national colour from it (First National before 1 May 1863): with
 the attacker's date 48 of 242 roster pairs per field flew the wrong period's flag; (2) on small fields a side steps
 toward the centre so the 250 m bound beats the front-line clamp (Henry Hill attacker front −890/−730, not −1000);
-(3) screenshots keep the shared shot() names; (4) the sandbox after-action is one page, no replay. Known: the field label
+(3) screenshots keep the shared shot() names; (4) the sandbox after-action is one page, no replay. Amended 2026-10-17 after the first CI screenshots (0 men lost in two hours): the defender front moves to +100 (on the
+objective) and the attacker front to −900, because the computer attacker marches about 1,000 m per clock hour; measured headless,
+the lines are in musket range by 06:45 and both sides have losses by 07:00 on Shiloh and Henry Hill (contact check in the probe).
+Known: the field label
 keeps the terrain file's name with its real dates; a sandbox title therefore carries a date that is the field's, not the
 fight's. Rosters from different years may meet; that is the point of a sandbox and is labelled so.
 

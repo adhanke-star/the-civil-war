@@ -832,8 +832,8 @@ self.CW_OFFLINE = {
    "sha256": "a427c8aa9a1c0e51688b94512c288677b2f3e069d5fce3ad29f02c7d95a2b35a"
   },
   "src/sim/sandbox-battle.js": {
-   "bytes": 18542,
-   "sha256": "4594a74ee9e9680548a6be6f92c6c36586a096d4529ff114abe6c56cfb49c2cd"
+   "bytes": 19349,
+   "sha256": "edfe5eb3b3fdd5426e511c5f1dd7e6c21e2c7f302ffbd3f3e8111bc471e75f44"
   },
   "src/sim/sides.js": {
    "bytes": 4791,
@@ -1482,5 +1482,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "2d28139179b071def9fea87d237c2c79f1b24c088248d3ef98c477462da209cc"
+ "generation": "0060a2d46e12b7b686a887ff8e4516665fb274565d7dc7b5afb137fa3a3c97c3"
 };

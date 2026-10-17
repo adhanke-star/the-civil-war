@@ -24,12 +24,17 @@ no save, no campaign change, no record entry.
   (ground, woods, sites, labels) = that of the built scenario on that terrain with the largest JSON.stringify length of
   those four keys (henry-hill: assets/scenarios/henry-hill.json). Field label = the terrain file's `name`.
 - Deployment (deterministic, pure function of roster + field half-size H): the attacker deploys on the west, facing +x; the
-  defender on the east, facing −x. Objective "the centre ground" at (0,0), r = 600 m. Defender front line at x = +400 m,
-  attacker front line at x = −1500 m (clamped to ±(H − 300)). Infantry spaced 260 m along z, centred on z = 0; if a line
-  would exceed 2·(H − 300) m, overflow brigades form a second line 320 m behind (further lines likewise). Batteries 160 m
-  behind the front line, evenly spread between the infantry; cavalry 350 m outboard of each flank (alternating). Facing
-  toward the enemy. Every unit stays inside |x|,|z| ≤ H − 250; no two units within 120 m. Amended 2026-10-16 (verifier
-  finding): when a side's rearmost rank (second line 320 m, or batteries 160 m, behind its front) would stand beyond
+  defender on the east, facing −x. Objective "the centre ground" at (0,0), r = 600 m. Defender front line at x = +100 m
+  (amended 2026-10-16: on the objective, inside its radius, so the attack meets it there; at +400 the lines were still
+  out of musket range for most of the battle), attacker front line at x = −900 m (amended 2026-10-17, was −1500: the
+  computer attacker marches about 1,000 m per clock hour, so a 1,000 m gap brings the lines into musket range about 40
+  clock minutes in, under three real minutes at 1x, and leaves most of the 06:00–08:00 window for the fight) (clamped to
+  ±(H − 300)). Infantry
+  spaced 260 m along z, centred on z = 0; if a line would exceed 2·(H − 300) m, overflow brigades form a second line
+  320 m behind (further lines likewise). Batteries 160 m behind the front line, evenly spread between the infantry;
+  cavalry 350 m outboard of each flank (alternating). Facing toward the enemy. Every unit stays inside |x|,|z| ≤ H − 250;
+  no two units within 120 m. Amended 2026-10-16 (verifier finding): when a side's rearmost rank (second line 320 m, or
+  batteries 160 m, behind its front) would stand beyond
   H − 250, the whole side steps toward the centre until it fits, so the attacker's front may sit inside −(H − 300)
   (Henry Hill, H 1300: −890 with batteries, −730 with two lines). The H − 250 bound wins over the front-line clamp.
 - Scenario: id `sandbox-battle`, title "Sandbox battle · <field name>", subtitle "<US roster label> against <CS roster
