@@ -1,5 +1,27 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0276 — 0274 cause: headless GPU compositor teardown blocks the page's main thread for ~30 s (2026-10-16)
+
+Evidence (diag-0274 ef85e41, CI 38975595565, both smoke samples, Chrome traces trace-online-battle.json.gz):
+- The held requests were complete in the service worker and in the renderer's subresource loader within 15 ms
+  (`ServiceWorkerSubresourceLoader::CommitCompleted "Body reading completed"` at +15 ms on a ThreadPool worker).
+- On the page's main thread one task ran 30,404 ms (sample 2) and 30,370 ms (sample 1) with nothing nested:
+  `ThreadControllerImpl::RunTask src_file third_party/blink/renderer/platform/widget/widget_base.cc src_func Shutdown
+  src_line 341, task_delay_us 1000000` — the previous document's widget teardown, posted 1 s after the navigation.
+- At the same instant the renderer's Compositor thread sat in `GpuChannel::WaitForGetOffsetInRange` for 30,400 ms; the
+  hold ended when the GPU process's VizCompositorThread next swapped a frame (`Display::FrameDisplayed`, `Swap`).
+- No JavaScript ran: the long-task observer saw no page task over 3 s, and the SW thread was idle.
+So the stall is Chromium under `--use-angle=swiftshader` on a 2-vCPU runner: the old page's compositor context waits
+for the SwiftShader GPU process to drain a command buffer that only moves on the next swap; every page load that
+happens in that window waits with it. It hits whichever requests are in flight: static imports of src/entry.js (goto
+times out at Playwright's 30 s) or main.js's dynamic graph (ready budget absorbs it). The 5–10 s holds on `?sw`
+navigations after a battle are the same teardown with a genuinely busy GPU. Nothing in sw.js, the test flow, the server
+or the game is at fault; real GPUs do not do this. Fix (CI only): the offline smoke launches Chromium with
+`--disable-gpu-compositing` (software compositing; WebGL still runs on SwiftShader), so no compositor command buffer
+exists to wait on. Acceptance: two fresh samples with no main-thread task over 2 s before battle-ready and no request
+whose Node receipt lags its CDP completion by over 1 s; then the heavy tracing is turned off by default.
+Still open from 7c7cf0d attempt 2: why `import('./main.js')` rejected; src/entry.js now reports the reason.
+
 ## 0275 — 0274 relocated: the worker answers fast; the page's loader processes the answers ~30 s late (2026-10-16)
 
 Read from the CDP admission traces of four offline runs (7c7cf0d attempts 1 and 2, 6f6f679, 0304ff0 green). Every "stalled"

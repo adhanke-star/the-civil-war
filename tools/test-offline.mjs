@@ -6,6 +6,7 @@
 // 1. the title registers the service worker and it takes control; 2. the title and a battle are visited online so
 // the worker caches what they load; 3. the browser goes offline; the title reloads from the cache and the same battle
 // loads on its own terrain and runs 10 s; 4. back online, the worker still answers. Fails on any page error.
+// Chromium runs with software compositing (Decision 0276).
 // Runs on CI (job "browsers" matrix entry "offline"); the Mac never launches a browser.
 
 import fs from 'node:fs/promises';
@@ -337,7 +338,9 @@ let failureState = null, traceSession = null;
 const diagFault = (where, error) => { if (diagnosticErrors.length < 64) diagnosticErrors.push({ stage: where, ...offlineAdmissionError(error) }); };
 const within = (promise, ms, label) => { let timer; return Promise.race([promise, new Promise((_, reject) => {
   timer = setTimeout(() => reject(Error(label + ' exceeded ' + ms + 'ms')), ms); })]).finally(() => clearTimeout(timer)); };
-const launchArgs = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
+// Decision 0276: with GPU compositing, the previous page's widget teardown waits up to 30 s on the SwiftShader command
+// buffer and blocks every load in flight; software compositing removes that wait. WebGL still runs on SwiftShader.
+const launchArgs = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-gpu-compositing'];
 if (traceAdmission) {
   try { launchArgs.push('--log-net-log=' + path.join(OUT, 'netlog.json'), '--net-log-capture-mode=Default'); }
   catch (error) { diagFault('netlog-args', error); }
