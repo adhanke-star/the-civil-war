@@ -7,7 +7,7 @@ comments, doc wording and B/C deferrals. cc3642a CI 39047011390: 8/9, browsers (
 Fixed on this branch: upgrade control allows assets/campaign-cs.json and decisions-cs.json as new assets; phaseResult side guard
 only for a real game; test-confederate 11 checks/11 controls (awardPhase side, carry, vet/weapon, duplicate join, swapped grade).
 Local: unit, confederate/campaign/save/sides/practice/economy/badges/officers/reward/level-rewards/progression/history both modes,
-manifest exact, diff-check clean. Own-SHA CI of the fix commit: read it first (gh run list --limit 3); A is accepted only on all nine.
+manifest exact, diff-check clean. 69a2bda CI 39052516397: probes red only on test-audio's pinned upgrade-script body, re-pinned next commit; read that SHA's CI first; A is accepted only on all nine.
 Known B seams (not defects in A): main.js:190 forces playerSide US for campaign launches (a CS phase would fail the new guard,
 not record wrongly); phaseOutcome/level cards/shop stock still use Union pools; briefing fielded list is US only.
 0278 worker cancellation and the camp.mp3 cancellation remain OPEN and UNPROVED; name the canceller before any fix.

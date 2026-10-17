@@ -433,7 +433,8 @@ export const AUDIO_CHECKS = [
     const source = api.recordingSource();
     const begin = source.indexOf('const report='), endText = 'process.exit(report.complete?0:1);';
     const old = source.slice(begin, source.indexOf(endText, begin) + endText.length);
-    assert.ok(Buffer.byteLength(old) === 18405 && createHash('sha256').update(old).digest('hex') === '820020ae1d6bcc64895940aa0b9d753dcf0df5aabf16f26406aba05c3c535405',
+    // Pinned body re-measured 2026-10-17 (0291): the upgrade control now admits the two new CS metadata assets.
+    assert.ok(Buffer.byteLength(old) === 18708 && createHash('sha256').update(old).digest('hex') === '21a7cbaf30c4406371f60931f7586a1142fba2ccc0aa92aec771227c69ba3f6d',
       'recordings-producer-process: old26 source body changed');
     const closeStart = source.indexOf('  const closeContext=async context=>{');
     const closeEnd = source.indexOf('  const fixtureSettings=', closeStart);

@@ -13,7 +13,8 @@ the research doc contradicting its own approval line, dropped Inferred/Disputed 
 Own CI 39047011390 on cc3642a: eight green; browsers (offline) red at old-assets-byte-unchanged, because the upgrade control
 admitted only the 12 figure files and assets/campaign-cs.json is a new asset. The control now allows the two CS metadata
 assets explicitly and still requires every old asset byte-unchanged. phaseResult's side guard now applies only to a real
-game, so a missing game keeps phaseOutcome's message. test-confederate grows to 11 checks and 11 named controls. A is
+game, so a missing game keeps phaseOutcome's message. test-confederate grows to 11 checks and 11 named controls. The audio probe pins the upgrade script body by
+bytes and sha256 (CI 39052516397 probes red on that pin alone); it was re-measured for the changed body. A is
 accepted only when the new SHA's own CI is all nine green; B (loot/UI/launch side) and C (cards, context, CI) remain.
 
 ## 0290 — Aaron approves v6; build the written A/B/C contract (2026-10-17)
