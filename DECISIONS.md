@@ -1,5 +1,22 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0287 — v5 candidate passes all nine; Confederate research is proposed, not adopted (Codex, 2026-10-17)
+
+b657362 / CI39038318606 passed all nine jobs, including the campaign playthrough. Sandbox openings pass, Willcox's
+marker shows Outranged with one hint and zero enemy words, and all22 balance runs finish in41s without errors. Three
+offline samples pass6/6 and upgrade26/26. Deployment diagnostics contain214 events, zero dropped,17 requests finished
+and zero failed. The earlier d04af7d camp-music cancellation remains unexplained; a clean sample is not a runtime fix.
+Current-SHA numbered images1–4 were displayed, then the recommended-first visual/release popup was sent. Choice is
+pending; no v5 tag/Release, remote-main advance or Pages deployment is claimed.
+
+docs/confederate-franchise-research.md preserves the qualified research proposal: six stored starter brigades with
+authored deployment/reinforcement timing, separate later joins rather than invented intact lineages; Shiloh/Stones
+River/Chattanooga narrative sources; six actual institutional/army choice candidates using the existing card schema;
+conservative Confederate arms-stock proposals. Separate deck selection and side-aware campaign/save/reward behavior
+still need a written files+commands contract and Aaron's scope choice before code. No v6 runtime data is adopted.
+Astra's source/context and reinforcement corrections are incorporated; inaccessible ordnance references are explicitly
+not independently reverified. Slavery/coercion, selective relief, disputed chronology and exact-model limits remain visible.
+
 ## 0286 — v5: camera/Outranged pass; unexplained camp-music cancellation gets scoped diagnostics (Codex, 2026-10-17)
 
 39036560372 on d04af7d: sandbox shard 3 passed; shard 4 passed with the actual Willcox marker reading Outranged, one

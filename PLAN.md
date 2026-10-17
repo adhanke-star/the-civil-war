@@ -1,7 +1,7 @@
 # Current execution — v1.1, then v2 (Aaron, 2026-10-12)
 
 STATUS 2026-10-17 (later): v4 RELEASED (tag v4 = 483b2ca, CI 39027953486 all 9, Pages green, Release Latest). v3 = 2ef47e9.
-0274 CLOSED (0276); 0278 open with the one-shot reload live (0279). v5 = polish round (0282): legs A–D reviewed and repaired (0285); fresh CI/visual/release pending. Contract below.
+0274 CLOSED (0276); 0278 open with the one-shot reload live (0279). v5 = polish round (0282): legs A–D reviewed/repaired (0285); b657362 CI39038318606 all nine green. Current-SHA images1–4 sent; explicit visual/release choice pending. Contract below.
 Aaron's hands-on play of sandbox, Confederate phase and officer cards UNRUN.
 
 v5 CONTRACT — POLISH ROUND: readability, camera, proof (Aaron chose this scope by popup, 2026-10-17; Fable wrote it)
