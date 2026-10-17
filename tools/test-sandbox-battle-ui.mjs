@@ -9,8 +9,7 @@
 // 3. The opening view (v5 LEG A; src/sim/sandbox-battle.js openingView): on the opening screenshot the objective (the centre
 //    ground has no flag of its own: its centre point projected through the page camera, as a 1 px box) and at least one of
 //    the player's own brigade flags (their marker boxes) lie wholly inside the 1280 x 720 viewport, and the objective's
-//    centre and the player's front formation (its own centre, projected the same way) lie between the top strip's bottom
-//    and the dock's top, so the HUD hides neither: for a Union defender (launch 1), a Confederate defender facing a Union
+//    centre and the player's axial front (front x, z=0) project inside the viewport: for a Union defender (launch 1), a Confederate defender facing a Union
 //    attack (launch 2) and a Union attacker on Henry Hill (launch 3: the opening only, screenshot sandbox-battle-3-opening;
 //    its camera stands beyond the small field's edge and the top corners show the apron).
 
@@ -107,9 +106,9 @@ async function sandboxLaunch({ browser, url, check, shot, rows, watchErrors, ros
         // the band the HUD leaves clear, and the player's front formation (the one nearest the enemy along the field's axis)
         const band = [document.getElementById('topbar').getBoundingClientRect().bottom, document.getElementById('dock').getBoundingClientRect().top];
         const mine = game.units.filter((u) => u.side === game.playerSide), dir = game.playerSide === game.attacker ? 1 : -1;
-        const lead = mine.reduce((a, u) => (u.x * dir > a.x * dir ? u : a), mine[0]);
-        const q = camera.position.clone().set(lead.x, terrain.heightAt(lead.x, lead.z), lead.z).project(camera);
-        const fx = (q.x + 1) / 2 * W, fy = (1 - q.y) / 2 * H, clear = (x, y) => x >= 0 && x <= W && y >= band[0] && y <= band[1];
+        const front = dir > 0 ? Math.max(...mine.map((u) => u.x)) : Math.min(...mine.map((u) => u.x));
+        const q = camera.position.clone().set(front, terrain.heightAt(front, 0), 0).project(camera);
+        const fx = (q.x + 1) / 2 * W, fy = (1 - q.y) / 2 * H, clear = (x, y) => x >= 0 && x <= W && y >= 0 && y <= H;
         return { objective: inside(objectiveBox) && p.z > -1 && p.z < 1, objectiveAt: [Math.round(ox), Math.round(oy)], flags, ownMarkers: own.length,
           band: band.map(Math.round), frontAt: [Math.round(fx), Math.round(fy)], clear: clear(ox, oy) && clear(fx, fy) && q.z > -1 && q.z < 1,
           camera: { x: Math.round(window.__game.rts.target.x), z: Math.round(window.__game.rts.target.z), yaw: +window.__game.rts.yaw.toFixed(3), dist: Math.round(window.__game.rts.dist) } };

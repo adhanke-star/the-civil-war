@@ -1,7 +1,7 @@
 # Current execution — v1.1, then v2 (Aaron, 2026-10-12)
 
 STATUS 2026-10-17 (later): v4 RELEASED (tag v4 = 483b2ca, CI 39027953486 all 9, Pages green, Release Latest). v3 = 2ef47e9.
-0274 CLOSED (0276); 0278 open with the one-shot reload live (0279). v5 = polish round (0282): contract below once written.
+0274 CLOSED (0276); 0278 open with the one-shot reload live (0279). v5 = polish round (0282): legs A–D reviewed and repaired (0285); fresh CI/visual/release pending. Contract below.
 Aaron's hands-on play of sandbox, Confederate phase and officer cards UNRUN.
 
 v5 CONTRACT — POLISH ROUND: readability, camera, proof (Aaron chose this scope by popup, 2026-10-17; Fable wrote it)
@@ -49,6 +49,19 @@ to first contact. It must finish under 10 minutes on CI (fast-forward; cap per p
 (only on exceptions). Report the table in your return so Fable can record it.
 
 Out: tuning constants, Union traits, new history, art, the Confederate franchise.
+
+Round-2 repair contract (Codex, 2026-10-17): preserve the four legs above. A: restore the exact midpoint and mandatory
+objective far edge; fit against the loaded terrain with the real RtsCamera (pitch clamp, target clamp and 2,000 m limit),
+in src/sim/sandbox-battle.js and src/main.js. tools/test-sandbox-battle.mjs must project the axial front (front x, z=0),
+objective and far edge through that camera on real Shiloh/Henry Hill heights for all four side/attacker combinations.
+tools/test-sandbox-battle-ui.mjs checks the original viewport contract: objective plus a visible own flag; its added HUD-band
+and arbitrary flank-brigade tests are incompatible with the specified midpoint on some attacker openings and are removed.
+B: tools/test-command-ui.mjs isolates Willcox/Hampton from other targets before the fictional 219 m fight, and reports actual
+target and losses; no fire or balance constants change. Commands: the existing v5 command list below, plus three complete
+badge/control runs; independent read-only Astra review of every leg and the repairs; then own-SHA CI all nine and screenshots.
+D repair (tools/balance-sides.mjs): defenders outside the objective march to it, then Hold; defenders already on it Hold.
+Attach the spawn listener before reinforcement initialization: record each arrival's full strength before combat and issue
+the player's doctrine immediately. Regenerate all 22 rows; the earlier deployment-hold table remains an earlier measurement.
 Commands (all must pass; report tails): node --check on changed files; node tools/test-sandbox-battle.mjs and --prove-fail;
 node tools/test-outranged.mjs (or the file you used) and --prove-fail; node tools/test-badges.mjs and --prove-fail and
 node tools/observe-badges.mjs (both modes if it has them); node tools/balance-sides.mjs; node tools/test-sides.mjs; node tools/test.mjs --unit;

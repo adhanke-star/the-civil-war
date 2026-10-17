@@ -2,7 +2,7 @@
 // prepared as the Battles route prepares it (preparePhase, the 'pack' route, sideScenario for the side) and run headless on
 // its real terrain twice, the player commanding the Union and then the Confederates, against the computer at Veteran, to
 // the phase's end. The player's side follows one simple scripted doctrine so the runs compare the scenarios, not a player:
-//   - defending: every formation holds where it is deployed (Hold); a reinforcement marches on the objective on arrival;
+//   - defending: every formation marches onto the objective if outside it, then holds (Hold);
 //   - attacking: every formation (reinforcements on arrival) marches on the objective, keeping its place in the line
 //     (its offset from its side's centre, squeezed inside the objective's circle); the march halts to fire and resumes
 //     (the player's line, combat.js), and a formation stopped short is sent on again every 10 battle seconds.
@@ -59,12 +59,10 @@ function runPhase(packId, phaseId, base, playerSide, capS) {
   const scenario = { ...sideScenario(base, playerSide), difficulty: 'veteran' };
   setPlan(scenario);
   const game = new Game({ scene: new Scene(), terrain: terrainOf(scenario.terrain), scenario, world: { fenceField: null }, effects: { volley() {}, boom() {} }, playerSide });
-  game.initializeReinforcements();
   const ratio = scenario.clockRatio ?? CLOCK_RATIO, phaseS = (clock(scenario.end) - clock(scenario.start)) * 60 / ratio;
   const role = scenario.attacker === playerSide ? 'attack' : 'defend', o = game.objective;
   const first = new Map(); // unit -> men when it took the field (losses are this battle's, not carried from earlier phases)
   const dest = new Map(); // player formation -> the point on the objective it was sent to
-  const known = new Set(); // player formations the doctrine has seen (a new one is a reinforcement on arrival)
   let contactS = null;
   const own = () => game.units.filter((u) => u.side === playerSide);
   /** Where `u` marches on the objective: its offset from its side's centre, squeezed inside 60% of the circle. */
@@ -74,6 +72,11 @@ function runPhase(packId, phaseId, base, playerSide, capS) {
     return [o.x + (u.x - cx) * k, o.z + (u.z - cz) * k];
   };
   const march = (u) => {
+    if (!u.alive || !u.canTakeOrders()) return;
+    if (role === 'defend' && Math.hypot(u.x - o.x, u.z - o.z) <= o.r) {
+      if (u.order.type !== 'hold' || !u.order.firm) u.orderHold();
+      return;
+    }
     const d = dest.get(u) ?? spot(u);
     dest.set(u, d);
     if (Math.hypot(u.x - d[0], u.z - d[1]) < 30 || !u.canTakeOrders()) return;
@@ -81,26 +84,20 @@ function runPhase(packId, phaseId, base, playerSide, capS) {
     if (['charge', 'attack', 'fallback'].includes(u.order.type)) return; // its own close fight (initiative) runs its course
     game.order(u, { type: 'move', points: [[u.x, u.z], d] });
   };
-  const doctrine = (opening) => {
-    for (const u of own()) {
-      if (!u.alive) continue;
-      const fresh = !known.has(u);
-      known.add(u);
-      if (role === 'defend') { if (opening) u.orderHold(); else if (fresh || dest.has(u)) march(u); }
-      else march(u);
-    }
-  };
-  const seen = () => { for (const u of game.units) if (!first.has(u)) first.set(u, u.men); };
-  seen(); doctrine(true);
+  const doctrine = () => { for (const u of own()) march(u); };
+  for (const u of game.units) first.set(u, u.men);
+  // Spawn precedes combat: capture the full arrival and issue its order without waiting for the retry interval.
+  game.on('spawn', (u) => { first.set(u, u.men); if (u.side === playerSide) march(u); });
+  game.initializeReinforcements();
+  doctrine();
   let ticks = 0, nextOrder = REORDER_S;
   while (!game.over && game.simTime < capS) {
     game.paused = false;
     game.tick(H);
     if (++ticks % CONTACT_EVERY === 0) {
       if (contactS === null && game.units.some((u) => first.has(u) && u.men < first.get(u))) contactS = game.simTime;
-      seen();
     }
-    if (game.simTime >= nextOrder) { nextOrder += REORDER_S; doctrine(false); seen(); }
+    if (game.simTime >= nextOrder) { nextOrder += REORDER_S; doctrine(); }
   }
   const capped = !game.over;
   if (capped) game.checkObjective(0, true); // the result as it stands at the cap
@@ -123,7 +120,7 @@ function markdown(report) {
 
 const started = Date.now();
 const report = { generatedAt: new Date(started).toISOString(), difficulty: 'veteran',
-  doctrine: 'defending, hold where deployed (reinforcements march on the objective); attacking, every formation marches on the objective.',
+  doctrine: 'defending, march onto the objective then hold; attacking, every formation marches on the objective; reinforcements follow the doctrine on arrival.',
   capS: CAP_S, rows: [], errors: 0, durationMs: 0 };
 for (const packId of PACKS) {
   const pack = JSON.parse(readText(`assets/packs/${packId}.json`));

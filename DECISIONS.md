@@ -1,5 +1,50 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0285 — v5 round 2: restore the camera contract; fix firing and balance fixtures (Codex, 2026-10-17)
+
+CI 39034411445 on 73587cc finished 7/9 green: shard 3 failed the added flank/HUD camera checks; shard 4 failed the
+Outranged scene because Hampton chose Griffin and never hit Willcox. Four independent read-only Astra reviews completed.
+A: restore the exact midpoint and mandatory objective far edge, fitted through the loaded terrain's real RtsCamera;
+the extra 12 px HUD-clear margin cannot fit some attacker views under the 2,000 m limit. The original viewport/own-flag
+contract remains; the arbitrary flank and added HUD-band assertions are removed. Independent actual-terrain checks:
+all eight side/attacker cases; Shiloh attacker 1,850 m, Henry Hill US attacker 1,860 m, CS attacker 1,680 m; defenders 900 m.
+B: isolate the fictional Willcox/Hampton pair, assert Hampton actually targets Willcox and causes losses. All player-side
+HUD paths and melee exclusion checked; no combat constant changed. C: all six measured badge scenes and their named
+mutants passed three repeats: 12/10, 39/25, 1/1, 1/1, 1/1, 23/15 at Bronze. These are fictional fixed-seed CPU fights
+and native awards, not authored campaign/browser completion or seed-variation coverage. observe-badges.mjs is export-only;
+test-observe-badges.mjs is the real check (326/326, plus controls).
+D: defenders now march to the objective and issue firm Hold; arrivals receive orders and their full loss baseline on
+spawn, before combat. The old report delayed some orders 9.1 simulation seconds and missed some immediate casualties.
+Final report: 22/22 in 73 s locally, zero errors, no capped runs; exceptions-only failure verified independently. Earlier
+0284 table records the former deployment-hold doctrine. Corrected table below; measurement only, no tuning. Unit,
+sides 8/8, Outranged 9/9 + controls, sandbox 15/15 + controls, syntax and offline manifest green. Fresh CI/browser images,
+Aaron's visual choice, tag/Release, remote-main fast-forward and Pages are still pending this repair push.
+
+| Phase | Side | Role | Result | Own losses % | Enemy losses % | Objective holder | First contact (min) | Ended (min) |
+|---|---|---|---|---|---|---|---|---|
+| shiloh / camps-at-dawn | Union | defend | draw | 3.5 | 4.3 | contested | 99.9 | 270 of 270 |
+| shiloh / camps-at-dawn | Confederate | attack | draw | 3 | 1.4 | contested | 14.7 | 270 of 270 |
+| shiloh / hornets-nest | Union | defend | draw | 21.7 | 20.3 | contested | 0.2 | 450 of 450 |
+| shiloh / hornets-nest | Confederate | attack | draw | 16.4 | 13.5 | contested | 0.2 | 450 of 450 |
+| shiloh / grants-last-line | Union | defend | decisive | 1.9 | 49.5 | contested | 0 | 90 of 90 |
+| shiloh / grants-last-line | Confederate | attack | victory | 7.5 | 2.4 | contested | 0 | 90 of 90 |
+| shiloh / buell-attacks | Union | attack | draw | 4.5 | 18.3 | contested | 0.2 | 570 of 570 |
+| shiloh / buell-attacks | Confederate | defend | draw | 11.3 | 6.8 | contested | 0.2 | 570 of 570 |
+| stones-river / dawn-on-the-right | Union | defend | victory | 2.2 | 5 | US | 0.1 | 210 of 210 |
+| stones-river / dawn-on-the-right | Confederate | attack | victory | 47.4 | 4.3 | CS | 0.1 | 210 of 210 |
+| stones-river / slaughter-pen | Union | defend | decisive | 4.4 | 24.4 | US | 0.1 | 210 of 210 |
+| stones-river / slaughter-pen | Confederate | attack | defeat | 26.1 | 13.5 | US | 0.1 | 210 of 210 |
+| stones-river / round-forest | Union | defend | draw | 4.6 | 11.2 | contested | 0.2 | 390 of 390 |
+| stones-river / round-forest | Confederate | attack | draw | 17.8 | 1.3 | contested | 0.2 | 390 of 390 |
+| stones-river / mcfaddens-ford | Union | defend | decisive | 1.7 | 22.5 | US | 17.7 | 60 of 60 |
+| stones-river / mcfaddens-ford | Confederate | attack | draw | 19.4 | 2 | contested | 3 | 60 of 60 |
+| chattanooga / orchard-knob | Union | attack | decisive | 0.6 | 94 | US | 42.6 | 116.4 of 120 |
+| chattanooga / orchard-knob | Confederate | defend | defeat | 100 | 0.7 | US | 45 | 82.3 of 120 |
+| chattanooga / lookout-mountain | Union | attack | victory | 6.6 | 16.2 | contested | 131.5 | 390 of 390 |
+| chattanooga / lookout-mountain | Confederate | defend | victory | 7.6 | 1.5 | CS | 192.1 | 390 of 390 |
+| chattanooga / missionary-ridge | Union | attack | decisive | 2.2 | 24.5 | contested | 7 | 110 of 110 |
+| chattanooga / missionary-ridge | Confederate | defend | draw | 25.1 | 8.2 | contested | 16.6 | 110 of 110 |
+
 ## 0284 — v5 legs measured locally; the balance table; handoff from Claude to Codex (Aaron, 2026-10-17)
 
 Aaron had not yet played a sandbox battle, a Confederate phase or an officer card (popup); v5 continues. The round-1 verifier

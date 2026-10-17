@@ -39,7 +39,7 @@ import { setQualityHandler } from './ui/settings-panel.js';
 import { FALLEN } from './units/soldier-mesh.js';
 import { pinRuntimeClose } from './units/impostor.js';
 import { battleSide, sideScenario, fitSideCamera, sideTexts } from './sim/sides.js';
-import { loadSandboxBattle } from './sim/sandbox-battle.js';
+import { loadSandboxBattle, fitSandboxCamera } from './sim/sandbox-battle.js';
 
 export function detectFieldGPUTier(renderer,post,stats,graphicsStop,load=()=>import('detect-gpu')) {
   return load().then(({getGPUTier})=>{
@@ -121,19 +121,10 @@ export function createFieldGraphicsStop(owners) {
 
 // The battle camera's vertical field of view (degrees); the sandbox opening view fits its frame with it.
 const FIELD_FOV = 32;
-/**
- * What the sandbox opening view (src/sim/sandbox-battle.js OPENING_VIEW) fits against: the field camera's opening pitch
- * (rts-camera.js: pitchForDist plus the Look > Camera elevation, clamped as its constructor clamps it), the lens, and the
- * page's frame (its height and the HUD's top strip and bottom dock in px, from hud.css's sizes; left to the 720 px default
- * if they cannot be read).
- */
+// Initial flat estimate; the loaded terrain is fitted by fitSandboxCamera below.
 function sandboxView() {
   const elevation = Number.isFinite(LOOK.cameraElevation) ? LOOK.cameraElevation * Math.PI / 180 : 0;
-  const pitchFor = (d) => Math.min(1.35, Math.max(0.3, pitchForDist(d) + elevation));
-  const css = getComputedStyle(document.documentElement), px = (name) => parseFloat(css.getPropertyValue(name));
-  const frame = { height: window.innerHeight, top: px('--edge') + px('--top-h'), bottom: px('--edge') + px('--dock-card-h') };
-  const ok = Object.values(frame).every((v) => Number.isFinite(v) && v >= 0) && frame.height > frame.top + frame.bottom;
-  return { pitchFor, fov: FIELD_FOV, ...(ok ? { frame } : {}) };
+  return { pitchFor: (d) => Math.min(1.35, Math.max(0.3, pitchForDist(d) + elevation)), fov: FIELD_FOV };
 }
 let fieldClaimed = false;
 // Importing this module has no field side effects. The owner commits navigation only after recheck.
@@ -275,13 +266,14 @@ if(resources){
 }
 Object.assign(stats, world.stats);
 
-// Opening view: both armies between the clock and the bottom panels; the pitch follows the zoom. A sandbox battle's view
+// Opening view: the pitch follows the zoom. A sandbox battle's view
 // is already the player's side's and must face the enemy (src/sim/sandbox-battle.js openingView), so it is never turned.
 const rts = new RtsCamera(camera, terrain, scenario.camera
   ? { target: [...scenario.camera.target], yaw: playerSide === 'CS' && !sandbox ? fitSideCamera(scenario.camera, terrain.half) : scenario.camera.yaw, dist: scenario.camera.dist }
   : scenario.practiceIntro
   ? { target: [-300, -610], yaw: -Math.PI / 2 - 0.12, dist: 740 }
   : { target: [-60, 200], yaw: -Math.PI / 2 - 0.12, dist: 1150 });
+if (sandbox) fitSandboxCamera(rts, scenario, playerSide);
 const effects = new Effects(scene, terrain, rts);
 resourceOwners.effects=effects;
 graphicsStop?.listenLast();

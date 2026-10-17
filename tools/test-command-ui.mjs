@@ -140,6 +140,14 @@ export async function commandControls({ browser, url, check, shot, result, watch
     const setup = await page.evaluate(() => {
       const { game, rts } = window.__game, c = game.combat;
       const w = game.units.find((u) => u.id === 'willcox'), h = game.units.find((u) => u.id === 'hampton');
+      // Isolate this fictional pair: otherwise Hampton chooses Griffin, the nearer target, and Willcox takes no fire.
+      const edge = window.__game.terrain.half - 260;
+      for (const u of game.units) {
+        if (u === w || u === h) continue;
+        u.manual = true; u.stop(); u.order = { type: 'hold' }; u.holdFire = true;
+        u.vehicle.position.x = u.side === 'US' ? -edge : edge; u.vehicle.position.z = edge;
+        u.layout(); u.snapFigures();
+      }
       for (const u of [w, h]) { u.manual = true; u.stop(); u.order = { type: 'hold' }; u.holdFire = false; }
       const east = Math.atan2(h.x - w.x, h.z - w.z);
       for (const k of [0, 1, -1, 2, -2, 3, -3, 4, -4, 6, -6]) { // the first bearing with sight, starting toward Hampton's own side
@@ -149,9 +157,10 @@ export async function commandControls({ browser, url, check, shot, result, watch
         h.facing = h.goalFacing = Math.atan2(w.x - x, w.z - z);
         w.facing = w.goalFacing = a;
         for (const u of [w, h]) { u.layout(); u.snapFigures(); }
+        const men = w.men;
         game.fastForward(13);
         rts.flyTo((w.x + h.x) / 2, (w.z + h.z) / 2, 650); rts.snap();
-        return { bearing: k * 10, dist: Math.round(Math.hypot(h.x - w.x, h.z - w.z)), outranged: w.outranged, hampton: h.outranged, reach: c.effRange(w) };
+        return { bearing: k * 10, dist: Math.round(Math.hypot(h.x - w.x, h.z - w.z)), target: h.target?.id, losses: men - w.men, outranged: w.outranged, hampton: h.outranged, reach: c.effRange(w) };
       }
       return null;
     });
@@ -164,7 +173,7 @@ export async function commandControls({ browser, url, check, shot, result, watch
         out: window.__game.game.units.filter((u) => u.side === 'US' && u.outranged).map((u) => u.short),
         enemyWords: [...document.querySelectorAll('.marker.cs .act')].filter((a) => a.textContent === 'Outranged').length };
     });
-    record('outranged-word', !!setup && setup.outranged === true && setup.hampton === false && word.act === 'Outranged' && word.shown && word.enemyWords === 0, { setup, word });
+    record('outranged-word', !!setup && setup.target === 'willcox' && setup.losses > 0 && setup.outranged === true && setup.hampton === false && word.act === 'Outranged' && word.shown && word.enemyWords === 0, { setup, word });
     const named = /^(.+) is outranged: its (muskets|guns) cannot reach the line firing on it\. (Charge \(C\), fall back \(F\) or hold|Fall back \(F\) or hold)\.$/.exec(word.hint || '');
     record('outranged-hint', !!named && word.out.includes(named[1]) && word.hints === 1, { hint: word.hint, hints: word.hints, out: word.out });
     await shot(page, 'command-outranged');

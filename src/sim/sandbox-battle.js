@@ -153,60 +153,47 @@ function rosterSource(packs, id, side, key) {
   return { pack, phase, row: rosterList([{ ...pack, phases: [phase] }]).find((r) => r.side === side) };
 }
 
-// Opening view game rule (metres; v5 LEG A). The camera stands behind the player's front looking at the enemy, its target
-// on the line between that front and the objective's centre. Must: the front and the objective's centre both project into
-// the band of the frame the HUD leaves clear (below the top strip, above the bottom dock: OPENING_VIEW.frame, less
-// `margin` px each side for uneven ground, which moves a point about 11 px). Should: the objective's far edge (r) inside
-// the frame. It is unmarked on the field (the minimap rings it), and an attacker's front stands about 900 m out, so at the
-// field camera's own limit of 2,000 m (src/render/rts-camera.js maxDist) the 1,500 m from front to far edge cannot also
-// clear the top strip. The search takes the smallest distance from 900 m (10 m steps) and, at it, the target nearest the
-// halfway point (10 m steps toward either end) that keeps both rules; failing that, the Must alone; failing that (no
-// built roster does), halfway at 2,000 m. The pitch is the field camera's zoom-dependent one (view.pitchFor: src/main.js
-// passes rts-camera.js pitchForDist plus the player's Look > Camera elevation, so the menu never loads three.js), the lens
-// the page's (view.fov, src/main.js FIELD_FOV), and the frame the page's (view.frame: its height and the HUD's top and
-// bottom px; the default is a 720 px page with hud.css's sizes). An attacker's camera on a small field (Henry Hill,
-// half 1,300 m) stands up to about 600 m beyond the map's edge to see this much; the dark apron (src/world/terrain.js
-// buildApron) fills what the top corners see past the edge. Flat ground is assumed; hills move points by the margin.
-export const OPENING_VIEW = Object.freeze({ minDist: 900, maxDist: 2000, step: 10, margin: 12,
-  frame: Object.freeze({ height: 720, top: 60, bottom: 158 }) }); // hud.css --edge + --top-h; --edge + --dock-card-h
-/**
- * Height in the frame (-1 bottom, 1 top) of a ground point s metres beyond the target along the view axis, for a camera
- * dist metres from the target at pitch radians and a vertical field of view of fov degrees: flat ground, the camera
- * placed as rts-camera.js update() places it (target + horizontal cos(pitch) dist behind, sin(pitch) dist up). A point
- * level with or behind the camera is -Infinity (never in the frame).
- */
+// Opening view game rule (v5 LEG A): the exact midpoint of the player's front x and objective x, z=0,
+// facing the enemy. Fit the axial front, objective and its far edge; the distance is the first 10 m step
+// from 900 m that fits. The menu uses flat-ground maths; after terrain loads, fitSandboxCamera uses the
+// real RtsCamera, including terrain clearance, pitch/target clamps and its 2,000 m distance limit.
+export const OPENING_VIEW = Object.freeze({ minDist: 900, maxDist: 2000, step: 10 });
+/** Height in the frame (-1 bottom, 1 top) of a flat-ground point s metres beyond the camera target. */
 export function viewHeight(s, dist, pitch, fov) {
   const h = Math.cos(pitch) * dist, up = Math.sin(pitch) * dist;
   if (h + s <= 0) return -Infinity;
   return Math.tan(pitch - Math.atan2(up, h + s)) / Math.tan((fov * Math.PI) / 360);
 }
-/** The HUD-clear band of the frame ([bottom, top] in -1..1) for `frame` ({ height, top, bottom } px) less `margin` px. */
-export function clearBand(frame, margin) {
-  return [-1 + (2 * (frame.bottom + margin)) / frame.height, 1 - (2 * (frame.top + margin)) / frame.height];
-}
-/**
- * The opening view (see OPENING_VIEW) of a player whose front line stands at x = front facing dir (+1 east, -1 west):
- * { target, yaw, dist }. `objective` is { x, r } on the line z = 0; `view` is { pitchFor, fov, frame? }.
- */
+/** The axial opening view; view.fits optionally projects through the loaded terrain's real camera. */
 export function openingView(front, dir, objective, view, V = OPENING_VIEW) {
-  const [lo, hi] = clearBand({ ...V.frame, ...view.frame }, V.margin), edge = objective.x + dir * objective.r;
-  const mid = Math.round((front + objective.x) / 2), min = Math.min(front, objective.x), max = Math.max(front, objective.x);
-  // rts-camera.js puts the camera at target + (sin yaw, cos yaw) * h: yaw -pi/2 stands it west, looking east (+x).
-  const yaw = dir > 0 ? -Math.PI / 2 : Math.PI / 2;
-  const fits = (tx, dist, withEdge) => {
-    const p = view.pitchFor(dist), y = (x) => viewHeight((x - tx) * dir, dist, p, view.fov), clear = (v) => v >= lo && v <= hi;
-    return clear(y(front)) && clear(y(objective.x)) && (!withEdge || Math.abs(y(edge)) <= 1);
-  };
-  for (const withEdge of [true, false]) {
-    for (let dist = V.minDist; dist <= V.maxDist; dist += V.step) {
-      for (let k = 0; mid - k * V.step >= min || mid + k * V.step <= max; k++) {
-        for (const tx of k ? [mid - k * V.step, mid + k * V.step] : [mid]) {
-          if (tx >= min && tx <= max && fits(tx, dist, withEdge)) return { target: [tx, 0], yaw, dist };
-        }
-      }
-    }
+  const target = [(front + objective.x) / 2, 0], yaw = dir > 0 ? -Math.PI / 2 : Math.PI / 2;
+  const points = [front, objective.x, objective.x + dir * objective.r];
+  const fits = view.fits ?? ((cam, xs) => xs.every((x) => Math.abs(viewHeight((x - target[0]) * dir, cam.dist, view.pitchFor(cam.dist), view.fov)) <= 1));
+  for (let dist = V.minDist; dist <= V.maxDist; dist += V.step) {
+    const cam = { target, yaw, dist };
+    if (fits(cam, points)) return cam;
   }
-  return { target: [mid, 0], yaw, dist: V.maxDist };
+  return { target, yaw, dist: V.maxDist };
+}
+/** Fit and place the sandbox's actual camera after terrain loading. No simulation or settings change. */
+export function fitSandboxCamera(rts, scenario, side) {
+  const dir = side === scenario.attacker ? 1 : -1, xs = scenario.units.filter((u) => u.side === side).map((u) => u.x);
+  const front = dir > 0 ? Math.max(...xs) : Math.min(...xs);
+  const place = (cam) => {
+    Object.assign(rts.goal, { x: cam.target[0], z: cam.target[1], yaw: cam.yaw, dist: cam.dist, pitch: rts._pitch(cam.dist) });
+    rts._clamp(); rts.snap();
+    rts.groundY = rts.terrain.heightAt(rts.goal.x, rts.goal.z);
+    rts.update(0); // publishes the actual terrain-cleared pose and projection matrix
+  };
+  const cam = openingView(front, dir, scenario.objective, { fits: (candidate, points) => {
+    place(candidate);
+    return points.every((x) => {
+      const p = rts.camera.position.clone().set(x, rts.terrain.heightAt(x, 0), 0).project(rts.camera);
+      return Math.abs(p.x) <= 1 && Math.abs(p.y) <= 1 && p.z > -1 && p.z < 1;
+    });
+  } });
+  place(cam);
+  return cam;
 }
 /** The opening view of each side (the side's front: its formation nearest the enemy, as deploy() faces it). */
 function sideViews(units, attacker, view) {
@@ -220,7 +207,7 @@ function sideViews(units, attacker, view) {
 
 /**
  * The prepared ('pack' route) scenario of one sandbox battle. `packs` are the raw battle packs, `henryHill` the raw
- * assets/scenarios/henry-hill.json and `terrainMeta` the field's assets/terrain/<field>.json (its halfSize and name); `view` is the field camera's { pitchFor, fov, frame? } (see OPENING_VIEW).
+ * assets/scenarios/henry-hill.json and `terrainMeta` the field's assets/terrain/<field>.json (its halfSize and name); `view` is the field camera's { pitchFor, fov } (see OPENING_VIEW).
  */
 export function sandboxBattleScenario({ field, us, cs, attacker }, { packs, henryHill, terrainMeta, view }) {
   if (!FIELD_IDS.includes(field)) throw new Error('Sandbox battle: the "field" parameter names no built field.');
@@ -228,8 +215,6 @@ export function sandboxBattleScenario({ field, us, cs, attacker }, { packs, henr
   const half = terrainMeta?.halfSize;
   if (!Number.isFinite(half) || typeof terrainMeta.name !== 'string') throw new Error('Sandbox battle: the field terrain description is invalid.');
   if (typeof view?.pitchFor !== 'function' || !Number.isFinite(view.fov)) throw new Error('Sandbox battle: the opening view needs the field camera\'s pitch rule and field of view.');
-  const fr = view.frame;
-  if (fr !== undefined && !(['height', 'top', 'bottom'].every((k) => Number.isFinite(fr?.[k]) && fr[k] >= 0) && fr.height > fr.top + fr.bottom)) throw new Error('Sandbox battle: the opening view\'s frame is invalid.');
   const U = rosterSource(packs, us, 'US', 'us'), C = rosterSource(packs, cs, 'CS', 'cs');
   const scenarios = [henryHill, ...packs.flatMap((p) => p.phases.map((ph) => ph.scenario))];
   const source = dressingSource(field, scenarios), defender = attacker === 'US' ? 'CS' : 'US';
@@ -310,7 +295,7 @@ async function readJson(url, fetcher, current) {
 }
 
 /** Read the address, fetch the three packs (each validated whole), Henry Hill and the field's terrain description, and build
- * the scenario; `view` is the field camera's { pitchFor, fov, frame? } (see OPENING_VIEW). */
+ * the scenario; `view` is the field camera's { pitchFor, fov } (see OPENING_VIEW). */
 export async function loadSandboxBattle(search, { fetcher = globalThis.fetch, isCurrent = () => true, view } = {}) {
   const current = () => { if (!isCurrent()) throw new Error('Field: the field launch was cancelled.'); };
   const asked = sandboxBattleSearch(search);
