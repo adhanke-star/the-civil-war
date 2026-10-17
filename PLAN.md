@@ -1,8 +1,8 @@
 # Current execution — v1.1, then v2 (Aaron, 2026-10-12)
 
-STATUS 2026-10-17: v3 RELEASED (tag v3 = 2ef47e9, CI 39001389623 all 9, Pages green, Release Latest). 0274 CLOSED (0276).
-0278 open with a one-shot reload mitigation (branch reload-0278). v4 = Officers, contract below. Aaron's hands-on sandbox and
-Confederate play UNRUN.
+STATUS 2026-10-17 (later): v4 RELEASED (tag v4 = 483b2ca, CI 39027953486 all 9, Pages green, Release Latest). v3 = 2ef47e9.
+0274 CLOSED (0276); 0278 open with the one-shot reload live (0279). v5 = polish round (0282): contract below once written.
+Aaron's hands-on play of sandbox, Confederate phase and officer cards UNRUN.
 
 v4 CONTRACT — OFFICERS: cards and a Merit track, sourced ranks only (Aaron chose this scope by popup, 2026-10-17; Fable wrote it)
 

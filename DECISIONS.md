@@ -1,5 +1,14 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0282 — v4 released; v5 is a polish round (Aaron, 2026-10-17)
+
+v4 = tag v4 at 483b2ca (CI 39027953486 all 9 green, Pages 39029443642 green, Release "v4 — Officers" is Latest). The first
+v4 CI screenshots showed a stray "null" (a null dialog section rendered as text by replaceChildren) and the Back control cut
+off below a 768 px viewport; both fixed with browser checks before tagging. Aaron chose, by popup after the two card screenshots:
+tag now, play later (sandbox, Confederate phase and officer cards still UNRUN by him); v5 = polish round before the Confederate
+franchise: opening camera frames the objective, the Henry Hill fire asymmetry (962 vs 35), a Confederate-side balance pass,
+Union AI temperament traits from sourced records, the six badge-award gaps. Contract at PLAN top once the inventory is in.
+
 ## 0281 — v4 officers: no inferred "took command"; save row shape; 128 names; wounded ends Merit in battle (2026-10-17)
 
 A verifier refuted the first v4 diff. (1) Law: "Took command at <phase>" was inferred whenever a later phase put a new name
