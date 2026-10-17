@@ -1,5 +1,48 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0284 — v5 legs measured locally; the balance table; handoff from Claude to Codex (Aaron, 2026-10-17)
+
+Aaron had not yet played a sandbox battle, a Confederate phase or an officer card (popup); v5 continues. The round-1 verifier
+finding (the Outranged word on the computer's markers) is fixed in 73587cc: `activity(u, playerSide)` in src/ui/hud.js reads
+Outranged only for the side the player commands, on every path (markers, unit card, army rows, tooltips), with the check
+marker-player-only in tools/test-outranged.mjs. Local Node suite on 73587cc: sandbox-battle 16/16 (+controls), outranged 9/9
+(+controls), badges 21/21 (+controls) with the six MEASURED feats at Bronze (First Volley 12/10, Fire Discipline 39/25,
+Stormers 1/1, Shock 1/1, Relentless 1/1, Rear Guard 23/15: the three at 1/1 have no margin), sides 8/8, test.mjs --unit OK,
+offline manifest OK, balance-sides 22/22 in 87 s. Round-2 verification and the Confederate research were started and stopped
+unfinished when Aaron handed the session to Codex; neither produced a finding or a claim. Own-SHA CI 39034411445 was in progress
+(webkit, firefox, offline green; the offline samples were 3/3 clean for 0278). LEG D's table (measured, no tuning in v5;
+player side on the scripted doctrine, computer Veteran, battle minutes):
+
+| Phase | Side | Role | Result | Own % | Enemy % | Holder | Contact |
+|---|---|---|---|---|---|---|---|
+| shiloh / camps-at-dawn | US | defend | draw | 3.3 | 5.2 | contested | 99.9 |
+| shiloh / camps-at-dawn | CS | attack | draw | 3.0 | 1.5 | contested | 14.7 |
+| shiloh / hornets-nest | US | defend | draw | 22.1 | 19.0 | contested | 0.2 |
+| shiloh / hornets-nest | CS | attack | draw | 19.5 | 10.4 | contested | 0.2 |
+| shiloh / grants-last-line | US | defend | defeat | 2.6 | 7.2 | contested | 0 |
+| shiloh / grants-last-line | CS | attack | victory | 7.5 | 2.4 | contested | 0 |
+| shiloh / buell-attacks | US | attack | draw | 4.5 | 18.3 | contested | 0.2 |
+| shiloh / buell-attacks | CS | defend | defeat | 14.8 | 5.3 | contested | 0.2 |
+| stones-river / dawn-on-the-right | US | defend | defeat | 9.9 | 40.3 | CS | 0.1 |
+| stones-river / dawn-on-the-right | CS | attack | victory | 47.6 | 4.3 | CS | 0.1 |
+| stones-river / slaughter-pen | US | defend | draw | 6.4 | 27.4 | contested | 0.1 |
+| stones-river / slaughter-pen | CS | attack | defeat | 26.1 | 13.5 | US | 0.1 |
+| stones-river / round-forest | US | defend | draw | 4.4 | 12.0 | contested | 0.2 |
+| stones-river / round-forest | CS | attack | draw | 17.8 | 1.3 | contested | 0.2 |
+| stones-river / mcfaddens-ford | US | defend | decisive | 2.5 | 23.0 | US | 11.8 |
+| stones-river / mcfaddens-ford | CS | attack | defeat | 17.7 | 1.8 | US | 3.0 |
+| chattanooga / orchard-knob | US | attack | decisive | 0.6 | 94.0 | US | 42.6 |
+| chattanooga / orchard-knob | CS | defend | defeat | 99.9 | 0.7 | US | 45.0 |
+| chattanooga / lookout-mountain | US | attack | victory | 6.7 | 16.3 | contested | 131.5 |
+| chattanooga / lookout-mountain | CS | defend | draw | 7.1 | 1.2 | contested | 153.1 |
+| chattanooga / missionary-ridge | US | attack | decisive | 2.2 | 24.5 | contested | 7.0 |
+| chattanooga / missionary-ridge | CS | defend | defeat | 22.8 | 5.5 | contested | 6.0 |
+
+Read: the scripted player loses more than the computer in 15 of 22 runs, so the doctrine, not the scenarios, drives most
+rows; the standouts for a later tuning round are Orchard Knob as the Confederate defender (the whole force lost in 83 min)
+and Dawn on the Right as the Confederate attacker (47.6 % lost for a victory). "contested" at the end in 14 rows means neither
+side held the objective alone. Nothing is tuned here (contract).
+
 ## 0283 — v5 polish scope after the inventory (Aaron, 2026-10-17)
 
 The inventory corrected two premises: all 20 badges are awardable in code (the "six gaps" of DECISIONS.md:782 are feats with no

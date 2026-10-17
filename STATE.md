@@ -1,14 +1,14 @@
 # STATE
-2026-10-17 · Claude Code (Fable 5.1 top loop, Opus coders). Worktree /private/tmp/cw-v3-20261016 (branch v4-officers = origin/main).
-v4 RELEASED: tag v4 = 483b2ca (CI 39027953486 all 9, Pages 39029443642 green, Release Latest). v3 = 2ef47e9, v2 = 0304ff0.
-Aaron's hands-on play UNRUN: sandbox battle, a Confederate phase, the officer cards. What he finds is the first polish item.
-0274 CLOSED (0275/0276): the offline smoke runs --disable-gpu-compositing, inventory deadline 60 s, NetLog + Chrome traces, 3 samples
-  per push; 11 of 11 samples clean since the fix. 0278 OPEN: rare canceled module fetch; one-shot reload live (src/entry.js);
-  if a sample shows "reloading once" or ERR_ABORTED, read its trace-offline/online-battle.json.gz before touching anything else.
-v5 = POLISH ROUND (0282): opening camera frames the objective; Henry Hill fire asymmetry (defenders lost 962 vs attackers 35);
-  CS-side balance pass; Union AI temperament traits (2 sources per Verified); six badge-award gaps. Contract: PLAN top.
-Then: Confederate franchise (research the Army of Tennessee first) → Eastern campaign → endgame.
+2026-10-17 06:20 PDT · handed from Claude Fable 5.1 to Codex. Worktree /private/tmp/cw-v3-20261016, branch v5-polish (from origin/main f838414).
+v4 RELEASED: tag v4 = 483b2ca (CI 39027953486 all 9, Pages green). v3 = 2ef47e9, v2 = 0304ff0.
+Aaron's hands-on play UNRUN (popup 2026-10-17): sandbox battle, a Confederate phase, the officer cards. What he finds goes first.
+v5 = POLISH (0282/0283): all four legs on the branch at 73587cc; local Node suite green (0284); round-1 finding fixed; round-2
+  verification NOT done (started, stopped); own-SHA CI 39034411445 was in progress (3 browser jobs green). Contract: PLAN top.
+  Left: verify round 2 → fix → CI all 9 → screenshots to Aaron → tag v5 + Release → fast-forward main → docs.
+0278 OPEN: rare canceled module fetch; one-shot reload live (src/entry.js). 39034411445 offline samples 3/3 clean. On a hit read
+  its trace-offline-battle.json.gz before touching anything.
+Then: v6 Confederate franchise (research brief first: nothing written yet) → Eastern campaign → endgame.
 Open, not gates: compressed atlases (0270/0271); live worker install UNRUN; names dropped past 128 officers are counted, not shown.
-Protected MAIN /Users/aaronhanke/Developer/the-civil-war (13a7b13 + WIP) is never edited. .out at cap: downloads go to the scratchpad.
-Note 2026-10-17 00:01: /private/tmp/cw-v1-1-20261012's tracked files and .git link were deleted by an unknown process; restored.
-Old build ~/Desktop/Video Game is read-only. History: two sources for Verified; never invent people, units or ranks.
+Protected MAIN /Users/aaronhanke/Developer/the-civil-war (13a7b13 + WIP, a divergent lineage) is never edited or merged.
+.out at cap: downloads go to a scratch dir. Old build ~/Desktop/Video Game is read-only. History: two sources for Verified;
+never invent people, units, ranks or presence. Process: Decision 0108 light loop; the retired proof regime stays retired (0272).
