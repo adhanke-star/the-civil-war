@@ -1,5 +1,13 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0290 — Aaron approves v6; build the written A/B/C contract (2026-10-17)
+
+Aaron selected “Approve v6 scope—build” in the scope popup. The contract at PLAN top is now authorized: all11 existing
+phases, six core brigades plus authored joins, six sourced institutional/army decisions, dated CS ordinary stock and the
+fixed13-item Game reputation pool preserving five tiers. No new battles, weapons, items, terrain or combat tuning.
+Root implements A/B/C on v6-confederate with fresh read-only Astra diff review and the stated Node/CI gates. Incomplete
+work stays off remote main; final numbered CI images and visual choice precede v6 release. Source qualifications remain.
+
 ## 0289 — proposed v6 contract reuses the Western ladder; scope choice pending (Codex, 2026-10-17)
 
 PLAN now specifies a proposed Confederate franchise using the existing11 phases, six core Shiloh brigades and50 separately

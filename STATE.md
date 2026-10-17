@@ -7,11 +7,11 @@ v5 camera/Outranged/badge/balance scope complete; corrected22-run report41s on C
 Earlier music camp.mp3 cancellation remains UNPROVED (0286);214-event diagnostic sample17finished/0failed is not a fix.
 0278 worker-module cancellation separate/OPEN; one-shot reload live, offline3×6/6 plus upgrade26/26 green.
 On cancellation/reload inspect matching trace/events and name canceller before a causal fix; no weakened error filters.
-v6 proposed research:docs/confederate-franchise-research.md; source/provenance qualifications retained.
-PLAN top contains PROPOSED v6 files+commands contract; scope choice PENDING, no v6 implementation/data adopted.
-Proposal:existing11 phases,6 core brigades+50 authored joins,6 sourced cards, side-aware existing franchise systems.
+v6 research:docs/confederate-franchise-research.md; source/provenance qualifications retained.
+Aaron APPROVED v6 scope by popup; PLAN top is the contract. Phase A WIP transfers to Claude Fable; unaccepted/unreviewed.
+Scope:existing11 phases,6 core brigades+50 authored joins,6 sourced cards, side-aware existing franchise systems.
 CS shop/phase loot use eligible pools; fixed period Game-reward pool preserves all reputation tiers without new items/dates.
-Next:fresh Astra contract review → commit/push/read CI → Aaron scope popup → build only after choice.
+Next:finish affected Node/controls+offline checks → fresh Astra review → accepted A commit/CI; then B/C; no partial main FF.
 Eastern campaign/endgame later; Union army traits need sources; compressed atlases remain default-off.
 Protected MAIN /Users/aaronhanke/Developer/the-civil-war=13a7b13+WIP: never edit/merge/stash/pull/reset.
 Old Desktop build read-only. No local browsers/heavy suites; disposable CI scratch; .out cap300MB.

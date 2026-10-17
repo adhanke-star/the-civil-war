@@ -242,7 +242,7 @@ const GAME_GRADES = { decisive: 'Decisive', victory: 'Victory', draw: 'Draw', de
  * ([{ unitId, regiment, side, by }], only when there are any) for recordPhase's trophy shelf.
  */
 export function phaseOutcome({ game, scenario, awardId, seed }) {
-  if (!game || !scenario || game.scenario !== scenario || game.playerSide !== 'US' || game.over !== true
+  if (!game || !scenario || game.scenario !== scenario || !['US', 'CS'].includes(game.playerSide) || game.over !== true
     || !(['US', 'CS'].includes(game.result?.winner) || (game.result?.winner === null && game.result.draw === true))) fail('only a completed, unaltered battle phase grants rewards.');
   if (typeof awardId !== 'string' || !awardId || awardId.length > 80) fail('a battle phase needs a bounded award identity.');
   const defs = new Map([...scenario.units, ...(scenario.reinforcements || [])].map((d) => [d.id, d])), live = new Map();
@@ -263,15 +263,16 @@ export function phaseOutcome({ game, scenario, awardId, seed }) {
     if (d.type === 'artillery') Object.assign(row, { gunsStart: d.guns, guns: !u ? d.guns : men ? u.gunSlots.filter((g) => g.alive).length : 0 });
     return row;
   });
-  const grade = GAME_GRADES[game.result.grade] || (game.result.winner === 'US' ? 'Victory' : game.result.winner === null ? 'Draw' : 'Defeat');
-  const captures = heldCaptures(game, 'US', scenario.crates, (c) => `Captured: ${c.name}${c.provenance ? ` (${c.provenance})` : ''}`);
+  const side = game.playerSide;
+  const grade = GAME_GRADES[game.result.grade] || (game.result.winner === side ? 'Victory' : game.result.winner === null ? 'Draw' : 'Defeat');
+  const captures = heldCaptures(game, side, scenario.crates, (c) => `Captured: ${c.name}${c.provenance ? ` (${c.provenance})` : ''}`);
   const cards = awardCards({ awardId, seed, grade, captures });
   // The after-action's map replay (src/sim/recorder.js; only when a recorder was attached) and "you vs history".
   // a replay that cannot be recorded never blocks the phase result: the after-action then simply has no replay page
   let replay = null;
   try { replay = game.recorder ? validateReplay(game.recorder.track(game)) : null; } catch { replay = null; }
-  const colours = colourRows(game, 'US').filter((r) => defs.has(r.unitId)).map((r) => ({ unitId: r.unitId, regiment: r.regiment, side: r.side, by: r.by }));
-  return frozen({ winner: game.result.winner, grade, held: game.holder === 'US', units, captures, cards, feats: phaseFeats(game, live),
+  const colours = colourRows(game, side).filter((r) => defs.has(r.unitId)).map((r) => ({ unitId: r.unitId, regiment: r.regiment, side: r.side, by: r.by }));
+  return frozen({ winner: game.result.winner, grade, held: game.holder === side, units, captures, cards, feats: phaseFeats(game, live),
     replay, history: historyComparison({ game, scenario, units, grade }), ...(colours.length ? { colours } : {}) });
 }
 
@@ -285,10 +286,10 @@ function colourRows(game, side) {
     && ['US', 'CS'].includes(r.side) && typeof r.by === 'string' && r.by.trim()).map((r) => ({ ...r })) : [];
 }
 /** What reached this phase's battle from camp (P5d game rules): one line per effect with the Union formations it touched. */
-function campRows(scenario) {
+function campRows(scenario, side = 'US') {
   const out = new Map();
   for (const d of [...(scenario.units || []), ...(scenario.reinforcements || [])]) {
-    if (d.side !== 'US') continue;
+    if (d.side !== side) continue;
     for (const line of campEffectLines(d)) {
       const key = line.split(':')[0];
       if (!out.has(key)) out.set(key, { effect: key, text: line.slice(key.length + 1).trim(), formations: [] });
@@ -317,7 +318,7 @@ export function historyComparison({ game, scenario, units = null, grade = null }
   const h = scenario.history || null;
   const own = game.playerSide === 'CS' ? 'CS' : 'US';
   const colours = colourRows(game, own).map((r) => ({ regiment: r.regiment, formation: r.formation ?? '', by: r.by, how: r.how ?? '' }));
-  const camp = campRows(scenario), extras = { ...(colours.length ? { colours } : {}), ...(camp.length ? { camp } : {}) };
+  const camp = campRows(scenario, own), extras = { ...(colours.length ? { colours } : {}), ...(camp.length ? { camp } : {}) };
   return {
     title: scenario.title ?? '', objective: scenario.objective?.name ?? '',
     result: { winner: game.result?.winner ?? null, grade: grade ?? GAME_GRADES[game.result?.grade] ?? null, why: game.result?.why ?? '', held: game.holder === own, side: own },

@@ -1,0 +1,537 @@
+{
+  "version": 1,
+  "id": "west-cs",
+  "side": "CS",
+  "title": "The Confederate Western Campaign 1862–63",
+  "franchise": [
+    {
+      "unitId": "cs-wood-brigade",
+      "label": "S. A. M. Wood's Brigade",
+      "kind": "infantry",
+      "men": 2228,
+      "weapon": "m1842",
+      "vet": "green"
+    },
+    {
+      "unitId": "cs-cleburne-brigade",
+      "label": "Cleburne's Brigade",
+      "kind": "infantry",
+      "men": 2789,
+      "weapon": "m1842",
+      "vet": "green"
+    },
+    {
+      "unitId": "cs-gladden-brigade",
+      "label": "Gladden's Brigade",
+      "kind": "infantry",
+      "men": 2080,
+      "weapon": "m1842",
+      "vet": "green"
+    },
+    {
+      "unitId": "cs-stephens-brigade",
+      "label": "Stephens's Brigade",
+      "kind": "infantry",
+      "men": 1516,
+      "weapon": "m1842",
+      "vet": "green"
+    },
+    {
+      "unitId": "cs-chalmers-brigade",
+      "label": "Chalmers's Brigade",
+      "kind": "infantry",
+      "men": 1739,
+      "weapon": "m1842",
+      "vet": "green"
+    },
+    {
+      "unitId": "cs-russell-brigade",
+      "label": "Russell's Brigade",
+      "kind": "infantry",
+      "men": 2650,
+      "weapon": "m1842",
+      "vet": "green"
+    }
+  ],
+  "phases": [
+    {
+      "packId": "shiloh",
+      "phaseId": "camps-at-dawn",
+      "joins": [
+        {
+          "unitId": "cs-hardcastle-3rd-mississippi-battalion",
+          "label": "3rd Mississippi Battalion (Hardcastle)",
+          "kind": "infantry",
+          "men": 280,
+          "weapon": "m1842",
+          "vet": "green"
+        },
+        {
+          "unitId": "cs-shaver-brigade",
+          "label": "Shaver's Brigade (Hindman's)",
+          "kind": "infantry",
+          "men": 2360,
+          "weapon": "m1842",
+          "vet": "green"
+        },
+        {
+          "unitId": "cs-swett-battery",
+          "label": "Swett's Mississippi Battery",
+          "kind": "battery",
+          "men": 120,
+          "guns": 6,
+          "weapon": "sixPdr",
+          "vet": "green"
+        },
+        {
+          "unitId": "cs-anderson-brigade",
+          "label": "Patton Anderson's Brigade",
+          "kind": "infantry",
+          "men": 1634,
+          "weapon": "m1842",
+          "vet": "green"
+        },
+        {
+          "unitId": "cs-johnson-brigade",
+          "label": "Bushrod Johnson's Brigade",
+          "kind": "infantry",
+          "men": 1637,
+          "weapon": "m1842",
+          "vet": "green"
+        }
+      ]
+    },
+    {
+      "packId": "shiloh",
+      "phaseId": "hornets-nest",
+      "joins": [
+        {
+          "unitId": "cs-jackson-brigade",
+          "label": "J. K. Jackson's Brigade",
+          "kind": "infantry",
+          "men": 2127,
+          "weapon": "m1842",
+          "vet": "green"
+        },
+        {
+          "unitId": "cs-gibson-brigade",
+          "label": "R. L. Gibson's Brigade",
+          "kind": "infantry",
+          "men": 2375,
+          "weapon": "m1842",
+          "vet": "green"
+        },
+        {
+          "unitId": "cs-bowen-brigade",
+          "label": "Bowen's Brigade",
+          "kind": "infantry",
+          "men": 1744,
+          "weapon": "m1842",
+          "vet": "green"
+        },
+        {
+          "unitId": "cs-statham-brigade",
+          "label": "Statham's Brigade",
+          "kind": "infantry",
+          "men": 3079,
+          "weapon": "m1842",
+          "vet": "green"
+        },
+        {
+          "unitId": "cs-ruggles-grand-battery",
+          "label": "Ruggles's massed batteries",
+          "kind": "battery",
+          "men": 1060,
+          "guns": 53,
+          "weapon": "sixPdr",
+          "vet": "green"
+        }
+      ]
+    },
+    {
+      "packId": "shiloh",
+      "phaseId": "grants-last-line",
+      "joins": [
+        {
+          "unitId": "cs-gage-alabama-battery",
+          "label": "Gage's Alabama Battery",
+          "kind": "battery",
+          "men": 80,
+          "guns": 4,
+          "weapon": "howitzer12",
+          "vet": "green"
+        }
+      ]
+    },
+    {
+      "packId": "shiloh",
+      "phaseId": "buell-attacks",
+      "joins": [
+        {
+          "unitId": "cs-hodgson-battery",
+          "label": "5th Company, Washington Artillery (Hodgson)",
+          "kind": "battery",
+          "men": 120,
+          "guns": 6,
+          "weapon": "sixPdr",
+          "vet": "green"
+        },
+        {
+          "unitId": "cs-mcclung-battery",
+          "label": "McClung's Tennessee Battery",
+          "kind": "battery",
+          "men": 80,
+          "guns": 4,
+          "weapon": "napoleon",
+          "vet": "green"
+        },
+        {
+          "unitId": "cs-trabue-brigade",
+          "label": "Trabue's Brigade",
+          "kind": "infantry",
+          "men": 2056,
+          "weapon": "m1842",
+          "vet": "green"
+        },
+        {
+          "unitId": "cs-pond-brigade",
+          "label": "Pond's Brigade",
+          "kind": "infantry",
+          "men": 1446,
+          "weapon": "m1842",
+          "vet": "green"
+        }
+      ]
+    },
+    {
+      "packId": "stones-river",
+      "phaseId": "dawn-on-the-right",
+      "joins": [
+        {
+          "unitId": "cs-rains-brigade",
+          "label": "Rains's Brigade",
+          "kind": "infantry",
+          "men": 1206,
+          "weapon": "m1842",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-ector-brigade",
+          "label": "Ector's Brigade",
+          "kind": "infantry",
+          "men": 1206,
+          "weapon": "m1842",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-mcnair-brigade",
+          "label": "McNair's Brigade",
+          "kind": "infantry",
+          "men": 1508,
+          "weapon": "m1842",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-humphreys-battery",
+          "label": "Humphreys's Arkansas Battery",
+          "kind": "battery",
+          "men": 120,
+          "guns": 6,
+          "weapon": "sixPdr",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-liddell-brigade",
+          "label": "Liddell's Brigade",
+          "kind": "infantry",
+          "men": 1709,
+          "weapon": "m1842",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-bjohnson-brigade",
+          "label": "B. R. Johnson's Brigade",
+          "kind": "infantry",
+          "men": 1922,
+          "weapon": "m1842",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-lpolk-brigade",
+          "label": "L. E. Polk's Brigade",
+          "kind": "infantry",
+          "men": 1343,
+          "weapon": "m1842",
+          "vet": "trained"
+        }
+      ]
+    },
+    {
+      "packId": "stones-river",
+      "phaseId": "slaughter-pen",
+      "joins": [
+        {
+          "unitId": "cs-manigault-brigade",
+          "label": "Manigault's Brigade",
+          "kind": "infantry",
+          "men": 1481,
+          "weapon": "m1842",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-maney-brigade",
+          "label": "Maney's Brigade",
+          "kind": "infantry",
+          "men": 1301,
+          "weapon": "m1842",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-turner-battery",
+          "label": "Smith's Mississippi Battery (Turner)",
+          "kind": "battery",
+          "men": 80,
+          "guns": 4,
+          "weapon": "napoleon",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-coltart-brigade",
+          "label": "Deas's Brigade (Coltart)",
+          "kind": "infantry",
+          "men": 2221,
+          "weapon": "m1842",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-vaughan-brigade",
+          "label": "Preston Smith's Brigade (Vaughan)",
+          "kind": "infantry",
+          "men": 1742,
+          "weapon": "m1842",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-stewart-brigade",
+          "label": "Stewart's Brigade",
+          "kind": "infantry",
+          "men": 1561,
+          "weapon": "m1842",
+          "vet": "trained"
+        }
+      ]
+    },
+    {
+      "packId": "stones-river",
+      "phaseId": "round-forest",
+      "joins": [
+        {
+          "unitId": "cs-donelson-brigade",
+          "label": "Donelson's Brigade",
+          "kind": "infantry",
+          "men": 1400,
+          "weapon": "m1842",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-adams-brigade",
+          "label": "Adams's Brigade (Gibson's from 31 December)",
+          "kind": "infantry",
+          "men": 1634,
+          "weapon": "m1842",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-preston-brigade",
+          "label": "Preston's Brigade",
+          "kind": "infantry",
+          "men": 1461,
+          "weapon": "m1842",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-palmer-brigade",
+          "label": "Palmer's Brigade (Pillow's on 2 January)",
+          "kind": "infantry",
+          "men": 1575,
+          "weapon": "m1842",
+          "vet": "trained"
+        }
+      ]
+    },
+    {
+      "packId": "stones-river",
+      "phaseId": "mcfaddens-ford",
+      "joins": [
+        {
+          "unitId": "cs-hanson-brigade",
+          "label": "Hanson's Brigade (the Orphan Brigade)",
+          "kind": "infantry",
+          "men": 1514,
+          "weapon": "m1842",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-washington-artillery",
+          "label": "5th Company, Washington Artillery (Vaught)",
+          "kind": "battery",
+          "men": 80,
+          "guns": 4,
+          "weapon": "sixPdr",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-wright-battery",
+          "label": "Wright's Tennessee Battery",
+          "kind": "battery",
+          "men": 80,
+          "guns": 4,
+          "weapon": "sixPdr",
+          "vet": "trained"
+        },
+        {
+          "unitId": "cs-semple-battery",
+          "label": "Semple's Alabama Battery (Fitzpatrick)",
+          "kind": "battery",
+          "men": 45,
+          "guns": 4,
+          "weapon": "napoleon",
+          "vet": "trained"
+        }
+      ]
+    },
+    {
+      "packId": "chattanooga",
+      "phaseId": "orchard-knob",
+      "joins": [
+        {
+          "unitId": "cs-28th-alabama",
+          "label": "28th Alabama Infantry",
+          "kind": "infantry",
+          "men": 377,
+          "weapon": "enfield",
+          "vet": "veteran"
+        },
+        {
+          "unitId": "cs-24th-alabama",
+          "label": "24th Alabama Infantry",
+          "kind": "infantry",
+          "men": 257,
+          "weapon": "enfield",
+          "vet": "veteran"
+        }
+      ]
+    },
+    {
+      "packId": "chattanooga",
+      "phaseId": "lookout-mountain",
+      "joins": [
+        {
+          "unitId": "cs-walthall-brigade",
+          "label": "Walthall's Brigade",
+          "kind": "infantry",
+          "men": 1489,
+          "weapon": "m1842",
+          "vet": "veteran"
+        },
+        {
+          "unitId": "cs-moore-brigade",
+          "label": "Moore's Brigade",
+          "kind": "infantry",
+          "men": 1205,
+          "weapon": "enfield",
+          "vet": "veteran"
+        },
+        {
+          "unitId": "cs-howell-section",
+          "label": "Gibson's section, Howell's Georgia Battery",
+          "kind": "battery",
+          "men": 40,
+          "guns": 2,
+          "weapon": "sixPdr",
+          "vet": "veteran"
+        },
+        {
+          "unitId": "cs-pettus-brigade",
+          "label": "Pettus's Brigade (three regiments)",
+          "kind": "infantry",
+          "men": 1158,
+          "weapon": "enfield",
+          "vet": "veteran"
+        }
+      ]
+    },
+    {
+      "packId": "chattanooga",
+      "phaseId": "missionary-ridge",
+      "joins": [
+        {
+          "unitId": "cs-deas-brigade",
+          "label": "Deas's Brigade",
+          "kind": "infantry",
+          "men": 1260,
+          "weapon": "enfield",
+          "vet": "veteran"
+        },
+        {
+          "unitId": "cs-waters-battery",
+          "label": "Waters's Alabama Battery (Hamilton)",
+          "kind": "battery",
+          "men": 80,
+          "guns": 4,
+          "weapon": "napoleon",
+          "vet": "veteran"
+        },
+        {
+          "unitId": "cs-tucker-brigade",
+          "label": "Anderson's Brigade (Tucker)",
+          "kind": "infantry",
+          "men": 1260,
+          "weapon": "enfield",
+          "vet": "veteran"
+        },
+        {
+          "unitId": "cs-bate-brigade",
+          "label": "Bate's Brigade (Tyler)",
+          "kind": "infantry",
+          "men": 1260,
+          "weapon": "enfield",
+          "vet": "veteran"
+        },
+        {
+          "unitId": "cs-finley-brigade",
+          "label": "Florida Brigade (Finley)",
+          "kind": "infantry",
+          "men": 1260,
+          "weapon": "enfield",
+          "vet": "veteran"
+        },
+        {
+          "unitId": "cs-cobb-battery",
+          "label": "Cobb's Kentucky Battery (Gracey)",
+          "kind": "battery",
+          "men": 80,
+          "guns": 4,
+          "weapon": "napoleon",
+          "vet": "veteran"
+        },
+        {
+          "unitId": "cs-strahl-brigade",
+          "label": "Strahl's Brigade",
+          "kind": "infantry",
+          "men": 1260,
+          "weapon": "enfield",
+          "vet": "veteran"
+        },
+        {
+          "unitId": "cs-stovall-brigade",
+          "label": "Stovall's Brigade",
+          "kind": "infantry",
+          "men": 1260,
+          "weapon": "enfield",
+          "vet": "veteran"
+        }
+      ]
+    }
+  ]
+}

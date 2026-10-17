@@ -382,9 +382,10 @@ function awardEnemy(prior, stats, awardId) {
  * after-action summary (also kept for badgeAward). A brigade or formation without feats is unchanged.
  */
 export function awardBadges(save, { awardId, feats, loan = false }) {
+  const side = save.campaign?.side || 'US', other = side === 'US' ? 'CS' : 'US';
   const brigades = [], enemyRows = [];
   const army = save.army.map((b) => {
-    const found = !loan && b.unitId && feats[b.unitId], stats = found && found.side === 'US' ? found : null;
+    const found = !loan && b.unitId && feats[b.unitId], stats = found && found.side === side ? found : null;
     // A brigade without feats still re-fits its badges to its slots (a veterancy drop this phase).
     if (!stats && !(b.badges || []).length) return b;
     const r = awardBrigade(b, stats, awardId);
@@ -397,7 +398,7 @@ export function awardBadges(save, { awardId, feats, loan = false }) {
   const enemy = { ...(save.enemy || {}) };
   for (const id of Object.keys(feats).sort()) {
     const stats = feats[id];
-    if (stats.side !== 'CS' || franchise.has(id)) continue;
+    if (stats.side !== other || franchise.has(id)) continue;
     const r = awardEnemy(enemy[id], stats, awardId);
     if (r.record) enemy[id] = r.record; else delete enemy[id];
     if (r.earned.length) enemyRows.push({ id, earned: r.earned, xfactor: r.xfactor });

@@ -51,11 +51,13 @@ export const nextLevelAt = (level) => (level < ECONOMY.levels.length ? ECONOMY.l
 export const shopTierFor = (level) => ECONOMY.shopTier[Math.max(1, Math.min(ECONOMY.shopTier.length - 1, level))];
 
 /** One phase's points, line by line. */
-export function phasePoints({ grade, held = false, lossesUS = 0, lossesCS = 0, loan = false }) {
+export function phasePoints({ grade, held = false, lossesUS = 0, lossesCS = 0, loan = false, side = 'US' }) {
   if (!Object.prototype.hasOwnProperty.call(ECONOMY.phasePoints, grade)) fail('unknown grade.');
+  if (!['US', 'CS'].includes(side)) fail('unknown player side.');
   const lines = [{ id: 'grade', label: `Grade: ${grade}`, points: ECONOMY.phasePoints[grade] }];
   if (held === true) lines.push({ id: 'held', label: 'Held the objective at the end', points: ECONOMY.heldBonus });
-  if (lossesUS <= lossesCS * ECONOMY.lowLossRatio) lines.push({ id: 'lowLoss', label: 'Losses at most half the enemy\'s', points: ECONOMY.lowLossBonus });
+  const own = side === 'CS' ? lossesCS : lossesUS, enemy = side === 'CS' ? lossesUS : lossesCS;
+  if (own <= enemy * ECONOMY.lowLossRatio) lines.push({ id: 'lowLoss', label: 'Losses at most half the enemy\'s', points: ECONOMY.lowLossBonus });
   const sum = lines.reduce((n, l) => n + l.points, 0);
   if (loan === true) lines.push({ id: 'loan', label: 'Army on loan: half', points: Math.floor(sum * ECONOMY.loanFactor) - sum });
   return { lines, score: lines.reduce((n, l) => n + l.points, 0) };
@@ -81,7 +83,7 @@ export function awardPhase(save, { awardId, grade, held = false, lossesUS = 0, l
   if (s.ledger.some((r) => r.kind === 'phase' && r.awardId === awardId)) return s;
   const row = s.campaign.history.find((r) => r.awardId === awardId);
   if (!row) fail('points need a recorded phase.');
-  const { score } = phasePoints({ grade, held, lossesUS, lossesCS, loan });
+  const { score } = phasePoints({ grade, held, lossesUS, lossesCS, loan, side: s.campaign.side || 'US' });
   const same = new Set(s.campaign.history.filter((r) => r.packId === row.packId && r.phaseId === row.phaseId).map((r) => r.awardId));
   const best = s.ledger.filter((r) => r.kind === 'phase' && same.has(r.awardId)).reduce((n, r) => Math.max(n, r.score), 0);
   const points = Math.max(0, score - best);
@@ -105,7 +107,7 @@ export function phaseSummary(before, after) {
   const b = before && before.version === 2 ? validateSnapshot(before) : null;
   if (!rec || (b && b.ledger.some((r) => r.kind === 'phase' && r.awardId === rec.awardId))) return null;
   const row = a.campaign.history.find((r) => r.awardId === rec.awardId);
-  const { lines } = phasePoints({ grade: row.grade, held: rec.held, lossesUS: row.lossesUS, lossesCS: row.lossesCS, loan: rec.loan });
+  const { lines } = phasePoints({ grade: row.grade, held: rec.held, lossesUS: row.lossesUS, lossesCS: row.lossesCS, loan: rec.loan, side: a.campaign.side || 'US' });
   if (rec.points < rec.score) lines.push({ id: 'replay', label: 'Replay: only the improvement on this phase\'s best is paid', points: rec.points - rec.score });
   return { lines, points: rec.points, score: rec.score, replay: row.replay, rp: a.rp,
     reputation: { from: b ? b.reputation : 0, to: a.reputation }, level: a.level, levelAt: ECONOMY.levels[a.level - 1], nextAt: nextLevelAt(a.level),

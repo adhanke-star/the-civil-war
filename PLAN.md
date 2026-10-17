@@ -1,14 +1,14 @@
-# Current execution — v6 proposal after released v5 (2026-10-17)
+# Current execution — v6 Confederate franchise (2026-10-17)
 
 STATUS 2026-10-17: v5 RELEASED (tag v5=b657362; own CI39038318606 all nine; images1–4 seen/approved by Aaron).
 Remote main=71ae410 (research/status docs only after b657; own CI39040575109 all nine), Pages39044236896 green, live HTTP200.
 0274 CLOSED; 0278 worker cancellation and the separate intermittent music cancellation remain OPEN. No causal fix claimed.
 Aaron's hands-on play of sandbox, Confederate phase and officer cards UNRUN.
 
-v6 PROPOSED CONTRACT — CONFEDERATE FRANCHISE (Codex, 2026-10-17; Aaron's scope choice PENDING)
+v6 CONTRACT — CONFEDERATE FRANCHISE (Codex, 2026-10-17; Aaron APPROVED by scope popup)
 
 Purpose: a second army through the existing Western ladder, using the same camp, slots, battle controls, rewards and officer
-cards. This extends DESIGN's post-v1 Confederate franchise. No implementation until Aaron chooses the scope by popup.
+cards. This extends DESIGN's post-v1 Confederate franchise. Aaron approved this scope, including the fixed Game-reward pool.
 Research of record: docs/confederate-franchise-research.md. Its provenance and disputed details remain attached to the content;
 the proposal does not upgrade source labels. Root Sol6.1 owns all writes; fresh read-only Astra refutes each diff before commit.
 Worktree /private/tmp/cw-v3-20261016, branch v6-confederate from71ae410. Protected local MAIN and Desktop parts bin stay untouched.
@@ -66,7 +66,7 @@ Side and storage contract
   across simulation, record, replay, after-action, camp and aria. Enemy progression applies to the opposite side. Unarrived
   reinforcements keep authored strength, and an absent stored formation never creates a battlefield unit.
 
-Loot/availability proposal — this is an explicit scope choice, not a historical claim about a captured lot
+Loot/availability — approved game policy, not a historical claim about a captured lot
 - CS ordinary shop stock uses the research whitelist and existing rarity/price/condition rules: April1862 m1842 proxy,
   enfield, sixPdr, howitzer12; Dec1862 adds napoleon; Nov1863 adds lorenz. These are game cutoffs. Keep exact-model Inferred
   qualifications and CS source/basis text rather than Union ARM_DATES prose. Shop recomputes the same eligible lots when
@@ -99,7 +99,7 @@ Loot/availability proposal — this is an explicit scope choice, not a historica
   no campaign depot award of actual captured formation equipment; adding one is OUT.
 
 Six decision cards (NEW assets/decisions-cs.json; same version1 schema, not appended to Union deck)
-All listed numerical effects are proposed GAME RULES using existing magnitudes, not evidence of historical consequences.
+All listed numerical effects are GAME RULES using existing magnitudes, not evidence of historical consequences.
 Each option has one gain/one cost; every pair has a points/store-free choice; max two cards per pack/phase.
 1. shiloh/grants-last-line: Beauregard's Apr6 dusk halt. Halt:morale+4/rations−10; press:rp+15/morale−4. Historical:halt.
 2. stones-river/dawn-on-the-right: Gorgas approves Mallet's post-Aug–Sep1862 inspection recommendations, retrospective

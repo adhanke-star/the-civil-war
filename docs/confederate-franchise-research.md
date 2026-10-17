@@ -123,9 +123,35 @@ Incidental existing seam, reported only: battlefield pack classes `parrott`/`nap
 
 Implementation proposal after review: ordinary CS stock remains the table above. Reputation cards are a separate GAME REWARD policy, using a fixed opening-date pool of ordinary CS types plus opponent models permitted by the existing April1862 availability estimates and existing fictional named variants. That pool preserves all five rarity tiers without new weapon types or saved reward dates. It does not document Confederate procurement, a specific captured lot or brigade issue; retain the underlying estimates' provenance. PLAN lists the exact ordered pool, whose Legendary entry is the existing Game item The Quiet Argument, based on Sharps. This proposal changes no research claim or stock eligibility and still needs Aaron's scope choice.
 
-## Before a v6 contract
+## Initial battery card mappings (approved game profiles, not exact historical allocations)
 
-Resolve initial roster plus joins without false unit continuity; decide if extra Shiloh command-transition/withdrawal mechanics belong in scope; distinguish sourced policy context from actual camp decisions; date/location gate cards; specify side-neutral franchise/save/reward effects and source-preserving tests. Current campaign.js:237 rejects matched non-US formations and decisions.js:50 still assumes Union morale; starter-plus-joins structure alone does not enable a Confederate franchise. Write DECISIONS+PLAN contract, show recommended-first scope popup, then build only after Aaron's choice. v5 remains unchanged.
+These mappings preserve the existing field abstraction and its source qualifications. Crew/gun counts are copied from the
+authored phase. A single card models mixed armament; it does not identify every piece as that model. In particular, the
+field class called napoleon is not itself evidence of a Napoleon gun.
+
+| Authored formation | Card profile | Qualification retained from the pack |
+|---|---|---|
+| cs-swett-battery | sixPdr | Mixed four smoothbores/two howitzers; majority profile. |
+| cs-ruggles-grand-battery | sixPdr | Aggregated massed batteries,53 guns used;62 disputed; majority-class game profile. |
+| cs-gage-alabama-battery | howitzer12 | Explicit exception to field class: mixed rifles/howitzers, no identified Napoleon. |
+| cs-hodgson-battery | sixPdr | Three-way mixed battery; selected game profile. |
+| cs-mcclung-battery | napoleon | Estimated mixed six-pounders/Napoleons; heavier-class game profile, not ordinary-shop evidence. |
+| cs-humphreys-battery | sixPdr | Mixed types; selected class already a guess. |
+| cs-turner-battery | napoleon | Two Napoleons/two howitzers; selected mixed-battery profile. |
+| cs-washington-artillery | sixPdr | Exact types unstated in the phase; low-confidence profile. |
+| cs-wright-battery | sixPdr | Brass pieces, exact types unstated; low-confidence profile. |
+| cs-semple-battery | napoleon | Authored four-gun phase group; source-qualified count, not a new six-gun allocation. |
+| cs-howell-section | sixPdr | Authored two six-pounders; existing crew estimate and historical no-fire account retained. |
+| cs-waters-battery | napoleon | Unsourced field-class guess; explicitly a game profile. |
+| cs-cobb-battery | napoleon | Authored four Napoleons; original sources retained. |
+
+## v6 contract boundary
+
+Aaron approved the PLAN contract by scope popup (Decision0290). It retains the existing eleven phases, separate joins,
+six historical institutional/army cases and existing franchise systems. Extra scripted Shiloh deaths/evacuation mechanics
+remain out. Phase A begins the side-neutral implementation; the completed flow must still pass the full contract and final
+visual/release boundary. This implementation does not upgrade research provenance or turn game equipment into an exact
+historical allocation. v5 remains the released baseline.
 
 ## Implementation overlap check (proposal only)
 

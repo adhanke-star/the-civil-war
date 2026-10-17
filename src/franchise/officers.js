@@ -89,9 +89,10 @@ export function meritEffectText(merit, { campaign = true, killed = null, kind = 
  */
 export function applyMerit(scenario, save, { loan = false } = {}) {
   if (loan || !save || save.version !== 2 || !scenario || !Array.isArray(scenario.units)) return scenario;
+  const side = save.campaign?.side || 'US';
   const army = new Set(save.army.filter((b) => typeof b.unitId === 'string').map((b) => b.unitId));
   const stamp = (d) => {
-    if (!d || d.side !== 'US' || !army.has(d.id) || !d.commander || !text(d.commander.name)) return d;
+    if (!d || d.side !== side || !army.has(d.id) || !d.commander || !text(d.commander.name)) return d;
     const r = officerRecord(save, d.commander.name), active = r.merit > 0 && !r.killed, fx = meritEffects(r.merit);
     return { ...d, officer: { merit: r.merit, active, record: r.record }, ...(active ? { meritRadius: fx.radius, meritSteady: fx.steady } : {}) };
   };
@@ -104,12 +105,13 @@ export function applyMerit(scenario, save, { loan = false } = {}) {
  * `successor` only where the pack names one for him. Formations that never arrived are left out.
  */
 export function officerRows({ game, scenario }) {
+  const side = game?.playerSide === 'CS' ? 'CS' : 'US';
   const live = new Map((Array.isArray(game?.units) ? game.units : []).map((u) => [u.id, u]));
   const down = new Map((Array.isArray(game?.result?.officers) ? game.result.officers : []).filter((r) => r && OFFICER_EVENTS.includes(r.kind)).map((r) => [r.unitId, r]));
   const rows = [];
   for (const d of [...(scenario?.units || []), ...(scenario?.reinforcements || [])]) {
     const u = live.get(d?.id);
-    if (!u || d.side !== 'US' || !d.commander || !text(d.commander.name)) continue;
+    if (!u || d.side !== side || !d.commander || !text(d.commander.name)) continue;
     const end = u.state === 'captured' ? 'surrendered' : u.state === 'routing' || !(u.men >= 1) ? 'broken' : 'steady';
     const hit = down.get(d.id), event = hit && hit.name === d.commander.name ? hit.kind : null;
     const next = event && d.commander.successor && text(d.commander.successor.name) ? d.commander.successor.name : null;

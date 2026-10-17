@@ -447,6 +447,10 @@ self.CW_OFFLINE = {
    "bytes": 28884,
    "sha256": "124c9b815eb8d8833c86afe1cbab5e3e3ec6135e9421c1deac5e629f993c0040"
   },
+  "assets/campaign-cs.json": {
+   "bytes": 13589,
+   "sha256": "b7a69d2753c9e9e0d2a71f83d3b6631143aa32414fe75a9eee0cd79973fdbe4d"
+  },
   "assets/campaign.json": {
    "bytes": 12214,
    "sha256": "5432973866be48626f98650b45860e2ac2c5f9f62b556b7d19b4d1a8f33a71a6"
@@ -696,16 +700,16 @@ self.CW_OFFLINE = {
    "sha256": "ef361122904cb2baaf4fbff967b5899e614cd75429015ee6d7b0bbb85cc05014"
   },
   "src/franchise/badges.js": {
-   "bytes": 38748,
-   "sha256": "55666772fec57be56d302ab598c1d76c2a66bb93211873c13aee436371be6597"
+   "bytes": 38830,
+   "sha256": "d37e34354f27ed6c9e18c25627c4d5571697153d6cd55f06dd5f587ca7e80556"
   },
   "src/franchise/camp-orders.js": {
    "bytes": 11821,
    "sha256": "0c7a204f28192aa2fdf765ddc7bdc0d5342a5732f7ae4bc8723b7e7adb542471"
   },
   "src/franchise/campaign.js": {
-   "bytes": 29289,
-   "sha256": "fa8883eaa774f3ec0572942c221225ff46c0b7659c32e35534ae35b3a127e658"
+   "bytes": 30091,
+   "sha256": "f21c4d0868a0d41b514da9225dd4fe44f4d5c66b2e5ba96c9623389c22d73023"
   },
   "src/franchise/captures.js": {
    "bytes": 5899,
@@ -716,8 +720,8 @@ self.CW_OFFLINE = {
    "sha256": "5b466822b193e46bc791630261e817a018bd8c1afae49649eb679c4cd0a8d269"
   },
   "src/franchise/economy.js": {
-   "bytes": 18332,
-   "sha256": "2592b9d3b8318e2297985b2800a7103ee935fc261205b6ddd4b2fbad2268c5b4"
+   "bytes": 18561,
+   "sha256": "47ca58946a7d20401a34b419d388369b566ac177a6d5f374899bdbae108c5aa2"
   },
   "src/franchise/intro.js": {
    "bytes": 2519,
@@ -728,20 +732,20 @@ self.CW_OFFLINE = {
    "sha256": "1f5d4010bf4e5d42c3fae0b7008eb7e28cbdcb6a10dae5f31304080517fe2e36"
   },
   "src/franchise/officers.js": {
-   "bytes": 25175,
-   "sha256": "6a5dc1f4da7ca17a1bea48176a6a052da8724b6c42580132468cb1ef3a748f88"
+   "bytes": 25275,
+   "sha256": "a44d0c136445f97dc69a26448fcff14aa017e634bf060a93b734eeb5fedbd150"
   },
   "src/franchise/practice-ui.js": {
    "bytes": 23305,
    "sha256": "620f4a0adf2d6de410634e912f3856846b9043e9938e4ca104e4214b24ef9581"
   },
   "src/franchise/practice.js": {
-   "bytes": 30670,
-   "sha256": "6c8421021fc13dcd72362d980ce4259d2736d6d5fa0d7071248bac822b0c70b9"
+   "bytes": 30735,
+   "sha256": "475f5616c01f573775495159e3ad157c78c95a027893a548e1e33a0caf6a1fe2"
   },
   "src/franchise/save.js": {
-   "bytes": 45915,
-   "sha256": "81162670f2de8dcfa4a0d674968018aac057a9187309a698592c239ef60cd544"
+   "bytes": 46269,
+   "sha256": "bc73022d8cd77015e6309183b356de4ca0a9396816e6407f6b8c5bca04ac58ce"
   },
   "src/franchise/tuning.js": {
    "bytes": 15340,
@@ -1487,5 +1491,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "6e5f63cde884783f3fa4c96bc5399e2742259c503917f771f0614eac273b1ba0"
+ "generation": "600ba20596f065b3d34394aeb680f5330ba13a8b22a55c81f0cd59ccd9810b81"
 };

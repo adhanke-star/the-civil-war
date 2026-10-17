@@ -67,8 +67,10 @@ function item(v) {
 
 /** The v2 campaign position: next ladder index, append-only history and per-unit carried strength. */
 function campaignRecord(c) {
-  shape(c, ['id', 'index', 'status', 'history', 'carry']);
+  shape(c, ['id', 'index', 'status', 'history', 'carry'], ['side']);
   const cid = id(c.id, 'campaign identity');
+  const side = has(c, 'side') ? c.side : 'US';
+  if (!['US', 'CS'].includes(side) || (cid === 'west-cs' && c.side !== 'CS') || (cid === 'west' && side !== 'US')) bad('campaign identity and side do not match.');
   const index = number(c.index, 'campaign position', 0, CAMPAIGN_LIMITS.phases);
   if (!['in-progress', 'complete'].includes(c.status)) bad('unknown campaign status.');
   const awards = new Set();
@@ -92,7 +94,8 @@ function campaignRecord(c) {
     shape(e, ['men'], ['guns']);
     carry[id(key, 'carried unit identity')] = { men: number(e.men, 'carried men', 0, 100000), ...(has(e, 'guns') ? { guns: number(e.guns, 'carried guns', 0, 200) } : {}) };
   }
-  return { id: cid, index, status: c.status, history, carry };
+  // Old Union exports keep their original shape; only an explicitly supplied side is retained.
+  return { id: cid, index, status: c.status, history, carry, ...(has(c, 'side') ? { side } : {}) };
 }
 
 /**

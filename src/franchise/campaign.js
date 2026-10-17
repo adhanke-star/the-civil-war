@@ -83,8 +83,10 @@ const same = (entry, packId, phaseId) => entry.packId === packId && entry.phaseI
 
 /** Strict campaign definition. Each battle's phases are contiguous, so a pack change means a new battle. */
 export function validateCampaign(json) {
-  shape(json, ['version', 'id', 'title', 'franchise', 'phases'], [], 'campaign');
+  shape(json, ['version', 'id', 'title', 'franchise', 'phases'], ['side'], 'campaign');
   if (json.version !== 1 || typeof json.id !== 'string' || !PACK.test(json.id)) fail('unsupported campaign version or identity.');
+  const side = has(json, 'side') ? json.side : 'US';
+  if (!['US', 'CS'].includes(side) || (json.id === 'west-cs' && json.side !== 'CS') || (json.id === 'west' && side !== 'US')) fail('campaign identity and side do not match.');
   const title = words(json.title, 'campaign title');
   if (!Array.isArray(json.franchise) || json.franchise.length > CAMPAIGN_LIMITS.franchise) fail('incomplete or oversized franchise roster.');
   // One row schema for the franchise and for every phase's joins; unitIds are unique across all of them.
@@ -121,7 +123,7 @@ export function validateCampaign(json) {
     return { packId: p.packId, phaseId: p.phaseId, ...(p.loan ? { loan: true } : {}), ...(joins ? { joins } : {}) };
   });
   if (unitIds.size > CAMPAIGN_LIMITS.franchise) fail('the franchise and its joining formations exceed the army limit.');
-  return frozen({ version: 1, id: json.id, title, franchise, phases });
+  return frozen({ version: 1, id: json.id, title, franchise, phases, ...(has(json, 'side') ? { side } : {}) });
 }
 
 function campaignSave(save, campaign) {
@@ -129,6 +131,7 @@ function campaignSave(save, campaign) {
   if (s.version !== 2 || s.kind !== 'campaign') fail('expected a campaign save.');
   if (campaign) {
     if (s.campaign.id !== campaign.id) fail('the save belongs to another campaign.');
+    if ((s.campaign.side || 'US') !== (campaign.side || 'US')) fail('the save commands another side.');
     if (s.campaign.status === 'complete' && s.campaign.index < campaign.phases.length) {
       // The ladder grew after this campaign finished (a new battle shipped): reopen it at the first new phase,
       // with every formation that joins up to that phase.
@@ -163,7 +166,7 @@ export function newCampaign({ campaign, slot, seed, at, difficulty } = {}) {
   if (difficulty !== undefined && !DIFFICULTY.levels.includes(difficulty)) fail('choose Recruit, Veteran or General.');
   const army = withJoins(c.franchise.map((r) => enlist(c, slot, r, 'muster', MUSTER)), c, slot, 0);
   return validateSnapshot({ format: 'the-civil-war', version: 2, kind: 'campaign', awardId: `${c.id}.${slot}.start`, army, depot: [], issued: [],
-    seed, grade: null, slot, campaign: { id: c.id, index: 0, status: 'in-progress', history: [], carry: {} }, ...(at === undefined ? {} : { updated: at }),
+    seed, grade: null, slot, campaign: { id: c.id, index: 0, status: 'in-progress', history: [], carry: {}, ...(c.side === 'CS' ? { side: 'CS' } : {}) }, ...(at === undefined ? {} : { updated: at }),
     ...(difficulty && difficulty !== 'veteran' ? { difficulty } : {}) });
 }
 
@@ -178,7 +181,7 @@ export function campaignPhase(save, campaign, { replay = false } = {}) {
   const entry = c.phases[at], attempt = 1 + s.campaign.history.filter((r) => same(r, entry.packId, entry.phaseId)).length;
   if (attempt > CAMPAIGN_LIMITS.attempts) fail('this phase has been replayed too often.');
   const awardId = awardFor(c.id, s.slot, entry.packId, entry.phaseId, attempt);
-  return frozen({ packId: entry.packId, phaseId: entry.phaseId, loan: entry.loan === true, index: at, isLast: at === c.phases.length - 1,
+  return frozen({ packId: entry.packId, phaseId: entry.phaseId, ...(c.side === 'CS' ? { side: 'CS' } : {}), loan: entry.loan === true, index: at, isLast: at === c.phases.length - 1,
     replay: !!replay, attempt, awardId, seed: `${s.seed}:${awardId}` });
 }
 
@@ -190,7 +193,9 @@ export function campaignPhase(save, campaign, { replay = false } = {}) {
  */
 export function applyCampaign(scenario, save, phase) {
   const s = campaignSave(save);
+  const side = s.campaign.side || 'US', other = side === 'US' ? 'CS' : 'US';
   if (!phase || typeof phase !== 'object' || typeof phase.packId !== 'string' || typeof phase.phaseId !== 'string') fail('applying a campaign needs its phase.');
+  if ((phase.side || 'US') !== side) fail('the phase commands another side.');
   if (!scenario || typeof scenario !== 'object' || !Array.isArray(scenario.units)) fail('applying a campaign needs a scenario roster.');
   const out = JSON.parse(JSON.stringify(scenario)), loan = phase.loan === true;
   const last = s.campaign.history[s.campaign.history.length - 1];
@@ -202,7 +207,7 @@ export function applyCampaign(scenario, save, phase) {
     if (!d) return d;
     const b = army.get(d.id);
     if (b) return !loan && (b.badges || []).length ? { ...d, badges: fieldBadges(b.badges, b.xfactor) } : d;
-    if (d.side === 'CS' && has(enemy, d.id)) return { ...d, badges: fieldBadges(enemy[d.id].badges, enemy[d.id].xfactor) };
+    if (d.side === other && has(enemy, d.id)) return { ...d, badges: fieldBadges(enemy[d.id].badges, enemy[d.id].xfactor) };
     return d;
   };
   // Camp (P5c): the morale the march out of camp set for this phase attempt (franchise brigades off loan) and the decision
@@ -212,7 +217,7 @@ export function applyCampaign(scenario, save, phase) {
     .reduce((n, r) => n + r.effects.filter((e) => e.kind === 'morale').reduce((m, e) => m + e.amount, 0), 0);
   const steadied = (d) => {
     if (!d) return d;
-    const b = army.get(d.id), delta = (d.side === 'US' ? decided : 0) + (b && has(ready, b.id) ? ready[b.id] : 0);
+    const b = army.get(d.id), delta = (d.side === side ? decided : 0) + (b && has(ready, b.id) ? ready[b.id] : 0);
     return delta ? { ...d, morale: Math.max(1, Math.min(100, Math.round((Number.isFinite(d.morale) ? d.morale : CAMP.defaultMorale) + delta))) } : d;
   };
   // Camp in battle (P5d): card points, pioneers, and the stores each brigade lacked on the march out for this attempt.
@@ -234,7 +239,7 @@ export function applyCampaign(scenario, save, phase) {
     if (army.has(d.id)) {
       if (loan) return d; // Grant's army is on loan: the franchise army is neither read nor written
       const b = army.get(d.id);
-      if (d.side !== 'US' || (b.kind === 'battery') !== artillery) fail(`franchise formation ${b.id} does not match its field unit.`);
+      if (d.side !== side || (b.kind === 'battery') !== artillery) fail(`franchise formation ${b.id} does not match its field unit.`);
       const men = Math.min(d.men, b.men), guns = artillery ? Math.min(Number.isSafeInteger(d.guns) ? d.guns : b.guns, b.guns) : 0;
       if (men <= 0 || (artillery && guns <= 0)) return null;
       // The field's equipment profile knows issue and capture origins only; reward and requisition cards field without one.
@@ -266,6 +271,7 @@ export function applyCampaign(scenario, save, phase) {
  */
 export function recordPhase(save, campaign, result) {
   const c = validateCampaign(campaign), s = campaignSave(save, c);
+  const side = s.campaign.side || 'US';
   shape(result, ['packId', 'phaseId', 'winner', 'grade', 'units', 'loot'], ['awardId', 'at', 'held', 'feats', 'colours', 'officers'], 'phase result');
   if (has(result, 'held') && typeof result.held !== 'boolean') fail('held must be true or false when present.');
   const history = s.campaign.history, last = history[history.length - 1];
@@ -316,7 +322,7 @@ export function recordPhase(save, campaign, result) {
     if (army.has(u.id)) {
       if (loan) continue;
       const b = army.get(u.id);
-      if (u.side !== 'US') fail(`franchise formation ${b.id} fought for the wrong side.`);
+      if (u.side !== side) fail(`franchise formation ${b.id} fought for the wrong side.`);
       // Ambulances (an army upgrade, P5c): a share of the phase's losses returns to the ranks (a game rule).
       const lost = u.menStart - u.men, men = Math.max(0, b.men - lost + (ambulances ? Math.floor(lost * CAMP.upgrades.ambulances.returned) : 0));
       const next = { ...b, men };
@@ -338,7 +344,7 @@ export function recordPhase(save, campaign, result) {
   const fought = s.army.map((b) => changed.get(b.id) || b);
   const draft = { ...s, awardId, grade: result.grade,
     army: replay ? fought : withJoins(fought, c, s.slot, Math.min(nextIndex, c.phases.length - 1)), depot: [...s.depot, ...result.loot],
-    campaign: { id: c.id, index: nextIndex, status: nextIndex >= c.phases.length ? 'complete' : 'in-progress',
+    campaign: { id: c.id, index: nextIndex, status: nextIndex >= c.phases.length ? 'complete' : 'in-progress', ...(has(s.campaign, 'side') ? { side } : {}),
       history: [...history, { packId: entry.packId, phaseId: entry.phaseId, awardId, winner: result.winner, grade: result.grade,
         lossesUS: losses.US, lossesCS: losses.CS, replay }], carry },
     ...(has(result, 'at') ? { updated: result.at } : {}) };
@@ -361,6 +367,7 @@ export function recordPhase(save, campaign, result) {
 /** The reward bridge for one campaign phase: phaseOutcome's survivors, grade and loot as recordPhase input. */
 export function phaseResult({ phase, game, scenario }) {
   if (!phase || typeof phase.awardId !== 'string') fail('a phase result needs the launched phase.');
+  if ((phase.side || 'US') !== game?.playerSide) fail('the result commands another side.');
   const outcome = phaseOutcome({ game, scenario, awardId: phase.awardId, seed: phase.seed });
   const officers = phase.loan ? [] : officerRows({ game, scenario }); // who led each Union formation, from the pack's names
   return { outcome, record: { packId: phase.packId, phaseId: phase.phaseId, awardId: phase.awardId, winner: outcome.winner,
