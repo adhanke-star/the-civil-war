@@ -9,6 +9,88 @@ import { probeProgress, progressRaw, seedProgress, holdProgressTransaction, rele
 import { installActivationObserver, readActivationObserver, closeActivationObserver, readAndCloseActivationObserver, activationAccessible } from './test-surrender-activation-ui.mjs';
 
 const copy = (v) => structuredClone(v), same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+// A canceled camp music request in CI39036560372 had no timestamp or page identity. This scoped diagnostic
+// leaves the error watcher and assertions intact; native media calls are forwarded unchanged. Remove after attribution.
+async function deploymentMusicDiagnostics(ctx, result) {
+  const trace = result.deploymentMusic = { rows: [], dropped: 0 }, cap = 600;
+  const record = (data) => {
+    const row = { at: Date.now(), ...data };
+    if (trace.rows.length < cap) trace.rows.push(row); else trace.dropped++;
+    if (row.kind === 'failed') console.log('DEPLOYMENT_MUSIC_FAILED ' + JSON.stringify(row));
+  };
+  await ctx.addInitScript(() => {
+    const ids = new WeakMap(), previous = new WeakMap(), listening = new WeakSet(); let next = 0;
+    const emit = (kind, el, extra = {}) => {
+      try {
+        if (el && !ids.has(el)) ids.set(el, ++next);
+        const src = el ? el.currentSrc || el.getAttribute('src') || previous.get(el) || '' : '';
+        if (el && src) previous.set(el, src);
+        console.debug('CW_DEPLOY_MUSIC ' + JSON.stringify({ kind, time: Date.now(), document: performance.timeOrigin,
+          url: location.href, element: el ? ids.get(el) : null, src, ready: el?.readyState, network: el?.networkState,
+          error: el?.error?.code ?? null, ...extra }));
+      } catch { /* diagnostics must not change a native call */ }
+    };
+    const listen = (el) => {
+      if (listening.has(el)) return; listening.add(el);
+      for (const name of ['abort', 'emptied', 'error', 'pause', 'playing', 'stalled', 'suspend']) el.addEventListener(name, () => emit('event-' + name, el));
+    };
+    const proto = HTMLMediaElement.prototype;
+    for (const name of ['play', 'pause', 'load', 'removeAttribute']) {
+      const original = proto[name], descriptor = Object.getOwnPropertyDescriptor(proto, name);
+      Object.defineProperty(proto, name, { configurable: true, writable: true, enumerable: descriptor?.enumerable ?? false,
+        value: function (...args) {
+          if (name !== 'removeAttribute' || args[0] === 'src') {
+            listen(this); emit('call-' + name, this, { stack: new Error().stack?.split('\n').slice(1, 6) });
+          }
+          return Reflect.apply(original, this, args);
+        } });
+    }
+    const src = Object.getOwnPropertyDescriptor(proto, 'src');
+    if (src?.set) Object.defineProperty(proto, 'src', { ...src, set(value) {
+      listen(this); emit('set-src', this, { value: typeof value === 'string' ? value : '<non-string>', stack: new Error().stack?.split('\n').slice(1, 6) });
+      return Reflect.apply(src.set, this, [value]);
+    } });
+    addEventListener('beforeunload', () => emit('document-unload', null));
+  });
+  const close = ctx.close.bind(ctx);
+  ctx.close = (...args) => { record({ kind: 'context-close-call' }); return close(...args); };
+  let serial = 0;
+  return async () => {
+    const page = await ctx.newPage(), id = ++serial, cdp = await ctx.newCDPSession(page), requests = new Map(); let loader = null;
+    const log = (row) => record({ page: id, loader, ...row });
+    page.on('console', (msg) => {
+      if (!msg.text().startsWith('CW_DEPLOY_MUSIC ')) return;
+      try { log({ kind: 'media', ...JSON.parse(msg.text().slice('CW_DEPLOY_MUSIC '.length)) }); }
+      catch (e) { log({ kind: 'diagnostic-error', message: e.message }); }
+    });
+    cdp.on('Page.frameNavigated', ({ frame }) => { if (!frame.parentId) { loader = frame.loaderId; log({ kind: 'document', url: frame.url, frame: frame.id }); } });
+    cdp.on('Network.requestWillBeSent', (e) => {
+      if (!e.request.url.includes('/assets/audio/music/')) return;
+      const headers = e.request.headers, range = Object.entries(headers).find(([k]) => k.toLowerCase() === 'range')?.[1] ?? null;
+      const req = { request: e.requestId, loader: e.loaderId, frame: e.frameId, url: e.request.url, started: e.timestamp, wallMs: e.wallTime * 1000 };
+      requests.set(e.requestId, req);
+      log({ kind: 'request', ...req, time: e.timestamp, documentURL: e.documentURL, resource: e.type, range, initiator: e.initiator });
+    });
+    cdp.on('Network.responseReceived', (e) => {
+      const req = requests.get(e.requestId); if (!req) return;
+      const headers = Object.fromEntries(Object.entries(e.response.headers).filter(([k]) => ['content-length', 'content-range', 'accept-ranges'].includes(k.toLowerCase())));
+      log({ kind: 'response', ...req, time: e.timestamp, wallMs: req.wallMs + (e.timestamp - req.started) * 1000,
+        status: e.response.status, headers, worker: e.response.fromServiceWorker, cached: e.response.fromDiskCache });
+    });
+    for (const [event, kind] of [['Network.loadingFinished', 'finished'], ['Network.loadingFailed', 'failed']]) cdp.on(event, (e) => {
+      const req = requests.get(e.requestId); if (req) log({ kind, ...req, time: e.timestamp, wallMs: req.wallMs + (e.timestamp - req.started) * 1000,
+        canceled: e.canceled, error: e.errorText, blocked: e.blockedReason });
+    });
+    for (const name of ['goto', 'reload', 'close']) {
+      const original = page[name].bind(page);
+      page[name] = (...args) => { log({ kind: 'harness-' + name, url: name === 'goto' ? args[0] : page.url() }); return original(...args); };
+    }
+    page.on('close', () => log({ kind: 'page-closed' }));
+    await cdp.send('Page.enable'); await cdp.send('Network.enable');
+    return page;
+  };
+}
+
 export function deploymentFixture() {
   const front = { ...copy(SAMPLE_ARMY[0]), id: 'saved-enemy-0', label: 'Saved Front', men: 2000,
     weapon: { uid: 'current', itemId: 'm1842', tier: 'common', conditionId: 'serviceable', from: 'Stored' } };
@@ -30,6 +112,7 @@ export function deploymentFixture() {
 
 export async function deploymentProgress({ browser, url, check, shot, result, watchErrors, native = false }) {
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, reducedMotion: 'reduce', acceptDownloads: true });
+  const newPage = await deploymentMusicDiagnostics(ctx, result);
   await probeProgress(ctx, { prefix: '__deploy', readFlag: '__deployReadBlocked', quotaFlag: '__deployQuota' });
   await ctx.addInitScript(() => {
     const original = HTMLCanvasElement.prototype.getContext, canvases = new WeakSet();
@@ -40,7 +123,7 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
       return value;
     };
   });
-  const page = await ctx.newPage(), errors = [], requests = [];
+  const page = await newPage(), errors = [], requests = [];
   const activation = result.surrenderActivation ||= { intro: null, saved: [], routes: [] };
   let activationOwned = false, activationIndex = -1;
   watchErrors(page, url, errors); page.on('request', (r) => requests.push(r.url()));
@@ -357,7 +440,7 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
       `whole refusal before field import/allocation/write; failed read cancellation retains retry/import: ${note.slice(0, 150)}`);
     }
     await seedProgress(page, JSON.stringify(equipped)); await load(); await review();
-    const other = await ctx.newPage(); watchErrors(other, url, errors);
+    const other = await newPage(); watchErrors(other, url, errors);
     await other.goto(url + '?camp'); await other.waitForFunction(() => window.__entry?.mode === 'camp');
     const alternative = validateSnapshot({ ...equipped, awardId: 'other-tab-before-launch', seed: 'other-tab-before-launch' });
     await importIn(other, alternative); await page.locator('#deploy-launch').click();
@@ -370,7 +453,7 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
     await seedProgress(page, JSON.stringify(equipped));
     {
     // A deliberately cancelled download has its own raw diagnostics; ordinary play keeps its watcher.
-    const page = await ctx.newPage(), diagnostic = result.deploymentDirectReviewCancel = { errors: [], requests: [], markers: [], controls: {} };
+    const page = await newPage(), diagnostic = result.deploymentDirectReviewCancel = { errors: [], requests: [], markers: [], controls: {} };
     watchErrors(page, url, diagnostic.errors);
     const ownedRequests = new Map(); let phase = 'holding-metadata', terminal;
     const transport = new Promise(resolve => { terminal = resolve; });
@@ -682,7 +765,7 @@ export async function deploymentProgress({ browser, url, check, shot, result, wa
     await page.locator('#intro-start').click();
     await waitLive(() => window.__game.game.over && document.getElementById('result').open);
     const stalePending = (await gameState()).outcome.snapshot, staleBaseline = (await gameState()).baseline;
-    const tab = await ctx.newPage(); watchErrors(tab, url, errors); await tab.goto(url + '?camp'); await tab.waitForFunction(() => window.__entry?.mode === 'camp');
+    const tab = await newPage(); watchErrors(tab, url, errors); await tab.goto(url + '?camp'); await tab.waitForFunction(() => window.__entry?.mode === 'camp');
     const changed = validateSnapshot({ ...staleBaseline, awardId: 'other-tab-before-save', seed: 'other-tab-before-save' });
     await importIn(tab, changed); await lootStart(); await lootFinish();
     activation.stale = { pending: JSON.stringify(stalePending), launchBaseline: JSON.stringify(staleBaseline),

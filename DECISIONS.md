@@ -1,5 +1,24 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0286 — v5: camera/Outranged pass; unexplained camp-music cancellation gets scoped diagnostics (Codex, 2026-10-17)
+
+39036560372 on d04af7d: sandbox shard 3 passed; shard 4 passed with the actual Willcox marker reading Outranged, one
+hint, zero computer-side Outranged words, and a 22/22 balance report in 42 s. Playthrough, probes, offline, Firefox and
+WebKit and shard 1 also passed (8/9). Shard 2 has one failure: deployment-no-console-errors accumulated
+camp.mp3 net::ERR_ABORTED. Its final assertion time is not the cancellation time. Original test-output-2/last-result.json
+was read; it has no music request/page/lifecycle diagnostic. Downloaded scratch was removed; the original remains on CI.
+
+Cause UNPROVED: application music cleanup (pause/remove src/load), document teardown and native media loading are distinct
+possibilities. Nothing links this to 0278. No runtime, server, wait, timeout or error-filter change is justified. A written
+PLAN contract limits the next push to deployment-page music diagnostics in tools/test-deployment-ui.mjs: native calls
+forwarded, page/document/request identities, CDP Range/response/canceled data, cleanup stacks, navigation/close markers,
+600-row limit plus explicit dropped count, persisted in the existing result. Every prior assertion and watchErrors is
+unchanged. Astra caught the initial clock mismatch; request wallTime now anchors CDP terminal events for comparison with
+media Date.now timestamps. Syntax, deployment 21/21 plus controls, unit and offline manifest checks pass. Native behavior
+of the diagnostic is CI-only UNRUN. A clean sample does not establish a canceller or a runtime fix.
+
+Read-only v6 research has a working draft in .out/v6-research-draft.md; no v6 contract or historical data is adopted.
+
 ## 0285 — v5 round 2: restore the camera contract; fix firing and balance fixtures (Codex, 2026-10-17)
 
 CI 39034411445 on 73587cc finished 7/9 green: shard 3 failed the added flank/HUD camera checks; shard 4 failed the

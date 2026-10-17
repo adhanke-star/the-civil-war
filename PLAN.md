@@ -62,6 +62,14 @@ badge/control runs; independent read-only Astra review of every leg and the repa
 D repair (tools/balance-sides.mjs): defenders outside the objective march to it, then Hold; defenders already on it Hold.
 Attach the spawn listener before reinforcement initialization: record each arrival's full strength before combat and issue
 the player's doctrine immediately. Regenerate all 22 rows; the earlier deployment-hold table remains an earlier measurement.
+Current CI follow-up (Codex, 2026-10-17): d04af7d / 39036560372 shard 2 reports one canceled camp.mp3 request. The retained
+artifact has no cancellation time/page/cause; neither an audio runtime fix nor an abort exception is justified. One bounded
+diagnostic change in tools/test-deployment-ui.mjs only: deployment pages record music request/response/failure (Range and
+CDP canceled flag), native media cleanup calls/events, and harness navigation/close with page/document/request identities.
+Keep all existing assertions and watchErrors unchanged; no runtime, server, timeout or filtering change. Limit diagnostic
+rows, report overflow explicitly, and retain them in last-result.json even on failure. Run node --check, Node deployment
+checks in both modes, test.mjs --unit, offline-manifest --check; independent Astra review, commit/push, read fresh all nine.
+Use a matching failed request and actual cleanup/teardown event to name its canceller; a clean sample alone is not a fix.
 Commands (all must pass; report tails): node --check on changed files; node tools/test-sandbox-battle.mjs and --prove-fail;
 node tools/test-outranged.mjs (or the file you used) and --prove-fail; node tools/test-badges.mjs and --prove-fail and
 node tools/observe-badges.mjs (both modes if it has them); node tools/balance-sides.mjs; node tools/test-sides.mjs; node tools/test.mjs --unit;
