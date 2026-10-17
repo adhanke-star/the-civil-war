@@ -4,7 +4,8 @@
 //   loadCampaign()                        -> { raw, def } (def validated by validateCampaign) or null when it ships empty
 //   loadPackSummary(packId)               -> { packId, title, phases: [{ id, title, date, start, line, us, commanders }] } (cached per
 //                                            page; `us` lists the phase's Union field unit ids, reinforcements included;
-//                                            `commanders` maps each unit id to its sourced { name, rank } for the camp's cards)
+//                                            `commanders` maps each unit id to its sourced { name, rank } for the camp's cards);
+//                                            `rosters` are the pack's sandbox-battle roster rows (src/sim/sandbox-battle.js rosterList)
 //   loadDecisions()                       -> the validated decision deck (assets/decisions.json; src/franchise/decisions.js)
 //   decisionLines(save, phase, deck?)     -> plain lines for the decisions and camp morale recorded for this phase attempt
 //   ladderPosition(def, index)            -> { battle, battles, phase, phases } for "Battle N of B · Phase k of n"
@@ -25,6 +26,7 @@
 import { validateCampaign } from '../franchise/campaign.js';
 import { exchangeDepot, validateSnapshot } from '../franchise/save.js';
 import { preparePhase } from '../sim/phase.js';
+import { rosterList } from '../sim/sandbox-battle.js';
 import { chainCommanders } from '../sim/ai.js';
 import { validateDeck, effectText } from '../franchise/decisions.js';
 import { whenArt, loadArt, portraitArt, genericPortrait, portraitLine } from './art.js';
@@ -85,7 +87,7 @@ export function loadPackSummary(packId, { fetcher } = {}) {
       const first = Array.isArray(pack?.phases) ? pack.phases[0]?.id : undefined;
       preparePhase(pack, first); // every phase validates, or the whole pack is refused
       if (pack.id !== packId) throw new Error('Campaign: battle pack identity does not match its file.');
-      return Object.freeze({ packId, title: pack.title, phases: Object.freeze(pack.phases.map((p) => Object.freeze({
+      return Object.freeze({ packId, title: pack.title, rosters: rosterList([pack]), phases: Object.freeze(pack.phases.map((p) => Object.freeze({
         id: p.id, title: p.scenario.title, date: p.scenario.date, start: p.scenario.start,
         line: shortLine(p.scenario), us: Object.freeze([...p.scenario.units, ...(Array.isArray(p.scenario.reinforcements) ? p.scenario.reinforcements : [])]
           .filter((u) => u && u.side === 'US' && typeof u.id === 'string').map((u) => u.id)),

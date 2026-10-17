@@ -1,5 +1,83 @@
 # Current execution — v1.1, then v2 (Aaron, 2026-10-12)
 
+v3 CONTRACT — SANDBOX BATTLE: a field and both rosters (Aaron chose this scope by popup, 2026-10-16; Fable wrote it)
+
+Worktree /private/tmp/cw-v3-20261016, branch v3-sandbox-battle (from f56cc2c). Never touch /Users/aaronhanke/Developer/the-civil-war.
+DESIGN §1 "Sandbox battle (pick field and both armies)". Nothing invented: every brigade, battery, commander, strength,
+weapon and veterancy comes from a built phase roster; the field is a built terrain; placement is an explicit game rule.
+
+## Player sees
+Title → Battles → below the three battle sections a fourth section "Sandbox battle": Field (5), Union army (11 rosters),
+Confederate army (11 rosters), Attacker (Union/Confederate); the existing Command and Difficulty selects apply; a
+"Fight" link; a note: "Not a historical engagement: two real rosters on a real field, placed by a game rule. No loot."
+The field opens with both whole rosters deployed in facing lines; the attacker's computer formations advance on the
+centre ground (or the player attacks); the clock runs 06:00–08:00; the result grades Decisive/Victory/Draw/Defeat from
+the objective and the casualty ratio; the after-action shows the grade and the losses and ONE line "A sandbox battle has
+no history to compare." on its own (one page: no comparison, no replay; the screen reader hears the same line). No loot,
+no save, no campaign change, no record entry.
+
+## Definitions (game rules; say so in code comments)
+- Roster = all formations of one side in one phase: `units` + `reinforcements` with that `side`, all present from the first
+  minute (no timetable). Label: "<Pack title> · <Phase title> · <n> brigades, <b> batteries[, <c> cavalry] · <men> men".
+  11 phases × 2 sides = 22 rosters. Roster id = `<packId>.<phaseId>`.
+- Field = one of the 5 terrains (shiloh, stones-river, chattanooga, lookout-mountain, henry-hill). Field dressing
+  (ground, woods, sites, labels) = that of the built scenario on that terrain with the largest JSON.stringify length of
+  those four keys (henry-hill: assets/scenarios/henry-hill.json). Field label = the terrain file's `name`.
+- Deployment (deterministic, pure function of roster + field half-size H): the attacker deploys on the west, facing +x; the
+  defender on the east, facing −x. Objective "the centre ground" at (0,0), r = 600 m. Defender front line at x = +400 m,
+  attacker front line at x = −1500 m (clamped to ±(H − 300)). Infantry spaced 260 m along z, centred on z = 0; if a line
+  would exceed 2·(H − 300) m, overflow brigades form a second line 320 m behind (further lines likewise). Batteries 160 m
+  behind the front line, evenly spread between the infantry; cavalry 350 m outboard of each flank (alternating). Facing
+  toward the enemy. Every unit stays inside |x|,|z| ≤ H − 250; no two units within 120 m. Amended 2026-10-16 (verifier
+  finding): when a side's rearmost rank (second line 320 m, or batteries 160 m, behind its front) would stand beyond
+  H − 250, the whole side steps toward the centre until it fits, so the attacker's front may sit inside −(H − 300)
+  (Henry Hill, H 1300: −890 with batteries, −730 with two lines). The H − 250 bound wins over the front-line clamp.
+- Scenario: id `sandbox-battle`, title "Sandbox battle · <field name>", subtitle "<US roster label> against <CS roster
+  label>", `attacker` as chosen, start "06:00", end "08:00", `clockRatio` 15, `victory` texts written as game rules (no
+  history), `objective` as above, `briefing` 3 short captions naming field, both rosters and the objective, NO `history`
+  key, `sources` on units carried from the roster unchanged. It must pass `prepareFieldScenario(out, 'pack')` validation;
+  if `scenario()` in src/sim/phase.js requires a `date`, use the ISO date of the CONFEDERATE roster's phase (amended
+  2026-10-16: the date picks the Confederate national colour drawn on the field, First National before 1 May 1863, so
+  their brigades fly their own period's flag) and show it nowhere as text in the UI (a sandbox has no date) — note this
+  in the file header.
+
+## In (files)
+- NEW src/sim/sandbox-battle.js: `FIELDS` (5), `rosterList(packs)` → 22 rows {id, side, label, counts, men}, `fieldDressing(field, scenarios)`,
+  `deploy(formations, attackerSide, half)` (pure), `sandboxBattleScenario({ field, us, cs, attacker }, { packs, henryHill, terrainMeta })`,
+  `sandboxBattleSearch(params)` (parse+validate the URL: field, us, cs, attacker, side, difficulty; refuse unknown ids with a thrown Error whose
+  message names the bad parameter). Terrain half-size comes from assets/terrain/<field>.json `halfSize` (fetch the JSON; the .bin is not needed here).
+- src/entry.js: add 'sandbox-battle' to the field route keys.
+- src/main.js: when `?sandbox-battle` is present, build the scenario with sandboxBattleScenario (fetch the three packs and henry-hill and the
+  field terrain JSON), then `sideScenario(scenario, playerSide)` exactly as a pack (so Command: Confederate works and the Decision 0273
+  attack-all rule applies to the computer attacker). HUD label "Sandbox battle · no progress rewards". Refuse combinations with ?campaign/?saved.
+- src/ui/entry.js + entry.css: the "Sandbox battle" section (ids `entry-sandbox-field`, `entry-sandbox-us`, `entry-sandbox-cs`,
+  `entry-sandbox-attacker`, `entry-sandbox-fight`); options built from the pack summaries (extend `loadPackSummary` in src/ui/briefing.js with
+  per-side counts and men, or compute from the full packs in sandbox-battle.js); href = `./?sandbox-battle&field=…&us=…&cs=…&attacker=…[&difficulty=…][&side=CS]`,
+  refreshed on every change (reuse the battlesDifficulty pattern). Keyboard and axe clean like the rest of the menu.
+- src/franchise/practice-ui.js (and whatever historyComparison needs): a scenario without `history` shows the one-line note instead of the comparison; noLoot path.
+- src/sim/phase.js only if validation must learn the sandbox allowances (date/history); keep every existing check for packs.
+- NEW tools/test-sandbox-battle.mjs (Node, CPU only; `--prove-fail` mutants like tools/test-sides.mjs): 22 rosters with the right counts (check two by hand against
+  assets/packs/*.json); every (field, us, cs, attacker) sample of ≥ 12 combinations incl. henry-hill with the two largest rosters and lookout-mountain: all units in
+  bounds, min pairwise distance ≥ 120 m, attacker all at x < defender min x, facing signs right, scenario passes prepareFieldScenario, sideScenario('CS')
+  gives every Union formation the attack role when the Union attacks; bad field/roster/attacker refused with the parameter named.
+- NEW tools/test-sandbox-battle-ui.mjs, wired into tools/test.mjs shard 3 like tools/test-packs-ui.mjs: Battles menu shows the section with 5/11/11 options; two launches
+  (shiloh: US buell-attacks vs CS camps-at-dawn, attacker CS, side US; henry-hill: US hornets-nest vs CS buell-attacks, attacker US, side CS) reach window.__ready, unit
+  counts equal roster counts, 40 s of play with no page errors, the attacker closes > 10 m on the objective; screenshots `.out/sandbox-battle-<n>-opening.png`
+  and `-battle.png` (amended 2026-10-16: the shared shot() helper's names, `.out/m1-sandbox-battle-<n>-opening-<stamp>.png`, are accepted); after the clock end (fastForward) the after-action shows the grade and the no-history line and no loot cards.
+- .github/workflows/ci.yml: add `sandbox-battle` to the Node probe loop. offline-manifest.js regenerated (`node tools/build-offline-manifest.mjs --write` then `--check`).
+
+## Out
+Custom strengths or arms, hour or weather choice, saving, loot, records, officers, AI temperament, new history or people, new art.
+
+## Commands (all must pass; report tails)
+`node --check` on every changed .js/.mjs · `node tools/test-sandbox-battle.mjs` and `--prove-fail` · `node tools/test-sides.mjs` and `--prove-fail` ·
+`node tools/test-packs.mjs` · `node tools/test.mjs --unit` · `node tools/build-offline-manifest.mjs --write && node tools/build-offline-manifest.mjs --check`.
+No browser on this Mac. Do not commit.
+
+## Done when (Fable judges)
+Own-SHA CI all 9 green (new CPU probe both modes, UI test in shard 3), main fast-forwarded, Pages green; CI screenshots looked at and sent to
+Aaron; Aaron opens Battles → Sandbox battle and fights one; tag v3 + Release notes.
+
 0274 DIAGNOSTIC LEG (Fable, 2026-10-16; branch diag-0274). Decision 0275 moved the fault from the worker to the page's
 loader: worker answers in ≤135 ms, the renderer processes them ~30 s late. This push instruments, it does not fix.
 Player sees: nothing new except that a field that fails to load now says why (src/entry.js keeps the import error).

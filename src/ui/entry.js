@@ -21,6 +21,8 @@
 // and starts the campaign at the chosen level; the camp names the campaign's level; the Battles list has its own choice,
 // carried on each phase link as ?difficulty= (none for Veteran). The trophy shelf also lists the regiment colours the army
 // took (save `trophies.colours`), and the camp's notes say where camp orders, training, shortages and pioneers reach the battle.
+// Sandbox battle (src/sim/sandbox-battle.js): below the battle sections, a field, a Union and a Confederate roster (from the pack
+// summaries) and the attacker; the Battles list's Command and Difficulty apply; the Fight link's address follows every change.
 import { createProgressStore, parseSnapshot, exportSnapshot, exchangeDepot, listSlots, MAX_SAVE_BYTES } from '../franchise/save.js';
 import { newCampaign, chooseBadges, campaignPhase, campaignDifficulty } from '../franchise/campaign.js';
 import { DIFFICULTY } from '../franchise/tuning.js';
@@ -37,6 +39,7 @@ import { TIER_BY_ID, STORE_ITEMS, STORE_BY_ID, VETERANCY, itemDef, conditionEffe
 import { compare, bestFit } from '../reward/model.js';
 import { savedDeployment, assertSavedLaunch } from '../franchise/practice.js';
 import { loadFieldScenario, loadBattlePack } from '../sim/phase.js';
+import { FIELDS, SANDBOX_PACKS, SANDBOX_NOTE, sandboxBattleHref } from '../sim/sandbox-battle.js';
 import { prepareBattleRecordings } from '../audio/bank.js';
 
 const PAGE_SIZE = 12;
@@ -107,7 +110,7 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
         <p id="entry-note"></p>
         <div class="entry-title-actions"><button id="entry-campaign-continue" class="entry-primary" type="button" aria-describedby="entry-campaign-slot" hidden>Continue</button><button id="entry-new-campaign" type="button" hidden>New campaign</button><button id="entry-battles" type="button" aria-expanded="false" aria-controls="entry-battle-list" hidden>Battles</button><button id="entry-continue" class="entry-primary" type="button">Continue</button></div>
         <p id="entry-campaign-slot" hidden></p>
-        <section id="entry-battle-list" aria-labelledby="entry-battles-heading" hidden><h2 id="entry-battles-heading" tabindex="-1">Battles</h2><p class="entry-note">Every built phase with its historical armies. No loot, and your campaign army is not changed.</p><p class="entry-battles-difficulty"><label for="entry-battles-difficulty">Difficulty</label><select id="entry-battles-difficulty"><option value="recruit">Recruit</option><option value="veteran" selected>Veteran</option><option value="general">General</option></select></p><p class="entry-battles-difficulty"><label for="entry-battles-side">Command</label><select id="entry-battles-side"><option value="US" selected>Union</option><option value="CS">Confederate</option></select></p><p class="entry-note" id="entry-battles-difficulty-note"></p><p id="entry-battles-status" role="status"></p><div id="entry-battle-rows"></div></section>
+        <section id="entry-battle-list" aria-labelledby="entry-battles-heading" hidden><h2 id="entry-battles-heading" tabindex="-1">Battles</h2><p class="entry-note">Every built phase with its historical armies. No loot, and your campaign army is not changed.</p><p class="entry-battles-difficulty"><label for="entry-battles-difficulty">Difficulty</label><select id="entry-battles-difficulty"><option value="recruit">Recruit</option><option value="veteran" selected>Veteran</option><option value="general">General</option></select></p><p class="entry-battles-difficulty"><label for="entry-battles-side">Command</label><select id="entry-battles-side"><option value="US" selected>Union</option><option value="CS">Confederate</option></select></p><p class="entry-note" id="entry-battles-difficulty-note"></p><p id="entry-battles-status" role="status"></p><div id="entry-battle-rows"></div><section id="entry-sandbox" class="entry-sandbox" aria-labelledby="entry-sandbox-heading"><h3 id="entry-sandbox-heading">Sandbox battle</h3><p class="entry-note" id="entry-sandbox-note">${SANDBOX_NOTE}</p><p id="entry-sandbox-status" role="status"></p><div id="entry-sandbox-controls" hidden><p class="entry-battles-difficulty"><label for="entry-sandbox-field">Field</label><select id="entry-sandbox-field"></select></p><p class="entry-battles-difficulty"><label for="entry-sandbox-us">Union army</label><select id="entry-sandbox-us"></select></p><p class="entry-battles-difficulty"><label for="entry-sandbox-cs">Confederate army</label><select id="entry-sandbox-cs"></select></p><p class="entry-battles-difficulty"><label for="entry-sandbox-attacker">Attacker</label><select id="entry-sandbox-attacker"><option value="US" selected>Union</option><option value="CS">Confederate</option></select></p><p class="entry-sandbox-fight"><a id="entry-sandbox-fight" class="entry-primary" href="./">Fight</a></p></div></section></section>
       </section>
       <section id="entry-camp" aria-labelledby="entry-camp-heading" hidden>
         <header class="entry-camp-head"><div><p class="rw-eyebrow">Between battles</p><h1 id="entry-camp-heading">Your army</h1><p id="entry-summary"></p></div>
@@ -1221,14 +1224,40 @@ export function mountEntry({ camp = false, deploy = false, onDeploy } = {}) {
         group.append(heading, items); rows.append(group);
       }
       node('entry-battles-status').textContent = '';
+      sandboxMenu(); // not awaited: the first battle link takes focus now
     }
     (node('entry-battle-rows').querySelector('a') || node('entry-battles-heading')).focus();
   });
+  // Sandbox battle: options from the three packs' summaries (cached), the field list from FIELDS; then the controls show.
+  const option = (value, text) => { const o = document.createElement('option'); o.value = value; o.textContent = text; return o; };
+  async function sandboxMenu() {
+    const say = node('entry-sandbox-status'), rows = [];
+    say.textContent = 'Loading the armies…';
+    for (const packId of SANDBOX_PACKS) {
+      try { const sum = titles.get(packId) || await loadPackSummary(packId); titles.set(packId, sum); rows.push(...sum.rosters); }
+      catch (err) { say.textContent = `The sandbox armies could not be loaded: ${err.message}`; return; }
+    }
+    node('entry-sandbox-field').replaceChildren(...FIELDS.map((f) => option(f.id, f.name)));
+    node('entry-sandbox-us').replaceChildren(...rows.filter((r) => r.side === 'US').map((r) => option(r.id, r.label)));
+    node('entry-sandbox-cs').replaceChildren(...rows.filter((r) => r.side === 'CS').map((r) => option(r.id, r.label)));
+    say.textContent = '';
+    node('entry-sandbox-controls').hidden = false;
+    sandboxHref();
+  }
+  const sandboxHref = () => {
+    const field = node('entry-sandbox-field').value, us = node('entry-sandbox-us').value, cs = node('entry-sandbox-cs').value;
+    if (!field || !us || !cs) return;
+    node('entry-sandbox-fight').href = sandboxBattleHref({ field, us, cs, attacker: node('entry-sandbox-attacker').value,
+      side: node('entry-battles-side').value, difficulty: node('entry-battles-difficulty').value });
+  };
+  for (const id of ['entry-sandbox-field', 'entry-sandbox-us', 'entry-sandbox-cs', 'entry-sandbox-attacker']) node(id).addEventListener('change', sandboxHref);
+  node('entry-sandbox-fight').addEventListener('click', (e) => { if (importing || pendingExchange || node('entry-sandbox-controls').hidden) e.preventDefault(); });
   // The Battles list's own difficulty and side: every phase link carries them (?difficulty=, none for Veteran; ?side=CS).
   const battlesDifficulty = () => {
     const level = node('entry-battles-difficulty').value, side = node('entry-battles-side').value;
     node('entry-battles-difficulty-note').textContent = `${difficultyName(level)}: ${DIFFICULTY_TEXT[level]} ${DIFFICULTY_NOTE}${side === 'CS' ? ' You command the Confederates; the computer fights the Union.' : ''}`;
     node('entry-battle-rows').querySelectorAll('a[data-pack]').forEach((a) => { a.href = battleHref(a.dataset.pack, a.dataset.phase, level, side); });
+    sandboxHref();
   };
   node('entry-battles-difficulty').addEventListener('change', battlesDifficulty);
   node('entry-battles-side').addEventListener('change', battlesDifficulty);

@@ -6,6 +6,7 @@ import { mountReward, configureRewardReplay, surrenderReportText } from '../rewa
 import { phaseResult, recordPhase } from './campaign.js';
 import { rewardArmy, applyRewardIssues } from '../ui/briefing.js';
 import { phaseSummary } from './economy.js';
+import { NO_HISTORY_NOTE } from '../sim/sandbox-battle.js';
 
 const GRADE_TEXT = { decisive: 'Decisive victory', victory: 'Victory', draw: 'Draw', defeat: 'Defeat' };
 // The recorded phase's requisition points (economy.js phaseSummary) for the result wording and the after-action; never throws.
@@ -35,10 +36,12 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null,
   replayButton.textContent = 'Replay this phase'; replayButton.hidden = true;
   if (campaign) action.after(replayButton); // campaign routes only: other result dialogs keep their exact actions
   const campHref = campaign ? `./?camp=${campaign.slot}` : './?camp';
-  // A battle-pack phase (campaign or Battles menu) records the 30-second map replay from its opening positions
-  // (src/sim/recorder.js; it reads the field and changes nothing) and offers "you vs history" after the result.
-  const packPhase = !!scenario.attacker && !manifest && (!!campaign || mode === 'historical');
-  if (packPhase) attachRecorder(game);
+  // A battle-pack phase (campaign or Battles menu, a sandbox battle included) offers its after-action after the result; all
+  // but the sandbox record the 30-second map replay from the opening positions (src/sim/recorder.js; it reads the field and
+  // changes nothing). The sandbox after-action is one page: the grade, the losses and the no-history line.
+  const battles = mode === 'historical' || mode === 'sandbox-battle';
+  const packPhase = !!scenario.attacker && !manifest && (!!campaign || battles);
+  if (packPhase && mode !== 'sandbox-battle') attachRecorder(game);
   /** The replay page's data: the validated track, the field's terrain and woods (null when nothing was recorded). */
   const replayFor = (track) => (track ? { track, terrain: game.terrain ?? null, woods: (scenario.woods || []).map((w) => w.polygon) } : null);
   let phase = null, phaseFailure = null, issueNote = '';
@@ -222,7 +225,9 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null,
         catch (err) { failure = err.message; recover(); }
       } });
   }
-  /** Battles menu: the after-action pages (you vs history, what really happened, the replay) with no loot or save. */
+  /** Battles menu: the after-action pages (you vs history, what really happened, the replay) with no loot or save. A scenario
+   * without `history` (a sandbox battle, src/sim/sandbox-battle.js) gets one page: the grade, the losses and one line saying
+   * it has no history to compare (also what a screen reader hears), with no comparison and no replay. */
   function startHistoryAfterAction() {
     if (rewardActive || !packPhase || campaign) return;
     rewardActive = true; sync();
@@ -234,12 +239,14 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null,
       const start = comparison.you[`start${side}`], lost = comparison.you[`losses${side}`];
       let track = null;
       try { track = game.recorder ? validateReplay(game.recorder.track(game)) : null; } catch { track = null; } // no replay page then
+      const story = !!scenario.history;
       reward = mountReward(document.body, { noLoot: true, grade: REWARD_GRADES[game.result.grade] || (game.result.winner === side ? 'Victory' : game.result.winner === null ? 'Draw' : 'Defeat'),
         rememberReplay: false, awardId: `battles-${scenario.id}`,
         afterAction: { title: scenario.title, why: game.result.why, surviving: start - lost, losses: lost,
           guns: game.units.filter((u) => u.side === side).reduce((n, u) => n + (u.alive && Array.isArray(u.gunSlots) ? u.gunSlots.filter((g) => g.alive).length : 0), 0),
-          eyebrow: `Battles · ${scenario.title}`, note: 'Historical battles grant no loot or franchise rewards.', badges: null,
-          history: comparison, replay: replayFor(track) },
+          eyebrow: story ? `Battles · ${scenario.title}` : scenario.title, note: story ? 'Historical battles grant no loot or franchise rewards.' : '',
+          ...(story ? {} : { line: NO_HISTORY_NOTE, noLootText: `${NO_HISTORY_NOTE} Sandbox battles grant no loot.` }),
+          badges: null, history: story ? comparison : null, replay: story ? replayFor(track) : null },
         onDone: finish });
     } catch (err) { hud.toast(err.message); finish(); }
   }
@@ -283,11 +290,11 @@ export function attachPracticeFlow({ game, scenario, hud, mode, manifest = null,
     const grade = GRADE_TEXT[game.result.grade] || '';
     const message = outcome
       ? `${manifest ? savedResultWhy() : game.result.why} ${outcome.summary.surviving.toLocaleString()} surviving men; ${outcome.summary.losses.toLocaleString()} lost. ${outcome.captures.length} held field crates. ${manifest ? 'Open only the new loot, save these survivors, then return to camp.' : 'Open the practice quartermaster issue.'}`
-      : `${game.result.why}${grade ? ` Result: ${grade}.` : ''} ${mode === 'historical' ? 'Historical battles grant no franchise rewards.' : 'Sandbox or altered battles grant no progress rewards.'}`;
+      : `${game.result.why}${grade ? ` Result: ${grade}.` : ''} ${mode === 'historical' ? 'Historical battles grant no franchise rewards.' : mode === 'sandbox-battle' ? 'Sandbox battles grant no loot or progress rewards.' : 'Sandbox or altered battles grant no progress rewards.'}`;
     const report = surrenderReportText(surrenderResult);
     // Battle-pack results may be a draw (winner null) and carry the player's grade.
     const heading = game.result.winner === 'US' ? 'Union victory' : game.result.winner === 'CS' ? 'Confederate victory' : 'Drawn battle';
-    const history = !outcome && packPhase && mode === 'historical';
+    const history = !outcome && packPhase && battles;
     panel(heading, report ? `${message} ${report}` : message, outcome ? 'Open the loot' : history ? 'After-action' : null, outcome ? openLoot : history ? startHistoryAfterAction : null,
       { exportable: !!manifest && !!outcome });
   }

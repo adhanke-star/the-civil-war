@@ -15,6 +15,20 @@ trace now also covers the offline battle load, three smoke samples per push. Can
 Chromium's ServiceWorkerSubresourceLoader aborting on a controller connection change; a Blink module-map/MemoryCache
 race when a second importer resolves the same URL while the first fetch is in flight. A one-shot automatic reload on a
 failed field import is a mitigation for Aaron to choose, not a fix.
+## 0277 — v3 is the sandbox battle: one built field, two built rosters (Aaron, 2026-10-16)
+
+Aaron chose, from four scoped options (popup, recommended), the sandbox battle as the v3 milestone: Battles menu →
+"Sandbox battle": Field (5 built terrains), Union army and Confederate army (each any of 11 phase rosters: all of one
+side's units and reinforcements present from the first minute), Attacker, Command, Difficulty. Contract at PLAN top.
+Game rules, named as such in src/sim/sandbox-battle.js: facing lines (attacker west), the centre ground as the only
+objective, 06:00–08:00 at 15×, no loot, no history comparison (one line says so), no save or record.
+Fable accepted four amendments the implementation forced: (1) the scenario's required date is the CONFEDERATE roster's
+phase date, because the renderer picks the Confederate national colour from it (First National before 1 May 1863): with
+the attacker's date 48 of 242 roster pairs per field flew the wrong period's flag; (2) on small fields a side steps
+toward the centre so the 250 m bound beats the front-line clamp (Henry Hill attacker front −890/−730, not −1000);
+(3) screenshots keep the shared shot() names; (4) the sandbox after-action is one page, no replay. Known: the field label
+keeps the terrain file's name with its real dates; a sandbox title therefore carries a date that is the field's, not the
+fight's. Rosters from different years may meet; that is the point of a sandbox and is labelled so.
 
 ## 0276 — 0274 cause: headless GPU compositor teardown blocks the page's main thread for ~30 s (2026-10-16)
 

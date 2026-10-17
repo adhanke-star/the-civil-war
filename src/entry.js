@@ -5,7 +5,7 @@ import { mixer } from './audio/mixer.js';
 import { playMusic, stopMusic } from './audio/music.js';
 
 const q = new URLSearchParams(location.search);
-if (['intro', 'practice', 'battle', 'sandbox', 'tune'].some((key) => q.has(key))) {
+if (['intro', 'practice', 'battle', 'sandbox', 'tune', 'sandbox-battle'].some((key) => q.has(key))) {
   document.getElementById('battle').hidden = false;
   try { await (await import('./main.js')).startField(); }
   catch (error) {

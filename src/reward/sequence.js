@@ -10,8 +10,10 @@
 //     d. Ratings: changed brigades count up to their new OVR and bars; Continue calls onDone(result).
 //   mode: 'one' deals a single card (the sandbox's "Deal one loot card") and closes after it.
 //   onDone(result): { awardId, army, depot, issued, seed, grade }
-//   afterAction: { title, why, surviving, losses, guns, eyebrow?, note?, points? }; a campaign phase sets its own eyebrow and
-//     note, and `points` (economy.js phaseSummary): the requisition points lines, a count-up of the total, the reputation
+//   afterAction: { title, why, surviving, losses, guns, eyebrow?, note?, line?, noLootText?, points? }; `note` ends the losses
+//     line ('' for none), `line` stands as its own line under it, and `noLootText` replaces the screen-reader announcement's
+//     "Historical battles grant no loot." under noLoot (a sandbox battle, src/franchise/practice-ui.js). A campaign phase
+//     sets its own eyebrow and note, and `points` (economy.js phaseSummary): the requisition points lines, a count-up of the total, the reputation
 //     track and, when a level was reached, an inline level-up panel with its reward card plus levelUpMoment below.
 //   levelUpMoment(host, { to, opened, shopTier, reduced }) -> the full-screen level-up moment: a non-blocking layer
 //     (pointer-events none, aria-hidden; the caller announces it) that leaves on its own; static under reduced motion.
@@ -607,12 +609,14 @@ export function mountReward(root, opts = {}) {
       crates.append(tint(el('li', { class: 'rw-crate', style: `--i:${i}` }, shapeIcon(tierId), el('span', { text: t.name })), tierId));
     });
     const nIssue = S.cards.filter((c) => c.source === 'issue').length;
+    const aarNote = opts.afterAction?.note ?? 'Practice rewards and ratings are game values; this does not record the historical outcome.';
     const foot = pageFoot('a');
     const sec = el('section', { class: 'rw-step rw-aar', 'aria-labelledby': 'rw-aar-grade' },
       el('p', { class: 'rw-eyebrow', text: opts.afterAction ? opts.afterAction.eyebrow ?? `Practice · ${opts.afterAction.title}` : 'After action · placeholder phase' }),
       el('h1', { class: 'rw-grade', id: 'rw-aar-grade', tabindex: '-1', 'data-grade': S.grade, text: S.grade }),
       el('p', { class: 'rw-grade-note', text: opts.afterAction?.why ?? GRADE_NOTES[S.grade] }),
-      opts.afterAction ? el('p', { class: 'rw-hint', text: `${opts.afterAction.surviving.toLocaleString()} surviving men · ${opts.afterAction.losses.toLocaleString()} lost · ${opts.afterAction.guns} crewed guns. ${opts.afterAction.note ?? 'Practice rewards and ratings are game values; this does not record the historical outcome.'}` }) : null,
+      opts.afterAction ? el('p', { class: 'rw-hint', text: `${opts.afterAction.surviving.toLocaleString()} surviving men · ${opts.afterAction.losses.toLocaleString()} lost · ${opts.afterAction.guns} crewed guns.${aarNote ? ` ${aarNote}` : ''}` }) : null,
+      typeof opts.afterAction?.line === 'string' && opts.afterAction.line ? el('p', { class: 'rw-hint rw-aar-line', text: opts.afterAction.line }) : null,
       opts.afterAction?.surrenderResult ? el('p', { class: 'rw-hint', text: surrenderReportText(opts.afterAction.surrenderResult) }) : null,
       story ? vsBlock(vsHistory) : null,
       pointsBlock(opts.afterAction?.points),
@@ -627,7 +631,7 @@ export function mountReward(root, opts = {}) {
     stage.append(sec);
     sec.querySelector('.rw-grade').focus({ preventScroll: true });
     const p = opts.afterAction?.points;
-    announce(`${S.grade}. ${p ? `${p.points} requisition points; reputation ${p.reputation.to}, level ${p.level}.${p.levelUp ? ` Reputation level ${p.levelUp.to} reached; a reward card goes to your depot.` : ''} ` : ''}${noLoot ? 'Historical battles grant no loot.' : `${S.captures.length} captures. ${S.cards.length} cards to open.`}`);
+    announce(`${S.grade}. ${p ? `${p.points} requisition points; reputation ${p.reputation.to}, level ${p.level}.${p.levelUp ? ` Reputation level ${p.levelUp.to} reached; a reward card goes to your depot.` : ''} ` : ''}${noLoot ? opts.afterAction?.noLootText ?? 'Historical battles grant no loot.' : `${S.captures.length} captures. ${S.cards.length} cards to open.`}`);
     if (p) later(() => countPoints(sec, p), ms(450));
     if (award) stampBadges(sec, award, !!p?.levelUp);
   }

@@ -39,6 +39,7 @@ import { setQualityHandler } from './ui/settings-panel.js';
 import { FALLEN } from './units/soldier-mesh.js';
 import { pinRuntimeClose } from './units/impostor.js';
 import { battleSide, sideScenario, fitSideCamera, sideTexts } from './sim/sides.js';
+import { loadSandboxBattle } from './sim/sandbox-battle.js';
 
 export function detectFieldGPUTier(renderer,post,stats,graphicsStop,load=()=>import('detect-gpu')) {
   return load().then(({getGPUTier})=>{
@@ -129,15 +130,20 @@ export async function startField({ manifest = null, campaign = null, isCurrent =
   const postDiagnostic = pinPostResourceDiagnostic(diagnosticPost);
   if (!isCurrent()) throw new Error('Practice: deployment review was cancelled.');
   if (campaign && (manifest || ![1, 2, 3].includes(campaign.slot)
-    || ['intro', 'practice', 'battle', 'sandbox', 'tune'].some((key) => new URLSearchParams(location.search).has(key)))) {
+    || ['intro', 'practice', 'battle', 'sandbox', 'tune', 'sandbox-battle'].some((key) => new URLSearchParams(location.search).has(key)))) {
     throw new Error('Campaign: a campaign phase cannot share its launch with another field mode.');
   }
   if (fieldClaimed) throw new Error('Practice: this page already owns a field. Return to camp before another deployment.');
+  // ?sandbox-battle (src/sim/sandbox-battle.js): never a campaign phase, a saved army, ?tune or another field mode.
+  if (new URLSearchParams(location.search).has('sandbox-battle')
+    && ['campaign', 'saved', 'battle', 'sandbox', 'intro', 'practice', 'tune'].some((key) => new URLSearchParams(location.search).has(key))) {
+    throw new Error('Sandbox battle: a sandbox battle cannot share its launch with a campaign, a saved army, the tuning panel or another field mode.');
+  }
   if (manifest) {
     assertSavedLaunch(manifest);
     if (manifest.scenario.id !== 'saved-practice' || !Array.isArray(manifest.scenario.sites)
       || !Array.isArray(manifest.scenario.woods)) throw new Error('Practice: the deployment needs its complete practice ground.');
-    if (['intro', 'practice', 'battle', 'sandbox', 'tune'].some((key) => new URLSearchParams(location.search).has(key))) {
+    if (['intro', 'practice', 'battle', 'sandbox', 'tune', 'sandbox-battle'].some((key) => new URLSearchParams(location.search).has(key))) {
       throw new Error('Practice: saved deployment cannot override another field mode.');
     }
   }
@@ -145,7 +151,10 @@ export async function startField({ manifest = null, campaign = null, isCurrent =
   let allocated = false;
   try {
     const currentOwner = () => { if (!isCurrent()) throw new Error('Practice: deployment review was cancelled.'); };
-    const mode = playMode(location.search);
+    // ?sandbox-battle&field=…&us=…&cs=…&attacker=…: two built rosters on a built field (no loot, no save, no record).
+    const sandbox = manifest || campaign || !new URLSearchParams(location.search).has('sandbox-battle') ? null
+      : await loadSandboxBattle(location.search, { isCurrent });
+    const mode = sandbox ? 'sandbox-battle' : playMode(location.search);
     // ?battle=<packId>[&phase=<phaseId>]: any battle pack but Henry Hill, which keeps its own route.
     const query = new URLSearchParams(location.search), packId = manifest || campaign ? null : query.get('battle');
     // Campaign: the slot's save and the shipped ladder name the phase; the pack is loaded, then carry and franchise apply.
@@ -161,14 +170,16 @@ export async function startField({ manifest = null, campaign = null, isCurrent =
       launch = { slot: campaign.slot, store, save, raw: ladder.raw, def: ladder.def, phase, loaded,
         scenario: prepareFieldScenario(applyCampaign(loaded.scenario, save, phase), 'pack') };
     }
-    const pack = launch ? launch.loaded : packId && packId !== 'henry-hill'
+    // A sandbox battle runs as a pack phase: the 'pack' route, the side choice and the pack result and grade.
+    const pack = launch ? launch.loaded : sandbox ? Object.freeze({ packId: 'sandbox-battle', phaseId: null, nextId: null, scenario: sandbox.scenario })
+      : packId && packId !== 'henry-hill'
       ? await loadBattlePack({ packId, phaseId: query.get('phase') ?? undefined, isCurrent }) : null;
     const ground = manifest || pack ? null : await loadFieldScenario({ isCurrent });
     currentOwner();
     const routeId = manifest ? 'saved-practice' : pack ? 'pack' : mode === 'practice' && !new URLSearchParams(location.search).has('practice') ? 'first-command' : 'henry-hill';
     // A saved manifest's scenario reference is the authoritative outcome identity.
     // ?side=CS (Battles menu only; DECISIONS 0273): the player commands the Confederates. Campaign, practice and saves stay Union.
-    const playerSide = pack && !launch && !manifest ? battleSide(location.search) : 'US';
+    const playerSide = sandbox ? sandbox.params.side : pack && !launch && !manifest ? battleSide(location.search) : 'US';
     const scenario = manifest ? (prepareFieldScenario(manifest.scenario, routeId), manifest.scenario) : launch ? launch.scenario : pack ? sideScenario(pack.scenario, playerSide)
       : prepareFieldScenario(routeId === 'first-command' ? introScenario(ground, { surrender: fictionalSurrenderRoute(location.search) }) : ground, routeId);
     document.getElementById('status').textContent = 'Loading the ground…';
@@ -366,6 +377,7 @@ practiceFlow = attachPracticeFlow({ game, scenario, hud, mode, manifest, campaig
 const practiceField = attachPracticeField({ game, scenario, hud, camera, terrain, rts, effects, manifest });
 document.getElementById('play-mode').textContent = launch ? launch.phase.loan
     ? "Campaign · Grant's army on loan; your brigades are unchanged" : 'Campaign · losses and loot carry to your army'
+  : sandbox ? `Sandbox battle · no progress rewards${playerSide === 'CS' ? ' · you command the Confederates' : ''}`
   : pack || mode === 'historical' ? `Historical battle · no franchise rewards${playerSide === 'CS' ? ' · you command the Confederates' : ''}`
   : mode === 'practice' ? 'Practice · rewards enabled' : 'Sandbox · no progress rewards';
 // keep the pause/speed buttons in step with keyboard changes
@@ -559,7 +571,7 @@ function frame(now) {
     fpsEl.textContent = stats.fps.toFixed(0);
     scaleEl.textContent = `· ${post.mode} ×${post.scale.toFixed(2)}`;
     const c = game.clockText();
-    hud.setClock(c.date, c.time, c.frac);
+    hud.setClock(sandbox ? 'Sandbox battle' : c.date, c.time, c.frac); // a sandbox has no date (its validation date is never shown)
     const o = game.objective;
     hud.objective(`Objective: ${(scenario.attacker ?? 'US') === game.playerSide ? 'take' : 'hold'} ${o.name}. ${game.holder === 'US' ? 'Union troops hold it.' : game.holder === 'CS' ? 'The Confederates hold it.' : game.holder === 'contested' ? 'Contested.' : 'Nobody holds it.'}`);
     fpsFrames = 0;
@@ -589,6 +601,7 @@ window.__game = { game, rts, terrain, scene, camera, post, world, effects, input
     'terrainArrays',{get:()=>terrainOwner.retainedArrays})):null,
   audio: { mixer, director }, // the UI test spies on mixer.log; nothing plays without a gesture
   pack: pack ? { packId: pack.packId, phaseId: pack.phaseId, nextId: pack.nextId } : null,
+  sandboxBattle: sandbox ? sandbox.params : null,
   // Campaign phase launch (tests force a result through window.__game.game, then drive the real result dialog).
   campaign: launch ? { slot: launch.slot, phase: launch.phase, briefing } : null };
 

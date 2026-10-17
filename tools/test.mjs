@@ -51,6 +51,8 @@
 // choice by keyboard, axe and 320 px.
 // `node tools/test.mjs --traits` runs the enemy commanders' traits UI only (tools/test-traits-ui.mjs, also in shard 4).
 // `node tools/test.mjs --command-chain` runs the sourced corps influence cards, Records and briefing (shard 4).
+// `node tools/test.mjs --sandbox-battle` runs the Battles menu's Sandbox battle only (tools/test-sandbox-battle-ui.mjs, also in
+// shard 3): the menu section, two launches, 40 s of battle and the no-history after-action.
 // `node tools/test.mjs --hooks` runs the difficulty, camp-effects and captured-colours UI only (tools/test-hooks-ui.mjs,
 // also in shard 3).
 // `node tools/test.mjs --art` runs the card art, portraits and living title/camp checks only (tools/test-art-ui.mjs, also
@@ -1886,6 +1888,7 @@ async function browserChecks(server, url) {
     if (process.argv.includes('--scene-allocation')) { result.mode = 'native diagnostic terrain restoration'; const {sceneAllocationControls} = await import('./test-scene-allocation-ui.mjs'); await sceneAllocationControls({browser,url,check,result,watchErrors}); return; }
     if (process.argv.includes('--level-rewards')) { result.mode = 'deferred level rewards'; const {levelRewardsControls} = await import('./test-level-rewards-ui.mjs'); await levelRewardsControls({browser,url,check,shot,result,watchErrors}); return; }
     if (process.argv.includes('--economy')) { result.mode = 'requisition points and shop'; const { economyControls } = await import('./test-economy-ui.mjs'); await economyControls({ browser, url, check, shot, result, watchErrors }); return; }
+    if (process.argv.includes('--sandbox-battle')) { result.mode = 'sandbox battle only'; const { sandboxBattleUIControls } = await import('./test-sandbox-battle-ui.mjs'); await sandboxBattleUIControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--packs-ui')) { result.mode = 'battle packs only'; const { packsUIControls } = await import('./test-packs-ui.mjs'); await packsUIControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--delegation')) { result.mode = 'delegation UI only'; const { delegationControls } = await import('./test-delegation-ui.mjs'); await delegationControls({ browser, url, check, shot, result, watchErrors }); return; }
     if (process.argv.includes('--command')) { result.mode = 'commanders and regiments UI only'; const { commandControls } = await import('./test-command-ui.mjs'); await commandControls({ browser, url, check, shot, result, watchErrors }); return; }
@@ -1954,6 +1957,8 @@ async function browserChecks(server, url) {
       await ordersControls({ browser, url, check, shot, result, watchErrors });
       const { hooksControls } = await import('./test-hooks-ui.mjs');
       await hooksControls({ browser, url, check, shot, result, watchErrors });
+      const { sandboxBattleUIControls } = await import('./test-sandbox-battle-ui.mjs');
+      await sandboxBattleUIControls({ browser, url, check, shot, result, watchErrors });
     }
     // Shard 4: commanders and regiments, cavalry, then every shipped battle-pack phase on its own terrain.
     if (runs(4)) {
