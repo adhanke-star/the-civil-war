@@ -1,5 +1,56 @@
 # Current execution — v1.1, then v2 (Aaron, 2026-10-12)
 
+STATUS 2026-10-17: v3 RELEASED (tag v3 = 2ef47e9, CI 39001389623 all 9, Pages green, Release Latest). 0274 CLOSED (0276).
+0278 open with a one-shot reload mitigation (branch reload-0278). v4 = Officers, contract below. Aaron's hands-on sandbox and
+Confederate play UNRUN.
+
+v4 CONTRACT — OFFICERS: cards and a Merit track, sourced ranks only (Aaron chose this scope by popup, 2026-10-17; Fable wrote it)
+
+Law first: never invent a person, unit, rank or presence. A commander's name and rank come from the pack phase being played; the
+game never changes rank text. Progression is a game value called Merit, labelled as such wherever it shows.
+
+Player sees
+- Camp: each brigade card's commander row is a button; it opens the OFFICER CARD: portrait where one is sourced (the existing
+  reward-card portrait mapping), else the generic silhouette; "Rank Name" as sourced for the current battle; command (brigade name,
+  parent string, regiments); campaign record (phases commanded with grade and men lost; "Wounded at …" / "Killed at …" from the
+  field events; "Took command" for a successor the pack names); Merit 0–3 as three stars with the plain words "Merit is a game
+  value earned by this brigade's results"; its effect in one line; the pack's sources for the commander. One Back control.
+- Battle: the unit card's commander line opens the same card read-only (pause not required; the card closes on Escape or Back).
+- Briefing: unchanged (enemy commanders and traits stay where they are).
+- Camp after a phase: a short "Officers" line in the after-action/camp summary listing Merit changes ("Hazen: Merit 2 → 3") and any
+  sourced rank change when the next ladder phase's pack gives the same name a different rank ("Promoted Brigadier General per
+  <pack source>"); if the ranks differ the card shows both with their phases.
+
+Game rules (named as such in code and on the card)
+- Merit: per commander name, per franchise save, 0–3. +1 when his brigade ends a battle's last phase at Victory or better with at
+  least half its men (same gate as the veterancy tier-up rule in src/franchise/campaign.js:15); −1 when it ends the phase broken
+  or surrendered; never below 0 or above 3. The loaned Shiloh day-1 army earns nothing (as for veterancy).
+- Effects: rally radius +10 % per Merit (src/game.js command radius 300 m) and steadiness +2 % per Merit (the morale factor
+  commandFactor uses), applied only to franchise brigades in campaign play, never in Battles, sandbox or practice.
+- A commander who dies in play (field event killed) keeps his record; his Merit stays with the name and no longer applies.
+- No rank ever changes from game events. Sourced rank changes are read from pack data only.
+
+In (files)
+- NEW src/franchise/officers.js: `officerRecord(save, name)`, `meritOf`, `applyMerit(scenario, save)` (effects), `recordOfficers(save, result)`
+  (Merit changes + wounded/killed + successor events from game.result), `rankHistory(name, packs)` (sourced ranks per phase), pure
+  functions with the limits style of the codebase.
+- src/franchise/save.js: optional `officers` map keyed by commander name: { merit, record: [{ pack, phase, grade, lost, event? }] },
+  validated, bounded (≤ 64 names, ≤ 24 records each), older saves load with an empty map; export/import carries it.
+- src/franchise/campaign.js: recordPhase → recordOfficers; applyCampaign → applyMerit.
+- src/game.js: rally radius and commandFactor read the Merit multipliers from unit.def (default 1); field events for wounded/killed
+  commanders are already produced (commanderHit) — surface them in game.result if not already there.
+- src/reward/sequence.js + reward.css (camp card button and the officer card page), src/ui/hud.js + hud.css (battle: commander line
+  opens the card), src/ui/art.js (silhouette reuse). Keyboard: the card is a dialog with focus trap, Escape closes; axe clean.
+- Tests: NEW tools/test-officers.mjs (Node; --prove-fail mutants): Merit rules (+1/−1/clamp, loan excluded), effects only in campaign,
+  save round-trip and bounds, rank history from the real packs (two names checked by hand against assets/packs), no rank change from
+  events. NEW tools/test-officers-ui.mjs (shard with the camp tests): open a card from camp and from a battle unit card, text shows
+  "Rank Name" from the pack, Merit label present, Escape closes, axe; screenshots `officer-card-camp` and `officer-card-battle`.
+- ci.yml Node loop: add `officers`. offline-manifest regenerated.
+Out: portraits research, enemy officer careers, command transfers, officer trading, new history text, Union traits.
+
+Done when: own-SHA CI all 9 green (probe both modes + UI test), main fast-forwarded, Pages green, CI screenshots looked at and sent to
+Aaron, tag v4 + Release notes; Aaron opens camp, reads one officer card, plays a phase and sees a Merit change.
+
 v3 CONTRACT — SANDBOX BATTLE: a field and both rosters (Aaron chose this scope by popup, 2026-10-16; Fable wrote it)
 
 Worktree /private/tmp/cw-v3-20261016, branch v3-sandbox-battle (from f56cc2c). Never touch /Users/aaronhanke/Developer/the-civil-war.

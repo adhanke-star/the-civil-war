@@ -1,5 +1,28 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0279 — v3 released; 0278 gets a one-shot reload; v4 is Officers (Aaron, 2026-10-17)
+
+v3 = tag v3 at 2ef47e9 (CI 39001389623 all 9 green, Pages 39003033964 green, Release "v3 — Sandbox battle" is Latest).
+Aaron chose, by popup after seeing the six CI screenshots: (1) tag now, play later, as for v2: his hands-on sandbox and
+Confederate play remain UNRUN and whatever he finds is the first polish item; (2) for 0278 a one-shot automatic reload when
+`import('./main.js')` fails with "Failed to fetch dynamically imported module" (Blink keeps the failed fetch in the module map,
+so only a reload can recover; a session flag keyed by address stops loops; the failure page shows only if the retry fails
+too); the traces stay armed to find the cause; (3) v4 = Officers: cards and promotion for the sourced commanders already in
+the packs, no rank anyone never held. Polish items noted from the screenshots and the headless runs, not gates: the opening
+camera frames the player's line but not the objective; on Henry Hill the Union attack stalls at 219 m and loses 35 men
+while the Confederate defenders lose 962 (fire or terrain asymmetry to look at in the balance round); sandbox titles carry
+the field's real dates.
+
+## 0280 — v4 contract: Officers are cards and a Merit track; ranks are sourced only (Aaron, 2026-10-17)
+
+Aaron chose, from three shapes (popup, recommended), officer cards plus a game Merit track with sourced ranks only; command
+transfers were rejected on history grounds. The game never changes a rank: rank text comes from the pack phase being played and
+changes only where the next ladder phase's pack gives the same name a new sourced rank. Merit 0–3 is a game value per
+commander name per save, earned by the brigade's results under the veterancy gate, buying rally radius and steadiness in
+campaign play only. Inventory behind it: packs carry 158 sourced commander entries (~150 names, ranks Lieutenant to Major
+General), 5 batteries without a commander, traits for 10 Confederate commanders, no per-commander state in saves today.
+Contract and acceptance: PLAN top.
+
 ## 0278 — Open: one worker-served module fetch is canceled (net::ERR_ABORTED) ~35–55 ms in, and the field import fails (2026-10-17)
 
 Seen twice today, both on pages controlled by the service worker, never in the 14 browser tests that load fields

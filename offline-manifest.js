@@ -692,8 +692,8 @@ self.CW_OFFLINE = {
    "sha256": "871a571f01a87162149f5cbc276676c53d39462402933009e9da645990d60fe1"
   },
   "src/entry.js": {
-   "bytes": 2298,
-   "sha256": "d4dcce9671aa4c40a7ea65450cea574a804cd836290063992a600f8bc3e5748e"
+   "bytes": 3547,
+   "sha256": "ef361122904cb2baaf4fbff967b5899e614cd75429015ee6d7b0bbb85cc05014"
   },
   "src/franchise/badges.js": {
    "bytes": 38748,
@@ -1482,5 +1482,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "0060a2d46e12b7b686a887ff8e4516665fb274565d7dc7b5afb137fa3a3c97c3"
+ "generation": "ce8fab591b150cee41785bbc8d19ef1de651566682eeb28145d328abc239758b"
 };
