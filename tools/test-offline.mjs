@@ -250,10 +250,11 @@ export async function writeOfflineAdmissionReport({ report, phase, write, hash, 
 export async function inspectOfflineCaches({ scope, expected, hashes }) {
   let expired = false;
   const readers = new Set(), guard = () => { if (expired) throw Error('inventory deadline'); };
+  // 27 s: software compositing reads every WebGL frame back on the main thread, so 118 reads can take over 9 s (Decision 0276).
   const timer = setTimeout(() => {
     expired = true;
     for (const reader of readers) reader.cancel().catch(() => {});
-  }, 9000);
+  }, 27000);
   const step = async operation => { guard(); const value = await operation(); guard(); return value; };
   const body = async (response, limit) => {
     const reader = response.body?.getReader();
@@ -445,7 +446,7 @@ const audit = async hashes => {
   let timer;
   try { audits.push({ stage, ...await Promise.race([
     page.evaluate(inspectOfflineCaches, { scope: url, expected, hashes }),
-    new Promise((_, reject) => { timer = setTimeout(() => reject(Error('inventory deadline')), 10000); }),
+    new Promise((_, reject) => { timer = setTimeout(() => reject(Error('inventory deadline')), 28000); }),
   ]) }); }
   catch { auditErrors.push({ stage, operation: 'cache inventory' }); }
   finally { clearTimeout(timer); }

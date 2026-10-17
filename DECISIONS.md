@@ -20,6 +20,10 @@ or the game is at fault; real GPUs do not do this. Fix (CI only): the offline sm
 `--disable-gpu-compositing` (software compositing; WebGL still runs on SwiftShader), so no compositor command buffer
 exists to wait on. Acceptance: two fresh samples with no main-thread task over 2 s before battle-ready and no request
 whose Node receipt lags its CDP completion by over 1 s; then the heavy tracing is turned off by default.
+Verified on f56cc2c (CI 38995812745): both samples 6/6, slowest request 1.7 s, online battle ready in 7.7 s (was 39 s), no
+main-thread task over 2.5 s. Side effect: software compositing reads every WebGL frame back on the main thread, so the
+cache inventory audit (118 reads during play) ran past its 9 s deadline and marked both runs invalid; the deadline is now
+27 s. The trace, netlog and two samples per push stay on (2 MB each, 7-day artifacts).
 Still open from 7c7cf0d attempt 2: why `import('./main.js')` rejected; src/entry.js now reports the reason.
 
 ## 0275 — 0274 relocated: the worker answers fast; the page's loader processes the answers ~30 s late (2026-10-16)

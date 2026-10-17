@@ -217,7 +217,7 @@ for(const [relative,tier,which]of [
     const inspect=vm.runInNewContext(functions+';inspectOfflineCaches',{URL,Response,TextEncoder,TextDecoder,performance,crypto:webcrypto,
       navigator:{serviceWorker:{getRegistration:async()=>null}},caches:{keys:async()=>['current'],match:address=>{
         calls.push(address);return new Promise(resolve=>{resolveMetadata=resolve;});}},
-      setTimeout:(f,ms)=>{assert.equal(ms,9000);deadline=f;return 1;},clearTimeout:()=>{}});
+      setTimeout:(f,ms)=>{assert.equal(ms,27000);deadline=f;return 1;},clearTimeout:()=>{}});
     const pending=inspect({scope,expected,hashes:true});
     for(let n=0;n<8;n++)await Promise.resolve();
     assert.equal(calls.length,1);deadline();resolveMetadata(undefined);
@@ -239,7 +239,7 @@ for(const [relative,tier,which]of [
     const audits=[],auditErrors=[];let timer,cleared=0;
     const audit=vm.runInNewContext(auditCode+';audit',{audits,auditErrors,stage:'first-failure',url:scope,expected,
       inspectOfflineCaches:()=>{},page:{evaluate:()=>mode==='success'?Promise.resolve({caches:[]}):mode==='reject'?Promise.reject(null):new Promise(()=>{})},
-      setTimeout:(f,ms)=>{assert.equal(ms,10000);timer=f;return 1;},clearTimeout:id=>{assert.equal(id,1);cleared++;}});
+      setTimeout:(f,ms)=>{assert.equal(ms,28000);timer=f;return 1;},clearTimeout:id=>{assert.equal(id,1);cleared++;}});
     const pending=audit(true);if(mode==='deadline')timer();await pending;
     check(mode==='success'?audits.length===1&&!auditErrors.length:!audits.length&&auditErrors.length===1,'audit success/rejection/deadline remains separate');
     check(cleared===1,'audit timer cleared');
