@@ -1,8 +1,186 @@
-# Current execution — v1.1, then v2 (Aaron, 2026-10-12)
+# Current execution — v6 proposal after released v5 (2026-10-17)
 
-STATUS 2026-10-17 (later): v4 RELEASED (tag v4 = 483b2ca, CI 39027953486 all 9, Pages green, Release Latest). v3 = 2ef47e9.
-0274 CLOSED (0276); 0278 open with the one-shot reload live (0279). v5 = polish round (0282): legs A–D reviewed/repaired (0285); b657362 CI39038318606 all nine green. Current-SHA images1–4 sent; explicit visual/release choice pending. Contract below.
+STATUS 2026-10-17: v5 RELEASED (tag v5=b657362; own CI39038318606 all nine; images1–4 seen/approved by Aaron).
+Remote main=71ae410 (research/status docs only after b657; own CI39040575109 all nine), Pages39044236896 green, live HTTP200.
+0274 CLOSED; 0278 worker cancellation and the separate intermittent music cancellation remain OPEN. No causal fix claimed.
 Aaron's hands-on play of sandbox, Confederate phase and officer cards UNRUN.
+
+v6 PROPOSED CONTRACT — CONFEDERATE FRANCHISE (Codex, 2026-10-17; Aaron's scope choice PENDING)
+
+Purpose: a second army through the existing Western ladder, using the same camp, slots, battle controls, rewards and officer
+cards. This extends DESIGN's post-v1 Confederate franchise. No implementation until Aaron chooses the scope by popup.
+Research of record: docs/confederate-franchise-research.md. Its provenance and disputed details remain attached to the content;
+the proposal does not upgrade source labels. Root Sol6.1 owns all writes; fresh read-only Astra refutes each diff before commit.
+Worktree /private/tmp/cw-v3-20261016, branch v6-confederate from71ae410. Protected local MAIN and Desktop parts bin stay untouched.
+
+Player sees
+- New campaign adds Command: Union / Confederate, default Union, alongside existing difficulty and three slots. One Continue
+  resumes the most recently saved available campaign of either side. Slot/camp titles name the army; switching the selector
+  never converts a save. Existing explicit overwrite confirmation remains the only way to replace a nonempty slot.
+- Confederate camp launches all eleven existing phases as CS, with its own deployed formations, rewards, captured colours,
+  officers, Merit, badges, requisition and stores. Losses carry; defeat never ends the ladder; replay is marked and never
+  duplicates awards. Absent formations stay in camp. Army joins are announced using their authored names.
+- Six sourced decisions use the existing card/reveal UI. National/municipal cases say whose decision it was and its real date;
+  their presence in camp is retrospective historical context. Options/effects are game rules, not invented brigade incidents.
+- Briefing/after-action add concise CS historical context for the existing battle windows, with sources and provenance. A
+  counterfactual player victory never rewrites the historical outcome. No extra mandatory screen or recurring device check.
+
+Data boundary
+- NEW assets/campaign-cs.json: version1, id west-cs, side CS, title The Confederate Western Campaign 1862–63. Existing
+  assets/campaign.json remains the Union definition and keeps its three loan phases. The CS ladder has NO loan phases:
+  shiloh/camps-at-dawn, hornets-nest, grants-last-line, buell-attacks; stones-river/dawn-on-the-right, slaughter-pen,
+  round-forest, mcfaddens-ford; chattanooga/orchard-knob, lookout-mountain, missionary-ridge. Same eleven dates, terrain,
+  openings, arrivals, objectives and clock limits as the packs. No new combat phase, Tunnel Hill, Ringgold or evacuation mode.
+- Six core starter brigades: cs-wood-brigade, cs-cleburne-brigade, cs-gladden-brigade, cs-stephens-brigade,
+  cs-chalmers-brigade, cs-russell-brigade. Copy each first authored CS formation's name, men and veterancy, including delayed
+  arrivals. Wood/Cleburne/Gladden open at dawn; Chalmers/Russell reinforce at840/900 simulation seconds; Stephens first fields
+  in hornets-nest. Those seconds are existing game timing, not new historical facts.
+- Every other authored CS infantry/artillery formation joins at its first ladder appearance; exclude mounted commander
+  figures and other nonformation entities. Live inventory:50 joins distributed5,5,1,4,7,6,4,4,2,4,8;56 total formations,
+  43 infantry and13 batteries. Dawn camp therefore contains11 stored formations,10 of which field in that phase. Keep
+  battalion/regimental/massed-battery labels literal; do not relabel them as historical brigades or divide aggregates.
+- Same ID can carry forward; changed ID is a separate join. No Gladden→Coltart→Deas, Russell→Vaughan or Chalmers→Tucker
+  equipment/career transfer. No speculative successor formations. Preserve the pack's Loomis/Coltart timing explanation.
+- Initial equipment cards are explicitly GAME PROFILES of the authored mix: smooth→m1842, rifled→enfield,
+  smbart→sixPdr, napoleon→napoleon, parrott→parrott10, unless the pack explicitly identifies another existing card type.
+  Review each of13 battery mappings against its status/source text before writing data; list any exception in the asset's
+  accompanying mapping table in docs/confederate-franchise-research.md. A field class is not proof of an exact gun model. Preserve mixed-armament qualification in
+  CS camp/formation information; no new strength, gun-count, rank, XP, historical issue or service claim is introduced.
+  Explicit exception:Gage's mixed rifles/howitzers maps to howitzer12, not an asserted Napoleon. Waters's unsourced field
+  class remains a qualified game profile, not a newly Verified gun identification. Ruggles retains53 authored guns/disputed62.
+
+Side and storage contract
+- Extend existing campaign definition with optional side (absent=US); new CS definitions carry CS. Extend the existing
+  campaign save record with optional side, absent=US for old saves, explicit CS for west-cs. Known id/side mismatches fail
+  validation; no silent conversion. Keep format/version2, three slots, existing byte/array bounds, import/export, stale-write
+  detection and atomic save transaction. No second store, migration job, saved derived cache or parallel campaign engine.
+- Validation/export of an old Union snapshot must retain its previous shape. campaignPhase forwards side; applyCampaign,
+  result recording and awards use that side. History keeps absolute lossesUS/lossesCS/winner; own/enemy calculations select
+  the player side. URL side cannot override a saved campaign's army. Saved practice remains Union.
+- Loader allowlist selects west→assets/campaign.json and west-cs→assets/campaign-cs.json, with corresponding decision decks;
+  no arbitrary URL/file from a save or query. Cache by definition/deck id, not one global pending promise. Camp resolves its
+  ladder from validated save identity; a missing/unknown ladder preserves the army and export path, without enabling play.
+- Campaign launch applies sideScenario exactly once for CS after the carried scenario is formed; existing US path remains
+  equivalent. Initial formations AND reinforcements use the correct badges, camp modifiers, Merit and controllable side.
+  Player-side grade, held objectives, crate captures, colours, survivor totals, low-loss points and officer records must agree
+  across simulation, record, replay, after-action, camp and aria. Enemy progression applies to the opposite side. Unarrived
+  reinforcements keep authored strength, and an absent stored formation never creates a battlefield unit.
+
+Loot/availability proposal — this is an explicit scope choice, not a historical claim about a captured lot
+- CS ordinary shop stock uses the research whitelist and existing rarity/price/condition rules: April1862 m1842 proxy,
+  enfield, sixPdr, howitzer12; Dec1862 adds napoleon; Nov1863 adds lorenz. These are game cutoffs. Keep exact-model Inferred
+  qualifications and CS source/basis text rather than Union ARM_DATES prose. Shop recomputes the same eligible lots when
+  buying; no unsupported earlier stock or purchase bypass, and no promise of unavailable rarities in the CS camp copy.
+  Level-up/shop messages distinguish reputation eligibility from actual stock; they never announce Very Rare/Legendary
+  arms as stocked when the current CS whitelist contains none. Check entry and both reward-sequence level-up paths.
+- CS phase issue cards use that phase's CS ordinary pool; captured crate cards use the opponent's dated eligible arm types.
+  Resolve named game uniques through raw UNIQUES.base and retain Game item labels. Exclude unsupported Whitworth artillery
+  and future Spencer/Henry at early dates; a generic gun class does not authorize an exact reward ID. Crates remain game
+  rewards; do not invent a surrender-to-usable-arms ratio or turn capturedLoadouts' read-only report into depot awards.
+- Existing exact-tier selection assumes all tiers exist. For CS phase loot only, a rolled empty tier falls to the highest
+  nonempty tier below it, and the final card tier matches the actual item. If a tier has only ordinary arms or only uniques,
+  select from that nonempty category. Rare+ guarantee remains satisfiable by Enfield. No new weapon,
+  rarity, item name or global probability/price/combat constant. Preserve all old Union RNG consumption, item/condition/UID,
+  counts and ordering by retaining its existing default path.
+- CS reputation awards retain the existing level tiers through a FIXED opening-date GAME REWARD pool, separately from
+  ordinary CS procurement. Commit this ordered list: m1842, sixPdr, lorenz, belgian, howitzer12, springfield, enfield,
+  napoleon, sharps, colt, parrott10, u-quiet-argument, u-brass-grandmother. These are ordinary CS types plus opponent weapon
+  models allowed by the existing April1862 availability estimates and existing Game-item variants. Retain those estimates'
+  provenance; they establish no particular Western brigade allocation or actual captured lot. Label these as Game reputation
+  rewards, not ordinary Confederate issue or documented captures. The Legendary pool is The Quiet Argument (fictional game
+  variant of Sharps); all five tiers are nonempty. Add no item or historical weapon name.
+- That fixed pool/order applies at EVERY CS level, so depot-full/deferred/save-recovery delivery needs no new saved reward
+  date and cannot change as the ladder advances. Keep existing level rarity requirements, seed/UID/condition rules,
+  ascending delivery, byte/depot limits and idempotency. Existing Union level rewards retain their prior exact path. Shop
+  eligibility does not expand because a game reputation card can be awarded. Phase capture eligibility remains date-bound.
+- The reward screen and recorded depot MUST use the same precomputed cards/policy. Current campaign UI independently
+  rerolls the cards; either pass the prepared outcome through its existing path or forward identical explicit policy inputs
+  to both paths. Review does not accept a pretty card that differs from what was saved. A source/context inventory found
+  no campaign depot award of actual captured formation equipment; adding one is OUT.
+
+Six decision cards (NEW assets/decisions-cs.json; same version1 schema, not appended to Union deck)
+All listed numerical effects are proposed GAME RULES using existing magnitudes, not evidence of historical consequences.
+Each option has one gain/one cost; every pair has a points/store-free choice; max two cards per pack/phase.
+1. shiloh/grants-last-line: Beauregard's Apr6 dusk halt. Halt:morale+4/rations−10; press:rp+15/morale−4. Historical:halt.
+2. stones-river/dawn-on-the-right: Gorgas approves Mallet's post-Aug–Sep1862 inspection recommendations, retrospective
+   bureau case. Inspect:morale+3/rp−10; immediate issue:rp+10/morale−3. Historical:inspection.
+3. same phase:1861 authorization/construction of Augusta works, productionApr1862, retrospective government/Rains case.
+   Invest:ammunition+20/rp−15; defer:rp+15/morale−3. Historical:invest. No powder delivered at Shiloh opening.
+4. chattanooga/orchard-knob: government runners during Sep1862–Sep1863 reporting period, War Department/Ordnance Bureau.
+   Fund:ammunition+20/rp−15; decline additional investment:rp+15/morale−3. Historical:fund; precise choice Inferred.
+5. same phase: Congress's Mar26,1863 impressment act, retrospective national policy. Authorize:rations+20/morale−4;
+   voluntary procurement:morale+4/rp−15. Historical:authorize. Preserve coercion, compensation rules versus abuses and
+   earlier seizures; do not turn morale−4 into a claim that civilians approved or that all purchases were voluntary.
+6. chattanooga/lookout-mountain: Richmond council's Apr1863 screened relief market, retrospective MUNICIPAL case.
+   Market:morale+3/rations−10; retain earlier arrangements:rp+10/morale−3. Historical:market. Name Councilman Randolph
+   only at that scope; preserve eligibility screening and riot-participant exclusion. No Western commander meeting/delivery.
+Cards carry sources/page labels/provenance from the brief; precise details stay Inferred when only one account supports
+them. Gains/costs say Game rule. The real institutional option is revealed; no fictitious camp allocation is called historical.
+Salvage and Virginia forced-labor cards remain OUT. No new cards shown in Union campaigns.
+
+Historical context, not new simulation
+- Extend campaign phase metadata with bounded before/after historical-context entries (text, provenance, source labels+URLs).
+  Reuse briefing and after-action sections. Maximum6 entries per phase,1000 characters per entry,8 sources per entry;
+  Verified requires two independently authored sources. No context saved as battle outcome and no new menu/mandatory screen.
+- Shiloh: attack waves; Johnston's afternoon death/Beauregard succession; encirclement/surrender about2200–2300; dusk halt;
+  Apr7 counterattack/withdrawal and later rear guard. Exact death minutes and massed-gun count stay disputed. Buell phase
+  still ends15:00: a later historical withdrawal is labelled later context, not a newly played evacuation or scripted death.
+- Stones River: Dec31 sequence, Round Forest, Jan2 ford, Jan3 council/withdrawal AFTER the existing Jan2 phase. Polk's letter
+  to Hardee and Cheatham/Withers recommendation are attributed correctly; Bragg's reinforcement belief is not a real arrival.
+- Chattanooga: Oct petition/Davis visit and Nov3 council/Nov4 Longstreet order before existing combat; Orchard/Lookout/Ridge;
+  later Ringgold/Dalton retreat and Nov30 relief at Bragg's request. No invented petition signatories, exact entire-command
+  departure date, cliff assault, army commander, combat phase or outcome-dependent rewriting of historical text.
+
+Files and commit boundaries (root writes; pause before expanding these seams)
+A. Pure data/side/persistence/results: assets/campaign-cs.json; src/franchise/campaign.js, save.js, practice.js, economy.js,
+   badges.js, officers.js; focused existing Node tests plus NEW tools/test-confederate.mjs. Cover new metadata/side invariants
+   without exposing an incomplete CS campaign in the title menu. No pack or combat tuning edits.
+B. Availability and complete player flow: src/reward/data.js, model.js, sequence.js; src/franchise/level-rewards.js,
+   practice-ui.js; src/ui/entry.js, briefing.js; src/main.js; index.html and existing UI CSS only as needed for the selector,
+   source/context copy and accessible layout; NEW tools/test-confederate-ui.mjs. All reward creation/recovery paths must
+   know CS policy. Saved-practice reward paths stay Union. No second renderer, resource mode, asset bake or new imagery.
+C. Six cards/context and completion: assets/decisions-cs.json; src/franchise/decisions.js; campaign/briefing/after-action
+   seams above; existing tools/test-playthrough.mjs, test-browsers.mjs, test-offline.mjs, test.mjs; .github/workflows/ci.yml; tools/build-offline-manifest.mjs and
+   generated offline-manifest.js; STATE/PLAN/DECISIONS/DESIGN and the research brief. Add both CS metadata assets to offline
+   base explicitly. CI probes enumerate confederate in both modes; test.mjs registers its CPU/UI paths. Same nine CI jobs:
+   add CS UI to the camp shard and a CS pass to the existing playthrough job, not a new suite.
+Every slice: affected Node checks → fresh Astra diff review → commit/push → read own-SHA CI. Keep incomplete work on this
+branch; only the complete approved feature advances remote main. Fix red jobs before acceptance; preserve original failures.
+
+Acceptance commands and meaningful controls (CPU here; browser commands run ONLY on Actions)
+- node --check on each changed JS/mjs file; git diff --check; node tools/build-offline-manifest.mjs --write;
+  node tools/build-offline-manifest.mjs --check; node tools/test.mjs --unit.
+- For each name below, run node tools/test-NAME.mjs and node tools/test-NAME.mjs --prove-fail:
+  confederate, campaign, save, sides, practice, economy, reward, level-rewards, badges, officers, progression, orders,
+  foragers, captured-loadouts, history, packs, offline-worker. Run only affected files per intermediate slice; full list at C.
+- New CPU cases: both definitions, all11 CS phases and exact first-appearance joins; malformed/mismatched side; old US save
+  and CS round trips; no cross-side franchise mutation; arrived/unarrived units; CS win/defeat/objective/loss/colour accounting;
+  replay/idempotency and same-ID carry; enemy badges/own Merit; six source-qualified cards and choice affordability; stock
+  dates/purchase refusal; empty-tier fallback, exact displayed/saved card match, all CS levels plus pending/full-depot recovery.
+  Mutants must fail by name for wrong side, swapped grade, enemy rewards, duplicate join, wrong deck, future stock and UI/model
+  policy mismatch. Add a few fixed pre-change Union seed/grade samples to ordinary regression assertions; do not rewrite them
+  to match a changed RNG stream. Preserve byte/depot bounds and three-slot stale-write controls.
+- Actions: existing node tools/test.mjs --shard=1, --shard=2, --shard=3 --trace-screenshots, --shard=4 --balance-sides;
+  confederate UI is included in shard2. Existing playthrough command plus node tools/test-playthrough.mjs --side=CS in the
+  same75-minute job; implement that side option. Retain US output at .out/playthrough and distinct CS output at
+  .out/playthrough-cs, each with side-labelled results/screenshots, and upload both. Both exit statuses gate the job; preserve
+  the US failure if it prevents the second pass. Firefox/WebKit smoke includes CS first/last phase; offline includes a loaded CS campaign/decision deck.
+  Existing Union checks and three offline samples/upgrade controls remain. Keep all nine jobs, no local browser launch.
+- UI must create CS in an owned test slot, reload/export/import, field CS at each battle, earn/issue actual displayed loot,
+  see own Outranged only, exercise decisions/officer card, defeat/replay and complete all11 phases using the existing real-UI
+  playthrough method. Label any terminal fixture honestly; it is not ordinary player completion. Keep US saves playable.
+  Screenshots: new-campaign selector, CS camp, CS battle opening, CS after-action loot, municipal decision/reveal, CS officer.
+  Reusing a prepared reward outcome must preserve the existing saved-practice ownership guard; CS campaign metadata must
+  not impersonate an owned saved-practice outcome to bypass that guard.
+  Check keyboard/focus/aria/axe through existing tools. Independent read-only Astra acceptance checks the final diff/artifacts.
+- Done: own-SHA all nine green; numbered actual CI images sent before the single recommended-first visual popup; approved
+  presentation; remote-main FF, own-SHA Pages green and live HTTP200; tag v6/Release and current STATE<20/PLAN/DECISIONS.
+  No resource, native-device, new-history-research completeness or unexplained-cancellation fix claim follows from these checks.
+
+OUT: new battles/terrain/phases, exact scripted commander deaths or evacuations, remapped brigade identities, new arms/items,
+Union army-command traits/history, combat/balance tuning, art/portraits, compressed-atlas adoption, save-slot expansion,
+new databases/parallel progression, actual captured-formation equipment awards, a new context-only card schema, release before
+scope/visual choices, and causal fixes for unexplained music/worker cancellations without a matching failure diagnosis.
 
 v5 CONTRACT — POLISH ROUND: readability, camera, proof (Aaron chose this scope by popup, 2026-10-17; Fable wrote it)
 

@@ -121,6 +121,8 @@ Outside ordinary CS stock: springfield (existing item is M1861, not Richmond/all
 
 Incidental existing seam, reported only: battlefield pack classes `parrott`/`napoleon` sometimes represent James rifles, howitzers or siege pieces. They cannot independently justify exact reward IDs. No pack or reward data was changed by this research.
 
+Implementation proposal after review: ordinary CS stock remains the table above. Reputation cards are a separate GAME REWARD policy, using a fixed opening-date pool of ordinary CS types plus opponent models permitted by the existing April1862 availability estimates and existing fictional named variants. That pool preserves all five rarity tiers without new weapon types or saved reward dates. It does not document Confederate procurement, a specific captured lot or brigade issue; retain the underlying estimates' provenance. PLAN lists the exact ordered pool, whose Legendary entry is the existing Game item The Quiet Argument, based on Sharps. This proposal changes no research claim or stock eligibility and still needs Aaron's scope choice.
+
 ## Before a v6 contract
 
 Resolve initial roster plus joins without false unit continuity; decide if extra Shiloh command-transition/withdrawal mechanics belong in scope; distinguish sourced policy context from actual camp decisions; date/location gate cards; specify side-neutral franchise/save/reward effects and source-preserving tests. Current campaign.js:237 rejects matched non-US formations and decisions.js:50 still assumes Union morale; starter-plus-joins structure alone does not enable a Confederate franchise. Write DECISIONS+PLAN contract, show recommended-first scope popup, then build only after Aaron's choice. v5 remains unchanged.

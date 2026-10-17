@@ -1,5 +1,30 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0289 — proposed v6 contract reuses the Western ladder; scope choice pending (Codex, 2026-10-17)
+
+PLAN now specifies a proposed Confederate franchise using the existing11 phases, six core Shiloh brigades and50 separately
+authored joins (56 formations:43 infantry/13 batteries), existing three-slot storage/camp/award systems, six real institutional
+or army decision cases, historical narrative bridges and a separate selected deck with the same schema. No v6 code or data
+is adopted before Aaron's scope popup. Roster identities, presence, ranks and disputed context retain their source limits.
+
+An implementation inventory found an important scope tradeoff: shared loot assumes nonempty exact rarity pools; campaign UI
+rerolls independently of recorded loot, and reputation rewards can also be delivered during save recovery. The proposal adds
+CS eligibility/fallback on phase loot while preserving the existing Union path. A fixed13-item opening-date Game-reward
+pool retains every reputation rarity tier, including the existing fictional Sharps variant The Quiet Argument at Legendary.
+It combines ordinary CS types with opponent models under the existing April1862 availability estimates, not documented
+Confederate issue or actual captures. Fixed pool/order keeps deferred recovery stable without new saved reward dates or
+items; the shop remains constrained separately. Fresh Astra proposed this narrower alternative to an ordinary-shop-only
+pool that would make levels4–10 all Enfields. Source-estimate qualifications and Game-item labels remain explicit. Fresh
+Astra review and Aaron's scope choice precede implementation; expand the contract if this policy changes.
+
+## 0288 — v5 released after Aaron's visual approval (Codex, 2026-10-17)
+
+Aaron confirmed seeing numbered images1–4 and approved release. Annotated tag v5 points to tested b657362, CI39038318606
+all nine green; Release v5 — Polish was published2026-10-17T15:15:19Z. Remote main fast-forwarded from f838414 to71ae410,
+whose four additional documentation paths passed own CI39040575109 all nine. Pages39044236896 deployed71ae410 successfully;
+the live game returned HTTP200. Protected local MAIN remains13a7b13+WIP and was not edited or advanced. No balance tuning,
+native-device play or causal fix for the unexplained music/worker cancellations is claimed. v5's finite boundary is complete.
+
 ## 0287 — v5 candidate passes all nine; Confederate research is proposed, not adopted (Codex, 2026-10-17)
 
 b657362 / CI39038318606 passed all nine jobs, including the campaign playthrough. Sandbox openings pass, Willcox's
