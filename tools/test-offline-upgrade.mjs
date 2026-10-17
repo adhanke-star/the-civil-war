@@ -109,7 +109,10 @@ try{
   try{git(['cat-file','-e',OLD+'^{commit}']);}catch{git(['fetch','--depth=1','origin',OLD]);}
   const oldFiles=new Set(git(['ls-tree','-r','--name-only',OLD]).trim().split('\n'));
   const assets=git(['diff','--name-status',OLD,'HEAD','--','assets']).trim().split('\n').filter(Boolean);
-  check('old-assets-byte-unchanged',assets.length===12&&assets.every(row=>row.startsWith('A\tassets/figures/confederate-infantry/')),assets);
+  // v6 (PLAN C) adds the Confederate campaign/decision metadata as NEW assets; old assets must still be byte-unchanged.
+  const CS_METADATA=['assets/campaign-cs.json','assets/decisions-cs.json'];
+  const figures=assets.filter(row=>row.startsWith('A\tassets/figures/confederate-infantry/'));
+  check('old-assets-byte-unchanged',figures.length===12&&assets.every(row=>figures.includes(row)||CS_METADATA.includes(row.replace(/^A\t/,''))),assets);
   const manifest=createOfflineManifest();report.generation=manifest.generation;
   check('generated-source-exact',await fs.readFile(path.join(ROOT,'offline-manifest.js'),'utf8')===serializeOfflineManifest(manifest),'actual disk equals committed byte-admission generation');
   report.oldWorker={bytes:Buffer.byteLength(git(['show',OLD+':sw.js'])),sha256:hash(git(['show',OLD+':sw.js']))};

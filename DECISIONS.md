@@ -1,5 +1,21 @@
 # DECISIONS (newest first; one short entry each)
 
+## 0291 — v6 phase A reviewed: no behaviour defect; the offline upgrade control and test gaps fixed (Fable, 2026-10-17)
+
+cc3642a (Codex's unaccepted phase A WIP) got its fresh read-only review: a six-lens refutation workflow (side contract, results
+and economy, data asset, test quality, Union regression, history law; three independent refuters per finding, 102 agents).
+Result: no behaviour defect in A's files. Old Union saves re-export byte-identical through the new code (12/12 pipeline
+samples); the 56-row asset matches the packs (one documented exception, Gage's howitzer12); the shipped ids expose no
+Confederate campaign. The 21 surviving findings were test-coverage gaps (awardPhase side, loss carry, vet/weapon mapping,
+duplicate join, swapped grade, west save with side CS, other-side definition, CS officer records), stale Union-only comments,
+the research doc contradicting its own approval line, dropped Inferred/Disputed words in the battery table, and B/C seams
+(main.js launch side, loot pools, level cards, shop stock, camp fielded list, practice-ui totals) deferred as the contract says.
+Own CI 39047011390 on cc3642a: eight green; browsers (offline) red at old-assets-byte-unchanged, because the upgrade control
+admitted only the 12 figure files and assets/campaign-cs.json is a new asset. The control now allows the two CS metadata
+assets explicitly and still requires every old asset byte-unchanged. phaseResult's side guard now applies only to a real
+game, so a missing game keeps phaseOutcome's message. test-confederate grows to 11 checks and 11 named controls. A is
+accepted only when the new SHA's own CI is all nine green; B (loot/UI/launch side) and C (cards, context, CI) remain.
+
 ## 0290 — Aaron approves v6; build the written A/B/C contract (2026-10-17)
 
 Aaron selected “Approve v6 scope—build” in the scope popup. The contract at PLAN top is now authorized: all11 existing

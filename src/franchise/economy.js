@@ -2,7 +2,7 @@
 // Depot, Staging: "shop selling arms only"). Pure logic over v2 campaign saves; no DOM, no storage. Every amount is a
 // GAME RULE from src/franchise/tuning.js; only the arms' first-issue months (src/reward/data.js ARM_DATES) are history.
 //
-//   phasePoints({ grade, held, lossesUS, lossesCS, loan }) -> { lines: [{ id, label, points }], score }
+//   phasePoints({ grade, held, lossesUS, lossesCS, loan, side }) -> { lines: [{ id, label, points }], score } (side: the player's)
 //   awardPhase(save, { awardId, grade, held, lossesUS, lossesCS, loan }) -> save with the phase's points paid once
 //   phaseSummary(before, after) -> the after-action's points breakdown and any level reached (null if nothing was paid)
 //   levelFor(reputation) / nextLevelAt(level) / shopTierFor(level) / levelCard({ seed, campaignId, slot, level })

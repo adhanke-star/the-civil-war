@@ -708,8 +708,8 @@ self.CW_OFFLINE = {
    "sha256": "0c7a204f28192aa2fdf765ddc7bdc0d5342a5732f7ae4bc8723b7e7adb542471"
   },
   "src/franchise/campaign.js": {
-   "bytes": 30091,
-   "sha256": "f21c4d0868a0d41b514da9225dd4fe44f4d5c66b2e5ba96c9623389c22d73023"
+   "bytes": 30272,
+   "sha256": "35b6108a2c5167019947a330b58d3457da292042d0f0bc9ef46a3bccf3806717"
   },
   "src/franchise/captures.js": {
    "bytes": 5899,
@@ -720,8 +720,8 @@ self.CW_OFFLINE = {
    "sha256": "5b466822b193e46bc791630261e817a018bd8c1afae49649eb679c4cd0a8d269"
   },
   "src/franchise/economy.js": {
-   "bytes": 18561,
-   "sha256": "47ca58946a7d20401a34b419d388369b566ac177a6d5f374899bdbae108c5aa2"
+   "bytes": 18588,
+   "sha256": "0ab0019f2f8940b6e5dd5e29fd12c0c4fde0099f808d9c9d77b13874e4409d73"
   },
   "src/franchise/intro.js": {
    "bytes": 2519,
@@ -732,16 +732,16 @@ self.CW_OFFLINE = {
    "sha256": "1f5d4010bf4e5d42c3fae0b7008eb7e28cbdcb6a10dae5f31304080517fe2e36"
   },
   "src/franchise/officers.js": {
-   "bytes": 25275,
-   "sha256": "a44d0c136445f97dc69a26448fcff14aa017e634bf060a93b734eeb5fedbd150"
+   "bytes": 25301,
+   "sha256": "46c953dad472094b7409fcf142e20bacf43731c57a27503121846de273ab4d5a"
   },
   "src/franchise/practice-ui.js": {
    "bytes": 23305,
    "sha256": "620f4a0adf2d6de410634e912f3856846b9043e9938e4ca104e4214b24ef9581"
   },
   "src/franchise/practice.js": {
-   "bytes": 30735,
-   "sha256": "475f5616c01f573775495159e3ad157c78c95a027893a548e1e33a0caf6a1fe2"
+   "bytes": 30757,
+   "sha256": "4268797c05a38ca24470be5b55c80c92778edf6b9447530bb64d458ef6a2cfdd"
   },
   "src/franchise/save.js": {
    "bytes": 46269,
@@ -1491,5 +1491,5 @@ self.CW_OFFLINE = {
    ]
   }
  },
- "generation": "600ba20596f065b3d34394aeb680f5330ba13a8b22a55c81f0cd59ccd9810b81"
+ "generation": "b24dcb4e9f36ad16a4128667e507332c951816d7442e9f515069502a9e588131"
 };

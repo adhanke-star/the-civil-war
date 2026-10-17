@@ -9,6 +9,9 @@ import { phasePoints, phaseSummary } from '../src/franchise/economy.js';
 import { awardBadges, FEAT_STATS } from '../src/franchise/badges.js';
 import { applyMerit, officerRows, recordOfficers } from '../src/franchise/officers.js';
 import { preparePhase, prepareFieldScenario } from '../src/sim/phase.js';
+import { VETERANCY } from '../src/reward/data.js';
+// Weapon card profiles of the authored field classes (PLAN v6 data boundary); Gage's is the one documented exception.
+const PROFILE = { smooth: 'm1842', rifled: 'enfield', smbart: 'sixPdr', napoleon: 'napoleon', parrott: 'parrott10' }, EXCEPT = { 'cs-gage-alabama-battery': 'howitzer12' };
 
 const read = p => JSON.parse(fs.readFileSync(new URL('../' + p, import.meta.url)));
 const CS = read('assets/campaign-cs.json'), US = read('assets/campaign.json'), copy = structuredClone;
@@ -54,7 +57,10 @@ const CHECKS = [
       for (const d of own) { const r = rows.find(r => r.unitId === d.id); assert.ok(r); }
     }
     const first = new Map(); for (const p of c.phases) for (const d of defs(authored(p))) if (d.side === 'CS' && !first.has(d.id)) first.set(d.id, d);
-    for (const r of rows) { const d = first.get(r.unitId); assert.equal(r.label, d.name); assert.equal(r.men, d.men); if (r.kind === 'battery') assert.equal(r.guns, d.guns); }
+    for (const r of rows) {
+      const d = first.get(r.unitId); assert.equal(r.label, d.name); assert.equal(r.men, d.men); if (r.kind === 'battery') assert.equal(r.guns, d.guns);
+      assert.equal(r.vet, VETERANCY[(d.xp || 1) - 1].id); assert.equal(r.weapon, EXCEPT[r.unitId] || PROFILE[d.weapon]);
+    }
     assert.equal(rows.find(r => r.unitId === 'cs-gage-alabama-battery').weapon, 'howitzer12');
     const dawn = authored(c.phases[0]); assert.equal(dawn.reinforcements.find(d => d.id === 'cs-chalmers-brigade').atSec, 840);
     assert.equal(dawn.reinforcements.find(d => d.id === 'cs-russell-brigade').atSec, 900);
@@ -66,6 +72,20 @@ const CHECKS = [
     assert.deepEqual(api.parseSnapshot(api.exportSnapshot(s)), s);
     for (const side of [undefined, 'US', 'CSA']) assert.throws(() => api.validateSnapshot({ ...s, campaign: { ...s.campaign, side } }));
     const p = api.campaignPhase(s, CS); assert.throws(() => api.applyCampaign(authored(p), s, { ...p, side: 'US' }));
+    const us = api.newCampaign({ campaign: US, slot: 1, seed: 1 });
+    assert.throws(() => api.validateSnapshot({ ...us, campaign: { ...us.campaign, side: 'CS' } }));
+    // Same ladder id, other side: the definition is refused for the save (campaign.js campaignSave), both ways round.
+    const x = api.newCampaign({ campaign: { ...copy(CS), id: 'x-ladder' }, slot: 3, seed: 1 });
+    assert.throws(() => api.campaignPhase(x, { ...copy(US), id: 'x-ladder' }), /another side/);
+    const y = api.newCampaign({ campaign: { ...copy(US), id: 'x-ladder' }, slot: 3, seed: 1 });
+    assert.throws(() => api.campaignPhase(y, { ...copy(CS), id: 'x-ladder' }), /another side/);
+  }],
+  ['duplicate-join', api => {
+    const across = copy(CS); across.phases[1].joins.push(copy(across.phases[0].joins[0]));
+    assert.throws(() => api.validateCampaign(across), /unique/);
+    const core = copy(CS); core.phases[0].joins.push(copy(core.franchise[0]));
+    assert.throws(() => api.validateCampaign(core), /unique/);
+    assert.throws(() => api.newCampaign({ campaign: across, slot: 3, seed: 1 }));
   }],
   ['legacy-union', api => {
     const s = api.newCampaign({ campaign: US, slot: 1, seed: 1 });
@@ -88,6 +108,10 @@ const CHECKS = [
     let s = start(api);
     for (let i = 0; i < 11; i++) {
       const prior = s, r = play(api, s, { loss: 3, winner: i === 4 ? 'US' : 'CS' }); s = r.after;
+      // Same-ID carry: a fielded brigade takes the field at min(authored, carried) strength and loses exactly the fixture's 3 men.
+      const was = prior.army.find(b => b.id === 'cs-wood-brigade').men, fielded = r.record.units.some(u => u.id === 'cs-wood-brigade');
+      if (fielded) assert.equal(defs(r.scenario).find(d => d.id === 'cs-wood-brigade').men, Math.min(was, defs(authored(r.phase)).find(d => d.id === 'cs-wood-brigade').men));
+      assert.equal(s.army.find(b => b.id === 'cs-wood-brigade').men, was - (fielded ? 3 : 0));
       assert.equal(s.campaign.side, 'CS'); assert.equal(s.campaign.index, i + 1);
       assert.equal(s.campaign.history.length, i + 1);
       assert.ok(s.army.length >= prior.army.length);
@@ -115,8 +139,12 @@ const CHECKS = [
     const args = { grade: 'Victory', held: true, lossesUS: 100, lossesCS: 10 };
     assert.ok(api.phasePoints({ ...args, side: 'CS' }).lines.some(l => l.id === 'lowLoss'));
     assert.ok(!api.phasePoints({ ...args, side: 'US' }).lines.some(l => l.id === 'lowLoss'));
-    const s = start(api), r = play(api, s, { loss: 3 });
-    assert.ok(api.phaseSummary(s, r.after).lines.some(l => l.id === 'lowLoss'));
+    const s = start(api), r = play(api, s, { loss: 3 }), summary = api.phaseSummary(s, r.after);
+    assert.ok(summary.lines.some(l => l.id === 'lowLoss'));
+    // The paid points (ledger row and rp) must equal the after-action's lines: the saved score is not recomputed for the Union.
+    const row = r.after.ledger.find(l => l.kind === 'phase' && l.awardId === r.phase.awardId);
+    assert.equal(row.score, summary.lines.filter(l => l.id !== 'replay').reduce((n, l) => n + l.points, 0));
+    assert.equal(r.after.rp - s.rp, summary.points);
   }],
   ['badges', api => {
     const s = start(api), p = api.campaignPhase(s, CS), scenario = api.applyCampaign(authored(p), s, p);
@@ -132,6 +160,10 @@ const CHECKS = [
     const field = api.applyCampaign(authored(replay), next, replay);
     assert.ok(field.units.find(d => d.id === own.id).badges.some(b => b.id === 'firstVolley'));
     assert.ok(field.units.find(d => d.id === enemy.id).badges.some(b => b.id === 'firstVolley'));
+    // Officer records written by the phase belong to CS commanders only (recordOfficers via recordPhase).
+    const led = side => new Set(defs(scenario).filter(d => d.side === side && d.commander?.name).map(d => d.commander.name));
+    const cs = led('CS'), us = led('US'), names = Object.keys(next.officers || {});
+    assert.ok(names.length); for (const n of names) { assert.ok(cs.has(n)); assert.ok(!us.has(n)); }
   }],
   ['officers', api => {
     const s = start(api), p = api.campaignPhase(s, CS), scenario = api.applyCampaign(authored(p), s, p), game = terminal(scenario);
@@ -154,13 +186,15 @@ const CHECKS = [
   }],
 ];
 const MUTANTS = {
-  roster: { definition: () => ({ ...copy(CS), phases: CS.phases.map((p, i) => i ? copy(p) : { ...copy(p), joins: [] }) }) },
+  roster: { definition: () => { const d = copy(CS); d.franchise[0].vet = 'veteran'; return d; } },
+  'duplicate-join': { validateCampaign: d => { const seen = new Set(d.franchise.map(r => r.unitId));
+    return campaign.validateCampaign({ ...d, phases: d.phases.map(p => ({ ...p, joins: p.joins?.filter(j => !seen.has(j.unitId) && seen.add(j.unitId)) })) }); } },
   identity: { validateCampaign: d => d },
   'legacy-union': { newCampaign: o => { const s = campaign.newCampaign(o); s.campaign.side = 'US'; return s; } },
   'field-side': { applyCampaign: scenario => copy(scenario) },
   'all-phases': { recordPhase: (...args) => { const s = campaign.recordPhase(...args); delete s.campaign.side; return s; } },
-  'result-side': { phaseOutcome: o => ({ ...phaseOutcome(o), grade: 'Defeat' }) },
-  'low-loss': { phasePoints: o => phasePoints({ ...o, side: 'US' }) },
+  'result-side': { phaseOutcome: o => { const r = phaseOutcome(o); return { ...r, grade: r.grade === 'Victory' ? 'Defeat' : r.grade === 'Defeat' ? 'Victory' : r.grade }; } },
+  'low-loss': { recordPhase: (...a) => { const n = copy(campaign.recordPhase(...a)); const row = n.ledger.find(l => l.kind === 'phase'); row.score -= 10; row.points -= 10; n.rp -= 10; n.reputation -= 10; return n; } },
   badges: { awardBadges: (s, ctx) => awardBadges({ ...s, campaign: { ...s.campaign, side: 'US' } }, ctx) },
   officers: { officerRows: o => officerRows({ ...o, game: { ...o.game, playerSide: 'US' } }) },
   replay: { recordPhase: (s, c, r) => { const n = campaign.recordPhase(s, c, r); if (n.campaign.history.at(-1).replay) n.campaign.index++; return n; } },

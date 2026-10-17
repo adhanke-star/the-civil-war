@@ -1,6 +1,6 @@
 # v6 Confederate franchise — research draft, 2026-10-17
 
-Research only. No adopted scope, runtime data or numerical game effects. Compiled from eight read-only research tasks while v5 CI runs; independent Astra reviews found three source/context adjustments plus an authored-reinforcement omission, incorporated below. No v6 scope is adopted. Verified below means two independently authored accounts were found, not two transcriptions of one report. Exact disputed times/counts remain qualified. Current pack text is reused, not promoted to Verified merely because it exists in JSON. Follow-up review could not reopen Semple p909, Cheatham p706, Barret p768 or Robertson's Chickamauga PDF because source access failed; those researcher readbacks were not independently repeated. No contradiction was established.
+Research of record for the v6 contract Aaron approved (Decision 0290); the proposal wording below predates that approval and is kept as written. Numerical game effects are GAME RULES set in PLAN, not research claims. Compiled from eight read-only research tasks while v5 CI runs; independent Astra reviews found three source/context adjustments plus an authored-reinforcement omission, incorporated below. The approval upgrades no source label. Verified below means two independently authored accounts were found, not two transcriptions of one report. Exact disputed times/counts remain qualified. Current pack text is reused, not promoted to Verified merely because it exists in JSON. Follow-up review could not reopen Semple p909, Cheatham p706, Barret p768 or Robertson's Chickamauga PDF because source access failed; those researcher readbacks were not independently repeated. No contradiction was established.
 
 ## 1. Roster and continuity
 
@@ -121,7 +121,7 @@ Outside ordinary CS stock: springfield (existing item is M1861, not Richmond/all
 
 Incidental existing seam, reported only: battlefield pack classes `parrott`/`napoleon` sometimes represent James rifles, howitzers or siege pieces. They cannot independently justify exact reward IDs. No pack or reward data was changed by this research.
 
-Implementation proposal after review: ordinary CS stock remains the table above. Reputation cards are a separate GAME REWARD policy, using a fixed opening-date pool of ordinary CS types plus opponent models permitted by the existing April1862 availability estimates and existing fictional named variants. That pool preserves all five rarity tiers without new weapon types or saved reward dates. It does not document Confederate procurement, a specific captured lot or brigade issue; retain the underlying estimates' provenance. PLAN lists the exact ordered pool, whose Legendary entry is the existing Game item The Quiet Argument, based on Sharps. This proposal changes no research claim or stock eligibility and still needs Aaron's scope choice.
+Implementation proposal after review: ordinary CS stock remains the table above. Reputation cards are a separate GAME REWARD policy, using a fixed opening-date pool of ordinary CS types plus opponent models permitted by the existing April1862 availability estimates and existing fictional named variants. That pool preserves all five rarity tiers without new weapon types or saved reward dates. It does not document Confederate procurement, a specific captured lot or brigade issue; retain the underlying estimates' provenance. PLAN lists the exact ordered pool, whose Legendary entry is the existing Game item The Quiet Argument, based on Sharps. This proposal changes no research claim or stock eligibility; Aaron approved it within the v6 scope (Decision 0290).
 
 ## Initial battery card mappings (approved game profiles, not exact historical allocations)
 
@@ -131,16 +131,16 @@ field class called napoleon is not itself evidence of a Napoleon gun.
 
 | Authored formation | Card profile | Qualification retained from the pack |
 |---|---|---|
-| cs-swett-battery | sixPdr | Mixed four smoothbores/two howitzers; majority profile. |
-| cs-ruggles-grand-battery | sixPdr | Aggregated massed batteries,53 guns used;62 disputed; majority-class game profile. |
-| cs-gage-alabama-battery | howitzer12 | Explicit exception to field class: mixed rifles/howitzers, no identified Napoleon. |
+| cs-swett-battery | sixPdr | Mixed four smoothbores/two howitzers (guns Inferred, one source); majority profile. |
+| cs-ruggles-grand-battery | sixPdr | Aggregated massed batteries, 53 guns used; 62 Disputed (about 55 in one article); majority-class game profile. |
+| cs-gage-alabama-battery | howitzer12 | Explicit exception to field class: mixed rifles/howitzers (guns Disputed: six against four; four used), no identified Napoleon. |
 | cs-hodgson-battery | sixPdr | Three-way mixed battery; selected game profile. |
 | cs-mcclung-battery | napoleon | Estimated mixed six-pounders/Napoleons; heavier-class game profile, not ordinary-shop evidence. |
 | cs-humphreys-battery | sixPdr | Mixed types; selected class already a guess. |
 | cs-turner-battery | napoleon | Two Napoleons/two howitzers; selected mixed-battery profile. |
 | cs-washington-artillery | sixPdr | Exact types unstated in the phase; low-confidence profile. |
 | cs-wright-battery | sixPdr | Brass pieces, exact types unstated; low-confidence profile. |
-| cs-semple-battery | napoleon | Authored four-gun phase group; source-qualified count, not a new six-gun allocation. |
+| cs-semple-battery | napoleon | Authored four-gun phase group (guns Inferred, Bearss, one source); not a new six-gun allocation. |
 | cs-howell-section | sixPdr | Authored two six-pounders; existing crew estimate and historical no-fire account retained. |
 | cs-waters-battery | napoleon | Unsourced field-class guess; explicitly a game profile. |
 | cs-cobb-battery | napoleon | Authored four Napoleons; original sources retained. |
@@ -162,4 +162,4 @@ Purpose/access: a Confederate franchise selects a different authored campaign an
 - briefing.js already loads definitions/packs; extend its campaign selector and side summaries, not another loader/cache. A campaign data asset follows the existing pack/data pattern, not a separate subsystem.
 - decisions.js and the existing reward pipeline have the same access/lifetime/ownership; extend contextual presentation and side-aware inputs instead of a second card/reward system. Keep old historical choices and Union results unchanged.
 
-The read-only inventory found strict Union assumptions in campaign definition/record/snapshot validation, launch, field matching, result bridge, low-loss points, badge/enemy eligibility, camp fielded summaries, officer Merit and quartermaster availability text. Generalizing these is explicit future implementation scope, not something starter-plus-joins alone solves. Saved practice remains Union. No migration, new subsystem, runtime change or contract is adopted here.
+The read-only inventory found strict Union assumptions in campaign definition/record/snapshot validation, launch, field matching, result bridge, low-loss points, badge/enemy eligibility, camp fielded summaries, officer Merit and quartermaster availability text. Generalizing these is explicit future implementation scope, not something starter-plus-joins alone solves. Saved practice remains Union. No migration or new subsystem is adopted; the runtime changes follow the approved PLAN contract (0290).

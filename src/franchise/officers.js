@@ -12,7 +12,7 @@
 //   meritEffectText(merit, { campaign, killed, kind })   the card's one effect line ('infantry'/'cavalry' vs 'battery'/'artillery')
 //   applyMerit(scenario, save, { loan }) -> a NEW scenario: franchise brigades carry `officer` (their commander's Merit and
 //                                          record, for the battle card) and, while the Merit applies, meritRadius/meritSteady
-//   officerRows({ game, scenario })      -> the phase result's officer rows (who led each Union formation and how it ended)
+//   officerRows({ game, scenario })      -> the phase result's officer rows (who led each of the player's formations and how it ended)
 //   validateOfficerRows(rows, unitIds)   -> canonical rows (recordPhase input)
 //   recordOfficers(save, ctx)            -> { save, summary }: Merit changes, records, wounded/killed events, and took-command
 //                                          only for a successor the pack names (never inferred from a new name on a brigade)
@@ -100,7 +100,7 @@ export function applyMerit(scenario, save, { loan = false } = {}) {
 }
 
 /**
- * Who led each Union formation that took the field and how it ended: [{ unitId, name, end, event?, successor? }]. The name is
+ * Who led each formation of the player's side that took the field and how it ended: [{ unitId, name, end, event?, successor? }]. The name is
  * the pack's (the definition's commander); `event` comes from the field's commander events (game.result.officers, src/game.js);
  * `successor` only where the pack names one for him. Formations that never arrived are left out.
  */

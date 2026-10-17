@@ -234,11 +234,11 @@ const GAME_GRADES = { decisive: 'Decisive', victory: 'Victory', draw: 'Draw', de
 
 /**
  * One finished battle-pack phase: end strength of every formation (both sides, unarrived reinforcements at
- * their authored strength), the grade, held captures, whether the Union held the objective at the end (`held`, for
+ * their authored strength), the grade, held captures, whether the player's side held the objective at the end (`held`, for
  * requisition points), the deterministic loot of `awardId` and each fielded formation's feat statistics (`feats`, for
  * badges), the map replay track when a recorder was attached (`replay`, src/sim/recorder.js; null otherwise) and "you vs
  * history" (`history`, historyComparison below). Rejects an altered roster exactly like practiceOutcome. Grants nothing by
- * itself; the campaign records it. Colours the Union took (P5d; src/game.js colourReport) ride along as `colours`
+ * itself; the campaign records it. Colours the player's side took (P5d; src/game.js colourReport) ride along as `colours`
  * ([{ unitId, regiment, side, by }], only when there are any) for recordPhase's trophy shelf.
  */
 export function phaseOutcome({ game, scenario, awardId, seed }) {
@@ -285,7 +285,7 @@ function colourRows(game, side) {
   return Array.isArray(rows) ? rows.filter((r) => r && typeof r.unitId === 'string' && typeof r.regiment === 'string' && r.regiment.trim()
     && ['US', 'CS'].includes(r.side) && typeof r.by === 'string' && r.by.trim()).map((r) => ({ ...r })) : [];
 }
-/** What reached this phase's battle from camp (P5d game rules): one line per effect with the Union formations it touched. */
+/** What reached this phase's battle from camp (P5d game rules): one line per effect with the player's formations it touched. */
 function campRows(scenario, side = 'US') {
   const out = new Map();
   for (const d of [...(scenario.units || []), ...(scenario.reinforcements || [])]) {
@@ -305,7 +305,7 @@ function campRows(scenario, side = 'US') {
  * clock the phase ended at against the historical window's end, and the game's scale (men per figure, clock ratio).
  * `units` are phaseOutcome rows ({ side, menStart, men }); without them the live roster is read (unarrived formations
  * lose nothing). Display data only: it grants and records nothing. With anything to show it also carries `colours` (those the
- * player's side took this phase) and `camp` (P5d: each camp effect that reached the battle and the Union formations it touched).
+ * player's side took this phase) and `camp` (P5d: each camp effect that reached the battle and the player's formations it touched).
  */
 export function historyComparison({ game, scenario, units = null, grade = null }) {
   if (!game || !scenario) fail('a history comparison needs the finished phase.');

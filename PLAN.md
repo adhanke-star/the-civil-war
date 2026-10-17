@@ -4,6 +4,7 @@ STATUS 2026-10-17: v5 RELEASED (tag v5=b657362; own CI39038318606 all nine; imag
 Remote main=71ae410 (research/status docs only after b657; own CI39040575109 all nine), Pages39044236896 green, live HTTP200.
 0274 CLOSED; 0278 worker cancellation and the separate intermittent music cancellation remain OPEN. No causal fix claimed.
 Aaron's hands-on play of sandbox, Confederate phase and officer cards UNRUN.
+v6 phase A: reviewed 2026-10-17 (0291): no behaviour defect; offline upgrade control fixed; test-confederate 11/11 both modes. Accepted only on all-nine own-SHA CI. B and C not started.
 
 v6 CONTRACT — CONFEDERATE FRANCHISE (Codex, 2026-10-17; Aaron APPROVED by scope popup)
 

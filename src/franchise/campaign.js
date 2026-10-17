@@ -211,7 +211,7 @@ export function applyCampaign(scenario, save, phase) {
     return d;
   };
   // Camp (P5c): the morale the march out of camp set for this phase attempt (franchise brigades off loan) and the decision
-  // cards chosen for it (every Union formation on the field). Only the definition's `morale` carries it (src/units/unit.js).
+  // cards chosen for it (every formation of the player's side on the field). Only the definition's `morale` carries it (src/units/unit.js).
   const ready = !loan && s.ready && s.ready.awardId === phase.awardId ? s.ready.morale : {};
   const decided = (s.decisions || []).filter((r) => r.awardId === phase.awardId)
     .reduce((n, r) => n + r.effects.filter((e) => e.kind === 'morale').reduce((m, e) => m + e.amount, 0), 0);
@@ -367,9 +367,10 @@ export function recordPhase(save, campaign, result) {
 /** The reward bridge for one campaign phase: phaseOutcome's survivors, grade and loot as recordPhase input. */
 export function phaseResult({ phase, game, scenario }) {
   if (!phase || typeof phase.awardId !== 'string') fail('a phase result needs the launched phase.');
-  if ((phase.side || 'US') !== game?.playerSide) fail('the result commands another side.');
+  // A missing or unfinished game keeps phaseOutcome's own message; only a real game of the other side is a side error.
+  if (game && typeof game === 'object' && (phase.side || 'US') !== game.playerSide) fail('the result commands another side.');
   const outcome = phaseOutcome({ game, scenario, awardId: phase.awardId, seed: phase.seed });
-  const officers = phase.loan ? [] : officerRows({ game, scenario }); // who led each Union formation, from the pack's names
+  const officers = phase.loan ? [] : officerRows({ game, scenario }); // who led each of the player's formations, from the pack's names
   return { outcome, record: { packId: phase.packId, phaseId: phase.phaseId, awardId: phase.awardId, winner: outcome.winner,
     grade: outcome.grade, held: outcome.held === true, units: outcome.units.map((u) => ({ ...u })), loot: outcome.cards.map((c) => ({ ...c })),
     ...(outcome.feats ? { feats: Object.fromEntries(Object.entries(outcome.feats).map(([id, f]) => [id, { ...f }])) } : {}),
